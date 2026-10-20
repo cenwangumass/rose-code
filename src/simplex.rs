@@ -175,6 +175,10 @@ struct Solver<'a> {
     /// Persistent pricing candidate list and its bucket level (see `bucket`).
     level: usize,
     list: Vec<usize>,
+    /// Feasibility class (-1 below, 1 above, 0 inside) of each basic variable at the last phase 1 cost evaluation.
+    p1_prev: Vec<(usize, i8)>,
+    /// Variable that left the basis in the last pivot.
+    leave_prev: Option<usize>,
     /// Structural columns of each row, ascending.
     rows: Vec<Vec<usize>>,
     /// Mirror of the reference's FTRAN structure (`faithful_ftran`).
@@ -399,6 +403,13 @@ const PHASE1_M: f64 = 1e6;
 const W_MIN: f64 = 1e-6;
 
 impl<'a> Solver<'a> {
+    fn sig(&self) -> Vec<i8> {
+        let (p, tol) = (self.p, self.opts.feasibility_tol);
+        self.basic.iter().map(|&j| {
+            if !is_inf(p.lo[j]) && self.x[j] < p.lo[j] - tol { -1 } else if !is_inf(p.up[j]) && self.x[j] > p.up[j] + tol { 1 } else { 0 }
+        }).collect()
+    }
+
     fn has_infeasible_basic(&self) -> bool {
         let tol = self.opts.feasibility_tol;
         self.basic.iter().any(|&j| {
@@ -431,8 +442,6 @@ impl<'a> Solver<'a> {
         for j in 0..p.n + p.m {
             self.d[j] = if self.pos_of[j] == NONE { (if pure { 0.0 } else { p.cost[j] }) - dot(&p.cols[j], &y) } else { 0.0 };
         }
-        self.list.clear();
-        self.level = 0;
         y
     }
 }
@@ -824,6 +833,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         refactorizations: 1,
         level: 0,
         list: Vec::new(),
+        p1_prev: Vec::new(),
+        leave_prev: None,
         rows: Vec::new(),
         mirror: None,
     };
@@ -864,8 +875,27 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         }
         let infeasible = s.has_infeasible_basic();
         if infeasible {
+            let was = phase1;
             phase1 = true;
-            s.composite_dual(false);
+            if was && !due {
+                // The reference corrects `d` in place when basic variables change feasibility class and re-scores only
+                // the columns whose `d` moved (the leaving variable's own penalty shift never touches the list).
+                let old_d = s.d.clone();
+                let cls = s.sig();
+                let cost_changed = s.p1_prev.iter().any(|&(j, c)| s.pos_of[j] != NONE && cls[s.pos_of[j]] != c);
+                s.composite_dual(false);
+                let tol = s.opts.optimality_tol;
+                let lp = s.leave_prev;
+                let delta: Vec<usize> = (0..s.d.len()).filter(|&j| Some(j) != lp && (s.d[j] - old_d[j]).abs() > tol).collect();
+                if cost_changed && !delta.is_empty() {
+                    s.update_list(&delta);
+                }
+            } else {
+                s.composite_dual(false);
+                s.list.clear();
+                s.level = 0;
+            }
+            s.p1_prev = s.basic.iter().zip(s.sig()).map(|(&j, c)| (j, c)).collect();
         } else if phase1 {
             // Back in a feasible region: continue with the true costs (weights and framework are kept).
             phase1 = false;
@@ -884,6 +914,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                     // No improving column for the penalised cost: try the pure sum of infeasibilities, which either
                     // continues the search or proves infeasibility with the multipliers as certificate.
                     let y = s.composite_dual(true);
+                    s.list.clear();
+                    s.level = 0;
                     match s.price() {
                         Some(q) => q,
                         None => {
@@ -1027,6 +1059,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             mi.update(r);
         }
         changed.push(leave);
+        s.leave_prev = Some(leave);
         let changed = s.pivot_row_order(&rho, &changed);
         s.update_list(&changed);
         if opts.record_trace {

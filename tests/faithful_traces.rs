@@ -1,4 +1,4 @@
-//! BLEND and SC50A (controlled profile) reproduce every reference decision when the reference's basis position order,
+//! BLEND, SC50A and BORE3D (controlled profile) reproduce every reference decision when the reference's basis position order,
 //! refactor iterations, Devex weights and sparse FTRAN output order are all mirrored (`faithful_*`).
 
 use rose::{mps, solve, Basis, SolveOptions, Status};
@@ -41,6 +41,11 @@ fn check(mps_name: &str, decisions: &str, objective: f64) {
 #[test]
 fn blend_matches_all_reference_decisions() {
     check("blend.mps", "blend-controlled.decisions.json", -30.812149845828216);
+}
+
+#[test]
+fn bore3d_matches_all_reference_decisions() {
+    check("bore3d.mps", "bore3d-controlled.decisions.json", 1373.0803942085);
 }
 
 #[test]
