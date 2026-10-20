@@ -252,6 +252,39 @@ impl RefStruct {
         }
     }
 
+    /// Swap `r` (sitting in slot `hole`) up the dependency walk starting at slot `cur` (the loop at module offset 0xf2f7d of the
+    /// reference update); when a column's list is as long as the distance to the hole the rest of the range shifts down instead.
+    fn walk(&mut self, r: usize, hole: usize, mut cur: usize) {
+        let _ = r;
+        while cur != hole {
+            let pos = self.at[cur];
+            if self.a[pos].len() + self.b[pos].len() >= cur - hole {
+                let occ = self.at[hole];
+                for t in hole..cur {
+                    self.at[t] = self.at[t + 1];
+                    let p = self.at[t];
+                    self.slot[p] = t;
+                }
+                self.at[cur] = occ;
+                self.slot[occ] = cur;
+                break;
+            }
+            let mut nxt = hole;
+            for &x in &self.a[pos] {
+                let sx = self.slot[x];
+                if sx > hole && sx < cur && sx > nxt {
+                    nxt = sx;
+                }
+            }
+            let occ = self.at[hole];
+            self.at[hole] = pos;
+            self.at[cur] = occ;
+            self.slot[pos] = hole;
+            self.slot[occ] = cur;
+            cur = nxt;
+        }
+    }
+
     /// Replace the column at position `r` by the entering column whose L-stage list is `spike`.
     pub fn update(&mut self, r: usize, spike: &[usize]) {
         let m = self.m;
@@ -269,8 +302,9 @@ impl RefStruct {
         }
         let old = self.kind[r];
         let mut convslot: Option<usize> = None;
+        let mut conv: Option<usize> = None;
         if old != -2 {
-            let conv = (0..m).filter(|&x| self.kind[x] == -2 && self.a[x].is_empty() && self.b[x].is_empty()).max_by_key(|&x| self.slot[x]);
+            conv = (0..m).filter(|&x| self.kind[x] == -2 && self.a[x].is_empty() && self.b[x].is_empty()).max_by_key(|&x| self.slot[x]);
             if let Some(x) = conv {
                 convslot = Some(self.slot[x]);
                 self.kind[x] = self.nuc.len() as i64;
@@ -313,54 +347,41 @@ impl RefStruct {
         let av: Vec<usize> = sp.iter().copied().filter(|&x| self.kind[x] == -2).collect();
         let bv: Vec<usize> = sp.iter().copied().filter(|&x| self.kind[x] >= 0).collect();
         let oldslot = self.slot[r];
-        let mut tail: Vec<usize> = (0..m).filter(|&p| self.kind[p] == -2 && p != r).collect();
-        tail.sort_unstable_by_key(|&p| self.slot[p]);
         let top: i64 = av.iter().map(|&x| self.slot[x] as i64).max().unwrap_or(-1);
         let mut moved = true;
-        let idx = if old == -2 {
-            if top < oldslot as i64 {
+        let mut tail_rebuild = false;
+        if old == -2 {
+            if top >= oldslot as i64 {
+                self.walk(r, oldslot, top as usize);
+            } else {
                 moved = false;
-                tail.iter().filter(|&&p| self.slot[p] < oldslot).count()
-            } else {
-                tail.iter().filter(|&&p| (self.slot[p] as i64) <= top).count()
             }
-        } else if matches!(convslot, Some(cs) if top < cs as i64) {
-            let cs = convslot.unwrap();
-            tail.iter().filter(|&&p| self.slot[p] < cs).count()
-        } else if !av.is_empty() {
-            tail.iter().filter(|&&p| (self.slot[p] as i64) <= top).count()
+        } else if let Some(cs) = convslot {
+            // the demoted column fills r's old slot; r takes the vacated tail slot and walks up from the highest spike entry
+            let x = conv.unwrap();
+            self.slot[x] = oldslot;
+            self.at[oldslot] = x;
+            self.slot[r] = cs;
+            self.at[cs] = r;
+            if top > cs as i64 {
+                self.walk(r, cs, top as usize);
+            }
         } else {
-            0
-        };
-        tail.insert(idx, r);
-        let i21n = m - tail.len();
-        let mut in_tail = vec![false; m];
-        for &p in &tail {
-            in_tail[p] = true;
-        }
-        let mut taken = vec![false; i21n];
-        let mut misplaced: Vec<usize> = Vec::new();
-        for p in 0..m {
-            if in_tail[p] {
-                continue;
+            // the tail grows by one slot: the occupant of the last non-tail slot fills r's old slot, r takes the new bottom slot
+            let bt = self.i21 - 1;
+            let q = self.at[bt];
+            if q != r {
+                self.slot[q] = oldslot;
+                self.at[oldslot] = q;
             }
-            if self.slot[p] < i21n {
-                taken[self.slot[p]] = true;
-            } else {
-                misplaced.push(p);
+            self.slot[r] = bt;
+            self.at[bt] = r;
+            self.i21 = bt;
+            if !av.is_empty() {
+                self.walk(r, bt, top as usize);
             }
         }
-        misplaced.sort_unstable_by_key(|&p| self.slot[p]);
-        let holes: Vec<usize> = (0..i21n).filter(|&t| !taken[t]).collect();
-        for (&p, &t) in misplaced.iter().zip(holes.iter()) {
-            self.slot[p] = t;
-            self.at[t] = p;
-        }
-        self.i21 = i21n;
-        for (s, &p) in tail.iter().enumerate() {
-            self.slot[p] = i21n + s;
-            self.at[i21n + s] = p;
-        }
+        let _ = &mut tail_rebuild;
         self.kind[r] = -2;
         let keep = (old != -2 && av.is_empty()) || (old == -2 && !moved);
         let mut elim: Vec<usize> = Vec::new();
@@ -384,6 +405,22 @@ impl RefStruct {
             }
         }
         if !elim.is_empty() {
+            // the eta covers the transitive holders: lists are not closed after earlier updates
+            let mut seen = vec![false; m];
+            seen[r] = true;
+            for &k in &elim {
+                seen[k] = true;
+            }
+            let mut todo = elim.clone();
+            while let Some(x) = todo.pop() {
+                for k in 0..m {
+                    if !seen[k] && self.kind[k] == -2 && (self.a[k].contains(&x) || self.b[k].contains(&x)) {
+                        seen[k] = true;
+                        todo.push(k);
+                        elim.push(k);
+                    }
+                }
+            }
             let mut ind = vec![r];
             ind.extend(elim);
             self.etas.push((r, ind));

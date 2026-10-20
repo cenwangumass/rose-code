@@ -752,7 +752,8 @@ fn ratio_test(
         for &(k, r) in &cands {
             if r <= theta {
                 let w = entries[k].1.abs();
-                if best_w < w {
+                let better = best_w < w;
+                if better {
                     best_w = w;
                     chosen = k;
                     step = r;
@@ -928,6 +929,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             }
             _ => (0..m).filter(|&i| alpha[i].abs() > 1e-14).map(|i| (i, dir * alpha[i])).collect(),
         };
+        if std::env::var_os("ROSE_ENTRIES").is_some() {
+            let e: Vec<String> = entries.iter().map(|&(i, a)| format!("{}:{}:{:e}", i, s.basic[i], a)).collect();
+            eprintln!("ENTRIES iter {iterations} q {q} [{}]", e.join(" "));
+        }
         let own = if !is_inf(p.lo[q]) && !is_inf(p.up[q]) { p.up[q] - p.lo[q] } else { INF };
         let mut leave_to_upper: Option<bool> = None;
         let (chosen, mut step, _pivot) = if infeasible {
