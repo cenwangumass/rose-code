@@ -436,6 +436,7 @@ impl RefStruct {
             (out, n)
         } else {
             let q = self.kahn(&start);
+            let x0 = x.clone();
             for &v in &q {
                 let xv = x[v];
                 if xv == 0.0 {
@@ -452,7 +453,23 @@ impl RefStruct {
                 eprintln!("WARN partial L solve (0x12a990 third strategy) not modelled");
             }
             e = (((self.nnz_l + m) as f64 + m as f64 + m as f64) * 7.0 * count_l as f64) / (m + 1) as f64 + e;
-            (q, count_l)
+            if m >= 250 && count_l * self.dthr > m {
+                // The reference's result is then dense and equals an ascending scan (PILOT4 call 219); the switch condition is
+                // inferred from the data, not read from `0x12a990`.
+                x = x0;
+                for v in 0..self.m {
+                    let xv = x[v];
+                    if xv.abs() <= TOL {
+                        continue;
+                    }
+                    for (e, &y) in self.lcols[v].iter().enumerate() {
+                        x[y] -= self.lvals[v][e] * xv;
+                    }
+                }
+                ((0..self.m).collect(), count_l)
+            } else {
+                (q, count_l)
+            }
         };
         let mut have = vec![false; self.m];
         for &v in &order {
