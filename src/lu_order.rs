@@ -8,7 +8,20 @@ const ABS_TOL: f64 = 1e-13;
 
 /// `cols[pos] = (is_slack, rows, values)` in incoming basis-position order. Returns `(row, pos)` per pivot step.
 pub fn pivot_order(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Vec<(usize, usize)> {
-    let mut seq = phases(m, cols);
+    factor_structure(m, cols).pivots
+}
+
+/// The pivot sequence together with what the sparse FTRAN model needs (`crate::ftran_order`): the singleton phase of each step
+/// (1..=4, 0 for the Markowitz nucleus) and the L column of each step as row indices in chain order.
+pub struct Structure {
+    pub pivots: Vec<(usize, usize)>,
+    pub phase: Vec<u8>,
+    pub l_rows: Vec<Vec<usize>>,
+}
+
+pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Structure {
+    let (mut seq, mut phase) = phases(m, cols);
+    let nsing = seq.len();
     let done_r: HashSet<usize> = seq.iter().map(|&(r, _)| r).collect();
     let done_c: HashSet<usize> = seq.iter().map(|&(_, c)| c).collect();
     let mut nuc: Vec<(usize, Vec<(usize, f64)>)> = Vec::new();
@@ -20,11 +33,22 @@ pub fn pivot_order(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Vec<(usiz
         d.reverse();
         nuc.push((pos, d));
     }
-    seq.extend(nucleus(m, &nuc));
-    seq
+    let (np, nl) = nucleus(m, &nuc);
+    seq.extend(np);
+    phase.resize(seq.len(), 0);
+    let mut step = vec![usize::MAX; m];
+    for (s, &(r, _)) in seq.iter().enumerate() {
+        step[r] = s;
+    }
+    let mut l_rows: Vec<Vec<usize>> = Vec::with_capacity(seq.len());
+    for (s, &(_, c)) in seq.iter().enumerate().take(nsing) {
+        l_rows.push(cols[c].1.iter().copied().filter(|&i| step[i] > s).collect());
+    }
+    l_rows.extend(nl);
+    Structure { pivots: seq, phase, l_rows }
 }
 
-fn phases(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Vec<(usize, usize)> {
+fn phases(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> (Vec<(usize, usize)>, Vec<u8>) {
     let n = cols.len();
     let mut rc = vec![0usize; m];
     for (is_slack, idx, _) in cols {
@@ -39,11 +63,14 @@ fn phases(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Vec<(usize, usize)
     let mut row_done = vec![false; m];
     let mut col_done = vec![false; n];
     let mut seq = Vec::with_capacity(m);
+    let mut phase: Vec<u8> = Vec::with_capacity(m);
+    let mut ph = 1u8;
     macro_rules! pivot {
         ($i:expr, $p:expr) => {{
             row_done[$i] = true;
             col_done[$p] = true;
             seq.push(($i, $p));
+            phase.push(ph);
         }};
     }
     // Phase 1: rows with one structural column and no slack, LIFO stack.
@@ -65,6 +92,7 @@ fn phases(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Vec<(usize, usize)
         }
     }
     // Phase 2: slack columns whose row has only the slack left.
+    ph = 2;
     for pos in 0..n {
         if col_done[pos] || !cols[pos].0 {
             continue;
@@ -76,6 +104,7 @@ fn phases(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Vec<(usize, usize)
         }
     }
     // Phase 3: one ascending pass.
+    ph = 3;
     for pos in 0..n {
         if col_done[pos] {
             continue;
@@ -96,6 +125,7 @@ fn phases(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Vec<(usize, usize)
         }
     }
     // Phase 4: column singletons over the unassigned rows.
+    ph = 4;
     let mut cnt = vec![0i64; n];
     let mut rowcols: Vec<Vec<usize>> = vec![Vec::new(); m];
     for (pos, (_, idx, _)) in cols.iter().enumerate() {
@@ -123,7 +153,7 @@ fn phases(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Vec<(usize, usize)
             }
         }
     }
-    seq
+    (seq, phase)
 }
 
 struct Node {
@@ -198,7 +228,7 @@ impl Nucleus {
 }
 
 /// `cols`: (position, entries (row, value) in column-chain order). Rows and positions are the global indices of the basis.
-fn nucleus(m: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> Vec<(usize, usize)> {
+fn nucleus(m: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> (Vec<(usize, usize)>, Vec<Vec<usize>>) {
     let npos = cols.iter().map(|c| c.0 + 1).max().unwrap_or(0);
     let mut s = Nucleus {
         nodes: Vec::new(),
@@ -241,6 +271,7 @@ fn nucleus(m: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> Vec<(usize, usize)>
         s.rins(r);
     }
     let mut out = Vec::new();
+    let mut lout: Vec<Vec<usize>> = Vec::new();
     let mut prows: HashSet<usize> = HashSet::new();
     let mut pcols: HashSet<usize> = HashSet::new();
     let mut remaining = ckeys.len();
@@ -300,6 +331,7 @@ fn nucleus(m: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> Vec<(usize, usize)>
         let pcol: Vec<usize> = s.colchain[pc].iter().copied().filter(|&i| s.nodes[i].r != pr).collect();
         let u: Vec<(usize, f64)> = prow.iter().map(|&i| (s.nodes[i].c, s.nodes[i].v)).collect();
         let l: Vec<(usize, f64)> = pcol.iter().map(|&i| (s.nodes[i].r, s.nodes[i].v / pv)).collect();
+        lout.push(l.iter().map(|x| x.0).collect());
         let col_ids: Vec<usize> = s.colchain[pc].clone();
         let row_ids: Vec<usize> = s.rowchain[pr].clone();
         if s_col < s_row {
@@ -407,7 +439,7 @@ fn nucleus(m: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> Vec<(usize, usize)>
             }
         }
     }
-    out
+    (out, lout)
 }
 
 /// Markowitz search over the count buckets; returns the node of the chosen pivot (rotating bucket heads as the reference does).
