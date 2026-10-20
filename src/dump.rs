@@ -15,6 +15,7 @@ pub const KINDS: &[(&str, &str, &str)] = &[
     ("dual", "BTY", "dual BTRAN after a factorization, in output order"),
     ("ord", "ORD", "pivot-row input list and changed columns per pivot (CORD for the cost-change pass)"),
     ("xb", "XB", "right-hand side and x_B of the basic-solution recompute"),
+    ("fstruct", "FSTRUCT", "U-factor structure (kinds, nucleus list, tail start, slots) before each column replacement"),
     ("ent", "ENT", "phase 1 ratio-test inputs: the signed FTRAN list, and distance, range and type per basis position"),
 ];
 

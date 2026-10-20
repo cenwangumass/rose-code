@@ -1361,6 +1361,11 @@ impl RefStruct {
     /// Replace the column at position `r` by the entering column of the last `ftran`.
     pub fn update(&mut self, r: usize) {
         let m = self.m;
+        if crate::dump::on("fstruct") {
+            static CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+            let n = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            crate::dump::emit("fstruct", serde_json::json!({"n": n, "m": m, "i3": self.nuc.len(), "i21": self.i21, "kind": self.kind, "nuc": self.nuc, "seqA": self.slot}));
+        }
         self.upd += 1;
         self.upd_work.clear();
         // The eta is stored first, at the current pool fill; its value array sits on a 16-byte boundary when the fill is even.
