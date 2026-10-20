@@ -1400,9 +1400,8 @@ impl RefStruct {
         if let Some(i) = sp.iter().position(|&x| x == r) {
             // The reference keeps the spike as a tail group and a nucleus group; the leaving column is deleted from the nucleus
             // group by moving that group's last entry into its place.
-            let j = sp.iter().rposition(|&x| x == r || self.kind[x] != -2).unwrap();
-            let last = sp.remove(j);
-            if j != i {
+            let last = sp.pop().unwrap();
+            if last != r {
                 sp[i] = last;
             }
         }
