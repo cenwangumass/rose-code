@@ -1551,7 +1551,15 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 let dims = s.mirror.as_ref().map(|mi| mi.dims());
                 let kinds = s.mirror.as_ref().map(|mi| mi.kinds().to_vec());
                 let bl = s.mirror.as_ref().map(|mi| mi.blists().to_vec()).unwrap_or_default();
-                eprintln!("ENT {{\"bl\":{:?},\"kinds\":{:?},\"dims\":{:?},\"iter\":{iterations},\"q\":{q},\"own\":{own:e},\"idx\":{:?},\"val\":{:?}}}", bl, kinds.unwrap_or_default(), dims, entries.iter().map(|e| e.0).collect::<Vec<_>>(), entries.iter().map(|e| e.1).collect::<Vec<_>>());
+                // Per basis position, as the reference's ratio-test arrays: distance, range (null when infinite) and type
+                // letter. A free variable has no class; the dump gives it type 'F' and its value as the distance.
+                let cls: Vec<_> = (0..m).map(&info).collect();
+                let dist: Vec<f64> = cls.iter().enumerate().map(|(pos, c)| c.map_or(xs[basic[pos]], |c| c.0)).collect();
+                let rng: Vec<Option<f64>> = cls.iter().map(|c| c.and_then(|c| (c.1 < INF).then_some(c.1))).collect();
+                let typ: String = cls.iter().map(|c| c.map_or('F', |c| c.2 as char)).collect();
+                crate::dump::emit("ent", serde_json::json!({"iter": iterations, "q": q, "own": (own < INF).then_some(own),
+                    "idx": entries.iter().map(|e| e.0).collect::<Vec<_>>(), "val": entries.iter().map(|e| e.1).collect::<Vec<_>>(),
+                    "d": dist, "rng": rng, "typ": typ, "dense": ft_dense, "bl": bl, "kinds": kinds, "dims": dims}));
             }
             let mut passes = Vec::new();
             let pick = phase1_ratio(tol, opts.pivot_tol, own, &entries, &info, &mut passes, ft_dense);
