@@ -65,6 +65,9 @@ pub struct RefStruct {
     h33: f64,
     h34: f64,
     lev_dense: bool,
+    /// The factor's longest L path is at least `0.1 m` (`m >= 250`), whatever the strategy gate: the reference's L stage then
+    /// hands on a dense vector (count -1) and the dense U routine runs.
+    lev_dense_ft: bool,
     last_dense: bool,
     /// Whether the most recent `btran` returned a dense result (count `-1`): its L^T solve ran dense.
     pub bt_dense: bool,
@@ -258,11 +261,12 @@ impl RefStruct {
             if (m as f64) > t { t as usize } else { m }
         };
         let mut lev_dense = false;
+        let mut lev_dense_ft = false;
         let levels = {
             let d = m - nseq;
             let nnz_tail: usize = lcols[nseq..].iter().map(|c| c.len()).sum();
             let outer = d < 6 || 10 * d * d <= m || nnz_tail <= 10 * d;
-            if m >= 250 && outer {
+            if m >= 250 {
                 let mut lev = vec![0usize; m];
                 for v in 0..m {
                     for &y in &lcols[v] {
@@ -270,8 +274,9 @@ impl RefStruct {
                     }
                 }
                 let maxlev = lev.iter().copied().max().unwrap_or(0);
-                lev_dense = (maxlev as f64) >= 0.1 * m as f64;
-                if !lev_dense { Some(lev) } else { None }
+                lev_dense_ft = (maxlev as f64) >= 0.1 * m as f64;
+                lev_dense = lev_dense_ft && outer;
+                if !lev_dense_ft && outer { Some(lev) } else { None }
             } else {
                 None
             }
@@ -305,6 +310,7 @@ impl RefStruct {
             h33,
             h34,
             lev_dense,
+            lev_dense_ft,
             last_dense: false,
             bt_dense: false,
             m,
@@ -578,13 +584,18 @@ impl RefStruct {
             }
         }
         tail.sort_unstable_by_key(|&p| std::cmp::Reverse(self.slot[p]));
+        // The dense U routine (`0x121ef0`) tests the raw value first; the sparse one (`0x1223e0`, at `0x12297b`) only the quotient.
+        let u_dense = rows.len() * self.dthr > m
+            || (!self.etas.is_empty() && count_l * self.dthr > m)
+            || !(self.nuc.len() + spike.len() < self.i21 || self.dens * (spike.len() as f64) < 2.0 * m as f64)
+            || self.lev_dense_ft;
         for &c in &tail {
-            let xc = x[c];
-            if xc.abs() <= TOL {
+            let mut xc = x[c];
+            if u_dense && xc.abs() <= TOL {
                 x[c] = 0.0;
                 continue;
             }
-            let xc = xc / self.diag[c];
+            xc /= self.diag[c];
             if xc.abs() <= TOL {
                 x[c] = 0.0;
                 continue;
@@ -609,7 +620,7 @@ impl RefStruct {
         let vec_dense = rows.len() * self.dthr > m || (!self.etas.is_empty() && count_l * self.dthr > m);
         self.work = self.u_work(&inp, &x, !dense, if vec_dense { None } else { Some(spike.len()) }) + e_l;
         self.last_dense = dense;
-        let ord = if dense { (0..m).collect() } else { self.uorder(&inp, &x) };
+        let ord = if dense || u_dense { (0..m).collect() } else { self.uorder(&inp, &x) };
         let mut out: Vec<(usize, f64)> = Vec::new();
         let mut done = vec![false; m];
         for &p in &ord {
