@@ -43,7 +43,7 @@ pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Stru
         nuc.push((pos, d));
     }
     let nuc_nnz = nuc.iter().map(|c| c.1.len()).sum();
-    let (np, nl, nv, npiv, nu, nuc_work) = nucleus(m, &nuc);
+    let (np, nl, nv, npiv, nu, nuc_work) = nucleus(m, cols.iter().map(|c| c.1.len()).sum(), &nuc);
     seq.extend(np);
     phase.resize(seq.len(), 0);
     let mut step = vec![usize::MAX; m];
@@ -282,7 +282,7 @@ impl Nucleus {
 /// `cols`: (position, entries (row, value) in column-chain order). Rows and positions are the global indices of the basis.
 type NucleusOut = (Vec<(usize, usize)>, Vec<Vec<usize>>, Vec<Vec<f64>>, Vec<f64>, Vec<Vec<(usize, f64)>>, f64);
 
-fn nucleus(m: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> NucleusOut {
+fn nucleus(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> NucleusOut {
     let npos = cols.iter().map(|c| c.0 + 1).max().unwrap_or(0);
     let mut s = Nucleus {
         nodes: Vec::new(),
@@ -332,8 +332,80 @@ fn nucleus(m: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> NucleusOut {
     let mut prows: HashSet<usize> = HashSet::new();
     let mut pcols: HashSet<usize> = HashSet::new();
     let mut remaining = ckeys.len();
+    // The reference's hand-off test (`0xd6736`): a nonzero estimate that starts at the nonzeros of the basis matrix and grows by
+    // `(r - 2)(c - 2) - 2` per pivot, with row and column counts `r`, `c` of the pivot; past the gate it is replaced by the exact count.
+    let mut z = nnz_b as f64;
+    let mut gated_at = usize::MAX;
     let mut work = 0.0;
     while remaining > 0 {
+        if gated_at != remaining {
+            gated_at = remaining;
+            let n = remaining as f64;
+            if remaining > 50 && z > 0.36 * n * n && n * n > 4.0 * m as f64 && m as f64 + n * n < 2e9 {
+                let exact: usize = ckeys.iter().filter(|c| !pcols.contains(c)).map(|&c| s.ccnt[c]).sum();
+                z = exact as f64;
+                if z > 0.325 * n * n && !s.building {
+                    // Hand the active matrix to the dense LU: rows by index, columns in ascending bucket order. (Rows in bucket order
+                    // reproduce the reference's pivots but not the parity of its vectorised dot products.)
+                    let mut rows: Vec<usize> = Vec::new();
+                    for k in 0..s.rb.len() {
+                        if k == 0 {
+                            for &r in s.rst.iter().rev() {
+                                if !prows.contains(&r) && s.rcnt[r] == 1 && !rows.contains(&r) {
+                                    rows.push(r);
+                                }
+                            }
+                        } else {
+                            rows.extend(s.rb[k].iter().copied());
+                        }
+                    }
+                    let mut cols_a: Vec<usize> = Vec::new();
+                    for k in 0..s.cb.len() {
+                        if k == 0 {
+                            for &c in s.cst.iter().rev() {
+                                if !pcols.contains(&c) && s.ccnt[c] == 1 && !cols_a.contains(&c) {
+                                    cols_a.push(c);
+                                }
+                            }
+                        } else {
+                            cols_a.extend(s.cb[k].iter().copied());
+                        }
+                    }
+                    rows.sort_unstable();
+                    let nn = remaining;
+                    if rows.len() == nn && cols_a.len() == nn {
+                        let mut a = vec![vec![0.0f64; nn]; nn];
+                        let rpos: std::collections::HashMap<usize, usize> = rows.iter().enumerate().map(|(i, &r)| (r, i)).collect();
+                        for (cj, &c) in cols_a.iter().enumerate() {
+                            for &id in &s.colchain[c] {
+                                let nd = &s.nodes[id];
+                                if nd.alive {
+                                    a[rpos[&nd.r]][cj] = nd.v;
+                                }
+                            }
+                        }
+                        let perm = dense_lu(&mut a, DENSE_BASE);
+                        for k in 0..nn {
+                            let piv = a[k][k];
+                            out.push((rows[perm[k]], cols_a[k]));
+                            let mut lr = Vec::new();
+                            let mut lv = Vec::new();
+                            for i in k + 1..nn {
+                                if a[i][k].abs() > ABS_TOL {
+                                    lr.push(rows[perm[i]]);
+                                    lv.push(a[i][k]);
+                                }
+                            }
+                            lout.push(lr);
+                            lvout.push(lv);
+                            pout.push(piv);
+                            uout.push((k + 1..nn).filter(|&j| a[k][j] != 0.0).map(|j| (cols_a[j], a[k][j])).collect());
+                        }
+                        return (out, lout, lvout, pout, uout, work);
+                    }
+                }
+            }
+        }
         let mut sing: Option<usize> = None;
         // Whether the singleton is a column singleton (true) or a row singleton.
         let mut sing_kind: Option<bool> = None;
@@ -383,6 +455,7 @@ fn nucleus(m: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> NucleusOut {
             },
         };
         let (pr, pc, pv) = (s.nodes[best].r, s.nodes[best].c, s.nodes[best].v);
+        z += (s.rcnt[pr] as f64 - 2.0) * (s.ccnt[pc] as f64 - 2.0) - 2.0;
         out.push((pr, pc));
         remaining -= 1;
         prows.insert(pr);
@@ -602,4 +675,114 @@ fn search(s: &mut Nucleus) -> Option<(usize, f64)> {
         k += 1;
     }
     best.map(|b| (b, count as f64 * last_bound))
+}
+
+/// Alignment parity of the reference's dense work array (row strides are in doubles), which fixes how its vectorised dot products peel.
+const DENSE_BASE: usize = 1;
+
+fn dot_lanes<const W: usize>(mut acc: f64, a: &[f64], b: &[f64], peel: usize) -> f64 {
+    let len = a.len();
+    if len < peel + W || len < 2 {
+        for t in 0..len {
+            acc -= a[t] * b[t];
+        }
+        return acc;
+    }
+    let end = len - ((len - peel) % W);
+    for t in 0..peel {
+        acc -= a[t] * b[t];
+    }
+    let mut ln = [0.0f64; W];
+    ln[0] = acc;
+    let mut t = peel;
+    while t < end {
+        for q in 0..W {
+            ln[q] -= a[t + q] * b[t + q];
+        }
+        t += W;
+    }
+    let r = if W == 2 {
+        ln[0] + ln[1]
+    } else {
+        let mut ev = ln[0];
+        let mut od = ln[1];
+        for q in (2..W).step_by(2) {
+            ev += ln[q];
+            od += ln[q + 1];
+        }
+        ev + od
+    };
+    let mut acc = r;
+    for t in end..len {
+        acc -= a[t] * b[t];
+    }
+    acc
+}
+
+/// The reference's dense LU on `a[row][col]` (`0xdd1b2`): column blocks of four with partial pivoting over the rows, the dot
+/// products of the block updates split in two lanes and those of the leftover columns in eight. Returns the row permutation.
+fn dense_lu(a: &mut [Vec<f64>], base: usize) -> Vec<usize> {
+    let n = a.len();
+    let mut perm: Vec<usize> = (0..n).collect();
+    let nb = n / 4 * 4;
+    let peel = |i: usize| (base + i * n) & 1;
+    let pick = |a: &[Vec<f64>], k: usize| {
+        let mut p = k;
+        for i in k + 1..n {
+            if a[i][k].abs() > a[p][k].abs() {
+                p = i;
+            }
+        }
+        p
+    };
+    for j0 in (0..nb).step_by(4) {
+        for i in 1..j0 {
+            for c in j0..j0 + 4 {
+                let col: Vec<f64> = (0..i).map(|t| a[t][c]).collect();
+                a[i][c] = dot_lanes::<2>(a[i][c], &a[i][..i], &col, peel(i));
+            }
+        }
+        for i in j0..n {
+            for c in j0..j0 + 4 {
+                let col: Vec<f64> = (0..j0).map(|t| a[t][c]).collect();
+                a[i][c] = dot_lanes::<2>(a[i][c], &a[i][..j0], &col, peel(i));
+            }
+        }
+        for k in j0..j0 + 4 {
+            let p = pick(a, k);
+            if p != k {
+                a.swap(p, k);
+                perm.swap(p, k);
+            }
+            let piv = a[k][k];
+            for i in k + 1..n {
+                let l = a[i][k] / piv;
+                a[i][k] = l;
+                for c in k + 1..j0 + 4 {
+                    let u = a[k][c];
+                    a[i][c] -= l * u;
+                }
+            }
+        }
+    }
+    for k in nb..n {
+        for i in 1..k {
+            let col: Vec<f64> = (0..i).map(|t| a[t][k]).collect();
+            a[i][k] = dot_lanes::<8>(a[i][k], &a[i][..i], &col, peel(i));
+        }
+        for i in k..n {
+            let col: Vec<f64> = (0..k).map(|t| a[t][k]).collect();
+            a[i][k] = dot_lanes::<8>(a[i][k], &a[i][..k], &col, peel(i));
+        }
+        let p = pick(a, k);
+        if p != k {
+            a.swap(p, k);
+            perm.swap(p, k);
+        }
+        let piv = a[k][k];
+        for i in k + 1..n {
+            a[i][k] /= piv;
+        }
+    }
+    perm
 }

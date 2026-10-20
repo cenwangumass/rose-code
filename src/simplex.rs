@@ -576,6 +576,34 @@ impl<'a> Solver<'a> {
             let est = mi.ftran_dense_work(&r);
             self.work.add_from(0x1219d6, 0x120673, est, crate::work::FAC);
         }
+        if let Some(mi) = self.mirror.as_mut() {
+            // The reference's FTRAN of the basic solution, value for value. The mirror's numeric factor is exact only where the
+            // reference's elimination arithmetic is modelled, so a result that fails the residual test falls back to the solve
+            // with the working factor.
+            let rows: Vec<usize> = (0..p.m).filter(|&i| r[i] != 0.0).collect();
+            let vals: Vec<f64> = rows.iter().map(|&i| r[i]).collect();
+            let out = mi.ftran_basic(&rows, &vals);
+            let mut xb = vec![0.0; p.m];
+            for (i, v) in out {
+                xb[i] = v;
+            }
+            if std::env::var_os("ROSE_XB").is_some() {
+                println!("XB {}", serde_json::to_string(&(&r, &xb)).unwrap());
+            }
+            let mut res = r.clone();
+            for (pos, &j) in self.basic.iter().enumerate() {
+                for &(i, a) in &p.cols[j] {
+                    res[i] -= a * xb[pos];
+                }
+            }
+            let scale = 1.0 + r.iter().fold(0.0f64, |a, v| a.max(v.abs()));
+            if res.iter().all(|v| v.abs() <= 1e-7 * scale) {
+                for (pos, &j) in self.basic.iter().enumerate() {
+                    self.x[j] = xb[pos];
+                }
+                return;
+            }
+        }
         self.factor.ftran(&mut r);
         for (pos, &j) in self.basic.iter().enumerate() {
             self.x[j] = r[pos];
@@ -1558,8 +1586,17 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             }
             res
         };
+        if chosen.is_none() && step >= INF && infeasible && own < INF {
+            // No admissible pivot and no improving slope in phase 1: the entering variable goes to its opposite bound.
+            step = own;
+        }
         if chosen.is_none() && step >= INF {
             if infeasible {
+                // Rebuild the factorization once and price again.
+                if s.factor.num_updates() > 0 {
+                    s.refactor()?;
+                    continue;
+                }
                 break Status::NumericalFailure;
             }
             let mut dir_x = vec![0.0; n + m];

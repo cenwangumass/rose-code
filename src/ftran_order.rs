@@ -361,7 +361,7 @@ impl RefStruct {
 
     /// L solve (Kahn order) and row etas on the entering column; returns the nonzero list the U solve receives, with values.
     /// Also returns the work estimate of the L stage and the row etas (`0x12bd30` / `0x12a990` and the eta loop of `0x120740`).
-    fn lstage_num(&self, rows: &[usize], vals: &[f64]) -> (Vec<(usize, f64)>, usize, f64) {
+    fn lstage_num(&self, rows: &[usize], vals: &[f64], force_dense: bool) -> (Vec<(usize, f64)>, usize, f64) {
         let m = self.m;
         let mut e = 0.0f64;
         let mut x = vec![0.0f64; self.m];
@@ -371,7 +371,7 @@ impl RefStruct {
             x[s] += v;
             start.push(s);
         }
-        let dense_l = rows.len() * self.dthr > self.m;
+        let dense_l = rows.len() * self.dthr > self.m || force_dense;
         let (mut order, count_l) = if dense_l {
             // Dense L solve (`0x12bd30`): every node in ascending order; the list handed on is the ascending scan.
             e = m as f64 + rows.len() as f64 * 2.0 + e;
@@ -506,8 +506,18 @@ impl RefStruct {
     /// FTRAN of a sparse column: the nonzeros `(position, value)` of `B^-1 a` in the reference's output order. The spike is kept
     /// for the following `update`.
     pub fn ftran(&mut self, rows: &[usize], vals: &[f64]) -> Vec<(usize, f64)> {
+        self.ftran_with(rows, vals, false)
+    }
+
+    /// FTRAN of the right-hand side after a factorization: the reference always runs the dense L solve there, whatever the
+    /// density, which fixes the order of the floating-point updates.
+    pub fn ftran_basic(&mut self, rows: &[usize], vals: &[f64]) -> Vec<(usize, f64)> {
+        self.ftran_with(rows, vals, true)
+    }
+
+    fn ftran_with(&mut self, rows: &[usize], vals: &[f64], force_dense: bool) -> Vec<(usize, f64)> {
         let m = self.m;
-        let (spike, count_l, e_l) = self.lstage_num(rows, vals);
+        let (spike, count_l, e_l) = self.lstage_num(rows, vals, force_dense);
         let mut x = vec![0.0f64; m];
         for &(p, v) in &spike {
             x[p] = v;
