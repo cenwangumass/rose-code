@@ -304,6 +304,34 @@ fn dot(col: &Column, v: &[f64]) -> f64 {
     col.iter().map(|&(r, a)| a * v[r]).sum()
 }
 
+/// Column dot product as the reference's vectorised loop evaluates it (`0x102d20`): below `peel + 8` terms it is sequential,
+/// otherwise the peeled head goes to lane 0, eight lane-wise partial sums follow, the lanes reduce pairwise and the tail is
+/// sequential. `peel` is the parity of the column's offset in the value array.
+fn dot_lanes(col: &Column, v: &[f64], peel: usize) -> f64 {
+    let n = col.len();
+    let t = |i: usize| col[i].1 * v[col[i].0];
+    if n < peel + 8 {
+        let mut acc = 0.0;
+        for i in 0..n {
+            acc += t(i);
+        }
+        return acc;
+    }
+    let n8 = n - ((n - peel) & 7);
+    let mut lanes = [0.0f64; 8];
+    for i in 0..peel {
+        lanes[0] += t(i);
+    }
+    for i in peel..n8 {
+        lanes[(i - peel) & 7] += t(i);
+    }
+    let mut tot = ((lanes[0] + lanes[2]) + (lanes[4] + lanes[6])) + ((lanes[1] + lanes[3]) + (lanes[5] + lanes[7]));
+    for i in n8..n {
+        tot += t(i);
+    }
+    tot
+}
+
 impl<'a> Solver<'a> {
     fn nonbasic_value(&self, j: usize) -> f64 {
         let (l, u) = (self.p.lo[j], self.p.up[j]);
@@ -1403,6 +1431,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         // The pivot-row update's own estimate (`0x102d20`, site `0x1040c7`) apart from its pivot-row term.
         let mut devex_est = 0.0f64;
         let mut alpha_dense = false;
+        let mut tau_ref: Option<Vec<(usize, f64)>> = None;
         if let Some(mi) = s.mirror.as_mut() {
             rho_ref = Some(mi.btran(&[(r, 1.0)], true, false));
             s.work.add_from(0x13174d, 0x102e5b, mi.work, crate::work::FAC);
@@ -1417,8 +1446,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             }
             devex_est = if mi.last_dense() { m as f64 * 1.5 } else { alen as f64 * 3.0 } + devex_est;
             let mut tau_len = Some(0usize);
+            tau_ref = Some(Vec::new());
             if dense_in || !inp.is_empty() {
                 let tau = mi.btran(&inp, false, dense_in);
+                tau_ref = Some(tau.clone());
                 s.work.add_from(0x12de50, 0x103ac7, mi.work, crate::work::FAC);
                 tau_len = if mi.bt_dense { None } else { Some(tau.len()) };
             }
@@ -1430,15 +1461,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         rho[r] = 1.0;
         s.factor.btran(&mut rho);
         if let Some(rr) = &rho_ref {
-            // The reference's BTRAN drops the entries that cancel; rose's keeps them as noise, which would lengthen the pivot row.
-            let mut keep = vec![false; m];
-            for &(i, _) in rr {
-                keep[i] = true;
-            }
-            for i in 0..m {
-                if !keep[i] {
-                    rho[i] = 0.0;
-                }
+            // The reference's BTRAN values and support (`0x131710`).
+            rho = vec![0.0; m];
+            for &(i, v) in rr {
+                rho[i] = v;
             }
         }
         let mut u = vec![0.0; m];
@@ -1448,11 +1474,37 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             }
         }
         s.factor.btran(&mut u);
+        if let Some(t) = &tau_ref {
+            u = vec![0.0; m];
+            for &(i, v) in t {
+                u[i] = v;
+            }
+        }
         if s.mirror.is_some() {
-            s.row_product_work(&rho, q, leave, 0x105498);
+            let rho_work: Vec<f64> = rho.iter().map(|&v| if v.abs() > ROW_DROP_TOL { v } else { 0.0 }).collect();
+            s.row_product_work(&rho_work, q, leave, 0x105498);
         }
         let theta_d = s.d[q] / alpha_rq;
-        let wq = s.w[q];
+        // The reference recomputes the entering column's weight from the pivot column (`0x102d20`): the entering variable's own 1,
+        // the pivot square, then the squares of the other entries in list order, over the reference framework.
+        let wq = if ftran_out.is_empty() {
+            s.w[q]
+        } else {
+            let mut t = if s.in_r0[q] { 1.0 } else { 0.0 };
+            if s.in_r0[s.basic[r]] {
+                t += alpha_rq * alpha_rq;
+            }
+            for &(i, v) in &ftran_out {
+                if i != r && s.in_r0[s.basic[i]] {
+                    t += v * v;
+                }
+            }
+            t
+        };
+        let mut col_off = vec![0usize; n + m];
+        for j in 1..n + m {
+            col_off[j] = col_off[j - 1] + p.cols[j - 1].len();
+        }
         let mut changed: Vec<usize> = Vec::new();
         for j in 0..n + m {
             if s.pos_of[j] != NONE || j == q {
@@ -1464,8 +1516,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 continue;
             }
             let ratio = arj / alpha_rq;
-            let vj = dot(&p.cols[j], &u);
-            s.w[j] = s.w[j] - 2.0 * ratio * vj + ratio * ratio * wq;
+            let vj = dot_lanes(&p.fcols[j], &u, col_off[j] & 1);
+            s.w[j] = ratio * ((wq * ratio - vj) - vj) + s.w[j];
             let floor = if opts.faithful_weights && !s.in_r0[j] { W_MIN } else { 1.0 };
             s.w[j] = s.w[j].max(floor);
             if !s.is_fixed(j) {

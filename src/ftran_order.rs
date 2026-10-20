@@ -900,6 +900,10 @@ impl RefStruct {
         for (r, &v) in self.perm.iter().enumerate() {
             row_of[v] = r;
         }
+        if self.bt_dense {
+            // The dense result keeps the sub-tolerance entries the L^T pass left in place.
+            return (0..m).filter(|&i| x[i] != 0.0).map(|i| (row_of[i], x[i])).collect();
+        }
         res.into_iter().filter(|&i| x[i] != 0.0).map(|i| (row_of[i], x[i])).collect()
     }
 
