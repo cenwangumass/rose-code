@@ -850,26 +850,70 @@ impl RefStruct {
                 x = w;
                 e = el + e;
             } else {
-                // Heap or levels: every reached node, descending, kept when at least the tolerance.
+                // Level buckets of the transposed graph when the factor has levels (`0x12bd30`), else a max-heap on the node index; every
+                // reached node is kept when at least the tolerance.
                 let mut seen = vec![false; m];
-                let mut heap: BinaryHeap<usize> = BinaryHeap::new();
-                for &i in l {
-                    seen[i] = true;
-                    heap.push(i);
-                }
-                while let Some(i) = heap.pop() {
-                    let v = x[i];
-                    if v.abs() >= TOL {
-                        res.push(i);
-                        for &(j, lv) in &lt[i] {
-                            x[j] -= lv * v;
-                            if !seen[j] {
-                                seen[j] = true;
-                                heap.push(j);
+                if self.levels.is_some() {
+                    // Level buckets of the transposed graph: a node comes after the nodes whose rows it appears in.
+                    let mut lev = vec![0usize; m];
+                    for v in (0..m).rev() {
+                        for &y in &self.lcols[v] {
+                            lev[v] = lev[v].max(lev[y] + 1);
+                        }
+                    }
+                    let maxlev = lev.iter().copied().max().unwrap_or(0);
+                    let mut buckets: Vec<Vec<usize>> = vec![Vec::new(); maxlev + 1];
+                    let mut lo = usize::MAX;
+                    for &i in l {
+                        seen[i] = true;
+                        buckets[lev[i]].push(i);
+                        lo = lo.min(lev[i]);
+                    }
+                    let mut lv_i = lo;
+                    while lv_i <= maxlev {
+                        let mut k = 0;
+                        while k < buckets[lv_i].len() {
+                            let i = buckets[lv_i][k];
+                            k += 1;
+                            let v = x[i];
+                            if v.abs() >= TOL {
+                                res.push(i);
+                                for &(j, lv) in &lt[i] {
+                                    x[j] -= lv * v;
+                                }
+                                // The reference walks the row from its last entry.
+                                for &(j, _) in lt[i].iter().rev() {
+                                    if !seen[j] {
+                                        seen[j] = true;
+                                        buckets[lev[j]].push(j);
+                                    }
+                                }
+                            } else {
+                                x[i] = 0.0;
                             }
                         }
-                    } else {
-                        x[i] = 0.0;
+                        lv_i += 1;
+                    }
+                } else {
+                    let mut heap: BinaryHeap<usize> = BinaryHeap::new();
+                    for &i in l {
+                        seen[i] = true;
+                        heap.push(i);
+                    }
+                    while let Some(i) = heap.pop() {
+                        let v = x[i];
+                        if v.abs() >= TOL {
+                            res.push(i);
+                            for &(j, lv) in &lt[i] {
+                                x[j] -= lv * v;
+                                if !seen[j] {
+                                    seen[j] = true;
+                                    heap.push(j);
+                                }
+                            }
+                        } else {
+                            x[i] = 0.0;
+                        }
                     }
                 }
                 let f1e0 = (self.nnz_l + m) as f64;
@@ -902,7 +946,8 @@ impl RefStruct {
         }
         if self.bt_dense {
             // The dense result keeps the sub-tolerance entries the L^T pass left in place.
-            return (0..m).filter(|&i| x[i] != 0.0).map(|i| (row_of[i], x[i])).collect();
+            // and lists them by ascending row.
+            return (0..m).filter_map(|r| { let i = self.perm[r]; (x[i] != 0.0).then(|| (r, x[i])) }).collect();
         }
         res.into_iter().filter(|&i| x[i] != 0.0).map(|i| (row_of[i], x[i])).collect()
     }

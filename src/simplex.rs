@@ -482,7 +482,8 @@ impl<'a> Solver<'a> {
     fn cost_change_work(&mut self, dc: &[(usize, f64)], q: usize, leave: usize) {
         let Some(mi) = self.mirror.as_mut() else { return };
         let (n, m) = (self.p.n, self.p.m);
-        let out = mi.btran(dc, false, false);
+        let dc_sorted = dc.to_vec();
+        let out = mi.btran(&dc_sorted, false, false);
         self.work.add_from(0x12de50, 0x10804b, mi.work, crate::work::FAC);
         // The mirror's values, which carry the reference's cancellation noise; a dense result is compacted with the row
         // product's drop tolerance.
@@ -512,6 +513,9 @@ impl<'a> Solver<'a> {
             }
         }
         let nz: Vec<usize> = out.iter().map(|e| e.0).filter(|&i| rho[i] != 0.0).collect();
+        if std::env::var_os("ROSE_ORD").is_some() {
+            eprintln!("CORD nz={:?} changed={:?}", nz, changed);
+        }
         let changed = self.pivot_row_order_by(&nz, &changed);
         self.update_list(&changed, usize::from(q < n), 0x108280);
     }
@@ -1694,8 +1698,24 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         }
         changed.push(leave);
         s.leave_prev = Some(leave);
-        s.last_pivot = Some(LastPivot { rows: ftran_out.iter().map(|e| e.0).filter(|&i| i != r).collect(), dense: alpha_dense, q, leave });
-        let changed = s.pivot_row_order(&rho, &changed);
+        s.last_pivot = Some(LastPivot { rows: {
+            // The reference removes the pivot entry from the list by moving the last entry into its place.
+            let mut rows: Vec<usize> = ftran_out.iter().map(|e| e.0).collect();
+            if let Some(k) = rows.iter().position(|&i| i == r) {
+                rows.swap_remove(k);
+            }
+            rows
+        }, dense: alpha_dense, q, leave });
+        if std::env::var_os("ROSE_ORD").is_some() {
+            eprintln!("ORD {} rho={:?} changed={:?}", iterations, rho_ref.as_ref().map(|r| r.iter().map(|e| (e.0, e.1 != 0.0 && rho[e.0] != 0.0)).collect::<Vec<_>>()), changed);
+        }
+        let changed = match (true, rho_ref.as_ref()) {
+            (true, Some(rr)) => {
+                let nz: Vec<usize> = rr.iter().map(|e| e.0).filter(|&i| rho[i] != 0.0).collect();
+                s.pivot_row_order_by(&nz, &changed)
+            }
+            _ => s.pivot_row_order(&rho, &changed),
+        };
         if s.mirror.is_some() {
             let nn = p.n;
             let nnz_a: usize = p.cols[..nn].iter().map(Vec::len).sum();
