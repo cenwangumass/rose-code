@@ -332,6 +332,8 @@ struct Solver<'a> {
     /// The reference's row-wise copy of the nonbasic structurals, in its storage order: a column that enters the basis is
     /// removed by moving the row's last entry into its place, a column that leaves is appended.
     rrows: Vec<Vec<usize>>,
+    /// The last `price` call scanned a non-empty list and found nothing.
+    list_failed: bool,
     /// The mirror's penalised dual multipliers `y` by row, from the last `dual_btran_work` (they carry the reference's rounding).
     y_ref: Option<Vec<f64>>,
     /// Mirror of the reference's FTRAN structure (`faithful_ftran`).
@@ -516,7 +518,7 @@ impl<'a> Solver<'a> {
         if std::env::var_os("ROSE_ORD").is_some() {
             eprintln!("CORD nz={:?} changed={:?}", nz, changed);
         }
-        let changed = self.pivot_row_order_by(&nz, &changed);
+        let changed = self.pivot_row_order_by(&nz, &changed, nz.len());
         self.update_list(&changed, usize::from(q < n), 0x108280);
     }
 
@@ -618,11 +620,11 @@ impl<'a> Solver<'a> {
     /// order over the rows of `rho`; otherwise structurals in index order; then slacks in row order.
     fn pivot_row_order(&self, rho: &[f64], changed: &[usize]) -> Vec<usize> {
         let nz: Vec<usize> = (0..self.p.m).rev().filter(|&i| rho[i] != 0.0).collect();
-        self.pivot_row_order_by(&nz, changed)
+        self.pivot_row_order_by(&nz, changed, nz.len())
     }
 
     /// As `pivot_row_order`, with the rows of `rho` in the order the reference stores them.
-    fn pivot_row_order_by(&self, nz: &[usize], changed: &[usize]) -> Vec<usize> {
+    fn pivot_row_order_by(&self, nz: &[usize], changed: &[usize], cnt: usize) -> Vec<usize> {
         let (n, m) = (self.p.n, self.p.m);
         let nnz_a: usize = self.p.cols[..n].iter().map(Vec::len).sum();
         let mut keep = vec![false; n + m];
@@ -630,7 +632,7 @@ impl<'a> Solver<'a> {
             keep[j] = true;
         }
         let mut out = Vec::with_capacity(changed.len());
-        if nz.len() * 3 * nnz_a < m * n {
+        if cnt * 3 * nnz_a < m * n {
             for &i in nz {
                 for &j in &self.rrows[i] {
                     if keep[j] {
@@ -716,6 +718,11 @@ impl<'a> Solver<'a> {
             if best.is_some() {
                 return best;
             }
+            if self.mirror.is_some() {
+                // The reference does not rebuild the list from here: the caller recomputes the duals first.
+                self.list_failed = true;
+                return None;
+            }
         }
         self.level = 0;
         self.list.clear();
@@ -738,6 +745,22 @@ impl<'a> Solver<'a> {
             self.work.add(0x105c0c, self.list.len() as f64 * 4.0, crate::work::CTX);
         }
         best
+    }
+
+    /// `price`, with the reference's recovery when the list scan finds nothing: the duals are recomputed from scratch
+    /// (no pivot) and the list is rebuilt by the next pass.
+    fn price_faithful(&mut self) -> Option<usize> {
+        self.list_failed = false;
+        let q = self.price();
+        if q.is_none() && self.list_failed {
+            self.list_failed = false;
+            self.dual_btran_work();
+            self.recompute_dual();
+            self.list.clear();
+            self.level = 0;
+            return self.price();
+        }
+        q
     }
 
     fn best_in_list(&self) -> Option<usize> {
@@ -1260,6 +1283,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         leave_prev: None,
         rows: Vec::new(),
         rrows: Vec::new(),
+        list_failed: false,
         y_ref: None,
         mirror: None,
         work: crate::work::Work::default(),
@@ -1391,15 +1415,18 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             phase1 = false;
             s.list.clear();
             s.level = 0;
-            s.dual_btran_work();
-            s.recompute_dual();
+            // After a refactorization the duals were just recomputed with the same (now feasible) basic values.
+            if !due {
+                s.dual_btran_work();
+                s.recompute_dual();
+            }
         }
         if std::env::var_os("ROSE_STATE").is_some() {
             let f = |v: &[f64]| v.iter().map(|x| format!("{x:e}")).collect::<Vec<_>>().join(",");
             eprintln!("STATE {{\"x\":[{}],\"list\":{:?},\"iter\":{iterations},\"infeasible\":{infeasible},\"basic\":{:?},\"d\":[{}],\"w\":[{}]}}", f(&s.x), s.list, s.basic, f(&s.d), f(&s.w));
         }
         let q = if infeasible {
-            match s.price() {
+            match s.price_faithful() {
                 Some(q) => q,
                 None => {
                     // No improving column for the penalised cost: try the pure sum of infeasibilities, which either
@@ -1407,7 +1434,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                     let y = s.composite_dual(true);
                     s.list.clear();
                     s.level = 0;
-                    match s.price() {
+                    match s.price_faithful() {
                         Some(q) => q,
                         None => {
                             farkas = Some(y.iter().map(|v| -v).collect());
@@ -1417,7 +1444,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 }
             }
         } else {
-            match s.price() {
+            match s.price_faithful() {
                 Some(q) => q,
                 None => break Status::Optimal,
             }
@@ -1627,7 +1654,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         let rho_rank: Option<Vec<usize>> = rho_ref.as_ref().map(|rr| {
             let mut rank = vec![usize::MAX; m];
             for (k, &(i, _)) in rr.iter().enumerate() {
-                rank[i] = k;
+                // Entries below the drop tolerance are not part of the reference's row-product input.
+                if rho[i].abs() > ROW_DROP_TOL {
+                    rank[i] = k;
+                }
             }
             rank
         });
@@ -1636,7 +1666,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             if s.pos_of[j] != NONE || j == q {
                 continue;
             }
-            let arj = dot(&p.cols[j], &rho);
+            let arj = match rho_rank.as_ref() {
+                Some(rank) => rank_dot(&p.cols[j], &rho, rank),
+                None => dot(&p.cols[j], &rho),
+            };
             // The reference's row product keeps the entries above its drop tolerance (`0x134d90`).
             if arj.abs() <= ROW_DROP_TOL {
                 continue;
@@ -1644,12 +1677,11 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             let ratio = arj / alpha_rq;
             let vj = dot_lanes(&p.fcols[j], &u, col_off[j] & 1);
             s.w[j] = ratio * ((wq * ratio - vj) - vj) + s.w[j];
-            let floor = if opts.faithful_weights && !s.in_r0[j] { W_MIN } else { 1.0 };
+            let floor = if opts.faithful_weights { W_MIN } else { 1.0 };
             s.w[j] = s.w[j].max(floor);
             if !s.is_fixed(j) {
                 // The reference sums the row product in the order of the BTRAN output list.
-                let a = rho_rank.as_ref().map_or(arj, |rank| rank_dot(&p.cols[j], &rho, rank));
-                s.d[j] -= theta_d * a;
+                    s.d[j] -= theta_d * arj;
             }
             changed.push(j);
         }
@@ -1670,7 +1702,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             s.d[leave] = -theta_d;
             s.d[q] = 0.0;
         }
-        s.w[leave] = wq / (alpha_rq * alpha_rq);
+        s.w[leave] = (wq / alpha_rq) / alpha_rq;
         s.w[leave] = s.w[leave].max(if opts.faithful_weights && !s.in_r0[leave] { W_MIN } else { 1.0 });
 
         // Basis change.
@@ -1712,7 +1744,11 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         let changed = match (true, rho_ref.as_ref()) {
             (true, Some(rr)) => {
                 let nz: Vec<usize> = rr.iter().map(|e| e.0).filter(|&i| rho[i] != 0.0).collect();
-                s.pivot_row_order_by(&nz, &changed)
+                {
+                    // The reference's density test counts the entries that survive the drop tolerance.
+                    let cnt = nz.iter().filter(|&&i| rho[i].abs() > ROW_DROP_TOL).count();
+                    s.pivot_row_order_by(&nz, &changed, cnt)
+                }
             }
             _ => s.pivot_row_order(&rho, &changed),
         };
