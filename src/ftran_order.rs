@@ -34,6 +34,8 @@ pub struct RefStruct {
     uc: Vec<Vec<(usize, f64)>>,
     /// Spike of the most recent solve: the L stage and eta result `(position, value)` in list order.
     spike: Vec<(usize, f64)>,
+    /// Dense x of the most recent solve after the L stage and after the row etas, for the `lstage` dump.
+    lsnap: std::cell::RefCell<(Vec<f64>, Vec<f64>)>,
     /// Refactorization trigger inputs (`0x142350`): updates since the factorization, accumulated solve result counts, accumulated
     /// eta lengths, and the factor size `nnz(L) + nnz(U) + 2 m` fixed at factorization time.
     upd: usize,
@@ -225,6 +227,8 @@ impl RefStruct {
                     }
                 }
             }
+            // The reference's tail columns hold no residues below the tolerance.
+            ents.retain(|e| e.1.abs() > TOL);
             for &v in &lst {
                 xv[v] = 0.0;
                 cnt[v] = 0;
@@ -321,6 +325,7 @@ impl RefStruct {
             diag: st.diag.clone(),
             uc,
             spike: Vec::new(),
+            lsnap: Default::default(),
         }
     }
 
@@ -471,6 +476,9 @@ impl RefStruct {
                 (q, count_l)
             }
         };
+        if crate::dump::on("lstage") {
+            self.lsnap.borrow_mut().0 = x.clone();
+        }
         let mut have = vec![false; self.m];
         for &v in &order {
             have[v] = true;
@@ -520,6 +528,9 @@ impl RefStruct {
                 have[eta.idx] = true;
             }
             x[eta.idx] = s;
+        }
+        if crate::dump::on("lstage") {
+            self.lsnap.borrow_mut().1 = x.clone();
         }
         // A dense vector goes on as the raw array: the reference keeps the sub-tolerance residues of the L and eta stages.
         if dense_l || (!self.etas.is_empty() && count_l * self.dthr > m) {
@@ -1043,6 +1054,11 @@ impl RefStruct {
     /// Whether the fresh factor's L solve goes level by level (`0x12a990`).
     pub fn has_levels(&self) -> bool {
         self.levels.is_some()
+    }
+
+    /// Dense x after the L stage and after the row etas, for the `lstage` dump.
+    pub fn lstage_snap(&self) -> (Vec<f64>, Vec<f64>) {
+        self.lsnap.borrow().clone()
     }
 
     /// U-stage state of the most recent solve for the `ustage` dump: the spike (the L-stage result), the diagonal, the tail
