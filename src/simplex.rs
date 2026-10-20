@@ -699,6 +699,10 @@ impl<'a> Solver<'a> {
         let tol = self.opts.optimality_tol;
         let free = is_inf(self.p.lo[j]) && is_inf(self.p.up[j]);
         let dj = self.d[j];
+        if free && self.opts.faithful_weights {
+            // The reference lists nonbasic free variables (status -3) in the top bucket and takes the first one whatever its reduced cost.
+            return Some(f64::INFINITY);
+        }
         let eligible = if free {
             dj.abs() > tol
         } else if self.at_upper[j] {
@@ -712,14 +716,6 @@ impl<'a> Solver<'a> {
     /// Entering variable: the first maximum-score entry of the persistent candidate list, rebuilt by a full
     /// pass over all variables when the list holds no eligible entry.
     fn price(&mut self) -> Option<usize> {
-        if self.mirror.is_some() {
-            // The reference puts nonbasic free variables in a top bucket (status -3) and takes the first one whatever its
-            // reduced cost.
-            let nm = self.p.n + self.p.m;
-            if let Some(j) = (0..nm).find(|&j| self.pos_of[j] == NONE && is_inf(self.p.lo[j]) && is_inf(self.p.up[j])) {
-                return Some(j);
-            }
-        }
         if !self.list.is_empty() {
             let best = self.best_in_list();
             self.work.add(0x105d03, self.list.len() as f64 * 4.0, crate::work::CTX);
@@ -791,6 +787,10 @@ impl<'a> Solver<'a> {
         // The reference empties the old list when the level rises, so it scans none of it.
         let mut raised = false;
         for &j in changed {
+            // The reference's update scores only the entries with status -1 or -2; a free variable (-3) keeps its place.
+            if self.opts.faithful_weights && is_inf(self.p.lo[j]) && is_inf(self.p.up[j]) {
+                continue;
+            }
             if let Some(sc) = self.score(j) {
                 if thr(self.level) < sc {
                     let b = bucket(sc);
@@ -1435,6 +1435,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 s.recompute_dual();
             }
         }
+        if false { let fr: Vec<usize> = (0..p.n + p.m).filter(|&j| s.pos_of[j] == NONE && is_inf(p.lo[j]) && is_inf(p.up[j])).collect(); eprintln!("FREE it={iterations} nfree={} list={} faithful={} first={:?}", fr.len(), s.list.len(), opts.faithful_weights, &fr[..fr.len().min(5)]); }
         if std::env::var_os("ROSE_STATE").is_some() {
             let f = |v: &[f64]| v.iter().map(|x| format!("{x:e}")).collect::<Vec<_>>().join(",");
             eprintln!("STATE {{\"x\":[{}],\"list\":{:?},\"iter\":{iterations},\"infeasible\":{infeasible},\"basic\":{:?},\"d\":[{}],\"w\":[{}]}}", f(&s.x), s.list, s.basic, f(&s.d), f(&s.w));
