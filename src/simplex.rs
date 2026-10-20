@@ -338,7 +338,11 @@ impl<'a> Solver<'a> {
             }
             self.basic = order;
             if self.opts.faithful_ftran {
-                self.mirror = Some(crate::ftran_order::RefStruct::fresh(self.p.m, &st, &rows));
+                let mi = crate::ftran_order::RefStruct::fresh(self.p.m, &st, &rows);
+                for (site, est) in st.work(&rows, mi.has_levels()) {
+                    self.work.add(site, est, crate::work::CTX);
+                }
+                self.mirror = Some(mi);
             }
         }
         let cols: Vec<Column> = self.basic.iter().map(|&j| self.p.cols[j].clone()).collect();
@@ -1094,6 +1098,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             s.rows[i].push(j);
         }
     }
+    // The starting factorization's work, which the reference counts after its first refactorization check.
+    let mut lu_work = Vec::new();
     if opts.faithful_ftran && opts.faithful_positions {
         // The reference factorizes the starting basis before the first iteration and numbers the positions by pivot step.
         let (order, st, rows) = s.reference_order();
@@ -1102,10 +1108,14 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         }
         s.basic = order;
         s.mirror = Some(crate::ftran_order::RefStruct::fresh(m, &st, &rows));
+        lu_work = st.work(&rows, s.mirror.as_ref().is_some_and(|mi| mi.has_levels()));
         let cols: Vec<Column> = s.basic.iter().map(|&j| s.p.cols[j].clone()).collect();
         s.factor = Factor::new(m, &cols).map_err(|_| SolveError::SingularBasis)?;
     }
     s.work.trig();
+    for (site, est) in lu_work {
+        s.work.add(site, est, crate::work::CTX);
+    }
     s.recompute_primal();
     s.primal_full_work();
     s.dual_btran_work();

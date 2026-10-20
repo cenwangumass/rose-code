@@ -882,6 +882,11 @@ impl RefStruct {
     }
 
     /// Whether the most recent `ftran` returned a dense result (the reference's count `-1`).
+    /// Whether the fresh factor's L solve goes level by level (`0x12a990`).
+    pub fn has_levels(&self) -> bool {
+        self.levels.is_some()
+    }
+
     pub fn last_dense(&self) -> bool {
         self.last_dense
     }

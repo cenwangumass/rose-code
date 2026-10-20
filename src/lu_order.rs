@@ -22,6 +22,10 @@ pub struct Structure {
     pub diag: Vec<f64>,
     /// Pivot-row entries `(basis position, value)` of the Markowitz steps (empty for singleton steps).
     pub u_rows: Vec<Vec<(usize, f64)>>,
+    /// Entries of the nucleus (the columns left after the singleton phases, in the rows left) and the Markowitz search's
+    /// work estimate.
+    pub nuc_nnz: usize,
+    pub nuc_work: f64,
 }
 
 pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Structure {
@@ -38,7 +42,8 @@ pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Stru
         d.reverse();
         nuc.push((pos, d));
     }
-    let (np, nl, nv, npiv, nu) = nucleus(m, &nuc);
+    let nuc_nnz = nuc.iter().map(|c| c.1.len()).sum();
+    let (np, nl, nv, npiv, nu, nuc_work) = nucleus(m, &nuc);
     seq.extend(np);
     phase.resize(seq.len(), 0);
     let mut step = vec![usize::MAX; m];
@@ -61,7 +66,38 @@ pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Stru
     l_vals.extend(nv);
     diag.extend(npiv);
     u_rows.extend(nu);
-    Structure { pivots: seq, phase, l_rows, l_vals, diag, u_rows }
+    Structure { pivots: seq, phase, l_rows, l_vals, diag, u_rows, nuc_nnz, nuc_work }
+}
+
+impl Structure {
+    /// The factorization's increments of the reference's work counter (`0xd4190`, `crate::work`) as `(site, estimate)`, given
+    /// the factored columns and whether the L solve levels are built (`crate::ftran_order`).
+    pub fn work(&self, cols: &[(bool, Vec<usize>, Vec<f64>)], levels: bool) -> Vec<(u32, f64)> {
+        let m = self.pivots.len() as f64;
+        let nnz_b: usize = cols.iter().map(|c| if c.0 { 1 } else { c.1.len() }).sum();
+        let nsing = self.phase.iter().filter(|&&p| p != 0).count();
+        let nnz_l: usize = self.l_rows.iter().map(Vec::len).sum();
+        // The entries of the singleton steps' columns that go to U (rows pivoted before them), and with the Markowitz pivot
+        // rows the off-diagonal U.
+        let nnz_l_sing: usize = (0..nsing).map(|k| self.l_rows[k].len()).sum();
+        let u_sing = nnz_b - nsing - nnz_l_sing - self.nuc_nnz;
+        let mut out = vec![
+            (0xd4ded, 5.0 * m + 100.0 + 3.0 * (nnz_l_sing + u_sing) as f64),
+            (0xd5300, 10.0 * m + 3.0 * nnz_b as f64 + 7.0 * self.nuc_nnz.max(1) as f64),
+        ];
+        if self.nuc_work > 0.0 {
+            out.push((0xd85e6, self.nuc_work));
+        }
+        let nnz_lu = (nnz_l + u_sing + self.u_rows.iter().map(Vec::len).sum::<usize>()) as f64;
+        // A size factor that ramps from 1 to 10 between 2e6 and 4e6 for 24 bytes per entry.
+        let a = 24.0 * nnz_lu;
+        let g = if a <= 2e6 { 1.0 } else if a < 4e6 { 1.0 + (a - 2e6) * 9.0 / 2e6 } else { 10.0 };
+        out.push((0xdc7b2, (2.0 * m + nnz_lu) * 2.0 * g));
+        if levels {
+            out.push((0xdcb7b, 2.0 * (nnz_l as f64 + m)));
+        }
+        out
+    }
 }
 
 fn phases(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> (Vec<(usize, usize)>, Vec<u8>) {
@@ -244,7 +280,7 @@ impl Nucleus {
 }
 
 /// `cols`: (position, entries (row, value) in column-chain order). Rows and positions are the global indices of the basis.
-type NucleusOut = (Vec<(usize, usize)>, Vec<Vec<usize>>, Vec<Vec<f64>>, Vec<f64>, Vec<Vec<(usize, f64)>>);
+type NucleusOut = (Vec<(usize, usize)>, Vec<Vec<usize>>, Vec<Vec<f64>>, Vec<f64>, Vec<Vec<(usize, f64)>>, f64);
 
 fn nucleus(m: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> NucleusOut {
     let npos = cols.iter().map(|c| c.0 + 1).max().unwrap_or(0);
@@ -296,12 +332,16 @@ fn nucleus(m: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> NucleusOut {
     let mut prows: HashSet<usize> = HashSet::new();
     let mut pcols: HashSet<usize> = HashSet::new();
     let mut remaining = ckeys.len();
+    let mut work = 0.0;
     while remaining > 0 {
         let mut sing: Option<usize> = None;
+        // Whether the singleton is a column singleton (true) or a row singleton.
+        let mut sing_kind: Option<bool> = None;
         while let Some(c) = s.cst.pop() {
             if s.ccnt[c] == 1 {
                 if let Some(&id) = s.colchain[c].iter().find(|&&i| s.nodes[i].alive) {
                     sing = Some(id);
+                    sing_kind = Some(true);
                     break;
                 }
             }
@@ -311,6 +351,7 @@ fn nucleus(m: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> NucleusOut {
                 if s.rcnt[r] == 1 {
                     if let Some(&id) = s.rowchain[r].iter().find(|&&i| s.nodes[i].alive) {
                         sing = Some(id);
+                        sing_kind = Some(false);
                         break;
                     }
                 }
@@ -330,10 +371,14 @@ fn nucleus(m: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> NucleusOut {
             }
             continue;
         }
+        let mut search_cost = 0.0;
         let best = match sing {
             Some(id) => id,
             None => match search(&mut s) {
-                Some(id) => id,
+                Some((id, c)) => {
+                    search_cost = c;
+                    id
+                }
                 None => break,
             },
         };
@@ -358,6 +403,13 @@ fn nucleus(m: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> NucleusOut {
         uout.push(u.clone());
         let col_ids: Vec<usize> = s.colchain[pc].clone();
         let row_ids: Vec<usize> = s.rowchain[pr].clone();
+        // The search's work (site `0xd85e6`): a singleton costs its remaining row (column singleton) or column (row
+        // singleton); a Markowitz step its search and the cheaper of the two elimination sweeps.
+        work += match sing_kind {
+            Some(true) => 10.0 * (prow.len() + 1) as f64,
+            Some(false) => 10.0 * (pcol.len() + 1) as f64,
+            None => 6.0 * search_cost + 10.0 * (s_row - pcol.len()).min(s_col - prow.len()) as f64,
+        };
         if s_col < s_row {
             for &i in &prow {
                 let c = s.nodes[i].c;
@@ -463,11 +515,12 @@ fn nucleus(m: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> NucleusOut {
             }
         }
     }
-    (out, lout, lvout, pout, uout)
+    (out, lout, lvout, pout, uout, work)
 }
 
-/// Markowitz search over the count buckets; returns the node of the chosen pivot (rotating bucket heads as the reference does).
-fn search(s: &mut Nucleus) -> Option<usize> {
+/// Markowitz search over the count buckets; returns the node of the chosen pivot (rotating bucket heads as the reference does)
+/// and the search's work factor: the candidates examined times the cost bound of the last bucket.
+fn search(s: &mut Nucleus) -> Option<(usize, f64)> {
     let first = |b: &Vec<Vec<usize>>| b.iter().position(|v| !v.is_empty());
     let cmin = first(&s.cb);
     let rmin = first(&s.rb);
@@ -484,8 +537,10 @@ fn search(s: &mut Nucleus) -> Option<usize> {
     let mut bratio = 0.0f64;
     let mut count = 0usize;
     let mut done = false;
+    let mut last_bound = 0.0;
     while k <= maxk && !done {
         let bound = if u74 < big && u69 < big { ((k * k) as f64).max((u74 * u69) as f64) } else { (k * k) as f64 };
+        last_bound = bound;
         for col in [true, false] {
             let lst: Vec<usize> = if col { s.cb[k].clone() } else { s.rb[k].clone() };
             if !lst.is_empty() {
@@ -546,5 +601,5 @@ fn search(s: &mut Nucleus) -> Option<usize> {
         }
         k += 1;
     }
-    best
+    best.map(|b| (b, count as f64 * last_bound))
 }
