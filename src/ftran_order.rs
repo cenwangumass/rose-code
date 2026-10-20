@@ -1022,6 +1022,12 @@ impl RefStruct {
         self.levels.is_some()
     }
 
+    /// U-stage state of the most recent solve for the `ustage` dump: the spike (the L-stage result), the diagonal, the tail
+    /// columns' U entries and the slots.
+    pub fn ustage_state(&self) -> (&[(usize, f64)], &[f64], &[Vec<(usize, f64)>], &[usize], &[i64], usize) {
+        (&self.spike, &self.diag, &self.uc, &self.slot, &self.kind, self.i21)
+    }
+
     pub fn last_dense(&self) -> bool {
         self.last_dense
     }

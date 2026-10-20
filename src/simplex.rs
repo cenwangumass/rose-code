@@ -1540,6 +1540,11 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             if crate::dump::on("ftran") {
                 crate::dump::emit("ftran", serde_json::json!({"iter": iterations, "q": q, "in": rows_q, "dense": mi.last_dense(), "out": crate::dump::sparse(&out)}));
             }
+            if crate::dump::on("ustage") {
+                let (spike, diag, uc, slot, kind, i21) = mi.ustage_state();
+                let tail: Vec<serde_json::Value> = (0..diag.len()).filter(|&p| kind[p] == -2).map(|p| serde_json::json!([p, slot[p], crate::dump::sparse(&uc[p])])).collect();
+                crate::dump::emit("ustage", serde_json::json!({"iter": iterations, "q": q, "i21": i21, "spike": crate::dump::sparse(spike), "diag": diag, "tail": tail}));
+            }
             s.work.add_from(0x1219d6, 0x120673, mi.work, crate::work::FAC);
             for &(i, a) in &out {
                 alpha[i] = a;
