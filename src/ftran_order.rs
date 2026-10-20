@@ -1368,7 +1368,7 @@ impl RefStruct {
         if crate::dump::on("fstruct") {
             static CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
             let n = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            crate::dump::emit("fstruct", serde_json::json!({"n": n, "m": m, "i3": self.nuc.len(), "i21": self.i21, "kind": self.kind, "nuc": self.nuc, "seqA": self.slot}));
+            crate::dump::emit("fstruct", serde_json::json!({"n": n, "m": m, "i3": self.nuc.len(), "i21": self.i21, "kind": self.kind, "nuc": self.nuc, "seqA": self.slot, "cols": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), [&self.a[k], &self.b[k]])).collect::<std::collections::BTreeMap<_, _>>()}));
         }
         self.upd += 1;
         self.upd_work.clear();
@@ -1521,8 +1521,18 @@ impl RefStruct {
                     }
                     remove_front_fill(&mut self.b[k], r);
                 } else {
-                    self.a[k].retain(|&y| y != r);
-                    remove_last_fill(&mut self.b[k], r);
+                    if in_a {
+                        // A and B share one array in the reference (A first): A's last entry fills the hole and B's last entry
+                        // takes the slot A gives up, which is the front of B.
+                        let p = self.a[k].iter().position(|&y| y == r).unwrap();
+                        self.a[k].swap_remove(p);
+                        if let Some(last) = self.b[k].pop() {
+                            self.b[k].insert(0, last);
+                        }
+                    }
+                    if in_b {
+                        remove_last_fill(&mut self.b[k], r);
+                    }
                     self.uc[k].retain(|e| e.0 != r);
                     elim.push(k);
                 }
