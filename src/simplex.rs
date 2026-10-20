@@ -284,6 +284,17 @@ struct Solver<'a> {
     mirror: Option<crate::ftran_order::RefStruct>,
     /// The reference's work counter (`crate::work`).
     work: crate::work::Work,
+    /// The last pivot, whose primal update the reference runs at the start of the next iteration (`0x105f20`).
+    last_pivot: Option<LastPivot>,
+}
+
+struct LastPivot {
+    /// Rows of the FTRAN result in its output order, without the pivot row.
+    rows: Vec<usize>,
+    /// Whether the reference held the FTRAN result as a dense vector.
+    dense: bool,
+    q: usize,
+    leave: usize,
 }
 
 fn dot(col: &Column, v: &[f64]) -> f64 {
@@ -335,9 +346,57 @@ impl<'a> Solver<'a> {
         self.refactorizations += 1;
         self.list.clear();
         self.recompute_primal();
+        self.primal_full_work();
         self.dual_btran_work();
         self.recompute_dual();
         Ok(())
+    }
+
+    /// Work of the reference's primal update (`0x105f20`, site `0x107b57`) when it recomputes `x_B` after a factorization:
+    /// copies and scans of length `m`, the columns of the nonbasic structurals away from zero, and every fifth time an extra copy.
+    fn primal_full_work(&mut self) {
+        if self.mirror.is_none() {
+            return;
+        }
+        let (n, m) = (self.p.n, self.p.m);
+        let mut est = (10 * m + 2 * n) as f64;
+        for j in 0..n {
+            if self.pos_of[j] == NONE && self.nonbasic_value(j) != 0.0 {
+                est += 2.0 * (self.p.cols[j].len() + 1) as f64;
+            }
+        }
+        if self.refactorizations % 5 == 4 {
+            est += 2.0 * m as f64;
+        }
+        self.work.add(0x107b57, est, crate::work::CTX);
+    }
+
+    /// The reference's handling of phase 1 cost changes after a pivot (`0x105f20`): a BTRAN of the cost changes `dc`
+    /// (positions and values), the row product of the result, and a list update over that row, which also carries the
+    /// entering column when it is structural.
+    fn cost_change_work(&mut self, dc: &[(usize, f64)], q: usize, leave: usize) {
+        let Some(mi) = self.mirror.as_mut() else { return };
+        let (n, m) = (self.p.n, self.p.m);
+        let out = mi.btran(dc, false, false);
+        self.work.add_from(0x12de50, 0x10804b, mi.work, crate::work::FAC);
+        // The mirror's values, which carry the reference's cancellation noise; a dense result is compacted with the row
+        // product's drop tolerance.
+        let bt_dense = mi.bt_dense;
+        let mut rho = vec![0.0; m];
+        for &(i, v) in &out {
+            if !bt_dense || v.abs() > ROW_DROP_TOL {
+                rho[i] = v;
+            }
+        }
+        self.row_product_work(&rho, q, leave, 0x10820b);
+        // The row's slack part is `rho` itself, basic slacks included (they are the positions whose cost changed).
+        let p = self.p;
+        let changed: Vec<usize> = (0..n + m)
+            .filter(|&j| (j >= n && rho[j - n] != 0.0) || (self.pos_of[j] == NONE && dot(&p.cols[j], &rho).abs() > ROW_DROP_TOL))
+            .collect();
+        let nz: Vec<usize> = out.iter().map(|e| e.0).filter(|&i| rho[i] != 0.0).collect();
+        let changed = self.pivot_row_order_by(&nz, &changed);
+        self.update_list(&changed, usize::from(q < n), 0x108280);
     }
 
     /// Work of the reference's dual recomputation after a factorization (`0x108d70`): a BTRAN of the dense vector of basic costs,
@@ -406,8 +465,13 @@ impl<'a> Solver<'a> {
     /// Order in which the reference stores the pivot-row entries: with a sparse `rho`, structurals in first-touch
     /// order over the rows of `rho`; otherwise structurals in index order; then slacks in row order.
     fn pivot_row_order(&self, rho: &[f64], changed: &[usize]) -> Vec<usize> {
+        let nz: Vec<usize> = (0..self.p.m).rev().filter(|&i| rho[i] != 0.0).collect();
+        self.pivot_row_order_by(&nz, changed)
+    }
+
+    /// As `pivot_row_order`, with the rows of `rho` in the order the reference stores them.
+    fn pivot_row_order_by(&self, nz: &[usize], changed: &[usize]) -> Vec<usize> {
         let (n, m) = (self.p.n, self.p.m);
-        let nz: Vec<usize> = (0..m).rev().filter(|&i| rho[i] != 0.0).collect();
         let nnz_a: usize = self.p.cols[..n].iter().map(Vec::len).sum();
         let mut keep = vec![false; n + m];
         for &j in changed {
@@ -415,7 +479,7 @@ impl<'a> Solver<'a> {
         }
         let mut out = Vec::with_capacity(changed.len());
         if nz.len() * 3 * nnz_a < m * n {
-            for &i in &nz {
+            for &i in nz {
                 for &j in &self.rows[i] {
                     if keep[j] {
                         keep[j] = false;
@@ -431,7 +495,7 @@ impl<'a> Solver<'a> {
                 }
             }
         }
-        for &i in &nz {
+        for &i in nz {
             if keep[n + i] {
                 keep[n + i] = false;
                 out.push(n + i);
@@ -1022,6 +1086,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         rows: Vec::new(),
         mirror: None,
         work: crate::work::Work::default(),
+        last_pivot: None,
     };
     s.rows = vec![Vec::new(); m];
     for j in 0..n {
@@ -1042,6 +1107,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     }
     s.work.trig();
     s.recompute_primal();
+    s.primal_full_work();
     s.dual_btran_work();
     s.recompute_dual();
     let mut trace = Vec::new();
@@ -1067,21 +1133,48 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 refactor_next = mi.refactor_due();
             }
         }
+        // The reference's primal update of the last pivot (`0x105f20`, site `0x107b57`): a pass over the FTRAN result, which
+        // also collects the phase 1 cost changes of the basic variables that changed feasibility class.
+        let last = s.last_pivot.take().filter(|_| !due);
+        let mut dc: Vec<(usize, f64)> = Vec::new();
+        if let Some(lp) = &last {
+            if phase1 {
+                let cls = s.sig();
+                for &i in &lp.rows {
+                    let (j, c) = s.p1_prev[i];
+                    if j == s.basic[i] && cls[i] != c {
+                        dc.push((i, PHASE1_M * f64::from(cls[i] - c)));
+                    }
+                }
+            }
+            if s.mirror.is_some() {
+                let est = if lp.dense { m as f64 * 3.0 } else { lp.rows.len() as f64 * 6.0 } + dc.len() as f64 * 4.0;
+                s.work.add(0x107b57, est, crate::work::CTX);
+            }
+        }
         let infeasible = s.has_infeasible_basic();
         if infeasible {
             let was = phase1;
             phase1 = true;
             if was && !due {
-                // The reference corrects `d` in place when basic variables change feasibility class and re-scores only
-                // the columns whose `d` moved (including the variable that just left, whose penalised `d` differs from its pivot-time value).
-                let old_d = s.d.clone();
-                let cls = s.sig();
-                let cost_changed = s.p1_prev.iter().any(|&(j, c)| s.pos_of[j] != NONE && cls[s.pos_of[j]] != c);
-                s.composite_dual(false);
-                let tol = s.opts.optimality_tol;
-                let delta: Vec<usize> = (0..s.d.len()).filter(|&j| (s.d[j] - old_d[j]).abs() > tol).collect();
-                if cost_changed && !delta.is_empty() {
-                    s.update_list(&delta, 0, 0x108280);
+                // The reference corrects `d` in place when basic variables change feasibility class and re-scores the
+                // entries of the row of the cost changes.
+                if s.mirror.is_some() {
+                    s.composite_dual(false);
+                    if let (Some(lp), false) = (&last, dc.is_empty()) {
+                        s.cost_change_work(&dc, lp.q, lp.leave);
+                    }
+                } else {
+                    // Without the mirror: re-score the columns whose `d` moved.
+                    let old_d = s.d.clone();
+                    let cls = s.sig();
+                    let cost_changed = s.p1_prev.iter().any(|&(j, c)| s.pos_of[j] != NONE && cls[s.pos_of[j]] != c);
+                    s.composite_dual(false);
+                    let tol = s.opts.optimality_tol;
+                    let delta: Vec<usize> = (0..s.d.len()).filter(|&j| (s.d[j] - old_d[j]).abs() > tol).collect();
+                    if cost_changed && !delta.is_empty() {
+                        s.update_list(&delta, 0, 0x108280);
+                    }
                 }
             } else {
                 s.composite_dual(false);
@@ -1220,6 +1313,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         let mut rho_ref: Option<Vec<(usize, f64)>> = None;
         // The pivot-row update's own estimate (`0x102d20`, site `0x1040c7`) apart from its pivot-row term.
         let mut devex_est = 0.0f64;
+        let mut alpha_dense = false;
         if let Some(mi) = s.mirror.as_mut() {
             rho_ref = Some(mi.btran(&[(r, 1.0)], true, false));
             s.work.add_from(0x13174d, 0x102e5b, mi.work, crate::work::FAC);
@@ -1227,6 +1321,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             // The cross-term vector goes in dense when the FTRAN result was dense or too long for a list (`0x102d20`).
             // By then the list no longer holds the pivot entry.
             let dense_in = mi.last_dense() || m <= mi.dthr() * (ftran_out.len() - 1);
+            alpha_dense = mi.last_dense();
             let alen = ftran_out.len() - 1;
             if dense_in {
                 devex_est = m as f64;
@@ -1305,6 +1400,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         }
         changed.push(leave);
         s.leave_prev = Some(leave);
+        s.last_pivot = Some(LastPivot { rows: ftran_out.iter().map(|e| e.0).filter(|&i| i != r).collect(), dense: alpha_dense, q, leave });
         let changed = s.pivot_row_order(&rho, &changed);
         if s.mirror.is_some() {
             let nn = p.n;
