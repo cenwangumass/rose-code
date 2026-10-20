@@ -427,6 +427,11 @@ impl<'a> Solver<'a> {
             .collect();
         mi.btran(&inp, false, true);
         self.work.add_from(0x12de50, 0x109289, mi.work, crate::work::FAC);
+        // The reduced costs that follow (`0x1020a0`, site `0x1021b0`): a pass over all variables and the columns of the
+        // nonbasic structurals that are not fixed.
+        let n = p.n;
+        let cols: usize = (0..n).filter(|&j| self.pos_of[j] == NONE && !self.is_fixed(j)).map(|j| p.cols[j].len()).sum();
+        self.work.add(0x1021b0, 3.0 * (n + p.m + cols) as f64, crate::work::CTX);
     }
 
     fn recompute_primal(&mut self) {
@@ -783,7 +788,15 @@ fn find_theta(s0: f64, bp: &mut [(f64, usize, bool)], weight: &dyn Fn(usize) -> 
 /// The reference's infeasible-start ratio test (`0xf0120`, see `reverse-engineer/replay/phase1_ratio.py`).
 /// `ent[k] = (position, alpha)` with `alpha > 0` meaning the basic variable decreases; `info(position)` gives the
 /// typed frame from `classify` (already mirrored, so `alpha` is flipped for mirrored variables here).
-fn phase1_ratio(tol_h: f64, tol_p0: f64, own: f64, ent: &[(usize, f64)], info: &dyn Fn(usize) -> Option<(f64, f64, u8, bool)>) -> Phase1Pick {
+/// `passes` receives the work of each pass: `Some((eligible, breakpoints))` for a breakpoint pass, `None` for a selection pass.
+fn phase1_ratio(
+    tol_h: f64,
+    tol_p0: f64,
+    own: f64,
+    ent: &[(usize, f64)],
+    info: &dyn Fn(usize) -> Option<(f64, f64, u8, bool)>,
+    passes: &mut Vec<Option<(usize, usize)>>,
+) -> Phase1Pick {
     let inf = INF;
     let frames: Vec<Option<(f64, f64, u8, bool)>> = ent.iter().map(|&(pos, _)| info(pos)).collect();
     let val = |k: usize| -> f64 {
@@ -842,6 +855,7 @@ fn phase1_ratio(tol_h: f64, tol_p0: f64, own: f64, ent: &[(usize, f64)], info: &
                 }
             }
         }
+        passes.push(Some(((0..ent.len()).filter(|&k| ent[k].1.abs() > tol_p).count(), bp.len())));
         let s0 = slope_b + slope_a;
         if s0 < 0.0 && bp.is_empty() {
             return Phase1Pick { entry: None, step: own.min(inf), pivot: 0.0, to_upper: false };
@@ -855,6 +869,7 @@ fn phase1_ratio(tol_h: f64, tol_p0: f64, own: f64, ent: &[(usize, f64)], info: &
             }
         }
         let (mut best, mut best_abs, mut step, mut to_upper) = (NONE, 0.0f64, 0.0f64, false);
+        passes.push(None);
         for k in 0..ent.len() {
             let Some((d, r, c, _)) = frames[k] else { continue };
             let a = val(k);
@@ -981,14 +996,19 @@ fn ratio_test(
     entries: &[(usize, f64)],
     dist_down: &dyn Fn(usize) -> f64,
     dist_up: &dyn Fn(usize) -> f64,
+    passes: &mut Vec<(usize, usize)>,
 ) -> (Option<usize>, f64, f64) {
     let mut first = true;
     loop {
         let mut theta = own;
         let mut cands: Vec<(usize, f64)> = Vec::new();
+        // Entries past the pivot tolerance with a bound in their direction (the reference counts those moving down
+        // whatever their bound), for the pass's work.
+        let mut eligible = 0usize;
         for (k, &(pos, a)) in entries.iter().enumerate() {
             if a > tol_p {
                 let d = dist_down(pos);
+                eligible += 1;
                 if d < INF {
                     let r = d / a;
                     if r <= theta {
@@ -999,6 +1019,7 @@ fn ratio_test(
             } else if a < -tol_p {
                 let d = dist_up(pos);
                 if d < INF {
+                    eligible += 1;
                     let r = d / -a;
                     if r <= theta {
                         cands.push((k, r));
@@ -1007,6 +1028,7 @@ fn ratio_test(
                 }
             }
         }
+        passes.push((eligible, cands.len()));
         if own < INF && own <= theta {
             return (None, own, 0.0);
         }
@@ -1265,7 +1287,21 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 let bl = s.mirror.as_ref().map(|mi| mi.blists().to_vec()).unwrap_or_default();
                 eprintln!("ENT {{\"bl\":{:?},\"kinds\":{:?},\"dims\":{:?},\"iter\":{iterations},\"q\":{q},\"own\":{own:e},\"idx\":{:?},\"val\":{:?}}}", bl, kinds.unwrap_or_default(), dims, entries.iter().map(|e| e.0).collect::<Vec<_>>(), entries.iter().map(|e| e.1).collect::<Vec<_>>());
             }
-            let pick = phase1_ratio(tol, opts.pivot_tol, own, &entries, &info);
+            let mut passes = Vec::new();
+            let pick = phase1_ratio(tol, opts.pivot_tol, own, &entries, &info, &mut passes);
+            if let Some(mi) = s.mirror.as_ref() {
+                // The reference's phase 1 ratio test (`0xf0120`): a breakpoint pass and a selection pass over the FTRAN result.
+                let dense = mi.last_dense();
+                for pass in passes {
+                    let (site, est) = match (pass, dense) {
+                        (Some((eligible, stored)), true) => (0xf15aa, (4 * stored + eligible + m) as f64),
+                        (Some((_, stored)), false) => (0xf0427, (4 * stored + 2 * entries.len()) as f64),
+                        (None, true) => (0xf125c, 3.0 * m as f64),
+                        (None, false) => (0xf07e3, 4.0 * entries.len() as f64),
+                    };
+                    s.work.add(site, est, crate::work::CTX);
+                }
+            }
             if pick.entry.is_some() {
                 leave_to_upper = Some(pick.to_upper);
             }
@@ -1280,7 +1316,21 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 let j = basic[pos];
                 if is_inf(up[j]) { INF } else { up[j] - xs[j] }
             };
-            ratio_test(opts.feasibility_tol, opts.pivot_tol, own, &entries, &down, &upd)
+            let mut passes = Vec::new();
+            let res = ratio_test(opts.feasibility_tol, opts.pivot_tol, own, &entries, &down, &upd, &mut passes);
+            if let Some(mi) = s.mirror.as_ref() {
+                // The reference's ratio test (`0xef960`): per pass, a scan of the FTRAN result and its stored candidates.
+                let dense = mi.last_dense();
+                for (eligible, stored) in passes {
+                    let (site, est) = if dense {
+                        (0xf010c, (2 * eligible + m + 3 * stored) as f64)
+                    } else {
+                        (0xefb7d, (4 * entries.len() + 3 * stored) as f64)
+                    };
+                    s.work.add(site, est, crate::work::CTX);
+                }
+            }
+            res
         };
         if chosen.is_none() && step >= INF {
             if infeasible {
