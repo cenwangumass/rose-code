@@ -53,6 +53,9 @@ pub struct RefStruct {
     /// Only the parity of `fill` matters: it decides the alignment of the next eta's value array.
     fill: usize,
     row_cap: Vec<usize>,
+    /// Alignment of the scratch eta behind each new diagonal (`ctx+0x1d0`): its value array sits `4 m` bytes after the index array in
+    /// an arena whose offsets add `24 maxupd + 8 (m + ncols) + 8`, so the parity is `(maxupd + ncols + 1) % 2` whatever `m` is.
+    scratch_peel: usize,
     /// Work of the last column replacement (`0xf15c0`), as `(site, estimate, scale)`.
     pub upd_work: Vec<(u32, f64, f64)>,
     /// Tail and nucleus U densities fixed at factorization time (`F+0x108`, `F+0x110`), and whether the level structure was built
@@ -106,7 +109,7 @@ fn dot(x: &[f64], c: &[f64], peel: usize) -> f64 {
 
 impl RefStruct {
     /// Fresh factor from the pivot sequence; `cols[pos]` is the basis column at incoming position `pos` as `(is_slack, rows, values)`.
-    pub fn fresh(m: usize, st: &Structure, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> RefStruct {
+    pub fn fresh(m: usize, ncols: usize, st: &Structure, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> RefStruct {
         let mut step = vec![usize::MAX; m];
         for (s, &(r, _)) in st.pivots.iter().enumerate() {
             step[r] = s;
@@ -283,6 +286,7 @@ impl RefStruct {
             nnz_l: nnz_l_tot,
             first_eta: vec![usize::MAX; m],
             work: 0.0,
+            scratch_peel: ((m as f64).powf(0.7) as usize).max(20).wrapping_add(ncols + 1) % 2,
             fill: 2 * (uc.iter().map(Vec::len).sum::<usize>() + nnz_l_tot),
             row_cap: {
                 let mut c = vec![0usize; m];
@@ -1533,8 +1537,8 @@ impl RefStruct {
                 val.push(c);
             }
             let xs: Vec<f64> = ind.iter().map(|&j| spk[j]).collect();
-            // The diagonal is summed from the scratch eta, which is 16-byte aligned.
-            newdiag = dot(&xs, &val, 0);
+            // The diagonal is summed from the scratch eta, whose alignment is fixed per factor object.
+            newdiag = dot(&xs, &val, self.scratch_peel);
             self.sum_eta += ind.len() as f64;
             self.upd_work.push((0xf1beb, 3.0 * ind.len() as f64, crate::work::CTX));
             let e = self.etas.len();

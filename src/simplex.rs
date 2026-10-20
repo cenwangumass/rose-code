@@ -438,7 +438,7 @@ impl<'a> Solver<'a> {
                         self.work.add(0xf461f, est, crate::work::CTX);
                     }
                 }
-                let mi = crate::ftran_order::RefStruct::fresh(self.p.m, &st, &rows);
+                let mi = crate::ftran_order::RefStruct::fresh(self.p.m, self.p.n, &st, &rows);
                 let lu = st.work(&rows, mi.has_levels());
                 self.work.factor_driver(&lu, crate::work::CTX);
                 for (site, est) in lu.into_iter().chain(mi.fresh_work()) {
@@ -1354,7 +1354,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             s.pos_of[j] = pos;
         }
         s.basic = order;
-        s.mirror = Some(crate::ftran_order::RefStruct::fresh(m, &st, &rows));
+        s.mirror = Some(crate::ftran_order::RefStruct::fresh(m, n, &st, &rows));
         let mi = s.mirror.as_ref().unwrap();
         lu_work = st.work(&rows, mi.has_levels());
         lu_work.extend(mi.fresh_work());
