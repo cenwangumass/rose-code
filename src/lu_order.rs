@@ -29,7 +29,7 @@ pub struct Structure {
 }
 
 pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Structure {
-    let (mut seq, mut phase) = phases(m, cols);
+    let (mut seq, mut phase, ov) = phases(m, cols);
     let nsing = seq.len();
     let done_r: HashSet<usize> = seq.iter().map(|&(r, _)| r).collect();
     let done_c: HashSet<usize> = seq.iter().map(|&(_, c)| c).collect();
@@ -61,6 +61,13 @@ pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Stru
         l_vals.push(idx.iter().zip(val).filter(|(&i, _)| step[i] > s).map(|(_, &x)| x / pv).collect());
         diag.push(pv);
         u_rows.push(Vec::new());
+    }
+    for (&s, &d) in &ov.diag {
+        diag[s] = d;
+    }
+    for (s, (r, v)) in ov.l {
+        l_rows[s] = r;
+        l_vals[s] = v;
     }
     l_rows.extend(nl);
     l_vals.extend(nv);
@@ -100,7 +107,7 @@ impl Structure {
     }
 }
 
-fn phases(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> (Vec<(usize, usize)>, Vec<u8>) {
+fn phases(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> (Vec<(usize, usize)>, Vec<u8>, crate::lu_pairs::Overrides) {
     let n = cols.len();
     let mut rc = vec![0usize; m];
     for (is_slack, idx, _) in cols {
@@ -176,6 +183,7 @@ fn phases(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> (Vec<(usize, usize
             }
         }
     }
+    let (row_done3, col_done3) = (row_done.clone(), col_done.clone());
     // Phase 4: column singletons over the unassigned rows.
     ph = 4;
     let mut cnt = vec![0i64; n];
@@ -205,7 +213,11 @@ fn phases(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> (Vec<(usize, usize
             }
         }
     }
-    (seq, phase)
+    let mut ov = crate::lu_pairs::Overrides::default();
+    if m - seq.len() >= 50 && std::env::var_os("ROSE_NO_PAIRS").is_none() {
+        ov = crate::lu_pairs::run(m, cols, &mut seq, &mut phase, &row_done3, &col_done3, &row_done, &col_done);
+    }
+    (seq, phase, ov)
 }
 
 struct Node {
@@ -332,18 +344,60 @@ fn nucleus(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> Nucle
     let mut prows: HashSet<usize> = HashSet::new();
     let mut pcols: HashSet<usize> = HashSet::new();
     let mut remaining = ckeys.len();
+    let n0 = remaining;
     // The reference's hand-off test (`0xd6736`): a nonzero estimate that starts at the nonzeros of the basis matrix and grows by
     // `(r - 2)(c - 2) - 2` per pivot, with row and column counts `r`, `c` of the pivot; past the gate it is replaced by the exact count.
     let mut z = nnz_b as f64;
-    let mut gated_at = usize::MAX;
     let mut work = 0.0;
     while remaining > 0 {
-        if gated_at != remaining {
-            gated_at = remaining;
+        let mut sing: Option<usize> = None;
+        // Whether the singleton is a column singleton (true) or a row singleton.
+        let mut sing_kind: Option<bool> = None;
+        while let Some(c) = s.cst.pop() {
+            if s.ccnt[c] == 1 {
+                if let Some(&id) = s.colchain[c].iter().find(|&&i| s.nodes[i].alive) {
+                    sing = Some(id);
+                    sing_kind = Some(true);
+                    break;
+                }
+            }
+        }
+        if sing.is_none() {
+            while let Some(r) = s.rst.pop() {
+                if s.rcnt[r] == 1 {
+                    if let Some(&id) = s.rowchain[r].iter().find(|&&i| s.nodes[i].alive) {
+                        sing = Some(id);
+                        sing_kind = Some(false);
+                        break;
+                    }
+                }
+            }
+        }
+        if sing.is_none() && s.building {
+            s.building = false;
+            for &c in &ckeys {
+                if !pcols.contains(&c) && s.ccnt[c] >= 2 {
+                    s.cins(c);
+                }
+            }
+            for &r in &rkeys {
+                if !prows.contains(&r) && s.rcnt[r] >= 2 {
+                    s.rins(r);
+                }
+            }
+            continue;
+        }
+        if sing.is_none() && !s.building {
             let n = remaining as f64;
+            if std::env::var_os("ROSE_GATE_LOG").is_some() && !s.building {
+                eprintln!("RGATE n={} z={}", remaining, z);
+            }
             if remaining > 50 && z > 0.36 * n * n && n * n > 4.0 * m as f64 && m as f64 + n * n < 2e9 {
                 let exact: usize = ckeys.iter().filter(|c| !pcols.contains(c)).map(|&c| s.ccnt[c]).sum();
                 z = exact as f64;
+                if std::env::var_os("ROSE_GATE_LOG").is_some() {
+                    eprintln!("RGATE2 n={} exact={} thr={}", remaining, exact, 0.325 * n * n);
+                }
                 if z > 0.325 * n * n && !s.building {
                     // Hand the active matrix to the dense LU: rows by index, columns in ascending bucket order. (Rows in bucket order
                     // reproduce the reference's pivots but not the parity of its vectorised dot products.)
@@ -384,7 +438,15 @@ fn nucleus(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> Nucle
                                 }
                             }
                         }
-                        let perm = dense_lu(&mut a, DENSE_BASE);
+                        let base = std::env::var("ROSE_DBASE").ok().and_then(|v| v.parse().ok()).unwrap_or(pool_fill(m, nnz_b) & 1);
+                        if std::env::var_os("ROSE_DENSE_INFO").is_some() {
+                            eprintln!("DINFO n0={} n={}", n0, nn);
+                        }
+                        if std::env::var_os("ROSE_DENSE_DUMP").is_some() {
+                            let flat: Vec<f64> = (0..nn).flat_map(|c| (0..nn).map(move |r| (r, c))).map(|(r, c)| a[r][c]).collect();
+                            println!("DENSE {}", serde_json::to_string(&(nn, &rows, &cols_a, flat, base)).unwrap());
+                        }
+                        let perm = dense_lu(&mut a, base);
                         for k in 0..nn {
                             let piv = a[k][k];
                             out.push((rows[perm[k]], cols_a[k]));
@@ -406,43 +468,6 @@ fn nucleus(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> Nucle
                 }
             }
         }
-        let mut sing: Option<usize> = None;
-        // Whether the singleton is a column singleton (true) or a row singleton.
-        let mut sing_kind: Option<bool> = None;
-        while let Some(c) = s.cst.pop() {
-            if s.ccnt[c] == 1 {
-                if let Some(&id) = s.colchain[c].iter().find(|&&i| s.nodes[i].alive) {
-                    sing = Some(id);
-                    sing_kind = Some(true);
-                    break;
-                }
-            }
-        }
-        if sing.is_none() {
-            while let Some(r) = s.rst.pop() {
-                if s.rcnt[r] == 1 {
-                    if let Some(&id) = s.rowchain[r].iter().find(|&&i| s.nodes[i].alive) {
-                        sing = Some(id);
-                        sing_kind = Some(false);
-                        break;
-                    }
-                }
-            }
-        }
-        if sing.is_none() && s.building {
-            s.building = false;
-            for &c in &ckeys {
-                if !pcols.contains(&c) && s.ccnt[c] >= 2 {
-                    s.cins(c);
-                }
-            }
-            for &r in &rkeys {
-                if !prows.contains(&r) && s.rcnt[r] >= 2 {
-                    s.rins(r);
-                }
-            }
-            continue;
-        }
         let mut search_cost = 0.0;
         let best = match sing {
             Some(id) => id,
@@ -455,7 +480,12 @@ fn nucleus(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> Nucle
             },
         };
         let (pr, pc, pv) = (s.nodes[best].r, s.nodes[best].c, s.nodes[best].v);
-        z += (s.rcnt[pr] as f64 - 2.0) * (s.ccnt[pc] as f64 - 2.0) - 2.0;
+        if std::env::var_os("ROSE_GATE_LOG").is_some() && !s.building {
+            eprintln!("RPIV n={} r={} c={} sing={:?}", remaining, s.rcnt[pr], s.ccnt[pc], sing_kind);
+        }
+        if sing.is_none() {
+            z += (s.rcnt[pr] as f64 - 2.0) * (s.ccnt[pc] as f64 - 2.0) - 2.0;
+        }
         out.push((pr, pc));
         remaining -= 1;
         prows.insert(pr);
@@ -677,8 +707,22 @@ fn search(s: &mut Nucleus) -> Option<(usize, f64)> {
     best.map(|b| (b, count as f64 * last_bound))
 }
 
-/// Alignment parity of the reference's dense work array (row strides are in doubles), which fixes how its vectorised dot products peel.
-const DENSE_BASE: usize = 1;
+/// The fill of the reference's double pool at the start of the factorization (`0xd4190`): twice the row count times the smaller of
+/// `m/2 + 2` and a power of the average column length. The nucleus nodes take 4 doubles per entry after it, so the dense work array
+/// starts at an odd or even double by this parity, which fixes how its vectorised dot products peel (row strides are in doubles).
+fn pool_fill(m: usize, nnz_b: usize) -> usize {
+    let avg = nnz_b as f64 / m as f64;
+    let g = if m < 500 {
+        avg * avg
+    } else if m < 3000 {
+        avg * avg.sqrt()
+    } else if m < 10000 {
+        avg * avg.sqrt().sqrt()
+    } else {
+        avg
+    };
+    (2.0 * ((m / 2 + 2) as f64).min(g) * m as f64) as usize
+}
 
 fn dot_lanes<const W: usize>(mut acc: f64, a: &[f64], b: &[f64], peel: usize) -> f64 {
     let len = a.len();
@@ -768,11 +812,11 @@ fn dense_lu(a: &mut [Vec<f64>], base: usize) -> Vec<usize> {
     for k in nb..n {
         for i in 1..k {
             let col: Vec<f64> = (0..i).map(|t| a[t][k]).collect();
-            a[i][k] = dot_lanes::<8>(a[i][k], &a[i][..i], &col, peel(i));
+            a[i][k] = dot_lanes::<2>(a[i][k], &a[i][..i], &col, (i * n) & 1);
         }
         for i in k..n {
             let col: Vec<f64> = (0..k).map(|t| a[t][k]).collect();
-            a[i][k] = dot_lanes::<8>(a[i][k], &a[i][..k], &col, peel(i));
+            a[i][k] = dot_lanes::<8>(a[i][k], &a[i][..k], &col, 0);
         }
         let p = pick(a, k);
         if p != k {

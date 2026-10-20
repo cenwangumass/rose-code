@@ -4,6 +4,7 @@ pub mod basis;
 pub mod ftran_order;
 pub mod lu;
 pub mod lu_order;
+pub mod lu_pairs;
 pub mod model;
 pub mod mps;
 pub mod simplex;
