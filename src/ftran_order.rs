@@ -460,8 +460,11 @@ impl RefStruct {
         let dense = rows.len() * self.dthr > m
             || (!self.etas.is_empty() && count_l * self.dthr > m)
             || !(self.nuc.len() + spike.len() < self.i21 || self.dens * (spike.len() as f64) < 2.0 * m as f64);
+        if std::env::var_os("ROSE_UDBG").is_some() {
+            eprintln!("FDBG dense={dense} rows={} dthr={} count_l={count_l} etas={} spike={} nuc={} i21={} dens={}", rows.len(), self.dthr, self.etas.len(), spike.len(), self.nuc.len(), self.i21, self.dens);
+        }
         let inp: Vec<usize> = spike.iter().map(|e| e.0).collect();
-        let ord = if dense { (0..m).collect() } else { self.uorder(&inp) };
+        let ord = if dense { (0..m).collect() } else { self.uorder(&inp, &x) };
         let mut out: Vec<(usize, f64)> = Vec::new();
         let mut done = vec![false; m];
         for &p in &ord {
@@ -491,6 +494,10 @@ impl RefStruct {
     /// The reference's refactorization decision, evaluated before an iteration's own update: at the update limit
     /// `max(20, m^0.7)`, or from `U >= m^0.45` when the accumulated work `(1.5 S + 2 c) m` exceeds `min((Z - 1.5 m)^2, 4 m^2 U0)`.
     /// `(nucleus list length, first tail slot, dens)`; for diagnostics against the reference's `i3`, `i21` and `(hdr33+hdr34)^2`.
+    pub fn blists(&self) -> &[Vec<usize>] {
+        &self.b
+    }
+
     pub fn kinds(&self) -> &[i64] {
         &self.kind
     }
@@ -515,7 +522,7 @@ impl RefStruct {
     }
 
     /// Order of the nonzero positions of the solution, given the L-stage list.
-    pub fn uorder(&self, inp: &[usize]) -> Vec<usize> {
+    pub fn uorder(&self, inp: &[usize], x: &[f64]) -> Vec<usize> {
         let m = self.m;
         let mut seen = vec![false; m];
         let mut inp_d: Vec<usize> = Vec::with_capacity(inp.len());
@@ -578,7 +585,10 @@ impl RefStruct {
         let mut lb = nuc.len();
         while let Some((_, k)) = heap.pop() {
             order.push(k);
-            lb += self.b[k].len();
+            // The reference's counter and nucleus-list discovery only see tail columns that survive the tolerance test.
+            if x[k] != 0.0 {
+                lb += self.b[k].len();
+            }
             for &j in &self.a[k] {
                 if !have[j] {
                     have[j] = true;
@@ -588,10 +598,10 @@ impl RefStruct {
         }
         let mut nm = vec![false; m];
         let mut lst: Vec<usize> = Vec::new();
-        for &x in nuc.iter().chain(order.iter().flat_map(|&k| self.b[k].iter())) {
-            if !nm[x] {
-                nm[x] = true;
-                lst.push(x);
+        for &y in nuc.iter().chain(order.iter().filter(|&&k| x[k] != 0.0).flat_map(|&k| self.b[k].iter())) {
+            if !nm[y] {
+                nm[y] = true;
+                lst.push(y);
             }
         }
         if std::env::var_os("ROSE_UDBG").is_some() {
@@ -707,8 +717,11 @@ impl RefStruct {
             }
         }
         if let Some(i) = sp.iter().position(|&x| x == r) {
-            let last = sp.pop().unwrap();
-            if i < sp.len() {
+            // The reference keeps the spike as a tail group and a nucleus group; the leaving column is deleted from the nucleus
+            // group by moving that group's last entry into its place.
+            let j = sp.iter().rposition(|&x| x == r || self.kind[x] != -2).unwrap();
+            let last = sp.remove(j);
+            if j != i {
                 sp[i] = last;
             }
         }
@@ -809,10 +822,10 @@ impl RefStruct {
                     if !in_a {
                         self.a[k].push(r);
                     }
-                    self.b[k].retain(|&y| y != r);
+                    remove_front_fill(&mut self.b[k], r);
                 } else {
                     self.a[k].retain(|&y| y != r);
-                    self.b[k].retain(|&y| y != r);
+                    remove_last_fill(&mut self.b[k], r);
                     self.uc[k].retain(|e| e.0 != r);
                     elim.push(k);
                 }
@@ -837,5 +850,21 @@ impl RefStruct {
         let mut bb = bv;
         bb.reverse();
         self.b[r] = bb;
+    }
+}
+
+/// Delete `r` from a column's nucleus list the way the reference does: the entry at the front of this (reversed) list fills the hole.
+fn remove_front_fill(v: &mut Vec<usize>, r: usize) {
+    if let Some(p) = v.iter().position(|&y| y == r) {
+        if p != 0 {
+            v[p] = v[0];
+        }
+        v.remove(0);
+    }
+}
+
+fn remove_last_fill(v: &mut Vec<usize>, r: usize) {
+    if let Some(p) = v.iter().position(|&y| y == r) {
+        v.swap_remove(p);
     }
 }
