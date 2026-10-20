@@ -103,23 +103,36 @@ fn is_inf(v: f64) -> bool {
     v.abs() >= INF
 }
 
+/// Internal layout: structurals, then one range column per ranged inequality row (as the reference does), then
+/// one slack per row. A ranged row `rl <= a x <= ru` becomes `a x + s + g = ru` with `s` fixed at 0 and
+/// `g in [0, ru - rl]`; a ranged `>=` row uses `-1` for both unit columns.
 fn build(model: &LpModel) -> Internal {
-    let (n, m) = (model.num_cols(), model.num_rows());
-    let mut cols: Vec<Column> = (0..n).map(|j| model.col(j).collect()).collect();
+    let (nm, m) = (model.num_cols(), model.num_rows());
+    let mut cols: Vec<Column> = (0..nm).map(|j| model.col(j).collect()).collect();
     let mut lo = model.col_lo.clone();
     let mut up = model.col_up.clone();
     let mut rhs = vec![0.0; m];
+    let mut slack: Vec<(f64, f64, f64)> = Vec::with_capacity(m);
     for i in 0..m {
         let (rl, ru) = (model.row_lo[i], model.row_up[i]);
         let (sign, r, slo, sup) = match (is_inf(rl), is_inf(ru)) {
             (false, false) if rl == ru => (1.0, ru, 0.0, 0.0),
-            (false, false) => (1.0, ru, 0.0, ru - rl),
+            (false, false) => {
+                cols.push(vec![(i, 1.0)]);
+                lo.push(0.0);
+                up.push(ru - rl);
+                (1.0, ru, 0.0, 0.0)
+            }
             (true, false) => (1.0, ru, 0.0, INF),
             (false, true) => (-1.0, rl, 0.0, INF),
             (true, true) => (1.0, 0.0, -INF, INF),
         };
-        cols.push(vec![(i, sign)]);
         rhs[i] = r;
+        slack.push((sign, slo, sup));
+    }
+    let n = cols.len();
+    for (i, &(sign, slo, sup)) in slack.iter().enumerate() {
+        cols.push(vec![(i, sign)]);
         lo.push(slo);
         up.push(sup);
     }
@@ -607,13 +620,14 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     let sgn = if model.sense == Sense::Maximize { -1.0 } else { 1.0 };
     let mut y: Vec<f64> = s.basic.iter().map(|&j| p.cost[j]).collect();
     s.factor.btran(&mut y);
-    let x: Vec<f64> = s.x[..n].to_vec();
+    let nm = model.num_cols();
+    let x: Vec<f64> = s.x[..nm].to_vec();
     Ok(SolveResult {
         status,
         objective: model.objective(&x),
         x,
         dual: y.iter().map(|v| sgn * v).collect(),
-        reduced_cost: s.d[..n].iter().map(|v| sgn * v).collect(),
+        reduced_cost: s.d[..nm].iter().map(|v| sgn * v).collect(),
         basis: Basis { basic: s.basic.clone(), at_upper: s.at_upper.clone() },
         iterations,
         refactorizations: s.refactorizations,

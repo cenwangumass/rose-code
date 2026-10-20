@@ -7,14 +7,15 @@ use rose::{mps, solve, Basis, SolveOptions};
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let model = mps::parse(&std::fs::read_to_string(&args[1]).unwrap()).unwrap();
-    let (n, m) = (model.num_cols(), model.num_rows());
     let states: Vec<serde_json::Value> =
         std::fs::read_to_string(&args[2])
             .unwrap()
             .lines()
             .map(|l| serde_json::from_str(&l.replace("NaN", "null").replace("Infinity", "null")).unwrap())
             .collect();
-    eprintln!("model {} x {}, state length {}", m, n, states[0]["status"].as_array().unwrap().len());
+    let m = model.num_rows();
+    let n_all = states[0]["status"].as_array().unwrap().len();
+    let n = n_all - m;
     let status: Vec<i64> = states[0]["status"].as_array().unwrap().iter().map(|s| s.as_i64().unwrap()).collect();
     let mut basic = vec![usize::MAX; m];
     let mut at_upper = vec![false; n + m];
