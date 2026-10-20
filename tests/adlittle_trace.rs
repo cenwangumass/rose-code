@@ -24,7 +24,7 @@ fn adlittle_matches_all_reference_decisions() {
             at_upper[j] = true;
         }
     }
-    let r = solve(&model, Some(&Basis { basic, at_upper }), &SolveOptions::default()).unwrap();
+    let r = solve(&model, Some(&Basis { basic, at_upper }), &SolveOptions { faithful_weights: true, ..SolveOptions::default() }).unwrap();
     assert_eq!(r.status, Status::Optimal);
     assert!((r.objective - 225494.96316238036).abs() < 1e-7 + 1e-8 * 225494.96, "objective {}", r.objective);
     let expected: Vec<(usize, Option<usize>)> =

@@ -26,7 +26,7 @@ fn main() {
             at_upper[j] = true;
         }
     }
-    let r = match solve(&model, Some(&Basis { basic, at_upper }), &SolveOptions::default()) {
+    let r = match solve(&model, Some(&Basis { basic, at_upper }), &SolveOptions { faithful_weights: true, ..SolveOptions::default() }) {
         Ok(r) => r,
         Err(e) => {
             println!("{}: {e}", args[1]);

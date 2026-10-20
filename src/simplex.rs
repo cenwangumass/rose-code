@@ -18,6 +18,9 @@ pub struct SolveOptions {
     /// Refactor after this many product-form updates.
     pub max_updates: usize,
     pub record_trace: bool,
+    /// Reproduce the reference's Devex weights exactly (weights outside the framework may fall below 1). The reference's
+    /// anti-degeneracy perturbation is not implemented, so this mode can stall on degenerate models; off by default.
+    pub faithful_weights: bool,
 }
 
 impl Default for SolveOptions {
@@ -29,6 +32,7 @@ impl Default for SolveOptions {
             max_iterations: 1_000_000,
             max_updates: 20,
             record_trace: true,
+            faithful_weights: false,
         }
     }
 }
@@ -351,6 +355,9 @@ impl<'a> Solver<'a> {
 
 /// Penalty on the sum of bound violations in the composite phase-1 cost (recovered from the reference's `d`).
 const PHASE1_M: f64 = 1e6;
+
+/// Rounding guard for Devex weights of variables outside the reference framework (the reference's smallest observed weight is 3e-4).
+const W_MIN: f64 = 1e-6;
 
 impl<'a> Solver<'a> {
     fn has_infeasible_basic(&self) -> bool {
@@ -931,9 +938,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             let ratio = arj / alpha_rq;
             let vj = dot(&p.cols[j], &u);
             s.w[j] = s.w[j] - 2.0 * ratio * vj + ratio * ratio * wq;
-            if s.in_r0[j] {
-                s.w[j] = s.w[j].max(1.0);
-            }
+            let floor = if opts.faithful_weights && !s.in_r0[j] { W_MIN } else { 1.0 };
+            s.w[j] = s.w[j].max(floor);
             if !s.is_fixed(j) {
                 s.d[j] -= theta_d * arj;
             }
@@ -942,9 +948,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         s.d[leave] = -theta_d;
         s.d[q] = 0.0;
         s.w[leave] = wq / (alpha_rq * alpha_rq);
-        if s.in_r0[leave] {
-            s.w[leave] = s.w[leave].max(1.0);
-        }
+        s.w[leave] = s.w[leave].max(if opts.faithful_weights && !s.in_r0[leave] { W_MIN } else { 1.0 });
 
         // Basis change.
         s.pos_of[leave] = NONE;
