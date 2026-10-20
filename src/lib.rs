@@ -7,6 +7,7 @@ pub mod lu_order;
 pub mod model;
 pub mod mps;
 pub mod simplex;
+pub mod work;
 
 pub use basis::Basis;
 pub use model::{LpModel, Sense};

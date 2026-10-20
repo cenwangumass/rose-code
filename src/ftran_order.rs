@@ -41,6 +41,22 @@ pub struct RefStruct {
     sum_eta: f64,
     last_alpha: usize,
     znz: f64,
+    /// Work-counter inputs (`crate::work`): phase-1 steps (`L+0xb8`), singleton-phase steps (`L+0xc4`), `nnz(L)`, and for each
+    /// position the first row eta that lists it (`F+0x1a0`).
+    n1: usize,
+    loff: usize,
+    nnz_l: usize,
+    first_eta: Vec<usize>,
+    /// Estimate of the most recent `ftran` (`0x120740`) or `btran` (`0x12de60`), before the factor object's scale 1.3.
+    pub work: f64,
+    /// Tail and nucleus U densities fixed at factorization time (`F+0x108`, `F+0x110`), and whether the level structure was built
+    /// but has too many levels (`F+0x140 >= m/10`), which makes the L^T solve dense.
+    h33: f64,
+    h34: f64,
+    lev_dense: bool,
+    last_dense: bool,
+    /// Whether the most recent `btran` returned a dense result (count `-1`): its L^T solve ran dense.
+    pub bt_dense: bool,
 }
 
 struct Eta {
@@ -222,6 +238,7 @@ impl RefStruct {
             let t = 5.0 * ((nnz as f64 / m as f64) + 1.0).powi(2);
             if (m as f64) > t { t as usize } else { m }
         };
+        let mut lev_dense = false;
         let levels = {
             let d = m - nseq;
             let nnz_tail: usize = lcols[nseq..].iter().map(|c| c.len()).sum();
@@ -234,11 +251,13 @@ impl RefStruct {
                     }
                 }
                 let maxlev = lev.iter().copied().max().unwrap_or(0);
-                if (maxlev as f64) < 0.1 * m as f64 { Some(lev) } else { None }
+                lev_dense = (maxlev as f64) >= 0.1 * m as f64;
+                if !lev_dense { Some(lev) } else { None }
             } else {
                 None
             }
         };
+        let nnz_l_tot: usize = lcols.iter().map(|c| c.len()).sum();
         let perm = step;
         let znz = (nnz + sa + sb + 2 * m) as f64;
         RefStruct {
@@ -247,6 +266,16 @@ impl RefStruct {
             sum_eta: 0.0,
             last_alpha: 0,
             znz,
+            n1: st.phase.iter().filter(|&&p| p == 1).count(),
+            loff: nseq,
+            nnz_l: nnz_l_tot,
+            first_eta: vec![usize::MAX; m],
+            work: 0.0,
+            h33,
+            h34,
+            lev_dense,
+            last_dense: false,
+            bt_dense: false,
             m,
             kind,
             nuc,
@@ -308,7 +337,10 @@ impl RefStruct {
     }
 
     /// L solve (Kahn order) and row etas on the entering column; returns the nonzero list the U solve receives, with values.
-    fn lstage_num(&self, rows: &[usize], vals: &[f64]) -> (Vec<(usize, f64)>, usize) {
+    /// Also returns the work estimate of the L stage and the row etas (`0x12bd30` / `0x12a990` and the eta loop of `0x120740`).
+    fn lstage_num(&self, rows: &[usize], vals: &[f64]) -> (Vec<(usize, f64)>, usize, f64) {
+        let m = self.m;
+        let mut e = 0.0f64;
         let mut x = vec![0.0f64; self.m];
         let mut start: Vec<usize> = Vec::with_capacity(rows.len());
         for (&r, &v) in rows.iter().zip(vals) {
@@ -319,11 +351,14 @@ impl RefStruct {
         let dense_l = rows.len() * self.dthr > self.m;
         let (mut order, count_l) = if dense_l {
             // Dense L solve (`0x12bd30`): every node in ascending order; the list handed on is the ascending scan.
+            e = m as f64 + rows.len() as f64 * 2.0 + e;
+            e = (m - self.loff) as f64 * 2.0 + self.n1 as f64 + self.n1 as f64 + e;
             for v in 0..self.m {
                 let xv = x[v];
                 if xv.abs() <= TOL {
                     continue;
                 }
+                e = self.lcols[v].len() as f64 * 2.0 + e;
                 for (e, &y) in self.lcols[v].iter().enumerate() {
                     x[y] -= self.lvals[v][e] * xv;
                 }
@@ -370,6 +405,7 @@ impl RefStruct {
                 l += 1;
             }
             let n = out.len();
+            e = ((self.nnz_l + m + 2 * m) as f64 * 5.0 * n as f64) / (m + 1) as f64 + e;
             (out, n)
         } else {
             let q = self.kahn(&start);
@@ -383,11 +419,51 @@ impl RefStruct {
                 }
             }
             let count_l = q.iter().filter(|&&v| x[v].abs() > TOL).count();
+            let d = m - self.loff;
+            let nnz_tail: usize = self.lcols[self.loff..].iter().map(|c| c.len()).sum();
+            if !(d < 6 || 10 * d * d <= m || nnz_tail <= 10 * d) && std::env::var_os("ROSE_WORK").is_some() {
+                eprintln!("WARN partial L solve (0x12a990 third strategy) not modelled");
+            }
+            e = (((self.nnz_l + m) as f64 + m as f64 + m as f64) * 7.0 * count_l as f64) / (m + 1) as f64 + e;
             (q, count_l)
         };
         let mut have = vec![false; self.m];
         for &v in &order {
             have[v] = true;
+        }
+        if !self.etas.is_empty() {
+            let netas = self.etas.len();
+            if dense_l || count_l * self.dthr > m {
+                e = self.sum_eta * 2.0 + e;
+            } else {
+                // Sparse eta pass: from the first eta that lists an input position; the list grows by the eta positions that
+                // become nonzero.
+                let mut inlist = vec![false; m];
+                let mut c0 = 0usize;
+                let mut first = netas;
+                for &v in &order {
+                    if x[v].abs() > TOL && !inlist[v] {
+                        inlist[v] = true;
+                        c0 += 1;
+                        first = first.min(self.first_eta[v]);
+                    }
+                }
+                let mut xe = x.clone();
+                let mut ee = (netas - first) as f64 * 3.0;
+                for eta in &self.etas[first..] {
+                    ee = eta.ind.len() as f64 * 2.0 + ee;
+                    let xs: Vec<f64> = eta.ind.iter().map(|&j| xe[j]).collect();
+                    let mut sv = dot(&xs, &eta.val);
+                    if sv.abs() <= TOL {
+                        sv = 0.0;
+                    } else if !inlist[eta.idx] {
+                        inlist[eta.idx] = true;
+                        c0 += 1;
+                    }
+                    xe[eta.idx] = sv;
+                }
+                e = ee + 3.0 * c0 as f64 + e;
+            }
         }
         for eta in &self.etas {
             let xs: Vec<f64> = eta.ind.iter().map(|&j| x[j]).collect();
@@ -401,14 +477,14 @@ impl RefStruct {
             }
             x[eta.idx] = s;
         }
-        (order.into_iter().filter(|&v| x[v].abs() > TOL).map(|v| (v, x[v])).collect(), count_l)
+        (order.into_iter().filter(|&v| x[v].abs() > TOL).map(|v| (v, x[v])).collect(), count_l, e)
     }
 
     /// FTRAN of a sparse column: the nonzeros `(position, value)` of `B^-1 a` in the reference's output order. The spike is kept
     /// for the following `update`.
     pub fn ftran(&mut self, rows: &[usize], vals: &[f64]) -> Vec<(usize, f64)> {
         let m = self.m;
-        let (spike, count_l) = self.lstage_num(rows, vals);
+        let (spike, count_l, e_l) = self.lstage_num(rows, vals);
         let mut x = vec![0.0f64; m];
         for &(p, v) in &spike {
             x[p] = v;
@@ -461,6 +537,9 @@ impl RefStruct {
             || (!self.etas.is_empty() && count_l * self.dthr > m)
             || !(self.nuc.len() + spike.len() < self.i21 || self.dens * (spike.len() as f64) < 2.0 * m as f64);
         let inp: Vec<usize> = spike.iter().map(|e| e.0).collect();
+        let vec_dense = rows.len() * self.dthr > m || (!self.etas.is_empty() && count_l * self.dthr > m);
+        self.work = self.u_work(&inp, &x, !dense, if vec_dense { None } else { Some(spike.len()) }) + e_l;
+        self.last_dense = dense;
         let ord = if dense { (0..m).collect() } else { self.uorder(&inp, &x) };
         let mut out: Vec<(usize, f64)> = Vec::new();
         let mut done = vec![false; m];
@@ -516,6 +595,453 @@ impl RefStruct {
         let d6 = (self.znz - 1.5 * m).powi(2);
         let d7 = (4.0 * m * m * c46c as f64).min(d6);
         (1.5 * self.sum_alpha + 2.0 * self.sum_eta) * m - d7 > 0.0
+    }
+
+    /// The reference BTRAN (`0x12de60`) of a sparse input given by basis position: U^T solve (`0x130b70` or the dense loop), the row
+    /// etas in reverse, the L^T solve, then the rows. Returns `(row, value)` with the reference's drops, and leaves its work
+    /// estimate in `work`. `direct` is the update-saving entry (`0x131710`), which goes to the sparse U^T solve without the density
+    /// test unless the first position's U^T row is empty. `dense_in` passes the input as a dense vector (count `-1`).
+    pub fn btran(&mut self, inp: &[(usize, f64)], direct: bool, dense_in: bool) -> Vec<(usize, f64)> {
+        let m = self.m;
+        let mut ut: Vec<Vec<(usize, f64)>> = vec![Vec::new(); m];
+        for c in 0..m {
+            for &(j, v) in &self.uc[c] {
+                ut[j].push((c, v));
+            }
+        }
+        let mut x = vec![0.0f64; m];
+        let mut e = 0.0f64;
+        let cnt = inp.len();
+        self.bt_dense = false;
+        let hsum = (self.h33 + self.h34) as usize;
+        let direct = direct && !inp.is_empty() && !ut[inp[0].0].is_empty();
+        // The current vector: a list (`Some`) or dense (`None`).
+        let mut list: Option<Vec<usize>>;
+        if !dense_in && (direct || hsum * cnt <= m) {
+            let mut out: Vec<usize> = Vec::new();
+            let mut w = vec![0.0f64; m];
+            let mut eu = 0.0f64;
+            let push = |w: &mut Vec<f64>, row: &[(usize, f64)], d: f64| {
+                for &(c, v) in row {
+                    w[c] = -(v * d) + w[c];
+                }
+            };
+            let mut lowest = m;
+            if self.h33 > 5.0 {
+                eu = cnt as f64 * 3.0;
+            }
+            for &(p, v) in inp {
+                let d = v / self.diag[p];
+                let tail = if self.h33 > 5.0 { self.kind[p] == -2 } else { self.slot[p] >= self.i21 };
+                if tail {
+                    if self.h33 <= 5.0 || d.abs() > TOL {
+                        lowest = lowest.min(self.slot[p]);
+                        w[p] += v;
+                    }
+                } else if d.abs() > TOL {
+                    out.push(p);
+                    x[p] = d;
+                    if self.h33 > 5.0 && self.kind[p] >= 0 {
+                        eu = ut[p].len() as f64 * 2.0 + eu;
+                    }
+                    push(&mut w, &ut[p], d);
+                    for &(c, _) in &ut[p] {
+                        lowest = lowest.min(self.slot[c]);
+                    }
+                }
+            }
+            if self.h33 > 5.0 {
+                eu = (m - lowest) as f64 * 2.0 + eu;
+            }
+            for t in lowest..m {
+                let p = self.at[t];
+                let d = w[p] / self.diag[p];
+                w[p] = 0.0;
+                if d.abs() > TOL {
+                    eu = ut[p].len() as f64 * 2.0 + eu;
+                    out.push(p);
+                    x[p] = d;
+                    push(&mut w, &ut[p], d);
+                }
+            }
+            e = eu + e;
+            if out.is_empty() {
+                self.work = e;
+                return Vec::new();
+            }
+            list = Some(out);
+        } else {
+            for &(p, v) in inp {
+                x[p] = v;
+            }
+            if !dense_in && cnt >= 1 {
+                e = cnt as f64 * 2.0 + m as f64 + e;
+            }
+            e = m as f64 + m as f64 + e;
+            for t in 0..m {
+                let p = self.at[t];
+                let xv = x[p];
+                let d = xv / self.diag[p];
+                if xv.abs() <= TOL || d.abs() <= TOL {
+                    x[p] = 0.0;
+                    continue;
+                }
+                x[p] = d;
+                e = ut[p].len() as f64 * 2.0 + e;
+                for &(c, v) in &ut[p] {
+                    x[c] -= v * d;
+                }
+            }
+            list = None;
+        }
+        // Row etas, last first.
+        if !self.etas.is_empty() {
+            let netas = self.etas.len();
+            match &mut list {
+                Some(l) if l.len() * self.dthr <= m => {
+                    let c0 = l.len();
+                    let mut inl = vec![false; m];
+                    for &p in l.iter() {
+                        inl[p] = true;
+                    }
+                    let mut es = netas as f64 + netas as f64 + c0 as f64 * 5.0;
+                    for eta in self.etas.iter().rev() {
+                        let xr = x[eta.idx];
+                        if xr == 0.0 {
+                            continue;
+                        }
+                        es = eta.ind.len() as f64 * 3.0 + es;
+                        for (k, &j) in eta.ind.iter().enumerate() {
+                            if j == eta.idx {
+                                x[j] = eta.val[k] * xr;
+                            } else {
+                                x[j] = eta.val[k] * xr + x[j];
+                                if !inl[j] {
+                                    inl[j] = true;
+                                    l.push(j);
+                                }
+                            }
+                        }
+                    }
+                    let n = l.len();
+                    e = es + (n - c0) as f64 * 2.0 + 3.0 * n as f64 + e;
+                    l.retain(|&p| {
+                        if x[p].abs() >= TOL {
+                            true
+                        } else {
+                            x[p] = 0.0;
+                            false
+                        }
+                    });
+                    if l.is_empty() {
+                        self.work = e;
+                        return Vec::new();
+                    }
+                }
+                _ => {
+                    for eta in self.etas.iter().rev() {
+                        let xr = x[eta.idx];
+                        if xr.abs() <= TOL {
+                            x[eta.idx] = 0.0;
+                            continue;
+                        }
+                        for (k, &j) in eta.ind.iter().enumerate() {
+                            if j == eta.idx {
+                                x[j] = eta.val[k] * xr;
+                            } else {
+                                x[j] = eta.val[k] * xr + x[j];
+                            }
+                        }
+                    }
+                    e = self.sum_eta * 2.0 + e;
+                    list = None;
+                }
+            }
+        }
+        // L^T: row i of L pushes into the earlier nodes.
+        let mut lt: Vec<Vec<(usize, f64)>> = vec![Vec::new(); m];
+        for v in 0..m {
+            for (k, &y) in self.lcols[v].iter().enumerate() {
+                lt[y].push((v, self.lvals[v][k]));
+            }
+        }
+        let mut res: Vec<usize> = Vec::new();
+        let sparse_l = match &list {
+            Some(l) => l.len() * self.dthr <= m && !self.lev_dense,
+            None => false,
+        };
+        if sparse_l {
+            let l = list.as_ref().unwrap();
+            let cnt = l.len();
+            let (n1, nseq) = (self.n1, self.loff);
+            let d = m - nseq;
+            let nnz_tail: usize = self.lcols[nseq..].iter().map(|c| c.len()).sum();
+            let mut hi = 0usize;
+            if d >= 6 && m < 10 * d * d && n1 < 2 * d && 10 * d < nnz_tail && cnt > 0 {
+                hi = l.iter().filter(|&&i| i >= nseq).count();
+            }
+            let dn = if d > 0 { nnz_tail as f64 * 0.5 / d as f64 } else { 0.0 };
+            if hi as f64 * dn * dn > d as f64 {
+                // Partial: inputs in the middle range directly, then the top range and the first-phase range, both descending.
+                let mut el = cnt as f64 * 3.0;
+                let mut w = vec![0.0f64; m];
+                let mut maxi = 0usize;
+                for &i in l {
+                    let v = x[i];
+                    if i < nseq {
+                        if i < n1 {
+                            w[i] += v;
+                        } else {
+                            res.push(i);
+                            el = lt[i].len() as f64 * 2.0 + el;
+                            for &(j, lv) in &lt[i] {
+                                w[j] -= lv * v;
+                            }
+                        }
+                    } else {
+                        maxi = maxi.max(i);
+                        w[i] = v;
+                    }
+                }
+                for &i in &res {
+                    w[i] = x[i];
+                }
+                el = (n1 as f64 - nseq as f64 + maxi as f64) * 2.0 + el;
+                let ranges: Vec<usize> = if nseq <= maxi { (nseq..=maxi).rev().collect() } else { Vec::new() };
+                for i in ranges.into_iter().chain((0..n1).rev()) {
+                    let v = w[i];
+                    if v.abs() > TOL {
+                        el = lt[i].len() as f64 * 2.0 + el;
+                        res.push(i);
+                        for &(j, lv) in &lt[i] {
+                            w[j] -= lv * v;
+                        }
+                    } else {
+                        w[i] = 0.0;
+                    }
+                }
+                x = w;
+                e = el + e;
+            } else {
+                // Heap or levels: every reached node, descending, kept when at least the tolerance.
+                let mut seen = vec![false; m];
+                let mut heap: BinaryHeap<usize> = BinaryHeap::new();
+                for &i in l {
+                    seen[i] = true;
+                    heap.push(i);
+                }
+                while let Some(i) = heap.pop() {
+                    let v = x[i];
+                    if v.abs() >= TOL {
+                        res.push(i);
+                        for &(j, lv) in &lt[i] {
+                            x[j] -= lv * v;
+                            if !seen[j] {
+                                seen[j] = true;
+                                heap.push(j);
+                            }
+                        }
+                    } else {
+                        x[i] = 0.0;
+                    }
+                }
+                let f1e0 = (self.nnz_l + m) as f64;
+                let k = if self.levels.is_some() { 5.0 } else { 7.0 };
+                e = (res.len() as f64 * k * (m as f64 + m as f64 + f1e0)) / (m + 1) as f64 + e;
+            }
+        } else {
+            self.bt_dense = true;
+            if let Some(l) = &list {
+                if !l.is_empty() {
+                    e = l.len() as f64 * 2.0 + m as f64 + e;
+                }
+            }
+            e = m as f64 + m as f64 + e;
+            for i in (0..m).rev() {
+                let v = x[i];
+                if v.abs() > TOL {
+                    e = lt[i].len() as f64 * 2.0 + e;
+                    res.push(i);
+                    for &(j, lv) in &lt[i] {
+                        x[j] -= lv * v;
+                    }
+                }
+            }
+        }
+        self.work = e;
+        let mut row_of = vec![0usize; m];
+        for (r, &v) in self.perm.iter().enumerate() {
+            row_of[v] = r;
+        }
+        res.into_iter().filter(|&i| x[i] != 0.0).map(|i| (row_of[i], x[i])).collect()
+    }
+
+    /// Density threshold of the solves (`F+0x104`).
+    pub fn dthr(&self) -> usize {
+        self.dthr
+    }
+
+    /// Whether the most recent `ftran` returned a dense result (the reference's count `-1`).
+    pub fn last_dense(&self) -> bool {
+        self.last_dense
+    }
+
+    /// Work estimate of an FTRAN with a dense input (the reference's count `-1`, e.g. the basic solution after a refactorization):
+    /// dense L solve, all row etas, dense U solve. `b` is indexed by row.
+    pub fn ftran_dense_work(&self, b: &[f64]) -> f64 {
+        let m = self.m;
+        let mut x = vec![0.0f64; m];
+        for r in 0..m {
+            x[self.perm[r]] += b[r];
+        }
+        let mut e = (m - self.loff) as f64 * 2.0 + self.n1 as f64 + self.n1 as f64;
+        for v in 0..m {
+            let xv = x[v];
+            if xv.abs() <= TOL {
+                continue;
+            }
+            e = self.lcols[v].len() as f64 * 2.0 + e;
+            for (k, &y) in self.lcols[v].iter().enumerate() {
+                x[y] -= self.lvals[v][k] * xv;
+            }
+        }
+        if !self.etas.is_empty() {
+            e = self.sum_eta * 2.0 + e;
+            for eta in &self.etas {
+                let xs: Vec<f64> = eta.ind.iter().map(|&j| x[j]).collect();
+                let sv = dot(&xs, &eta.val);
+                x[eta.idx] = if sv.abs() <= TOL { 0.0 } else { sv };
+            }
+        }
+        for t in (self.i21..m).rev() {
+            let c = self.at[t];
+            let xc = x[c] / self.diag[c];
+            if x[c].abs() <= TOL || xc.abs() <= TOL {
+                x[c] = 0.0;
+                continue;
+            }
+            x[c] = xc;
+            for &(j, v) in &self.uc[c] {
+                x[j] -= v * xc;
+            }
+        }
+        self.u_work(&[], &x, false, None) + e
+    }
+
+    /// Work estimate of the U stage: the sparse solve `0x1223e0` (`sparse`) or the dense one `0x121ef0`. `x` holds the solved
+    /// values, so a tail column survived the tolerance test when its entry is nonzero. `cnt` is the input count when the input
+    /// is a sparse list.
+    fn u_work(&self, inp: &[usize], x: &[f64], sparse: bool, cnt: Option<usize>) -> f64 {
+        let m = self.m;
+        let i21 = self.i21;
+        let i3 = self.nuc.len();
+        let len = |c: usize| self.uc[c].len();
+        // Every tail slot from the top down, then the nucleus list (shared by the dense paths).
+        let full_tail = |mut e: f64| {
+            e = (m - i21) as f64 * 3.0 + e;
+            for t in i21..m {
+                let c = self.at[t];
+                if x[c] != 0.0 {
+                    e += len(c) as f64 * 2.0;
+                }
+            }
+            e
+        };
+        if !sparse {
+            let mut e = 0.0f64;
+            if let Some(n) = cnt {
+                e = m as f64 + n as f64 * 2.0 + e;
+            }
+            e = (m - i21) as f64 * 3.0 + e;
+            for t in (i21..m).rev() {
+                let c = self.at[t];
+                if x[c] != 0.0 {
+                    e = (len(c) as f64 + 2.0) * 2.0 + e;
+                }
+            }
+            return 3.0 * i21.saturating_sub(1) as f64 + e;
+        }
+        let n = inp.len();
+        let d2 = self.dens;
+        if (m as f64) <= n as f64 * d2 {
+            let e = full_tail(0.0);
+            return i3 as f64 + i3 as f64 + e;
+        }
+        let tail: Vec<usize> = inp.iter().copied().filter(|&p| self.kind[p] == -2).collect();
+        let nuc_in = inp.iter().filter(|&&p| self.kind[p] >= 0).count();
+        if d2 * ((nuc_in + tail.len()) as f64) > (i3 + (m - i21)) as f64 {
+            let e = (2 * (nuc_in + tail.len())) as f64;
+            let e = full_tail(e);
+            return i3 as f64 + i3 as f64 + e;
+        }
+        let mut e = (tail.len() * 2) as f64;
+        let mut mark = vec![false; m];
+        let mut heap: BinaryHeap<usize> = BinaryHeap::new();
+        for &p in &tail {
+            mark[p] = true;
+            heap.push(self.slot[p]);
+        }
+        let (mut lb, mut ld) = (nuc_in, nuc_in);
+        let mut surv: Vec<usize> = Vec::new();
+        let visit = |c: usize, lb: &mut usize, ld: &mut usize, surv: &mut Vec<usize>| -> bool {
+            if x[c] != 0.0 {
+                *lb += self.b[c].len();
+                *ld += self.a[c].len();
+                surv.push(c);
+                true
+            } else {
+                false
+            }
+        };
+        while let Some(&top) = heap.peek() {
+            let size = heap.len();
+            if size > 1 && ((top - i21) as f64) < 6.0 * size as f64 {
+                // Remaining slots are close together: scan the range from the top slot down.
+                e = (top - i21) as f64 * 5.0 + size as f64 + size as f64 + e;
+                for t in (i21..=top).rev() {
+                    visit(self.at[t], &mut lb, &mut ld, &mut surv);
+                }
+                break;
+            }
+            heap.pop();
+            let c = self.at[top];
+            if visit(c, &mut lb, &mut ld, &mut surv) {
+                for &j in &self.a[c] {
+                    if !mark[j] {
+                        mark[j] = true;
+                        heap.push(self.slot[j]);
+                    }
+                }
+            }
+            e += 8.0;
+        }
+        e = ld as f64 * 3.0 + e;
+        if lb as f64 * 2.5 <= i3 as f64 {
+            let mut nm = vec![false; m];
+            let mut cntn = 0usize;
+            for &p in inp.iter().filter(|&&p| self.kind[p] >= 0) {
+                if !nm[p] {
+                    nm[p] = true;
+                    cntn += 1;
+                }
+            }
+            for &c in &surv {
+                e = e + self.b[c].len() as f64 * 2.0 + 4.0;
+                for &y in &self.b[c] {
+                    if !nm[y] {
+                        nm[y] = true;
+                        cntn += 1;
+                    }
+                }
+            }
+            e + 3.0 * cntn as f64
+        } else {
+            e += nuc_in as f64;
+            for &c in &surv {
+                e = e + self.b[c].len() as f64 * 2.0 + 4.0;
+            }
+            e + 3.0 * i3 as f64
+        }
     }
 
     /// Order of the nonzero positions of the solution, given the L-stage list.
@@ -722,7 +1248,7 @@ impl RefStruct {
         let old = self.kind[r];
         let mut convslot: Option<usize> = None;
         let mut conv: Option<usize> = None;
-        if old != -2 {
+        if old != -2 && self.slot[r] + 1 != self.i21 {
             conv = (0..m).filter(|&x| self.kind[x] == -2 && self.a[x].is_empty() && self.b[x].is_empty()).max_by_key(|&x| self.slot[x]);
             if let Some(x) = conv {
                 convslot = Some(self.slot[x]);
@@ -836,6 +1362,10 @@ impl RefStruct {
             let xs: Vec<f64> = ind.iter().map(|&j| spk[j]).collect();
             newdiag = dot(&xs, &val);
             self.sum_eta += ind.len() as f64;
+            let e = self.etas.len();
+            for &j in &ind {
+                self.first_eta[j] = self.first_eta[j].min(e);
+            }
             self.etas.push(Eta { idx: r, ind, val });
         }
         self.diag[r] = newdiag;

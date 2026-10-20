@@ -282,6 +282,8 @@ struct Solver<'a> {
     rows: Vec<Vec<usize>>,
     /// Mirror of the reference's FTRAN structure (`faithful_ftran`).
     mirror: Option<crate::ftran_order::RefStruct>,
+    /// The reference's work counter (`crate::work`).
+    work: crate::work::Work,
 }
 
 fn dot(col: &Column, v: &[f64]) -> f64 {
@@ -333,8 +335,35 @@ impl<'a> Solver<'a> {
         self.refactorizations += 1;
         self.list.clear();
         self.recompute_primal();
+        self.dual_btran_work();
         self.recompute_dual();
         Ok(())
+    }
+
+    /// Work of the reference's dual recomputation after a factorization (`0x108d70`): a BTRAN of the dense vector of basic costs,
+    /// with the phase 1 penalty on the infeasible ones.
+    fn dual_btran_work(&mut self) {
+        let Some(mi) = self.mirror.as_mut() else { return };
+        let p = self.p;
+        let tol = self.opts.feasibility_tol;
+        let inp: Vec<(usize, f64)> = self
+            .basic
+            .iter()
+            .enumerate()
+            .map(|(pos, &j)| {
+                let inf = if !is_inf(p.lo[j]) && self.x[j] < p.lo[j] - tol {
+                    -1.0
+                } else if !is_inf(p.up[j]) && self.x[j] > p.up[j] + tol {
+                    1.0
+                } else {
+                    0.0
+                };
+                (pos, p.cost[j] + PHASE1_M * inf)
+            })
+            .filter(|e| e.1 != 0.0)
+            .collect();
+        mi.btran(&inp, false, true);
+        self.work.add_from(0x12de50, 0x109289, mi.work, crate::work::FAC);
     }
 
     fn recompute_primal(&mut self) {
@@ -350,6 +379,10 @@ impl<'a> Solver<'a> {
                     }
                 }
             }
+        }
+        if let Some(mi) = self.mirror.as_ref() {
+            let est = mi.ftran_dense_work(&r);
+            self.work.add_from(0x1219d6, 0x120673, est, crate::work::FAC);
         }
         self.factor.ftran(&mut r);
         for (pos, &j) in self.basic.iter().enumerate() {
@@ -408,6 +441,38 @@ impl<'a> Solver<'a> {
         out
     }
 
+    /// Work of the reference's pivot-row product (`0x134d90`) for the row combination `rho` (`reverse-engineer/specs/primal-simplex.md`,
+    /// "Work counter"): its rows hold the nonbasic structural columns that are not fixed, where `q` already counts as basic and
+    /// `leave` as nonbasic.
+    fn row_product_work(&mut self, rho: &[f64], q: usize, leave: usize, caller: u32) {
+        let (n, m) = (self.p.n, self.p.m);
+        let nz: Vec<usize> = (0..m).filter(|&i| rho[i] != 0.0).collect();
+        let nnz_a: usize = self.p.cols[..n].iter().map(Vec::len).sum();
+        let mut seen = vec![false; n];
+        let (mut p5, mut d) = (0usize, 0usize);
+        for &i in &nz {
+            for &j in &self.rows[i] {
+                if ((self.pos_of[j] == NONE && j != q) || j == leave) && self.p.lo[j] != self.p.up[j] {
+                    p5 += 1;
+                    if !seen[j] {
+                        seen[j] = true;
+                        d += 1;
+                    }
+                }
+            }
+        }
+        let nr = nz.len() as f64;
+        let est = if nz.len() == 1 {
+            // A multiplier below one in magnitude goes through the filtering loop, one more pass over the row.
+            if rho[nz[0]].abs() < 1.0 { 10.5 + 5.0 * p5 as f64 } else { 10.5 + 4.0 * p5 as f64 }
+        } else if m * n <= nz.len() * 3 * nnz_a {
+            8.5 * nr + 2.0 * p5 as f64 + 2.5 * n as f64
+        } else {
+            11.5 * nr + 3.5 * p5 as f64 + 3.0 * d as f64
+        };
+        self.work.add_from(0x135e92, caller, est, crate::work::CTX);
+    }
+
     /// Eligibility and score `d^2 / w` of a nonbasic variable, or `None` if it cannot enter.
     fn score(&self, j: usize) -> Option<f64> {
         if self.pos_of[j] != NONE || self.is_fixed(j) {
@@ -429,12 +494,18 @@ impl<'a> Solver<'a> {
     /// Entering variable: the first maximum-score entry of the persistent candidate list, rebuilt by a full
     /// pass over all variables when the list holds no eligible entry.
     fn price(&mut self) -> Option<usize> {
-        if let Some(j) = self.best_in_list() {
-            return Some(j);
+        if !self.list.is_empty() {
+            let best = self.best_in_list();
+            self.work.add(0x105d03, self.list.len() as f64 * 4.0, crate::work::CTX);
+            if best.is_some() {
+                return best;
+            }
         }
         self.level = 0;
         self.list.clear();
-        for j in 0..self.p.n + self.p.m {
+        let nm = self.p.n + self.p.m;
+        self.work.add(0x105b2d, nm as f64 + nm as f64, crate::work::CTX);
+        for j in 0..nm {
             if let Some(sc) = self.score(j) {
                 if thr(self.level) < sc {
                     let b = bucket(sc);
@@ -446,7 +517,11 @@ impl<'a> Solver<'a> {
                 }
             }
         }
-        self.best_in_list()
+        let best = self.best_in_list();
+        if !self.list.is_empty() {
+            self.work.add(0x105c0c, self.list.len() as f64 * 4.0, crate::work::CTX);
+        }
+        best
     }
 
     fn best_in_list(&self) -> Option<usize> {
@@ -464,8 +539,10 @@ impl<'a> Solver<'a> {
 
     /// After a pivot: score the changed entries (in index order), raise the level if a higher bucket appears,
     /// keep still-qualifying old entries first, then append the new ones.
-    fn update_list(&mut self, changed: &[usize]) {
+    fn update_list(&mut self, changed: &[usize], extra: usize, caller: u32) {
         let mut fresh: Vec<usize> = Vec::new();
+        // The reference empties the old list when the level rises, so it scans none of it.
+        let mut raised = false;
         for &j in changed {
             if let Some(sc) = self.score(j) {
                 if thr(self.level) < sc {
@@ -473,12 +550,14 @@ impl<'a> Solver<'a> {
                     if self.level < b {
                         self.level = b;
                         fresh.clear();
+                        raised = true;
                     }
                     fresh.push(j);
                 }
             }
         }
         let old = std::mem::take(&mut self.list);
+        let old_len = if raised { 0 } else { old.len() };
         let mut kept: Vec<usize> = Vec::new();
         for j in old {
             if fresh.contains(&j) {
@@ -492,8 +571,19 @@ impl<'a> Solver<'a> {
         }
         kept.extend(fresh);
         self.list = kept;
+        // The reference's pivot row has no fixed structural columns (its row storage leaves them out).
+        let n = self.p.n;
+        let rowlen = changed.iter().filter(|&&j| j >= n || !self.is_fixed(j)).count();
+        let est = (rowlen + extra) as f64 * 4.0 + old_len as f64 + old_len as f64 + self.list.len() as f64 * 2.0;
+        if std::env::var_os("ROSE_WORK_DBG").is_some() {
+            eprintln!("UPD {caller:#x} changed {changed:?} old {old_len} new {:?} level {} est {est} extra {extra}", self.list, self.level);
+        }
+        self.work.add_from(0x1087b1, caller, est, crate::work::CTX);
     }
 }
+
+/// Drop tolerance of the pivot-row product (`0x134d90`'s first argument).
+const ROW_DROP_TOL: f64 = 1e-13;
 
 /// Penalty on the sum of bound violations in the composite phase-1 cost (recovered from the reference's `d`).
 const PHASE1_M: f64 = 1e6;
@@ -931,6 +1021,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         leave_prev: None,
         rows: Vec::new(),
         mirror: None,
+        work: crate::work::Work::default(),
     };
     s.rows = vec![Vec::new(); m];
     for j in 0..n {
@@ -949,7 +1040,9 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         let cols: Vec<Column> = s.basic.iter().map(|&j| s.p.cols[j].clone()).collect();
         s.factor = Factor::new(m, &cols).map_err(|_| SolveError::SingularBasis)?;
     }
+    s.work.trig();
     s.recompute_primal();
+    s.dual_btran_work();
     s.recompute_dual();
     let mut trace = Vec::new();
     let mut iterations = 0usize;
@@ -988,7 +1081,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 let tol = s.opts.optimality_tol;
                 let delta: Vec<usize> = (0..s.d.len()).filter(|&j| (s.d[j] - old_d[j]).abs() > tol).collect();
                 if cost_changed && !delta.is_empty() {
-                    s.update_list(&delta);
+                    s.update_list(&delta, 0, 0x108280);
                 }
             } else {
                 s.composite_dual(false);
@@ -1001,6 +1094,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             phase1 = false;
             s.list.clear();
             s.level = 0;
+            s.dual_btran_work();
             s.recompute_dual();
         }
         if std::env::var_os("ROSE_STATE").is_some() {
@@ -1033,15 +1127,19 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         };
         let mut alpha = vec![0.0; m];
         let dir = if s.d[q] < 0.0 { 1.0 } else { -1.0 };
+        let mut ftran_out: Vec<(usize, f64)> = Vec::new();
         let entries: Vec<(usize, f64)> = if let Some(mi) = s.mirror.as_mut() {
             // The reference's FTRAN, value for value and in its output order.
             let rows_q: Vec<usize> = p.fcols[q].iter().map(|&(i, _)| i).collect();
             let vals_q: Vec<f64> = p.fcols[q].iter().map(|&(_, a)| a).collect();
             let out = mi.ftran(&rows_q, &vals_q);
+            s.work.add_from(0x1219d6, 0x120673, mi.work, crate::work::FAC);
             for &(i, a) in &out {
                 alpha[i] = a;
             }
-            out.iter().map(|&(i, a)| (i, dir * a)).collect()
+            let e = out.iter().map(|&(i, a)| (i, dir * a)).collect();
+            ftran_out = out;
+            e
         } else {
             for &(i, a) in &p.cols[q] {
                 alpha[i] = a;
@@ -1119,9 +1217,46 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         let alpha_rq = alpha[r];
 
         // Pivot row alpha_r = e_r' B^-1 [A I] and the Devex cross-term vector tau = B^-T u.
+        let mut rho_ref: Option<Vec<(usize, f64)>> = None;
+        // The pivot-row update's own estimate (`0x102d20`, site `0x1040c7`) apart from its pivot-row term.
+        let mut devex_est = 0.0f64;
+        if let Some(mi) = s.mirror.as_mut() {
+            rho_ref = Some(mi.btran(&[(r, 1.0)], true, false));
+            s.work.add_from(0x13174d, 0x102e5b, mi.work, crate::work::FAC);
+            let inp: Vec<(usize, f64)> = ftran_out.iter().copied().filter(|&(i, _)| s.in_r0[s.basic[i]]).collect();
+            // The cross-term vector goes in dense when the FTRAN result was dense or too long for a list (`0x102d20`).
+            // By then the list no longer holds the pivot entry.
+            let dense_in = mi.last_dense() || m <= mi.dthr() * (ftran_out.len() - 1);
+            let alen = ftran_out.len() - 1;
+            if dense_in {
+                devex_est = m as f64;
+            }
+            devex_est = if mi.last_dense() { m as f64 * 1.5 } else { alen as f64 * 3.0 } + devex_est;
+            let mut tau_len = Some(0usize);
+            if dense_in || !inp.is_empty() {
+                let tau = mi.btran(&inp, false, dense_in);
+                s.work.add_from(0x12de50, 0x103ac7, mi.work, crate::work::FAC);
+                tau_len = if mi.bt_dense { None } else { Some(tau.len()) };
+            }
+            if let Some(t) = tau_len {
+                devex_est = devex_est + m as f64 + t as f64 * 2.0;
+            }
+        }
         let mut rho = vec![0.0; m];
         rho[r] = 1.0;
         s.factor.btran(&mut rho);
+        if let Some(rr) = &rho_ref {
+            // The reference's BTRAN drops the entries that cancel; rose's keeps them as noise, which would lengthen the pivot row.
+            let mut keep = vec![false; m];
+            for &(i, _) in rr {
+                keep[i] = true;
+            }
+            for i in 0..m {
+                if !keep[i] {
+                    rho[i] = 0.0;
+                }
+            }
+        }
         let mut u = vec![0.0; m];
         for i in 0..m {
             if s.in_r0[s.basic[i]] {
@@ -1129,6 +1264,9 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             }
         }
         s.factor.btran(&mut u);
+        if s.mirror.is_some() {
+            s.row_product_work(&rho, q, leave, 0x105498);
+        }
         let theta_d = s.d[q] / alpha_rq;
         let wq = s.w[q];
         let mut changed: Vec<usize> = Vec::new();
@@ -1137,7 +1275,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 continue;
             }
             let arj = dot(&p.cols[j], &rho);
-            if arj == 0.0 {
+            // The reference's row product keeps the entries above its drop tolerance (`0x134d90`).
+            if arj.abs() <= ROW_DROP_TOL {
                 continue;
             }
             let ratio = arj / alpha_rq;
@@ -1167,7 +1306,16 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         changed.push(leave);
         s.leave_prev = Some(leave);
         let changed = s.pivot_row_order(&rho, &changed);
-        s.update_list(&changed);
+        if s.mirror.is_some() {
+            let nn = p.n;
+            let nnz_a: usize = p.cols[..nn].iter().map(Vec::len).sum();
+            let rowlen = changed.iter().filter(|&&j| j >= nn || !s.is_fixed(j)).count() + 1;
+            let est = 2.0 * rowlen as f64 * ((m as f64 + m as f64 + nnz_a as f64) / (m + 1 + nn) as f64 + 1.5) + devex_est;
+            s.work.add_from(0x1040c7, 0x143ff9, est, crate::work::CTX);
+        }
+        // The reference's pivot row also carries the entering column (`0x102d20`).
+        s.update_list(&changed, 1, 0x1442ab);
+        s.work.trig();
         if opts.record_trace {
             trace.push(TraceEvent { iteration: iterations, entering: q, leaving: Some(leave), position: Some(r), step });
         }
