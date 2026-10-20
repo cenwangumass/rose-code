@@ -712,6 +712,14 @@ impl<'a> Solver<'a> {
     /// Entering variable: the first maximum-score entry of the persistent candidate list, rebuilt by a full
     /// pass over all variables when the list holds no eligible entry.
     fn price(&mut self) -> Option<usize> {
+        if self.mirror.is_some() {
+            // The reference puts nonbasic free variables in a top bucket (status -3) and takes the first one whatever its
+            // reduced cost.
+            let nm = self.p.n + self.p.m;
+            if let Some(j) = (0..nm).find(|&j| self.pos_of[j] == NONE && is_inf(self.p.lo[j]) && is_inf(self.p.up[j])) {
+                return Some(j);
+            }
+        }
         if !self.list.is_empty() {
             let best = self.best_in_list();
             self.work.add(0x105d03, self.list.len() as f64 * 4.0, crate::work::CTX);
