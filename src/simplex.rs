@@ -286,6 +286,9 @@ struct Solver<'a> {
     work: crate::work::Work,
     /// The last pivot, whose primal update the reference runs at the start of the next iteration (`0x105f20`).
     last_pivot: Option<LastPivot>,
+    /// Work of the last column replacement, which the reference does after the next refactorization check (and not at all
+    /// when it refactors instead).
+    upd_work: Vec<(u32, f64, f64)>,
 }
 
 struct LastPivot {
@@ -338,8 +341,14 @@ impl<'a> Solver<'a> {
             }
             self.basic = order;
             if self.opts.faithful_ftran {
+                if let Some(old) = self.mirror.as_ref() {
+                    let est = old.discard_work();
+                    if est > 0.0 {
+                        self.work.add(0xf461f, est, crate::work::CTX);
+                    }
+                }
                 let mi = crate::ftran_order::RefStruct::fresh(self.p.m, &st, &rows);
-                for (site, est) in st.work(&rows, mi.has_levels()) {
+                for (site, est) in st.work(&rows, mi.has_levels()).into_iter().chain(mi.fresh_work()) {
                     self.work.add(site, est, crate::work::CTX);
                 }
                 self.mirror = Some(mi);
@@ -1113,6 +1122,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         mirror: None,
         work: crate::work::Work::default(),
         last_pivot: None,
+        upd_work: Vec::new(),
     };
     s.rows = vec![Vec::new(); m];
     for j in 0..n {
@@ -1130,7 +1140,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         }
         s.basic = order;
         s.mirror = Some(crate::ftran_order::RefStruct::fresh(m, &st, &rows));
-        lu_work = st.work(&rows, s.mirror.as_ref().is_some_and(|mi| mi.has_levels()));
+        let mi = s.mirror.as_ref().unwrap();
+        lu_work = st.work(&rows, mi.has_levels());
+        lu_work.extend(mi.fresh_work());
+
         let cols: Vec<Column> = s.basic.iter().map(|&j| s.p.cols[j].clone()).collect();
         s.factor = Factor::new(m, &cols).map_err(|_| SolveError::SingularBasis)?;
     }
@@ -1157,8 +1170,13 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             None if opts.faithful_ftran && s.mirror.is_some() => std::mem::replace(&mut refactor_next, false),
             None => s.factor.num_updates() >= opts.max_updates,
         };
+        let upd_work = std::mem::take(&mut s.upd_work);
         if due {
             s.refactor()?;
+        } else {
+            for (site, est, scale) in upd_work {
+                s.work.add(site, est, scale);
+            }
         }
         if opts.refactor_schedule.is_none() {
             if let Some(mi) = s.mirror.as_ref() {
@@ -1457,6 +1475,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         s.factor.update(r, alpha);
         if let Some(mi) = s.mirror.as_mut() {
             mi.update(r);
+            s.upd_work = std::mem::take(&mut mi.upd_work);
         }
         changed.push(leave);
         s.leave_prev = Some(leave);

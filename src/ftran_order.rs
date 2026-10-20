@@ -49,6 +49,8 @@ pub struct RefStruct {
     first_eta: Vec<usize>,
     /// Estimate of the most recent `ftran` (`0x120740`) or `btran` (`0x12de60`), before the factor object's scale 1.3.
     pub work: f64,
+    /// Work of the last column replacement (`0xf15c0`), as `(site, estimate, scale)`.
+    pub upd_work: Vec<(u32, f64, f64)>,
     /// Tail and nucleus U densities fixed at factorization time (`F+0x108`, `F+0x110`), and whether the level structure was built
     /// but has too many levels (`F+0x140 >= m/10`), which makes the L^T solve dense.
     h33: f64,
@@ -271,6 +273,7 @@ impl RefStruct {
             nnz_l: nnz_l_tot,
             first_eta: vec![usize::MAX; m],
             work: 0.0,
+            upd_work: Vec::new(),
             h33,
             h34,
             lev_dense,
@@ -882,6 +885,45 @@ impl RefStruct {
     }
 
     /// Whether the most recent `ftran` returned a dense result (the reference's count `-1`).
+    /// Work of the factor update routine (`0xf15c0`) when it installs this fresh factor, as `(site, estimate)`. The routine
+    /// keeps a running sum that it stores at several points; a store it skips leaves its amount to the next one.
+    pub fn fresh_work(&self) -> Vec<(u32, f64)> {
+        let m = self.m;
+        let (dc, x100) = (self.i21 - self.nuc.len(), self.i21);
+        let mut out = Vec::new();
+        let mut acc = 9.0 * m as f64;
+        if dc > 0 {
+            out.push((0xf4f9b, acc));
+            acc = 0.0;
+        }
+        acc += dc as f64;
+        let r11 = if dc < x100 {
+            out.push((0xf4ffd, acc));
+            acc = 0.0;
+            x100
+        } else {
+            dc
+        };
+        acc += 2.0 * r11 as f64;
+        if r11 < m {
+            out.push((0xf507a, acc));
+            acc = 0.0;
+        }
+        // The highest tail slot whose U column is empty, scanning down to the tail start.
+        let mut r13 = m - 1;
+        while r13 > x100 && !self.uc[self.at[r13]].is_empty() {
+            r13 -= 1;
+        }
+        acc += (m - 1 - r13) as f64;
+        out.push((0xf51af, acc));
+        out
+    }
+
+    /// Work of the update routine clearing the pending FTRAN spike when the factor is replaced (`0xf15c0`, site `0xf461f`).
+    pub fn discard_work(&self) -> f64 {
+        2.0 * self.spike.len() as f64
+    }
+
     /// Whether the fresh factor's L solve goes level by level (`0x12a990`).
     pub fn has_levels(&self) -> bool {
         self.levels.is_some()
@@ -1154,10 +1196,15 @@ impl RefStruct {
     /// Swap `r` (sitting in slot `hole`) up the dependency walk starting at slot `cur` (the loop at module offset 0xf2f7d of the
     /// reference update); when a column's list is as long as the distance to the hole the rest of the range shifts down instead.
     fn walk(&mut self, r: usize, hole: usize, mut cur: usize) {
-        let _ = r;
+        // Column lengths leave out row r, which the reference has already removed from U.
+        let len = |s: &Self, pos: usize| s.a[pos].iter().chain(&s.b[pos]).filter(|&&x| x != r).count();
+        // The reference's work: each jump scans the column (2 per entry and 5) on the factor's scale; the final shift
+        // moves the slots in between.
+        let mut jumps = 0.0;
         while cur != hole {
             let pos = self.at[cur];
-            if self.a[pos].len() + self.b[pos].len() >= cur - hole {
+            if len(self, pos) >= cur - hole {
+                self.upd_work.push((0xf3d83, 2.0 * (cur - hole) as f64, crate::work::CTX));
                 let occ = self.at[hole];
                 for t in hole..cur {
                     self.at[t] = self.at[t + 1];
@@ -1168,6 +1215,7 @@ impl RefStruct {
                 self.slot[occ] = cur;
                 break;
             }
+            jumps += 2.0 * len(self, pos) as f64 + 5.0;
             let mut nxt = hole;
             for &x in &self.a[pos] {
                 let sx = self.slot[x];
@@ -1181,6 +1229,11 @@ impl RefStruct {
             self.slot[pos] = hole;
             self.slot[occ] = cur;
             cur = nxt;
+        }
+        if jumps > 0.0 {
+            // Stored before the shift.
+            let at = self.upd_work.len() - usize::from(self.upd_work.last().is_some_and(|w| w.0 == 0xf3d83));
+            self.upd_work.insert(at, (0xf3ca4, jumps, crate::work::FAC));
         }
     }
 
@@ -1226,6 +1279,17 @@ impl RefStruct {
     pub fn update(&mut self, r: usize) {
         let m = self.m;
         self.upd += 1;
+        self.upd_work.clear();
+        // The new U column's entries (`0xf15c0`, sites `0xf2521` and `0xf2e3c`).
+        let k = self.spike.iter().filter(|e| e.0 != r).count();
+        if k > 0 {
+            self.upd_work.push((0xf2521, 3.0 * k as f64, crate::work::CTX));
+        }
+        // A tail column leaves the row-wise copy of U entry by entry.
+        if self.kind[r] == -2 && !self.uc[r].is_empty() {
+            let len = self.uc[r].len();
+            self.upd_work.push((if len < k { 0xf2044 } else { 0xf207a }, 5.0 * len as f64, crate::work::CTX));
+        }
         self.sum_alpha += self.last_alpha as f64;
         let spike: Vec<usize> = self.spike.iter().map(|e| e.0).collect();
         let spike = &spike[..];
@@ -1335,6 +1399,11 @@ impl RefStruct {
         let _ = &mut tail_rebuild;
         self.kind[r] = -2;
         let keep = (old != -2 && av.is_empty()) || (old == -2 && !moved);
+        // Row r of U: the tail columns that reference r (`0xf2a51`), unless the column stays in its slot.
+        let refs = (0..m).filter(|&x| x != r && self.kind[x] == -2 && (self.a[x].contains(&r) || self.b[x].contains(&r))).count();
+        if refs > 0 && !(keep && !moved) {
+            self.upd_work.push((0xf2a51, 3.0 * refs as f64, crate::work::CTX));
+        }
         let mut elim: Vec<usize> = Vec::new();
         for k in 0..m {
             if k == r || self.kind[k] != -2 {
@@ -1367,11 +1436,15 @@ impl RefStruct {
             let xs: Vec<f64> = ind.iter().map(|&j| spk[j]).collect();
             newdiag = dot(&xs, &val);
             self.sum_eta += ind.len() as f64;
+            self.upd_work.push((0xf1beb, 3.0 * ind.len() as f64, crate::work::CTX));
             let e = self.etas.len();
             for &j in &ind {
                 self.first_eta[j] = self.first_eta[j].min(e);
             }
             self.etas.push(Eta { idx: r, ind, val });
+        }
+        if k > 0 {
+            self.upd_work.push((0xf2e3c, 5.0 * k as f64, crate::work::CTX));
         }
         self.diag[r] = newdiag;
         self.uc[r] = self.spike.iter().copied().filter(|e| e.0 != r).collect();
