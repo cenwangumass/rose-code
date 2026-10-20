@@ -26,6 +26,9 @@ pub struct RefStruct {
     at: Vec<usize>,
     etas: Vec<Eta>,
     lvals: Vec<Vec<f64>>,
+    /// Longest-path level of each L node, when the reference solves L level by level (`0x12a990`): only for `m >= 250`, a
+    /// small level count (`< m/10`) and a short Markowitz L part. Otherwise the L solve is the Kahn FIFO.
+    levels: Option<Vec<usize>>,
     diag: Vec<f64>,
     /// Numeric U entries of each tail column `(position, value)`.
     uc: Vec<Vec<(usize, f64)>>,
@@ -219,6 +222,23 @@ impl RefStruct {
             let t = 5.0 * ((nnz as f64 / m as f64) + 1.0).powi(2);
             if (m as f64) > t { t as usize } else { m }
         };
+        let levels = {
+            let d = m - nseq;
+            let nnz_tail: usize = lcols[nseq..].iter().map(|c| c.len()).sum();
+            let outer = d < 6 || 10 * d * d <= m || nnz_tail <= 10 * d;
+            if m >= 250 && outer {
+                let mut lev = vec![0usize; m];
+                for v in 0..m {
+                    for &y in &lcols[v] {
+                        lev[y] = lev[y].max(lev[v] + 1);
+                    }
+                }
+                let maxlev = lev.iter().copied().max().unwrap_or(0);
+                if (maxlev as f64) < 0.1 * m as f64 { Some(lev) } else { None }
+            } else {
+                None
+            }
+        };
         let perm = step;
         let znz = (nnz + sa + sb + 2 * m) as f64;
         RefStruct {
@@ -241,6 +261,7 @@ impl RefStruct {
             at: (0..m).collect(),
             etas: Vec::new(),
             lvals,
+            levels,
             diag: st.diag.clone(),
             uc,
             spike: Vec::new(),
@@ -295,18 +316,61 @@ impl RefStruct {
             x[s] += v;
             start.push(s);
         }
-        let q = self.kahn(&start);
-        for &v in &q {
-            let xv = x[v];
-            if xv == 0.0 {
-                continue;
+        let (mut order, count_l) = if let Some(lev) = &self.levels {
+            // Level-bucket L solve: nodes are taken level by level, each level in insertion order (inputs first, then the
+            // nodes reached from lower levels); values below the tolerance are dropped without propagating.
+            let maxlev = lev.iter().copied().max().unwrap_or(0);
+            let mut buckets: Vec<Vec<usize>> = vec![Vec::new(); maxlev + 1];
+            let mut active = vec![false; self.m];
+            let mut l = usize::MAX;
+            for &v in &start {
+                if !active[v] {
+                    active[v] = true;
+                    buckets[lev[v]].push(v);
+                    l = l.min(lev[v]);
+                }
             }
-            for (e, &y) in self.lcols[v].iter().enumerate() {
-                x[y] -= self.lvals[v][e] * xv;
+            let mut remaining: usize = buckets.iter().map(Vec::len).sum();
+            let mut out: Vec<usize> = Vec::new();
+            while remaining > 0 && l <= maxlev {
+                let mut i = 0;
+                while i < buckets[l].len() {
+                    let v = buckets[l][i];
+                    i += 1;
+                    remaining -= 1;
+                    let xv = x[v];
+                    if xv.abs() >= TOL {
+                        out.push(v);
+                        for (e, &y) in self.lcols[v].iter().enumerate() {
+                            if !active[y] {
+                                active[y] = true;
+                                buckets[lev[y]].push(y);
+                                remaining += 1;
+                            }
+                            x[y] -= self.lvals[v][e] * xv;
+                        }
+                    } else {
+                        x[v] = 0.0;
+                    }
+                }
+                l += 1;
             }
-        }
-        let count_l = q.iter().filter(|&&v| x[v].abs() > TOL).count();
-        let mut order = q;
+            let n = out.len();
+            (out, n)
+        } else {
+            let q = self.kahn(&start);
+            for &v in &q {
+                let xv = x[v];
+                if xv == 0.0 {
+                    continue;
+                }
+                for (e, &y) in self.lcols[v].iter().enumerate() {
+                    x[y] -= self.lvals[v][e] * xv;
+                }
+            }
+            let count_l = q.iter().filter(|&&v| x[v].abs() > TOL).count();
+            (q, count_l)
+        };
         let mut have = vec![false; self.m];
         for &v in &order {
             have[v] = true;

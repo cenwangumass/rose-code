@@ -111,6 +111,8 @@ struct Internal {
     n: usize,
     m: usize,
     cols: Vec<Column>,
+    /// The same columns in the model's entry order (the reference's LU structure and FTRAN depend on it).
+    fcols: Vec<Column>,
     lo: Vec<f64>,
     up: Vec<f64>,
     rhs: Vec<f64>,
@@ -128,6 +130,7 @@ fn build(model: &LpModel) -> Internal {
     let (nm, m) = (model.num_cols(), model.num_rows());
     let mut cols: Vec<Column> = (0..nm).map(|j| model.col(j).collect()).collect();
     // The model keeps the file's entry order (the crash tie-break needs it); the solver works on columns sorted by row.
+    let mut fcols = cols.clone();
     for c in &mut cols {
         c.sort_by_key(|e| e.0);
     }
@@ -161,7 +164,8 @@ fn build(model: &LpModel) -> Internal {
     let sgn = if model.sense == Sense::Maximize { -1.0 } else { 1.0 };
     let mut cost: Vec<f64> = model.obj.iter().map(|c| sgn * c).collect();
     cost.resize(n + m, 0.0);
-    Internal { n, m, cols, lo, up, rhs, cost }
+    fcols.extend(cols[fcols.len()..].iter().cloned());
+    Internal { n, m, cols, fcols, lo, up, rhs, cost }
 }
 
 /// Crash basis of the reference (primal simplex setup, `0x1387d0`): each equality row (fixed slack) may receive one structural
@@ -298,7 +302,7 @@ impl<'a> Solver<'a> {
         let cols: Vec<(bool, Vec<usize>, Vec<f64>)> = self
             .basic
             .iter()
-            .map(|&v| (v >= n, self.p.cols[v].iter().map(|&(r, _)| r).collect(), self.p.cols[v].iter().map(|&(_, a)| a).collect()))
+            .map(|&v| (v >= n, self.p.fcols[v].iter().map(|&(r, _)| r).collect(), self.p.fcols[v].iter().map(|&(_, a)| a).collect()))
             .collect();
         let st = crate::lu_order::factor_structure(self.p.m, &cols);
         let order = st.pivots.iter().map(|&(_, pos)| self.basic[pos]).collect();
@@ -969,14 +973,13 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             phase1 = true;
             if was && !due {
                 // The reference corrects `d` in place when basic variables change feasibility class and re-scores only
-                // the columns whose `d` moved (the leaving variable's own penalty shift never touches the list).
+                // the columns whose `d` moved (including the variable that just left, whose penalised `d` differs from its pivot-time value).
                 let old_d = s.d.clone();
                 let cls = s.sig();
                 let cost_changed = s.p1_prev.iter().any(|&(j, c)| s.pos_of[j] != NONE && cls[s.pos_of[j]] != c);
                 s.composite_dual(false);
                 let tol = s.opts.optimality_tol;
-                let lp = s.leave_prev;
-                let delta: Vec<usize> = (0..s.d.len()).filter(|&j| Some(j) != lp && (s.d[j] - old_d[j]).abs() > tol).collect();
+                let delta: Vec<usize> = (0..s.d.len()).filter(|&j| (s.d[j] - old_d[j]).abs() > tol).collect();
                 if cost_changed && !delta.is_empty() {
                     s.update_list(&delta);
                 }
@@ -995,7 +998,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         }
         if std::env::var_os("ROSE_STATE").is_some() {
             let f = |v: &[f64]| v.iter().map(|x| format!("{x:e}")).collect::<Vec<_>>().join(",");
-            eprintln!("STATE {{\"iter\":{iterations},\"infeasible\":{infeasible},\"basic\":{:?},\"d\":[{}],\"w\":[{}]}}", s.basic, f(&s.d), f(&s.w));
+            eprintln!("STATE {{\"x\":[{}],\"list\":{:?},\"iter\":{iterations},\"infeasible\":{infeasible},\"basic\":{:?},\"d\":[{}],\"w\":[{}]}}", f(&s.x), s.list, s.basic, f(&s.d), f(&s.w));
         }
         let q = if infeasible {
             match s.price() {
@@ -1025,8 +1028,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         let dir = if s.d[q] < 0.0 { 1.0 } else { -1.0 };
         let entries: Vec<(usize, f64)> = if let Some(mi) = s.mirror.as_mut() {
             // The reference's FTRAN, value for value and in its output order.
-            let rows_q: Vec<usize> = p.cols[q].iter().map(|&(i, _)| i).collect();
-            let vals_q: Vec<f64> = p.cols[q].iter().map(|&(_, a)| a).collect();
+            let rows_q: Vec<usize> = p.fcols[q].iter().map(|&(i, _)| i).collect();
+            let vals_q: Vec<f64> = p.fcols[q].iter().map(|&(_, a)| a).collect();
             let out = mi.ftran(&rows_q, &vals_q);
             for &(i, a) in &out {
                 alpha[i] = a;
@@ -1048,6 +1051,9 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 let j = basic[pos];
                 classify(xs[j], lo[j], up[j], tol)
             };
+            if std::env::var_os("ROSE_ENT").is_some() {
+                eprintln!("ENT {{\"iter\":{iterations},\"q\":{q},\"own\":{own:e},\"idx\":{:?},\"val\":{:?}}}", entries.iter().map(|e| e.0).collect::<Vec<_>>(), entries.iter().map(|e| e.1).collect::<Vec<_>>());
+            }
             let pick = phase1_ratio(tol, opts.pivot_tol, own, &entries, &info);
             if pick.entry.is_some() {
                 leave_to_upper = Some(pick.to_upper);
