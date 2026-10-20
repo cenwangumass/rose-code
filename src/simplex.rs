@@ -968,6 +968,7 @@ fn phase1_ratio(
     ent: &[(usize, f64)],
     info: &dyn Fn(usize) -> Option<(f64, f64, u8, bool)>,
     passes: &mut Vec<Option<(usize, usize)>>,
+    dense: bool,
 ) -> Phase1Pick {
     let inf = INF;
     let frames: Vec<Option<(f64, f64, u8, bool)>> = ent.iter().map(|&(pos, _)| info(pos)).collect();
@@ -1022,7 +1023,12 @@ fn phase1_ratio(
                     }
                     b'B' => slope_a += a,
                     b'L' | b'X' => slope_b += a,
-                    b'N' | b'U' => bp.push((d / a, k, false)),
+                    // The reference's dense-result variant records only the breakpoints below the entering variable's range.
+                    b'N' | b'U' => {
+                        if !dense || d / a < own {
+                            bp.push((d / a, k, false));
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -1446,12 +1452,23 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         } else {
             match s.price_faithful() {
                 Some(q) => q,
-                None => break Status::Optimal,
+                None => {
+                    // Before declaring optimality, rebuild the basic solution from a fresh factorization: drift in the updated
+                    // values can hide a bound violation just above the tolerance.
+                    if s.factor.num_updates() > 0 {
+                        s.refactor()?;
+                        if s.has_infeasible_basic() {
+                            continue;
+                        }
+                    }
+                    break Status::Optimal;
+                }
             }
         };
         let mut alpha = vec![0.0; m];
         let dir = if s.d[q] < 0.0 { 1.0 } else { -1.0 };
         let mut ftran_out: Vec<(usize, f64)> = Vec::new();
+        let mut ft_dense = false;
         let entries: Vec<(usize, f64)> = if let Some(mi) = s.mirror.as_mut() {
             // The reference's FTRAN, value for value and in its output order.
             let rows_q: Vec<usize> = p.fcols[q].iter().map(|&(i, _)| i).collect();
@@ -1461,6 +1478,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             for &(i, a) in &out {
                 alpha[i] = a;
             }
+            ft_dense = mi.last_dense();
             let e = out.iter().map(|&(i, a)| (i, dir * a)).collect();
             ftran_out = out;
             e
@@ -1487,7 +1505,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 eprintln!("ENT {{\"bl\":{:?},\"kinds\":{:?},\"dims\":{:?},\"iter\":{iterations},\"q\":{q},\"own\":{own:e},\"idx\":{:?},\"val\":{:?}}}", bl, kinds.unwrap_or_default(), dims, entries.iter().map(|e| e.0).collect::<Vec<_>>(), entries.iter().map(|e| e.1).collect::<Vec<_>>());
             }
             let mut passes = Vec::new();
-            let pick = phase1_ratio(tol, opts.pivot_tol, own, &entries, &info, &mut passes);
+            let pick = phase1_ratio(tol, opts.pivot_tol, own, &entries, &info, &mut passes, ft_dense);
             if let Some(mi) = s.mirror.as_ref() {
                 // The reference's phase 1 ratio test (`0xf0120`): a breakpoint pass and a selection pass over the FTRAN result.
                 let dense = mi.last_dense();
