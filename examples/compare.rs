@@ -53,7 +53,7 @@ fn main() {
         faithful_weights: true,
         faithful_positions: positions,
         faithful_ftran: positions && std::env::var_os("ROSE_NO_FTRAN").is_none(),
-        refactor_schedule: if positions { Some(schedule) } else { None },
+        refactor_schedule: if positions && std::env::var_os("ROSE_OWN_TRIGGER").is_none() { Some(schedule) } else { None },
         ..SolveOptions::default()
     };
     let r = match solve(&model, Some(&Basis { basic, at_upper }), &opts) {

@@ -1,5 +1,5 @@
-//! BLEND, SC50A and BORE3D (controlled profile) reproduce every reference decision when the reference's basis position order,
-//! refactor iterations, Devex weights and sparse FTRAN output order are all mirrored (`faithful_*`).
+//! ADLITTLE, BLEND, SC50A and BORE3D (controlled profile) reproduce every reference decision when the reference's basis position order,
+//! Devex weights and sparse FTRAN output order are all mirrored (`faithful_*`).
 
 use rose::{mps, solve, Basis, SolveOptions, Status};
 
@@ -21,12 +21,11 @@ fn check(mps_name: &str, decisions: &str, objective: f64) {
             at_upper[j] = true;
         }
     }
-    let schedule: Vec<usize> = fx["refactor_schedule"].as_array().unwrap().iter().map(|v| v.as_u64().unwrap() as usize).collect();
+    // No refactor schedule: the mirror's own trigger (`0x142350`) decides when to refactorize.
     let opts = SolveOptions {
         faithful_weights: true,
         faithful_positions: true,
         faithful_ftran: true,
-        refactor_schedule: Some(schedule),
         ..SolveOptions::default()
     };
     let r = solve(&model, Some(&Basis { basic, at_upper }), &opts).unwrap();
@@ -51,4 +50,9 @@ fn bore3d_matches_all_reference_decisions() {
 #[test]
 fn sc50a_matches_all_reference_decisions() {
     check("sc50a.mps", "sc50a-controlled.decisions.json", -64.57507705856449);
+}
+
+#[test]
+fn adlittle_matches_all_reference_decisions_with_the_recovered_refactor_trigger() {
+    check("adlittle.mps", "adlittle-controlled.decisions.json", 225494.96316238036);
 }

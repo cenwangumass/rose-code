@@ -31,6 +31,13 @@ pub struct RefStruct {
     uc: Vec<Vec<(usize, f64)>>,
     /// Spike of the most recent solve: the L stage and eta result `(position, value)` in list order.
     spike: Vec<(usize, f64)>,
+    /// Refactorization trigger inputs (`0x142350`): updates since the factorization, accumulated solve result counts, accumulated
+    /// eta lengths, and the factor size `nnz(L) + nnz(U) + 2 m` fixed at factorization time.
+    upd: usize,
+    sum_alpha: f64,
+    sum_eta: f64,
+    last_alpha: usize,
+    znz: f64,
 }
 
 struct Eta {
@@ -213,7 +220,13 @@ impl RefStruct {
             if (m as f64) > t { t as usize } else { m }
         };
         let perm = step;
+        let znz = (nnz + sa + sb + 2 * m) as f64;
         RefStruct {
+            upd: 0,
+            sum_alpha: 0.0,
+            sum_eta: 0.0,
+            last_alpha: 0,
+            znz,
             m,
             kind,
             nuc,
@@ -387,7 +400,25 @@ impl RefStruct {
             }
         }
         self.spike = spike;
+        self.last_alpha = out.len();
         out
+    }
+
+    /// The reference's refactorization decision, evaluated before an iteration's own update: at the update limit
+    /// `max(20, m^0.7)`, or from `U >= m^0.45` when the accumulated work `(1.5 S + 2 c) m` exceeds `min((Z - 1.5 m)^2, 4 m^2 U0)`.
+    pub fn refactor_due(&self) -> bool {
+        let m = self.m as f64;
+        let maxupd = (m.powf(0.7) as usize).max(20);
+        if self.upd == maxupd {
+            return true;
+        }
+        let c46c = m.powf(0.45) as usize;
+        if self.upd < c46c {
+            return false;
+        }
+        let d6 = (self.znz - 1.5 * m).powi(2);
+        let d7 = (4.0 * m * m * c46c as f64).min(d6);
+        (1.5 * self.sum_alpha + 2.0 * self.sum_eta) * m - d7 > 0.0
     }
 
     /// Order of the nonzero positions of the solution, given the L-stage list.
@@ -563,6 +594,8 @@ impl RefStruct {
     /// Replace the column at position `r` by the entering column of the last `ftran`.
     pub fn update(&mut self, r: usize) {
         let m = self.m;
+        self.upd += 1;
+        self.sum_alpha += self.last_alpha as f64;
         let spike: Vec<usize> = self.spike.iter().map(|e| e.0).collect();
         let spike = &spike[..];
         let eta_cand = self.eliminate(r);
@@ -699,6 +732,7 @@ impl RefStruct {
             }
             let xs: Vec<f64> = ind.iter().map(|&j| spk[j]).collect();
             newdiag = dot(&xs, &val);
+            self.sum_eta += ind.len() as f64;
             self.etas.push(Eta { idx: r, ind, val });
         }
         self.diag[r] = newdiag;

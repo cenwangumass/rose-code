@@ -860,6 +860,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     let mut trace = Vec::new();
     let mut iterations = 0usize;
     let mut phase1 = false;
+    let mut refactor_next = false;
     let mut farkas: Option<Vec<f64>> = None;
     let mut ray: Option<Vec<f64>> = None;
     let status = loop {
@@ -868,10 +869,16 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         }
         let due = match &opts.refactor_schedule {
             Some(sched) => sched.contains(&iterations),
+            None if opts.faithful_ftran && s.mirror.is_some() => std::mem::replace(&mut refactor_next, false),
             None => s.factor.num_updates() >= opts.max_updates,
         };
         if due {
             s.refactor()?;
+        }
+        if opts.refactor_schedule.is_none() {
+            if let Some(mi) = s.mirror.as_ref() {
+                refactor_next = mi.refactor_due();
+            }
         }
         let infeasible = s.has_infeasible_basic();
         if infeasible {
