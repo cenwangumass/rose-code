@@ -607,6 +607,12 @@ impl RefStruct {
     /// The reference's refactorization decision, evaluated before an iteration's own update: at the update limit
     /// `max(20, m^0.7)`, or from `U >= m^0.45` when the accumulated work `(1.5 S + 2 c) m` exceeds `min((Z - 1.5 m)^2, 4 m^2 U0)`.
     /// `(nucleus list length, first tail slot, dens)`; for diagnostics against the reference's `i3`, `i21` and `(hdr33+hdr34)^2`.
+    /// The fresh factor's numerics for the `luout` dump: the diagonal and each position's L column `(position, value)`.
+    pub fn numerics(&self) -> (&[f64], Vec<Vec<(usize, f64)>>) {
+        let l = (0..self.m).map(|v| self.lcols[v].iter().copied().zip(self.lvals[v].iter().copied()).collect()).collect();
+        (&self.diag, l)
+    }
+
     pub fn blists(&self) -> &[Vec<usize>] {
         &self.b
     }
@@ -1368,7 +1374,7 @@ impl RefStruct {
         if crate::dump::on("fstruct") {
             static CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
             let n = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            crate::dump::emit("fstruct", serde_json::json!({"n": n, "m": m, "i3": self.nuc.len(), "i21": self.i21, "kind": self.kind, "nuc": self.nuc, "seqA": self.slot, "cols": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), [&self.a[k], &self.b[k]])).collect::<std::collections::BTreeMap<_, _>>()}));
+            crate::dump::emit("fstruct", serde_json::json!({"n": n, "m": m, "i3": self.nuc.len(), "i21": self.i21, "kind": self.kind, "nuc": self.nuc, "seqA": self.slot, "fill": self.fill, "diag": self.diag, "uvals": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), (self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.0).collect::<Vec<_>>(), self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.1).collect::<Vec<_>>()))).collect::<std::collections::BTreeMap<_, _>>(), "cols": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), [&self.a[k], &self.b[k]])).collect::<std::collections::BTreeMap<_, _>>()}));
         }
         self.upd += 1;
         self.upd_work.clear();

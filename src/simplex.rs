@@ -440,6 +440,10 @@ impl<'a> Solver<'a> {
                     }
                 }
                 let mi = crate::ftran_order::RefStruct::fresh(self.p.m, self.p.n, &st, &rows);
+                if crate::dump::on("luout") {
+                    let (diag, l) = mi.numerics();
+                    crate::dump::emit("luout", serde_json::json!({"n": self.refactorizations, "diag": diag, "l": l}));
+                }
                 let lu = st.work(&rows, mi.has_levels());
                 self.work.factor_driver(&lu, crate::work::CTX);
                 for (site, est) in lu.into_iter().chain(mi.fresh_work()) {
