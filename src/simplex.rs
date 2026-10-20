@@ -354,6 +354,7 @@ struct LastPivot {
     dense: bool,
     q: usize,
     leave: usize,
+    alpha_rq: f64,
 }
 
 fn dot(col: &Column, v: &[f64]) -> f64 {
@@ -486,7 +487,7 @@ impl<'a> Solver<'a> {
     /// The reference's handling of phase 1 cost changes after a pivot (`0x105f20`): a BTRAN of the cost changes `dc`
     /// (positions and values), the row product of the result, and a list update over that row, which also carries the
     /// entering column when it is structural.
-    fn cost_change_work(&mut self, dc: &[(usize, f64)], q: usize, leave: usize) {
+    fn cost_change_work(&mut self, dc: &[(usize, f64)], q: usize, leave: usize, alpha_rq: f64) {
         let Some(mi) = self.mirror.as_mut() else { return };
         let (n, m) = (self.p.n, self.p.m);
         let dc_sorted = dc.to_vec();
@@ -508,6 +509,21 @@ impl<'a> Solver<'a> {
         let mut rank = vec![usize::MAX; m];
         for (k, &(i, _)) in out.iter().enumerate() {
             rank[i] = k;
+        }
+        // The reference's pass also reaches basic entries of the stored d. The entering variable (basic by now) loses its
+        // row product when it is a slack, `alpha_rq` when structural (it is the entering column's pivot element, as in
+        // the pivot-row update). Basic slacks outside the cost-change positions lose their raw row entry (rounding noise);
+        // basic structurals are not touched.
+        if q != NONE {
+            self.d[q] = if q < n { self.d[q] - alpha_rq } else { self.d[q] - rank_dot(&p.cols[q], &rho, &rank) };
+        }
+        for j in n..n + m {
+            if self.pos_of[j] != NONE && j != q && !dc.iter().any(|e| self.basic[e.0] == j) {
+                let ab = dot(&p.cols[j], &rho);
+                if ab != 0.0 {
+                    self.d[j] -= ab;
+                }
+            }
         }
         let mut changed: Vec<usize> = Vec::new();
         for j in 0..n + m {
@@ -1458,7 +1474,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 if s.mirror.is_some() {
                     // The reference keeps `d` and applies the cost changes to it in place.
                     if let (Some(lp), false) = (&last, dc.is_empty()) {
-                        s.cost_change_work(&dc, lp.q, lp.leave);
+                        s.cost_change_work(&dc, lp.q, lp.leave, lp.alpha_rq);
                     }
                 } else {
                     // Without the mirror: re-score the columns whose `d` moved.
@@ -1673,7 +1689,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             s.y_ref = None;
             // The reference still runs the primal update of the move at the next iteration (`0x105f20`): the phase 1 cost
             // changes of the basic variables whose class changed re-score the columns they touch.
-            s.last_pivot = Some(LastPivot { rows: ftran_out.iter().map(|e| e.0).collect(), dense: s.mirror.as_ref().is_some_and(|mi| mi.last_dense()), q: NONE, leave: NONE });
+            s.last_pivot = Some(LastPivot { rows: ftran_out.iter().map(|e| e.0).collect(), dense: s.mirror.as_ref().is_some_and(|mi| mi.last_dense()), q: NONE, leave: NONE, alpha_rq: 0.0 });
             if opts.record_trace {
                 trace.push(TraceEvent { iteration: iterations, entering: q, leaving: None, position: None, step });
             }
@@ -1791,6 +1807,12 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             Some(rank) => theta_d * rank_dot(&p.cols[leave], &rho, rank),
             None => theta_d,
         };
+        // The entering variable takes part in the row update before it turns basic: a slack with its row product, a
+        // structural with the pivot element (`alpha_rq`), so `d` ends as rounding noise (exactly 0.0 in most pivots).
+        let arq_x = match rho_rank.as_ref() {
+            Some(rank) => rank_dot(&p.cols[q], &rho, rank),
+            None => dot(&p.cols[q], &rho),
+        };
         let mut changed: Vec<usize> = Vec::new();
         for j in 0..n + m {
             if s.pos_of[j] != NONE || j == q {
@@ -1827,10 +1849,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                     leave_penalty = PHASE1_M * f64::from(c);
                 }
             }
-            s.d[q] = if step == 0.0 { 0.0 } else { -dir * alpha_rq };
+            s.d[q] = s.d[q] - theta_d * if q < n { alpha_rq } else { arq_x };
         } else {
             s.d[leave] = -theta_leave;
-            s.d[q] = 0.0;
+            s.d[q] = if s.mirror.is_some() { s.d[q] - theta_d * if q < n { alpha_rq } else { arq_x } } else { 0.0 };
         }
         s.w[leave] = (wq / alpha_rq) / alpha_rq;
         s.w[leave] = s.w[leave].max(if opts.faithful_weights && !s.in_r0[leave] { W_MIN } else { 1.0 });
@@ -1867,7 +1889,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 rows.swap_remove(k);
             }
             rows
-        }, dense: alpha_dense, q, leave });
+        }, dense: alpha_dense, q, leave, alpha_rq });
         if crate::dump::on("ord") {
             let rho_nz = rho_ref.as_ref().map(|r| r.iter().map(|e| (e.0, e.1 != 0.0 && rho[e.0] != 0.0)).collect::<Vec<_>>());
             crate::dump::emit("ord", serde_json::json!({"iter": iterations, "rho": rho_nz, "changed": changed}));
