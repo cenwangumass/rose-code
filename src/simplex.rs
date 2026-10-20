@@ -173,7 +173,7 @@ fn build(model: &LpModel) -> Internal {
 pub fn crash_basis(model: &LpModel) -> Basis {
     let p = build(model);
     let (n, m) = (p.n, p.m);
-    let file_cols: Vec<Column> = (0..n).map(|j| model.col(j).collect()).collect();
+    let file_cols: Vec<Column> = (0..n).map(|j| if j < model.num_cols() { model.col(j).collect() } else { p.cols[j].clone() }).collect();
     let mut b = Basis::slack(n, m);
     for j in 0..n {
         b.at_upper[j] = is_inf(p.lo[j]) && !is_inf(p.up[j]);
@@ -891,13 +891,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     let (n, m) = (p.n, p.m);
     let basis = match start {
         Some(b) => b.clone(),
-        None => {
-            let mut b = Basis::slack(n, m);
-            for j in 0..n {
-                b.at_upper[j] = is_inf(p.lo[j]) && !is_inf(p.up[j]);
-            }
-            b
-        }
+        // Cold start: the reference's crash basis (`crash_basis`).
+        None => crash_basis(model),
     };
     basis.validate(n, m).map_err(SolveError::InvalidBasis)?;
     let mut pos_of = vec![NONE; n + m];
