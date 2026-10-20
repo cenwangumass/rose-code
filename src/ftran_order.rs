@@ -1414,8 +1414,14 @@ impl RefStruct {
             conv = (0..m).filter(|&x| self.kind[x] == -2 && self.a[x].is_empty() && self.b[x].is_empty()).max_by_key(|&x| self.slot[x]);
             if let Some(x) = conv {
                 convslot = Some(self.slot[x]);
-                self.kind[x] = self.nuc.len() as i64;
-                self.nuc.push(x);
+                // Only a column some tail column refers to joins the nucleus list; the others become singletons.
+                let held = (0..m).any(|k| self.kind[k] == -2 && self.a[k].contains(&x));
+                if held {
+                    self.kind[x] = self.nuc.len() as i64;
+                    self.nuc.push(x);
+                } else {
+                    self.kind[x] = -1;
+                }
                 for k in 0..m {
                     if self.kind[k] == -2 && self.a[k].contains(&x) {
                         self.a[k].retain(|&y| y != x);
