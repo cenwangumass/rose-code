@@ -1640,7 +1640,12 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             if s.in_r0[s.basic[r]] {
                 t += alpha_rq * alpha_rq;
             }
-            for &(i, v) in &ftran_out {
+            // The reference drops the pivot entry from the list by moving the last entry into its slot, then sums.
+            let mut order = ftran_out.clone();
+            if let (false, Some(k)) = (alpha_dense, order.iter().position(|e| e.0 == r)) {
+                order.swap_remove(k);
+            }
+            for &(i, v) in &order {
                 if i != r && s.in_r0[s.basic[i]] {
                     t += v * v;
                 }
