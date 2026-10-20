@@ -8,4 +8,5 @@ pub mod simplex;
 
 pub use basis::Basis;
 pub use model::{LpModel, Sense};
+pub mod verify;
 pub use simplex::{solve, SolveOptions, SolveResult, Status, TraceEvent};

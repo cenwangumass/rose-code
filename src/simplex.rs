@@ -36,6 +36,7 @@ impl Default for SolveOptions {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Status {
     Optimal,
+    Infeasible,
     Unbounded,
     IterationLimit,
     NumericalFailure,
@@ -65,13 +66,15 @@ pub struct SolveResult {
     pub iterations: usize,
     pub refactorizations: usize,
     pub trace: Vec<TraceEvent>,
+    /// Row multipliers `y` proving infeasibility (see `verify::check_farkas`) when the status is `Infeasible`.
+    pub farkas: Option<Vec<f64>>,
+    /// Recession direction over the original columns proving unboundedness when the status is `Unbounded`.
+    pub ray: Option<Vec<f64>>,
 }
 
 #[derive(Debug)]
 pub enum SolveError {
     InvalidBasis(String),
-    /// The starting point is primal infeasible; Phase 1 is not implemented yet.
-    InfeasibleStart { max_violation: f64 },
     SingularBasis,
 }
 
@@ -79,7 +82,6 @@ impl std::fmt::Display for SolveError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             SolveError::InvalidBasis(s) => write!(f, "invalid basis: {s}"),
-            SolveError::InfeasibleStart { max_violation } => write!(f, "starting basis is infeasible (violation {max_violation:.3e})"),
             SolveError::SingularBasis => write!(f, "starting basis is singular"),
         }
     }
@@ -347,6 +349,115 @@ impl<'a> Solver<'a> {
     }
 }
 
+enum Phase1 {
+    Continue,
+    Infeasible(Vec<f64>),
+    Failure,
+}
+
+impl<'a> Solver<'a> {
+    fn has_infeasible_basic(&self) -> bool {
+        let tol = self.opts.feasibility_tol;
+        self.basic.iter().any(|&j| {
+            (!is_inf(self.p.lo[j]) && self.x[j] < self.p.lo[j] - tol) || (!is_inf(self.p.up[j]) && self.x[j] > self.p.up[j] + tol)
+        })
+    }
+
+    /// One iteration minimizing the sum of bound violations of the basic variables (composite cost `-1` below the
+    /// lower bound, `+1` above the upper bound). Infeasible basics block at the bound they are heading to.
+    /// This is a textbook Phase 1, not a recovery of the reference's infeasibility-removing mode.
+    fn phase1_iteration(&mut self, iterations: &mut usize, trace: &mut Vec<TraceEvent>) -> Phase1 {
+        let p = self.p;
+        let (n, m) = (p.n, p.m);
+        let (ftol, otol) = (self.opts.feasibility_tol, self.opts.optimality_tol);
+        let below = |x: f64, j: usize| !is_inf(p.lo[j]) && x < p.lo[j] - ftol;
+        let above = |x: f64, j: usize| !is_inf(p.up[j]) && x > p.up[j] + ftol;
+        let mut y: Vec<f64> = self
+            .basic
+            .iter()
+            .map(|&j| if below(self.x[j], j) { -1.0 } else if above(self.x[j], j) { 1.0 } else { 0.0 })
+            .collect();
+        self.factor.btran(&mut y);
+        let mut q = NONE;
+        let mut best = 0.0;
+        for j in 0..n + m {
+            if self.pos_of[j] != NONE || self.is_fixed(j) {
+                continue;
+            }
+            let dj = -dot(&p.cols[j], &y);
+            let free = is_inf(p.lo[j]) && is_inf(p.up[j]);
+            let ok = if free { dj.abs() > otol } else if self.at_upper[j] { dj > otol } else { dj < -otol };
+            if ok && best < dj.abs() {
+                best = dj.abs();
+                q = j;
+            }
+        }
+        if q == NONE {
+            return Phase1::Infeasible(y.iter().map(|v| -v).collect());
+        }
+        let dq = -dot(&p.cols[q], &y);
+        let mut alpha = vec![0.0; m];
+        for &(i, a) in &p.cols[q] {
+            alpha[i] = a;
+        }
+        self.factor.ftran(&mut alpha);
+        let dir = if dq < 0.0 { 1.0 } else { -1.0 };
+        let entries: Vec<(usize, f64)> = (0..m).filter(|&i| alpha[i].abs() > 1e-14).map(|i| (i, dir * alpha[i])).collect();
+        let own = if !is_inf(p.lo[q]) && !is_inf(p.up[q]) { p.up[q] - p.lo[q] } else { INF };
+        let (chosen, step, _) = {
+            let (xs, basic) = (&self.x, &self.basic);
+            // Distance until the basic variable reaches the bound it blocks at when it moves down / up.
+            let down = |pos: usize| {
+                let j = basic[pos];
+                if above(xs[j], j) { xs[j] - p.up[j] } else if below(xs[j], j) || is_inf(p.lo[j]) { INF } else { xs[j] - p.lo[j] }
+            };
+            let upd = |pos: usize| {
+                let j = basic[pos];
+                if below(xs[j], j) { p.lo[j] - xs[j] } else if above(xs[j], j) || is_inf(p.up[j]) { INF } else { p.up[j] - xs[j] }
+            };
+            ratio_test(ftol, self.opts.pivot_tol, own, &entries, &down, &upd)
+        };
+        if chosen.is_none() && step >= INF {
+            return Phase1::Failure;
+        }
+        let step = step.max(0.0);
+        *iterations += 1;
+        let (leave_info, moved): (Option<(usize, usize, bool)>, Vec<(usize, f64)>) = match chosen {
+            Some(k) => {
+                let (r, a_r) = entries[k];
+                let j = self.basic[r];
+                let xj = self.x[j];
+                let to_upper = if a_r > 0.0 { above(xj, j) } else { !below(xj, j) };
+                (Some((r, j, to_upper)), entries.clone())
+            }
+            None => (None, entries.clone()),
+        };
+        for &(i, a) in &moved {
+            let j = self.basic[i];
+            self.x[j] -= step * a;
+        }
+        self.x[q] += dir * step;
+        let Some((r, leave, to_upper)) = leave_info else {
+            self.at_upper[q] = !self.at_upper[q];
+            self.x[q] = self.nonbasic_value(q);
+            if self.opts.record_trace {
+                trace.push(TraceEvent { iteration: *iterations, entering: q, leaving: None, position: None, step });
+            }
+            return Phase1::Continue;
+        };
+        self.x[leave] = if to_upper { p.up[leave] } else { p.lo[leave] };
+        self.pos_of[leave] = NONE;
+        self.at_upper[leave] = to_upper;
+        self.basic[r] = q;
+        self.pos_of[q] = r;
+        self.factor.update(r, alpha);
+        if self.opts.record_trace {
+            trace.push(TraceEvent { iteration: *iterations, entering: q, leaving: Some(leave), position: Some(r), step });
+        }
+        Phase1::Continue
+    }
+}
+
 /// Bucket thresholds of the candidate list: `T[0] = 0`, `T[k] = 2^(k-20)`.
 fn thr(k: usize) -> f64 {
     if k == 0 {
@@ -493,27 +604,39 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     }
     s.recompute_primal();
     s.recompute_dual();
-    let mut worst = 0.0f64;
-    for &j in &s.basic {
-        if !is_inf(p.lo[j]) {
-            worst = worst.max(p.lo[j] - s.x[j]);
-        }
-        if !is_inf(p.up[j]) {
-            worst = worst.max(s.x[j] - p.up[j]);
-        }
-    }
-    if worst > opts.feasibility_tol {
-        return Err(SolveError::InfeasibleStart { max_violation: worst });
-    }
-
     let mut trace = Vec::new();
     let mut iterations = 0usize;
+    let mut phase1 = false;
+    let mut farkas: Option<Vec<f64>> = None;
+    let mut ray: Option<Vec<f64>> = None;
     let status = loop {
         if iterations >= opts.max_iterations {
             break Status::IterationLimit;
         }
         if s.factor.num_updates() >= opts.max_updates {
             s.refactor()?;
+        }
+        if s.has_infeasible_basic() {
+            phase1 = true;
+            match s.phase1_iteration(&mut iterations, &mut trace) {
+                Phase1::Continue => continue,
+                Phase1::Infeasible(y) => {
+                    farkas = Some(y);
+                    break Status::Infeasible;
+                }
+                Phase1::Failure => break Status::NumericalFailure,
+            }
+        }
+        if phase1 {
+            // Back in a feasible region: restart the phase-2 pricing state from the true costs.
+            phase1 = false;
+            s.w.iter_mut().for_each(|w| *w = 1.0);
+            for j in 0..n + m {
+                s.in_r0[j] = s.pos_of[j] == NONE;
+            }
+            s.list.clear();
+            s.level = 0;
+            s.recompute_dual();
         }
         let Some(q) = s.price() else {
             break Status::Optimal;
@@ -539,6 +662,13 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             ratio_test(opts.feasibility_tol, opts.pivot_tol, own, &entries, &down, &upd)
         };
         if chosen.is_none() && step >= INF {
+            let mut dir_x = vec![0.0; n + m];
+            dir_x[q] = dir;
+            for &(i, a) in &entries {
+                dir_x[s.basic[i]] -= a;
+            }
+            dir_x.truncate(model.num_cols());
+            ray = Some(dir_x);
             break Status::Unbounded;
         }
         step = step.max(0.0);
@@ -632,6 +762,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         iterations,
         refactorizations: s.refactorizations,
         trace,
+        farkas,
+        ray,
     })
 }
 
