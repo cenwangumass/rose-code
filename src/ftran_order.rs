@@ -460,9 +460,6 @@ impl RefStruct {
         let dense = rows.len() * self.dthr > m
             || (!self.etas.is_empty() && count_l * self.dthr > m)
             || !(self.nuc.len() + spike.len() < self.i21 || self.dens * (spike.len() as f64) < 2.0 * m as f64);
-        if std::env::var_os("ROSE_UDBG").is_some() {
-            eprintln!("FDBG dense={dense} rows={} dthr={} count_l={count_l} etas={} spike={} nuc={} i21={} dens={}", rows.len(), self.dthr, self.etas.len(), spike.len(), self.nuc.len(), self.i21, self.dens);
-        }
         let inp: Vec<usize> = spike.iter().map(|e| e.0).collect();
         let ord = if dense { (0..m).collect() } else { self.uorder(&inp, &x) };
         let mut out: Vec<(usize, f64)> = Vec::new();
@@ -603,9 +600,6 @@ impl RefStruct {
                 nm[y] = true;
                 lst.push(y);
             }
-        }
-        if std::env::var_os("ROSE_UDBG").is_some() {
-            eprintln!("UDBG n={} sing={} tri={} nuc={} order={} lb={} i3={} i21={} dens={}", n, sing.len(), tri.len(), nuc.len(), order.len(), lb, i3, self.i21, d2);
         }
         let mut out = sing;
         out.extend(order);
