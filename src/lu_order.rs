@@ -745,15 +745,12 @@ fn dot_lanes<const W: usize>(mut acc: f64, a: &[f64], b: &[f64], peel: usize) ->
         }
         t += W;
     }
+    // Eight lanes are four xmm accumulators: (p0 + p1) + (p2 + p3) per lane parity, then even + odd.
     let r = if W == 2 {
         ln[0] + ln[1]
     } else {
-        let mut ev = ln[0];
-        let mut od = ln[1];
-        for q in (2..W).step_by(2) {
-            ev += ln[q];
-            od += ln[q + 1];
-        }
+        let ev = (ln[0] + ln[2]) + (ln[4] + ln[6]);
+        let od = (ln[1] + ln[3]) + (ln[5] + ln[7]);
         ev + od
     };
     let mut acc = r;
@@ -812,7 +809,7 @@ fn dense_lu(a: &mut [Vec<f64>], base: usize) -> Vec<usize> {
     for k in nb..n {
         for i in 1..k {
             let col: Vec<f64> = (0..i).map(|t| a[t][k]).collect();
-            a[i][k] = dot_lanes::<2>(a[i][k], &a[i][..i], &col, (i * n) & 1);
+            a[i][k] = dot_lanes::<8>(a[i][k], &a[i][..i], &col, 0);
         }
         for i in k..n {
             let col: Vec<f64> = (0..k).map(|t| a[t][k]).collect();
