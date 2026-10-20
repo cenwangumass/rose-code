@@ -1626,6 +1626,8 @@ impl RefStruct {
         }
         // The new U column goes to the pool unless it fits the old column's slot, and each of its entries to a row of the row-wise copy, which moves to the end of the
         // pool with room to grow when it is full.
+        let fill_in = self.fill;
+        let mut fp_rows: Vec<(usize, usize, usize, usize)> = Vec::new();
         if k > old_rows.len() {
             self.fill += k;
         }
@@ -1639,11 +1641,19 @@ impl RefStruct {
             // A row that already holds an entry of the old column takes the new entry in place.
             for &(row, _) in self.spike.iter().filter(|e| e.0 != r && !old_rows.contains(&e.0)) {
                 if cnt[row] >= self.row_cap[row] {
-                    let extra = (cnt[row] / 2).max(4);
+                    // The growth is capped by the updates left before the refactorization (`0xf2cd1`: `F+0x188 - F+0x18c`).
+                    let left = (((m as f64).powf(0.7) as usize).max(20) + 1).saturating_sub(self.upd);
+                    let extra = (cnt[row] / 2).max(4).min(left);
+                    fp_rows.push((row, cnt[row], self.row_cap[row], extra));
                     self.fill += cnt[row] + extra;
                     self.row_cap[row] = cnt[row] + extra;
                 }
             }
+        }
+        if crate::dump::on("fillparts") {
+            static FP: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+            let n = FP.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            crate::dump::emit("fillparts", serde_json::json!({"n": n, "k": k, "old": old_rows.len(), "col": if k > old_rows.len() { k } else { 0 }, "fill_after_eta": fill_in, "rows": fp_rows}));
         }
         self.diag[r] = newdiag;
         self.uc[r] = self.spike.iter().copied().filter(|e| e.0 != r).collect();
