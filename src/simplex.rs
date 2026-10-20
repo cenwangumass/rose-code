@@ -19,7 +19,7 @@ pub struct SolveOptions {
     pub max_updates: usize,
     pub record_trace: bool,
     /// Reproduce the reference's Devex weights exactly (weights outside the framework may fall below 1). The reference's
-    /// anti-degeneracy perturbation is not implemented, so this mode can stall on degenerate models; off by default.
+    /// anti-degeneracy perturbation is not implemented; no stall was seen on the benchmark corpus. On by default; `SolveOptions::plain()` turns it off.
     pub faithful_weights: bool,
     /// Renumber basis positions after each refactorization the way the reference does (only the singleton part of the
     /// order is recovered; the nucleus is ordered by remaining entries and previous position). Affects tie-breaking only.
@@ -36,16 +36,23 @@ impl Default for SolveOptions {
     fn default() -> Self {
         SolveOptions {
             feasibility_tol: 1e-6,
-            optimality_tol: 1e-6,
+            optimality_tol: 1e-7,
             pivot_tol: 1e-9,
             max_iterations: 1_000_000,
             max_updates: 20,
             record_trace: true,
-            faithful_weights: false,
-            faithful_positions: false,
+            faithful_weights: true,
+            faithful_positions: true,
             refactor_schedule: None,
-            faithful_ftran: false,
+            faithful_ftran: true,
         }
+    }
+}
+
+impl SolveOptions {
+    /// The solver without the reference-matching tie-breaking (own Devex floor, own basis position order, no FTRAN mirror).
+    pub fn plain() -> Self {
+        SolveOptions { faithful_weights: false, faithful_positions: false, faithful_ftran: false, ..SolveOptions::default() }
     }
 }
 

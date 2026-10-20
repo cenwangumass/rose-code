@@ -17,7 +17,7 @@ fn check(mps_name: &str, decisions: &str, objective: f64) {
     want.sort();
     got.sort();
     assert_eq!(got, want, "crash columns differ from the reference start basis");
-    let opts = SolveOptions { faithful_weights: true, faithful_positions: true, faithful_ftran: true, ..SolveOptions::default() };
+    let opts = SolveOptions::default();
     let r = solve(&model, Some(&basis), &opts).unwrap();
     assert_eq!(r.status, Status::Optimal);
     assert!((r.objective - objective).abs() < 1e-7 + 1e-8 * objective.abs());
