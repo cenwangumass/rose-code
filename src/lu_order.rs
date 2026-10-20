@@ -17,7 +17,7 @@ pub fn pivot_order(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Vec<(usiz
             continue;
         }
         let mut d: Vec<(usize, f64)> = idx.iter().copied().zip(val.iter().copied()).filter(|(i, _)| !done_r.contains(i)).collect();
-        d.sort_by(|a, b| b.0.cmp(&a.0));
+        d.reverse();
         nuc.push((pos, d));
     }
     seq.extend(nucleus(m, &nuc));
