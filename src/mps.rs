@@ -209,8 +209,7 @@ pub fn parse(text: &str) -> Result<LpModel, MpsError> {
     let mut row_idx = Vec::new();
     let mut val = Vec::new();
     for c in &cols {
-        let mut c = c.clone();
-        c.sort_by_key(|e| e.0);
+        let c = c.clone();
         for (i, v) in c {
             row_idx.push(i);
             val.push(v);

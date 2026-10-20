@@ -127,6 +127,10 @@ fn is_inf(v: f64) -> bool {
 fn build(model: &LpModel) -> Internal {
     let (nm, m) = (model.num_cols(), model.num_rows());
     let mut cols: Vec<Column> = (0..nm).map(|j| model.col(j).collect()).collect();
+    // The model keeps the file's entry order (the crash tie-break needs it); the solver works on columns sorted by row.
+    for c in &mut cols {
+        c.sort_by_key(|e| e.0);
+    }
     let mut lo = model.col_lo.clone();
     let mut up = model.col_up.clone();
     let mut rhs = vec![0.0; m];
@@ -158,6 +162,90 @@ fn build(model: &LpModel) -> Internal {
     let mut cost: Vec<f64> = model.obj.iter().map(|c| sgn * c).collect();
     cost.resize(n + m, 0.0);
     Internal { n, m, cols, lo, up, rhs, cost }
+}
+
+/// Crash basis of the reference (primal simplex setup, `0x1387d0`): each equality row (fixed slack) may receive one structural
+/// column in place of its slack. Singleton columns with an infinite upper bound go first; then columns with fewer than 10
+/// entries are taken bucket by bucket (by static entry count, buckets scanned from the highest index first) while their dynamic
+/// count of still-unassigned equality rows is within the pass limit; a column takes the unassigned equality row with the
+/// largest `|a|` (first on ties) and marks all of its equality rows used. Recovered from the assignments of the reference on
+/// ADLITTLE, BLEND, SC50A and BORE3D (the set of crash columns matches on all four).
+pub fn crash_basis(model: &LpModel) -> Basis {
+    let p = build(model);
+    let (n, m) = (p.n, p.m);
+    let file_cols: Vec<Column> = (0..n).map(|j| model.col(j).collect()).collect();
+    let mut b = Basis::slack(n, m);
+    for j in 0..n {
+        b.at_upper[j] = is_inf(p.lo[j]) && !is_inf(p.up[j]);
+    }
+    // used[r]: row r is not an equality row, or already has a column.
+    let mut used: Vec<bool> = (0..m).map(|i| p.up[n + i] - p.lo[n + i] > 0.0).collect();
+    let mut cols_of_row: Vec<Vec<usize>> = vec![Vec::new(); m];
+    for j in 0..n {
+        for &(r, _) in &p.cols[j] {
+            cols_of_row[r].push(j);
+        }
+    }
+    // Fixed columns never enter the crash.
+    let mut eligible: Vec<bool> = (0..n).map(|j| p.up[j] - p.lo[j] > 0.0).collect();
+    let assign = |b: &mut Basis, used: &mut Vec<bool>, eligible: &mut Vec<bool>, j: usize, r: usize| {
+        b.basic[r] = j;
+        used[r] = true;
+        eligible[j] = false;
+    };
+    for j in 0..n {
+        if eligible[j] && p.cols[j].len() == 1 && is_inf(p.up[j]) {
+            let r = p.cols[j][0].0;
+            if !used[r] {
+                assign(&mut b, &mut used, &mut eligible, j, r);
+            }
+        }
+    }
+    // The reference's per-column counter starts at -1, so it holds the number of unassigned equality rows minus one.
+    let mut count = vec![-1i64; n];
+    for r in 0..m {
+        if !used[r] {
+            for &j in &cols_of_row[r] {
+                count[j] += 1;
+            }
+        }
+    }
+    let mut buckets: Vec<Vec<usize>> = vec![Vec::new(); 11];
+    for j in (0..n).rev() {
+        if eligible[j] && p.cols[j].len() < 10 {
+            buckets[p.cols[j].len()].push(j);
+        }
+    }
+    let mut marked = used.clone();
+    for bk in 1..10usize {
+        for t in 0..bk as i64 {
+            for &j in &buckets[bk] {
+                if !(0..=t).contains(&count[j]) {
+                    continue;
+                }
+                let mut best: Option<(usize, f64)> = None;
+                for &(r, a) in &file_cols[j] {
+                    if !marked[r] && best.map_or(a.abs() > 0.0, |(_, v)| a.abs() > v) {
+                        best = Some((r, a.abs()));
+                    }
+                }
+                if let Some((r, _)) = best {
+                    assign(&mut b, &mut used, &mut eligible, j, r);
+                }
+                for &(r, _) in &p.cols[j] {
+                    if !marked[r] {
+                        marked[r] = true;
+                        for &k in &cols_of_row[r] {
+                            if (0..10).contains(&count[k]) {
+                                count[k] -= 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    b
 }
 
 struct Solver<'a> {
