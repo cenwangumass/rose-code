@@ -1756,6 +1756,11 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             }
             rank
         });
+        // The leaving variable takes part in the row update like any nonbasic: its row product is 1 up to rounding.
+        let theta_leave = match rho_rank.as_ref() {
+            Some(rank) => theta_d * rank_dot(&p.cols[leave], &rho, rank),
+            None => theta_d,
+        };
         let mut changed: Vec<usize> = Vec::new();
         for j in 0..n + m {
             if s.pos_of[j] != NONE || j == q {
@@ -1786,7 +1791,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             // The reference keeps the stored value of a basic variable: the leaving one moves by the pivot-row update like any
             // other entry and loses its phase 1 penalty; the entering one is left holding the negated pivot element (zero for a
             // degenerate step; this matches 277 of 330 DEGEN2 pivots).
-            s.d[leave] -= theta_d;
+            s.d[leave] -= theta_leave;
             if let Some(&(j, c)) = s.p1_prev.get(r) {
                 if j == leave && c != 0 {
                     leave_penalty = PHASE1_M * f64::from(c);
@@ -1794,7 +1799,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             }
             s.d[q] = if step == 0.0 { 0.0 } else { -dir * alpha_rq };
         } else {
-            s.d[leave] = -theta_d;
+            s.d[leave] = -theta_leave;
             s.d[q] = 0.0;
         }
         s.w[leave] = (wq / alpha_rq) / alpha_rq;
