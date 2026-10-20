@@ -26,7 +26,36 @@ fn main() {
             at_upper[j] = true;
         }
     }
-    let r = match solve(&model, Some(&Basis { basic, at_upper }), &SolveOptions { faithful_weights: true, ..SolveOptions::default() }) {
+    // Iterations at which the reference refactorized: its basis positions are renumbered by more than the one swapped position.
+    let order = |st: &serde_json::Value| -> Vec<usize> {
+        let sv: Vec<i64> = st["status"].as_array().unwrap().iter().map(|s| s.as_i64().unwrap()).collect();
+        let mut o = vec![usize::MAX; m];
+        for (j, &s) in sv.iter().enumerate() {
+            if s >= 0 {
+                o[s as usize] = j;
+            }
+        }
+        o
+    };
+    let mut schedule = Vec::new();
+    for k in 1..states.len() {
+        let mut prev = order(&states[k - 1]);
+        let (pos, enter) = (states[k - 1]["after"]["pos"].as_i64().unwrap(), states[k - 1]["after"]["enter"].as_i64().unwrap());
+        if pos >= 0 && enter >= 0 {
+            prev[pos as usize] = enter as usize;
+        }
+        if prev.iter().zip(order(&states[k])).filter(|(a, b)| *a != b).count() > 1 {
+            schedule.push(k);
+        }
+    }
+    let positions = std::env::var_os("ROSE_NO_POSITIONS").is_none();
+    let opts = SolveOptions {
+        faithful_weights: true,
+        faithful_positions: positions,
+        refactor_schedule: if positions { Some(schedule) } else { None },
+        ..SolveOptions::default()
+    };
+    let r = match solve(&model, Some(&Basis { basic, at_upper }), &opts) {
         Ok(r) => r,
         Err(e) => {
             println!("{}: {e}", args[1]);

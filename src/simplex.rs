@@ -21,6 +21,12 @@ pub struct SolveOptions {
     /// Reproduce the reference's Devex weights exactly (weights outside the framework may fall below 1). The reference's
     /// anti-degeneracy perturbation is not implemented, so this mode can stall on degenerate models; off by default.
     pub faithful_weights: bool,
+    /// Renumber basis positions after each refactorization the way the reference does (only the singleton part of the
+    /// order is recovered; the nucleus is ordered by remaining entries and previous position). Affects tie-breaking only.
+    pub faithful_positions: bool,
+    /// Refactorize exactly before these iteration counts instead of after `max_updates` updates (taken from a reference trace;
+    /// the reference's own trigger depends on its LU fill, which is not reproduced).
+    pub refactor_schedule: Option<Vec<usize>>,
 }
 
 impl Default for SolveOptions {
@@ -33,6 +39,8 @@ impl Default for SolveOptions {
             max_updates: 20,
             record_trace: true,
             faithful_weights: false,
+            faithful_positions: false,
+            refactor_schedule: None,
         }
     }
 }
@@ -185,7 +193,112 @@ impl<'a> Solver<'a> {
         }
     }
 
+    /// Basis positions after a refactorization, as recovered from the reference (`reverse-engineer/replay/position_order.py`):
+    /// (1) a stack-driven elimination of structural columns that own a singleton row (initial rows ascending, the largest popped
+    /// first, rows freed by a pivot pushed on top), (2) slack columns alone in their row, (3) remaining one-entry columns, (4) singleton
+    /// elimination on the remaining rows with the same kind of stack keyed by previous position, (5) the rest.
+    fn reference_order(&self) -> Vec<usize> {
+        let (n, m) = (self.p.n, self.p.m);
+        let prev = &self.basic;
+        let pp: std::collections::HashMap<usize, usize> = prev.iter().enumerate().map(|(i, &v)| (v, i)).collect();
+        let mut cnt = vec![0usize; m];
+        let mut rows_of: Vec<Vec<usize>> = vec![Vec::new(); m];
+        for &v in prev {
+            for &(r, _) in &self.p.cols[v] {
+                cnt[r] += 1;
+                rows_of[r].push(v);
+            }
+        }
+        let mut active: std::collections::HashSet<usize> = prev.iter().copied().collect();
+        let mut pivrows = vec![false; m];
+        let mut out: Vec<usize> = Vec::with_capacity(m);
+        let unique = |r: usize, active: &std::collections::HashSet<usize>| rows_of[r].iter().copied().find(|x| active.contains(x));
+        let singles = |rows: &[usize], cnt: &Vec<usize>, pivrows: &Vec<bool>, active: &std::collections::HashSet<usize>| -> Vec<usize> {
+            let mut res: Vec<usize> = rows.iter().copied().filter(|&r| cnt[r] == 1 && !pivrows[r] && unique(r, active).map_or(false, |v| v < n)).collect();
+            res.sort_unstable();
+            res.dedup();
+            res
+        };
+        let all_rows: Vec<usize> = (0..m).collect();
+        let mut stack = singles(&all_rows, &cnt, &pivrows, &active);
+        while let Some(r) = stack.pop() {
+            if cnt[r] != 1 || pivrows[r] {
+                continue;
+            }
+            let Some(v) = unique(r, &active) else { continue };
+            if v >= n {
+                continue;
+            }
+            out.push(v);
+            pivrows[r] = true;
+            active.remove(&v);
+            let rows_v: Vec<usize> = self.p.cols[v].iter().map(|&(i, _)| i).collect();
+            for &i in &rows_v {
+                cnt[i] -= 1;
+            }
+            stack.extend(singles(&rows_v, &cnt, &pivrows, &active));
+        }
+        let mut slack_picks: Vec<usize> = prev
+            .iter()
+            .copied()
+            .filter(|&v| v >= n && active.contains(&v) && cnt[self.p.cols[v][0].0] == 1 && !pivrows[self.p.cols[v][0].0])
+            .collect();
+        slack_picks.sort_by_key(|v| pp[v]);
+        for &v in &slack_picks {
+            for &(i, _) in &self.p.cols[v] {
+                pivrows[i] = true;
+                cnt[i] -= 1;
+            }
+            active.remove(&v);
+        }
+        out.extend(slack_picks);
+        let mut blk2: Vec<usize> = prev.iter().copied().filter(|v| active.contains(v) && self.p.cols[*v].len() == 1).collect();
+        blk2.sort_by_key(|v| pp[v]);
+        for &v in &blk2 {
+            for &(i, _) in &self.p.cols[v] {
+                pivrows[i] = true;
+                cnt[i] -= 1;
+            }
+            active.remove(&v);
+        }
+        out.extend(blk2);
+        let live = |v: usize, pivrows: &Vec<bool>| -> Vec<usize> { self.p.cols[v].iter().map(|&(i, _)| i).filter(|&i| !pivrows[i]).collect() };
+        let mut instack: std::collections::HashSet<usize> = std::collections::HashSet::new();
+        let mut st: Vec<usize> = Vec::new();
+        let push_new = |st: &mut Vec<usize>, instack: &mut std::collections::HashSet<usize>, active: &std::collections::HashSet<usize>, pivrows: &Vec<bool>| {
+            let mut new: Vec<usize> = prev.iter().copied().filter(|v| active.contains(v) && !instack.contains(v) && live(*v, pivrows).len() == 1).collect();
+            new.sort_by_key(|v| pp[v]);
+            for v in new {
+                instack.insert(v);
+                st.push(v);
+            }
+        };
+        push_new(&mut st, &mut instack, &active, &pivrows);
+        while let Some(v) = st.pop() {
+            let lv = live(v, &pivrows);
+            if lv.len() != 1 {
+                continue;
+            }
+            out.push(v);
+            pivrows[lv[0]] = true;
+            active.remove(&v);
+            push_new(&mut st, &mut instack, &active, &pivrows);
+        }
+        let mut rest: Vec<usize> = prev.iter().copied().filter(|v| active.contains(v)).collect();
+        rest.sort_by_key(|v| (live(*v, &pivrows).len(), std::cmp::Reverse(pp[v])));
+        out.extend(rest);
+        out
+    }
+
     fn refactor(&mut self) -> Result<(), SolveError> {
+        if self.opts.faithful_positions {
+            let order = self.reference_order();
+            debug_assert_eq!(order.len(), self.basic.len());
+            for (pos, &j) in order.iter().enumerate() {
+                self.pos_of[j] = pos;
+            }
+            self.basic = order;
+        }
         let cols: Vec<Column> = self.basic.iter().map(|&j| self.p.cols[j].clone()).collect();
         self.factor = Factor::new(self.p.m, &cols).map_err(|_| SolveError::SingularBasis)?;
         self.refactorizations += 1;
@@ -803,7 +916,11 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         if iterations >= opts.max_iterations {
             break Status::IterationLimit;
         }
-        if s.factor.num_updates() >= opts.max_updates {
+        let due = match &opts.refactor_schedule {
+            Some(sched) => sched.contains(&iterations),
+            None => s.factor.num_updates() >= opts.max_updates,
+        };
+        if due {
             s.refactor()?;
         }
         let infeasible = s.has_infeasible_basic();
