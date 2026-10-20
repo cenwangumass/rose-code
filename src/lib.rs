@@ -2,6 +2,7 @@
 
 pub mod basis;
 pub mod lu;
+pub mod lu_order;
 pub mod model;
 pub mod mps;
 pub mod simplex;
