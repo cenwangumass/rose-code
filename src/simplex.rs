@@ -144,6 +144,8 @@ struct Solver<'a> {
     /// Persistent pricing candidate list and its bucket level (see `bucket`).
     level: usize,
     list: Vec<usize>,
+    /// Structural columns of each row, ascending.
+    rows: Vec<Vec<usize>>,
 }
 
 fn dot(col: &Column, v: &[f64]) -> f64 {
@@ -205,6 +207,44 @@ impl<'a> Solver<'a> {
 
     fn is_fixed(&self, j: usize) -> bool {
         self.p.lo[j] == self.p.up[j]
+    }
+
+    /// Order in which the reference stores the pivot-row entries: with a sparse `rho`, structurals in first-touch
+    /// order over the rows of `rho`; otherwise structurals in index order; then slacks in row order.
+    fn pivot_row_order(&self, rho: &[f64], changed: &[usize]) -> Vec<usize> {
+        let (n, m) = (self.p.n, self.p.m);
+        let nz: Vec<usize> = (0..m).rev().filter(|&i| rho[i] != 0.0).collect();
+        let nnz_a: usize = self.p.cols[..n].iter().map(Vec::len).sum();
+        let mut keep = vec![false; n + m];
+        for &j in changed {
+            keep[j] = true;
+        }
+        let mut out = Vec::with_capacity(changed.len());
+        if nz.len() * 3 * nnz_a < m * n {
+            for &i in &nz {
+                for &j in &self.rows[i] {
+                    if keep[j] {
+                        keep[j] = false;
+                        out.push(j);
+                    }
+                }
+            }
+        } else {
+            for j in 0..n {
+                if keep[j] {
+                    keep[j] = false;
+                    out.push(j);
+                }
+            }
+        }
+        for &i in &nz {
+            if keep[n + i] {
+                keep[n + i] = false;
+                out.push(n + i);
+            }
+        }
+        out.extend((0..n + m).filter(|&j| keep[j]));
+        out
     }
 
     /// Eligibility and score `d^2 / w` of a nonbasic variable, or `None` if it cannot enter.
@@ -430,7 +470,14 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         refactorizations: 1,
         level: 0,
         list: Vec::new(),
+        rows: Vec::new(),
     };
+    s.rows = vec![Vec::new(); m];
+    for j in 0..n {
+        for &(i, _) in &s.p.cols[j] {
+            s.rows[i].push(j);
+        }
+    }
     s.recompute_primal();
     s.recompute_dual();
     let mut worst = 0.0f64;
@@ -546,7 +593,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         s.pos_of[q] = r;
         s.factor.update(r, alpha);
         changed.push(leave);
-        changed.sort_unstable();
+        let changed = s.pivot_row_order(&rho, &changed);
         s.update_list(&changed);
         if opts.record_trace {
             trace.push(TraceEvent { iteration: iterations, entering: q, leaving: Some(leave), position: Some(r), step });
