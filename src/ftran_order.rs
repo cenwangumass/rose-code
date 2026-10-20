@@ -49,6 +49,10 @@ pub struct RefStruct {
     first_eta: Vec<usize>,
     /// Estimate of the most recent `ftran` (`0x120740`) or `btran` (`0x12de60`), before the factor object's scale 1.3.
     pub work: f64,
+    /// Fill of the reference's pool for etas and the row-wise copy of U (`F+0x160`), and the capacity of each row of that copy.
+    /// Only the parity of `fill` matters: it decides the alignment of the next eta's value array.
+    fill: usize,
+    row_cap: Vec<usize>,
     /// Work of the last column replacement (`0xf15c0`), as `(site, estimate, scale)`.
     pub upd_work: Vec<(u32, f64, f64)>,
     /// Tail and nucleus U densities fixed at factorization time (`F+0x108`, `F+0x110`), and whether the level structure was built
@@ -65,27 +69,32 @@ struct Eta {
     idx: usize,
     ind: Vec<usize>,
     val: Vec<f64>,
+    /// Elements before the first 16-byte boundary of the value array in the reference's pool (the parity of the pool fill at which
+    /// the eta was stored).
+    peel: usize,
 }
 
 const TOL: f64 = 1e-13;
 
-/// Eta dot product as the reference evaluates it: sequential below eight terms, otherwise one element peeled (its value arrays sit
-/// 8 bytes off a 16-byte boundary) and eight lane-wise partial sums.
-fn dot(x: &[f64], c: &[f64]) -> f64 {
+/// Eta dot product as the reference evaluates it: the vectorised loop peels the elements before the first 16-byte boundary of
+/// the value array (`peel` is 0 or 1) and keeps eight lane-wise partial sums; below `peel + 8` terms it is sequential.
+fn dot(x: &[f64], c: &[f64], peel: usize) -> f64 {
     let n = c.len();
     let t = |i: usize| x[i] * c[i];
-    if n < 9 {
+    if n < peel + 8 {
         let mut acc = 0.0;
         for i in 0..n {
             acc += t(i);
         }
         return acc;
     }
-    let n8 = n - ((n - 1) & 7);
+    let n8 = n - ((n - peel) & 7);
     let mut lanes = [0.0f64; 8];
-    lanes[0] = t(0);
-    for i in 1..n8 {
-        lanes[(i - 1) & 7] += t(i);
+    for i in 0..peel {
+        lanes[0] += t(i);
+    }
+    for i in peel..n8 {
+        lanes[(i - peel) & 7] += t(i);
     }
     let mut tot = (((lanes[0] + lanes[2]) + lanes[4]) + lanes[6]) + (((lanes[1] + lanes[3]) + lanes[5]) + lanes[7]);
     for i in n8..n {
@@ -273,6 +282,16 @@ impl RefStruct {
             nnz_l: nnz_l_tot,
             first_eta: vec![usize::MAX; m],
             work: 0.0,
+            fill: 2 * (uc.iter().map(Vec::len).sum::<usize>() + nnz_l_tot),
+            row_cap: {
+                let mut c = vec![0usize; m];
+                for col in &uc {
+                    for &(row, _) in col {
+                        c[row] += 1;
+                    }
+                }
+                c
+            },
             upd_work: Vec::new(),
             h33,
             h34,
@@ -456,7 +475,7 @@ impl RefStruct {
                 for eta in &self.etas[first..] {
                     ee = eta.ind.len() as f64 * 2.0 + ee;
                     let xs: Vec<f64> = eta.ind.iter().map(|&j| xe[j]).collect();
-                    let mut sv = dot(&xs, &eta.val);
+                    let mut sv = dot(&xs, &eta.val, eta.peel);
                     if sv.abs() <= TOL {
                         sv = 0.0;
                     } else if !inlist[eta.idx] {
@@ -470,7 +489,7 @@ impl RefStruct {
         }
         for eta in &self.etas {
             let xs: Vec<f64> = eta.ind.iter().map(|&j| x[j]).collect();
-            let mut s = dot(&xs, &eta.val);
+            let mut s = dot(&xs, &eta.val, eta.peel);
             if s.abs() <= TOL {
                 s = 0.0;
             }
@@ -960,7 +979,7 @@ impl RefStruct {
             e = self.sum_eta * 2.0 + e;
             for eta in &self.etas {
                 let xs: Vec<f64> = eta.ind.iter().map(|&j| x[j]).collect();
-                let sv = dot(&xs, &eta.val);
+                let sv = dot(&xs, &eta.val, eta.peel);
                 x[eta.idx] = if sv.abs() <= TOL { 0.0 } else { sv };
             }
         }
@@ -1284,6 +1303,10 @@ impl RefStruct {
         let m = self.m;
         self.upd += 1;
         self.upd_work.clear();
+        // The eta is stored first, at the current pool fill; its value array sits on a 16-byte boundary when the fill is even.
+        let peel = self.fill % 2;
+        // The old column's entries leave the row-wise copy after the new column's entries have been added.
+        let old_rows: Vec<usize> = if self.kind[r] == -2 { self.uc[r].iter().map(|e| e.0).collect() } else { Vec::new() };
         // The new U column's entries (`0xf15c0`, sites `0xf2521` and `0xf2e3c`).
         let k = self.spike.iter().filter(|e| e.0 != r).count();
         if k > 0 {
@@ -1440,17 +1463,42 @@ impl RefStruct {
                 val.push(c);
             }
             let xs: Vec<f64> = ind.iter().map(|&j| spk[j]).collect();
-            newdiag = dot(&xs, &val);
+            newdiag = dot(&xs, &val, peel);
             self.sum_eta += ind.len() as f64;
             self.upd_work.push((0xf1beb, 3.0 * ind.len() as f64, crate::work::CTX));
             let e = self.etas.len();
             for &j in &ind {
                 self.first_eta[j] = self.first_eta[j].min(e);
             }
-            self.etas.push(Eta { idx: r, ind, val });
+            let esz = ind.len();
+            self.etas.push(Eta { idx: r, ind, val, peel });
+            self.fill += esz;
         }
         if k > 0 {
             self.upd_work.push((0xf2e3c, 5.0 * k as f64, crate::work::CTX));
+        }
+        // The new U column goes to the pool unless it fits the old column's slot, and each of its entries to a row of the row-wise copy, which moves to the end of the
+        // pool with room to grow when it is full.
+        if k > old_rows.len() {
+            self.fill += k;
+        }
+        if k > 0 {
+            let mut cnt = vec![0usize; m];
+            for c in (0..m).filter(|&c| c != r && self.kind[c] == -2) {
+                for &(row, _) in &self.uc[c] {
+                    cnt[row] += 1;
+                }
+            }
+            for &row in &old_rows {
+                cnt[row] += 1;
+            }
+            for &(row, _) in self.spike.iter().filter(|e| e.0 != r) {
+                if cnt[row] >= self.row_cap[row] {
+                    let extra = (cnt[row] / 2).max(4);
+                    self.fill += cnt[row] + extra;
+                    self.row_cap[row] = cnt[row] + extra;
+                }
+            }
         }
         self.diag[r] = newdiag;
         self.uc[r] = self.spike.iter().copied().filter(|e| e.0 != r).collect();
@@ -1476,3 +1524,4 @@ fn remove_last_fill(v: &mut Vec<usize>, r: usize) {
         v.swap_remove(p);
     }
 }
+
