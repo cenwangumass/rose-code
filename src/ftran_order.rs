@@ -316,7 +316,21 @@ impl RefStruct {
             x[s] += v;
             start.push(s);
         }
-        let (mut order, count_l) = if let Some(lev) = &self.levels {
+        let dense_l = rows.len() * self.dthr > self.m;
+        let (mut order, count_l) = if dense_l {
+            // Dense L solve (`0x12bd30`): every node in ascending order; the list handed on is the ascending scan.
+            for v in 0..self.m {
+                let xv = x[v];
+                if xv.abs() <= TOL {
+                    continue;
+                }
+                for (e, &y) in self.lcols[v].iter().enumerate() {
+                    x[y] -= self.lvals[v][e] * xv;
+                }
+            }
+            let count_l = (0..self.m).filter(|&v| x[v].abs() > TOL).count();
+            ((0..self.m).collect(), count_l)
+        } else if let Some(lev) = &self.levels {
             // Level-bucket L solve: nodes are taken level by level, each level in insertion order (inputs first, then the
             // nodes reached from lower levels); values below the tolerance are dropped without propagating.
             let maxlev = lev.iter().copied().max().unwrap_or(0);
@@ -463,6 +477,12 @@ impl RefStruct {
                 out.push((p, x[p]));
             }
         }
+        // The column replacement receives the spike in ascending order after a dense solve (the reference scans the dense vector),
+        // and in L-stage order after a sparse one.
+        let mut spike = spike;
+        if dense {
+            spike.sort_unstable_by_key(|e| e.0);
+        }
         self.spike = spike;
         self.last_alpha = out.len();
         out
@@ -470,6 +490,15 @@ impl RefStruct {
 
     /// The reference's refactorization decision, evaluated before an iteration's own update: at the update limit
     /// `max(20, m^0.7)`, or from `U >= m^0.45` when the accumulated work `(1.5 S + 2 c) m` exceeds `min((Z - 1.5 m)^2, 4 m^2 U0)`.
+    /// `(nucleus list length, first tail slot, dens)`; for diagnostics against the reference's `i3`, `i21` and `(hdr33+hdr34)^2`.
+    pub fn kinds(&self) -> &[i64] {
+        &self.kind
+    }
+
+    pub fn dims(&self) -> (usize, usize, f64) {
+        (self.nuc.len(), self.i21, self.dens)
+    }
+
     pub fn refactor_due(&self) -> bool {
         let m = self.m as f64;
         let maxupd = (m.powf(0.7) as usize).max(20);
@@ -564,6 +593,9 @@ impl RefStruct {
                 nm[x] = true;
                 lst.push(x);
             }
+        }
+        if std::env::var_os("ROSE_UDBG").is_some() {
+            eprintln!("UDBG n={} sing={} tri={} nuc={} order={} lb={} i3={} i21={} dens={}", n, sing.len(), tri.len(), nuc.len(), order.len(), lb, i3, self.i21, d2);
         }
         let mut out = sing;
         out.extend(order);

@@ -1052,7 +1052,9 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 classify(xs[j], lo[j], up[j], tol)
             };
             if std::env::var_os("ROSE_ENT").is_some() {
-                eprintln!("ENT {{\"iter\":{iterations},\"q\":{q},\"own\":{own:e},\"idx\":{:?},\"val\":{:?}}}", entries.iter().map(|e| e.0).collect::<Vec<_>>(), entries.iter().map(|e| e.1).collect::<Vec<_>>());
+                let dims = s.mirror.as_ref().map(|mi| mi.dims());
+                let kinds = s.mirror.as_ref().map(|mi| mi.kinds().to_vec());
+                eprintln!("ENT {{\"kinds\":{:?},\"dims\":{:?},\"iter\":{iterations},\"q\":{q},\"own\":{own:e},\"idx\":{:?},\"val\":{:?}}}", kinds.unwrap_or_default(), dims, entries.iter().map(|e| e.0).collect::<Vec<_>>(), entries.iter().map(|e| e.1).collect::<Vec<_>>());
             }
             let pick = phase1_ratio(tol, opts.pivot_tol, own, &entries, &info);
             if pick.entry.is_some() {
