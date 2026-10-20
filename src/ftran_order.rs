@@ -1321,7 +1321,9 @@ impl RefStruct {
         let old = self.kind[r];
         let mut convslot: Option<usize> = None;
         let mut conv: Option<usize> = None;
-        if old != -2 && self.slot[r] + 1 != self.i21 {
+        // The reference demotes a bare tail column only when the new column depends on the tail; with no tail entries in the spike
+        // the tail simply grows by one slot.
+        if old != -2 && self.slot[r] + 1 != self.i21 && sp.iter().any(|&y| y != r && self.kind[y] == -2) {
             conv = (0..m).filter(|&x| self.kind[x] == -2 && self.a[x].is_empty() && self.b[x].is_empty()).max_by_key(|&x| self.slot[x]);
             if let Some(x) = conv {
                 convslot = Some(self.slot[x]);
