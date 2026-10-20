@@ -515,8 +515,8 @@ impl<'a> Solver<'a> {
             }
         }
         let nz: Vec<usize> = out.iter().map(|e| e.0).filter(|&i| rho[i] != 0.0).collect();
-        if std::env::var_os("ROSE_ORD").is_some() {
-            eprintln!("CORD nz={:?} changed={:?}", nz, changed);
+        if crate::dump::on("ord") {
+            eprintln!("CORD {}", serde_json::json!({"nz": nz, "changed": changed}));
         }
         let changed = self.pivot_row_order_by(&nz, &changed, nz.len());
         self.update_list(&changed, usize::from(q < n), 0x108280);
@@ -545,6 +545,9 @@ impl<'a> Solver<'a> {
             .filter(|e| e.1 != 0.0)
             .collect();
         let out = mi.btran(&inp, false, true);
+        if crate::dump::on("dual") {
+            crate::dump::emit("dual", serde_json::json!({"refactor": self.refactorizations, "out": crate::dump::sparse(&out)}));
+        }
         self.work.add_from(0x12de50, 0x109289, mi.work, crate::work::FAC);
         let mut y = vec![0.0; p.m];
         for &(i, v) in &out {
@@ -587,8 +590,8 @@ impl<'a> Solver<'a> {
             for (i, v) in out {
                 xb[i] = v;
             }
-            if std::env::var_os("ROSE_XB").is_some() {
-                println!("XB {}", serde_json::to_string(&(&r, &xb)).unwrap());
+            if crate::dump::on("xb") {
+                crate::dump::emit("xb", serde_json::json!({"rhs": r, "xb": xb}));
             }
             let mut res = r.clone();
             for (pos, &j) in self.basic.iter().enumerate() {
@@ -1372,6 +1375,12 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     s.recompute_dual();
     let mut trace = Vec::new();
     let mut iterations = 0usize;
+    // Pricing passes of the main loop, the call index of the `pricing` dump.
+    let mut pricing_calls = 0usize;
+    if crate::dump::on("header") {
+        let fixed: Vec<usize> = (0..p.n + p.m).filter(|&j| s.is_fixed(j)).collect();
+        crate::dump::emit("header", serde_json::json!({"n": p.n, "m": p.m, "fixed": fixed}));
+    }
     let mut phase1 = false;
     let mut refactor_next = false;
     let mut farkas: Option<Vec<f64>> = None;
@@ -1464,10 +1473,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             }
         }
         if false { let fr: Vec<usize> = (0..p.n + p.m).filter(|&j| s.pos_of[j] == NONE && is_inf(p.lo[j]) && is_inf(p.up[j])).collect(); eprintln!("FREE it={iterations} nfree={} list={} faithful={} first={:?}", fr.len(), s.list.len(), opts.faithful_weights, &fr[..fr.len().min(5)]); }
-        if std::env::var_os("ROSE_STATE").is_some() {
-            let f = |v: &[f64]| v.iter().map(|x| format!("{x:e}")).collect::<Vec<_>>().join(",");
-            eprintln!("STATE {{\"x\":[{}],\"list\":{:?},\"iter\":{iterations},\"infeasible\":{infeasible},\"basic\":{:?},\"d\":[{}],\"w\":[{}]}}", f(&s.x), s.list, s.basic, f(&s.d), f(&s.w));
+        if crate::dump::on("pricing") {
+            crate::dump::emit("pricing", serde_json::json!({"n": pricing_calls, "iter": iterations, "infeasible": infeasible, "list": s.list, "basic": s.basic, "d": s.d, "w": s.w, "x": s.x}));
         }
+        pricing_calls += 1;
         let q = if infeasible {
             match s.price_faithful() {
                 Some(q) => q,
@@ -1511,6 +1520,9 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             let rows_q: Vec<usize> = p.fcols[q].iter().map(|&(i, _)| i).collect();
             let vals_q: Vec<f64> = p.fcols[q].iter().map(|&(_, a)| a).collect();
             let out = mi.ftran(&rows_q, &vals_q);
+            if crate::dump::on("ftran") {
+                crate::dump::emit("ftran", serde_json::json!({"iter": iterations, "q": q, "in": rows_q, "dense": mi.last_dense(), "out": crate::dump::sparse(&out)}));
+            }
             s.work.add_from(0x1219d6, 0x120673, mi.work, crate::work::FAC);
             for &(i, a) in &out {
                 alpha[i] = a;
@@ -1535,7 +1547,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 let j = basic[pos];
                 classify(xs[j], lo[j], up[j], tol)
             };
-            if std::env::var_os("ROSE_ENT").is_some() {
+            if crate::dump::on("ent") {
                 let dims = s.mirror.as_ref().map(|mi| mi.dims());
                 let kinds = s.mirror.as_ref().map(|mi| mi.kinds().to_vec());
                 let bl = s.mirror.as_ref().map(|mi| mi.blists().to_vec()).unwrap_or_default();
@@ -1644,6 +1656,9 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         let mut tau_ref: Option<Vec<(usize, f64)>> = None;
         if let Some(mi) = s.mirror.as_mut() {
             rho_ref = Some(mi.btran(&[(r, 1.0)], true, false));
+            if crate::dump::on("rho") {
+                crate::dump::emit("rho", serde_json::json!({"iter": iterations, "r": r, "out": crate::dump::sparse(rho_ref.as_deref().unwrap())}));
+            }
             s.work.add_from(0x13174d, 0x102e5b, mi.work, crate::work::FAC);
             let inp: Vec<(usize, f64)> = ftran_out.iter().copied().filter(|&(i, _)| s.in_r0[s.basic[i]]).collect();
             // The cross-term vector goes in dense when the FTRAN result was dense or too long for a list (`0x102d20`).
@@ -1659,6 +1674,9 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             tau_ref = Some(Vec::new());
             if dense_in || !inp.is_empty() {
                 let tau = mi.btran(&inp, false, dense_in);
+                if crate::dump::on("tau") {
+                    crate::dump::emit("tau", serde_json::json!({"iter": iterations, "out": crate::dump::sparse(&tau)}));
+                }
                 tau_ref = Some(tau.clone());
                 s.work.add_from(0x12de50, 0x103ac7, mi.work, crate::work::FAC);
                 tau_len = if mi.bt_dense { None } else { Some(tau.len()) };
@@ -1807,8 +1825,9 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             }
             rows
         }, dense: alpha_dense, q, leave });
-        if std::env::var_os("ROSE_ORD").is_some() {
-            eprintln!("ORD {} rho={:?} changed={:?}", iterations, rho_ref.as_ref().map(|r| r.iter().map(|e| (e.0, e.1 != 0.0 && rho[e.0] != 0.0)).collect::<Vec<_>>()), changed);
+        if crate::dump::on("ord") {
+            let rho_nz = rho_ref.as_ref().map(|r| r.iter().map(|e| (e.0, e.1 != 0.0 && rho[e.0] != 0.0)).collect::<Vec<_>>());
+            crate::dump::emit("ord", serde_json::json!({"iter": iterations, "rho": rho_nz, "changed": changed}));
         }
         let changed = match (true, rho_ref.as_ref()) {
             (true, Some(rr)) => {
