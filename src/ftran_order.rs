@@ -504,6 +504,10 @@ impl RefStruct {
             }
             x[eta.idx] = s;
         }
+        // A dense vector goes on as the raw array: the reference keeps the sub-tolerance residues of the L and eta stages.
+        if dense_l || (!self.etas.is_empty() && count_l * self.dthr > m) {
+            return ((0..m).filter(|&v| x[v] != 0.0).map(|v| (v, x[v])).collect(), count_l, e);
+        }
         (order.into_iter().filter(|&v| x[v].abs() > TOL).map(|v| (v, x[v])).collect(), count_l, e)
     }
 
@@ -599,6 +603,8 @@ impl RefStruct {
         if dense {
             spike.sort_unstable_by_key(|e| e.0);
         }
+        // The column replacement does not receive the residues.
+        spike.retain(|e| e.1.abs() > TOL);
         self.spike = spike;
         self.last_alpha = out.len();
         out
