@@ -810,6 +810,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             s.level = 0;
             s.recompute_dual();
         }
+        if std::env::var_os("ROSE_STATE").is_some() {
+            let f = |v: &[f64]| v.iter().map(|x| format!("{x:e}")).collect::<Vec<_>>().join(",");
+            eprintln!("STATE {{\"iter\":{iterations},\"infeasible\":{infeasible},\"basic\":{:?},\"d\":[{}],\"w\":[{}]}}", s.basic, f(&s.d), f(&s.w));
+        }
         let q = if infeasible {
             match s.price() {
                 Some(q) => q,
@@ -926,7 +930,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             }
             let ratio = arj / alpha_rq;
             let vj = dot(&p.cols[j], &u);
-            s.w[j] = (s.w[j] - 2.0 * ratio * vj + ratio * ratio * wq).max(1.0);
+            s.w[j] = s.w[j] - 2.0 * ratio * vj + ratio * ratio * wq;
+            if s.in_r0[j] {
+                s.w[j] = s.w[j].max(1.0);
+            }
             if !s.is_fixed(j) {
                 s.d[j] -= theta_d * arj;
             }
@@ -934,7 +941,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         }
         s.d[leave] = -theta_d;
         s.d[q] = 0.0;
-        s.w[leave] = (wq / (alpha_rq * alpha_rq)).max(1.0);
+        s.w[leave] = wq / (alpha_rq * alpha_rq);
+        if s.in_r0[leave] {
+            s.w[leave] = s.w[leave].max(1.0);
+        }
 
         // Basis change.
         s.pos_of[leave] = NONE;
