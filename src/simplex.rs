@@ -349,11 +349,8 @@ impl<'a> Solver<'a> {
     }
 }
 
-enum Phase1 {
-    Continue,
-    Infeasible(Vec<f64>),
-    Failure,
-}
+/// Penalty on the sum of bound violations in the composite phase-1 cost (recovered from the reference's `d`).
+const PHASE1_M: f64 = 1e6;
 
 impl<'a> Solver<'a> {
     fn has_infeasible_basic(&self) -> bool {
@@ -363,98 +360,284 @@ impl<'a> Solver<'a> {
         })
     }
 
-    /// One iteration minimizing the sum of bound violations of the basic variables (composite cost `-1` below the
-    /// lower bound, `+1` above the upper bound). Infeasible basics block at the bound they are heading to.
-    /// This is a textbook Phase 1, not a recovery of the reference's infeasibility-removing mode.
-    fn phase1_iteration(&mut self, iterations: &mut usize, trace: &mut Vec<TraceEvent>) -> Phase1 {
+    /// Reduced costs of the reference's infeasible-start mode: true cost plus `PHASE1_M` times the cost vector
+    /// `-1` (basic below its lower bound) / `+1` (above its upper bound). `pure` drops the true cost and the
+    /// penalty factor, which gives the pure sum-of-infeasibilities duals used for the infeasibility certificate.
+    /// Returns the basic cost vector's multipliers `y`.
+    fn composite_dual(&mut self, pure: bool) -> Vec<f64> {
         let p = self.p;
-        let (n, m) = (p.n, p.m);
-        let (ftol, otol) = (self.opts.feasibility_tol, self.opts.optimality_tol);
-        let below = |x: f64, j: usize| !is_inf(p.lo[j]) && x < p.lo[j] - ftol;
-        let above = |x: f64, j: usize| !is_inf(p.up[j]) && x > p.up[j] + ftol;
+        let tol = self.opts.feasibility_tol;
         let mut y: Vec<f64> = self
             .basic
             .iter()
-            .map(|&j| if below(self.x[j], j) { -1.0 } else if above(self.x[j], j) { 1.0 } else { 0.0 })
+            .map(|&j| {
+                let inf = if !is_inf(p.lo[j]) && self.x[j] < p.lo[j] - tol {
+                    -1.0
+                } else if !is_inf(p.up[j]) && self.x[j] > p.up[j] + tol {
+                    1.0
+                } else {
+                    0.0
+                };
+                if pure { inf } else { p.cost[j] + PHASE1_M * inf }
+            })
             .collect();
         self.factor.btran(&mut y);
-        let mut q = NONE;
-        let mut best = 0.0;
-        for j in 0..n + m {
-            if self.pos_of[j] != NONE || self.is_fixed(j) {
-                continue;
+        for j in 0..p.n + p.m {
+            self.d[j] = if self.pos_of[j] == NONE { (if pure { 0.0 } else { p.cost[j] }) - dot(&p.cols[j], &y) } else { 0.0 };
+        }
+        self.list.clear();
+        self.level = 0;
+        y
+    }
+}
+
+/// One breakpoint-based ratio test result: entry index, step, `|pivot|`, and whether the leaving variable ends at its upper bound.
+struct Phase1Pick {
+    entry: Option<usize>,
+    step: f64,
+    pivot: f64,
+    to_upper: bool,
+}
+
+/// Type byte of a basic variable for the phase-1 ratio test, in a frame where the variable has a finite lower bound
+/// (variables bounded only above are mirrored): returns `(dist, range, type, mirrored)`; `None` for free variables.
+fn classify(x: f64, lo: f64, up: f64, tol: f64) -> Option<(f64, f64, u8, bool)> {
+    let (lo_inf, up_inf) = (is_inf(lo), is_inf(up));
+    if lo_inf && up_inf {
+        return None;
+    }
+    let (dist, range, mirrored) = if lo_inf { (-x + up, INF, true) } else { (x - lo, if up_inf { INF } else { up - lo }, false) };
+    let t = if dist < -tol {
+        b'B'
+    } else if range < INF && dist - range > tol {
+        b'A'
+    } else if range < INF && dist - range >= -tol {
+        if range <= tol { b'X' } else { b'U' }
+    } else if dist <= tol {
+        b'L'
+    } else {
+        b'N'
+    };
+    Some((dist, range, t, mirrored))
+}
+
+/// Mid-point search of the breakpoint where the cumulative slope reaches zero: a Hoare partition around the first element
+/// that adds the lower part / subtracts the upper part of the weights `|a|` (transcribed from the reference).
+fn find_theta(s0: f64, bp: &mut [(f64, usize, bool)], weight: &dyn Fn(usize) -> f64) -> f64 {
+    let n = bp.len();
+    let (mut s, mut lo, mut hi) = (s0, 0usize, n - 1);
+    if hi > 0 {
+        loop {
+            let piv = bp[lo].0;
+            let mut i = lo as isize - 1;
+            let mut j = hi as isize + 1;
+            loop {
+                j -= 1;
+                while piv < bp[j as usize].0 {
+                    j -= 1;
+                }
+                i += 1;
+                while bp[i as usize].0 < piv {
+                    i += 1;
+                }
+                if j <= i {
+                    break;
+                }
+                bp.swap(i as usize, j as usize);
             }
-            let dj = -dot(&p.cols[j], &y);
-            let free = is_inf(p.lo[j]) && is_inf(p.up[j]);
-            let ok = if free { dj.abs() > otol } else if self.at_upper[j] { dj > otol } else { dj < -otol };
-            if ok && best < dj.abs() {
-                best = dj.abs();
-                q = j;
+            let j = j as usize;
+            if s >= 0.0 {
+                for t in j + 1..=hi {
+                    s -= weight(bp[t].1);
+                }
+            } else if lo <= j {
+                for t in lo..=j {
+                    s += weight(bp[t].1);
+                }
+            }
+            if s < 0.0 {
+                lo = j + 1;
+            } else {
+                hi = j;
+            }
+            if lo >= hi {
+                break;
             }
         }
-        if q == NONE {
-            return Phase1::Infeasible(y.iter().map(|v| -v).collect());
+    }
+    bp[lo].0
+}
+
+/// The reference's infeasible-start ratio test (`0xf0120`, see `reverse-engineer/replay/phase1_ratio.py`).
+/// `ent[k] = (position, alpha)` with `alpha > 0` meaning the basic variable decreases; `info(position)` gives the
+/// typed frame from `classify` (already mirrored, so `alpha` is flipped for mirrored variables here).
+fn phase1_ratio(tol_h: f64, tol_p0: f64, own: f64, ent: &[(usize, f64)], info: &dyn Fn(usize) -> Option<(f64, f64, u8, bool)>) -> Phase1Pick {
+    let inf = INF;
+    let frames: Vec<Option<(f64, f64, u8, bool)>> = ent.iter().map(|&(pos, _)| info(pos)).collect();
+    let val = |k: usize| -> f64 {
+        let a = ent[k].1;
+        match frames[k] {
+            Some((_, _, _, true)) => -a,
+            _ => a,
         }
-        let dq = -dot(&p.cols[q], &y);
-        let mut alpha = vec![0.0; m];
-        for &(i, a) in &p.cols[q] {
-            alpha[i] = a;
+    };
+    let mut tol_p = tol_p0;
+    let mut first = true;
+    loop {
+        let (mut slope_a, mut slope_b) = (0.0f64, 0.0f64);
+        let mut bp: Vec<(f64, usize, bool)> = Vec::new();
+        for k in 0..ent.len() {
+            let Some((d, r, c, _)) = frames[k] else { continue };
+            let a = val(k);
+            if a <= tol_p {
+                if !(a < -tol_p) {
+                    continue;
+                }
+                match c {
+                    b'A' => slope_a -= a,
+                    b'B' => {
+                        if d / a < own {
+                            bp.push((d / a, k, false));
+                        }
+                        if r < inf && (d - r) / a < own {
+                            bp.push(((d - r) / a, k, true));
+                        }
+                        slope_a += a;
+                    }
+                    b'L' | b'N' => {
+                        if r < inf && (d - r) / a < own {
+                            bp.push(((d - r) / a, k, true));
+                        }
+                    }
+                    b'U' | b'X' => slope_b -= a,
+                    _ => {}
+                }
+            } else {
+                match c {
+                    b'A' => {
+                        if (d - r) / a < own {
+                            bp.push(((d - r) / a, k, true));
+                        }
+                        if d / a < own {
+                            bp.push((d / a, k, false));
+                        }
+                        slope_a -= a;
+                    }
+                    b'B' => slope_a += a,
+                    b'L' | b'X' => slope_b += a,
+                    b'N' | b'U' => bp.push((d / a, k, false)),
+                    _ => {}
+                }
+            }
         }
-        self.factor.ftran(&mut alpha);
-        let dir = if dq < 0.0 { 1.0 } else { -1.0 };
-        let entries: Vec<(usize, f64)> = (0..m).filter(|&i| alpha[i].abs() > 1e-14).map(|i| (i, dir * alpha[i])).collect();
-        let own = if !is_inf(p.lo[q]) && !is_inf(p.up[q]) { p.up[q] - p.lo[q] } else { INF };
-        let (chosen, step, _) = {
-            let (xs, basic) = (&self.x, &self.basic);
-            // Distance until the basic variable reaches the bound it blocks at when it moves down / up.
-            let down = |pos: usize| {
-                let j = basic[pos];
-                if above(xs[j], j) { xs[j] - p.up[j] } else if below(xs[j], j) || is_inf(p.lo[j]) { INF } else { xs[j] - p.lo[j] }
-            };
-            let upd = |pos: usize| {
-                let j = basic[pos];
-                if below(xs[j], j) { p.lo[j] - xs[j] } else if above(xs[j], j) || is_inf(p.up[j]) { INF } else { p.up[j] - xs[j] }
-            };
-            ratio_test(ftol, self.opts.pivot_tol, own, &entries, &down, &upd)
+        let s0 = slope_b + slope_a;
+        if s0 < 0.0 && bp.is_empty() {
+            return Phase1Pick { entry: None, step: own.min(inf), pivot: 0.0, to_upper: false };
+        }
+        let mut theta = 0.0;
+        if s0 < 0.0 {
+            let mut work = bp.clone();
+            theta = find_theta(s0, &mut work, &|k| val(k).abs());
+            if own < inf && own <= theta {
+                return Phase1Pick { entry: None, step: own, pivot: 0.0, to_upper: false };
+            }
+        }
+        let (mut best, mut best_abs, mut step, mut to_upper) = (NONE, 0.0f64, 0.0f64, false);
+        for k in 0..ent.len() {
+            let Some((d, r, c, _)) = frames[k] else { continue };
+            let a = val(k);
+            let aa = a.abs();
+            if a <= tol_p {
+                if !(a < -tol_p) {
+                    continue;
+                }
+                match c {
+                    b'L' | b'N' => {
+                        if r < inf && ((d - r) - theta * a).abs() * 2.0 <= tol_h && best_abs < aa {
+                            (step, best, best_abs, to_upper) = ((d - r) / a, k, aa, true);
+                        }
+                    }
+                    b'B' => {
+                        if (d - theta * a).abs() * 2.0 <= tol_h && best_abs < aa {
+                            (step, best, best_abs, to_upper) = (d / a, k, aa, false);
+                        } else if r < inf && ((d - r) - theta * a).abs() * 2.0 <= tol_h && best_abs < aa {
+                            (step, best, best_abs, to_upper) = ((d - r) / a, k, aa, true);
+                        }
+                    }
+                    b'U' | b'X' => {
+                        if ((d - r) - theta * a).abs() <= tol_h && best_abs < aa {
+                            (step, best, best_abs, to_upper) = ((d - r) / a, k, aa, true);
+                        }
+                    }
+                    _ => {}
+                }
+            } else {
+                match c {
+                    b'N' | b'U' => {
+                        if (d - theta * a).abs() * 2.0 <= tol_h && best_abs < aa {
+                            (step, best, best_abs, to_upper) = (d / a, k, aa, false);
+                        }
+                    }
+                    b'A' => {
+                        if tol_h < ((d - r) - theta * a).abs() * 2.0 || a <= best_abs {
+                            if (d - theta * a).abs() * 2.0 <= tol_h && best_abs < a {
+                                (step, best, best_abs, to_upper) = (d / a, k, aa, false);
+                            }
+                        } else {
+                            (step, best, best_abs, to_upper) = ((d - r) / a, k, aa, true);
+                        }
+                    }
+                    b'L' | b'X' => {
+                        if (d - theta * a).abs() <= tol_h && best_abs < a {
+                            (step, best, best_abs, to_upper) = (d / a, k, aa, false);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        if best == NONE {
+            step = inf;
+            for &(rr, k, tu) in &bp {
+                if rr < step {
+                    (step, best, to_upper) = (rr, k, tu);
+                }
+            }
+            if best == NONE {
+                return Phase1Pick { entry: None, step, pivot: 0.0, to_upper: false };
+            }
+            // The routine itself does not compare this step with the entering variable's range; a bound flip is needed
+            // when the entering variable reaches its opposite bound first.
+            if own < inf && own <= step {
+                return Phase1Pick { entry: None, step: own, pivot: 0.0, to_upper: false };
+            }
+        }
+        let pa = val(best).abs();
+        // A mirrored variable reaches the opposite bound of the original frame.
+        let mirrored = matches!(frames[best], Some((_, _, _, true)));
+        let pick = Phase1Pick { entry: Some(best), step, pivot: pa, to_upper: to_upper != mirrored };
+        if !first || pa >= 0.1 {
+            return pick;
+        }
+        let mx = ent.iter().enumerate().fold(0.0f64, |m, (k, _)| m.max(val(k).abs()));
+        let mult = if mx >= 1e13 {
+            1e-6
+        } else if mx >= 1e10 {
+            1e-5
+        } else if mx >= 1e7 {
+            1e-4
+        } else if mx >= 1e4 {
+            1e-3
+        } else if mx >= 10.0 {
+            1e-2
+        } else {
+            0.1
         };
-        if chosen.is_none() && step >= INF {
-            return Phase1::Failure;
+        if tol_p * mx * mult <= pa {
+            return pick;
         }
-        let step = step.max(0.0);
-        *iterations += 1;
-        let (leave_info, moved): (Option<(usize, usize, bool)>, Vec<(usize, f64)>) = match chosen {
-            Some(k) => {
-                let (r, a_r) = entries[k];
-                let j = self.basic[r];
-                let xj = self.x[j];
-                let to_upper = if a_r > 0.0 { above(xj, j) } else { !below(xj, j) };
-                (Some((r, j, to_upper)), entries.clone())
-            }
-            None => (None, entries.clone()),
-        };
-        for &(i, a) in &moved {
-            let j = self.basic[i];
-            self.x[j] -= step * a;
-        }
-        self.x[q] += dir * step;
-        let Some((r, leave, to_upper)) = leave_info else {
-            self.at_upper[q] = !self.at_upper[q];
-            self.x[q] = self.nonbasic_value(q);
-            if self.opts.record_trace {
-                trace.push(TraceEvent { iteration: *iterations, entering: q, leaving: None, position: None, step });
-            }
-            return Phase1::Continue;
-        };
-        self.x[leave] = if to_upper { p.up[leave] } else { p.lo[leave] };
-        self.pos_of[leave] = NONE;
-        self.at_upper[leave] = to_upper;
-        self.basic[r] = q;
-        self.pos_of[q] = r;
-        self.factor.update(r, alpha);
-        if self.opts.record_trace {
-            trace.push(TraceEvent { iteration: *iterations, entering: q, leaving: Some(leave), position: Some(r), step });
-        }
-        Phase1::Continue
+        tol_p *= mx * mult;
+        first = false;
     }
 }
 
@@ -616,30 +799,38 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         if s.factor.num_updates() >= opts.max_updates {
             s.refactor()?;
         }
-        if s.has_infeasible_basic() {
+        let infeasible = s.has_infeasible_basic();
+        if infeasible {
             phase1 = true;
-            match s.phase1_iteration(&mut iterations, &mut trace) {
-                Phase1::Continue => continue,
-                Phase1::Infeasible(y) => {
-                    farkas = Some(y);
-                    break Status::Infeasible;
-                }
-                Phase1::Failure => break Status::NumericalFailure,
-            }
-        }
-        if phase1 {
-            // Back in a feasible region: restart the phase-2 pricing state from the true costs.
+            s.composite_dual(false);
+        } else if phase1 {
+            // Back in a feasible region: continue with the true costs (weights and framework are kept).
             phase1 = false;
-            s.w.iter_mut().for_each(|w| *w = 1.0);
-            for j in 0..n + m {
-                s.in_r0[j] = s.pos_of[j] == NONE;
-            }
             s.list.clear();
             s.level = 0;
             s.recompute_dual();
         }
-        let Some(q) = s.price() else {
-            break Status::Optimal;
+        let q = if infeasible {
+            match s.price() {
+                Some(q) => q,
+                None => {
+                    // No improving column for the penalised cost: try the pure sum of infeasibilities, which either
+                    // continues the search or proves infeasibility with the multipliers as certificate.
+                    let y = s.composite_dual(true);
+                    match s.price() {
+                        Some(q) => q,
+                        None => {
+                            farkas = Some(y.iter().map(|v| -v).collect());
+                            break Status::Infeasible;
+                        }
+                    }
+                }
+            }
+        } else {
+            match s.price() {
+                Some(q) => q,
+                None => break Status::Optimal,
+            }
         };
         let mut alpha = vec![0.0; m];
         for &(i, a) in &p.cols[q] {
@@ -649,7 +840,20 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         let dir = if s.d[q] < 0.0 { 1.0 } else { -1.0 };
         let entries: Vec<(usize, f64)> = (0..m).filter(|&i| alpha[i].abs() > 1e-14).map(|i| (i, dir * alpha[i])).collect();
         let own = if !is_inf(p.lo[q]) && !is_inf(p.up[q]) { p.up[q] - p.lo[q] } else { INF };
-        let (chosen, mut step, _pivot) = {
+        let mut leave_to_upper: Option<bool> = None;
+        let (chosen, mut step, _pivot) = if infeasible {
+            let (xs, basic, lo, up) = (&s.x, &s.basic, &p.lo, &p.up);
+            let tol = opts.feasibility_tol;
+            let info = |pos: usize| {
+                let j = basic[pos];
+                classify(xs[j], lo[j], up[j], tol)
+            };
+            let pick = phase1_ratio(tol, opts.pivot_tol, own, &entries, &info);
+            if pick.entry.is_some() {
+                leave_to_upper = Some(pick.to_upper);
+            }
+            (pick.entry, pick.step, pick.pivot)
+        } else {
             let (xs, basic, lo, up) = (&s.x, &s.basic, &p.lo, &p.up);
             let down = |pos: usize| {
                 let j = basic[pos];
@@ -662,6 +866,9 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             ratio_test(opts.feasibility_tol, opts.pivot_tol, own, &entries, &down, &upd)
         };
         if chosen.is_none() && step >= INF {
+            if infeasible {
+                break Status::NumericalFailure;
+            }
             let mut dir_x = vec![0.0; n + m];
             dir_x[q] = dir;
             for &(i, a) in &entries {
@@ -690,7 +897,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         };
         let (r, a_r) = entries[k];
         let leave = s.basic[r];
-        let to_upper = a_r < 0.0;
+        let to_upper = leave_to_upper.unwrap_or(a_r < 0.0);
         // Snap the leaving variable to the bound it reached.
         s.x[leave] = if to_upper { p.up[leave] } else { p.lo[leave] };
         let alpha_rq = alpha[r];
