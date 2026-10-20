@@ -3,8 +3,9 @@
 //! Positions are the basis positions after the LU renumbering (the pivot step). A fresh factor has singleton positions (kind -1),
 //! a nucleus list of diagonal-only positions (phase 3 pivots, kind = index in the list) and a triangular tail (phase 4 and the
 //! Markowitz nucleus, slots `i21..m`) whose columns carry U entries split into tail positions (`a`) and nucleus-list positions (`b`).
-//! Column replacements follow the update rules recovered from the GDB dumps. Only the structure is mirrored; values come from the
-//! solver's own factorization, entries that cancel numerically are dropped by the caller.
+//! Column replacements follow the update rules recovered from the GDB dumps. The factor is mirrored numerically as well (L multipliers,
+//! U columns, diagonal, row etas, including the reference's lane-wise eta dot products), so the solve returns the reference's values
+//! bit for bit and drops the entries that cancel exactly as it does.
 
 use crate::lu_order::Structure;
 use std::collections::BinaryHeap;
@@ -19,20 +20,62 @@ pub struct RefStruct {
     lcols: Vec<Vec<usize>>,
     perm: Vec<usize>,
     dens: f64,
+    /// Density threshold fixed at factorization time (`f104` in the notes): 2, or `5 (nnzL/m + 1)^2` capped at `m`.
+    dthr: usize,
     slot: Vec<usize>,
     at: Vec<usize>,
-    etas: Vec<(usize, Vec<usize>)>,
+    etas: Vec<Eta>,
+    lvals: Vec<Vec<f64>>,
+    diag: Vec<f64>,
+    /// Numeric U entries of each tail column `(position, value)`.
+    uc: Vec<Vec<(usize, f64)>>,
+    /// Spike of the most recent solve: the L stage and eta result `(position, value)` in list order.
+    spike: Vec<(usize, f64)>,
+}
+
+struct Eta {
+    idx: usize,
+    ind: Vec<usize>,
+    val: Vec<f64>,
+}
+
+const TOL: f64 = 1e-13;
+
+/// Eta dot product as the reference evaluates it: sequential below eight terms, otherwise one element peeled (its value arrays sit
+/// 8 bytes off a 16-byte boundary) and eight lane-wise partial sums.
+fn dot(x: &[f64], c: &[f64]) -> f64 {
+    let n = c.len();
+    let t = |i: usize| x[i] * c[i];
+    if n < 9 {
+        let mut acc = 0.0;
+        for i in 0..n {
+            acc += t(i);
+        }
+        return acc;
+    }
+    let n8 = n - ((n - 1) & 7);
+    let mut lanes = [0.0f64; 8];
+    lanes[0] = t(0);
+    for i in 1..n8 {
+        lanes[(i - 1) & 7] += t(i);
+    }
+    let mut tot = (((lanes[0] + lanes[2]) + lanes[4]) + lanes[6]) + (((lanes[1] + lanes[3]) + lanes[5]) + lanes[7]);
+    for i in n8..n {
+        tot += t(i);
+    }
+    tot
 }
 
 impl RefStruct {
-    /// Fresh structure from the pivot sequence; `cols[pos]` are the rows of the basis column at incoming position `pos`.
-    pub fn fresh(m: usize, st: &Structure, cols: &[Vec<usize>]) -> RefStruct {
+    /// Fresh factor from the pivot sequence; `cols[pos]` is the basis column at incoming position `pos` as `(is_slack, rows, values)`.
+    pub fn fresh(m: usize, st: &Structure, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> RefStruct {
         let mut step = vec![usize::MAX; m];
         for (s, &(r, _)) in st.pivots.iter().enumerate() {
             step[r] = s;
         }
         let n1 = st.phase.iter().filter(|&&p| p == 1 || p == 2).count();
         let n3 = st.phase.iter().filter(|&&p| p == 3).count();
+        let nseq = st.phase.iter().filter(|&&p| p != 0).count();
         let i21 = n1 + n3;
         let mut kind = vec![-1i64; m];
         let mut nuc = Vec::new();
@@ -44,44 +87,131 @@ impl RefStruct {
             kind[s] = -2;
         }
         let lcols: Vec<Vec<usize>> = st.l_rows.iter().map(|rows| rows.iter().map(|&r| step[r]).collect()).collect();
+        let lvals = st.l_vals.clone();
+        // pivot-row values of the Markowitz steps, by column
+        let mut mk: Vec<Vec<(usize, f64)>> = vec![Vec::new(); m];
+        for s in nseq..m {
+            for &(c, v) in &st.u_rows[s] {
+                mk[c].push((s, v));
+            }
+        }
         let mut a = vec![Vec::new(); m];
         let mut b = vec![Vec::new(); m];
+        let mut uc: Vec<Vec<(usize, f64)>> = vec![Vec::new(); m];
         let (mut sa, mut sb) = (0usize, 0usize);
-        let mut mark = vec![usize::MAX; m];
+        let mut xv = vec![0.0f64; m];
+        let mut cnt = vec![0i32; m];
         for t in i21..m {
             let c = st.pivots[t].1;
-            let mut seen: Vec<usize> = Vec::new();
-            for &r in &cols[c] {
-                let x = step[r];
-                if x < t && mark[x] != t {
-                    mark[x] = t;
-                    seen.push(x);
+            let (_, idx, val) = &cols[c];
+            let mut start: Vec<usize> = Vec::new();
+            for (&i, &v) in idx.iter().zip(val) {
+                let s = step[i];
+                if s <= t {
+                    xv[s] += v;
+                    start.push(s);
+                }
+            }
+            let mut lst = start.clone();
+            for &v in &lst {
+                cnt[v] += 1;
+            }
+            let mut k = 0;
+            while k < lst.len() {
+                let v = lst[k];
+                k += 1;
+                for &y in &lcols[v] {
+                    if y > t {
+                        continue;
+                    }
+                    if cnt[y] == 0 {
+                        lst.push(y);
+                    }
+                    cnt[y] += 1;
+                }
+            }
+            let mut q: Vec<usize> = Vec::new();
+            for &v in &lst[..start.len()] {
+                cnt[v] -= 1;
+                if cnt[v] == 0 {
+                    q.push(v);
                 }
             }
             let mut k = 0;
-            while k < seen.len() {
-                let v = seen[k];
+            while k < q.len() {
+                let v = q[k];
                 k += 1;
-                for &x in &lcols[v] {
-                    if x < t && mark[x] != t {
-                        mark[x] = t;
-                        seen.push(x);
+                for &y in &lcols[v] {
+                    if y > t {
+                        continue;
+                    }
+                    cnt[y] -= 1;
+                    if cnt[y] == 0 {
+                        q.push(y);
                     }
                 }
             }
-            let mut av: Vec<usize> = seen.iter().copied().filter(|&x| kind[x] == -2).collect();
-            av.sort_unstable();
-            let mut bv: Vec<usize> = seen.iter().copied().filter(|&x| kind[x] >= 0).collect();
+            for &v in &q {
+                if v >= t {
+                    continue;
+                }
+                let x = xv[v];
+                if x == 0.0 {
+                    continue;
+                }
+                for (e, &y) in lcols[v].iter().enumerate() {
+                    if y > t {
+                        continue;
+                    }
+                    xv[y] -= lvals[v][e] * x;
+                }
+            }
+            let mut ents: Vec<(usize, f64)> = Vec::new();
+            let mut touched: Vec<usize> = lst.clone();
+            touched.sort_unstable();
+            touched.dedup();
+            for &v in &touched {
+                if v < t && xv[v].abs() > TOL {
+                    ents.push((v, xv[v]));
+                }
+            }
+            for &(sidx, vv) in &mk[c] {
+                if sidx < t {
+                    if let Some(e) = ents.iter_mut().find(|e| e.0 == sidx) {
+                        e.1 = vv;
+                    } else {
+                        ents.push((sidx, vv));
+                    }
+                }
+            }
+            for &v in &lst {
+                xv[v] = 0.0;
+                cnt[v] = 0;
+            }
+            for &v in &touched {
+                xv[v] = 0.0;
+            }
+            ents.sort_unstable_by_key(|e| e.0);
+            let av: Vec<usize> = ents.iter().map(|e| e.0).filter(|&x| kind[x] == -2).collect();
+            let mut bv: Vec<usize> = ents.iter().map(|e| e.0).filter(|&x| kind[x] >= 0).collect();
             bv.sort_unstable_by_key(|&x| std::cmp::Reverse(kind[x]));
             sa += av.len();
             sb += bv.len();
             a[t] = av;
             b[t] = bv;
+            uc[t] = ents;
         }
         let nt = m - i21;
         let nn = nuc.len();
         let h33 = if nt > 0 { (sa + nt) as f64 / nt as f64 } else { 1.5 };
         let h34 = if nn > 0 { (sb + nn) as f64 / nn as f64 } else { 1.5 };
+        let nnz: usize = lcols.iter().map(|c| c.len()).sum();
+        let dthr = if nnz <= m {
+            2
+        } else {
+            let t = 5.0 * ((nnz as f64 / m as f64) + 1.0).powi(2);
+            if (m as f64) > t { t as usize } else { m }
+        };
         let perm = step;
         RefStruct {
             m,
@@ -93,16 +223,20 @@ impl RefStruct {
             lcols,
             perm,
             dens: (h33 + h34) * (h33 + h34),
+            dthr,
             slot: (0..m).collect(),
             at: (0..m).collect(),
             etas: Vec::new(),
+            lvals,
+            diag: st.diag.clone(),
+            uc,
+            spike: Vec::new(),
         }
     }
 
-    /// L solve in the reference's order (Kahn FIFO over the L columns) followed by the row etas: the list handed to the U solve.
-    pub fn lstage(&self, rows: &[usize]) -> Vec<usize> {
+    fn kahn(&self, start: &[usize]) -> Vec<usize> {
         let mut cnt = vec![0i32; self.m];
-        let mut lst: Vec<usize> = rows.iter().map(|&r| self.perm[r]).collect();
+        let mut lst: Vec<usize> = start.to_vec();
         let n0 = lst.len();
         for &v in &lst {
             cnt[v] += 1;
@@ -136,17 +270,124 @@ impl RefStruct {
                 }
             }
         }
-        let mut have = vec![false; self.m];
-        for &v in &q {
-            have[v] = true;
+        q
+    }
+
+    /// L solve (Kahn order) and row etas on the entering column; returns the nonzero list the U solve receives, with values.
+    fn lstage_num(&self, rows: &[usize], vals: &[f64]) -> (Vec<(usize, f64)>, usize) {
+        let mut x = vec![0.0f64; self.m];
+        let mut start: Vec<usize> = Vec::with_capacity(rows.len());
+        for (&r, &v) in rows.iter().zip(vals) {
+            let s = self.perm[r];
+            x[s] += v;
+            start.push(s);
         }
-        for (idx, ind) in &self.etas {
-            if !have[*idx] && ind.iter().any(|&j| have[j]) {
-                q.push(*idx);
-                have[*idx] = true;
+        let q = self.kahn(&start);
+        for &v in &q {
+            let xv = x[v];
+            if xv == 0.0 {
+                continue;
+            }
+            for (e, &y) in self.lcols[v].iter().enumerate() {
+                x[y] -= self.lvals[v][e] * xv;
             }
         }
-        q
+        let count_l = q.iter().filter(|&&v| x[v].abs() > TOL).count();
+        let mut order = q;
+        let mut have = vec![false; self.m];
+        for &v in &order {
+            have[v] = true;
+        }
+        for eta in &self.etas {
+            let xs: Vec<f64> = eta.ind.iter().map(|&j| x[j]).collect();
+            let mut s = dot(&xs, &eta.val);
+            if s.abs() <= TOL {
+                s = 0.0;
+            }
+            if !have[eta.idx] && s != 0.0 {
+                order.push(eta.idx);
+                have[eta.idx] = true;
+            }
+            x[eta.idx] = s;
+        }
+        (order.into_iter().filter(|&v| x[v].abs() > TOL).map(|v| (v, x[v])).collect(), count_l)
+    }
+
+    /// FTRAN of a sparse column: the nonzeros `(position, value)` of `B^-1 a` in the reference's output order. The spike is kept
+    /// for the following `update`.
+    pub fn ftran(&mut self, rows: &[usize], vals: &[f64]) -> Vec<(usize, f64)> {
+        let m = self.m;
+        let (spike, count_l) = self.lstage_num(rows, vals);
+        let mut x = vec![0.0f64; m];
+        for &(p, v) in &spike {
+            x[p] = v;
+        }
+        let mut touched = vec![false; m];
+        let mut tail: Vec<usize> = Vec::new();
+        for &(p, _) in &spike {
+            touched[p] = true;
+            if self.kind[p] == -2 {
+                tail.push(p);
+            }
+        }
+        let mut k = 0;
+        while k < tail.len() {
+            let c = tail[k];
+            k += 1;
+            for &j in &self.a[c] {
+                if !touched[j] {
+                    touched[j] = true;
+                    tail.push(j);
+                }
+            }
+        }
+        tail.sort_unstable_by_key(|&p| std::cmp::Reverse(self.slot[p]));
+        for &c in &tail {
+            let xc = x[c];
+            if xc.abs() <= TOL {
+                x[c] = 0.0;
+                continue;
+            }
+            let xc = xc / self.diag[c];
+            if xc.abs() <= TOL {
+                x[c] = 0.0;
+                continue;
+            }
+            x[c] = xc;
+            for &(j, v) in &self.uc[c] {
+                x[j] -= v * xc;
+                touched[j] = true;
+            }
+        }
+        for p in 0..m {
+            if touched[p] && self.kind[p] != -2 {
+                let v = x[p] / self.diag[p];
+                x[p] = if x[p].abs() <= TOL || v.abs() <= TOL { 0.0 } else { v };
+            }
+        }
+        // A dense result (the reference's `-1` count) is scanned by position index; a sparse one comes in the U solve's order.
+        let dense = rows.len() * self.dthr > m
+            || (!self.etas.is_empty() && count_l * self.dthr > m)
+            || !(self.nuc.len() + spike.len() < self.i21 || self.dens * (spike.len() as f64) < 2.0 * m as f64);
+        let inp: Vec<usize> = spike.iter().map(|e| e.0).collect();
+        let ord = if dense { (0..m).collect() } else { self.uorder(&inp) };
+        let mut out: Vec<(usize, f64)> = Vec::new();
+        let mut done = vec![false; m];
+        for &p in &ord {
+            if !done[p] {
+                done[p] = true;
+                if x[p] != 0.0 {
+                    out.push((p, x[p]));
+                }
+            }
+        }
+        for p in 0..m {
+            if touched[p] && !done[p] && x[p] != 0.0 {
+                out.push((p, x[p]));
+            }
+        }
+        self.spike = spike;
+        out
     }
 
     /// Order of the nonzero positions of the solution, given the L-stage list.
@@ -239,10 +480,6 @@ impl RefStruct {
         out
     }
 
-    pub fn ftran_order(&self, rows: &[usize]) -> Vec<usize> {
-        self.uorder(&self.lstage(rows))
-    }
-
     fn drop_nuc(&mut self, x: usize) {
         let idx = self.kind[x] as usize;
         let last = self.nuc.pop().unwrap();
@@ -285,9 +522,55 @@ impl RefStruct {
         }
     }
 
-    /// Replace the column at position `r` by the entering column whose L-stage list is `spike`.
-    pub fn update(&mut self, r: usize, spike: &[usize]) {
+    /// Row elimination of a column replacement at `r`: the eta multipliers `(position, multiplier)` in elimination order.
+    fn eliminate(&self, r: usize) -> Vec<(usize, f64)> {
         let m = self.m;
+        let d0 = self.diag[r];
+        let mut rows: Vec<Vec<(usize, f64)>> = vec![Vec::new(); m];
+        for k in 0..m {
+            if self.kind[k] == -2 {
+                for &(row, v) in &self.uc[k] {
+                    rows[row].push((k, v));
+                }
+            }
+        }
+        let mut w = vec![0.0f64; m];
+        let mut seen = vec![false; m];
+        let mut heap: std::collections::BinaryHeap<std::cmp::Reverse<(usize, usize)>> = std::collections::BinaryHeap::new();
+        for &(k, v) in &rows[r] {
+            w[k] = v * (1.0 / d0);
+            seen[k] = true;
+            heap.push(std::cmp::Reverse((self.slot[k], k)));
+        }
+        let mut eta = Vec::new();
+        while let Some(std::cmp::Reverse((_, k))) = heap.pop() {
+            let c = -w[k] / self.diag[k];
+            if c.abs() <= TOL {
+                continue;
+            }
+            eta.push((k, c));
+            for &(l, v) in &rows[k] {
+                w[l] += c * v;
+                if !seen[l] {
+                    seen[l] = true;
+                    heap.push(std::cmp::Reverse((self.slot[l], l)));
+                }
+            }
+        }
+        eta
+    }
+
+    /// Replace the column at position `r` by the entering column of the last `ftran`.
+    pub fn update(&mut self, r: usize) {
+        let m = self.m;
+        let spike: Vec<usize> = self.spike.iter().map(|e| e.0).collect();
+        let spike = &spike[..];
+        let eta_cand = self.eliminate(r);
+        let mut spk = vec![0.0f64; m];
+        for &(p, v) in &self.spike {
+            spk[p] = v;
+        }
+        let d0 = self.diag[r];
         let mut sp: Vec<usize> = Vec::with_capacity(spike.len());
         for &x in spike {
             if !sp.contains(&x) {
@@ -322,6 +605,7 @@ impl RefStruct {
         } else if old == -2 {
             let old_b = std::mem::take(&mut self.b[r]);
             self.a[r].clear();
+            self.uc[r].clear();
             self.kind[r] = -1;
             let mut refd = vec![false; m];
             for k in 0..m {
@@ -400,31 +684,25 @@ impl RefStruct {
                 } else {
                     self.a[k].retain(|&y| y != r);
                     self.b[k].retain(|&y| y != r);
+                    self.uc[k].retain(|e| e.0 != r);
                     elim.push(k);
                 }
             }
         }
-        if !elim.is_empty() {
-            // the eta covers the transitive holders: lists are not closed after earlier updates
-            let mut seen = vec![false; m];
-            seen[r] = true;
-            for &k in &elim {
-                seen[k] = true;
-            }
-            let mut todo = elim.clone();
-            while let Some(x) = todo.pop() {
-                for k in 0..m {
-                    if !seen[k] && self.kind[k] == -2 && (self.a[k].contains(&x) || self.b[k].contains(&x)) {
-                        seen[k] = true;
-                        todo.push(k);
-                        elim.push(k);
-                    }
-                }
-            }
+        let mut newdiag = spk[r];
+        if !elim.is_empty() && !eta_cand.is_empty() {
             let mut ind = vec![r];
-            ind.extend(elim);
-            self.etas.push((r, ind));
+            let mut val = vec![1.0 / d0];
+            for &(k, c) in &eta_cand {
+                ind.push(k);
+                val.push(c);
+            }
+            let xs: Vec<f64> = ind.iter().map(|&j| spk[j]).collect();
+            newdiag = dot(&xs, &val);
+            self.etas.push(Eta { idx: r, ind, val });
         }
+        self.diag[r] = newdiag;
+        self.uc[r] = self.spike.iter().copied().filter(|e| e.0 != r).collect();
         self.a[r] = av;
         let mut bb = bv;
         bb.reverse();

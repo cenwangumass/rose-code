@@ -17,6 +17,11 @@ pub struct Structure {
     pub pivots: Vec<(usize, usize)>,
     pub phase: Vec<u8>,
     pub l_rows: Vec<Vec<usize>>,
+    /// L multipliers matching `l_rows` and the pivot value of each step.
+    pub l_vals: Vec<Vec<f64>>,
+    pub diag: Vec<f64>,
+    /// Pivot-row entries `(basis position, value)` of the Markowitz steps (empty for singleton steps).
+    pub u_rows: Vec<Vec<(usize, f64)>>,
 }
 
 pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Structure {
@@ -33,7 +38,7 @@ pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Stru
         d.reverse();
         nuc.push((pos, d));
     }
-    let (np, nl) = nucleus(m, &nuc);
+    let (np, nl, nv, npiv, nu) = nucleus(m, &nuc);
     seq.extend(np);
     phase.resize(seq.len(), 0);
     let mut step = vec![usize::MAX; m];
@@ -41,11 +46,22 @@ pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Stru
         step[r] = s;
     }
     let mut l_rows: Vec<Vec<usize>> = Vec::with_capacity(seq.len());
-    for (s, &(_, c)) in seq.iter().enumerate().take(nsing) {
-        l_rows.push(cols[c].1.iter().copied().filter(|&i| step[i] > s).collect());
+    let mut l_vals: Vec<Vec<f64>> = Vec::with_capacity(seq.len());
+    let mut diag: Vec<f64> = Vec::with_capacity(seq.len());
+    let mut u_rows: Vec<Vec<(usize, f64)>> = Vec::with_capacity(seq.len());
+    for (s, &(prow, c)) in seq.iter().enumerate().take(nsing) {
+        let (_, idx, val) = &cols[c];
+        let pv = val[idx.iter().position(|&i| i == prow).unwrap()];
+        l_rows.push(idx.iter().copied().filter(|&i| step[i] > s).collect());
+        l_vals.push(idx.iter().zip(val).filter(|(&i, _)| step[i] > s).map(|(_, &x)| x / pv).collect());
+        diag.push(pv);
+        u_rows.push(Vec::new());
     }
     l_rows.extend(nl);
-    Structure { pivots: seq, phase, l_rows }
+    l_vals.extend(nv);
+    diag.extend(npiv);
+    u_rows.extend(nu);
+    Structure { pivots: seq, phase, l_rows, l_vals, diag, u_rows }
 }
 
 fn phases(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> (Vec<(usize, usize)>, Vec<u8>) {
@@ -228,7 +244,9 @@ impl Nucleus {
 }
 
 /// `cols`: (position, entries (row, value) in column-chain order). Rows and positions are the global indices of the basis.
-fn nucleus(m: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> (Vec<(usize, usize)>, Vec<Vec<usize>>) {
+type NucleusOut = (Vec<(usize, usize)>, Vec<Vec<usize>>, Vec<Vec<f64>>, Vec<f64>, Vec<Vec<(usize, f64)>>);
+
+fn nucleus(m: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> NucleusOut {
     let npos = cols.iter().map(|c| c.0 + 1).max().unwrap_or(0);
     let mut s = Nucleus {
         nodes: Vec::new(),
@@ -272,6 +290,9 @@ fn nucleus(m: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> (Vec<(usize, usize)
     }
     let mut out = Vec::new();
     let mut lout: Vec<Vec<usize>> = Vec::new();
+    let mut lvout: Vec<Vec<f64>> = Vec::new();
+    let mut pout: Vec<f64> = Vec::new();
+    let mut uout: Vec<Vec<(usize, f64)>> = Vec::new();
     let mut prows: HashSet<usize> = HashSet::new();
     let mut pcols: HashSet<usize> = HashSet::new();
     let mut remaining = ckeys.len();
@@ -332,6 +353,9 @@ fn nucleus(m: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> (Vec<(usize, usize)
         let u: Vec<(usize, f64)> = prow.iter().map(|&i| (s.nodes[i].c, s.nodes[i].v)).collect();
         let l: Vec<(usize, f64)> = pcol.iter().map(|&i| (s.nodes[i].r, s.nodes[i].v / pv)).collect();
         lout.push(l.iter().map(|x| x.0).collect());
+        lvout.push(l.iter().map(|x| x.1).collect());
+        pout.push(pv);
+        uout.push(u.clone());
         let col_ids: Vec<usize> = s.colchain[pc].clone();
         let row_ids: Vec<usize> = s.rowchain[pr].clone();
         if s_col < s_row {
@@ -439,7 +463,7 @@ fn nucleus(m: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> (Vec<(usize, usize)
             }
         }
     }
-    (out, lout)
+    (out, lout, lvout, pout, uout)
 }
 
 /// Markowitz search over the count buckets; returns the node of the chosen pivot (rotating bucket heads as the reference does).

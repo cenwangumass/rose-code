@@ -201,7 +201,7 @@ impl<'a> Solver<'a> {
 
     /// Basis positions after a refactorization: the order of the reference LU's pivot steps (`crate::lu_order`, recovered in
     /// `reverse-engineer/specs/lu-factor.md`), applied to the basis in its previous position order.
-    fn reference_order(&self) -> (Vec<usize>, crate::lu_order::Structure, Vec<Vec<usize>>) {
+    fn reference_order(&self) -> (Vec<usize>, crate::lu_order::Structure, Vec<(bool, Vec<usize>, Vec<f64>)>) {
         let n = self.p.n;
         let cols: Vec<(bool, Vec<usize>, Vec<f64>)> = self
             .basic
@@ -210,8 +210,7 @@ impl<'a> Solver<'a> {
             .collect();
         let st = crate::lu_order::factor_structure(self.p.m, &cols);
         let order = st.pivots.iter().map(|&(_, pos)| self.basic[pos]).collect();
-        let rows = cols.into_iter().map(|c| c.1).collect();
-        (order, st, rows)
+        (order, st, cols)
     }
 
     fn refactor(&mut self) -> Result<(), SolveError> {
@@ -697,10 +696,10 @@ fn thr(k: usize) -> f64 {
     }
 }
 
-/// Largest `k` with `T[k] < score`.
+/// Largest `k` with `T[k] < score`, capped at the reference's top level 58.
 fn bucket(score: f64) -> usize {
     let mut k = 0;
-    while thr(k + 1) < score {
+    while k < 58 && thr(k + 1) < score {
         k += 1;
     }
     k
@@ -835,14 +834,15 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         }
     }
     if opts.faithful_ftran && opts.faithful_positions {
+        // The reference factorizes the starting basis before the first iteration and numbers the positions by pivot step.
         let (order, st, rows) = s.reference_order();
-        let identity = order.iter().zip(&s.basic).all(|(a, b)| a == b);
-        if std::env::var_os("ROSE_STATE").is_some() {
-            eprintln!("INITIAL position order is the pivot order: {identity}");
+        for (pos, &j) in order.iter().enumerate() {
+            s.pos_of[j] = pos;
         }
-        if identity {
-            s.mirror = Some(crate::ftran_order::RefStruct::fresh(m, &st, &rows));
-        }
+        s.basic = order;
+        s.mirror = Some(crate::ftran_order::RefStruct::fresh(m, &st, &rows));
+        let cols: Vec<Column> = s.basic.iter().map(|&j| s.p.cols[j].clone()).collect();
+        s.factor = Factor::new(m, &cols).map_err(|_| SolveError::SingularBasis)?;
     }
     s.recompute_primal();
     s.recompute_dual();
@@ -900,39 +900,23 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             }
         };
         let mut alpha = vec![0.0; m];
-        for &(i, a) in &p.cols[q] {
-            alpha[i] = a;
-        }
-        s.factor.ftran(&mut alpha);
         let dir = if s.d[q] < 0.0 { 1.0 } else { -1.0 };
-        let rows_q: Vec<usize> = p.cols[q].iter().map(|&(i, _)| i).collect();
-        let spike: Option<Vec<usize>> = s.mirror.as_ref().map(|mi| mi.lstage(&rows_q));
-        let entries: Vec<(usize, f64)> = match (&s.mirror, &spike) {
-            (Some(mi), Some(sp)) => {
-                let ord = mi.uorder(sp);
-                let mut seen = vec![false; m];
-                let mut e: Vec<(usize, f64)> = Vec::new();
-                for &i in &ord {
-                    if !seen[i] {
-                        seen[i] = true;
-                        if alpha[i].abs() > 1e-14 {
-                            e.push((i, dir * alpha[i]));
-                        }
-                    }
-                }
-                for i in 0..m {
-                    if !seen[i] && alpha[i].abs() > 1e-14 {
-                        e.push((i, dir * alpha[i]));
-                    }
-                }
-                e
+        let entries: Vec<(usize, f64)> = if let Some(mi) = s.mirror.as_mut() {
+            // The reference's FTRAN, value for value and in its output order.
+            let rows_q: Vec<usize> = p.cols[q].iter().map(|&(i, _)| i).collect();
+            let vals_q: Vec<f64> = p.cols[q].iter().map(|&(_, a)| a).collect();
+            let out = mi.ftran(&rows_q, &vals_q);
+            for &(i, a) in &out {
+                alpha[i] = a;
             }
-            _ => (0..m).filter(|&i| alpha[i].abs() > 1e-14).map(|i| (i, dir * alpha[i])).collect(),
+            out.iter().map(|&(i, a)| (i, dir * a)).collect()
+        } else {
+            for &(i, a) in &p.cols[q] {
+                alpha[i] = a;
+            }
+            s.factor.ftran(&mut alpha);
+            (0..m).filter(|&i| alpha[i].abs() > 1e-14).map(|i| (i, dir * alpha[i])).collect()
         };
-        if std::env::var_os("ROSE_ENTRIES").is_some() {
-            let e: Vec<String> = entries.iter().map(|&(i, a)| format!("{}:{}:{:e}", i, s.basic[i], a)).collect();
-            eprintln!("ENTRIES iter {iterations} q {q} [{}]", e.join(" "));
-        }
         let own = if !is_inf(p.lo[q]) && !is_inf(p.up[q]) { p.up[q] - p.lo[q] } else { INF };
         let mut leave_to_upper: Option<bool> = None;
         let (chosen, mut step, _pivot) = if infeasible {
@@ -1039,8 +1023,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         s.basic[r] = q;
         s.pos_of[q] = r;
         s.factor.update(r, alpha);
-        if let (Some(mi), Some(sp)) = (s.mirror.as_mut(), spike.as_ref()) {
-            mi.update(r, sp);
+        if let Some(mi) = s.mirror.as_mut() {
+            mi.update(r);
         }
         changed.push(leave);
         let changed = s.pivot_row_order(&rho, &changed);
