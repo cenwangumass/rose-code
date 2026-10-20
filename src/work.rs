@@ -12,12 +12,21 @@ pub const FAC: f64 = 1.3;
 
 pub struct Work {
     pub w: f64,
+    /// `W` at the refactorization check that last decided to refactorize (`ctx+0x150`); zero before the first.
+    w150: f64,
+    /// Whether a check has decided to refactorize yet. The reference's `w150 > 0` holds after the setup work (not modelled in
+    /// `W`) of the first check, so it is a flag here.
+    decided_once: bool,
+    /// Smoothed cost of the factorization driver `0xd4190` (`ctx+0x158`): half the last cost plus half the previous value.
+    w158: f64,
+    /// Cost of the factorization in progress: the sum of the driver's own increments.
+    fac_cost: f64,
     log: bool,
 }
 
 impl Default for Work {
     fn default() -> Self {
-        Work { w: 0.0, log: std::env::var_os("ROSE_WORK").is_some() }
+        Work { w: 0.0, w150: 0.0, decided_once: false, w158: 0.0, fac_cost: 0.0, log: std::env::var_os("ROSE_WORK").is_some() }
     }
 }
 
@@ -37,6 +46,38 @@ impl Work {
         self.w = d + self.w;
         if self.log {
             eprintln!("WINC {d:.4} {site:#x} {caller:#x}");
+        }
+    }
+
+    /// The time clause of the refactorization check: every tenth update, when the work since the last decision exceeds
+    /// `8 * w158 + 100 * nnz(A)`. `w` is `W` at the check.
+    pub fn clause(&self, upd: usize, nnz_a: usize, w: f64) -> bool {
+        upd % 10 == 9 && self.decided_once && w - self.w150 > 8.0 * self.w158 + 100.0 * nnz_a as f64
+    }
+
+    /// Records a check that decided to refactorize, at `W = w`.
+    pub fn decided(&mut self, w: f64) {
+        self.w150 = w;
+        self.decided_once = true;
+    }
+
+    /// Adds the increments of the factorization driver `0xd4190` (the sites that make up its cost) and, at its end, smooths
+    /// the cost into `w158`.
+    pub fn factor_driver(&mut self, sites: &[(u32, f64)], scale: f64) {
+        self.fac_cost = 0.0;
+        for &(site, est) in sites {
+            if matches!(site, 0xd4ded | 0xd5300 | 0xd85e6 | 0xdc7b2 | 0xdcb7b) {
+                self.fac_cost += est * scale;
+            }
+        }
+    }
+
+    /// Smooths the cost of the factorization just done into `w158`.
+    pub fn factor_done(&mut self) {
+        // The first factorization stores its cost as it is; later ones average it with the previous value.
+        self.w158 = if self.w158 == 0.0 { self.fac_cost } else { 0.5 * (self.fac_cost + self.w158) };
+        if self.log {
+            eprintln!("W158 {} cost {} w150 {}", self.w158, self.fac_cost, self.w150);
         }
     }
 

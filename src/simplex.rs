@@ -348,9 +348,12 @@ impl<'a> Solver<'a> {
                     }
                 }
                 let mi = crate::ftran_order::RefStruct::fresh(self.p.m, &st, &rows);
-                for (site, est) in st.work(&rows, mi.has_levels()).into_iter().chain(mi.fresh_work()) {
+                let lu = st.work(&rows, mi.has_levels());
+                self.work.factor_driver(&lu, crate::work::CTX);
+                for (site, est) in lu.into_iter().chain(mi.fresh_work()) {
                     self.work.add(site, est, crate::work::CTX);
                 }
+                self.work.factor_done();
                 self.mirror = Some(mi);
             }
         }
@@ -1148,9 +1151,12 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         s.factor = Factor::new(m, &cols).map_err(|_| SolveError::SingularBasis)?;
     }
     s.work.trig();
+    s.work.decided(s.work.w);
+    s.work.factor_driver(&lu_work, crate::work::CTX);
     for (site, est) in lu_work {
         s.work.add(site, est, crate::work::CTX);
     }
+    s.work.factor_done();
     s.recompute_primal();
     s.primal_full_work();
     s.dual_btran_work();
@@ -1170,6 +1176,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             None if opts.faithful_ftran && s.mirror.is_some() => std::mem::replace(&mut refactor_next, false),
             None => s.factor.num_updates() >= opts.max_updates,
         };
+        let w_check = s.work.w;
         let upd_work = std::mem::take(&mut s.upd_work);
         if due {
             s.refactor()?;
@@ -1180,7 +1187,11 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         }
         if opts.refactor_schedule.is_none() {
             if let Some(mi) = s.mirror.as_ref() {
-                refactor_next = mi.refactor_due();
+                let nnz_a: usize = p.cols[..p.n].iter().map(Vec::len).sum();
+                refactor_next = mi.refactor_due() || s.work.clause(mi.updates(), nnz_a, w_check);
+                if refactor_next {
+                    s.work.decided(w_check);
+                }
             }
         }
         // The reference's primal update of the last pivot (`0x105f20`, site `0x107b57`): a pass over the FTRAN result, which

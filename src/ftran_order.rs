@@ -585,6 +585,10 @@ impl RefStruct {
         (self.nuc.len(), self.i21, self.dens)
     }
 
+    pub fn updates(&self) -> usize {
+        self.upd
+    }
+
     pub fn refactor_due(&self) -> bool {
         let m = self.m as f64;
         let maxupd = (m.powf(0.7) as usize).max(20);
