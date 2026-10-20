@@ -96,7 +96,8 @@ fn dot(x: &[f64], c: &[f64], peel: usize) -> f64 {
     for i in peel..n8 {
         lanes[(i - peel) & 7] += t(i);
     }
-    let mut tot = (((lanes[0] + lanes[2]) + lanes[4]) + lanes[6]) + (((lanes[1] + lanes[3]) + lanes[5]) + lanes[7]);
+    // The compiled reduction adds the four packed accumulators pairwise: (l0+l2 | l1+l3) + (l4+l6 | l5+l7), then the two halves.
+    let mut tot = ((lanes[0] + lanes[2]) + (lanes[4] + lanes[6])) + ((lanes[1] + lanes[3]) + (lanes[5] + lanes[7]));
     for i in n8..n {
         tot += t(i);
     }
@@ -1463,7 +1464,8 @@ impl RefStruct {
                 val.push(c);
             }
             let xs: Vec<f64> = ind.iter().map(|&j| spk[j]).collect();
-            newdiag = dot(&xs, &val, peel);
+            // The diagonal is summed from the scratch eta, which is 16-byte aligned.
+            newdiag = dot(&xs, &val, 0);
             self.sum_eta += ind.len() as f64;
             self.upd_work.push((0xf1beb, 3.0 * ind.len() as f64, crate::work::CTX));
             let e = self.etas.len();
@@ -1489,10 +1491,8 @@ impl RefStruct {
                     cnt[row] += 1;
                 }
             }
-            for &row in &old_rows {
-                cnt[row] += 1;
-            }
-            for &(row, _) in self.spike.iter().filter(|e| e.0 != r) {
+            // A row that already holds an entry of the old column takes the new entry in place.
+            for &(row, _) in self.spike.iter().filter(|e| e.0 != r && !old_rows.contains(&e.0)) {
                 if cnt[row] >= self.row_cap[row] {
                     let extra = (cnt[row] / 2).max(4);
                     self.fill += cnt[row] + extra;
