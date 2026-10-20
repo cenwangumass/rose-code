@@ -6,6 +6,6 @@ fn main() {
     let opts = if a[2] == "faithful" { SolveOptions { faithful_weights: true, faithful_positions: true, faithful_ftran: true, ..SolveOptions::default() } } else { SolveOptions::plain() };
     let r = solve(&model, None, &opts).unwrap();
     for e in &r.trace.iter().take(600).collect::<Vec<_>>() {
-        println!("{} {}", e.entering, e.leaving.map_or(-1, |v| v as i64));
+        println!("{} {} {:e}", e.entering, e.leaving.map_or(-1, |v| v as i64), e.step);
     }
 }

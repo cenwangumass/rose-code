@@ -256,7 +256,56 @@ pub fn crash_basis(model: &LpModel) -> Basis {
             }
         }
     }
+    flip_to_upper(&p, &mut b);
     b
+}
+
+/// The reference's bound placement after the crash (`0x1387d0`, decompiled lines 405-560): each nonbasic column with a finite
+/// range, taken in ascending order of `(up - lo) * cost` (ties by descending index, which reproduces BOEING2), moves to its upper
+/// bound when that lowers the total infeasibility of the row slacks (a slack is feasible in `[0, up]`), or leaves it unchanged
+/// while the cost is negative. The row activities follow the placements already made.
+fn flip_to_upper(p: &Internal, b: &mut Basis) {
+    let (n, m) = (p.n, p.m);
+    let mut is_basic = vec![false; n + m];
+    for &j in &b.basic {
+        is_basic[j] = true;
+    }
+    // Slack-space activity: `(rhs - A x_N) / sign` for every row.
+    let mut act = p.rhs.clone();
+    for j in 0..n {
+        if is_basic[j] {
+            continue;
+        }
+        let v = if b.at_upper[j] { p.up[j] } else if is_inf(p.lo[j]) { 0.0 } else { p.lo[j] };
+        if v != 0.0 {
+            for &(i, a) in &p.cols[j] {
+                act[i] -= a * v;
+            }
+        }
+    }
+    let sign: Vec<f64> = (0..m).map(|i| p.cols[n + i][0].1).collect();
+    let mut sact: Vec<f64> = (0..m).map(|i| act[i] / sign[i]).collect();
+    let mut cand: Vec<usize> = (0..n)
+        .filter(|&j| !is_basic[j] && !b.at_upper[j] && !is_inf(p.lo[j]) && !is_inf(p.up[j]) && p.up[j] > p.lo[j])
+        .collect();
+    let key = |j: usize| (p.up[j] - p.lo[j]) * p.cost[j];
+    cand.sort_by(|&x, &y| key(x).partial_cmp(&key(y)).unwrap().then(y.cmp(&x)));
+    for j in cand {
+        let range = p.up[j] - p.lo[j];
+        let mut gain = 0.0;
+        for &(i, a) in &p.cols[j] {
+            let hi = p.up[n + i];
+            let infeas = |x: f64| if x >= 0.0 { if hi < x { x - hi } else { 0.0 } } else { -x };
+            let x = sact[i];
+            gain += infeas(x) - infeas(x - a / sign[i] * range);
+        }
+        if gain > 0.0 || (gain == 0.0 && p.cost[j] < 0.0) {
+            b.at_upper[j] = true;
+            for &(i, a) in &p.cols[j] {
+                sact[i] -= a / sign[i] * range;
+            }
+        }
+    }
 }
 
 struct Solver<'a> {
@@ -280,6 +329,11 @@ struct Solver<'a> {
     leave_prev: Option<usize>,
     /// Structural columns of each row, ascending.
     rows: Vec<Vec<usize>>,
+    /// The reference's row-wise copy of the nonbasic structurals, in its storage order: a column that enters the basis is
+    /// removed by moving the row's last entry into its place, a column that leaves is appended.
+    rrows: Vec<Vec<usize>>,
+    /// The mirror's penalised dual multipliers `y` by row, from the last `dual_btran_work` (they carry the reference's rounding).
+    y_ref: Option<Vec<f64>>,
     /// Mirror of the reference's FTRAN structure (`faithful_ftran`).
     mirror: Option<crate::ftran_order::RefStruct>,
     /// The reference's work counter (`crate::work`).
@@ -307,6 +361,13 @@ fn dot(col: &Column, v: &[f64]) -> f64 {
 /// Column dot product as the reference's vectorised loop evaluates it (`0x102d20`): below `peel + 8` terms it is sequential,
 /// otherwise the peeled head goes to lane 0, eight lane-wise partial sums follow, the lanes reduce pairwise and the tail is
 /// sequential. `peel` is the parity of the column's offset in the value array.
+/// Dot product summing the terms in the rank order of the vector's support (the order of the reference's BTRAN output list).
+fn rank_dot(col: &Column, v: &[f64], rank: &[usize]) -> f64 {
+    let mut terms: Vec<(usize, f64)> = col.iter().filter(|&&(i, _)| rank[i] != usize::MAX).map(|&(i, a)| (rank[i], a * v[i])).collect();
+    terms.sort_by_key(|t| t.0);
+    terms.iter().fold(0.0, |acc, t| acc + t.1)
+}
+
 fn dot_lanes(col: &Column, v: &[f64], peel: usize) -> f64 {
     let n = col.len();
     let t = |i: usize| col[i].1 * v[col[i].0];
@@ -433,11 +494,23 @@ impl<'a> Solver<'a> {
             }
         }
         self.row_product_work(&rho, q, leave, 0x10820b);
-        // The row's slack part is `rho` itself, basic slacks included (they are the positions whose cost changed).
+        // The row's slack part is `rho` itself, basic slacks included (they are the positions whose cost changed). The
+        // reference subtracts the row product from `d` in place, summing in the order of the BTRAN output list.
         let p = self.p;
-        let changed: Vec<usize> = (0..n + m)
-            .filter(|&j| (j >= n && rho[j - n] != 0.0) || (self.pos_of[j] == NONE && dot(&p.cols[j], &rho).abs() > ROW_DROP_TOL))
-            .collect();
+        let mut rank = vec![usize::MAX; m];
+        for (k, &(i, _)) in out.iter().enumerate() {
+            rank[i] = k;
+        }
+        let mut changed: Vec<usize> = Vec::new();
+        for j in 0..n + m {
+            let a = if self.pos_of[j] == NONE { rank_dot(&p.cols[j], &rho, &rank) } else { 0.0 };
+            if self.pos_of[j] == NONE && a.abs() > ROW_DROP_TOL {
+                self.d[j] -= a;
+            }
+            if (j >= n && rho[j - n] != 0.0) || (self.pos_of[j] == NONE && a.abs() > ROW_DROP_TOL) {
+                changed.push(j);
+            }
+        }
         let nz: Vec<usize> = out.iter().map(|e| e.0).filter(|&i| rho[i] != 0.0).collect();
         let changed = self.pivot_row_order_by(&nz, &changed);
         self.update_list(&changed, usize::from(q < n), 0x108280);
@@ -465,8 +538,13 @@ impl<'a> Solver<'a> {
             })
             .filter(|e| e.1 != 0.0)
             .collect();
-        mi.btran(&inp, false, true);
+        let out = mi.btran(&inp, false, true);
         self.work.add_from(0x12de50, 0x109289, mi.work, crate::work::FAC);
+        let mut y = vec![0.0; p.m];
+        for &(i, v) in &out {
+            y[i] = v;
+        }
+        self.y_ref = Some(y);
         // The reduced costs that follow (`0x1020a0`, site `0x1021b0`): a pass over all variables and the columns of the
         // nonbasic structurals that are not fixed.
         let n = p.n;
@@ -498,8 +576,29 @@ impl<'a> Solver<'a> {
         }
     }
 
+    /// `d_j = c_j - sum y_i a_ij`, subtracting the terms in the column's stored order (`0x1020a0`).
+    fn set_d_from_y(&mut self, y: &[f64]) {
+        let p = self.p;
+        for j in 0..p.n + p.m {
+            self.d[j] = if self.pos_of[j] == NONE {
+                let mut acc = p.cost[j];
+                for &(i, a) in &p.fcols[j] {
+                    acc -= y[i] * a;
+                }
+                acc
+            } else {
+                0.0
+            };
+        }
+    }
+
     fn recompute_dual(&mut self) {
         let p = self.p;
+        if let Some(y) = self.y_ref.take() {
+            self.set_d_from_y(&y);
+            self.y_ref = Some(y);
+            return;
+        }
         let mut y: Vec<f64> = self.basic.iter().map(|&j| p.cost[j]).collect();
         self.factor.btran(&mut y);
         for j in 0..p.n + p.m {
@@ -529,7 +628,7 @@ impl<'a> Solver<'a> {
         let mut out = Vec::with_capacity(changed.len());
         if nz.len() * 3 * nnz_a < m * n {
             for &i in nz {
-                for &j in &self.rows[i] {
+                for &j in &self.rrows[i] {
                     if keep[j] {
                         keep[j] = false;
                         out.push(j);
@@ -702,7 +801,7 @@ const ROW_DROP_TOL: f64 = 1e-13;
 const PHASE1_M: f64 = 1e6;
 
 /// Rounding guard for Devex weights of variables outside the reference framework (the reference's smallest observed weight is 3e-4).
-const W_MIN: f64 = 1e-6;
+const W_MIN: f64 = 1e-12;
 
 impl<'a> Solver<'a> {
     fn sig(&self) -> Vec<i8> {
@@ -725,6 +824,12 @@ impl<'a> Solver<'a> {
     /// Returns the basic cost vector's multipliers `y`.
     fn composite_dual(&mut self, pure: bool) -> Vec<f64> {
         let p = self.p;
+        if !pure {
+            if let Some(y) = self.y_ref.take() {
+                self.set_d_from_y(&y);
+                return y;
+            }
+        }
         let tol = self.opts.feasibility_tol;
         let mut y: Vec<f64> = self
             .basic
@@ -1150,15 +1255,21 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         p1_prev: Vec::new(),
         leave_prev: None,
         rows: Vec::new(),
+        rrows: Vec::new(),
+        y_ref: None,
         mirror: None,
         work: crate::work::Work::default(),
         last_pivot: None,
         upd_work: Vec::new(),
     };
     s.rows = vec![Vec::new(); m];
+    s.rrows = vec![Vec::new(); m];
     for j in 0..n {
         for &(i, _) in &s.p.cols[j] {
             s.rows[i].push(j);
+            if s.pos_of[j] == NONE {
+                s.rrows[i].push(j);
+            }
         }
     }
     // The starting factorization's work, which the reference counts after its first refactorization check.
@@ -1249,7 +1360,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 // The reference corrects `d` in place when basic variables change feasibility class and re-scores the
                 // entries of the row of the cost changes.
                 if s.mirror.is_some() {
-                    s.composite_dual(false);
+                    // The reference keeps `d` and applies the cost changes to it in place.
                     if let (Some(lp), false) = (&last, dc.is_empty()) {
                         s.cost_change_work(&dc, lp.q, lp.leave);
                     }
@@ -1414,6 +1525,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             // Bound flip: the entering variable travels to its opposite bound.
             s.at_upper[q] = !s.at_upper[q];
             s.x[q] = s.nonbasic_value(q);
+            s.y_ref = None;
+            // The reference still runs the primal update of the move at the next iteration (`0x105f20`): the phase 1 cost
+            // changes of the basic variables whose class changed re-score the columns they touch.
+            s.last_pivot = Some(LastPivot { rows: ftran_out.iter().map(|e| e.0).collect(), dense: s.mirror.as_ref().is_some_and(|mi| mi.last_dense()), q: NONE, leave: NONE });
             if opts.record_trace {
                 trace.push(TraceEvent { iteration: iterations, entering: q, leaving: None, position: None, step });
             }
@@ -1505,6 +1620,13 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         for j in 1..n + m {
             col_off[j] = col_off[j - 1] + p.cols[j - 1].len();
         }
+        let rho_rank: Option<Vec<usize>> = rho_ref.as_ref().map(|rr| {
+            let mut rank = vec![usize::MAX; m];
+            for (k, &(i, _)) in rr.iter().enumerate() {
+                rank[i] = k;
+            }
+            rank
+        });
         let mut changed: Vec<usize> = Vec::new();
         for j in 0..n + m {
             if s.pos_of[j] != NONE || j == q {
@@ -1521,20 +1643,50 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             let floor = if opts.faithful_weights && !s.in_r0[j] { W_MIN } else { 1.0 };
             s.w[j] = s.w[j].max(floor);
             if !s.is_fixed(j) {
-                s.d[j] -= theta_d * arj;
+                // The reference sums the row product in the order of the BTRAN output list.
+                let a = rho_rank.as_ref().map_or(arj, |rank| rank_dot(&p.cols[j], &rho, rank));
+                s.d[j] -= theta_d * a;
             }
             changed.push(j);
         }
-        s.d[leave] = -theta_d;
-        s.d[q] = 0.0;
+        // The penalty leaves `d` of the leaving variable after the list update, which scores it with the penalty still in.
+        let mut leave_penalty = 0.0;
+        if s.mirror.is_some() && phase1 {
+            // The reference keeps the stored value of a basic variable: the leaving one moves by the pivot-row update like any
+            // other entry and loses its phase 1 penalty; the entering one is left holding the negated pivot element (zero for a
+            // degenerate step; this matches 277 of 330 DEGEN2 pivots).
+            s.d[leave] -= theta_d;
+            if let Some(&(j, c)) = s.p1_prev.get(r) {
+                if j == leave && c != 0 {
+                    leave_penalty = PHASE1_M * f64::from(c);
+                }
+            }
+            s.d[q] = if step == 0.0 { 0.0 } else { -dir * alpha_rq };
+        } else {
+            s.d[leave] = -theta_d;
+            s.d[q] = 0.0;
+        }
         s.w[leave] = wq / (alpha_rq * alpha_rq);
         s.w[leave] = s.w[leave].max(if opts.faithful_weights && !s.in_r0[leave] { W_MIN } else { 1.0 });
 
         // Basis change.
+        s.y_ref = None;
         s.pos_of[leave] = NONE;
         s.at_upper[leave] = to_upper;
         s.basic[r] = q;
         s.pos_of[q] = r;
+        if q < n {
+            for &(i, _) in &p.cols[q] {
+                if let Some(k) = s.rrows[i].iter().position(|&j| j == q) {
+                    s.rrows[i].swap_remove(k);
+                }
+            }
+        }
+        if leave < n {
+            for &(i, _) in &p.cols[leave] {
+                s.rrows[i].push(leave);
+            }
+        }
         s.factor.update(r, alpha);
         if let Some(mi) = s.mirror.as_mut() {
             mi.update(r);
@@ -1553,6 +1705,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         }
         // The reference's pivot row also carries the entering column (`0x102d20`).
         s.update_list(&changed, 1, 0x1442ab);
+        s.d[leave] -= leave_penalty;
         s.work.trig();
         if opts.record_trace {
             trace.push(TraceEvent { iteration: iterations, entering: q, leaving: Some(leave), position: Some(r), step });
