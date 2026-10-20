@@ -426,6 +426,7 @@ impl<'a> Solver<'a> {
     fn refactor(&mut self) -> Result<(), SolveError> {
         if self.opts.faithful_positions {
             let (order, st, rows) = self.reference_order();
+            crate::dump::emit("luin", serde_json::json!({"n": self.refactorizations, "cols": self.basic, "out": order}));
             debug_assert_eq!(order.len(), self.basic.len());
             for (pos, &j) in order.iter().enumerate() {
                 self.pos_of[j] = pos;
@@ -1412,9 +1413,12 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 s.work.add(site, est, scale);
             }
         }
+        // The reference makes this check after the ratio test, and not at all for a bound flip: `check_state` takes it back.
+        let mut check_state = None;
         if opts.refactor_schedule.is_none() {
             if let Some(mi) = s.mirror.as_ref() {
                 let nnz_a: usize = p.cols[..p.n].iter().map(Vec::len).sum();
+                check_state = Some(s.work.decision_state());
                 refactor_next = mi.refactor_due() || s.work.clause(mi.updates(), nnz_a, w_check);
                 if refactor_next {
                     s.work.decided(w_check);
@@ -1647,6 +1651,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         s.x[q] += dir * step;
         let Some(k) = chosen else {
             // Bound flip: the entering variable travels to its opposite bound.
+            if let Some(st) = check_state {
+                refactor_next = false;
+                s.work.restore_decision(st);
+            }
             s.at_upper[q] = !s.at_upper[q];
             s.x[q] = s.nonbasic_value(q);
             s.y_ref = None;

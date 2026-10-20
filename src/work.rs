@@ -55,6 +55,15 @@ impl Work {
         upd % 10 == 9 && self.decided_once && w - self.w150 > 8.0 * self.w158 + 100.0 * nnz_a as f64
     }
 
+    /// The decision state `(w150, decided_once)`, to take a check back (the reference runs no check on a bound flip).
+    pub fn decision_state(&self) -> (f64, bool) {
+        (self.w150, self.decided_once)
+    }
+
+    pub fn restore_decision(&mut self, st: (f64, bool)) {
+        (self.w150, self.decided_once) = st;
+    }
+
     /// Records a check that decided to refactorize, at `W = w`.
     pub fn decided(&mut self, w: f64) {
         self.w150 = w;
