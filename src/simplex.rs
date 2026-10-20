@@ -749,7 +749,7 @@ impl<'a> Solver<'a> {
     fn price(&mut self) -> Option<usize> {
         if !self.list.is_empty() {
             let best = self.best_in_list();
-            self.work.add(0x105d03, self.list.len() as f64 * 4.0, crate::work::CTX);
+            self.work.add(0x105d03, self.scanned(best) as f64 * 4.0, crate::work::CTX);
             if best.is_some() {
                 return best;
             }
@@ -777,7 +777,7 @@ impl<'a> Solver<'a> {
         }
         let best = self.best_in_list();
         if !self.list.is_empty() {
-            self.work.add(0x105c0c, self.list.len() as f64 * 4.0, crate::work::CTX);
+            self.work.add(0x105c0c, self.scanned(best) as f64 * 4.0, crate::work::CTX);
         }
         best
     }
@@ -796,6 +796,15 @@ impl<'a> Solver<'a> {
             return self.price();
         }
         q
+    }
+
+    /// Entries of the list the reference's scan looks at: all of them, except that it stops at a free variable (top bucket,
+    /// nothing beats it), after the entries before it.
+    fn scanned(&self, best: Option<usize>) -> usize {
+        match best {
+            Some(j) if self.score(j) == Some(f64::INFINITY) => self.list.iter().position(|&x| x == j).unwrap(),
+            _ => self.list.len(),
+        }
     }
 
     fn best_in_list(&self) -> Option<usize> {
