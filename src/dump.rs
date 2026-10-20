@@ -11,6 +11,7 @@ pub const KINDS: &[(&str, &str, &str)] = &[
     ("pricing", "PLIST", "each pricing call: call index, candidate list, d, w, basic set and x"),
     ("ftran", "FTR", "pivot-column FTRAN input rows and result in output order"),
     ("ustage", "USTG", "U-stage state of each pivot-column FTRAN: the L-stage result (spike, ascending), the diagonal, the tail columns' U entries and slots"),
+    ("lstage", "LST", "dense x (by position) of each pivot-column FTRAN after the L stage (l) and after the row etas (e)"),
     ("rho", "BTR", "pivot-row BTRAN result in output order"),
     ("tau", "BTT", "Devex cross-term BTRAN result in output order"),
     ("dual", "BTY", "dual BTRAN after a factorization, in output order"),

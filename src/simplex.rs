@@ -1540,6 +1540,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             if crate::dump::on("ftran") {
                 crate::dump::emit("ftran", serde_json::json!({"iter": iterations, "q": q, "in": rows_q, "dense": mi.last_dense(), "out": crate::dump::sparse(&out)}));
             }
+            if crate::dump::on("lstage") {
+                let (l, e) = mi.lstage_snap();
+                crate::dump::emit("lstage", serde_json::json!({"iter": iterations, "q": q, "l": l, "e": e}));
+            }
             if crate::dump::on("ustage") {
                 let (spike, diag, uc, slot, kind, i21) = mi.ustage_state();
                 let tail: Vec<serde_json::Value> = (0..diag.len()).filter(|&p| kind[p] == -2).map(|p| serde_json::json!([p, slot[p], crate::dump::sparse(&uc[p])])).collect();
