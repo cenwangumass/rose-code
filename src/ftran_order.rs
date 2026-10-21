@@ -45,6 +45,9 @@ pub struct RefStruct {
     /// eta lengths, and the factor size `nnz(L) + nnz(U) + 2 m` fixed at factorization time.
     upd: usize,
     sum_alpha: f64,
+    /// `upd` and `sum_alpha` before the most recent update: the scan window of `pricing0` counts the updates made before the one
+    /// whose pivot triggered the refactorization.
+    before_last: (usize, f64),
     sum_eta: f64,
     last_alpha: usize,
     znz: f64,
@@ -306,6 +309,7 @@ impl RefStruct {
         RefStruct {
             upd: 0,
             sum_alpha: 0.0,
+            before_last: (0, 0.0),
             sum_eta: 0.0,
             last_alpha: 0,
             znz,
@@ -767,6 +771,11 @@ impl RefStruct {
     }
 
     /// Sum of the FTRAN result counts of the updates since the factorization (`F+0x190`).
+    /// Update count and result-count sum before the most recent update (`F+0x18c`, `F+0x190` as the refactorization reads them).
+    pub fn window_stats(&self) -> (usize, f64) {
+        self.before_last
+    }
+
     pub fn sum_alpha(&self) -> f64 {
         self.sum_alpha
     }
@@ -1544,6 +1553,7 @@ impl RefStruct {
             let n = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             crate::dump::emit("fstruct", serde_json::json!({"rowl": (0..m).filter(|&y| !self.rowl[y].is_empty()).map(|y| (y.to_string(), self.rowl[y].clone())).collect::<std::collections::BTreeMap<_, _>>(), "mark": self.mark, "n": n, "m": m, "i3": self.nuc.len(), "i21": self.i21, "kind": self.kind, "nuc": self.nuc, "seqA": self.slot, "fill": self.fill, "diag": self.diag, "uvals": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), (self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.0).collect::<Vec<_>>(), self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.1).collect::<Vec<_>>()))).collect::<std::collections::BTreeMap<_, _>>(), "cols": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), [&self.a[k], &self.b[k]])).collect::<std::collections::BTreeMap<_, _>>()}));
         }
+        self.before_last = (self.upd, self.sum_alpha);
         self.upd += 1;
         self.upd_work.clear();
         // The reference's position array is read by the mark raises before it is rewritten at the end of the update.

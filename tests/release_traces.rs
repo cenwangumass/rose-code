@@ -58,6 +58,13 @@ fn afiro_release_matches_the_reference() {
     check("afiro");
 }
 
+/// ADLITTLE starts in phase 1 (scan tolerance `P[0x3c0] * P[0]`, cost shifts in the dual update, dense dual recomputation at the end of
+/// phase 1) and never switches the method: all 104 decisions and the returned solution agree.
+#[test]
+fn adlittle_release_matches_the_reference() {
+    check("adlittle");
+}
+
 /// Decisions 0..24 of the reference (the first 25 of the trace) are the `SimplexPricing=0` ones; the 26th is taken after the switch.
 #[test]
 fn sc50a_release_matches_the_reference_up_to_the_switch() {

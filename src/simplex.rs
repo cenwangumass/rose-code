@@ -492,8 +492,11 @@ struct P0 {
     dstore: Vec<f64>,
     /// Dual multipliers, kept by one BTRAN per pivot.
     y: Vec<f64>,
-    /// Position of the last leaving variable and the entering `d`: the BTRAN input of the next dual update.
-    pending: Option<(usize, f64)>,
+    /// The BTRAN input of the next dual update: the leaving position with the entering `d`, then (phase 1) the cost shifts of the basic
+    /// variables that changed feasibility class, in the reference's order.
+    pending: Option<Vec<(usize, f64)>>,
+    /// Reduced-cost tolerance of the scan and the rebuild: `ctx+0x388`, or in phase 1 `P[0x3c0] * P[0]` (`P0_DTOL_P1`).
+    tol: f64,
     /// The duals are recomputed and the list rebuilt at the next pricing call.
     rebuild: bool,
     /// Pricing calls so far (the dump's call index).
@@ -622,9 +625,10 @@ impl<'a> Solver<'a> {
             self.basic = order;
             if self.opts.faithful_ftran {
                 if let (Some(old), Some(p0)) = (self.mirror.as_ref(), self.p0.as_mut()) {
-                    // `0xf15c0` (`0xf4562`): the scan window follows the mean FTRAN result count of the updates just made.
-                    let u = old.updates();
-                    let avg = if u > 0 { (old.sum_alpha() / u as f64) as usize } else { 0 };
+                    // `0xf15c0` (`0xf4562`): the scan window follows the mean FTRAN result count of the updates made before the last one
+                    // (the refactorization is decided before that update is counted).
+                    let (u, sum) = old.window_stats();
+                    let avg = if u > 0 { (sum / u as f64) as usize } else { 0 };
                     p0.window = (avg / 2).max(P0_WINDOW);
                 }
                 if let Some(old) = self.mirror.as_ref() {
@@ -944,6 +948,9 @@ impl<'a> Solver<'a> {
                         acc -= y[i] * a;
                     }
                     acc
+                } else if self.p0.is_some() {
+                    // `pricing0`: the returned reduced costs are the scan's scores (`0xfecb0`), the eight-lane kernel.
+                    dot_lanes_from(&p.fcols[j], y, col_off(j), p.cost[j])
                 } else {
                     let mut acc = p.cost[j];
                     for &(i, a) in &p.fcols[j] {
@@ -1260,6 +1267,8 @@ fn p0_key(s: f64) -> usize {
 const P0_WINDOW: usize = 10;
 /// Reduced-cost tolerance of the `pricing0` scan (`ctx+0x388`).
 const P0_DTOL: f64 = 1e-6;
+/// Phase 1 form of the tolerance (`ctx+0x2d0 != 0`): `P+0x3c0` (1e-7) times the infeasibility cost shift `P[0]` (1e6).
+const P0_DTOL_P1: f64 = 1e-7 * PHASE1_M;
 
 impl<'a> Solver<'a> {
     /// Nonbasic, not fixed: the variables the `pricing0` list ranks (status -1, -2 or -3 of the reference).
@@ -1320,14 +1329,28 @@ impl<'a> Solver<'a> {
         p0.pending = None;
     }
 
+    /// Phase 1 of `pricing0`: the cost shifts of the basic variables that changed feasibility class since the last pricing call join the
+    /// BTRAN input of the next dual update (after the entering `d`). Without a valid dual (`update` false: a fresh start, a refactorization
+    /// or the first infeasible pass) the duals are rebuilt from the costs and the shifts instead.
+    fn p0_cost_changes(&mut self, update: bool, dc: &[(usize, f64)]) {
+        let p0 = self.p0.as_mut().unwrap();
+        if !update {
+            p0.rebuild = true;
+            return;
+        }
+        if !dc.is_empty() {
+            p0.pending.get_or_insert_with(Vec::new).extend_from_slice(dc);
+        }
+    }
+
     /// Applies the pending dual update: the BTRAN of the entering `d` at the leaving position, in the updated basis (`0xfb790`, mode 2).
     fn p0_update_duals(&mut self) {
-        let Some((r, dq)) = self.p0.as_mut().unwrap().pending.take() else { return };
+        let Some(inp) = self.p0.as_mut().unwrap().pending.take() else { return };
         let mi = self.mirror.as_mut().unwrap();
-        let out = mi.btran(&[(r, dq)], false, false);
+        let out = mi.btran(&inp, false, false);
         let dense = mi.bt_dense;
         if crate::dump::on("dual") {
-            crate::dump::emit("dual", serde_json::json!({"update": [r, dq], "out": crate::dump::sparse(&out)}));
+            crate::dump::emit("dual", serde_json::json!({"update": inp, "out": crate::dump::sparse(&out)}));
         }
         self.work.add_from(0x12de50, 0xfb7ee, mi.work, crate::work::FAC);
         let y = &mut self.p0.as_mut().unwrap().y;
@@ -1359,7 +1382,7 @@ impl<'a> Solver<'a> {
                         q = Some((j, s));
                         break;
                     }
-                    if s < -P0_DTOL {
+                    if s < -p0.tol {
                         if s + s < p0.dstore[j] {
                             cnt += 1;
                             marked[i] = true;
@@ -1434,7 +1457,7 @@ impl<'a> Solver<'a> {
             self.p0_rebuild();
             // The reference scans again only if the rebuild counted a dual infeasibility (a free variable counts always).
             let p0 = self.p0.as_ref().unwrap();
-            let any = (0..self.p.n + self.p.m).any(|j| self.p0_eligible(j) && (p0.dstore[j] < -P0_DTOL || (is_inf(self.p.lo[j]) && is_inf(self.p.up[j]))));
+            let any = (0..self.p.n + self.p.m).any(|j| self.p0_eligible(j) && (p0.dstore[j] < -p0.tol || (is_inf(self.p.lo[j]) && is_inf(self.p.up[j]))));
             if !any {
                 return None;
             }
@@ -2068,7 +2091,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     s.recompute_dual();
     if opts.pricing0 {
         assert!(s.mirror.is_some(), "pricing0 needs faithful_ftran and faithful_positions");
-        s.p0 = Some(P0 { list: Vec::new(), pos: 0, dstore: vec![0.0; n + m], y: Vec::new(), pending: None, rebuild: true, calls: 0, window: P0_WINDOW });
+        s.p0 = Some(P0 { list: Vec::new(), pos: 0, dstore: vec![0.0; n + m], y: Vec::new(), pending: None, tol: P0_DTOL, rebuild: true, calls: 0, window: P0_WINDOW });
     }
     let mut trace = Vec::new();
     let mut iterations = 0usize;
@@ -2141,7 +2164,11 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         if infeasible {
             let was = phase1;
             phase1 = true;
-            if was && !due {
+            if opts.pricing0 {
+                // `pricing0`: no maintained `d`; the cost shifts join the BTRAN input of the dual update (a refactorization or a
+                // fresh start rebuilds the duals instead).
+                s.p0_cost_changes(was && !due, &dc);
+            } else if was && !due {
                 // The reference corrects `d` in place when basic variables change feasibility class and re-scores the
                 // entries of the row of the cost changes.
                 if s.mirror.is_some() {
@@ -2179,8 +2206,17 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             }
             s.list.clear();
             s.level = 0;
+            if opts.pricing0 && !due {
+                // The end of phase 1 recomputes the duals from the true costs (one dense BTRAN) and keeps the list.
+                s.dual_btran_work();
+                let p0 = s.p0.as_mut().unwrap();
+                if !p0.rebuild {
+                    p0.y = s.y_ref.clone().unwrap();
+                    p0.pending = None;
+                }
+            }
             // After a refactorization the duals were just recomputed with the same (now feasible) basic values.
-            if !due {
+            if !due && !opts.pricing0 {
                 s.dual_btran_work();
                 s.recompute_dual();
             }
@@ -2190,7 +2226,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             crate::dump::emit("pricing", serde_json::json!({"n": PRC.load(std::sync::atomic::Ordering::Relaxed), "iter": iterations, "infeasible": infeasible, "list": s.list, "basic": s.basic, "d": s.d, "w": s.w, "x": s.x}));
         }
         PRC.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let q = if infeasible {
+        if let Some(p0) = s.p0.as_mut() {
+            p0.tol = if infeasible { P0_DTOL_P1 } else { P0_DTOL };
+        }
+        let q = if infeasible && !opts.pricing0 {
             match s.price_admitting() {
                 Some(q) => q,
                 None => {
@@ -2447,7 +2486,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 }
                 rows
             }, dense: s.mirror.as_ref().is_some_and(|mi| mi.last_dense()), q, leave, alpha_rq });
-            s.p0.as_mut().unwrap().pending = Some((r, dq));
+            s.p0.as_mut().unwrap().pending = Some(vec![(r, dq)]);
             s.work.trig();
             if let Some((d, u, na)) = chk {
                 let w_now = s.work.w;
