@@ -434,7 +434,7 @@ impl<'a> Solver<'a> {
     fn refactor(&mut self) -> Result<(), SolveError> {
         if self.opts.faithful_positions {
             let (order, st, rows) = self.reference_order();
-            crate::dump::emit("luin", serde_json::json!({"n": self.refactorizations, "cols": self.basic, "out": order}));
+            crate::dump::emit("luin", serde_json::json!({"n": self.refactorizations, "cols": self.basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "phase": st.phase}));
             debug_assert_eq!(order.len(), self.basic.len());
             for (pos, &j) in order.iter().enumerate() {
                 self.pos_of[j] = pos;

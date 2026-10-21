@@ -406,13 +406,13 @@ fn nucleus(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> Nucle
             if std::env::var_os("ROSE_GATE_LOG").is_some() && !s.building {
                 eprintln!("RGATE n={} z={}", remaining, z);
             }
-            if remaining > 50 && z > 0.36 * n * n && n * n > 4.0 * m as f64 && m as f64 + n * n < 2e9 {
+            if remaining > 50 && z > 0.36 * (n * n) && n * n > 4.0 * m as f64 && m as f64 + n * n < 2e9 {
                 let exact: usize = ckeys.iter().filter(|c| !pcols.contains(c)).map(|&c| s.ccnt[c]).sum();
                 z = exact as f64;
                 if std::env::var_os("ROSE_GATE_LOG").is_some() {
                     eprintln!("RGATE2 n={} exact={} thr={}", remaining, exact, 0.325 * n * n);
                 }
-                if z > 0.325 * n * n && !s.building {
+                if z > 0.325 * (n * n) && !s.building {
                     // Hand the active matrix to the dense LU: rows by index, columns in ascending bucket order. (Rows in bucket order
                     // reproduce the reference's pivots but not the parity of its vectorised dot products.)
                     let mut rows: Vec<usize> = Vec::new();
