@@ -1444,7 +1444,6 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     let mut trace = Vec::new();
     let mut iterations = 0usize;
     // Pricing passes of the main loop, the call index of the `pricing` dump.
-    let mut pricing_calls = 0usize;
     if crate::dump::on("header") {
         let fixed: Vec<usize> = (0..p.n + p.m).filter(|&j| s.is_fixed(j)).collect();
         crate::dump::emit("header", serde_json::json!({"n": p.n, "m": p.m, "fixed": fixed}));
@@ -1462,14 +1461,14 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             None if opts.faithful_ftran && s.mirror.is_some() => std::mem::replace(&mut refactor_next, false),
             None => s.factor.num_updates() >= opts.max_updates,
         };
-        let w_check = s.work.w;
+        // The reference's check reads `W` at the end of the iteration (right after `trig()`), before this update's own work.
+        let mut pending_upd: Vec<(u32, f64, f64)> = Vec::new();
+        let mut chk: Option<(bool, usize, usize)> = None;
         let upd_work = std::mem::take(&mut s.upd_work);
         if due {
             s.refactor()?;
         } else {
-            for (site, est, scale) in upd_work {
-                s.work.add(site, est, scale);
-            }
+            pending_upd = upd_work;
         }
         // The reference makes this check after the ratio test, and not at all for a bound flip: `check_state` takes it back.
         let mut check_state = None;
@@ -1477,10 +1476,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             if let Some(mi) = s.mirror.as_ref() {
                 let nnz_a: usize = p.cols[..p.n].iter().map(Vec::len).sum();
                 check_state = Some(s.work.decision_state());
-                refactor_next = mi.refactor_due() || s.work.clause(mi.updates(), nnz_a, w_check);
-                if refactor_next {
-                    s.work.decided(w_check);
-                }
+                chk = Some((mi.refactor_due(), mi.updates(), nnz_a));
             }
         }
         // The reference's primal update of the last pivot (`0x105f20`, site `0x107b57`): a pass over the FTRAN result, which
@@ -1547,7 +1543,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         if crate::dump::on("pricing") {
             crate::dump::emit("pricing", serde_json::json!({"n": PRC.load(std::sync::atomic::Ordering::Relaxed), "iter": iterations, "infeasible": infeasible, "list": s.list, "basic": s.basic, "d": s.d, "w": s.w, "x": s.x}));
         }
-        pricing_calls += 1; PRC.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        PRC.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let q = if infeasible {
             match s.price_faithful() {
                 Some(q) => q,
@@ -1718,6 +1714,9 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         s.x[q] += dir * step;
         let Some(k) = chosen else {
             // Bound flip: the entering variable travels to its opposite bound.
+            for (site, est, scale) in std::mem::take(&mut pending_upd) {
+                s.work.add(site, est, scale);
+            }
             if let Some(st) = check_state {
                 refactor_next = false;
                 s.work.restore_decision(st);
@@ -1971,6 +1970,16 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         }
         s.d[leave] -= leave_penalty;
         s.work.trig();
+        if let Some((d, u, na)) = chk {
+            let w_now = s.work.w;
+            refactor_next = d || s.work.clause(u, na, w_now);
+            if refactor_next {
+                s.work.decided(w_now);
+            }
+        }
+        for (site, est, scale) in std::mem::take(&mut pending_upd) {
+            s.work.add(site, est, scale);
+        }
         if opts.record_trace {
             trace.push(TraceEvent { iteration: iterations, entering: q, leaving: Some(leave), position: Some(r), step });
         }
