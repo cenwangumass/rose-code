@@ -779,6 +779,11 @@ impl RefStruct {
         self.sum_alpha
     }
 
+    /// The update limit `max(20, floor(m^0.7))`.
+    pub fn max_updates(&self) -> usize {
+        ((self.m as f64).powf(0.7) as usize).max(20)
+    }
+
     pub fn refactor_due(&self) -> bool {
         let m = self.m as f64;
         let maxupd = (m.powf(0.7) as usize).max(20);

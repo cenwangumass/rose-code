@@ -482,6 +482,8 @@ struct Solver<'a> {
     upd_work: Vec<(u32, f64, f64)>,
     /// State of the `pricing0` option (`None` when it is off or after the switch to Devex pricing).
     p0: Option<P0>,
+    /// Set by `price0` when the scan found nothing after many updates: refactorize and price again.
+    want_refactor: bool,
     /// Counters of the method decision (`crate::method`).
     sw: crate::method::Method,
 }
@@ -1421,10 +1423,17 @@ impl<'a> Solver<'a> {
         let start = p0.pos;
         let (mut i, mut cnt, mut best, mut q): (usize, usize, f64, Option<(usize, f64)>) = (start, 0, 0.0, None);
         let mut marked = vec![false; nm];
+        // Work of the reference's scan (`0xfdef9`): 2 per entry visited, and per candidate 6 plus 2 per column entry of a structural.
+        let mut scan_est = 0.0f64;
         if start < m {
             loop {
                 let j = p0.list[i];
+                scan_est += 2.0;
                 if self.p0_eligible(j) {
+                    scan_est += 6.0;
+                    if j < self.p.n {
+                        scan_est += 2.0 * self.p.cols[j].len() as f64;
+                    }
                     let (s, free) = self.p0_score(j, &p0.y, &col_off);
                     if free {
                         // A free variable is taken at once, whatever its reduced cost.
@@ -1456,6 +1465,14 @@ impl<'a> Solver<'a> {
             }
         }
         let newpos = i + 1 - cnt;
+        if self.mirror.is_some() {
+            if cnt != 0 {
+                scan_est += 4.0 * cnt as f64;
+            }
+            if scan_est != 0.0 {
+                self.work.add(0xfdef9, scan_est, crate::work::CTX);
+            }
+        }
         // Gather the counted entries into the last `cnt` positions of the window, in place.
         let mut h = start;
         let mut t = newpos;
@@ -1502,6 +1519,12 @@ impl<'a> Solver<'a> {
         let mut q = self.p0_scan();
         dump(self, "out", q);
         self.p0.as_mut().unwrap().calls += 1;
+        if q.is_none() && self.mirror.as_ref().is_some_and(|mi| 5 * mi.updates() > 4 * mi.max_updates()) {
+            // The reference does not recompute the duals when the scan finds nothing after many updates (`0x1445ad`: five times
+            // the updates above four times the limit): it sets the refactorization state 9 and prices again on the new factor.
+            self.want_refactor = true;
+            return None;
+        }
         if q.is_none() {
             // Nothing in the window and the list: recompute the duals and rebuild, then scan once more.
             self.recomputed = true;
@@ -2088,6 +2111,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         y_ref: None,
         y_rank: Vec::new(),
         unsnapped: Default::default(),
+        want_refactor: false,
         dst: vec![0.0; p.n + p.m],
         rhs_shift: Vec::new(),
         mirror: None,
@@ -2139,15 +2163,15 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     for (site, est) in lu_work {
         s.work.add(site, est, crate::work::CTX);
     }
+    if opts.pricing0 {
+        assert!(s.mirror.is_some(), "pricing0 needs faithful_ftran and faithful_positions");
+        s.p0 = Some(P0 { list: Vec::new(), pos: 0, dstore: vec![0.0; n + m], y: Vec::new(), pending: None, tol: P0_DTOL, rebuild: true, calls: 0, window: P0_WINDOW });
+    }
     s.work.factor_done();
     s.recompute_primal();
     s.primal_full_work();
     s.dual_btran_work();
     s.recompute_dual();
-    if opts.pricing0 {
-        assert!(s.mirror.is_some(), "pricing0 needs faithful_ftran and faithful_positions");
-        s.p0 = Some(P0 { list: Vec::new(), pos: 0, dstore: vec![0.0; n + m], y: Vec::new(), pending: None, tol: P0_DTOL, rebuild: true, calls: 0, window: P0_WINDOW });
-    }
     let mut trace = Vec::new();
     let mut iterations = 0usize;
     // Pricing passes of the main loop, the call index of the `pricing` dump.
@@ -2264,7 +2288,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             }
             // The reference's primal update of the last pivot still runs the phase 1 cost-change pass on the iteration that ends
             // phase 1 (its work counts toward the refactorization clause).
-            if s.mirror.is_some() && !due {
+            if s.mirror.is_some() && !due && s.p0.is_none() {
                 if let (Some(lp), false) = (&last, dc.is_empty()) {
                     s.cost_change_work(&dc, lp.q, lp.leave, lp.alpha_rq, q_only);
                 }
@@ -2306,6 +2330,12 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         } else {
             match if s.p0.is_some() { s.price0() } else { s.price_admitting() } {
                 Some(q) => q,
+                None if std::mem::take(&mut s.want_refactor) => {
+                    s.work.trig();
+                    s.work.decided(s.work.w);
+                    refactor_next = true;
+                    continue;
+                }
                 None => {
                     // The reference recomputes the duals once more when the scan finds nothing (`0x145520`, with the residual check).
                     if s.mirror.is_some() && !s.recomputed {
