@@ -900,23 +900,18 @@ impl<'a> Solver<'a> {
     /// Work of the reference's dual recomputation after a factorization (`0x108d70`): a BTRAN of the dense vector of basic costs,
     /// with the phase 1 penalty on the infeasible ones.
     fn dual_btran_work(&mut self) {
-        let Some(mi) = self.mirror.as_mut() else { return };
+        if self.mirror.is_none() {
+            return;
+        }
         let p = self.p;
-        let tol = self.opts.feasibility_tol;
+        // The classes come from the distance array (`dst`), as in the reference's pricing0 rebuild (`0xfb790`).
+        let sg = self.sig();
+        let mi = self.mirror.as_mut().unwrap();
         let inp: Vec<(usize, f64)> = self
             .basic
             .iter()
             .enumerate()
-            .map(|(pos, &j)| {
-                let inf = if !is_inf(p.lo[j]) && self.x[j] < p.lo[j] - tol {
-                    -1.0
-                } else if !is_inf(p.up[j]) && self.x[j] > p.up[j] + tol {
-                    1.0
-                } else {
-                    0.0
-                };
-                (pos, p.cost[j] + PHASE1_M * inf)
-            })
+            .map(|(pos, &j)| (pos, p.cost[j] + PHASE1_M * f64::from(sg[pos])))
             .filter(|e| e.1 != 0.0)
             .collect();
         let out = mi.btran(&inp, false, true);
