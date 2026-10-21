@@ -15,6 +15,8 @@ pub struct RefStruct {
     kind: Vec<i64>,
     nuc: Vec<usize>,
     i21: usize,
+    /// The reference's upper bound `[L+0xe8]` on the position of a tail column without entries, scanned downward at updates.
+    mark: usize,
     a: Vec<Vec<usize>>,
     b: Vec<Vec<usize>>,
     lcols: Vec<Vec<usize>>,
@@ -56,6 +58,8 @@ pub struct RefStruct {
     /// Only the parity of `fill` matters: it decides the alignment of the next eta's value array.
     fill: usize,
     row_cap: Vec<usize>,
+    /// The reference's row-wise copy: for each row, the tail columns whose A or B list holds it, in insertion order.
+    rowl: Vec<Vec<usize>>,
     /// Alignment of the scratch eta behind each new diagonal (`ctx+0x1d0`): its value array sits `4 m` bytes after the index array in
     /// an arena whose offsets add `24 maxupd + 8 (m + ncols) + 8`, so the parity is `(maxupd + ncols + 1) % 2` whatever `m` is.
     scratch_peel: usize,
@@ -254,7 +258,8 @@ impl RefStruct {
             bv.sort_unstable_by_key(|&x| std::cmp::Reverse(kind[x]));
             sa += av.len();
             sb += bv.len();
-            a[t] = av;
+            // The reference lists the fresh tail column's A entries in descending order.
+            a[t] = av.into_iter().rev().collect();
             b[t] = bv;
             uc[t] = ents;
         }
@@ -295,6 +300,7 @@ impl RefStruct {
         let nnz_l_tot: usize = lcols.iter().map(|c| c.len()).sum();
         let perm = step;
         let znz = (nnz + sa + sb + 2 * m) as f64;
+        let mark0 = (i21..m).rev().find(|&t| kind[t] == -2 && a[t].is_empty() && b[t].is_empty()).unwrap_or(i21.min(m - 1));
         RefStruct {
             upd: 0,
             sum_alpha: 0.0,
@@ -308,6 +314,35 @@ impl RefStruct {
             work: 0.0,
             scratch_peel: ((m as f64).powf(0.7) as usize).max(20).wrapping_add(ncols + 1) % 2,
             fill: 2 * (uc.iter().map(Vec::len).sum::<usize>() + nnz_l_tot),
+            // A row lists its tail columns in the order of the factorization's U row (Markowitz steps), or in the order of the
+            // basis columns for a row of the singleton phases.
+            rowl: {
+                let mut member = vec![Vec::new(); m];
+                for t in i21..m {
+                    if kind[t] == -2 {
+                        for &y in a[t].iter().chain(b[t].iter()) {
+                            member[y].push(t);
+                        }
+                    }
+                }
+                let mut pos_of_col = vec![usize::MAX; m];
+                for (t, &(_, c)) in st.pivots.iter().enumerate() {
+                    pos_of_col[c] = t;
+                }
+                let mut rl = vec![Vec::new(); m];
+                for y in 0..m {
+                    if member[y].is_empty() {
+                        continue;
+                    }
+                    let order: Vec<usize> = if st.u_rows[y].is_empty() {
+                        (0..m).filter(|&c| pos_of_col[c] != usize::MAX).map(|c| pos_of_col[c]).collect()
+                    } else {
+                        st.u_rows[y].iter().map(|&(c, _)| pos_of_col[c]).collect()
+                    };
+                    rl[y] = order.into_iter().filter(|t| member[y].contains(t)).collect();
+                }
+                rl
+            },
             row_cap: {
                 let mut c = vec![0usize; m];
                 for col in &uc {
@@ -329,6 +364,7 @@ impl RefStruct {
             kind,
             nuc,
             i21,
+            mark: mark0,
             a,
             b,
             lcols,
@@ -1457,10 +1493,12 @@ impl RefStruct {
         if crate::dump::on("fstruct") {
             static CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
             let n = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            crate::dump::emit("fstruct", serde_json::json!({"n": n, "m": m, "i3": self.nuc.len(), "i21": self.i21, "kind": self.kind, "nuc": self.nuc, "seqA": self.slot, "fill": self.fill, "diag": self.diag, "uvals": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), (self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.0).collect::<Vec<_>>(), self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.1).collect::<Vec<_>>()))).collect::<std::collections::BTreeMap<_, _>>(), "cols": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), [&self.a[k], &self.b[k]])).collect::<std::collections::BTreeMap<_, _>>()}));
+            crate::dump::emit("fstruct", serde_json::json!({"rowl": (0..m).filter(|&y| !self.rowl[y].is_empty()).map(|y| (y.to_string(), self.rowl[y].clone())).collect::<std::collections::BTreeMap<_, _>>(), "mark": self.mark, "n": n, "m": m, "i3": self.nuc.len(), "i21": self.i21, "kind": self.kind, "nuc": self.nuc, "seqA": self.slot, "fill": self.fill, "diag": self.diag, "uvals": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), (self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.0).collect::<Vec<_>>(), self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.1).collect::<Vec<_>>()))).collect::<std::collections::BTreeMap<_, _>>(), "cols": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), [&self.a[k], &self.b[k]])).collect::<std::collections::BTreeMap<_, _>>()}));
         }
         self.upd += 1;
         self.upd_work.clear();
+        // The reference's position array is read by the mark raises before it is rewritten at the end of the update.
+        let slot0 = self.slot.clone();
         // The eta is stored first, at the current pool fill; its value array sits on a 16-byte boundary when the fill is even.
         let peel = self.fill % 2;
         // The old column's entries leave the row-wise copy after the new column's entries have been added.
@@ -1473,7 +1511,7 @@ impl RefStruct {
         // A tail column leaves the row-wise copy of U entry by entry.
         if self.kind[r] == -2 && !self.uc[r].is_empty() {
             let len = self.uc[r].len();
-            self.upd_work.push((if len < k { 0xf2044 } else { 0xf207a }, 5.0 * len as f64, crate::work::CTX));
+            self.upd_work.push((if k == 0 { 0xf2521 } else if len < k { 0xf2044 } else { 0xf207a }, 5.0 * len as f64, crate::work::CTX));
         }
         self.sum_alpha += self.last_alpha as f64;
         let spike: Vec<usize> = self.spike.iter().map(|e| e.0).collect();
@@ -1499,6 +1537,23 @@ impl RefStruct {
             }
         }
         let old = self.kind[r];
+        let mut single_rows: Vec<usize> = Vec::new();
+        if old == -2 {
+            // The old column leaves the rows it appears in (`0xf1e7a`): the entries before it in each row list are passed.
+            let rows: Vec<usize> = self.a[r].iter().chain(self.b[r].iter()).copied().collect();
+            for y in rows {
+                if let Some(p) = self.rowl[y].iter().position(|&t| t == r) {
+                    if self.rowl[y].len() > 1 && p > 0 {
+                        self.upd_work.push((0xf1f82, p as f64, crate::work::CTX));
+                    }
+                    if self.rowl[y].len() == 1 {
+                        single_rows.push(y);
+                    }
+                    self.rowl[y].swap_remove(p);
+                }
+            }
+        }
+        let mut demoted_front = vec![false; m];
         let mut convslot: Option<usize> = None;
         let mut conv: Option<usize> = None;
         // The reference demotes a bare tail column only when the new column depends on the tail; with no tail entries in the spike
@@ -1517,9 +1572,44 @@ impl RefStruct {
                 }
                 for k in 0..m {
                     if self.kind[k] == -2 && self.a[k].contains(&x) {
-                        self.a[k].retain(|&y| y != x);
+                        // The last entry of A fills the hole, and the demoted column takes the slot A gives up (the front of B).
+                        let p = self.a[k].iter().position(|&y| y == x).unwrap();
+                        self.a[k].swap_remove(p);
+                        if p > 0 {
+                            self.upd_work.push((0xf3eac, p as f64, crate::work::CTX));
+                        }
                         self.b[k].insert(0, x);
+                        demoted_front[k] = true;
                     }
+                }
+            }
+        }
+        let mut xlim: i64;
+        {
+            // The reference scans the slots from the mark down to the first tail column without entries (`0xf1c60`), 3 units per
+            // slot passed, when a leaving nucleus column's spike reaches above the last nucleus slot.
+            let oldslot0 = self.slot[r] as i64;
+            let bt = self.i21 as i64 - 1;
+            let floor = bt.max(oldslot0);
+            let top = self.spike.iter().filter(|e| e.0 != r).map(|e| self.slot[e.0] as i64).max().unwrap_or(floor).max(floor);
+            xlim = bt;
+            if top == floor {
+                if bt >= oldslot0 && k > 0 {
+                    xlim = bt - 1;
+                }
+            } else if floor <= oldslot0 {
+                if oldslot0 == bt {
+                    xlim = bt - 1 + i64::from(k == 0);
+                }
+            } else {
+                let stop = convslot.map_or(floor, |c| c as i64);
+                let passed = (self.mark as i64 - stop).max(0);
+                if passed > 0 {
+                    self.upd_work.push((0xf1d02, 3.0 * passed as f64, crate::work::CTX));
+                }
+                self.mark = stop as usize;
+                if convslot.is_none() {
+                    xlim = bt - 1;
                 }
             }
         }
@@ -1589,6 +1679,12 @@ impl RefStruct {
             }
         }
         let _ = &mut tail_rebuild;
+        // A row whose only entry was the old column leaves the singleton list when its position is within the reference's limit.
+        for y in single_rows {
+            if xlim >= self.slot[y] as i64 {
+                self.upd_work.push((0xf1f37, 3.0, crate::work::CTX));
+            }
+        }
         self.kind[r] = -2;
         let keep = (old != -2 && av.is_empty()) || (old == -2 && !moved);
         // Row r of U: the tail columns that reference r (`0xf2a51`), unless the column stays in its slot.
@@ -1604,6 +1700,19 @@ impl RefStruct {
             let in_a = self.a[k].contains(&r);
             let in_b = self.b[k].contains(&r);
             if in_a || in_b {
+                // The reference scans the lists from their start for `r`; the booking is the number of entries passed.
+                let pa = self.a[k].iter().position(|&y| y == r).unwrap_or(0);
+                let pb = self.b[k].iter().position(|&y| y == r).unwrap_or(0).saturating_sub(usize::from(demoted_front[k]));
+                let (site, units) = if keep {
+                    (0xf4073, if old != -2 && in_b { pb } else { 0 })
+                } else if in_a {
+                    (0xf2969, pa)
+                } else {
+                    (0xf3f71, pb)
+                };
+                if units > 0 {
+                    self.upd_work.push((site, units as f64, crate::work::CTX));
+                }
                 if keep {
                     if !in_a {
                         self.a[k].push(r);
@@ -1624,8 +1733,15 @@ impl RefStruct {
                     }
                     self.uc[k].retain(|e| e.0 != r);
                     elim.push(k);
+                    // A column left without entries raises the mark to its slot (`0xf29d5`).
+                    if self.a[k].is_empty() && self.b[k].is_empty() {
+                        self.mark = self.mark.max(slot0[k]);
+                    }
                 }
             }
+        }
+        if !keep {
+            self.rowl[r].clear();
         }
         let mut newdiag = spk[r];
         if !elim.is_empty() && !eta_cand.is_empty() {
@@ -1647,6 +1763,10 @@ impl RefStruct {
             let esz = ind.len();
             self.etas.push(Eta { idx: r, ind, val, peel });
             self.fill += esz;
+        }
+        if k == 0 {
+            // A new column without entries is a candidate for the scan (`0xf2e58`).
+            self.mark = self.mark.max(slot0[r]);
         }
         if k > 0 {
             self.upd_work.push((0xf2e3c, 5.0 * k as f64, crate::work::CTX));
@@ -1687,6 +1807,9 @@ impl RefStruct {
         self.a[r] = av;
         let mut bb = bv;
         bb.reverse();
+        for &y in self.a[r].iter().chain(bb.iter()) {
+            self.rowl[y].push(r);
+        }
         self.b[r] = bb;
     }
 }
