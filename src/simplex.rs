@@ -1275,20 +1275,22 @@ impl<'a> Solver<'a> {
     }
 }
 
-/// Bucket key of the `pricing0` candidate list (`0xfecb0`): the binary exponent of `|s|` (clamped to -15..=34), above 0x41 for an
-/// attractive (negative) score and mirrored below it for the others.
+/// Bucket key of the `pricing0` candidate list (the sort routine `0xfffc0`, called by `0xfecb0` when `P+0x80 == 1`, as on every
+/// corpus model): the binary exponent `k` of `|s|` (`frexp`), clamped to -25..=25 (25 at `|s| >= 2^25`, -25 below 2^-25 plus an ulp);
+/// the key is `0x4b + k` for an attractive (negative) score and `0x19 - k` for the others, so a score of 2^24 or more ranks with
+/// the basic and fixed variables (key 0).
 fn p0_key(s: f64) -> usize {
-    const HI: f64 = f64::from_bits(0x420fffd2ef000000);
-    const LO: f64 = f64::from_bits(0x3f00000010_7e1fe9);
+    const HI: f64 = 33554432.0; // 2^25
+    const LO: f64 = f64::from_bits(0x3e60000000000001);
     let a = s.abs();
     let k: i32 = if a >= HI {
-        34
+        25
     } else if a < LO {
-        -15
+        -25
     } else {
         ((a.to_bits() >> 52) & 0x7ff) as i32 - 1022
     };
-    (if s < 0.0 { k + 0x41 } else { 0x23 - k }) as usize
+    (if s < 0.0 { k + 0x4b } else { 0x19 - k }) as usize
 }
 
 /// Initial window of the `pricing0` scan: it ends at the first position more than this many past its start once a candidate was counted (`P+0x50`).

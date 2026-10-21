@@ -84,6 +84,13 @@ fn blend_release_matches_the_reference() {
     check("blend");
 }
 
+/// BORE3D: 101 decisions (phase 1 first, no switch). The candidate list's key is the one of the sort routine `0xfffc0`
+/// (exponent clamped to -25..=25, key `0x19 - k` for the non-attractive), which puts scores of 2^24 and more with the basic variables.
+#[test]
+fn bore3d_release_matches_the_reference() {
+    check("bore3d");
+}
+
 /// The scale factors against the reference's (`replay/gdb_scale_factors.py`, captured by `compare.py scale`; skipped where a
 /// capture is missing, as the captures are not under version control).
 #[test]
