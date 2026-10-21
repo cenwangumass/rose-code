@@ -711,7 +711,15 @@ impl<'a> Solver<'a> {
                 "snap_degenerate": before.snap_degenerate, "snap_iters": before.snap_iters, "avg": avg, "l_total": inp.l_total, "u_total": inp.u_total, "switch": switch}));
         }
         if switch {
+            // The switch books the Devex initialization (`0x142c4c`: `3 (n + m)`; `0x132d88`: `2 nnz(A)`), then the reference runs the Devex
+            // factorization handling too: the primal update's `x_B` pass (`0x107b57`) and the reduced-cost pass (`0x1021b0`), on top of the
+            // `pricing0` handling already booked.
+            let nnz_a: usize = (0..self.p.n).map(|j| self.p.cols[j].len()).sum();
+            self.work.add(0x142c4c, 3.0 * (self.p.n + self.p.m) as f64, crate::work::CTX);
+            self.work.add(0x132d88, 2.0 * nnz_a as f64, crate::work::CTX);
             self.p0 = None;
+            self.primal_full_work();
+            self.reduced_cost_work();
             self.reset_weights();
             self.list.clear();
             self.level = 0;
@@ -889,10 +897,15 @@ impl<'a> Solver<'a> {
         if self.cleanup || self.p0.is_some() {
             return;
         }
-        let n = p.n;
-        let cols: usize = (0..n).filter(|&j| self.pos_of[j] == NONE && !self.is_fixed(j)).map(|j| p.cols[j].len()).sum();
-        self.work.add(0x1021b0, 3.0 * (n + p.m + cols) as f64, crate::work::CTX);
+        self.reduced_cost_work();
         self.residual_check_work();
+    }
+
+    /// Work of the reduced-cost pass after the duals (`0x1020a0`, site `0x1021b0`).
+    fn reduced_cost_work(&mut self) {
+        let p = self.p;
+        let cols: usize = (0..p.n).filter(|&j| self.pos_of[j] == NONE && !self.is_fixed(j)).map(|j| p.cols[j].len()).sum();
+        self.work.add(0x1021b0, 3.0 * (p.n + p.m + cols) as f64, crate::work::CTX);
     }
 
     fn recompute_primal(&mut self) {
