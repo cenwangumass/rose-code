@@ -19,6 +19,9 @@ pub struct Structure {
     pub l_rows: Vec<Vec<usize>>,
     /// L multipliers matching `l_rows` and the pivot value of each step.
     pub l_vals: Vec<Vec<f64>>,
+    /// The column entries before the division by the pivot, for the singleton-phase steps; NaN where not known (pair
+    /// overrides, nucleus steps).
+    pub l_raw: Vec<Vec<f64>>,
     pub diag: Vec<f64>,
     /// Pivot-row entries `(basis position, value)` of the Markowitz steps (empty for singleton steps).
     pub u_rows: Vec<Vec<(usize, f64)>>,
@@ -52,6 +55,7 @@ pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Stru
     }
     let mut l_rows: Vec<Vec<usize>> = Vec::with_capacity(seq.len());
     let mut l_vals: Vec<Vec<f64>> = Vec::with_capacity(seq.len());
+    let mut l_raw: Vec<Vec<f64>> = Vec::with_capacity(seq.len());
     let mut diag: Vec<f64> = Vec::with_capacity(seq.len());
     let mut u_rows: Vec<Vec<(usize, f64)>> = Vec::with_capacity(seq.len());
     for (s, &(prow, c)) in seq.iter().enumerate().take(nsing) {
@@ -59,6 +63,7 @@ pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Stru
         let pv = val[idx.iter().position(|&i| i == prow).unwrap()];
         l_rows.push(idx.iter().copied().filter(|&i| step[i] > s).collect());
         l_vals.push(idx.iter().zip(val).filter(|(&i, _)| step[i] > s).map(|(_, &x)| x / pv).collect());
+        l_raw.push(idx.iter().zip(val).filter(|(&i, _)| step[i] > s).map(|(_, &x)| x).collect());
         diag.push(pv);
         u_rows.push(Vec::new());
     }
@@ -67,13 +72,15 @@ pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Stru
     }
     for (s, (r, v)) in ov.l {
         l_rows[s] = r;
+        l_raw[s] = vec![f64::NAN; v.len()];
         l_vals[s] = v;
     }
     l_rows.extend(nl);
+    l_raw.extend(nv.iter().map(|v| vec![f64::NAN; v.len()]));
     l_vals.extend(nv);
     diag.extend(npiv);
     u_rows.extend(nu);
-    Structure { pivots: seq, phase, l_rows, l_vals, diag, u_rows, nuc_nnz, nuc_work }
+    Structure { pivots: seq, phase, l_rows, l_vals, l_raw, diag, u_rows, nuc_nnz, nuc_work }
 }
 
 impl Structure {

@@ -205,14 +205,19 @@ impl RefStruct {
                     continue;
                 }
                 let x = xv[v];
-                if x == 0.0 {
+                // Noise at or below the tolerance does not propagate (a cancellation residue of 1.2e-13 made PEROLD's tail
+                // column 600 carry a spurious entry).
+                if x == 0.0 || x.abs() <= TOL {
                     continue;
                 }
                 for (e, &y) in lcols[v].iter().enumerate() {
                     if y > t {
                         continue;
                     }
-                    xv[y] -= lvals[v][e] * x;
+                    // A singleton-phase column subtracts `(x * a) / d` with the raw entry `a`, not `x * (a / d)`; the
+                    // multiplier is the only form known for pair overrides and nucleus columns.
+                    let a = st.l_raw[v][e];
+                    xv[y] -= if a.is_nan() { lvals[v][e] * x } else { (x * a) / st.diag[v] };
                 }
             }
             let mut ents: Vec<(usize, f64)> = Vec::new();
