@@ -283,7 +283,7 @@ impl RefStruct {
                 }
                 let maxlev = lev.iter().copied().max().unwrap_or(0);
                 lev_dense_ft = (maxlev as f64) >= 0.1 * m as f64;
-                lev_dense = lev_dense_ft && outer;
+                lev_dense = lev_dense_ft;
                 if !lev_dense_ft && outer { Some(lev) } else { None }
             } else {
                 None
