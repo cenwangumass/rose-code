@@ -1150,6 +1150,11 @@ impl RefStruct {
         2.0 * self.spike.len() as f64
     }
 
+    /// The dual recomputation's BTRAN leaves no pending FTRAN spike (`0xf461f` is not booked for it at the next refactor).
+    pub fn clear_spike(&mut self) {
+        self.spike.clear();
+    }
+
     /// Whether the fresh factor's L solve goes level by level (`0x12a990`).
     pub fn has_levels(&self) -> bool {
         self.lev_built

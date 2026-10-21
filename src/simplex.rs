@@ -352,6 +352,8 @@ struct Solver<'a> {
     /// Whether basic variables are infeasible (`ctx+0x2d0 != 0`): the list update and the pricing scan then take the dual
     /// tolerance `P[0x3c0] * P[0]` = `1e-7 * 1e6` instead of the plain one.
     p1_tol_on: bool,
+    /// Whether the last pricing call recomputed the duals (the list scan failed).
+    recomputed: bool,
     /// The pivot row and `extra` of the last list update from the pivot step (`0x1442ab`), which `0x107e14` repeats.
     last_upd: Option<(Vec<usize>, usize)>,
     /// The pivot row's values (`arj`) of that update, and the row being built for the next one.
@@ -480,6 +482,16 @@ impl<'a> Solver<'a> {
         Ok(())
     }
 
+    /// The reference's residual check (`0x145a36` in `0x145520`): after the duals are recomputed, when no basic variable is
+    /// infeasible and the factorization count is 4 modulo 5, it books `(rows + 2 * sum(len + 1 over basic structurals)) * c` for the pass that forms their reduced costs.
+    fn residual_check_work(&mut self) {
+        if self.mirror.is_none() || self.refactorizations % 5 != 4 || self.has_infeasible_basic() {
+            return;
+        }
+        let nnz: usize = self.basic.iter().filter(|&&j| j < self.p.n).map(|&j| self.p.cols[j].len() + 1).sum();
+        self.work.add(0x145a36, (self.p.m + 2 * nnz) as f64, crate::work::CTX);
+    }
+
     /// Work of the reference's primal update (`0x105f20`, site `0x107b57`) when it recomputes `x_B` after a factorization:
     /// copies and scans of length `m`, the columns of the nonbasic structurals away from zero, and every fifth time an extra copy.
     fn primal_full_work(&mut self) {
@@ -606,6 +618,7 @@ impl<'a> Solver<'a> {
             .filter(|e| e.1 != 0.0)
             .collect();
         let out = mi.btran(&inp, false, true);
+        mi.clear_spike();
         if crate::dump::on("dual") {
             crate::dump::emit("dual", serde_json::json!({"refactor": self.refactorizations, "out": crate::dump::sparse(&out)}));
         }
@@ -620,6 +633,7 @@ impl<'a> Solver<'a> {
         let n = p.n;
         let cols: usize = (0..n).filter(|&j| self.pos_of[j] == NONE && !self.is_fixed(j)).map(|j| p.cols[j].len()).sum();
         self.work.add(0x1021b0, 3.0 * (n + p.m + cols) as f64, crate::work::CTX);
+        self.residual_check_work();
     }
 
     fn recompute_primal(&mut self) {
@@ -851,9 +865,11 @@ impl<'a> Solver<'a> {
     /// (no pivot) and the list is rebuilt by the next pass.
     fn price_faithful(&mut self) -> Option<usize> {
         self.list_failed = false;
+        self.recomputed = false;
         let q = self.price();
         if q.is_none() && self.list_failed {
             self.list_failed = false;
+            self.recomputed = true;
             self.dual_btran_work();
             self.recompute_dual();
             self.list.clear();
@@ -1472,6 +1488,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         work: crate::work::Work::default(),
         last_pivot: None,
         p1_tol_on: false,
+        recomputed: false,
         last_upd: None,
         last_row: Vec::new(),
         pending_row: None,
@@ -1657,6 +1674,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             match s.price_faithful() {
                 Some(q) => q,
                 None => {
+                    // The reference recomputes the duals once more when the scan finds nothing (`0x145520`, with the residual check).
+                    if s.mirror.is_some() && !s.recomputed {
+                        s.dual_btran_work();
+                    }
                     // Before declaring optimality, rebuild the basic solution from a fresh factorization: drift in the updated
                     // values can hide a bound violation just above the tolerance.
                     if s.factor.num_updates() > 0 {
