@@ -12,6 +12,8 @@ pub const FAC: f64 = 1.3;
 
 pub struct Work {
     pub w: f64,
+    /// Increments are dropped while set (the solution read-out after the last factorization).
+    pub mute: bool,
     /// `W` at the refactorization check that last decided to refactorize (`ctx+0x150`); zero before the first.
     w150: f64,
     /// Whether a check has decided to refactorize yet. The reference's `w150 > 0` holds after the setup work (not modelled in
@@ -26,13 +28,16 @@ pub struct Work {
 
 impl Default for Work {
     fn default() -> Self {
-        Work { w: 0.0, w150: 0.0, decided_once: false, w158: 0.0, fac_cost: 0.0, log: std::env::var_os("ROSE_WORK").is_some() }
+        Work { mute: false, w: 0.0, w150: 0.0, decided_once: false, w158: 0.0, fac_cost: 0.0, log: std::env::var_os("ROSE_WORK").is_some() }
     }
 }
 
 impl Work {
     /// `W = est * scale + W`, in the reference's operation order.
     pub fn add(&mut self, site: u32, est: f64, scale: f64) {
+        if self.mute {
+            return;
+        }
         let d = est * scale;
         self.w = d + self.w;
         if self.log {
@@ -42,6 +47,9 @@ impl Work {
 
     /// As `add`, for a shared routine (solve wrapper, row product) whose increment is told apart by its call site.
     pub fn add_from(&mut self, site: u32, caller: u32, est: f64, scale: f64) {
+        if self.mute {
+            return;
+        }
         let d = est * scale;
         self.w = d + self.w;
         if self.log {

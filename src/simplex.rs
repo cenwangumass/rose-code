@@ -354,6 +354,11 @@ struct Solver<'a> {
     p1_tol_on: bool,
     /// Whether the last pricing call recomputed the duals (the list scan failed).
     recomputed: bool,
+    /// The scan that follows a recomputation of the duals: the reference's recomputation already covered it, so a scan that finds nothing is not booked.
+    rescan: bool,
+    /// The final factorization of a solve that ended with right-hand-side shifts: the reference removes the shifts in a dual clean-up pass
+    /// that factorizes the basis in ascending index order (`0xf6a00`), instead of refactorizing in pivot order.
+    cleanup: bool,
     /// The pivot row and `extra` of the last list update from the pivot step (`0x1442ab`), which `0x107e14` repeats.
     last_upd: Option<(Vec<usize>, usize)>,
     /// The pivot row's values (`arj`) of that update, and the row being built for the next one.
@@ -429,13 +434,14 @@ impl<'a> Solver<'a> {
 
     /// Basis positions after a refactorization: the order of the reference LU's pivot steps (`crate::lu_order`, recovered in
     /// `reverse-engineer/specs/lu-factor.md`), applied to the basis in its previous position order.
-    fn reference_order(&self) -> (Vec<usize>, crate::lu_order::Structure, Vec<(bool, Vec<usize>, Vec<f64>)>) {
+    fn reference_order(&self, fac_no: usize) -> (Vec<usize>, crate::lu_order::Structure, Vec<(bool, Vec<usize>, Vec<f64>)>) {
         let n = self.p.n;
         let cols: Vec<(bool, Vec<usize>, Vec<f64>)> = self
             .basic
             .iter()
             .map(|&v| (v >= n, self.p.fcols[v].iter().map(|&(r, _)| r).collect(), self.p.fcols[v].iter().map(|&(_, a)| a).collect()))
             .collect();
+        crate::lu_order::set_factorization_number(fac_no);
         let st = crate::lu_order::factor_structure(self.p.m, &cols);
         let order = st.pivots.iter().map(|&(_, pos)| self.basic[pos]).collect();
         (order, st, cols)
@@ -443,7 +449,10 @@ impl<'a> Solver<'a> {
 
     fn refactor(&mut self) -> Result<(), SolveError> {
         if self.opts.faithful_positions {
-            let (order, st, rows) = self.reference_order();
+            if self.cleanup {
+                self.basic.sort_unstable();
+            }
+            let (order, st, rows) = self.reference_order(self.refactorizations + 1);
             crate::dump::emit("luin", serde_json::json!({"n": self.refactorizations, "cols": self.basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "phase": st.phase}));
             debug_assert_eq!(order.len(), self.basic.len());
             for (pos, &j) in order.iter().enumerate() {
@@ -452,7 +461,7 @@ impl<'a> Solver<'a> {
             self.basic = order;
             if self.opts.faithful_ftran {
                 if let Some(old) = self.mirror.as_ref() {
-                    let est = old.discard_work();
+                    let est = if self.cleanup { old.discard_work_unused() } else { old.discard_work() };
                     if est > 0.0 {
                         self.work.add(0xf461f, est, crate::work::CTX);
                     }
@@ -463,11 +472,23 @@ impl<'a> Solver<'a> {
                     crate::dump::emit("luout", serde_json::json!({"n": self.refactorizations, "diag": diag, "l": l}));
                 }
                 let lu = st.work(&rows, mi.has_levels());
+                if self.cleanup {
+                    // The clean-up pass's setup (`0xe84b9`): two units per nonzero of the constraint matrix; the dual simplex install of the
+                    // factor then books `3 m` (`0xf48ae`), `nnz(U)` (`0x1327dc`) and `3 m` (`0x1329c1`) at the factor object's scale.
+                    let nnz_a: usize = (0..self.p.n).map(|j| self.p.cols[j].len()).sum();
+                    self.work.add(0xe84b9, 2.0 * nnz_a as f64, crate::work::CTX);
+                }
                 self.work.factor_driver(&lu, crate::work::CTX);
                 for (site, est) in lu.into_iter().chain(mi.fresh_work()) {
                     self.work.add(site, est, crate::work::CTX);
                 }
                 self.work.factor_done();
+                if self.cleanup {
+                    let m = self.p.m as f64;
+                    self.work.add(0xf48ae, 3.0 * m, crate::work::FAC);
+                    self.work.add(0x1327dc, mi.u_nnz() as f64, crate::work::FAC);
+                    self.work.add(0x1329c1, 3.0 * m, crate::work::FAC);
+                }
                 self.mirror = Some(mi);
             }
         }
@@ -476,10 +497,28 @@ impl<'a> Solver<'a> {
         self.refactorizations += 1;
         self.list.clear();
         self.recompute_primal();
-        self.primal_full_work();
-        self.dual_btran_work();
+        if self.cleanup {
+            self.cleanup_work();
+        } else {
+            self.primal_full_work();
+            self.dual_btran_work();
+        }
         self.recompute_dual();
         Ok(())
+    }
+
+    /// The dual clean-up pass that follows a primal optimum with shifts (`0xf6a00`), after its factorization and the recomputation of the duals:
+    /// the pricing setup (`0xe7000`, `3 m + 3.5 n`) and the final solution handling (`0xc362f`, `0xc1fe3`, `0xbf981`, `0xcd191`).
+    /// Not modelled: `0xc142b`, `(4 m + 2 r) c` with `r` the length of a sparse vector in the update routine `0xc0050` (43, 0, 420, 517, 0 on
+    /// BOEING2, DEGEN2, PILOT4, PEROLD, DEGEN3).
+    fn cleanup_work(&mut self) {
+        let (m, n) = (self.p.m as f64, self.p.n as f64);
+        self.dual_btran_work();
+        self.work.add(0xe7000, 3.0 * m + 3.5 * n, crate::work::CTX);
+        self.work.add(0xc362f, m, crate::work::CTX);
+        self.work.add(0xc1fe3, 5.0 * m, crate::work::CTX);
+        self.work.add(0xbf981, 2.0 * (n + m), crate::work::CTX);
+        self.work.add(0xcd191, 2.0 * m, crate::work::CTX);
     }
 
     /// The reference's residual check (`0x145a36` in `0x145520`): after the duals are recomputed, when no basic variable is
@@ -618,11 +657,11 @@ impl<'a> Solver<'a> {
             .filter(|e| e.1 != 0.0)
             .collect();
         let out = mi.btran(&inp, false, true);
-        mi.clear_spike();
         if crate::dump::on("dual") {
             crate::dump::emit("dual", serde_json::json!({"refactor": self.refactorizations, "out": crate::dump::sparse(&out)}));
         }
-        self.work.add_from(0x12de50, 0x109289, mi.work, crate::work::FAC);
+        let caller = if self.cleanup { 0xe53a7 } else { 0x109289 };
+        self.work.add_from(0x12de50, caller, mi.work, crate::work::FAC);
         let mut y = vec![0.0; p.m];
         for &(i, v) in &out {
             y[i] = v;
@@ -630,6 +669,9 @@ impl<'a> Solver<'a> {
         self.y_ref = Some(y);
         // The reduced costs that follow (`0x1020a0`, site `0x1021b0`): a pass over all variables and the columns of the
         // nonbasic structurals that are not fixed.
+        if self.cleanup {
+            return;
+        }
         let n = p.n;
         let cols: usize = (0..n).filter(|&j| self.pos_of[j] == NONE && !self.is_fixed(j)).map(|j| p.cols[j].len()).sum();
         self.work.add(0x1021b0, 3.0 * (n + p.m + cols) as f64, crate::work::CTX);
@@ -654,7 +696,14 @@ impl<'a> Solver<'a> {
             }
         }
         if let Some(mi) = self.mirror.as_ref() {
-            let est = mi.ftran_dense_work(&r);
+            // The clean-up pass solves for the unshifted right-hand side.
+            let mut r0 = r.clone();
+            if self.cleanup {
+                for (ri, sh) in r0.iter_mut().zip(&self.rhs_shift) {
+                    *ri -= sh;
+                }
+            }
+            let est = mi.ftran_dense_work(&r0);
             self.work.add_from(0x1219d6, 0x120673, est, crate::work::FAC);
         }
         if let Some(mi) = self.mirror.as_mut() {
@@ -841,7 +890,10 @@ impl<'a> Solver<'a> {
         self.level = 0;
         self.list.clear();
         let nm = self.p.n + self.p.m;
-        self.work.add(0x105b2d, nm as f64 + nm as f64, crate::work::CTX);
+        let full_pass = nm as f64 + nm as f64;
+        if !self.rescan {
+            self.work.add(0x105b2d, full_pass, crate::work::CTX);
+        }
         for j in 0..nm {
             if let Some(sc) = self.score(j) {
                 if thr(self.level) < sc {
@@ -855,6 +907,9 @@ impl<'a> Solver<'a> {
             }
         }
         let best = self.best_in_list();
+        if self.rescan && best.is_some() {
+            self.work.add(0x105b2d, full_pass, crate::work::CTX);
+        }
         if !self.list.is_empty() {
             self.work.add(0x105c0c, self.scanned(best) as f64 * 4.0, crate::work::CTX);
         }
@@ -878,7 +933,10 @@ impl<'a> Solver<'a> {
                 crate::dump::emit("pricing", serde_json::json!({"n": PRC.load(std::sync::atomic::Ordering::Relaxed), "iter": 0, "infeasible": true, "list": self.list, "basic": self.basic, "d": self.d, "w": self.w, "x": self.x}));
             }
             PRC.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            return self.price();
+            self.rescan = true;
+            let q = self.price();
+            self.rescan = false;
+            return q;
         }
         q
     }
@@ -1489,6 +1547,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         last_pivot: None,
         p1_tol_on: false,
         recomputed: false,
+        rescan: false,
+        cleanup: false,
         last_upd: None,
         last_row: Vec::new(),
         pending_row: None,
@@ -1509,7 +1569,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     let mut lu_work = Vec::new();
     if opts.faithful_ftran && opts.faithful_positions {
         // The reference factorizes the starting basis before the first iteration and numbers the positions by pivot step.
-        let (order, st, rows) = s.reference_order();
+        crate::lu_order::reset_pair_gate();
+        let (order, st, rows) = s.reference_order(1);
         for (pos, &j) in order.iter().enumerate() {
             s.pos_of[j] = pos;
         }
@@ -1681,6 +1742,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                     // Before declaring optimality, rebuild the basic solution from a fresh factorization: drift in the updated
                     // values can hide a bound violation just above the tolerance.
                     if s.factor.num_updates() > 0 {
+                        s.cleanup = s.mirror.is_some() && !s.rhs_shift.is_empty();
                         s.refactor()?;
                         if s.has_infeasible_basic() {
                             continue;
@@ -2168,7 +2230,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     };
 
     if status == Status::Optimal {
+        // The solution is read from the factorization that was just built; its work was booked then.
+        s.work.mute = s.cleanup;
         s.recompute_primal();
+        s.work.mute = false;
         s.recompute_dual();
     }
     let sgn = if model.sense == Sense::Maximize { -1.0 } else { 1.0 };

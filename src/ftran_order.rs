@@ -37,6 +37,8 @@ pub struct RefStruct {
     uc: Vec<Vec<(usize, f64)>>,
     /// Spike of the most recent solve: the L stage and eta result `(position, value)` in list order.
     spike: Vec<(usize, f64)>,
+    /// Whether the column replacement has used the spike since the last FTRAN.
+    spike_used: bool,
     /// Dense x of the most recent solve after the L stage and after the row etas, for the `lstage` dump.
     lsnap: std::cell::RefCell<(Vec<f64>, Vec<f64>)>,
     /// Refactorization trigger inputs (`0x142350`): updates since the factorization, accumulated solve result counts, accumulated
@@ -382,6 +384,7 @@ impl RefStruct {
             diag: st.diag.clone(),
             uc,
             spike: Vec::new(),
+            spike_used: false,
             lsnap: Default::default(),
         }
     }
@@ -733,6 +736,7 @@ impl RefStruct {
         // The column replacement does not receive the residues.
         spike.retain(|e| e.1.abs() > TOL);
         self.spike = spike;
+        self.spike_used = false;
         self.last_alpha = out.len();
         out
     }
@@ -1150,9 +1154,15 @@ impl RefStruct {
         2.0 * self.spike.len() as f64
     }
 
-    /// The dual recomputation's BTRAN leaves no pending FTRAN spike (`0xf461f` is not booked for it at the next refactor).
-    pub fn clear_spike(&mut self) {
-        self.spike.clear();
+    /// Work of discarding the pending FTRAN spike when the clean-up pass factorizes after the last iteration: the spike counts only if no
+    /// column replacement has used it (a bound flip was the last FTRAN).
+    pub fn discard_work_unused(&self) -> f64 {
+        if self.spike_used { 0.0 } else { 2.0 * self.spike.len() as f64 }
+    }
+
+    /// `nnz(U)` of the fresh factor (the reference's `F+0xb0` pointer array total): the factor size less `nnz(L)` and the two diagonals.
+    pub fn u_nnz(&self) -> usize {
+        self.znz as usize - self.nnz_l - 2 * self.m
     }
 
     /// Whether the fresh factor's L solve goes level by level (`0x12a990`).
@@ -1847,6 +1857,7 @@ impl RefStruct {
             self.rowl[y].push(r);
         }
         self.b[r] = bb;
+        self.spike_used = true;
     }
 }
 

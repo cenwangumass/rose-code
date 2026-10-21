@@ -261,8 +261,10 @@ fn phases(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> (Vec<(usize, usize
     }
     let mut ov = crate::lu_pairs::Overrides::default();
     let loff = seq.len();
-    if m - seq.len() >= 50 && std::env::var_os("ROSE_NO_PAIRS").is_none() {
+    if pair_gate(m - seq.len()) && std::env::var_os("ROSE_NO_PAIRS").is_none() {
+        let before = seq.len();
         ov = crate::lu_pairs::run(m, cols, &mut seq, &mut phase, &row_done3, &col_done3, &row_done, &col_done);
+        pair_gate_end(seq.len() - before);
     }
     (seq, phase, ov, loff)
 }
@@ -340,6 +342,52 @@ impl Nucleus {
 
 /// `cols`: (position, entries (row, value) in column-chain order). Rows and positions are the global indices of the basis.
 type NucleusOut = (Vec<(usize, usize)>, Vec<Vec<usize>>, Vec<Vec<f64>>, Vec<f64>, Vec<Vec<(usize, f64)>>, f64);
+
+thread_local! {
+    /// Doubleton pass gate state kept across factorizations: `(ctx+0x4e0 attempts, ctx+0x4e4 gate word)`, and `ctx+0x2c0`, the number of
+    /// factorizations including the running one.
+    static PAIR_GATE: std::cell::Cell<(i64, i64)> = std::cell::Cell::new((0, 0));
+    static FAC_NO: std::cell::Cell<i64> = std::cell::Cell::new(1);
+}
+
+/// Start of a solve: the gate word starts at 0 (parameter `[env+0x2450]` neither 0 nor 1; `0x2f7e1+0x4e7`), no attempts.
+pub fn reset_pair_gate() {
+    PAIR_GATE.with(|c| c.set((0, 0)));
+    FAC_NO.with(|c| c.set(1));
+}
+
+/// `ctx+0x2c0` while the next factorization runs.
+pub fn set_factorization_number(n: usize) {
+    FAC_NO.with(|c| c.set(n as i64));
+}
+
+const GATE_ALWAYS: i64 = 2_000_000_000;
+
+/// The doubleton pass gate (`0xe08f0..0xe0990`): at least 4 rows remain and the gate word is `>= 2e9`, or `>= 0` with at least 50 rows remaining.
+/// A run counts as an attempt.
+fn pair_gate(remaining: usize) -> bool {
+    let (att, gate) = PAIR_GATE.with(|c| c.get());
+    let run = remaining >= 4 && remaining - 4 <= 0x1dcd64fc && gate >= 0 && (gate >= GATE_ALWAYS || remaining >= 50);
+    if run {
+        PAIR_GATE.with(|c| c.set((att + 1, gate)));
+    }
+    run
+}
+
+/// End of a pass that did `steps` pivots (`0xe277e`): a productive pass (>= 20 steps) raises the gate word; from the 21st factorization on the word
+/// then becomes 2e9 when `2 * word >= attempts` and -1 (pass off) otherwise.
+fn pair_gate_end(steps: usize) {
+    let (att, mut gate) = PAIR_GATE.with(|c| c.get());
+    if gate < GATE_ALWAYS {
+        if steps >= 20 {
+            gate += 1;
+        }
+        if FAC_NO.with(|c| c.get()) > 20 {
+            gate = if 2 * gate >= att { GATE_ALWAYS } else { -1 };
+        }
+    }
+    PAIR_GATE.with(|c| c.set((att, gate)));
+}
 
 thread_local! { pub static DENSE_N: std::cell::Cell<usize> = std::cell::Cell::new(0); }
 fn nucleus(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> NucleusOut {
