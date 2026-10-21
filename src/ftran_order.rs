@@ -459,7 +459,9 @@ impl RefStruct {
             let x0 = x.clone();
             for &v in &q {
                 let xv = x[v];
-                if xv == 0.0 {
+                // The sparse L solve drops a node at or below the tolerance without keeping or propagating it.
+                if xv.abs() <= TOL {
+                    x[v] = 0.0;
                     continue;
                 }
                 for (e, &y) in self.lcols[v].iter().enumerate() {
@@ -649,7 +651,8 @@ impl RefStruct {
         // The column replacement receives the spike in ascending order after a dense solve (the reference scans the dense vector),
         // and in L-stage order after a sparse one.
         let mut spike = spike;
-        if dense {
+        // Only a dense L-stage result is scanned by position; a sparse one keeps the L-stage order.
+        if vec_dense {
             spike.sort_unstable_by_key(|e| e.0);
         }
         // The column replacement does not receive the residues.
