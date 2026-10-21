@@ -814,6 +814,10 @@ impl<'a> Solver<'a> {
             self.recompute_dual();
             self.list.clear();
             self.level = 0;
+            if crate::dump::on("pricing") {
+                crate::dump::emit("pricing", serde_json::json!({"n": PRC.load(std::sync::atomic::Ordering::Relaxed), "iter": 0, "infeasible": true, "list": self.list, "basic": self.basic, "d": self.d, "w": self.w, "x": self.x}));
+            }
+            PRC.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             return self.price();
         }
         q
@@ -892,6 +896,9 @@ impl<'a> Solver<'a> {
 
 /// Drop tolerance of the pivot-row product (`0x134d90`'s first argument).
 const ROW_DROP_TOL: f64 = 1e-13;
+
+/// Pricing calls of the reference's `0x105a50` (the dump's `n`): the retry after a failed scan of the candidate list is one too.
+static PRC: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 /// Penalty on the sum of bound violations in the composite phase-1 cost (recovered from the reference's `d`).
 const PHASE1_M: f64 = 1e6;
@@ -1507,9 +1514,9 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         }
         if false { let fr: Vec<usize> = (0..p.n + p.m).filter(|&j| s.pos_of[j] == NONE && is_inf(p.lo[j]) && is_inf(p.up[j])).collect(); eprintln!("FREE it={iterations} nfree={} list={} faithful={} first={:?}", fr.len(), s.list.len(), opts.faithful_weights, &fr[..fr.len().min(5)]); }
         if crate::dump::on("pricing") {
-            crate::dump::emit("pricing", serde_json::json!({"n": pricing_calls, "iter": iterations, "infeasible": infeasible, "list": s.list, "basic": s.basic, "d": s.d, "w": s.w, "x": s.x}));
+            crate::dump::emit("pricing", serde_json::json!({"n": PRC.load(std::sync::atomic::Ordering::Relaxed), "iter": iterations, "infeasible": infeasible, "list": s.list, "basic": s.basic, "d": s.d, "w": s.w, "x": s.x}));
         }
-        pricing_calls += 1;
+        pricing_calls += 1; PRC.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let q = if infeasible {
             match s.price_faithful() {
                 Some(q) => q,
