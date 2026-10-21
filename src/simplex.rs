@@ -395,6 +395,34 @@ fn rank_dot(col: &Column, v: &[f64], rank: &[usize]) -> f64 {
     terms.iter().fold(0.0, |acc, t| acc + t.1)
 }
 
+/// `init - sum a_i y_i` accumulated as the reference's read-out kernel does: sequentially below `peel + 8` entries, else the peeled head
+/// and the eight-lane body, the lanes folded pairwise, then the tail (as `dot_lanes`, with the start value in lane 0).
+fn dot_lanes_from(col: &Column, y: &[f64], peel: usize, init: f64) -> f64 {
+    let n = col.len();
+    let t = |i: usize| -(col[i].1 * y[col[i].0]);
+    if n < peel + 8 {
+        let mut acc = init;
+        for i in 0..n {
+            acc += t(i);
+        }
+        return acc;
+    }
+    let n8 = n - ((n - peel) & 7);
+    let mut lanes = [0.0f64; 8];
+    lanes[0] = init;
+    for i in 0..peel {
+        lanes[0] += t(i);
+    }
+    for i in peel..n8 {
+        lanes[(i - peel) & 7] += t(i);
+    }
+    let mut tot = ((lanes[0] + lanes[2]) + (lanes[4] + lanes[6])) + ((lanes[1] + lanes[3]) + (lanes[5] + lanes[7]));
+    for i in n8..n {
+        tot += t(i);
+    }
+    tot
+}
+
 fn dot_lanes(col: &Column, v: &[f64], peel: usize) -> f64 {
     let n = col.len();
     let t = |i: usize| col[i].1 * v[col[i].0];
@@ -755,10 +783,19 @@ impl<'a> Solver<'a> {
     /// `d_j = c_j - sum y_i a_ij`, subtracting the terms in the column's stored order (`0x1020a0`).
     fn set_d_from_y(&mut self, y: &[f64]) {
         let p = self.p;
+        let mut offs = vec![0usize; p.n + p.m];
+        for j in 1..p.n + p.m {
+            offs[j] = offs[j - 1] + p.cols[j - 1].len();
+        }
+        let col_off = |j: usize| offs[j] & 1;
         for j in 0..p.n + p.m {
             self.d[j] = if self.pos_of[j] == NONE {
-                if self.cleanup {
-                    // The clean-up pass accumulates over the column's entries in the order of the rows in the dual BTRAN output list.
+                if self.cleanup && p.lo[j] == p.up[j] {
+                    // The API read-out (`0x1a7120..0x1a73c0`) recomputes the reduced cost of a fixed variable from the matrix: the cost plus
+                    // the negated column products in stored column order, with the eight-lane kernel (peel by the value pointer's alignment).
+                    dot_lanes_from(&p.fcols[j], y, col_off(j), p.cost[j])
+                } else if self.cleanup {
+                    // Every other nonbasic variable returns the solver's d, here the sum in the order of the rows in the dual BTRAN output list.
                     let mut e: Vec<(usize, f64)> = p.fcols[j].clone();
                     e.sort_by_key(|x| self.y_rank[x.0]);
                     let mut acc = p.cost[j];
