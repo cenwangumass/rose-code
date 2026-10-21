@@ -450,6 +450,8 @@ struct Solver<'a> {
     /// Nonbasic variables that left the basis in phase 2: the reference keeps their computed value (not the bound) for the next
     /// recomputation of `x_B`.
     unsnapped: std::collections::HashSet<usize>,
+    /// Distance of each basic variable in the frame of the ratio test (`x - lo`, or `up - x` without a lower bound).
+    dst: Vec<f64>,
     /// The reference's persistent rhs shift by row: each time a variable leaves outside its bound, `a_ij * (bound - x)` is added
     /// for its column; the recomputation of `x_B` starts from `b + shift` and the shift is never reset (PEROLD: it stays after the
     /// variable re-enters).
@@ -892,6 +894,19 @@ impl<'a> Solver<'a> {
     }
 
     fn recompute_primal(&mut self) {
+        self.recompute_primal_x();
+        for pos in 0..self.basic.len() {
+            let j = self.basic[pos];
+            self.dst[j] = self.dist_of(j, self.x[j]);
+        }
+    }
+
+    fn dist_of(&self, j: usize, x: f64) -> f64 {
+        let p = self.p;
+        if is_inf(p.lo[j]) { -x + p.up[j] } else { x - p.lo[j] }
+    }
+
+    fn recompute_primal_x(&mut self) {
         let p = self.p;
         let mut r = p.rhs.clone();
         for (ri, sh) in r.iter_mut().zip(&self.rhs_shift) {
@@ -1278,11 +1293,15 @@ impl<'a> Solver<'a> {
 /// Bucket key of the `pricing0` candidate list (the sort routine `0xfffc0`, called by `0xfecb0` when `P+0x80 == 1`, as on every
 /// corpus model): the binary exponent `k` of `|s|` (`frexp`), clamped to -25..=25 (25 at `|s| >= 2^25`, -25 below 2^-25 plus an ulp);
 /// the key is `0x4b + k` for an attractive (negative) score and `0x19 - k` for the others, so a score of 2^24 or more ranks with
-/// the basic and fixed variables (key 0).
-fn p0_key(s: f64) -> usize {
+/// the basic and fixed variables (key 0). With `m >= 500` (`P+0x1c = n`, `0x137ce0`) a structural variable's `|s|` is first divided by
+/// its column count plus 0.01 (`div`, `ctx+0x78` = the column's entry count).
+fn p0_key(s: f64, div: Option<f64>) -> usize {
     const HI: f64 = 33554432.0; // 2^25
     const LO: f64 = f64::from_bits(0x3e60000000000001);
-    let a = s.abs();
+    let a = match div {
+        Some(c) => s.abs() / (c + 0.01),
+        None => s.abs(),
+    };
     let k: i32 = if a >= HI {
         25
     } else if a < LO {
@@ -1346,7 +1365,8 @@ impl<'a> Solver<'a> {
             }
             let (s, free) = self.p0_score(j, &y, &col_off);
             dstore[j] = s;
-            keys[j] = if free { 100 } else { p0_key(s) };
+            let div = if self.p.m >= 500 && j < self.p.n { Some(self.p.cols[j].len() as f64) } else { None };
+            keys[j] = if free { 100 } else { p0_key(s, div) };
         }
         let mut list: Vec<usize> = (0..nm).collect();
         list.sort_by(|&a, &b| keys[b].cmp(&keys[a]).then(b.cmp(&a)));
@@ -1578,12 +1598,13 @@ struct Phase1Pick {
 
 /// Type byte of a basic variable for the phase-1 ratio test, in a frame where the variable has a finite lower bound
 /// (variables bounded only above are mirrored): returns `(dist, range, type, mirrored)`; `None` for free variables.
-fn classify(x: f64, lo: f64, up: f64, tol: f64) -> Option<(f64, f64, u8, bool)> {
+fn classify(x: f64, lo: f64, up: f64, tol: f64, kept: f64) -> Option<(f64, f64, u8, bool)> {
     let (lo_inf, up_inf) = (is_inf(lo), is_inf(up));
     if lo_inf && up_inf {
         return None;
     }
-    let (dist, range, mirrored) = if lo_inf { (-x + up, INF, true) } else { (x - lo, if up_inf { INF } else { up - lo }, false) };
+    let _ = x;
+    let (dist, range, mirrored) = if lo_inf { (kept, INF, true) } else { (kept, if up_inf { INF } else { up - lo }, false) };
     let t = if dist < -tol {
         b'B'
     } else if range < INF && dist - range > tol {
@@ -2065,6 +2086,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         y_ref: None,
         y_rank: Vec::new(),
         unsnapped: Default::default(),
+        dst: vec![0.0; p.n + p.m],
         rhs_shift: Vec::new(),
         mirror: None,
         work: crate::work::Work::default(),
@@ -2343,7 +2365,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             let tol = opts.feasibility_tol;
             let info = |pos: usize| {
                 let j = basic[pos];
-                classify(xs[j], lo[j], up[j], tol)
+                classify(xs[j], lo[j], up[j], tol, s.dst[j])
             };
             if crate::dump::on("ent") {
                 let dims = s.mirror.as_ref().map(|mi| mi.dims());
@@ -2451,12 +2473,15 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         for &(i, a) in &entries {
             let j = s.basic[i];
             s.x[j] -= move_step * a;
+            s.dst[j] = if is_inf(p.lo[j]) { s.dst[j] + move_step * a } else { s.dst[j] - move_step * a };
         }
+        let dq_base = s.dist_of(q, s.nonbasic_value(q));
         if s.unsnapped.remove(&q) {
             // A variable that left outside its bound enters from the bound, not from the value it kept.
             s.x[q] = s.nonbasic_value(q);
         }
         s.x[q] += dir * move_step;
+        s.dst[q] = if is_inf(p.lo[q]) { dq_base - dir * move_step } else { dq_base + dir * move_step };
         let Some(k) = chosen else {
             // Bound flip: the entering variable travels to its opposite bound.
             for (site, est, scale) in std::mem::take(&mut pending_upd) {
