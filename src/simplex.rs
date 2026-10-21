@@ -30,6 +30,11 @@ pub struct SolveOptions {
     /// List the nonzeros of the entering column in the order the reference's sparse FTRAN produces them (needs `faithful_positions`).
     /// The Phase 1 ratio test depends on that order (`crate::ftran_order`).
     pub faithful_ftran: bool,
+    /// The release profile's initial pricing (`SimplexPricing=-1` starts as `SimplexPricing=0`, `reverse-engineer/specs/primal-simplex.md`):
+    /// no Devex weights and no maintained reduced costs; the duals are updated by one BTRAN per pivot and the entering variable is
+    /// the best of a window of a persistent, bucket-sorted candidate list. Needs `faithful_ftran`. Phase 1 and the later switch
+    /// to Devex pricing (`0x142500`) are not implemented. Off by default.
+    pub pricing0: bool,
 }
 
 impl Default for SolveOptions {
@@ -45,6 +50,7 @@ impl Default for SolveOptions {
             faithful_positions: true,
             refactor_schedule: None,
             faithful_ftran: true,
+            pricing0: false,
         }
     }
 }
@@ -53,6 +59,11 @@ impl SolveOptions {
     /// The solver without the reference-matching tie-breaking (own Devex floor, own basis position order, no FTRAN mirror).
     pub fn plain() -> Self {
         SolveOptions { faithful_weights: false, faithful_positions: false, faithful_ftran: false, ..SolveOptions::default() }
+    }
+
+    /// The reference's release profile as far as it is recovered: the faithful options with the initial `SimplexPricing=0` pricing.
+    pub fn release() -> Self {
+        SolveOptions { pricing0: true, ..SolveOptions::default() }
     }
 }
 
@@ -369,6 +380,26 @@ struct Solver<'a> {
     /// Work of the last column replacement, which the reference does after the next refactorization check (and not at all
     /// when it refactors instead).
     upd_work: Vec<(u32, f64, f64)>,
+    /// State of the `pricing0` option (`None` when it is off).
+    p0: Option<P0>,
+}
+
+/// State of the release profile's initial pricing (`0xfbe60`, list build `0xfecb0`, dual update `0xfb790`).
+struct P0 {
+    /// All variables, sorted at each rebuild by bucket key (descending), then by index (descending); the scan permutes it in place.
+    list: Vec<usize>,
+    /// Scan position (`P+0x54`).
+    pos: usize,
+    /// The reference's stored `d` (sign-adjusted so that attractive is negative), `ctx+0x1e0`.
+    dstore: Vec<f64>,
+    /// Dual multipliers, kept by one BTRAN per pivot.
+    y: Vec<f64>,
+    /// Position of the last leaving variable and the entering `d`: the BTRAN input of the next dual update.
+    pending: Option<(usize, f64)>,
+    /// The duals are recomputed and the list rebuilt at the next pricing call.
+    rebuild: bool,
+    /// Pricing calls so far (the dump's call index).
+    calls: usize,
 }
 
 struct LastPivot {
@@ -538,6 +569,10 @@ impl<'a> Solver<'a> {
             self.dual_btran_work();
         }
         self.recompute_dual();
+        if let Some(p0) = self.p0.as_mut() {
+            p0.rebuild = true;
+            p0.pending = None;
+        }
         Ok(())
     }
 
@@ -1087,6 +1122,215 @@ impl<'a> Solver<'a> {
     }
 }
 
+/// Bucket key of the `pricing0` candidate list (`0xfecb0`): the binary exponent of `|s|` (clamped to -15..=34), above 0x41 for an
+/// attractive (negative) score and mirrored below it for the others.
+fn p0_key(s: f64) -> usize {
+    const HI: f64 = f64::from_bits(0x420fffd2ef000000);
+    const LO: f64 = f64::from_bits(0x3f00000010_7e1fe9);
+    let a = s.abs();
+    let k: i32 = if a >= HI {
+        34
+    } else if a < LO {
+        -15
+    } else {
+        ((a.to_bits() >> 52) & 0x7ff) as i32 - 1022
+    };
+    (if s < 0.0 { k + 0x41 } else { 0x23 - k }) as usize
+}
+
+/// Window of the `pricing0` scan: it ends at the first position more than this many past its start once a candidate was counted (`P+0x50`).
+const P0_WINDOW: usize = 10;
+/// Reduced-cost tolerance of the `pricing0` scan (`ctx+0x388`).
+const P0_DTOL: f64 = 1e-6;
+
+impl<'a> Solver<'a> {
+    /// Nonbasic, not fixed: the variables the `pricing0` list ranks (status -1, -2 or -3 of the reference).
+    fn p0_eligible(&self, j: usize) -> bool {
+        self.pos_of[j] == NONE && !self.is_fixed(j)
+    }
+
+    /// The reference's score `s` of a nonbasic variable (`d`, negated at the upper bound) and whether it is free, from the duals `y`.
+    fn p0_score(&self, j: usize, y: &[f64], col_off: &dyn Fn(usize) -> usize) -> (f64, bool) {
+        let p = self.p;
+        let d = dot_lanes_from(&p.fcols[j], y, col_off(j), p.cost[j]);
+        let free = is_inf(p.lo[j]) && is_inf(p.up[j]);
+        if free {
+            (d, true)
+        } else if self.at_upper[j] {
+            (-d, false)
+        } else {
+            (d, false)
+        }
+    }
+
+    fn p0_col_offsets(&self) -> Vec<usize> {
+        let p = self.p;
+        let mut offs = vec![0usize; p.n + p.m];
+        for j in 1..p.n + p.m {
+            offs[j] = offs[j - 1] + p.cols[j - 1].len();
+        }
+        offs
+    }
+
+    /// Recomputes the duals (a dense BTRAN of the basic costs), then scores every variable and sorts the list (`0xfb790`, `0xfecb0`).
+    fn p0_rebuild(&mut self) {
+        if self.y_ref.is_none() {
+            self.dual_btran_work();
+        }
+        let y = self.y_ref.clone().unwrap();
+        let nm = self.p.n + self.p.m;
+        let offs = self.p0_col_offsets();
+        let col_off = |j: usize| offs[j] & 1;
+        let mut dstore = vec![0.0; nm];
+        let mut keys = vec![0usize; nm];
+        for j in 0..nm {
+            if !self.p0_eligible(j) {
+                continue;
+            }
+            let (s, free) = self.p0_score(j, &y, &col_off);
+            dstore[j] = s;
+            keys[j] = if free { 100 } else { p0_key(s) };
+        }
+        let mut list: Vec<usize> = (0..nm).collect();
+        list.sort_by(|&a, &b| keys[b].cmp(&keys[a]).then(b.cmp(&a)));
+        let p0 = self.p0.as_mut().unwrap();
+        p0.list = list;
+        p0.dstore = dstore;
+        p0.y = y;
+        p0.pos = 0;
+        p0.rebuild = false;
+        p0.pending = None;
+    }
+
+    /// Applies the pending dual update: the BTRAN of the entering `d` at the leaving position, in the updated basis (`0xfb790`, mode 2).
+    fn p0_update_duals(&mut self) {
+        let Some((r, dq)) = self.p0.as_mut().unwrap().pending.take() else { return };
+        let mi = self.mirror.as_mut().unwrap();
+        let out = mi.btran(&[(r, dq)], false, false);
+        let dense = mi.bt_dense;
+        if crate::dump::on("dual") {
+            crate::dump::emit("dual", serde_json::json!({"update": [r, dq], "out": crate::dump::sparse(&out)}));
+        }
+        self.work.add_from(0x12de50, 0xfb7ee, mi.work, crate::work::FAC);
+        let y = &mut self.p0.as_mut().unwrap().y;
+        for &(i, v) in &out {
+            if !dense || v < -ROW_DROP_TOL || ROW_DROP_TOL < v {
+                y[i] += v;
+            }
+        }
+    }
+
+    /// One scan of the list window from the current position (`0xfbe60`). Returns the entering variable and its `d`.
+    fn p0_scan(&mut self) -> Option<(usize, f64)> {
+        let m = self.p.m;
+        let nm = self.p.n + self.p.m;
+        let offs = self.p0_col_offsets();
+        let col_off = |j: usize| offs[j] & 1;
+        let mut p0 = self.p0.take().unwrap();
+        let start = p0.pos;
+        let (mut i, mut cnt, mut best, mut q): (usize, usize, f64, Option<(usize, f64)>) = (start, 0, 0.0, None);
+        let mut marked = vec![false; nm];
+        if start < m {
+            loop {
+                let j = p0.list[i];
+                if self.p0_eligible(j) {
+                    let (s, free) = self.p0_score(j, &p0.y, &col_off);
+                    if free {
+                        // A free variable is taken at once, whatever its reduced cost.
+                        p0.dstore[j] = if s <= 0.0 { s } else { -s };
+                        q = Some((j, s));
+                        break;
+                    }
+                    if s < -P0_DTOL {
+                        if s + s < p0.dstore[j] {
+                            cnt += 1;
+                            marked[i] = true;
+                            if best > s {
+                                best = s;
+                                q = Some((j, if self.at_upper[j] { -s } else { s }));
+                            }
+                        }
+                        p0.dstore[j] = s;
+                    }
+                }
+                if P0_WINDOW < i - start && cnt != 0 {
+                    break;
+                }
+                i += 1;
+                if i >= m {
+                    break;
+                }
+            }
+        }
+        let newpos = i + 1 - cnt;
+        // Gather the counted entries into the last `cnt` positions of the window, in place.
+        let mut h = start;
+        let mut t = newpos;
+        while t <= i {
+            if marked[t] {
+                marked[t] = false;
+            } else {
+                while !marked[h] {
+                    h += 1;
+                }
+                p0.list.swap(h, t);
+                marked[h] = false;
+                h += 1;
+            }
+            t += 1;
+        }
+        p0.pos = newpos;
+        self.p0 = Some(p0);
+        q
+    }
+
+    /// Entering variable of the `pricing0` option, or `None` at optimality (after the recomputation of the duals the reference makes
+    /// when the list holds nothing).
+    fn price0(&mut self) -> Option<usize> {
+        self.recomputed = false;
+        if self.p0.as_ref().unwrap().rebuild {
+            self.p0_rebuild();
+        } else {
+            self.p0_update_duals();
+        }
+        let dump = |s: &Self, tag: &str, q: Option<(usize, f64)>| {
+            if crate::dump::on("pricing0") {
+                let p0 = s.p0.as_ref().unwrap();
+                crate::dump::emit("pricing0", serde_json::json!({"n": p0.calls, "tag": tag, "list": p0.list, "pos": p0.pos, "y": p0.y, "dstore": p0.dstore, "q": q.map(|e| e.0), "d": q.map(|e| e.1)}));
+            }
+        };
+        let before = |s: &Self| {
+            if crate::dump::on("pricing0") {
+                let p0 = s.p0.as_ref().unwrap();
+                crate::dump::emit("pricing0", serde_json::json!({"n": p0.calls, "tag": "in", "list": p0.list, "pos": p0.pos, "y": p0.y, "dstore": p0.dstore}));
+            }
+        };
+        before(self);
+        let mut q = self.p0_scan();
+        dump(self, "out", q);
+        self.p0.as_mut().unwrap().calls += 1;
+        if q.is_none() {
+            // Nothing in the window and the list: recompute the duals and rebuild, then scan once more.
+            self.recomputed = true;
+            self.y_ref = None;
+            self.p0_rebuild();
+            // The reference scans again only if the rebuild counted a dual infeasibility (a free variable counts always).
+            let p0 = self.p0.as_ref().unwrap();
+            let any = (0..self.p.n + self.p.m).any(|j| self.p0_eligible(j) && (p0.dstore[j] < -P0_DTOL || (is_inf(self.p.lo[j]) && is_inf(self.p.up[j]))));
+            if !any {
+                return None;
+            }
+            before(self);
+            q = self.p0_scan();
+            dump(self, "out", q);
+            self.p0.as_mut().unwrap().calls += 1;
+        }
+        let (j, d) = q?;
+        self.d[j] = d;
+        Some(j)
+    }
+}
+
 /// Drop tolerance of the pivot-row product (`0x134d90`'s first argument).
 const ROW_DROP_TOL: f64 = 1e-13;
 /// Pivot-row entries at or below this are left out of the Devex weight update (`0x103d0d`).
@@ -1614,6 +1858,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         last_row: Vec::new(),
         pending_row: None,
         upd_work: Vec::new(),
+        p0: None,
     };
     s.rows = vec![Vec::new(); m];
     s.rrows = vec![Vec::new(); m];
@@ -1655,6 +1900,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     s.primal_full_work();
     s.dual_btran_work();
     s.recompute_dual();
+    if opts.pricing0 {
+        assert!(s.mirror.is_some(), "pricing0 needs faithful_ftran and faithful_positions");
+        s.p0 = Some(P0 { list: Vec::new(), pos: 0, dstore: vec![0.0; n + m], y: Vec::new(), pending: None, rebuild: true, calls: 0 });
+    }
     let mut trace = Vec::new();
     let mut iterations = 0usize;
     // Pricing passes of the main loop, the call index of the `pricing` dump.
@@ -1793,7 +2042,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 }
             }
         } else {
-            match s.price_faithful() {
+            match if opts.pricing0 { s.price0() } else { s.price_faithful() } {
                 Some(q) => q,
                 None => {
                     // The reference recomputes the duals once more when the scan finds nothing (`0x145520`, with the residual check).
@@ -2009,6 +2258,48 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             }
         }
         let alpha_rq = alpha[r];
+
+        if s.p0.is_some() {
+            // `pricing0`: no pivot row, no Devex weights, no maintained `d`; the next pricing call updates the duals by one BTRAN.
+            let dq = s.d[q];
+            s.y_ref = None;
+            s.pos_of[leave] = NONE;
+            s.at_upper[leave] = to_upper;
+            s.basic[r] = q;
+            s.pos_of[q] = r;
+            s.factor.update(r, alpha);
+            if let Some(mi) = s.mirror.as_mut() {
+                mi.update(r);
+                s.upd_work = std::mem::take(&mut mi.upd_work);
+            }
+            s.leave_prev = Some(leave);
+            s.last_pivot = Some(LastPivot { rows: {
+                let mut rows: Vec<usize> = ftran_out.iter().map(|e| e.0).collect();
+                if let Some(k) = rows.iter().position(|&i| i == r) {
+                    rows.swap_remove(k);
+                }
+                rows
+            }, dense: s.mirror.as_ref().is_some_and(|mi| mi.last_dense()), q, leave, alpha_rq });
+            s.p0.as_mut().unwrap().pending = Some((r, dq));
+            s.work.trig();
+            if let Some((d, u, na)) = chk {
+                let w_now = s.work.w;
+                refactor_next = d || s.work.clause(u, na, w_now);
+                if refactor_next {
+                    s.work.decided(w_now);
+                }
+            }
+            let upd_work = std::mem::take(&mut s.upd_work);
+            if !refactor_next {
+                for (site, est, scale) in upd_work {
+                    s.work.add(site, est, scale);
+                }
+            }
+            if opts.record_trace {
+                trace.push(TraceEvent { iteration: iterations, entering: q, leaving: Some(leave), position: Some(r), step });
+            }
+            continue;
+        }
 
         // Pivot row alpha_r = e_r' B^-1 [A I] and the Devex cross-term vector tau = B^-T u.
         let mut rho_ref: Option<Vec<(usize, f64)>> = None;
