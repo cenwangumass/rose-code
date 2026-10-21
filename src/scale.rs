@@ -184,6 +184,9 @@ impl Scaling {
         for i in 0..m {
             s.row_lo[i] = scale_bound(model.row_lo[i], self.row[i]);
             s.row_up[i] = scale_bound(model.row_up[i], self.row[i]);
+            if let Some(r) = s.row_range.get_mut(i) {
+                *r *= self.row[i];
+            }
         }
         Some(s)
     }

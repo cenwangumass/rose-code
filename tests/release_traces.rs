@@ -91,6 +91,14 @@ fn bore3d_release_matches_the_reference() {
     check("bore3d");
 }
 
+/// BOEING2 (ranges, scaling, shifted bounds): the start point agrees (bound placement of the crash with the crash columns, exact range
+/// widths) and the first 120 decisions. A numeric difference in the last bit of a basic variable's distance at the 16th ratio
+/// test (x_B accumulation) makes the next decision differ from row 120 on; not modelled.
+#[test]
+fn boeing2_release_matches_the_reference_at_the_start() {
+    check_rows("boeing2", 120);
+}
+
 /// The scale factors against the reference's (`replay/gdb_scale_factors.py`, captured by `compare.py scale`; skipped where a
 /// capture is missing, as the captures are not under version control).
 #[test]

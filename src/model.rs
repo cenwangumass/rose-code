@@ -20,6 +20,9 @@ pub struct LpModel {
     pub col_up: Vec<f64>,
     pub row_lo: Vec<f64>,
     pub row_up: Vec<f64>,
+    /// The range `|R|` of a ranged row as the file gives it (0 for none, or when absent); the solver's range column is `[0, row_range]`,
+    /// which differs in the last bits from `row_up - row_lo`. Used only when it agrees with the bounds.
+    pub row_range: Vec<f64>,
     /// Column `j` holds `row_idx[col_start[j]..col_start[j + 1]]` with matching `val`.
     pub col_start: Vec<usize>,
     pub row_idx: Vec<usize>,
@@ -35,6 +38,15 @@ impl LpModel {
 
     pub fn num_rows(&self) -> usize {
         self.row_lo.len()
+    }
+
+    /// Width of the range column of row `i` (`row_up - row_lo`, or the file's exact `|R|` when it agrees with the bounds).
+    pub fn range_width(&self, i: usize) -> f64 {
+        let w = self.row_up[i] - self.row_lo[i];
+        match self.row_range.get(i) {
+            Some(&r) if r > 0.0 && (w - r).abs() <= 1e-9 * r => r,
+            _ => w,
+        }
     }
 
     pub fn col(&self, j: usize) -> impl Iterator<Item = (usize, f64)> + '_ {

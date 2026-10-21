@@ -192,9 +192,11 @@ pub fn parse(text: &str) -> Result<LpModel, MpsError> {
     let m = rows.len();
     let mut row_lo = vec![-INF; m];
     let mut row_up = vec![INF; m];
+    let mut row_range = vec![0.0; m];
     for (i, (_, kind)) in rows.iter().enumerate() {
         let r = rhs[i];
         let rg = range[i];
+        row_range[i] = rg.map_or(0.0, f64::abs);
         match kind {
             RowKind::E => match rg {
                 None => (row_lo[i], row_up[i]) = (r, r),
@@ -225,6 +227,7 @@ pub fn parse(text: &str) -> Result<LpModel, MpsError> {
         col_up: up,
         row_lo,
         row_up,
+        row_range,
         col_start,
         row_idx,
         val,

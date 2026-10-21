@@ -167,7 +167,7 @@ fn build(model: &LpModel) -> Internal {
             (false, false) => {
                 cols.push(vec![(i, 1.0)]);
                 lo.push(0.0);
-                up.push(ru - rl);
+                up.push(model.range_width(i));
                 (1.0, ru, 0.0, 0.0)
             }
             (true, false) => (1.0, ru, 0.0, INF),
@@ -376,12 +376,9 @@ fn flip_to_upper(p: &Internal, b: &mut Basis) {
     for &j in &b.basic {
         is_basic[j] = true;
     }
-    // Slack-space activity: `(rhs - A x_N) / sign` for every row.
+    // Slack-space activity (every structural at its bound, the crash columns too): `(rhs - A x_N) / sign` for every row.
     let mut act = p.rhs.clone();
     for j in 0..n {
-        if is_basic[j] {
-            continue;
-        }
         let v = if b.at_upper[j] { p.up[j] } else if is_inf(p.lo[j]) { 0.0 } else { p.lo[j] };
         if v != 0.0 {
             for &(i, a) in &p.cols[j] {
@@ -392,7 +389,7 @@ fn flip_to_upper(p: &Internal, b: &mut Basis) {
     let sign: Vec<f64> = (0..m).map(|i| p.cols[n + i][0].1).collect();
     let mut sact: Vec<f64> = (0..m).map(|i| act[i] / sign[i]).collect();
     let mut cand: Vec<usize> = (0..n)
-        .filter(|&j| !is_basic[j] && !b.at_upper[j] && !is_inf(p.lo[j]) && !is_inf(p.up[j]) && p.up[j] > p.lo[j])
+        .filter(|&j| !b.at_upper[j] && !is_inf(p.lo[j]) && !is_inf(p.up[j]) && p.up[j] > p.lo[j])
         .collect();
     let key = |j: usize| (p.up[j] - p.lo[j]) * p.cost[j];
     let mut keys: Vec<f64> = cand.iter().map(|&j| key(j)).collect();
@@ -407,7 +404,10 @@ fn flip_to_upper(p: &Internal, b: &mut Basis) {
             gain += infeas(x) - infeas(x - a / sign[i] * range);
         }
         if gain > 0.0 || (gain == 0.0 && p.cost[j] < 0.0) {
-            b.at_upper[j] = true;
+            // A crash column keeps its basic status (the reference writes the positions afterwards) but its placement moves the row activities.
+            if !is_basic[j] {
+                b.at_upper[j] = true;
+            }
             for &(i, a) in &p.cols[j] {
                 sact[i] -= a / sign[i] * range;
             }
@@ -2129,7 +2129,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     // Pricing passes of the main loop, the call index of the `pricing` dump.
     if crate::dump::on("header") {
         let fixed: Vec<usize> = (0..p.n + p.m).filter(|&j| s.is_fixed(j)).collect();
-        crate::dump::emit("header", serde_json::json!({"n": p.n, "m": p.m, "fixed": fixed}));
+        let upper: Vec<usize> = (0..p.n + p.m).filter(|&j| s.pos_of[j] == NONE && s.at_upper[j]).collect();
+        crate::dump::emit("header", serde_json::json!({"n": p.n, "m": p.m, "fixed": fixed, "basic": s.basic, "upper": upper}));
     }
     let mut phase1 = false;
     let mut refactor_next = false;
