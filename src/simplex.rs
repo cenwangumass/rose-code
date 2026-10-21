@@ -488,6 +488,10 @@ impl<'a> Solver<'a> {
         if self.refactorizations % 5 == 4 {
             est += 2.0 * m as f64;
         }
+        // The right-hand side is built as a copy (2 units per row), or as `b + shift` (3 units) once the shift array exists.
+        if !self.rhs_shift.is_empty() {
+            est += m as f64;
+        }
         self.work.add(0x107b57, est, crate::work::CTX);
     }
 
@@ -1509,11 +1513,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         // The reference's check reads `W` at the end of the iteration (right after `trig()`), before this update's own work.
         let mut pending_upd: Vec<(u32, f64, f64)> = Vec::new();
         let mut chk: Option<(bool, usize, usize)> = None;
-        let upd_work = std::mem::take(&mut s.upd_work);
         if due {
             s.refactor()?;
-        } else {
-            pending_upd = upd_work;
         }
         // The reference makes this check after the ratio test, and not at all for a bound flip: `check_state` takes it back.
         let mut check_state = None;
@@ -2082,8 +2083,12 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 s.work.decided(w_now);
             }
         }
-        for (site, est, scale) in std::mem::take(&mut pending_upd) {
-            s.work.add(site, est, scale);
+        // The reference updates the factor after the check; when the check calls for a refactorization the update is not made.
+        let upd_work = std::mem::take(&mut s.upd_work);
+        if !refactor_next {
+            for (site, est, scale) in upd_work {
+                s.work.add(site, est, scale);
+            }
         }
         if opts.record_trace {
             trace.push(TraceEvent { iteration: iterations, entering: q, leaving: Some(leave), position: Some(r), step });
