@@ -1492,6 +1492,14 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                         dc.push((i, PHASE1_M * f64::from(cls[i] - c)));
                     }
                 }
+                // The variable that just became basic may be infeasible (the infeasible clamp below lets it): its position
+                // takes the penalty too.
+                if lp.q != NONE && s.pos_of[lp.q] != NONE {
+                    let r = s.pos_of[lp.q];
+                    if cls[r] != 0 {
+                        dc.push((r, PHASE1_M * f64::from(cls[r])));
+                    }
+                }
             }
             if s.mirror.is_some() {
                 let est = if lp.dense { m as f64 * 3.0 } else { lp.rows.len() as f64 * 6.0 } + dc.len() as f64 * 4.0;
@@ -1704,7 +1712,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             ray = Some(dir_x);
             break Status::Unbounded;
         }
-        step = step.max(0.0);
+        // A phase 1 step may be negative (a basic variable inside its tolerance leaves from the wrong side of its bound).
+        if !infeasible {
+            step = step.max(0.0);
+        }
         iterations += 1;
         // Move the basic variables and the entering variable.
         for &(i, a) in &entries {
