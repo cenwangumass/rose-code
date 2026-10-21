@@ -855,6 +855,17 @@ impl<'a> Solver<'a> {
             }
             return;
         }
+        // The entering variable's own change next to others: the reference first repeats the previous pivot row for it alone
+        // (`0x107e14` pass), then solves for the remaining changes.
+        if q != NONE && self.pos_of[q] != NONE && dc.len() > 1 {
+            let r = self.pos_of[q];
+            if let Some(k) = dc.iter().position(|e| e.0 == r) {
+                self.cost_change_work(&[dc[k]], q, leave, alpha_rq, true);
+                let rest: Vec<(usize, f64)> = dc.iter().copied().filter(|e| e.0 != r).collect();
+                self.cost_change_work(&rest, q, leave, alpha_rq, false);
+                return;
+            }
+        }
         let Some(mi) = self.mirror.as_mut() else { return };
         let (n, m) = (self.p.n, self.p.m);
         let dc_sorted = dc.to_vec();
