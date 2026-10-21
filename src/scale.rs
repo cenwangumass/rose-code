@@ -16,6 +16,8 @@ use crate::simplex::{SolveError, SolveOptions, SolveResult};
 pub struct Scaling {
     pub col: Vec<f64>,
     pub row: Vec<f64>,
+    /// Objective scale (a power of two): the scaled costs are multiplied by it (see [`obj_scale`]).
+    pub obj: f64,
 }
 
 const LOWEST: f64 = 7.105427357601002e-15; // 2^-47
@@ -145,7 +147,35 @@ pub fn compute(model: &LpModel) -> Scaling {
         changed = row_pass(&mut row, &col, thr);
     }
     let clamp = |x: f64| if x < LOWEST { LOWEST } else { x.min(HIGHEST) };
-    Scaling { col: col.into_iter().map(clamp).collect(), row: row.into_iter().map(clamp).collect() }
+    let col: Vec<f64> = col.into_iter().map(clamp).collect();
+    let obj = obj_scale(model, &col);
+    Scaling { col, row: row.into_iter().map(clamp).collect(), obj }
+}
+
+/// The objective scale of the setup routine (`0x11c803..0x11cbad`, `ObjScale` 0): from the largest and smallest nonzero
+/// scaled cost `|c_j C_j|` it takes `t = min(100 / max, 1 / (10 g))` with `g = sqrt(max(1e-6, min) max)`; `t < 2` leaves the
+/// costs alone, else they are multiplied by `2^ilogb(t)` (at most `2^9`). Only PEROLD and PILOT4 of the corpus get a factor (2).
+fn obj_scale(model: &LpModel, col: &[f64]) -> f64 {
+    let (mut mx, mut mn) = (0.0f64, f64::INFINITY);
+    for j in 0..model.num_cols() {
+        let c = (model.obj[j] * col[j]).abs();
+        if c != 0.0 {
+            mx = mx.max(c);
+            mn = mn.min(c);
+        }
+    }
+    if mx == 0.0 {
+        return 1.0;
+    }
+    let g = (mn.max(1e-6) * mx).sqrt();
+    let t = (100.0 / mx).min(1.0 / (10.0 * g));
+    if t < 2.0 {
+        1.0
+    } else if t > 1000.0 {
+        512.0
+    } else {
+        pow2_floor(t)
+    }
 }
 
 fn scale_bound(v: f64, f: f64) -> f64 {
@@ -175,6 +205,7 @@ impl Scaling {
         for j in 0..nm {
             let c = self.col[j];
             s.obj[j] *= c;
+            s.obj[j] *= self.obj;
             s.col_lo[j] = scale_bound(model.col_lo[j], 1.0 / c);
             s.col_up[j] = scale_bound(model.col_up[j], 1.0 / c);
             for p in model.col_start[j]..model.col_start[j + 1] {
@@ -197,10 +228,10 @@ impl Scaling {
         let nm = model.num_cols();
         for j in 0..nm {
             r.x[j] *= self.col[j];
-            r.reduced_cost[j] /= self.col[j];
+            r.reduced_cost[j] /= self.col[j] * self.obj;
         }
         for (i, y) in r.dual.iter_mut().enumerate() {
-            *y *= self.row[i];
+            *y *= self.row[i] / self.obj;
         }
         if let Some(f) = r.farkas.as_mut() {
             for (i, y) in f.iter_mut().enumerate() {
