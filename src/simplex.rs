@@ -1567,6 +1567,13 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         } else if phase1 {
             // Back in a feasible region: continue with the true costs (weights and framework are kept).
             phase1 = false;
+            // The reference's primal update of the last pivot still runs the phase 1 cost-change pass on the iteration that ends
+            // phase 1 (its work counts toward the refactorization clause).
+            if s.mirror.is_some() && !due {
+                if let (Some(lp), false) = (&last, dc.is_empty()) {
+                    s.cost_change_work(&dc, lp.q, lp.leave, lp.alpha_rq);
+                }
+            }
             s.list.clear();
             s.level = 0;
             // After a refactorization the duals were just recomputed with the same (now feasible) basic values.
