@@ -2859,27 +2859,27 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             }
         }
         let mut rho = vec![0.0; m];
-        rho[r] = 1.0;
-        s.factor.btran(&mut rho);
         if let Some(rr) = &rho_ref {
             // The reference's BTRAN values and support (`0x131710`).
-            rho = vec![0.0; m];
             for &(i, v) in rr {
                 rho[i] = v;
             }
+        } else {
+            rho[r] = 1.0;
+            s.factor.btran(&mut rho);
         }
         let mut u = vec![0.0; m];
-        for i in 0..m {
-            if s.in_r0[s.basic[i]] {
-                u[i] = alpha[i];
-            }
-        }
-        s.factor.btran(&mut u);
         if let Some(t) = &tau_ref {
-            u = vec![0.0; m];
             for &(i, v) in t {
                 u[i] = v;
             }
+        } else {
+            for i in 0..m {
+                if s.in_r0[s.basic[i]] {
+                    u[i] = alpha[i];
+                }
+            }
+            s.factor.btran(&mut u);
         }
         if s.mirror.is_some() {
             let rho_work: Vec<f64> = rho.iter().map(|&v| if v.abs() > ROW_DROP_TOL { v } else { 0.0 }).collect();
