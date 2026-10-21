@@ -694,7 +694,7 @@ impl RefStruct {
         for p in 0..m {
             if touched[p] && self.kind[p] != -2 {
                 let v = x[p] / self.diag[p];
-                x[p] = if x[p].abs() <= TOL || v.abs() <= TOL { 0.0 } else { v };
+                x[p] = if (u_dense && x[p].abs() <= TOL) || v.abs() <= TOL { 0.0 } else { v };
             }
         }
         if bs {
