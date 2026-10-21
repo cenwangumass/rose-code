@@ -1016,6 +1016,34 @@ fn classify(x: f64, lo: f64, up: f64, tol: f64) -> Option<(f64, f64, u8, bool)> 
     Some((dist, range, t, mirrored))
 }
 
+/// `s` plus (`sign` = 1) or minus (`sign` = -1) the weights of `part`, in the reference's order (`0xf0a58`..`0xf0cc0`):
+/// fewer than 8 terms sequentially; otherwise four two-lane accumulators over blocks of 8 (`s` in lane 0 of the first),
+/// combined as `((a0 + a1) + (a2 + a3))`, then lane 0 + lane 1, then the remaining terms one by one.
+fn lane_sum(s: f64, part: &[(f64, usize, bool)], sign: f64, weight: &dyn Fn(usize) -> f64) -> f64 {
+    let n = part.len();
+    let nv = n & !7;
+    if nv == 0 {
+        return part.iter().fold(s, |s, b| s + sign * weight(b.1));
+    }
+    let mut acc = [[s, 0.0f64], [0.0; 2], [0.0; 2], [0.0; 2]];
+    for blk in part[..nv].chunks(8) {
+        for a in 0..4 {
+            for l in 0..2 {
+                acc[a][l] += sign * weight(blk[2 * a + l].1);
+            }
+        }
+    }
+    let t0 = acc[0][0] + acc[1][0];
+    let t1 = acc[0][1] + acc[1][1];
+    let u0 = acc[2][0] + acc[3][0];
+    let u1 = acc[2][1] + acc[3][1];
+    let mut r = (t0 + u0) + (t1 + u1);
+    for b in &part[nv..] {
+        r += sign * weight(b.1);
+    }
+    r
+}
+
 /// Mid-point search of the breakpoint where the cumulative slope reaches zero: a Hoare partition around the first element
 /// that adds the lower part / subtracts the upper part of the weights `|a|` (transcribed from the reference).
 fn find_theta(s0: f64, bp: &mut [(f64, usize, bool)], weight: &dyn Fn(usize) -> f64) -> f64 {
@@ -1042,13 +1070,9 @@ fn find_theta(s0: f64, bp: &mut [(f64, usize, bool)], weight: &dyn Fn(usize) -> 
             }
             let j = j as usize;
             if s >= 0.0 {
-                for t in j + 1..=hi {
-                    s -= weight(bp[t].1);
-                }
+                s = lane_sum(s, &bp[j + 1..=hi], -1.0, weight);
             } else if lo <= j {
-                for t in lo..=j {
-                    s += weight(bp[t].1);
-                }
+                s = lane_sum(s, &bp[lo..=j], 1.0, weight);
             }
             if s < 0.0 {
                 lo = j + 1;
@@ -1222,6 +1246,10 @@ fn phase1_ratio(
             if own < inf && own <= step {
                 return Phase1Pick { entry: None, step: own, pivot: 0.0, to_upper: false };
             }
+        }
+        // The same flip when the second pass found a blocking entry beyond the entering variable's own range.
+        if own < inf && own <= step {
+            return Phase1Pick { entry: None, step: own, pivot: 0.0, to_upper: false };
         }
         let pa = val(best).abs();
         // A mirrored variable reaches the opposite bound of the original frame.
