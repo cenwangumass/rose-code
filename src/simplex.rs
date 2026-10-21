@@ -339,6 +339,10 @@ struct Solver<'a> {
     /// Nonbasic variables that left the basis in phase 2: the reference keeps their computed value (not the bound) for the next
     /// recomputation of `x_B`.
     unsnapped: std::collections::HashSet<usize>,
+    /// The reference's persistent rhs shift by row: each time a variable leaves outside its bound, `a_ij * (bound - x)` is added
+    /// for its column; the recomputation of `x_B` starts from `b + shift` and the shift is never reset (PEROLD: it stays after the
+    /// variable re-enters).
+    rhs_shift: Vec<f64>,
     /// Mirror of the reference's FTRAN structure (`faithful_ftran`).
     mirror: Option<crate::ftran_order::RefStruct>,
     /// The reference's work counter (`crate::work`).
@@ -588,9 +592,12 @@ impl<'a> Solver<'a> {
     fn recompute_primal(&mut self) {
         let p = self.p;
         let mut r = p.rhs.clone();
+        for (ri, sh) in r.iter_mut().zip(&self.rhs_shift) {
+            *ri += sh;
+        }
         for j in 0..p.n + p.m {
             if self.pos_of[j] == NONE {
-                let v = if self.unsnapped.contains(&j) { self.x[j] } else { self.nonbasic_value(j) };
+                let v = self.nonbasic_value(j);
                 self.x[j] = v;
                 if v != 0.0 {
                     for &(i, a) in &p.cols[j] {
@@ -1434,6 +1441,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         list_failed: false,
         y_ref: None,
         unsnapped: Default::default(),
+        rhs_shift: Vec::new(),
         mirror: None,
         work: crate::work::Work::default(),
         last_pivot: None,
@@ -1816,6 +1824,13 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         } else {
             s.x[leave] = x_before[0];
             s.unsnapped.insert(leave);
+            let delta = bound - x_before[0];
+            if s.rhs_shift.is_empty() {
+                s.rhs_shift = vec![0.0; p.m];
+            }
+            for &(i, a) in &p.cols[leave] {
+                s.rhs_shift[i] += a * delta;
+            }
         }
         let alpha_rq = alpha[r];
 
