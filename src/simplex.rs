@@ -1855,6 +1855,16 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         let mut norm_reset = false;
         let mut changed: Vec<usize> = Vec::new();
         for j in 0..n + m {
+            if j >= n && j != q && j != leave && s.pos_of[j] != NONE && s.mirror.is_some() {
+                let arj = match rho_rank.as_ref() {
+                    Some(rank) => rank_dot(&p.cols[j], &rho, rank),
+                    None => dot(&p.cols[j], &rho),
+                };
+                if arj.abs() > ROW_DROP_TOL && !s.is_fixed(j) {
+                    s.d[j] -= theta_d * arj;
+                }
+                continue;
+            }
             if s.pos_of[j] != NONE || j == q {
                 continue;
             }
