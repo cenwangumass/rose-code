@@ -16,6 +16,13 @@ pub struct Method {
     pub factorizations: u32,
     /// The method is Devex pricing (`ctx+0x3ec == 1`).
     pub devex: bool,
+    /// The release profile's bookkeeping runs (counters, snapshot, perturbation); off in the controlled profile.
+    pub active: bool,
+    /// Perturbation level (`ctx+0x338`, +2 per perturbation) and size (`ctx+0x340`, tripled by each one; 0 disables).
+    pub level: u32,
+    pub pert: f64,
+    /// The last `decide` found the perturbation due (`0xfb207..0xfb283`): the caller runs `Solver::perturb`.
+    pub perturb_due: bool,
 }
 
 /// What the decision reads from the factor and the model.
@@ -38,6 +45,14 @@ const STEP_TOL: f64 = 1e-6;
 impl Method {
     /// An iteration was made (`0x143a22`); `step` is its step length and `counted` whether it has a leaving variable that is not fixed
     /// and an entering variable that is not free.
+    /// The perturbation routine (`0x141a60`) ran: the level rises by 2 and the size triples (while below `1e6 * PerturbValue`).
+    pub fn perturbed(&mut self) {
+        self.level += 2;
+        if 1e6 * 0.0002 > self.pert {
+            self.pert *= 3.0;
+        }
+    }
+
     pub fn iteration(&mut self, flip: bool, counted: bool, step: f64) {
         self.iters += 1.0;
         if !flip && counted && step.abs() <= STEP_TOL {
@@ -70,7 +85,12 @@ impl Method {
         if switch {
             self.devex = true;
         }
-        if self.factorizations % 2 == 1 {
+        self.perturb_due = false;
+        if self.factorizations % (self.level + 2) == 1 {
+            // The pricing driver (`0xfb207`) perturbs when the degenerate iterations since the snapshot exceed 0.9 of all of them.
+            if self.pert > 0.0 && f64::from(self.degenerate - self.snap_degenerate) > (a - b) * 0.9 {
+                self.perturb_due = true;
+            }
             self.snap_degenerate = self.degenerate;
             self.snap_iters = self.iters;
         }

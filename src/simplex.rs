@@ -694,10 +694,53 @@ impl<'a> Solver<'a> {
             p0.rebuild = true;
             p0.pending = None;
         }
-        if self.p0.is_some() && !self.cleanup {
+        if self.sw.active && !self.cleanup {
             self.method_decision(sw_avg);
+            if self.sw.perturb_due {
+                self.perturb();
+            }
         }
         Ok(())
+    }
+
+    /// The bound perturbation (`0x141a60`, called from the pricing driver after a factorization): every basic variable at a bound (type
+    /// `L`, or `U`) moves off it by `(r % m + m) * size / m`, `r` the next output of a 64-bit LCG seeded with the iteration count, in
+    /// position order. The reference changes its distance array and the persistent right-hand side shift (the basic values follow at the
+    /// next recomputation), not `x_B`.
+    fn perturb(&mut self) {
+        let (p, m) = (self.p, self.p.m);
+        let tol = self.opts.feasibility_tol;
+        let size = self.sw.pert;
+        let mut state = self.sw.iters as u64;
+        for pos in 0..m {
+            let j = self.basic[pos];
+            let Some((dist, range, typ, mirrored)) = classify(self.x[j], p.lo[j], p.up[j], tol, self.dst[j]) else { continue };
+            if typ != b'L' && typ != b'U' {
+                continue;
+            }
+            state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            let mut t = (state >> 32) as u32;
+            t ^= t >> 11;
+            t ^= (t << 7) & 0x9d2c5680;
+            t ^= (t << 15) & 0xefc60000;
+            t ^= t >> 18;
+            let r = (t & 0x7fff_ffff) as i64;
+            let k = ((r % m as i64) + m as i64) as f64 * size / m as f64;
+            let amt = if typ == b'L' { k } else { -k };
+            let nd = dist + amt;
+            if (typ == b'L' && nd > range) || (typ == b'U' && 0.0 > nd) {
+                continue;
+            }
+            self.dst[j] = nd;
+            if self.rhs_shift.is_empty() {
+                self.rhs_shift = vec![0.0; m];
+            }
+            let a = if mirrored { -amt } else { amt };
+            for &(i, v) in &p.cols[j] {
+                self.rhs_shift[i] += v * a;
+            }
+        }
+        self.sw.perturbed();
     }
 
     /// The method decision after a factorization (`0x142500`): switches from `pricing0` to Devex pricing, restarting the weights and the list.
@@ -1327,6 +1370,9 @@ fn p0_key(s: f64, div: Option<f64>) -> usize {
     (if s < 0.0 { k + 0x4b } else { 0x19 - k }) as usize
 }
 
+/// `PerturbValue` default (`ctx+0x340` at the start).
+const PERTURB_VALUE: f64 = 0.0002;
+
 /// Initial window of the `pricing0` scan: it ends at the first position more than this many past its start once a candidate was counted (`P+0x50`).
 const P0_WINDOW: usize = 10;
 /// Reduced-cost tolerance of the `pricing0` scan (`ctx+0x388`).
@@ -1592,15 +1638,16 @@ impl<'a> Solver<'a> {
     fn sig(&self) -> Vec<i8> {
         let (p, tol) = (self.p, self.opts.feasibility_tol);
         self.basic.iter().map(|&j| {
-            if !is_inf(p.lo[j]) && self.x[j] < p.lo[j] - tol { -1 } else if !is_inf(p.up[j]) && self.x[j] > p.up[j] + tol { 1 } else { 0 }
+            let (li, ui) = (is_inf(p.lo[j]), is_inf(p.up[j]));
+            if li && ui { return 0; }
+            let d = self.dst[j];
+            if li { return if d < -tol { 1 } else { 0 }; }
+            if d < -tol { -1 } else if !ui && d - (p.up[j] - p.lo[j]) > tol { 1 } else { 0 }
         }).collect()
     }
 
     fn has_infeasible_basic(&self) -> bool {
-        let tol = self.opts.feasibility_tol;
-        self.basic.iter().any(|&j| {
-            (!is_inf(self.p.lo[j]) && self.x[j] < self.p.lo[j] - tol) || (!is_inf(self.p.up[j]) && self.x[j] > self.p.up[j] + tol)
-        })
+        self.sig().iter().any(|&c| c != 0)
     }
 
     /// Reduced costs of the reference's infeasible-start mode: true cost plus `PHASE1_M` times the cost vector
@@ -1616,20 +1663,8 @@ impl<'a> Solver<'a> {
             }
         }
         let tol = self.opts.feasibility_tol;
-        let mut y: Vec<f64> = self
-            .basic
-            .iter()
-            .map(|&j| {
-                let inf = if !is_inf(p.lo[j]) && self.x[j] < p.lo[j] - tol {
-                    -1.0
-                } else if !is_inf(p.up[j]) && self.x[j] > p.up[j] + tol {
-                    1.0
-                } else {
-                    0.0
-                };
-                if pure { inf } else { p.cost[j] + PHASE1_M * inf }
-            })
-            .collect();
+        let sg = self.sig();
+        let mut y: Vec<f64> = self.basic.iter().enumerate().map(|(i, &j)| { let inf = f64::from(sg[i]); if pure { inf } else { p.cost[j] + PHASE1_M * inf } }).collect();
         self.factor.btran(&mut y);
         for j in 0..p.n + p.m {
             self.d[j] = if self.pos_of[j] == NONE { (if pure { 0.0 } else { p.cost[j] }) - dot(&p.cols[j], &y) } else { 0.0 };
@@ -2190,6 +2225,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     }
     if opts.pricing0 {
         assert!(s.mirror.is_some(), "pricing0 needs faithful_ftran and faithful_positions");
+        s.sw.active = true;
+        s.sw.pert = PERTURB_VALUE;
         s.p0 = Some(P0 { list: Vec::new(), pos: 0, dstore: vec![0.0; n + m], y: Vec::new(), pending: None, tol: P0_DTOL, rebuild: true, calls: 0, window: P0_WINDOW });
     }
     s.work.factor_done();
@@ -2521,7 +2558,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         }
         // A phase 1 step may be negative (a basic variable inside its tolerance leaves from the wrong side of its bound).
         iterations += 1;
-        if s.p0.is_some() {
+        if s.sw.active {
             let counted = chosen.is_some_and(|k| !s.is_fixed(s.basic[entries[k].0])) && !(is_inf(p.lo[q]) && is_inf(p.up[q]));
             s.sw.iteration(chosen.is_none(), counted, step);
         }
