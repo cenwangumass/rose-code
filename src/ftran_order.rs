@@ -1597,6 +1597,9 @@ impl RefStruct {
                 }
             }
         }
+        // A new column without entries besides its diagonal is not a tail column: it stays among the non-tail columns (at the
+        // last non-tail slot) and keeps its place in the nucleus lists that refer to it.
+        let bare = k == 0 && old != -2;
         let mut demoted_front = vec![false; m];
         let mut convslot: Option<usize> = None;
         let mut conv: Option<usize> = None;
@@ -1658,7 +1661,13 @@ impl RefStruct {
             }
         }
         if old >= 0 {
-            self.drop_nuc(r);
+            let held = (0..m).any(|x| x != r && self.kind[x] == -2 && self.b[x].contains(&r));
+            if !bare || !held {
+                self.drop_nuc(r);
+                if bare {
+                    self.kind[r] = -1;
+                }
+            }
         } else if old == -2 {
             let old_b = std::mem::take(&mut self.b[r]);
             self.a[r].clear();
@@ -1717,7 +1726,9 @@ impl RefStruct {
             }
             self.slot[r] = bt;
             self.at[bt] = r;
-            self.i21 = bt;
+            if !bare {
+                self.i21 = bt;
+            }
             if !av.is_empty() {
                 self.walk(r, bt, top as usize);
             }
@@ -1729,7 +1740,9 @@ impl RefStruct {
                 self.upd_work.push((0xf1f37, 3.0, crate::work::CTX));
             }
         }
-        self.kind[r] = -2;
+        if !bare {
+            self.kind[r] = -2;
+        }
         let keep = (old != -2 && av.is_empty()) || (old == -2 && !moved);
         // Row r of U: the tail columns that reference r (`0xf2a51`), unless the column stays in its slot.
         let refs = (0..m).filter(|&x| x != r && self.kind[x] == -2 && (self.a[x].contains(&r) || self.b[x].contains(&r))).count();
@@ -1743,6 +1756,9 @@ impl RefStruct {
             }
             let in_a = self.a[k].contains(&r);
             let in_b = self.b[k].contains(&r);
+            if bare {
+                continue;
+            }
             if in_a || in_b {
                 // The reference scans the lists from their start for `r`; the booking is the number of entries passed.
                 let pa = self.a[k].iter().position(|&y| y == r).unwrap_or(0);
