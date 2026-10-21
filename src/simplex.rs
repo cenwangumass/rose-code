@@ -1863,7 +1863,12 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             }
             s.d[q] = s.d[q] - theta_d * if q < n { alpha_rq } else { arq_x };
         } else {
-            s.d[leave] = -theta_leave;
+            // The reference subtracts from the stored value (rounding noise included) in phase 2 as well.
+            if s.mirror.is_some() {
+                s.d[leave] -= theta_leave;
+            } else {
+                s.d[leave] = -theta_leave;
+            }
             s.d[q] = if s.mirror.is_some() { s.d[q] - theta_d * if q < n { alpha_rq } else { arq_x } } else { 0.0 };
         }
         s.w[leave] = (wq / alpha_rq) / alpha_rq;
