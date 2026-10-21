@@ -12,6 +12,8 @@ use std::collections::BinaryHeap;
 
 pub struct RefStruct {
     m: usize,
+    /// The pivot-row BTRAN of this position ran since the last update: the reference then finds the row-eta solve cached (`F+0x1d8`, `0xf193e`).
+    row_cached: Option<usize>,
     kind: Vec<i64>,
     nuc: Vec<usize>,
     i21: usize,
@@ -368,6 +370,7 @@ impl RefStruct {
             last_dense: false,
             last_ordered: false,
             bt_dense: false,
+            row_cached: None,
             m,
             kind,
             nuc,
@@ -820,6 +823,9 @@ impl RefStruct {
         let mut e = 0.0f64;
         let cnt = inp.len();
         self.bt_dense = false;
+        if direct && inp.len() == 1 {
+            self.row_cached = Some(inp[0].0);
+        }
         let hsum = (self.h33 + self.h34) as usize;
         let direct = direct && !inp.is_empty() && !ut[inp[0].0].is_empty();
         // The current vector: a list (`Some`) or dense (`None`).
@@ -1600,7 +1606,8 @@ impl RefStruct {
         let (eta_cand, solve_len) = self.eliminate(r);
         // The solve runs only when a spike entry lies below `max(slot[r], i21 - 1)` (`0xf1859..0xf191f`).
         let solve_floor = self.slot[r].max(self.i21.saturating_sub(1));
-        if solve_len > 0 && self.spike.iter().any(|e| e.0 != r && self.slot[e.0] > solve_floor) {
+        let cached = self.row_cached.take() == Some(r);
+        if !cached && solve_len > 0 && self.spike.iter().any(|e| e.0 != r && self.slot[e.0] > solve_floor) {
             self.upd_work.push((0x1322ed, 2.0 * solve_len as f64, crate::work::FAC));
         }
         let mut spk = vec![0.0f64; m];

@@ -753,7 +753,7 @@ impl<'a> Solver<'a> {
         let switch = self.sw.decide(&inp);
         if crate::dump::on("switch") {
             crate::dump::emit("switch", serde_json::json!({"call": self.refactorizations - 1, "iters": before.iters, "degenerate": before.degenerate,
-                "snap_degenerate": before.snap_degenerate, "snap_iters": before.snap_iters, "avg": avg, "l_total": inp.l_total, "u_total": inp.u_total, "switch": switch}));
+                "snap_degenerate": before.snap_degenerate, "snap_iters": before.snap_iters, "avg": avg, "l_total": inp.l_total, "u_total": inp.u_total, "switch": switch, "mode": self.sw.mode}));
         }
         if switch {
             // The switch books the Devex initialization (`0x142c4c`: `3 (n + m)`; `0x132d88`: `2 nnz(A)`), then the reference runs the Devex
@@ -761,10 +761,25 @@ impl<'a> Solver<'a> {
             // `pricing0` handling already booked.
             let nnz_a: usize = (0..self.p.n).map(|j| self.p.cols[j].len()).sum();
             self.work.add(0x142c4c, 3.0 * (self.p.n + self.p.m) as f64, crate::work::CTX);
-            self.work.add(0x132d88, 2.0 * nnz_a as f64, crate::work::CTX);
+            if before.mode == 0 {
+                self.work.add(0x132d88, 2.0 * nnz_a as f64, crate::work::CTX);
+            }
             self.p0 = None;
-            self.primal_full_work();
-            self.reduced_cost_work();
+            // The Devex initialization builds the row-wise copy afresh (`0x132d88`, `2 nnz(A)`): nonbasic, non-fixed structurals in index order.
+            if before.mode == 0 {
+                self.rrows = vec![Vec::new(); self.p.m];
+                for j in 0..self.p.n {
+                    if self.pos_of[j] == NONE && !self.is_fixed(j) {
+                        for &(i, _) in &self.p.cols[j] {
+                            self.rrows[i].push(j);
+                        }
+                    }
+                }
+            }
+            if before.mode == 0 {
+                self.primal_full_work();
+                self.reduced_cost_work();
+            }
             self.reset_weights();
             self.list.clear();
             self.level = 0;
@@ -1971,6 +1986,100 @@ fn phase1_ratio(
     }
 }
 
+/// The phase 1 ratio test used once the method has been switched (`ctx+0x468 == 0`, `0xeefa0`; `reverse-engineer/replay/ratio_eefa0.py`,
+/// spec "Phase 1 ratio test with ctx+0x468 == 0"): a Harris test over the typed entries. Arguments as `phase1_ratio`.
+fn phase1_eefa0(
+    tol_h: f64,
+    tol_p0: f64,
+    own: f64,
+    ent: &[(usize, f64)],
+    info: &dyn Fn(usize) -> Option<(f64, f64, u8, bool)>,
+    passes: &mut Vec<(usize, usize)>,
+) -> Phase1Pick {
+    let inf = INF;
+    let frames: Vec<Option<(f64, f64, u8, bool)>> = ent.iter().map(|&(pos, _)| info(pos)).collect();
+    let val = |k: usize| -> f64 {
+        let a = ent[k].1;
+        match frames[k] {
+            Some((_, _, _, true)) => -a,
+            _ => a,
+        }
+    };
+    let none = |step: f64| Phase1Pick { entry: None, step, pivot: 0.0, to_upper: false };
+    let mut tol_p = tol_p0;
+    let mut first = true;
+    loop {
+        let mut bound = own;
+        let mut rec: Vec<(usize, f64, bool)> = Vec::new();
+        for k in 0..ent.len() {
+            let Some((d, r, c, _)) = frames[k] else { continue };
+            let a = val(k);
+            if a <= tol_p {
+                if !(a < -tol_p) {
+                    continue;
+                }
+                let (dd, up) = match c {
+                    b'L' | b'N' => {
+                        if !(r < inf) {
+                            continue;
+                        }
+                        (d - r, true)
+                    }
+                    b'B' => (d, false),
+                    b'U' | b'X' => (d - r, true),
+                    _ => continue,
+                };
+                let ratio = dd / a;
+                if ratio <= bound {
+                    rec.push((k, ratio, up));
+                    bound = bound.min((dd - tol_h) / a);
+                }
+            } else {
+                let (dd, up) = match c {
+                    b'N' | b'U' | b'L' | b'X' => (d, false),
+                    b'A' => (d - r, true),
+                    _ => continue,
+                };
+                let ratio = dd / a;
+                if ratio <= bound {
+                    rec.push((k, ratio, up));
+                    bound = bound.min((dd + tol_h) / a);
+                }
+            }
+        }
+        // Work of the pass: recorded and eligible entries (`0xef226` for a list, `0xef8c3` for a dense result; the capture names the next pc).
+        passes.push(((0..ent.len()).filter(|&k| ent[k].1.abs() > tol_p).count(), rec.len()));
+        if own < inf && own <= bound {
+            return none(own);
+        }
+        if bound == inf || rec.is_empty() {
+            return none(if first { inf } else { 0.0 });
+        }
+        let (mut best, mut best_abs, mut step, mut up) = (rec[rec.len() - 1].0, 0.0f64, 0.0f64, false);
+        for &(k, ratio, u) in &rec {
+            if ratio <= bound {
+                let aa = val(k).abs();
+                if best_abs < aa {
+                    (step, best, best_abs, up) = (ratio, k, aa, u);
+                }
+            }
+        }
+        let mirrored = matches!(frames[best], Some((_, _, _, true)));
+        let pick = Phase1Pick { entry: Some(best), step, pivot: best_abs, to_upper: up != mirrored };
+        if !first || best_abs >= 0.1 {
+            return pick;
+        }
+        let mx = (0..ent.len()).fold(0.0f64, |m, k| m.max(val(k).abs()));
+        let mult = if mx >= 1e13 { 1e-6 } else if mx >= 1e10 { 1e-5 } else if mx >= 1e7 { 1e-4 } else if mx >= 1e4 { 1e-3 } else if mx >= 10.0 { 1e-2 } else { 0.1 };
+        let nt = tol_p * mx * mult;
+        if nt <= best_abs {
+            return pick;
+        }
+        tol_p = nt;
+        first = false;
+    }
+}
+
 /// Bucket thresholds of the candidate list: `T[0] = 0`, `T[k] = 2^(k-20)`.
 fn thr(k: usize) -> f64 {
     if k == 0 {
@@ -2483,8 +2592,21 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                     "d": dist, "rng": rng, "typ": typ, "dense": ft_dense, "bl": bl, "kinds": kinds, "dims": dims}));
             }
             let mut passes = Vec::new();
-            let pick = phase1_ratio(tol, opts.pivot_tol, own, &entries, &info, &mut passes, ft_dense);
+            let eefa = s.sw.mode != 0;
+            let mut passes2: Vec<(usize, usize)> = Vec::new();
+            let pick = if eefa {
+                phase1_eefa0(tol, opts.pivot_tol, own, &entries, &info, &mut passes2)
+            } else {
+                phase1_ratio(tol, opts.pivot_tol, own, &entries, &info, &mut passes, ft_dense)
+            };
             if let Some(mi) = s.mirror.as_ref() {
+                let dense = mi.last_dense();
+                for (eligible, rec) in passes2 {
+                    let (site, est) = if dense { (0xef8d5, (2 * rec + 2 * eligible + m) as f64) } else { (0xef238, (2 * rec + 4 * entries.len()) as f64) };
+                    s.work.add(site, est, crate::work::CTX);
+                }
+            }
+            if let Some(mi) = s.mirror.as_ref().filter(|_| !eefa) {
                 // The reference's phase 1 ratio test (`0xf0120`): a breakpoint pass and a selection pass over the FTRAN result.
                 let dense = mi.last_dense();
                 for pass in passes {
@@ -2673,6 +2795,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         let mut rho_ref: Option<Vec<(usize, f64)>> = None;
         // The pivot-row update's own estimate (`0x102d20`, site `0x1040c7`) apart from its pivot-row term.
         let mut devex_est = 0.0f64;
+        // Method 2 (`0x104a03`) has no cross-term BTRAN and a simpler work estimate.
+        let m2 = s.sw.mode == 2;
         let mut alpha_dense = false;
         let mut alpha_ordered = false;
         let mut tau_ref: Option<Vec<(usize, f64)>> = None;
@@ -2704,13 +2828,13 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             alpha_dense = mi.last_dense();
             alpha_ordered = mi.last_ordered();
             let alen = ftran_out.len() - 1;
-            if dense_in {
+            if dense_in && !m2 {
                 devex_est = m as f64;
             }
             devex_est = if mi.last_dense() { m as f64 * 1.5 } else { alen as f64 * 3.0 } + devex_est;
             let mut tau_len = Some(0usize);
             tau_ref = Some(Vec::new());
-            if dense_in || !inp.is_empty() {
+            if !m2 && (dense_in || !inp.is_empty()) {
                 let tau = mi.btran(&inp, false, dense_in);
                 if crate::dump::on("tau") {
                     crate::dump::emit("tau", serde_json::json!({"iter": iterations, "out": crate::dump::sparse(&tau)}));
@@ -2719,7 +2843,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 s.work.add_from(0x12de50, 0x103ac7, mi.work, crate::work::FAC);
                 tau_len = if mi.bt_dense { None } else { Some(tau.len()) };
             }
-            if let Some(t) = tau_len {
+            if let (Some(t), false) = (tau_len, m2) {
                 devex_est = devex_est + m as f64 + t as f64 * 2.0;
             }
         }
@@ -2756,8 +2880,11 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         let wq = if ftran_out.is_empty() {
             s.w[q]
         } else {
-            let mut t = if s.in_r0[q] { 1.0 } else { 0.0 };
-            if s.in_r0[s.basic[r]] {
+            // Mode 2 (`0x104a03`) takes the entering variable's 1 always and counts the variables whose weight is positive instead of the flags.
+            let m2 = s.sw.mode == 2;
+            let inr = |j: usize| if m2 { s.w[j] > 0.0 } else { s.in_r0[j] };
+            let mut t = if m2 || s.in_r0[q] { 1.0 } else { 0.0 };
+            if inr(s.basic[r]) {
                 t += alpha_rq * alpha_rq;
             }
             // The reference drops the pivot entry from the list by moving the last entry into its slot, then sums.
@@ -2766,7 +2893,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 order.swap_remove(k);
             }
             for &(i, v) in &order {
-                if i != r && s.in_r0[s.basic[i]] {
+                if i != r && inr(s.basic[i]) {
                     t += v * v;
                 }
             }
@@ -2787,8 +2914,12 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             rank
         });
         // The leaving variable takes part in the row update like any nonbasic: its row product is 1 up to rounding.
+        let leave_arj = match rho_rank.as_ref() {
+            Some(rank) => rank_dot(&p.cols[leave], &rho, rank),
+            None => 1.0,
+        };
         let theta_leave = match rho_rank.as_ref() {
-            Some(rank) => theta_d * rank_dot(&p.cols[leave], &rho, rank),
+            Some(_) => theta_d * leave_arj,
             None => theta_d,
         };
         // The entering variable takes part in the row update before it turns basic: a slack with its row product, a
@@ -2828,7 +2959,12 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 continue;
             }
             // The Devex update has its own, larger drop tolerance (`0x103d0d`); d and the list keep the row product's.
-            if arj.abs() > WEIGHT_DROP_TOL {
+            if m2 {
+                // Mode 2 (`0x104c2d`): `w_j = max(w_j, wq / alpha^2 * arj^2 + 1)`, no cross term.
+                if arj.abs() > WEIGHT_DROP_TOL {
+                    s.w[j] = s.w[j].max(((wq / alpha_rq) / alpha_rq) * arj * arj + 1.0);
+                }
+            } else if arj.abs() > WEIGHT_DROP_TOL {
                 let ratio = arj / alpha_rq;
                 let vj = dot_lanes(&p.fcols[j], &u, col_off[j] & 1);
                 s.w[j] = ratio * ((wq * ratio - vj) - vj) + s.w[j];
@@ -2866,8 +3002,18 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             s.d[q] = if s.mirror.is_some() { s.d[q] - theta_d * if q < n { alpha_rq } else { arq_x } } else { 0.0 };
         }
         s.w[leave] = (wq / alpha_rq) / alpha_rq;
-        if opts.faithful_weights && s.w[leave] <= NORM_RESET_TOL { norm_reset = true; }
-        s.w[leave] = s.w[leave].max(if opts.faithful_weights { W_MIN } else { 1.0 });
+        if m2 {
+            // Mode 2: the leaving weight is floored at 1 and the pivot-row loop then reaches the leaving variable with its row product.
+            let wl = s.w[leave].max(1.0);
+            s.w[leave] = wl;
+            if leave_arj.abs() > WEIGHT_DROP_TOL {
+                s.w[leave] = wl.max(((wq / alpha_rq) / alpha_rq) * leave_arj * leave_arj + 1.0);
+            }
+            s.w[q] = 1.0;
+        } else {
+            if opts.faithful_weights && s.w[leave] <= NORM_RESET_TOL { norm_reset = true; }
+            s.w[leave] = s.w[leave].max(if opts.faithful_weights { W_MIN } else { 1.0 });
+        }
 
         // Basis change.
         s.y_ref = None;
@@ -2921,7 +3067,11 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             let nn = p.n;
             let nnz_a: usize = p.cols[..nn].iter().map(Vec::len).sum();
             let rowlen = changed.iter().filter(|&&j| j >= nn || !s.is_fixed(j)).count() + 1;
-                let est = 2.0 * rowlen as f64 * ((m as f64 + m as f64 + nnz_a as f64) / (m + 1 + nn) as f64 + 1.5) + devex_est;
+                let est = if m2 {
+                    3.0 * rowlen as f64 + devex_est
+                } else {
+                    2.0 * rowlen as f64 * ((m as f64 + m as f64 + nnz_a as f64) / (m + 1 + nn) as f64 + 1.5) + devex_est
+                };
             s.work.add_from(0x1040c7, 0x143ff9, est, crate::work::CTX);
         }
         // The leaving variable's entry of the pivot row is `rho_r . a_leave` (1 up to rounding).

@@ -1,6 +1,6 @@
 //! The release profile's method decision (`0x142500`): it starts as `SimplexPricing=0` (`crate::simplex::SolveOptions::pricing0`) and, at a
 //! refactorization, switches to Devex pricing when a work estimate favours it. Rules: `reverse-engineer/specs/primal-simplex.md`,
-//! "Method switch". Captured inputs: `reverse-engineer/replay/gdb_switch.py`, `compare.py switch`.
+//! "Method switch" (method 2 is the second test of `decide`; see `crate::simplex::phase1_eefa0`). Captured inputs: `reverse-engineer/replay/gdb_switch.py`, `compare.py switch`.
 
 /// Counters of the iteration step (`ctx+0x2a0`, `0x330`, `0x334`, `0x2b0`) and the decision made from them.
 #[derive(Clone, Debug, Default)]
@@ -14,8 +14,9 @@ pub struct Method {
     pub snap_iters: f64,
     /// Factorizations so far, the initial one included (`ctx+0x2c0`).
     pub factorizations: u32,
-    /// The method is Devex pricing (`ctx+0x3ec == 1`).
-    pub devex: bool,
+    /// The method (`ctx+0x3ec`): 0 `pricing0`, 1 Devex pricing, 2 Devex pricing reached by the second test of `decide`. A non-zero mode also
+    /// clears `ctx+0x468`, which selects the phase 1 ratio test `0xeefa0` (`crate::simplex::phase1_eefa0`).
+    pub mode: u8,
     /// The release profile's bookkeeping runs (counters, snapshot, perturbation); off in the controlled profile.
     pub active: bool,
     /// Perturbation level (`ctx+0x338`, +2 per perturbation) and size (`ctx+0x340`, tripled by each one; 0 disables).
@@ -60,30 +61,35 @@ impl Method {
         }
     }
 
-    /// The decision after a factorization (`0x142500`, the work-based branch for the default parameters; state 10 or 2): `true` switches to
-    /// Devex pricing. Afterwards the snapshot of the pricing driver (`0xfb207`) is taken on odd factorization counts.
+    /// The decision after a factorization (`0x142500`, the work-based branch for the default parameters; state 10 or 2): `true` enters Devex
+    /// pricing (mode 1 or 2; the weights are initialised again). Afterwards the snapshot of the pricing driver (`0xfb207`) is taken on odd factorization counts.
     pub fn decide(&mut self, inp: &Inputs) -> bool {
         self.factorizations += 1;
         let (a, b) = (self.iters, self.snap_iters);
         let mut switch = false;
-        if !self.devex && a != 0.0 && a != b {
+        if self.mode != 1 && a != 0.0 && a != b {
             let rows = inp.rows as f64;
             let cols = inp.cols as f64;
+            // `ctx+0x338 >> 1` (the perturbation level, even) joins the degenerate share.
             let mut big = a / (rows + cols)
                 + 0.3
                 + 1.2 * inp.avg as f64 / rows
-                + 0.6 * (f64::from(self.degenerate - self.snap_degenerate) / (a - b));
-            if inp.infeasible {
+                + 0.6 * (f64::from(self.level as i32 >> 1) + f64::from(self.degenerate - self.snap_degenerate) / (a - b));
+            // Halved in phase 1 while `ctx+0x468 != 0`, that is before any switch.
+            if inp.infeasible && self.mode == 0 {
                 big *= 0.5;
             }
             // `P+0x3b0`: rows * (rows^2 / cols)^0.35 / 20.
             let p3b0 = if inp.cols == 0 { 1.0 } else { rows * (rows * rows / cols).powf(0.35) / 20.0 };
             let denom = inp.u_total as f64 - 2.0 * rows + 3.0 * inp.l_total as f64;
             let rhs = p3b0 / (inp.avg as f64 + 1.0) + 1.0 + 9.0 * cols / denom;
-            switch = big + big > rhs;
-        }
-        if switch {
-            self.devex = true;
+            if big + big > rhs {
+                self.mode = 1;
+                switch = true;
+            } else if self.mode == 0 && 1.2 * big > 1.0 + 6.0 * cols / denom {
+                self.mode = 2;
+                switch = true;
+            }
         }
         self.perturb_due = false;
         if self.factorizations % (self.level + 2) == 1 {

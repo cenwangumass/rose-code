@@ -118,11 +118,12 @@ fn perold_release_matches_the_reference() {
     check("perold");
 }
 
-/// DEGEN3 (m >= 500: the candidate list key and the scan's best score divide a structural's |s| by its column count plus 0.01):
-/// the first 3695 decisions agree (the phase 1 duals after an empty scan classify from the distance array `dst`; the next divergence is the method switch at the refactorization of step 3817).
+/// DEGEN3 (m >= 500: the candidate list key and the scan's best score divide a structural's |s| by its column count plus 0.01): all 5165
+/// decisions and the returned solution agree. Phase 1 passes through method 2 (`Method::decide`'s second test: Devex weights `max(w, 1 + wq arj^2 / alpha^2)` without a
+/// cross term, the `0xeefa0` ratio test) at the refactorization of step 3737 and into method 1 at step 3817.
 #[test]
-fn degen3_release_matches_the_reference_at_the_start() {
-    check_rows("degen3", 3695);
+fn degen3_release_matches_the_reference_decisions() {
+    check("degen3");
 }
 
 /// The scale factors against the reference's (`replay/gdb_scale_factors.py`, captured by `compare.py scale`; skipped where a
