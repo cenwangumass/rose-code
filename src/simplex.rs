@@ -1379,7 +1379,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     for j in 0..n {
         for &(i, _) in &s.p.cols[j] {
             s.rows[i].push(j);
-            if s.pos_of[j] == NONE {
+            // The reference's row-wise copy leaves out fixed columns.
+            if s.pos_of[j] == NONE && !s.is_fixed(j) {
                 s.rrows[i].push(j);
             }
         }
@@ -1889,7 +1890,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 }
             }
         }
-        if leave < n {
+        if leave < n && !s.is_fixed(leave) {
             for &(i, _) in &p.cols[leave] {
                 s.rrows[i].push(leave);
             }
@@ -1915,7 +1916,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         }
         let changed = match (true, rho_ref.as_ref()) {
             (true, Some(rr)) => {
-                let nz: Vec<usize> = rr.iter().map(|e| e.0).filter(|&i| rho[i] != 0.0).collect();
+                let nz: Vec<usize> = rr.iter().map(|e| e.0).filter(|&i| rho[i].abs() > ROW_DROP_TOL).collect();
                 {
                     // The reference's density test counts the entries that survive the drop tolerance.
                     let cnt = nz.iter().filter(|&&i| rho[i].abs() > ROW_DROP_TOL).count();
