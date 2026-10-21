@@ -29,6 +29,7 @@ pub struct RefStruct {
     /// Longest-path level of each L node, when the reference solves L level by level (`0x12a990`): only for `m >= 250`, a
     /// small level count (`< m/10`) and a short Markowitz L part. Otherwise the L solve is the Kahn FIFO.
     levels: Option<Vec<usize>>,
+    lev_built: bool,
     diag: Vec<f64>,
     /// Numeric U entries of each tail column `(position, value)`.
     uc: Vec<Vec<(usize, f64)>>,
@@ -269,6 +270,7 @@ impl RefStruct {
             if (m as f64) > t { t as usize } else { m }
         };
         let mut lev_dense = false;
+        let mut lev_built = false;
         let mut lev_dense_ft = false;
         let levels = {
             let d = m - nseq;
@@ -284,6 +286,7 @@ impl RefStruct {
                 let maxlev = lev.iter().copied().max().unwrap_or(0);
                 lev_dense_ft = (maxlev as f64) >= 0.1 * m as f64;
                 lev_dense = lev_dense_ft;
+                lev_built = outer;
                 if !lev_dense_ft && outer { Some(lev) } else { None }
             } else {
                 None
@@ -337,6 +340,7 @@ impl RefStruct {
             etas: Vec::new(),
             lvals,
             levels,
+            lev_built,
             diag: st.diag.clone(),
             uc,
             spike: Vec::new(),
@@ -1077,7 +1081,7 @@ impl RefStruct {
 
     /// Whether the fresh factor's L solve goes level by level (`0x12a990`).
     pub fn has_levels(&self) -> bool {
-        self.levels.is_some()
+        self.lev_built
     }
 
     /// Dense x after the L stage and after the row etas, for the `lstage` dump.

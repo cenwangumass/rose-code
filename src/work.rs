@@ -75,7 +75,7 @@ impl Work {
     pub fn factor_driver(&mut self, sites: &[(u32, f64)], scale: f64) {
         self.fac_cost = 0.0;
         for &(site, est) in sites {
-            if matches!(site, 0xd4ded | 0xd5300 | 0xd85e6 | 0xdc7b2 | 0xdcb7b) {
+            if matches!(site, 0xd4ded | 0xd5300 | 0xd85e6 | 0xd8973 | 0xdc7b2 | 0xdcb7b) {
                 self.fac_cost += est * scale;
             }
         }

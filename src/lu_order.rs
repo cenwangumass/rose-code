@@ -29,6 +29,7 @@ pub struct Structure {
     /// work estimate.
     pub nuc_nnz: usize,
     pub nuc_work: f64,
+    pub dense_n: usize,
 }
 
 pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Structure {
@@ -80,7 +81,7 @@ pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Stru
     l_vals.extend(nv);
     diag.extend(npiv);
     u_rows.extend(nu);
-    Structure { pivots: seq, phase, l_rows, l_vals, l_raw, diag, u_rows, nuc_nnz, nuc_work }
+    Structure { pivots: seq, phase, l_rows, l_vals, l_raw, diag, u_rows, nuc_nnz, nuc_work, dense_n: DENSE_N.with(|c| c.get()) }
 }
 
 impl Structure {
@@ -101,6 +102,10 @@ impl Structure {
         ];
         if self.nuc_work > 0.0 {
             out.push((0xd85e6, self.nuc_work));
+        }
+        if self.dense_n > 0 {
+            let n = self.dense_n as f64;
+            out.push((0xd8973, 0.15 * n * (n + 1.0)));
         }
         let nnz_lu = (nnz_l + u_sing + self.u_rows.iter().map(Vec::len).sum::<usize>()) as f64;
         // A size factor that ramps from 1 to 10 between 2e6 and 4e6 for 24 bytes per entry.
@@ -301,7 +306,9 @@ impl Nucleus {
 /// `cols`: (position, entries (row, value) in column-chain order). Rows and positions are the global indices of the basis.
 type NucleusOut = (Vec<(usize, usize)>, Vec<Vec<usize>>, Vec<Vec<f64>>, Vec<f64>, Vec<Vec<(usize, f64)>>, f64);
 
+thread_local! { pub static DENSE_N: std::cell::Cell<usize> = std::cell::Cell::new(0); }
 fn nucleus(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> NucleusOut {
+    DENSE_N.with(|c| c.set(0));
     let npos = cols.iter().map(|c| c.0 + 1).max().unwrap_or(0);
     let mut s = Nucleus {
         nodes: Vec::new(),
@@ -470,6 +477,7 @@ fn nucleus(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> Nucle
                             pout.push(piv);
                             uout.push((k + 1..nn).filter(|&j| a[k][j] != 0.0).map(|j| (cols_a[j], a[k][j])).collect());
                         }
+                        DENSE_N.with(|c| c.set(nn));
                         return (out, lout, lvout, pout, uout, work);
                     }
                 }
