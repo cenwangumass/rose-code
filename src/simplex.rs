@@ -336,6 +336,9 @@ struct Solver<'a> {
     list_failed: bool,
     /// The mirror's penalised dual multipliers `y` by row, from the last `dual_btran_work` (they carry the reference's rounding).
     y_ref: Option<Vec<f64>>,
+    /// Nonbasic variables that left the basis in phase 2: the reference keeps their computed value (not the bound) for the next
+    /// recomputation of `x_B`.
+    unsnapped: std::collections::HashSet<usize>,
     /// Mirror of the reference's FTRAN structure (`faithful_ftran`).
     mirror: Option<crate::ftran_order::RefStruct>,
     /// The reference's work counter (`crate::work`).
@@ -587,7 +590,7 @@ impl<'a> Solver<'a> {
         let mut r = p.rhs.clone();
         for j in 0..p.n + p.m {
             if self.pos_of[j] == NONE {
-                let v = self.nonbasic_value(j);
+                let v = if self.unsnapped.contains(&j) { self.x[j] } else { self.nonbasic_value(j) };
                 self.x[j] = v;
                 if v != 0.0 {
                     for &(i, a) in &p.cols[j] {
@@ -1308,6 +1311,7 @@ fn ratio_test(
     entries: &[(usize, f64)],
     dist_down: &dyn Fn(usize) -> f64,
     dist_up: &dyn Fn(usize) -> f64,
+    col_count: &dyn Fn(usize) -> Option<usize>,
     passes: &mut Vec<(usize, usize)>,
 ) -> (Option<usize>, f64, f64) {
     let mut first = true;
@@ -1350,7 +1354,11 @@ fn ratio_test(
         let (mut best_w, mut chosen, mut step) = (0.0, NONE, 0.0);
         for &(k, r) in &cands {
             if r <= theta {
-                let w = entries[k].1.abs();
+                // Structural basic variables are favoured by their column count (the reference's tie-break among equal pivots).
+                let mut w = entries[k].1.abs();
+                if let Some(c) = col_count(entries[k].0) {
+                    w *= (c as f64 - 1.0).min(10.0) / 10.0 + 1.0;
+                }
                 let better = best_w < w;
                 if better {
                     best_w = w;
@@ -1425,6 +1433,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         rrows: Vec::new(),
         list_failed: false,
         y_ref: None,
+        unsnapped: Default::default(),
         mirror: None,
         work: crate::work::Work::default(),
         last_pivot: None,
@@ -1709,8 +1718,18 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 let j = basic[pos];
                 if is_inf(up[j]) { INF } else { up[j] - xs[j] }
             };
+            if crate::dump::on("ent2") {
+                let dist: Vec<f64> = (0..m).map(|pos| { let j = basic[pos]; if is_inf(lo[j]) { xs[j] } else { xs[j] - lo[j] } }).collect();
+                let rng: Vec<Option<f64>> = (0..m).map(|pos| { let j = basic[pos]; (!is_inf(lo[j]) && !is_inf(up[j])).then_some(up[j] - lo[j]) }).collect();
+                let typ: String = (0..m).map(|pos| { let j = basic[pos]; if is_inf(lo[j]) && is_inf(up[j]) { 'F' } else { 'N' } }).collect();
+                crate::dump::emit("ent2", serde_json::json!({"iter": iterations, "q": q, "own": (own < INF).then_some(own),
+                    "idx": entries.iter().map(|e| e.0).collect::<Vec<_>>(), "val": entries.iter().map(|e| e.1).collect::<Vec<_>>(),
+                    "d": dist, "rng": rng, "typ": typ}));
+            }
             let mut passes = Vec::new();
-            let res = ratio_test(opts.feasibility_tol, opts.pivot_tol, own, &entries, &down, &upd, &mut passes);
+            // Set up at `0x138722`: the weight applies from 500 rows (the field is 0 below that).
+            let col_count = |pos: usize| { let j = basic[pos]; (m >= 500 && j < n).then(|| p.cols[j].len()) };
+            let res = ratio_test(opts.feasibility_tol, opts.pivot_tol, own, &entries, &down, &upd, &col_count, &mut passes);
             if let Some(mi) = s.mirror.as_ref() {
                 // The reference's ratio test (`0xef960`): per pass, a scan of the FTRAN result and its stored candidates.
                 let dense = mi.last_dense();
@@ -1748,10 +1767,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             break Status::Unbounded;
         }
         // A phase 1 step may be negative (a basic variable inside its tolerance leaves from the wrong side of its bound).
-        if !infeasible {
-            step = step.max(0.0);
-        }
         iterations += 1;
+        let x_leave_before = chosen.map(|k| s.x[s.basic[entries[k].0]]);
         // Move the basic variables and the entering variable.
         for &(i, a) in &entries {
             let j = s.basic[i];
@@ -1781,8 +1798,18 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         let (r, a_r) = entries[k];
         let leave = s.basic[r];
         let to_upper = leave_to_upper.unwrap_or(a_r < 0.0);
-        // Snap the leaving variable to the bound it reached.
-        s.x[leave] = if to_upper { p.up[leave] } else { p.lo[leave] };
+        // Snap the leaving variable to the bound it reached. In phase 2 a variable that ends outside its bound (a negative
+        // Harris step) keeps its computed value, which the reference's next recomputation of `x_B` uses.
+        let x_before = [x_leave_before.unwrap_or(0.0)];
+        let bound = if to_upper { p.up[leave] } else { p.lo[leave] };
+        let outside = if to_upper { x_before[0] > bound } else { x_before[0] < bound };
+        if infeasible || !outside {
+            s.x[leave] = bound;
+            s.unsnapped.remove(&leave);
+        } else {
+            s.x[leave] = x_before[0];
+            s.unsnapped.insert(leave);
+        }
         let alpha_rq = alpha[r];
 
         // Pivot row alpha_r = e_r' B^-1 [A I] and the Devex cross-term vector tau = B^-T u.
