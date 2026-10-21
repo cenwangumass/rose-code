@@ -271,6 +271,97 @@ pub fn crash_basis(model: &LpModel) -> Basis {
     b
 }
 
+/// The reference's sort of a key array with a companion index array (`0x8bee60`, `0x8bf1f0`): ascending, not stable. Ranges of 100
+/// or more are partitioned around the median of three (the smaller side is sorted by a recursive call, the larger one goes on in
+/// the loop, at most 50 rounds); what is left, and every smaller range, is shell-sorted with gaps `n/2`, then `gap/2.2`, ending
+/// with 1 (a gap of 2 goes to 1). Ties therefore keep the input order only in the insertion-sort stage.
+fn ref_sort<T: Copy>(a: &mut [f64], idx: &mut [T]) {
+    fn quick<T: Copy>(a: &mut [f64], idx: &mut [T], mut lo: usize, mut hi: usize, mut depth: u32) {
+        while hi - lo >= 100 && depth < 50 {
+            let n = hi - lo;
+            let (x, y, z) = (a[lo], a[lo + n / 2], a[hi - 1]);
+            let p = if (x > y) == (x < z) { x } else if (y > x) == (y < z) { y } else { z };
+            let (mut i, mut r, mut lp, mut rp) = (lo, hi, lo, 0usize);
+            if lo < hi && p > a[lo] {
+                while i < hi && p > a[i] {
+                    i += 1;
+                }
+                lp = i;
+            }
+            while i < r {
+                let v = a[i];
+                if p > v {
+                    a.swap(i, lp);
+                    idx.swap(i, lp);
+                    i += 1;
+                    lp += 1;
+                } else if v == p {
+                    i += 1;
+                } else {
+                    loop {
+                        r -= 1;
+                        rp += 1;
+                        let w = a[r];
+                        if p > w {
+                            if i < r {
+                                // a[i] <- a[lp], a[lp] <- a[r], a[r] <- v
+                                let (il, ir) = (idx[lp], idx[r]);
+                                a[i] = a[lp];
+                                a[lp] = w;
+                                a[r] = v;
+                                idx[r] = idx[i];
+                                idx[i] = il;
+                                idx[lp] = ir;
+                                i += 1;
+                                lp += 1;
+                            }
+                            break;
+                        } else if w == p {
+                            if i < r {
+                                a[i] = w;
+                                a[r] = v;
+                                idx.swap(i, r);
+                                i += 1;
+                            }
+                            break;
+                        } else if i >= r {
+                            break;
+                        }
+                    }
+                }
+            }
+            depth += 1;
+            let (left, right) = (lp - lo, rp);
+            if left > right {
+                quick(a, idx, hi - rp, hi, depth);
+                hi = lp;
+            } else {
+                quick(a, idx, lo, lp, depth);
+                lo = hi - rp;
+            }
+        }
+        shell(a, idx, lo, hi);
+    }
+    fn shell<T: Copy>(a: &mut [f64], idx: &mut [T], lo: usize, hi: usize) {
+        let mut gap = (hi - lo) / 2;
+        while gap > 0 {
+            for s in lo + gap..hi {
+                let (key, ki) = (a[s], idx[s]);
+                let mut k = s;
+                while k >= lo + gap && a[k - gap] > key {
+                    a[k] = a[k - gap];
+                    idx[k] = idx[k - gap];
+                    k -= gap;
+                }
+                a[k] = key;
+                idx[k] = ki;
+            }
+            gap = if gap == 2 { 1 } else { (gap as f64 / 2.2) as usize };
+        }
+    }
+    quick(a, idx, 0, a.len(), 0);
+}
+
 /// The reference's bound placement after the crash (`0x1387d0`, decompiled lines 405-560): each nonbasic column with a finite
 /// range, taken in ascending order of `(up - lo) * cost` (ties by descending index, which reproduces BOEING2), moves to its upper
 /// bound when that lowers the total infeasibility of the row slacks (a slack is feasible in `[0, up]`), or leaves it unchanged
@@ -300,7 +391,8 @@ fn flip_to_upper(p: &Internal, b: &mut Basis) {
         .filter(|&j| !is_basic[j] && !b.at_upper[j] && !is_inf(p.lo[j]) && !is_inf(p.up[j]) && p.up[j] > p.lo[j])
         .collect();
     let key = |j: usize| (p.up[j] - p.lo[j]) * p.cost[j];
-    cand.sort_by(|&x, &y| key(x).partial_cmp(&key(y)).unwrap().then(y.cmp(&x)));
+    let mut keys: Vec<f64> = cand.iter().map(|&j| key(j)).collect();
+    ref_sort(&mut keys, &mut cand);
     for j in cand {
         let range = p.up[j] - p.lo[j];
         let mut gain = 0.0;
@@ -322,6 +414,8 @@ fn flip_to_upper(p: &Internal, b: &mut Basis) {
 struct Solver<'a> {
     p: &'a Internal,
     opts: &'a SolveOptions,
+    /// Variable dropped last from a singular supplied basis: not priced until the basis is primal feasible.
+    excluded: Option<usize>,
     basic: Vec<usize>,
     pos_of: Vec<usize>,
     at_upper: Vec<bool>,
@@ -946,7 +1040,7 @@ impl<'a> Solver<'a> {
 
     /// Eligibility and score `d^2 / w` of a nonbasic variable, or `None` if it cannot enter.
     fn score(&self, j: usize) -> Option<f64> {
-        if self.pos_of[j] != NONE || self.is_fixed(j) {
+        if self.pos_of[j] != NONE || self.is_fixed(j) || self.excluded == Some(j) {
             return None;
         }
         // The reference's candidate scan accepts |d| above 1e-6 (it rejected a d of 1.5e-7 that the default 1e-7 takes).
@@ -1032,6 +1126,18 @@ impl<'a> Solver<'a> {
             let q = self.price();
             self.rescan = false;
             return q;
+        }
+        q
+    }
+
+    /// `price_faithful`, except that the variable dropped from a singular supplied basis stays out of the scan until the scan finds no
+    /// other candidate; it is then admitted and the list rebuilt (the reference adds 3 to its status, -4 -> -1, in `0xcda5b`).
+    fn price_admitting(&mut self) -> Option<usize> {
+        let q = self.price_faithful();
+        if q.is_none() && self.excluded.take().is_some() {
+            self.list.clear();
+            self.level = 0;
+            return self.price_faithful();
         }
         q
     }
@@ -1807,12 +1913,56 @@ fn ratio_test(
     }
 }
 
+/// The reference's repair of a singular supplied basis ("variables dropped from basis"): the columns that get no pivot in the
+/// reference's LU order leave the basis (nonbasic at their lower bound) and the slacks of the rows left without a pivot replace them.
+/// Returns the last variable dropped (highest basis position), which the reference keeps out of pricing until the basis is
+/// primal feasible (status -4 until `0x155139` adds 3 back).
+fn repair_basis(p: &Internal, b: &mut Basis) -> Option<usize> {
+    let (n, m) = (p.n, p.m);
+    let cols: Vec<(bool, Vec<usize>, Vec<f64>)> = b
+        .basic
+        .iter()
+        .map(|&v| (v >= n, p.fcols[v].iter().map(|&(r, _)| r).collect(), p.fcols[v].iter().map(|&(_, a)| a).collect()))
+        .collect();
+    crate::lu_order::reset_pair_gate();
+    crate::lu_order::set_factorization_number(1);
+    let piv = crate::lu_order::pivot_order(m, &cols);
+    if piv.len() == m {
+        return None;
+    }
+    let mut row_done = vec![false; m];
+    let mut pos_done = vec![false; m];
+    for &(r, pos) in &piv {
+        row_done[r] = true;
+        pos_done[pos] = true;
+    }
+    let free_rows = (0..m).filter(|&r| !row_done[r]);
+    let dropped = (0..m).filter(|&pos| !pos_done[pos]);
+    let mut last = None;
+    for (pos, r) in dropped.zip(free_rows) {
+        let out = b.basic[pos];
+        b.at_upper[out] = false;
+        b.basic[pos] = n + r;
+        b.at_upper[n + r] = false;
+        last = Some(out);
+    }
+    last
+}
+
 /// Solve starting from `start` (a primal feasible basis). `None` uses the all-slack basis with columns at their lower bounds.
 pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Result<SolveResult, SolveError> {
     let p = build(model);
     let (n, m) = (p.n, p.m);
+    let mut excluded = None;
     let basis = match start {
-        Some(b) => b.clone(),
+        Some(b) => {
+            let mut b = b.clone();
+            b.validate(n, m).map_err(SolveError::InvalidBasis)?;
+            // The reference gets a basis as variable statuses, so its incoming position order is the variable order.
+            b.basic.sort_unstable();
+            excluded = repair_basis(&p, &mut b);
+            b
+        }
         // Cold start: the reference's crash basis (`crash_basis`).
         None => crash_basis(model),
     };
@@ -1827,6 +1977,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     let mut s = Solver {
         p: &p,
         opts,
+        excluded,
         basic: basis.basic.clone(),
         pos_of,
         at_upper: basis.at_upper.clone(),
@@ -1971,6 +2122,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         }
         let infeasible = s.has_infeasible_basic();
         s.p1_tol_on = infeasible;
+
         if infeasible {
             let was = phase1;
             phase1 = true;
@@ -2024,7 +2176,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         }
         PRC.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let q = if infeasible {
-            match s.price_faithful() {
+            match s.price_admitting() {
                 Some(q) => q,
                 None => {
                     // No improving column for the penalised cost: try the pure sum of infeasibilities, which either
@@ -2032,7 +2184,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                     let y = s.composite_dual(true);
                     s.list.clear();
                     s.level = 0;
-                    match s.price_faithful() {
+                    match s.price_admitting() {
                         Some(q) => q,
                         None => {
                             farkas = Some(y.iter().map(|v| -v).collect());
@@ -2042,7 +2194,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 }
             }
         } else {
-            match if opts.pricing0 { s.price0() } else { s.price_faithful() } {
+            match if opts.pricing0 { s.price0() } else { s.price_admitting() } {
                 Some(q) => q,
                 None => {
                     // The reference recomputes the duals once more when the scan finds nothing (`0x145520`, with the residual check).
