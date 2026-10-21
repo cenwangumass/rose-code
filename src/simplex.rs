@@ -349,6 +349,11 @@ struct Solver<'a> {
     work: crate::work::Work,
     /// The last pivot, whose primal update the reference runs at the start of the next iteration (`0x105f20`).
     last_pivot: Option<LastPivot>,
+    /// Whether basic variables are infeasible (`ctx+0x2d0 != 0`): the list update and the pricing scan then take the dual
+    /// tolerance `P[0x3c0] * P[0]` = `1e-7 * 1e6` instead of the plain one.
+    p1_tol_on: bool,
+    /// The pivot row and `extra` of the last list update from the pivot step (`0x1442ab`), which `0x107e14` repeats.
+    last_upd: Option<(Vec<usize>, usize)>,
     /// Work of the last column replacement, which the reference does after the next refactorization check (and not at all
     /// when it refactors instead).
     upd_work: Vec<(u32, f64, f64)>,
@@ -498,8 +503,9 @@ impl<'a> Solver<'a> {
     /// The reference's handling of phase 1 cost changes after a pivot (`0x105f20`): a BTRAN of the cost changes `dc`
     /// (positions and values), the row product of the result, and a list update over that row, which also carries the
     /// entering column when it is structural.
-    fn cost_change_work(&mut self, dc: &[(usize, f64)], q: usize, leave: usize, alpha_rq: f64) {
+    fn cost_change_work(&mut self, dc: &[(usize, f64)], q: usize, leave: usize, alpha_rq: f64, q_only: bool) {
         let Some(mi) = self.mirror.as_mut() else { return };
+        self.work.mute = q_only;
         let (n, m) = (self.p.n, self.p.m);
         let dc_sorted = dc.to_vec();
         let out = mi.btran(&dc_sorted, false, false);
@@ -551,6 +557,13 @@ impl<'a> Solver<'a> {
             eprintln!("CORD {}", serde_json::json!({"nz": nz, "changed": changed}));
         }
         let changed = self.pivot_row_order_by(&nz, &changed, nz.len());
+        self.work.mute = false;
+        if q_only {
+            if let Some((c, e)) = self.last_upd.clone() {
+                self.update_list(&c, e, 0x107e14);
+            }
+            return;
+        }
         self.update_list(&changed, usize::from(q < n), 0x108280);
     }
 
@@ -763,7 +776,7 @@ impl<'a> Solver<'a> {
             return None;
         }
         // The reference's candidate scan accepts |d| above 1e-6 (it rejected a d of 1.5e-7 that the default 1e-7 takes).
-        let tol = if self.opts.faithful_weights { self.opts.optimality_tol.max(1e-6) } else { self.opts.optimality_tol };
+        let tol = if self.opts.faithful_weights && self.p1_tol_on { 1e-7 * PHASE1_M } else if self.opts.faithful_weights { self.opts.optimality_tol.max(1e-6) } else { self.opts.optimality_tol };
         let free = is_inf(self.p.lo[j]) && is_inf(self.p.up[j]);
         let dj = self.d[j];
         if free && self.opts.faithful_weights {
@@ -839,27 +852,13 @@ impl<'a> Solver<'a> {
     }
 
     /// The reference's "Resetting Norm" (`0x102d20`, after the basis change): w = 1 and framework membership for every nonbasic
-    /// variable, w = 0 and no membership for the basic ones, then the candidate list is rebuilt by a full pass.
-    fn reset_norm(&mut self) {
+    /// variable, w = 0 and no membership for the basic ones. The candidate list keeps its entries and takes the normal update.
+    fn reset_weights(&mut self) {
         let nm = self.p.n + self.p.m;
         for j in 0..nm {
             let nb = self.pos_of[j] == NONE;
             self.w[j] = if nb { 1.0 } else { 0.0 };
             self.in_r0[j] = nb;
-        }
-        self.level = 0;
-        self.list.clear();
-        for j in 0..nm {
-            if let Some(sc) = self.score(j) {
-                if thr(self.level) < sc {
-                    let b = bucket(sc);
-                    if b > self.level {
-                        self.level = b;
-                        self.list.clear();
-                    }
-                    self.list.push(j);
-                }
-            }
         }
     }
 
@@ -888,6 +887,9 @@ impl<'a> Solver<'a> {
     /// After a pivot: score the changed entries (in index order), raise the level if a higher bucket appears,
     /// keep still-qualifying old entries first, then append the new ones.
     fn update_list(&mut self, changed: &[usize], extra: usize, caller: u32) {
+        if caller == 0x1442ab {
+            self.last_upd = Some((changed.to_vec(), extra));
+        }
         let mut fresh: Vec<usize> = Vec::new();
         // The reference empties the old list when the level rises, so it scans none of it.
         let mut raised = false;
@@ -1452,6 +1454,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         mirror: None,
         work: crate::work::Work::default(),
         last_pivot: None,
+        p1_tol_on: false,
+        last_upd: None,
         upd_work: Vec::new(),
     };
     s.rows = vec![Vec::new(); m];
@@ -1532,6 +1536,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         // also collects the phase 1 cost changes of the basic variables that changed feasibility class.
         let last = s.last_pivot.take().filter(|_| !due);
         let mut dc: Vec<(usize, f64)> = Vec::new();
+        // The entering variable alone changes class: the reference neither solves nor takes a row product for it (`0x107e14`).
+        let mut q_only = false;
         if let Some(lp) = &last {
             if phase1 {
                 let cls = s.sig();
@@ -1547,15 +1553,17 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                     let r = s.pos_of[lp.q];
                     if cls[r] != 0 {
                         dc.push((r, PHASE1_M * f64::from(cls[r])));
+                        q_only = dc.len() == 1;
                     }
                 }
             }
             if s.mirror.is_some() {
-                let est = if lp.dense { m as f64 * 3.0 } else { lp.rows.len() as f64 * 6.0 } + dc.len() as f64 * 4.0;
+                let est = if lp.dense { m as f64 * 3.0 } else { lp.rows.len() as f64 * 6.0 } + if q_only { 0.0 } else { dc.len() as f64 * 4.0 };
                 s.work.add(0x107b57, est, crate::work::CTX);
             }
         }
         let infeasible = s.has_infeasible_basic();
+        s.p1_tol_on = infeasible;
         if infeasible {
             let was = phase1;
             phase1 = true;
@@ -1565,7 +1573,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 if s.mirror.is_some() {
                     // The reference keeps `d` and applies the cost changes to it in place.
                     if let (Some(lp), false) = (&last, dc.is_empty()) {
-                        s.cost_change_work(&dc, lp.q, lp.leave, lp.alpha_rq);
+                        s.cost_change_work(&dc, lp.q, lp.leave, lp.alpha_rq, q_only);
                     }
                 } else {
                     // Without the mirror: re-score the columns whose `d` moved.
@@ -1592,7 +1600,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             // phase 1 (its work counts toward the refactorization clause).
             if s.mirror.is_some() && !due {
                 if let (Some(lp), false) = (&last, dc.is_empty()) {
-                    s.cost_change_work(&dc, lp.q, lp.leave, lp.alpha_rq);
+                    s.cost_change_work(&dc, lp.q, lp.leave, lp.alpha_rq, q_only);
                 }
             }
             s.list.clear();
@@ -2076,9 +2084,14 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 let est = 2.0 * rowlen as f64 * ((m as f64 + m as f64 + nnz_a as f64) / (m + 1 + nn) as f64 + 1.5) + devex_est;
             s.work.add_from(0x1040c7, 0x143ff9, est, crate::work::CTX);
         }
+        if s.mirror.is_some() && opts.faithful_weights {
+            s.p1_tol_on = s.has_infeasible_basic();
+        }
         // The reference's pivot row also carries the entering column (`0x102d20`).
         if norm_reset && opts.faithful_weights {
-            s.reset_norm();
+            // The reset sets the weights; the candidate list keeps its entries and level and takes the normal update.
+            s.reset_weights();
+            s.update_list(&changed, 1, 0x1442ab);
         } else {
             s.update_list(&changed, 1, 0x1442ab);
         }
