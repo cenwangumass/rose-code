@@ -420,6 +420,7 @@ struct Solver<'a> {
     opts: &'a SolveOptions,
     /// Variable dropped last from a singular supplied basis: not priced until the basis is primal feasible.
     excluded: Option<usize>,
+    restart: bool,
     basic: Vec<usize>,
     pos_of: Vec<usize>,
     at_upper: Vec<bool>,
@@ -620,10 +621,11 @@ impl<'a> Solver<'a> {
     fn refactor(&mut self) -> Result<(), SolveError> {
         let mut sw_avg = 0usize;
         if self.opts.faithful_positions {
-            if self.cleanup {
+            if self.cleanup || self.restart {
                 self.basic.sort_unstable();
             }
-            let (order, st, rows) = self.reference_order(self.refactorizations + 1);
+            // The driver restart after a repaired basis (`0xcda5b`) factors like the starting factorization.
+            let (order, st, rows) = self.reference_order(if self.restart { 1 } else { self.refactorizations + 1 });
             crate::dump::emit("luin", serde_json::json!({"n": self.refactorizations, "cols": self.basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "phase": st.phase}));
             debug_assert_eq!(order.len(), self.basic.len());
             for (pos, &j) in order.iter().enumerate() {
@@ -1250,6 +1252,13 @@ impl<'a> Solver<'a> {
     fn price_admitting(&mut self) -> Option<usize> {
         let q = self.price_faithful();
         if q.is_none() && self.excluded.take().is_some() {
+            // The reference re-enters its driver, which rebuilds the basis in ascending column order and refactors.
+            self.restart = true;
+            let r = self.refactor();
+            self.restart = false;
+            if r.is_err() {
+                return None;
+            }
             self.list.clear();
             self.level = 0;
             return self.price_faithful();
@@ -1657,7 +1666,6 @@ impl<'a> Solver<'a> {
                 return y;
             }
         }
-        let tol = self.opts.feasibility_tol;
         let sg = self.sig();
         let mut y: Vec<f64> = self.basic.iter().enumerate().map(|(i, &j)| { let inf = f64::from(sg[i]); if pure { inf } else { p.cost[j] + PHASE1_M * inf } }).collect();
         self.factor.btran(&mut y);
@@ -2147,6 +2155,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         p: &p,
         opts,
         excluded,
+        restart: false,
         basic: basis.basic.clone(),
         pos_of,
         at_upper: basis.at_upper.clone(),
