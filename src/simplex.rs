@@ -354,6 +354,9 @@ struct Solver<'a> {
     p1_tol_on: bool,
     /// The pivot row and `extra` of the last list update from the pivot step (`0x1442ab`), which `0x107e14` repeats.
     last_upd: Option<(Vec<usize>, usize)>,
+    /// The pivot row's values (`arj`) of that update, and the row being built for the next one.
+    last_row: Vec<(usize, f64)>,
+    pending_row: Option<Vec<(usize, f64)>>,
     /// Work of the last column replacement, which the reference does after the next refactorization check (and not at all
     /// when it refactors instead).
     upd_work: Vec<(u32, f64, f64)>,
@@ -504,8 +507,24 @@ impl<'a> Solver<'a> {
     /// (positions and values), the row product of the result, and a list update over that row, which also carries the
     /// entering column when it is structural.
     fn cost_change_work(&mut self, dc: &[(usize, f64)], q: usize, leave: usize, alpha_rq: f64, q_only: bool) {
+        if q_only {
+            // Only the entering variable changed class: no BTRAN and no row product. The reference applies `d_j -= dc * arj` over the
+            // previous pivot row (`0x1084a0` again, with `dc` as the step) and repeats its list update (`0x107e14`).
+            let step = dc[0].1 / alpha_rq;
+            for &(j, arj) in &self.last_row.clone() {
+                if j == q {
+                    // The entering variable carries its own cost change: `(d - y) + dc` keeps the noise of `d`.
+                    self.d[j] = (self.d[j] - step * arj) + dc[0].1;
+                } else if self.pos_of[j] == NONE && !self.is_fixed(j) || j >= self.p.n && self.pos_of[j] != NONE {
+                    self.d[j] -= step * arj;
+                }
+            }
+            if let Some((c, e)) = self.last_upd.clone() {
+                self.update_list(&c, e, 0x107e14);
+            }
+            return;
+        }
         let Some(mi) = self.mirror.as_mut() else { return };
-        self.work.mute = q_only;
         let (n, m) = (self.p.n, self.p.m);
         let dc_sorted = dc.to_vec();
         let out = mi.btran(&dc_sorted, false, false);
@@ -531,13 +550,17 @@ impl<'a> Solver<'a> {
         // row product when it is a slack, `alpha_rq` when structural (it is the entering column's pivot element, as in
         // the pivot-row update). Basic slacks outside the cost-change positions lose their raw row entry (rounding noise);
         // basic structurals are not touched.
-        if q != NONE {
+        if q != NONE && !q_only {
             self.d[q] = if q < n { self.d[q] - alpha_rq } else { self.d[q] - rank_dot(&p.cols[q], &rho, &rank) };
         }
         for j in n..n + m {
-            if self.pos_of[j] != NONE && j != q && !dc.iter().any(|e| self.basic[e.0] == j) {
+            if self.pos_of[j] != NONE && j != q {
                 let ab = dot(&p.cols[j], &rho);
-                if ab != 0.0 {
+                // A basic slack at a cost-change position gets the row entry and its own cost change: `(d - y) + dc`, whose
+                // rounding keeps the stored noise of `d` (`0x1084a0` on the row vector, then the cost change).
+                if let Some(e) = dc.iter().find(|e| self.basic[e.0] == j) {
+                    self.d[j] = (self.d[j] - ab) + e.1;
+                } else if ab != 0.0 {
                     self.d[j] -= ab;
                 }
             }
@@ -557,13 +580,6 @@ impl<'a> Solver<'a> {
             eprintln!("CORD {}", serde_json::json!({"nz": nz, "changed": changed}));
         }
         let changed = self.pivot_row_order_by(&nz, &changed, nz.len());
-        self.work.mute = false;
-        if q_only {
-            if let Some((c, e)) = self.last_upd.clone() {
-                self.update_list(&c, e, 0x107e14);
-            }
-            return;
-        }
         self.update_list(&changed, usize::from(q < n), 0x108280);
     }
 
@@ -889,6 +905,7 @@ impl<'a> Solver<'a> {
     fn update_list(&mut self, changed: &[usize], extra: usize, caller: u32) {
         if caller == 0x1442ab {
             self.last_upd = Some((changed.to_vec(), extra));
+            self.last_row = self.pending_row.take().unwrap_or_default();
         }
         let mut fresh: Vec<usize> = Vec::new();
         // The reference empties the old list when the level rises, so it scans none of it.
@@ -1456,6 +1473,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         last_pivot: None,
         p1_tol_on: false,
         last_upd: None,
+        last_row: Vec::new(),
+        pending_row: None,
         upd_work: Vec::new(),
     };
     s.rows = vec![Vec::new(); m];
@@ -1962,6 +1981,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         };
         let mut norm_reset = false;
         let mut changed: Vec<usize> = Vec::new();
+        let mut rowvals: Vec<(usize, f64)> = Vec::new();
         for j in 0..n + m {
             if j >= n && j != q && j != leave && s.pos_of[j] != NONE && s.mirror.is_some() {
                 let arj = match rho_rank.as_ref() {
@@ -1974,6 +1994,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                     }
                     // The reference keeps a basic slack's rounding-noise row product in the pivot row like any entry.
                     changed.push(j);
+                    rowvals.push((j, arj));
                 }
                 continue;
             }
@@ -2002,6 +2023,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                     s.d[j] -= theta_d * arj;
             }
             changed.push(j);
+            rowvals.push((j, arj));
         }
         // The penalty leaves `d` of the leaving variable after the list update, which scores it with the penalty still in.
         let mut leave_penalty = 0.0;
@@ -2027,7 +2049,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         }
         s.w[leave] = (wq / alpha_rq) / alpha_rq;
         if opts.faithful_weights && s.w[leave] <= NORM_RESET_TOL { norm_reset = true; }
-        s.w[leave] = s.w[leave].max(if opts.faithful_weights && !s.in_r0[leave] { W_MIN } else { 1.0 });
+        s.w[leave] = s.w[leave].max(if opts.faithful_weights { W_MIN } else { 1.0 });
 
         // Basis change.
         s.y_ref = None;
@@ -2084,6 +2106,14 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 let est = 2.0 * rowlen as f64 * ((m as f64 + m as f64 + nnz_a as f64) / (m + 1 + nn) as f64 + 1.5) + devex_est;
             s.work.add_from(0x1040c7, 0x143ff9, est, crate::work::CTX);
         }
+        // The leaving variable's entry of the pivot row is `rho_r . a_leave` (1 up to rounding).
+        let arl = match rho_rank.as_ref() {
+            Some(rank) => rank_dot(&p.cols[leave], &rho, rank),
+            None => dot(&p.cols[leave], &rho),
+        };
+        rowvals.push((leave, arl));
+        rowvals.push((q, if q < n { alpha_rq } else { arq_x }));
+        s.pending_row = Some(rowvals);
         if s.mirror.is_some() && opts.faithful_weights {
             s.p1_tol_on = s.has_infeasible_basic();
         }

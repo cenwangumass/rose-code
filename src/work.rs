@@ -22,22 +22,17 @@ pub struct Work {
     /// Cost of the factorization in progress: the sum of the driver's own increments.
     fac_cost: f64,
     log: bool,
-    /// While set, increments are dropped (numerics that the reference does not run as a separate pass).
-    pub mute: bool,
 }
 
 impl Default for Work {
     fn default() -> Self {
-        Work { w: 0.0, w150: 0.0, decided_once: false, w158: 0.0, fac_cost: 0.0, mute: false, log: std::env::var_os("ROSE_WORK").is_some() }
+        Work { w: 0.0, w150: 0.0, decided_once: false, w158: 0.0, fac_cost: 0.0, log: std::env::var_os("ROSE_WORK").is_some() }
     }
 }
 
 impl Work {
     /// `W = est * scale + W`, in the reference's operation order.
     pub fn add(&mut self, site: u32, est: f64, scale: f64) {
-        if self.mute {
-            return;
-        }
         let d = est * scale;
         self.w = d + self.w;
         if self.log {
@@ -47,9 +42,6 @@ impl Work {
 
     /// As `add`, for a shared routine (solve wrapper, row product) whose increment is told apart by its call site.
     pub fn add_from(&mut self, site: u32, caller: u32, est: f64, scale: f64) {
-        if self.mute {
-            return;
-        }
         let d = est * scale;
         self.w = d + self.w;
         if self.log {
