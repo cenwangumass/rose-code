@@ -510,6 +510,39 @@ struct P0 {
     calls: usize,
     /// Scan window (`P+0x50`): set at each refactorization to `max(10, trunc(avg / 2))`, `avg = trunc(S / U)` the mean FTRAN result count of the `U` updates since the last one.
     window: usize,
+    /// The bucket-chain variant of the candidate list (`P+0x80 == 2`, see `Buckets`), for models with at least twice as many columns as
+    /// rows per column entry (`0x137fc9`); `list` is unused then.
+    bk: Option<Buckets>,
+}
+
+/// The reference's bucket candidate list when `P+0x80 == 2` (`0xfecb0` second loop, scan `0xfbe60` from `0xfbfcc`): `next` is the array
+/// `P+0x40` (the successor in the chain of the same bucket), `head[k]` / `tail[k]` the chains `P+0x88 + 4k` / `P+0x21c + 4k` for the keys
+/// `1..=100` (`-1` empty), `visited` the entries scanned since the rebuild (`P+0x3c8`).
+struct Buckets {
+    head: [i64; 101],
+    tail: [i64; 101],
+    next: Vec<i64>,
+    visited: usize,
+    /// The chains were built once; later refactorizations only recompute the duals (`0xe4092`: `0x145520` is skipped while `P+0x78 > 0`).
+    built: bool,
+    /// `P+0x78 = r8d` of the gate (`p0_bucket_mode`); the sign flip at each factorization (`0x1428ce`..`0x1428d3`) makes `0xe4092` rebuild when the
+    /// factorization is a clean-up (`ctx+0x294` in 3..8) or its number (`ctx+0x2c0`, the first is 1) is 1 modulo `r8d`.
+    r8: usize,
+    /// The refactorization just made calls the rebuild (the first one always does).
+    full: bool,
+}
+
+impl Buckets {
+    /// Appends `j` to the chain of key `k`.
+    fn append(&mut self, k: usize, j: usize) {
+        if self.tail[k] != -1 {
+            self.next[self.tail[k] as usize] = j as i64;
+        } else {
+            self.head[k] = j as i64;
+        }
+        self.tail[k] = j as i64;
+        self.next[j] = -1;
+    }
 }
 
 struct LastPivot {
@@ -695,6 +728,9 @@ impl<'a> Solver<'a> {
         if let Some(p0) = self.p0.as_mut() {
             p0.rebuild = true;
             p0.pending = None;
+            if let Some(bk) = p0.bk.as_mut() {
+                bk.full = self.cleanup || self.refactorizations % bk.r8 == 1;
+            }
         }
         if self.sw.active && !self.cleanup {
             self.method_decision(sw_avg);
@@ -1400,6 +1436,40 @@ fn p0_key(s: f64, div: Option<f64>) -> usize {
     (if s < 0.0 { k + 0x4b } else { 0x19 - k }) as usize
 }
 
+/// Whether the reference runs the bucket-chain candidate list (`P+0x80 = 2`, `P+0x78 = r8d` at `0x1385d1`): with `SimplexPricing` at its release
+/// default and no warm start, when `trunc(n * (n / m) / max(n, nnz)) >= 2` (`0x137f86`..`0x137fce`, `nnz` = `ctx+0x3d0`). That is a model of
+/// one column count per row at most: `fx_unbounded`, `fx_tied` (1 row, 2 columns); no Netlib model of the corpus below 80BAU3B.
+fn p0_bucket_mode(n: usize, m: usize, nnz: usize) -> bool {
+    p0_bucket_r8(n, m, nnz) >= 2
+}
+
+/// `r8d` of `0x137fc9`: `trunc(n * (n / m) / max(n, nnz))`.
+fn p0_bucket_r8(n: usize, m: usize, nnz: usize) -> usize {
+    if m == 0 {
+        return 0;
+    }
+    ((n as f64 / m as f64 * n as f64) / n.max(nnz) as f64) as usize
+}
+
+/// Bucket key of the bucket-chain list (`0xfecb0`, `0xfbe60`): like `p0_key` with the exponent clamped to -15..=34 (`17179500000` and
+/// `3.051758e-05`), `0x41 + k` for an attractive score and `0x23 - k` for the others. Keys run from 1 to 99.
+fn p0_key2(s: f64, div: Option<f64>) -> usize {
+    const HI: f64 = 17179500000.0;
+    const LO: f64 = 3.051758e-05;
+    let a = match div {
+        Some(c) => s.abs() / (c + 0.01),
+        None => s.abs(),
+    };
+    let k: i32 = if a >= HI {
+        34
+    } else if a < LO {
+        -15
+    } else {
+        ((a.to_bits() >> 52) & 0x7ff) as i32 - 1022
+    };
+    (if s < 0.0 { 0x41 + k } else { 0x23 - k }) as usize
+}
+
 /// `PerturbValue` default (`ctx+0x340` at the start).
 const PERTURB_VALUE: f64 = 0.0002;
 
@@ -1465,6 +1535,37 @@ impl<'a> Solver<'a> {
             let div = if self.p.m >= 500 && j < self.p.n { Some(self.p.cols[j].len() as f64) } else { None };
             keys[j] = if free { 100 } else { p0_key(s, div) };
         }
+        if self.p0.as_ref().unwrap().bk.is_some() {
+            // Bucket chains: the variables of each key in index order (`0xfecb0`, the loop that appends to `P+0x21c + 4 key`).
+            let keys2: Vec<usize> = (0..nm)
+                .map(|j| {
+                    if !self.p0_eligible(j) {
+                        return 0;
+                    }
+                    let div = if self.p.m >= 500 && j < self.p.n { Some(self.p.cols[j].len() as f64) } else { None };
+                    p0_key2(dstore[j], div)
+                })
+                .collect();
+            let p0 = self.p0.as_mut().unwrap();
+            let bk = p0.bk.as_mut().unwrap();
+            bk.head = [-1; 101];
+            bk.tail = [-1; 101];
+            bk.visited = 0;
+            bk.built = true;
+            bk.full = false;
+            for j in 0..nm {
+                let k = keys2[j];
+                if k != 0 {
+                    bk.append(k, j);
+                }
+            }
+            p0.dstore = dstore;
+            p0.y = y;
+            p0.pos = 0;
+            p0.rebuild = false;
+            p0.pending = None;
+            return;
+        }
         sort_work.push((0x1010a3, 4.0 * self.p.n as f64));
         sort_work.push((0x1002f8, 5.0 * self.p.m as f64));
         sort_work.push((0x100404, 3.0 * nm as f64));
@@ -1516,6 +1617,9 @@ impl<'a> Solver<'a> {
 
     /// One scan of the list window from the current position (`0xfbe60`). Returns the entering variable and its `d`.
     fn p0_scan(&mut self) -> Option<(usize, f64)> {
+        if self.p0.as_ref().unwrap().bk.is_some() {
+            return self.p0_scan2();
+        }
         let m = self.p.m;
         let nm = self.p.n + self.p.m;
         let offs = self.p0_col_offsets();
@@ -1595,25 +1699,190 @@ impl<'a> Solver<'a> {
         q
     }
 
+    /// The scan of the bucket-chain list (`0xfbe60` from `0xfbfcc`, non-sparse loop `0xfce50`): walks the chains from the highest non-empty
+    /// bucket down through the visited entries (basic ones are only linked), scoring every nonbasic non-fixed one (the stored `d` takes the
+    /// score whether attractive or not); the window ends after `window` entries once an attractive one was seen. The visited entries are
+    /// then unlinked from their buckets (the buckets above the end are emptied, the partly scanned one keeps the rest; every `window`-th
+    /// update the rest and the lower buckets move up one key) and re-inserted by their new score, except the entering variable.
+    fn p0_scan2(&mut self) -> Option<(usize, f64)> {
+        let nm = self.p.n + self.p.m;
+        let offs = self.p0_col_offsets();
+        let col_off = |j: usize| offs[j] & 1;
+        let upd = self.mirror.as_ref().map_or(0, |mi| mi.updates());
+        let mut p0 = self.p0.take().unwrap();
+        let mut bk = p0.bk.take().unwrap();
+        let m500 = self.p.m >= 500;
+        let n = self.p.n;
+        if bk.visited as f64 > 3.0 * nm as f64 {
+            // `P+0x3c8` above three times the variable count: nothing is returned, the caller recomputes and rebuilds.
+            p0.bk = Some(bk);
+            self.p0 = Some(p0);
+            return None;
+        }
+        let mut b0 = 0usize;
+        if bk.head[100] >= 0 {
+            b0 = 100;
+        } else {
+            for k in (1..100).rev() {
+                if bk.head[k] >= 0 {
+                    b0 = k;
+                    break;
+                }
+            }
+        }
+        let (mut prev, mut first): (i64, i64) = (-1, -1);
+        let mut last: i64 = -1;
+        let mut q: Option<(usize, f64)> = None;
+        let mut best = 0.0f64;
+        let mut nattr = 0usize;
+        let mut visited = 0usize;
+        let mut b = b0;
+        if b0 > 0 {
+            let mut cur = bk.head[b];
+            'scan: loop {
+                if cur < 0 {
+                    loop {
+                        b -= 1;
+                        if b == 0 {
+                            last = -1;
+                            break 'scan;
+                        }
+                        cur = bk.head[b];
+                        if cur >= 0 {
+                            break;
+                        }
+                    }
+                }
+                let j = cur as usize;
+                visited += 1;
+                if self.p0_eligible(j) {
+                    let (s, free) = self.p0_score(j, &p0.y, &col_off);
+                    p0.dstore[j] = s;
+                    if free {
+                        // A free variable is taken at once and is not linked into the visited chain.
+                        q = Some((j, s));
+                        last = cur;
+                        break 'scan;
+                    }
+                    if s < -p0.tol {
+                        nattr += 1;
+                        let sc = if m500 && j < n { s / (self.p.cols[j].len() as f64 + 0.01) } else { s };
+                        if best > sc {
+                            best = sc;
+                            q = Some((j, if self.at_upper[j] { -s } else { s }));
+                        }
+                    }
+                }
+                if prev != -1 {
+                    bk.next[prev as usize] = cur;
+                } else {
+                    first = cur;
+                }
+                prev = cur;
+                last = cur;
+                if visited > p0.window && nattr != 0 {
+                    break 'scan;
+                }
+                cur = bk.next[j];
+            }
+        }
+        bk.visited += visited;
+        // Unlink: the buckets above the end of the scan are empty, the one it ended in keeps the rest of its chain.
+        if b == 100 {
+            let rest = if last >= 0 { bk.next[last as usize] } else { -1 };
+            bk.head[100] = rest;
+            if rest < 0 {
+                bk.tail[100] = -1;
+            }
+        } else {
+            for k in b + 1..=b0.min(99) {
+                bk.head[k] = -1;
+                bk.tail[k] = -1;
+            }
+            if b != 0 {
+                let rest = if last >= 0 { bk.next[last as usize] } else { -1 };
+                let w = p0.window.max(1);
+                if upd % w != w - 1 {
+                    bk.head[b + 1] = -1;
+                    bk.tail[b + 1] = -1;
+                    bk.head[b] = rest;
+                    if rest < 0 {
+                        bk.tail[b] = -1;
+                    }
+                } else {
+                    if rest < 0 {
+                        bk.head[b + 1] = -1;
+                        bk.tail[b + 1] = -1;
+                    } else {
+                        bk.head[b + 1] = rest;
+                        bk.tail[b + 1] = bk.tail[b];
+                    }
+                    for k in (2..=b).rev() {
+                        bk.head[k] = bk.head[k - 1];
+                        bk.tail[k] = bk.tail[k - 1];
+                    }
+                    bk.head[1] = -1;
+                    bk.tail[1] = -1;
+                }
+            } else {
+                bk.head[1] = -1;
+                bk.tail[1] = -1;
+            }
+        }
+        if prev >= 0 {
+            bk.next[prev as usize] = -1;
+        }
+        // Re-insert the visited entries by their new score.
+        let mut cur = first;
+        while cur >= 0 {
+            let j = cur as usize;
+            let nxt = bk.next[j];
+            bk.next[j] = -1;
+            if q.map(|e| e.0) != Some(j) && self.p0_eligible(j) {
+                let free = is_inf(self.p.lo[j]) && is_inf(self.p.up[j]);
+                if !free {
+                    let div = if m500 && j < n { Some(self.p.cols[j].len() as f64) } else { None };
+                    bk.append(p0_key2(p0.dstore[j], div), j);
+                }
+            }
+            cur = nxt;
+        }
+        p0.bk = Some(bk);
+        self.p0 = Some(p0);
+        q
+    }
+
     /// Entering variable of the `pricing0` option, or `None` at optimality (after the recomputation of the duals the reference makes
     /// when the list holds nothing).
     fn price0(&mut self) -> Option<usize> {
         self.recomputed = false;
         if self.p0.as_ref().unwrap().rebuild {
-            self.p0_rebuild();
+            if self.p0.as_ref().unwrap().bk.as_ref().is_some_and(|b| b.built && !b.full) {
+                // Bucket chains keep their state across a refactorization: only the duals are recomputed (`P+0x10 = 0`, `0xfb790` in the scan).
+                if self.y_ref.is_none() {
+                    self.dual_btran_work();
+                }
+                let y = self.y_ref.clone().unwrap();
+                let p0 = self.p0.as_mut().unwrap();
+                p0.y = y;
+                p0.rebuild = false;
+                p0.pending = None;
+            } else {
+                self.p0_rebuild();
+            }
         } else {
             self.p0_update_duals();
         }
         let dump = |s: &Self, tag: &str, q: Option<(usize, f64)>| {
             if crate::dump::on("pricing0") {
                 let p0 = s.p0.as_ref().unwrap();
-                crate::dump::emit("pricing0", serde_json::json!({"n": p0.calls, "tag": tag, "list": p0.list, "pos": p0.pos, "y": p0.y, "dstore": p0.dstore, "q": q.map(|e| e.0), "d": q.map(|e| e.1)}));
+                crate::dump::emit("pricing0", serde_json::json!({"n": p0.calls, "tag": tag, "list": p0.bk.as_ref().map_or(p0.list.iter().map(|&x| x as i64).collect::<Vec<_>>(), |b| b.next.clone()), "head": p0.bk.as_ref().map(|b| b.head.to_vec()), "tail": p0.bk.as_ref().map(|b| b.tail.to_vec()), "pos": p0.pos, "y": p0.y, "dstore": p0.dstore, "q": q.map(|e| e.0), "d": q.map(|e| e.1)}));
             }
         };
         let before = |s: &Self| {
             if crate::dump::on("pricing0") {
                 let p0 = s.p0.as_ref().unwrap();
-                crate::dump::emit("pricing0", serde_json::json!({"n": p0.calls, "tag": "in", "list": p0.list, "pos": p0.pos, "y": p0.y, "dstore": p0.dstore}));
+                crate::dump::emit("pricing0", serde_json::json!({"n": p0.calls, "tag": "in", "list": p0.bk.as_ref().map_or(p0.list.iter().map(|&x| x as i64).collect::<Vec<_>>(), |b| b.next.clone()), "head": p0.bk.as_ref().map(|b| b.head.to_vec()), "tail": p0.bk.as_ref().map(|b| b.tail.to_vec()), "pos": p0.pos, "y": p0.y, "dstore": p0.dstore}));
             }
         };
         before(self);
@@ -2351,7 +2620,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         assert!(s.mirror.is_some(), "pricing0 needs faithful_ftran and faithful_positions");
         s.sw.active = true;
         s.sw.pert = PERTURB_VALUE;
-        s.p0 = Some(P0 { list: Vec::new(), pos: 0, dstore: vec![0.0; n + m], y: Vec::new(), pending: None, tol: P0_DTOL, rebuild: true, calls: 0, window: P0_WINDOW });
+        let nnz: usize = (0..n).map(|j| p.cols[j].len()).sum();
+        s.p0 = Some(P0 { list: Vec::new(), pos: 0, dstore: vec![0.0; n + m], y: Vec::new(), pending: None, tol: P0_DTOL, rebuild: true, calls: 0, window: P0_WINDOW, bk: p0_bucket_mode(n, m, nnz).then(|| Buckets { head: [-1; 101], tail: [-1; 101], next: vec![-1; n + m], visited: 0, built: false, r8: p0_bucket_r8(n, m, nnz), full: true }) });
     }
     s.work.factor_done();
     s.recompute_primal();
@@ -2766,6 +3036,12 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             s.y_ref = None;
             s.pos_of[leave] = NONE;
             s.at_upper[leave] = to_upper;
+            if s.p0_eligible(leave) {
+                // The bucket-chain list takes the leaving variable at the tail of its lowest bucket (key 1), where the next scan reaches it last.
+                if let Some(bk) = s.p0.as_mut().unwrap().bk.as_mut() {
+                    bk.append(1, leave);
+                }
+            }
             s.basic[r] = q;
             s.pos_of[q] = r;
             s.factor.update(r, alpha);
