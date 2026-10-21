@@ -896,6 +896,8 @@ impl<'a> Solver<'a> {
 
 /// Drop tolerance of the pivot-row product (`0x134d90`'s first argument).
 const ROW_DROP_TOL: f64 = 1e-13;
+/// Pivot-row entries at or below this are left out of the Devex weight update (`0x103d0d`).
+const WEIGHT_DROP_TOL: f64 = 1e-12;
 
 /// Pricing calls of the reference's `0x105a50` (the dump's `n`): the retry after a failed scan of the candidate list is one too.
 static PRC: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
@@ -1833,11 +1835,14 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             if arj.abs() <= ROW_DROP_TOL {
                 continue;
             }
-            let ratio = arj / alpha_rq;
-            let vj = dot_lanes(&p.fcols[j], &u, col_off[j] & 1);
-            s.w[j] = ratio * ((wq * ratio - vj) - vj) + s.w[j];
-            let floor = if opts.faithful_weights { W_MIN } else { 1.0 };
-            s.w[j] = s.w[j].max(floor);
+            // The Devex update has its own, larger drop tolerance (`0x103d0d`); d and the list keep the row product's.
+            if arj.abs() > WEIGHT_DROP_TOL {
+                let ratio = arj / alpha_rq;
+                let vj = dot_lanes(&p.fcols[j], &u, col_off[j] & 1);
+                s.w[j] = ratio * ((wq * ratio - vj) - vj) + s.w[j];
+                let floor = if opts.faithful_weights { W_MIN } else { 1.0 };
+                s.w[j] = s.w[j].max(floor);
+            }
             if !s.is_fixed(j) {
                 // The reference sums the row product in the order of the BTRAN output list.
                     s.d[j] -= theta_d * arj;
