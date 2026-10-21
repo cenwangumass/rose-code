@@ -748,7 +748,8 @@ impl<'a> Solver<'a> {
         if self.pos_of[j] != NONE || self.is_fixed(j) {
             return None;
         }
-        let tol = self.opts.optimality_tol;
+        // The reference's candidate scan accepts |d| above 1e-6 (it rejected a d of 1.5e-7 that the default 1e-7 takes).
+        let tol = if self.opts.faithful_weights { self.opts.optimality_tol.max(1e-6) } else { self.opts.optimality_tol };
         let free = is_inf(self.p.lo[j]) && is_inf(self.p.up[j]);
         let dj = self.d[j];
         if free && self.opts.faithful_weights {
