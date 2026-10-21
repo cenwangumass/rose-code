@@ -2023,7 +2023,22 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 crate::dump::emit("rho", serde_json::json!({"iter": iterations, "r": r, "out": crate::dump::sparse(rho_ref.as_deref().unwrap())}));
             }
             s.work.add_from(0x13174d, 0x102e5b, mi.work, crate::work::FAC);
-            let inp: Vec<(usize, f64)> = ftran_out.iter().copied().filter(|&(i, _)| s.in_r0[s.basic[i]]).collect();
+            // The reference's input list for the cross-term BTRAN (`0x102d20`): the pivot entry first (when its variable is in `R0`),
+            // then the pivot column's list with the pivot entry dropped by moving the last entry into its slot (when the column
+            // came out as a list rather than ascending).
+            let inp: Vec<(usize, f64)> = match ftran_out.iter().position(|e| e.0 == r) {
+                Some(k) if !alpha_ordered => {
+                    let mut rest = ftran_out.clone();
+                    let piv = rest.swap_remove(k);
+                    let mut v: Vec<(usize, f64)> = Vec::with_capacity(rest.len() + 1);
+                    if s.in_r0[s.basic[piv.0]] {
+                        v.push(piv);
+                    }
+                    v.extend(rest.into_iter().filter(|&(i, _)| s.in_r0[s.basic[i]]));
+                    v
+                }
+                _ => ftran_out.iter().copied().filter(|&(i, _)| s.in_r0[s.basic[i]]).collect(),
+            };
             // The cross-term vector goes in dense when the FTRAN result was dense or too long for a list (`0x102d20`).
             // By then the list no longer holds the pivot entry.
             let dense_in = mi.last_dense() || m <= mi.dthr() * (ftran_out.len() - 1);
