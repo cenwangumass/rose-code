@@ -47,7 +47,9 @@ pub fn any() -> bool {
 /// Writes one record of `kind` under its tag.
 pub fn emit(kind: &str, rec: serde_json::Value) {
     let tag = KINDS.iter().find(|k| k.0 == kind).map_or("DUMP", |k| k.1);
-    eprintln!("{tag} {rec}");
+    // One write per record: stderr is unbuffered and `Value`'s Display writes piece by piece.
+    let line = format!("{tag} {}\n", serde_json::to_string(&rec).unwrap());
+    std::io::Write::write_all(&mut std::io::stderr().lock(), line.as_bytes()).unwrap();
 }
 
 /// A sparse vector as `[[index, value], ...]`.
