@@ -119,10 +119,10 @@ fn perold_release_matches_the_reference() {
 }
 
 /// DEGEN3 (m >= 500: the candidate list key and the scan's best score divide a structural's |s| by its column count plus 0.01):
-/// the first 1400 decisions agree; the next one needs the perturbation / mode rules.
+/// the first 1740 decisions agree (the refactorization timing needs the work counter of the sort routine and of the row-eta solve).
 #[test]
 fn degen3_release_matches_the_reference_at_the_start() {
-    check_rows("degen3", 1400);
+    check_rows("degen3", 1740);
 }
 
 /// The scale factors against the reference's (`replay/gdb_scale_factors.py`, captured by `compare.py scale`; skipped where a

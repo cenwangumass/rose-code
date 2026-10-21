@@ -1522,7 +1522,7 @@ impl RefStruct {
     }
 
     /// Row elimination of a column replacement at `r`: the eta multipliers `(position, multiplier)` in elimination order.
-    fn eliminate(&self, r: usize) -> Vec<(usize, f64)> {
+    fn eliminate(&self, r: usize) -> (Vec<(usize, f64)>, usize) {
         let m = self.m;
         let d0 = self.diag[r];
         let mut rows: Vec<Vec<(usize, f64)>> = vec![Vec::new(); m];
@@ -1542,12 +1542,20 @@ impl RefStruct {
             heap.push(std::cmp::Reverse((self.slot[k], k)));
         }
         let mut eta = Vec::new();
+        // The reference's solve (`0x131760`) books 2 per entry of the row-wise copy of every accepted position, `r` first.
+        let rlen = |y: usize| (0..m).filter(|&x| self.kind[x] == -2 && (self.a[x].contains(&y) || self.b[x].contains(&y))).count();
+        // Only positions in the tail (slot >= i21) are visited in the heap phase of the solve that books; the earlier ones are
+        // handled in the list phase.
+        let mut visited = if self.slot[r] >= self.i21 { rlen(r) } else { 0 };
         while let Some(std::cmp::Reverse((_, k))) = heap.pop() {
             let c = -w[k] / self.diag[k];
             if c.abs() <= TOL {
                 continue;
             }
             eta.push((k, c));
+            if self.slot[k] >= self.i21 {
+                visited += rlen(k);
+            }
             for &(l, v) in &rows[k] {
                 w[l] += c * v;
                 if !seen[l] {
@@ -1556,7 +1564,7 @@ impl RefStruct {
                 }
             }
         }
-        eta
+        (eta, visited)
     }
 
     /// Replace the column at position `r` by the entering column of the last `ftran`.
@@ -1589,7 +1597,12 @@ impl RefStruct {
         self.sum_alpha += self.last_alpha as f64;
         let spike: Vec<usize> = self.spike.iter().map(|e| e.0).collect();
         let spike = &spike[..];
-        let eta_cand = self.eliminate(r);
+        let (eta_cand, solve_len) = self.eliminate(r);
+        // The solve runs only when a spike entry lies below `max(slot[r], i21 - 1)` (`0xf1859..0xf191f`).
+        let solve_floor = self.slot[r].max(self.i21.saturating_sub(1));
+        if solve_len > 0 && self.spike.iter().any(|e| e.0 != r && self.slot[e.0] > solve_floor) {
+            self.upd_work.push((0x1322ed, 2.0 * solve_len as f64, crate::work::FAC));
+        }
         let mut spk = vec![0.0f64; m];
         for &(p, v) in &self.spike {
             spk[p] = v;

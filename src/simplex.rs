@@ -1374,14 +1374,26 @@ impl<'a> Solver<'a> {
         let col_off = |j: usize| offs[j] & 1;
         let mut dstore = vec![0.0; nm];
         let mut keys = vec![0usize; nm];
+        // Work of the sort routine `0xfffc0`: the bucket table (101), 2 per column entry of every eligible structural, then 4 per
+        // structural, 5 per row and 3 per variable (the count and placement passes).
+        let mut sort_work: Vec<(u32, f64)> = vec![(0x100fa5, 101.0)];
         for j in 0..nm {
             if !self.p0_eligible(j) {
                 continue;
             }
             let (s, free) = self.p0_score(j, &y, &col_off);
+            if j < self.p.n {
+                sort_work.push((0x1010f3, 2.0 * self.p.cols[j].len() as f64));
+            }
             dstore[j] = s;
             let div = if self.p.m >= 500 && j < self.p.n { Some(self.p.cols[j].len() as f64) } else { None };
             keys[j] = if free { 100 } else { p0_key(s, div) };
+        }
+        sort_work.push((0x1010a3, 4.0 * self.p.n as f64));
+        sort_work.push((0x1002f8, 5.0 * self.p.m as f64));
+        sort_work.push((0x100404, 3.0 * nm as f64));
+        for (site, est) in sort_work {
+            self.work.add(site, est, crate::work::CTX);
         }
         let mut list: Vec<usize> = (0..nm).collect();
         list.sort_by(|&a, &b| keys[b].cmp(&keys[a]).then(b.cmp(&a)));
