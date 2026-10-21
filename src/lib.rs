@@ -6,6 +6,7 @@ pub mod ftran_order;
 pub mod lu;
 pub mod lu_order;
 pub mod lu_pairs;
+pub mod method;
 pub mod model;
 pub mod mps;
 pub mod scale;

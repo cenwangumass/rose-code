@@ -1,6 +1,6 @@
 //! AFIRO (release profile, `SimplexPricing=-1` before its switch) reproduces every reference decision and the returned solution bit
-//! for bit with the `pricing0` and `scaling` options; SC50A and BLEND reproduce the decisions up to the method switch (`0x142500`),
-//! whose Devex pricing is not implemented. The models, reference traces and reference runs live in `reverse-engineer/`.
+//! for bit with the `pricing0` and `scaling` options; SC50A and BLEND also reproduce the method switch (`0x142500`)
+//! and the Devex pricing after it. The models, reference traces and reference runs live in `reverse-engineer/`.
 
 use rose::{mps, solve, SolveOptions, Status};
 
@@ -58,22 +58,30 @@ fn afiro_release_matches_the_reference() {
     check("afiro");
 }
 
-/// ADLITTLE starts in phase 1 (scan tolerance `P[0x3c0] * P[0]`, cost shifts in the dual update, dense dual recomputation at the end of
-/// phase 1) and never switches the method: all 104 decisions and the returned solution agree.
+/// ADLITTLE starts in phase 1 (tolerance `P[0x3c0] * P[0]`, cost shifts in the dual update, dense dual recomputation at the end of phase 1)
+/// and never switches the method: all 104 decisions and the returned solution agree.
 #[test]
 fn adlittle_release_matches_the_reference() {
     check("adlittle");
 }
 
-/// Decisions 0..24 of the reference (the first 25 of the trace) are the `SimplexPricing=0` ones; the 26th is taken after the switch.
+/// DEGEN2: 690 decisions (phase 1 first), the method switch at the twelfth factorization (step 526) and Devex pricing after it.
 #[test]
-fn sc50a_release_matches_the_reference_up_to_the_switch() {
-    check_rows("sc50a", 25);
+fn degen2_release_matches_the_reference() {
+    check("degen2");
 }
 
+/// SC50A: `SimplexPricing=0` for 25 decisions, the method switch at the sixth factorization (`0x142500`, `crate::method`) and Devex
+/// pricing afterwards; all 32 decisions and the returned solution agree.
 #[test]
-fn blend_release_matches_the_reference_up_to_the_switch() {
-    check_rows("blend", 25);
+fn sc50a_release_matches_the_reference() {
+    check("sc50a");
+}
+
+/// BLEND: the switch at the third factorization; all 64 decisions and the returned solution agree.
+#[test]
+fn blend_release_matches_the_reference() {
+    check("blend");
 }
 
 /// The scale factors against the reference's (`replay/gdb_scale_factors.py`, captured by `compare.py scale`; skipped where a

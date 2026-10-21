@@ -771,7 +771,6 @@ impl RefStruct {
     }
 
     /// Sum of the FTRAN result counts of the updates since the factorization (`F+0x190`).
-    /// Update count and result-count sum before the most recent update (`F+0x18c`, `F+0x190` as the refactorization reads them).
     pub fn window_stats(&self) -> (usize, f64) {
         self.before_last
     }
@@ -1177,6 +1176,11 @@ impl RefStruct {
     /// `nnz(U)` of the fresh factor (the reference's `F+0xb0` pointer array total): the factor size less `nnz(L)` and the two diagonals.
     pub fn u_nnz(&self) -> usize {
         self.znz as usize - self.nnz_l - 2 * self.m
+    }
+
+    /// `nnz(L)` of the fresh factor (the reference's `F+0x58` pointer array total).
+    pub fn l_nnz(&self) -> usize {
+        self.nnz_l
     }
 
     /// Whether the fresh factor's L solve goes level by level (`0x12a990`).

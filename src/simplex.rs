@@ -478,8 +478,10 @@ struct Solver<'a> {
     /// Work of the last column replacement, which the reference does after the next refactorization check (and not at all
     /// when it refactors instead).
     upd_work: Vec<(u32, f64, f64)>,
-    /// State of the `pricing0` option (`None` when it is off).
+    /// State of the `pricing0` option (`None` when it is off or after the switch to Devex pricing).
     p0: Option<P0>,
+    /// Counters of the method decision (`crate::method`).
+    sw: crate::method::Method,
 }
 
 /// State of the release profile's initial pricing (`0xfbe60`, list build `0xfecb0`, dual update `0xfb790`).
@@ -612,6 +614,7 @@ impl<'a> Solver<'a> {
     }
 
     fn refactor(&mut self) -> Result<(), SolveError> {
+        let mut sw_avg = 0usize;
         if self.opts.faithful_positions {
             if self.cleanup {
                 self.basic.sort_unstable();
@@ -624,6 +627,10 @@ impl<'a> Solver<'a> {
             }
             self.basic = order;
             if self.opts.faithful_ftran {
+                if let Some(old) = self.mirror.as_ref() {
+                    let (u, sum) = old.window_stats();
+                    sw_avg = if u > 0 { (sum / u as f64) as usize } else { 0 };
+                }
                 if let (Some(old), Some(p0)) = (self.mirror.as_ref(), self.p0.as_mut()) {
                     // `0xf15c0` (`0xf4562`): the scan window follows the mean FTRAN result count of the updates made before the last one
                     // (the refactorization is decided before that update is counted).
@@ -683,7 +690,28 @@ impl<'a> Solver<'a> {
             p0.rebuild = true;
             p0.pending = None;
         }
+        if self.p0.is_some() && !self.cleanup {
+            self.method_decision(sw_avg);
+        }
         Ok(())
+    }
+
+    /// The method decision after a factorization (`0x142500`): switches from `pricing0` to Devex pricing, restarting the weights and the list.
+    fn method_decision(&mut self, avg: usize) {
+        let mi = self.mirror.as_ref().unwrap();
+        let inp = crate::method::Inputs { rows: self.p.m, cols: self.p.n, avg, l_total: mi.l_nnz() + self.p.m, u_total: mi.u_nnz() + self.p.m, infeasible: self.has_infeasible_basic() };
+        let before = self.sw.clone();
+        let switch = self.sw.decide(&inp);
+        if crate::dump::on("switch") {
+            crate::dump::emit("switch", serde_json::json!({"call": self.refactorizations - 1, "iters": before.iters, "degenerate": before.degenerate,
+                "snap_degenerate": before.snap_degenerate, "snap_iters": before.snap_iters, "avg": avg, "l_total": inp.l_total, "u_total": inp.u_total, "switch": switch}));
+        }
+        if switch {
+            self.p0 = None;
+            self.reset_weights();
+            self.list.clear();
+            self.level = 0;
+        }
     }
 
     /// The dual clean-up pass that follows a primal optimum with shifts (`0xf6a00`), after its factorization and the recomputation of the duals:
@@ -2048,6 +2076,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         pending_row: None,
         upd_work: Vec::new(),
         p0: None,
+        sw: crate::method::Method { factorizations: 1, ..Default::default() },
     };
     s.rows = vec![Vec::new(); m];
     s.rrows = vec![Vec::new(); m];
@@ -2164,7 +2193,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         if infeasible {
             let was = phase1;
             phase1 = true;
-            if opts.pricing0 {
+            if s.p0.is_some() {
                 // `pricing0`: no maintained `d`; the cost shifts join the BTRAN input of the dual update (a refactorization or a
                 // fresh start rebuilds the duals instead).
                 s.p0_cost_changes(was && !due, &dc);
@@ -2197,6 +2226,15 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         } else if phase1 {
             // Back in a feasible region: continue with the true costs (weights and framework are kept).
             phase1 = false;
+            if s.p0.is_some() && !due {
+                // The end of phase 1 recomputes the duals from the true costs (one dense BTRAN) and keeps the list.
+                s.dual_btran_work();
+                let p0 = s.p0.as_mut().unwrap();
+                if !p0.rebuild {
+                    p0.y = s.y_ref.clone().unwrap();
+                    p0.pending = None;
+                }
+            }
             // The reference's primal update of the last pivot still runs the phase 1 cost-change pass on the iteration that ends
             // phase 1 (its work counts toward the refactorization clause).
             if s.mirror.is_some() && !due {
@@ -2206,17 +2244,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             }
             s.list.clear();
             s.level = 0;
-            if opts.pricing0 && !due {
-                // The end of phase 1 recomputes the duals from the true costs (one dense BTRAN) and keeps the list.
-                s.dual_btran_work();
-                let p0 = s.p0.as_mut().unwrap();
-                if !p0.rebuild {
-                    p0.y = s.y_ref.clone().unwrap();
-                    p0.pending = None;
-                }
-            }
             // After a refactorization the duals were just recomputed with the same (now feasible) basic values.
-            if !due && !opts.pricing0 {
+            if !due && !s.p0.is_some() {
                 s.dual_btran_work();
                 s.recompute_dual();
             }
@@ -2229,7 +2258,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         if let Some(p0) = s.p0.as_mut() {
             p0.tol = if infeasible { P0_DTOL_P1 } else { P0_DTOL };
         }
-        let q = if infeasible && !opts.pricing0 {
+        let q = if infeasible && !s.p0.is_some() {
             match s.price_admitting() {
                 Some(q) => q,
                 None => {
@@ -2248,7 +2277,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 }
             }
         } else {
-            match if opts.pricing0 { s.price0() } else { s.price_admitting() } {
+            match if s.p0.is_some() { s.price0() } else { s.price_admitting() } {
                 Some(q) => q,
                 None => {
                     // The reference recomputes the duals once more when the scan finds nothing (`0x145520`, with the residual check).
@@ -2407,6 +2436,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         }
         // A phase 1 step may be negative (a basic variable inside its tolerance leaves from the wrong side of its bound).
         iterations += 1;
+        if s.p0.is_some() {
+            let counted = chosen.is_some_and(|k| !s.is_fixed(s.basic[entries[k].0])) && !(is_inf(p.lo[q]) && is_inf(p.up[q]));
+            s.sw.iteration(chosen.is_none(), counted, step);
+        }
         let x_leave_before = chosen.map(|k| s.x[s.basic[entries[k].0]]);
         // Move the basic variables and the entering variable.
         // Phase 2 does not move the point by a negative Harris step (reference, PEROLD ratio calls 50, 82, 354, ...: the
