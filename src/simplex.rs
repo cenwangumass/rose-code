@@ -744,7 +744,7 @@ impl<'a> Solver<'a> {
     /// Work of the reference's primal update (`0x105f20`, site `0x107b57`) when it recomputes `x_B` after a factorization:
     /// copies and scans of length `m`, the columns of the nonbasic structurals away from zero, and every fifth time an extra copy.
     fn primal_full_work(&mut self) {
-        if self.mirror.is_none() {
+        if self.mirror.is_none() || self.p0.is_some() {
             return;
         }
         let (n, m) = (self.p.n, self.p.m);
@@ -884,7 +884,7 @@ impl<'a> Solver<'a> {
         self.y_ref = Some(y);
         // The reduced costs that follow (`0x1020a0`, site `0x1021b0`): a pass over all variables and the columns of the
         // nonbasic structurals that are not fixed.
-        if self.cleanup {
+        if self.cleanup || self.p0.is_some() {
             return;
         }
         let n = p.n;
@@ -1436,8 +1436,10 @@ impl<'a> Solver<'a> {
                         if s + s < p0.dstore[j] {
                             cnt += 1;
                             marked[i] = true;
-                            if best > s {
-                                best = s;
+                            // With `m >= 500` (`P+0x1c = n`) a structural's score is divided by its column count plus 0.01 for the comparison.
+                            let sc = if m >= 500 && j < self.p.n { s / (self.p.cols[j].len() as f64 + 0.01) } else { s };
+                            if best > sc {
+                                best = sc;
                                 q = Some((j, if self.at_upper[j] { -s } else { s }));
                             }
                         }
@@ -2207,7 +2209,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                     }
                 }
             }
-            if s.mirror.is_some() {
+            if s.mirror.is_some() && s.p0.is_none() {
                 let est = if lp.dense { m as f64 * 3.0 } else { lp.rows.len() as f64 * 6.0 } + if q_only { 0.0 } else { dc.len() as f64 * 4.0 };
                 s.work.add(0x107b57, est, crate::work::CTX);
             }

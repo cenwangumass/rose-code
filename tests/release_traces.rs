@@ -100,6 +100,13 @@ fn boeing2_release_matches_the_reference_at_the_start() {
     check_rows("boeing2", 120);
 }
 
+/// DEGEN3 (m >= 500: the candidate list key and the scan's best score divide a structural's |s| by its column count plus 0.01):
+/// the first 1400 decisions agree; the next one needs the perturbation / mode rules.
+#[test]
+fn degen3_release_matches_the_reference_at_the_start() {
+    check_rows("degen3", 1400);
+}
+
 /// The scale factors against the reference's (`replay/gdb_scale_factors.py`, captured by `compare.py scale`; skipped where a
 /// capture is missing, as the captures are not under version control).
 #[test]
