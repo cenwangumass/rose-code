@@ -336,6 +336,8 @@ struct Solver<'a> {
     list_failed: bool,
     /// The mirror's penalised dual multipliers `y` by row, from the last `dual_btran_work` (they carry the reference's rounding).
     y_ref: Option<Vec<f64>>,
+    /// Position of each row in the output list of the last dual BTRAN (`usize::MAX` for rows without an entry).
+    y_rank: Vec<usize>,
     /// Nonbasic variables that left the basis in phase 2: the reference keeps their computed value (not the bound) for the next
     /// recomputation of `x_B`.
     unsnapped: std::collections::HashSet<usize>,
@@ -496,6 +498,10 @@ impl<'a> Solver<'a> {
         self.factor = Factor::new(self.p.m, &cols).map_err(|_| SolveError::SingularBasis)?;
         self.refactorizations += 1;
         self.list.clear();
+        if self.cleanup {
+            // The clean-up pass removes the shifts before it solves for the basic values.
+            self.rhs_shift.clear();
+        }
         self.recompute_primal();
         if self.cleanup {
             self.cleanup_work();
@@ -509,12 +515,13 @@ impl<'a> Solver<'a> {
 
     /// The dual clean-up pass that follows a primal optimum with shifts (`0xf6a00`), after its factorization and the recomputation of the duals:
     /// the pricing setup (`0xe7000`, `3 m + 3.5 n`) and the final solution handling (`0xc362f`, `0xc1fe3`, `0xbf981`, `0xcd191`).
-    /// Not modelled: `0xc142b`, `(4 m + 2 r) c` with `r` the length of a sparse vector in the update routine `0xc0050` (43, 0, 420, 517, 0 on
-    /// BOEING2, DEGEN2, PILOT4, PEROLD, DEGEN3).
     fn cleanup_work(&mut self) {
         let (m, n) = (self.p.m as f64, self.p.n as f64);
         self.dual_btran_work();
         self.work.add(0xe7000, 3.0 * m + 3.5 * n, crate::work::CTX);
+        // `0xc142b`: the nonbasic structurals at a nonzero value, whose columns the solution read-out sums (`0xc0ef0`).
+        let r: usize = (0..self.p.n).filter(|&j| self.pos_of[j] == NONE && self.nonbasic_value(j) != 0.0).map(|j| self.p.cols[j].len()).sum();
+        self.work.add(0xc142b, 4.0 * m + 2.0 * r as f64, crate::work::CTX);
         self.work.add(0xc362f, m, crate::work::CTX);
         self.work.add(0xc1fe3, 5.0 * m, crate::work::CTX);
         self.work.add(0xbf981, 2.0 * (n + m), crate::work::CTX);
@@ -664,8 +671,13 @@ impl<'a> Solver<'a> {
         self.work.add_from(0x12de50, caller, mi.work, crate::work::FAC);
         let mut y = vec![0.0; p.m];
         for &(i, v) in &out {
-            y[i] = v;
+            y[i] = if self.cleanup && v.abs() < 1e-13 { 0.0 } else { v };
         }
+        let mut rk = vec![usize::MAX; p.m];
+        for (k, &(i, _)) in out.iter().enumerate() {
+            rk[i] = k;
+        }
+        self.y_rank = rk;
         self.y_ref = Some(y);
         // The reduced costs that follow (`0x1020a0`, site `0x1021b0`): a pass over all variables and the columns of the
         // nonbasic structurals that are not fixed.
@@ -745,11 +757,22 @@ impl<'a> Solver<'a> {
         let p = self.p;
         for j in 0..p.n + p.m {
             self.d[j] = if self.pos_of[j] == NONE {
-                let mut acc = p.cost[j];
-                for &(i, a) in &p.fcols[j] {
-                    acc -= y[i] * a;
+                if self.cleanup {
+                    // The clean-up pass accumulates over the column's entries in the order of the rows in the dual BTRAN output list.
+                    let mut e: Vec<(usize, f64)> = p.fcols[j].clone();
+                    e.sort_by_key(|x| self.y_rank[x.0]);
+                    let mut acc = p.cost[j];
+                    for &(i, a) in &e {
+                        acc -= y[i] * a;
+                    }
+                    acc
+                } else {
+                    let mut acc = p.cost[j];
+                    for &(i, a) in &p.fcols[j] {
+                        acc -= y[i] * a;
+                    }
+                    acc
                 }
-                acc
             } else {
                 0.0
             };
@@ -1540,6 +1563,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         rrows: Vec::new(),
         list_failed: false,
         y_ref: None,
+        y_rank: Vec::new(),
         unsnapped: Default::default(),
         rhs_shift: Vec::new(),
         mirror: None,
@@ -2239,6 +2263,11 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     let sgn = if model.sense == Sense::Maximize { -1.0 } else { 1.0 };
     let mut y: Vec<f64> = s.basic.iter().map(|&j| p.cost[j]).collect();
     s.factor.btran(&mut y);
+    if status == Status::Optimal {
+        if let Some(yr) = s.y_ref.as_ref() {
+            y = yr.clone();
+        }
+    }
     let nm = model.num_cols();
     let x: Vec<f64> = s.x[..nm].to_vec();
     Ok(SolveResult {
