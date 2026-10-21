@@ -766,6 +766,11 @@ impl RefStruct {
         self.upd
     }
 
+    /// Sum of the FTRAN result counts of the updates since the factorization (`F+0x190`).
+    pub fn sum_alpha(&self) -> f64 {
+        self.sum_alpha
+    }
+
     pub fn refactor_due(&self) -> bool {
         let m = self.m as f64;
         let maxupd = (m.powf(0.7) as usize).max(20);

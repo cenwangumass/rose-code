@@ -8,6 +8,7 @@ pub mod lu_order;
 pub mod lu_pairs;
 pub mod model;
 pub mod mps;
+pub mod scale;
 pub mod simplex;
 pub mod work;
 

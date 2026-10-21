@@ -35,6 +35,9 @@ pub struct SolveOptions {
     /// the best of a window of a persistent, bucket-sorted candidate list. Needs `faithful_ftran`. Phase 1 and the later switch
     /// to Devex pricing (`0x142500`) are not implemented. Off by default.
     pub pricing0: bool,
+    /// Scale the model the way the reference does by default (`ScaleFlag`, power-of-two factors, `crate::scale`) and unscale the
+    /// result. Off by default; on in `SolveOptions::release()`.
+    pub scaling: bool,
 }
 
 impl Default for SolveOptions {
@@ -51,6 +54,7 @@ impl Default for SolveOptions {
             refactor_schedule: None,
             faithful_ftran: true,
             pricing0: false,
+            scaling: false,
         }
     }
 }
@@ -63,7 +67,7 @@ impl SolveOptions {
 
     /// The reference's release profile as far as it is recovered: the faithful options with the initial `SimplexPricing=0` pricing.
     pub fn release() -> Self {
-        SolveOptions { pricing0: true, ..SolveOptions::default() }
+        SolveOptions { pricing0: true, scaling: true, ..SolveOptions::default() }
     }
 }
 
@@ -494,6 +498,8 @@ struct P0 {
     rebuild: bool,
     /// Pricing calls so far (the dump's call index).
     calls: usize,
+    /// Scan window (`P+0x50`): set at each refactorization to `max(10, trunc(avg / 2))`, `avg = trunc(S / U)` the mean FTRAN result count of the `U` updates since the last one.
+    window: usize,
 }
 
 struct LastPivot {
@@ -615,6 +621,12 @@ impl<'a> Solver<'a> {
             }
             self.basic = order;
             if self.opts.faithful_ftran {
+                if let (Some(old), Some(p0)) = (self.mirror.as_ref(), self.p0.as_mut()) {
+                    // `0xf15c0` (`0xf4562`): the scan window follows the mean FTRAN result count of the updates just made.
+                    let u = old.updates();
+                    let avg = if u > 0 { (old.sum_alpha() / u as f64) as usize } else { 0 };
+                    p0.window = (avg / 2).max(P0_WINDOW);
+                }
                 if let Some(old) = self.mirror.as_ref() {
                     let est = if self.cleanup { old.discard_work_unused() } else { old.discard_work() };
                     if est > 0.0 {
@@ -1244,7 +1256,7 @@ fn p0_key(s: f64) -> usize {
     (if s < 0.0 { k + 0x41 } else { 0x23 - k }) as usize
 }
 
-/// Window of the `pricing0` scan: it ends at the first position more than this many past its start once a candidate was counted (`P+0x50`).
+/// Initial window of the `pricing0` scan: it ends at the first position more than this many past its start once a candidate was counted (`P+0x50`).
 const P0_WINDOW: usize = 10;
 /// Reduced-cost tolerance of the `pricing0` scan (`ctx+0x388`).
 const P0_DTOL: f64 = 1e-6;
@@ -1359,7 +1371,7 @@ impl<'a> Solver<'a> {
                         p0.dstore[j] = s;
                     }
                 }
-                if P0_WINDOW < i - start && cnt != 0 {
+                if p0.window < i - start && cnt != 0 {
                     break;
                 }
                 i += 1;
@@ -1951,6 +1963,9 @@ fn repair_basis(p: &Internal, b: &mut Basis) -> Option<usize> {
 
 /// Solve starting from `start` (a primal feasible basis). `None` uses the all-slack basis with columns at their lower bounds.
 pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Result<SolveResult, SolveError> {
+    if opts.scaling {
+        return crate::scale::solve(model, start, opts);
+    }
     let p = build(model);
     let (n, m) = (p.n, p.m);
     let mut excluded = None;
@@ -2053,7 +2068,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     s.recompute_dual();
     if opts.pricing0 {
         assert!(s.mirror.is_some(), "pricing0 needs faithful_ftran and faithful_positions");
-        s.p0 = Some(P0 { list: Vec::new(), pos: 0, dstore: vec![0.0; n + m], y: Vec::new(), pending: None, rebuild: true, calls: 0 });
+        s.p0 = Some(P0 { list: Vec::new(), pos: 0, dstore: vec![0.0; n + m], y: Vec::new(), pending: None, rebuild: true, calls: 0, window: P0_WINDOW });
     }
     let mut trace = Vec::new();
     let mut iterations = 0usize;
