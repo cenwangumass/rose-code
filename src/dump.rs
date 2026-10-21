@@ -22,6 +22,7 @@ pub const KINDS: &[(&str, &str, &str)] = &[
     ("luout", "LUOUT", "numerics of each fresh factor: the diagonal and the L columns (the reference's lu_in `diag`, `Lcp`/`Lidx`/`Lval`)"),
     ("ent", "ENT", "phase 1 ratio-test inputs: the signed FTRAN list, and distance, range and type per basis position"),
     ("ent2", "ENT2", "phase 2 ratio-test inputs: the signed FTRAN list, and distance to the lower bound, range and free flag per basis position"),
+    ("bsolve", "BSOLVE", "basic-solution FTRAN (after a factorization): L-stage result, x after the tail columns, final x, kinds, slots, diag"),
     ("fillparts", "FILLP", "per factor update: pool fill on entry, eta size, new column entries added, and the row growths (row, cnt, cap, extra)"),
 ];
 

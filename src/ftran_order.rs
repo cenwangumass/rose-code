@@ -604,6 +604,8 @@ impl RefStruct {
             || (!self.etas.is_empty() && count_l * self.dthr > m)
             || !(self.nuc.len() + spike.len() < self.i21 || self.dens * (spike.len() as f64) < 2.0 * m as f64)
             || self.lev_dense_ft;
+        let bs = force_dense && crate::dump::on("bsolve");
+        let x_l = if bs { x.clone() } else { Vec::new() };
         for &c in &tail {
             let mut xc = x[c];
             if u_dense && xc.abs() <= TOL {
@@ -621,11 +623,15 @@ impl RefStruct {
                 touched[j] = true;
             }
         }
+        let x_t = if bs { x.clone() } else { Vec::new() };
         for p in 0..m {
             if touched[p] && self.kind[p] != -2 {
                 let v = x[p] / self.diag[p];
                 x[p] = if x[p].abs() <= TOL || v.abs() <= TOL { 0.0 } else { v };
             }
+        }
+        if bs {
+            crate::dump::emit("bsolve", serde_json::json!({"l": x_l, "tail_done": x_t, "x": x, "tail": tail, "kind": self.kind, "slot": self.slot, "diag": self.diag, "u_dense": u_dense, "uc": self.uc, "lcols": self.lcols, "lvals": self.lvals, "perm": self.perm, "rows": rows, "vals": vals}));
         }
         // A dense result (the reference's `-1` count) is scanned by position index; a sparse one comes in the U solve's order.
         let dense = rows.len() * self.dthr > m

@@ -1770,11 +1770,18 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         iterations += 1;
         let x_leave_before = chosen.map(|k| s.x[s.basic[entries[k].0]]);
         // Move the basic variables and the entering variable.
+        // Phase 2 does not move the point by a negative Harris step (reference, PEROLD ratio calls 50, 82, 354, ...: the
+        // basics stay as they are, the entering variable stays at its bound and the leaving one keeps its computed value).
+        let move_step = if infeasible { step } else { step.max(0.0) };
         for &(i, a) in &entries {
             let j = s.basic[i];
-            s.x[j] -= step * a;
+            s.x[j] -= move_step * a;
         }
-        s.x[q] += dir * step;
+        if s.unsnapped.remove(&q) {
+            // A variable that left outside its bound enters from the bound, not from the value it kept.
+            s.x[q] = s.nonbasic_value(q);
+        }
+        s.x[q] += dir * move_step;
         let Some(k) = chosen else {
             // Bound flip: the entering variable travels to its opposite bound.
             for (site, est, scale) in std::mem::take(&mut pending_upd) {
