@@ -1716,6 +1716,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         // The pivot-row update's own estimate (`0x102d20`, site `0x1040c7`) apart from its pivot-row term.
         let mut devex_est = 0.0f64;
         let mut alpha_dense = false;
+        let mut alpha_ordered = false;
         let mut tau_ref: Option<Vec<(usize, f64)>> = None;
         if let Some(mi) = s.mirror.as_mut() {
             rho_ref = Some(mi.btran(&[(r, 1.0)], true, false));
@@ -1728,6 +1729,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             // By then the list no longer holds the pivot entry.
             let dense_in = mi.last_dense() || m <= mi.dthr() * (ftran_out.len() - 1);
             alpha_dense = mi.last_dense();
+            alpha_ordered = mi.last_ordered();
             let alen = ftran_out.len() - 1;
             if dense_in {
                 devex_est = m as f64;
@@ -1787,7 +1789,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             }
             // The reference drops the pivot entry from the list by moving the last entry into its slot, then sums.
             let mut order = ftran_out.clone();
-            if let (false, Some(k)) = (alpha_dense, order.iter().position(|e| e.0 == r)) {
+            if let (false, Some(k)) = (alpha_ordered, order.iter().position(|e| e.0 == r)) {
                 order.swap_remove(k);
             }
             for &(i, v) in &order {

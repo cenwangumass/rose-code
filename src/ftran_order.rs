@@ -69,6 +69,9 @@ pub struct RefStruct {
     /// hands on a dense vector (count -1) and the dense U routine runs.
     lev_dense_ft: bool,
     last_dense: bool,
+    /// Whether the last result came out in ascending position order (the dense scan or the dense U routine): the reference's
+    /// pivot column is then a dense vector for the Devex `wq` sum.
+    last_ordered: bool,
     /// Whether the most recent `btran` returned a dense result (count `-1`): its L^T solve ran dense.
     pub bt_dense: bool,
 }
@@ -312,6 +315,7 @@ impl RefStruct {
             lev_dense,
             lev_dense_ft,
             last_dense: false,
+            last_ordered: false,
             bt_dense: false,
             m,
             kind,
@@ -620,6 +624,7 @@ impl RefStruct {
         let vec_dense = rows.len() * self.dthr > m || (!self.etas.is_empty() && count_l * self.dthr > m);
         self.work = self.u_work(&inp, &x, !dense, if vec_dense { None } else { Some(spike.len()) }) + e_l;
         self.last_dense = dense;
+        self.last_ordered = dense || u_dense;
         let ord = if dense || u_dense { (0..m).collect() } else { self.uorder(&inp, &x) };
         let mut out: Vec<(usize, f64)> = Vec::new();
         let mut done = vec![false; m];
@@ -1080,6 +1085,10 @@ impl RefStruct {
 
     pub fn last_dense(&self) -> bool {
         self.last_dense
+    }
+
+    pub fn last_ordered(&self) -> bool {
+        self.last_ordered
     }
 
     /// Work estimate of an FTRAN with a dense input (the reference's count `-1`, e.g. the basic solution after a refactorization):
