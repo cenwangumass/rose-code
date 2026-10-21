@@ -2333,6 +2333,9 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 None if std::mem::take(&mut s.want_refactor) => {
                     s.work.trig();
                     s.work.decided(s.work.w);
+                    if let Some(mi) = s.mirror.as_mut() {
+                        mi.count_all_updates();
+                    }
                     refactor_next = true;
                     continue;
                 }

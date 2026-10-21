@@ -775,6 +775,11 @@ impl RefStruct {
         self.before_last
     }
 
+    /// A refactorization decided without an update of its own iteration (the empty scan): every update counts in the statistics.
+    pub fn count_all_updates(&mut self) {
+        self.before_last = (self.upd, self.sum_alpha);
+    }
+
     pub fn sum_alpha(&self) -> f64 {
         self.sum_alpha
     }

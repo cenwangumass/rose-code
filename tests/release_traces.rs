@@ -48,8 +48,10 @@ fn check_rows(name: &str, limit: usize) {
     let mine = |v: &[f64]| v.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
     assert_eq!(r.iterations as f64, res["iter_count"].as_f64().unwrap(), "iterations");
     assert_eq!(r.objective.to_bits(), res["obj"].as_f64().unwrap().to_bits(), "objective");
-    assert_eq!(mine(&r.x), bits(&res["x"]), "x");
-    assert_eq!(mine(&r.reduced_cost), bits(&res["rc"]), "reduced costs");
+    // The reference's vectors end with one column per ranged row (`MPS_Rg...`): the model's own columns come first.
+    let head = |v: Vec<u64>, n: usize| v.into_iter().take(n).collect::<Vec<_>>();
+    assert_eq!(mine(&r.x), head(bits(&res["x"]), r.x.len()), "x");
+    assert_eq!(mine(&r.reduced_cost), head(bits(&res["rc"]), r.reduced_cost.len()), "reduced costs");
     assert_eq!(mine(&r.dual), bits(&res["pi"]), "duals");
 }
 
@@ -91,13 +93,12 @@ fn bore3d_release_matches_the_reference() {
     check("bore3d");
 }
 
-/// BOEING2 (ranges, scaling, shifted bounds): the start point agrees (bound placement of the crash with the crash columns, exact range
-/// widths) and the first 120 decisions. The ratio-test distances (`compare.py ratio --profile release`) agree for calls 0..117
-/// (the phase 1 distance is a maintained array, not `x - lo`); the reference refactors before call 118, rose later, so the
-/// decisions differ from row 120 on; not modelled.
+/// BOEING2 (ranges, scaling, shifted bounds): all 217 decisions, the method switch at the ninth factorization and the returned
+/// solution. The phase 1 ratio test reads a maintained distance per basic variable (not `x - lo`); `pricing0` books the scan's work
+/// (`0xfdef9`) and no primal-update/reduced-cost work; an empty scan after many updates refactorizes (`0x1445ad`).
 #[test]
-fn boeing2_release_matches_the_reference_at_the_start() {
-    check_rows("boeing2", 120);
+fn boeing2_release_matches_the_reference() {
+    check("boeing2");
 }
 
 /// DEGEN3 (m >= 500: the candidate list key and the scan's best score divide a structural's |s| by its column count plus 0.01):
