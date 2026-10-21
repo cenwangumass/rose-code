@@ -6,6 +6,7 @@ use std::collections::HashMap;
 
 const SING_TOL: f64 = 1e-10;
 const DROP_TOL: f64 = 1e-13;
+const UNZ_TOL: f64 = 1e-13;
 
 /// What the pass computes that the generic singleton formulas (`factor_structure`) do not: the Schur pivot of each pair, and
 /// for a row pair the second column's L multipliers.
@@ -13,6 +14,13 @@ const DROP_TOL: f64 = 1e-13;
 pub struct Overrides {
     pub diag: HashMap<usize, f64>,
     pub l: HashMap<usize, (Vec<usize>, Vec<f64>)>,
+    /// Number of nonzero entries in the U row of a column pair's second pivot (the pivot row `hi` after the elimination,
+    /// fill from the first pivot's row included).
+    pub unz: HashMap<usize, usize>,
+    /// Columns of the U row of a column pair's two pivots in the reference's storage order (it fixes the order of the
+    /// factor update's row lists): the first row lists its other columns in row order and the partner last; the second row
+    /// lists its own columns, then the fill that the first row adds.
+    pub urow: HashMap<usize, Vec<usize>>,
 }
 
 struct Pass<'a> {
@@ -249,7 +257,8 @@ impl Pass<'_> {
         let mut csing: Vec<usize> = Vec::new();
         self.rowc[lo] = 0;
         self.colc[pc] = 0;
-        self.push_step(lo, pc);
+        let s1 = self.push_step(lo, pc);
+        self.ov.urow.insert(s1, others_lo.iter().map(|e| e.0).chain(std::iter::once(nc)).collect());
         for &(c, u) in &others_lo {
             self.temp[c] = ((-x_p) * u) / p;
             self.colc[c] -= 1;
@@ -264,6 +273,21 @@ impl Pass<'_> {
         let s2 = self.push_step(hi, nc);
         self.ov.diag.insert(s2, schur);
         self.ov.l.insert(s2, (Vec::new(), Vec::new()));
+        {
+            let mut vals: HashMap<usize, f64> = HashMap::new();
+            for &(c, v) in &others_hi {
+                vals.insert(c, v);
+            }
+            for &(c, _) in &others_lo {
+                let t = self.temp[c];
+                let e = vals.entry(c).or_insert(0.0);
+                *e += t;
+            }
+            self.ov.unz.insert(s2, vals.values().filter(|v| v.abs() > UNZ_TOL).count());
+            let own: Vec<usize> = others_hi.iter().map(|e| e.0).filter(|c| vals[c].abs() > UNZ_TOL).collect();
+            let fill = others_lo.iter().map(|e| e.0).filter(|c| !others_hi.iter().any(|h| h.0 == *c) && vals[c].abs() > UNZ_TOL);
+            self.ov.urow.insert(s2, own.into_iter().chain(fill).collect());
+        }
         for &(c, _) in &others_hi {
             self.colc[c] -= 1;
             if self.colc[c] == 1 {

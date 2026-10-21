@@ -129,7 +129,7 @@ impl RefStruct {
         }
         let n1 = st.phase.iter().filter(|&&p| p == 1 || p == 2).count();
         let n3 = st.phase.iter().filter(|&&p| p == 3).count();
-        let nseq = st.phase.iter().filter(|&&p| p != 0).count();
+        let nseq = st.loff;
         let i21 = n1 + n3;
         let mut kind = vec![-1i64; m];
         let mut nuc = Vec::new();
@@ -291,7 +291,7 @@ impl RefStruct {
                 let maxlev = lev.iter().copied().max().unwrap_or(0);
                 lev_dense_ft = (maxlev as f64) >= 0.1 * m as f64;
                 lev_dense = lev_dense_ft;
-                lev_built = outer;
+                lev_built = true;
                 if !lev_dense_ft && outer { Some(lev) } else { None }
             } else {
                 None
@@ -334,7 +334,9 @@ impl RefStruct {
                     if member[y].is_empty() {
                         continue;
                     }
-                    let order: Vec<usize> = if st.u_rows[y].is_empty() {
+                    let order: Vec<usize> = if let Some(u) = st.pair_urow.get(&y) {
+                        u.iter().map(|&c| pos_of_col[c]).collect()
+                    } else if st.u_rows[y].is_empty() {
                         (0..m).filter(|&c| pos_of_col[c] != usize::MAX).map(|c| pos_of_col[c]).collect()
                     } else {
                         st.u_rows[y].iter().map(|&(c, _)| pos_of_col[c]).collect()
@@ -435,7 +437,7 @@ impl RefStruct {
             x[s] += v;
             start.push(s);
         }
-        let dense_l = rows.len() * self.dthr > self.m || force_dense;
+        let dense_l = rows.len() * self.dthr > self.m || force_dense || self.lev_dense_ft;
         let (mut order, count_l) = if dense_l {
             // Dense L solve (`0x12bd30`): every node in ascending order; the list handed on is the ascending scan.
             e = m as f64 + rows.len() as f64 * 2.0 + e;
@@ -511,10 +513,36 @@ impl RefStruct {
             let count_l = q.iter().filter(|&&v| x[v].abs() > TOL).count();
             let d = m - self.loff;
             let nnz_tail: usize = self.lcols[self.loff..].iter().map(|c| c.len()).sum();
-            if !(d < 6 || 10 * d * d <= m || nnz_tail <= 10 * d) && std::env::var_os("ROSE_WORK").is_some() {
-                eprintln!("WARN partial L solve (0x12a990 third strategy) not modelled");
+            if !(d < 6 || 10 * d * d <= m || nnz_tail <= 10 * d) {
+                // Third strategy of `0x12a990`: the head columns (below `loff`) in Kahn order, then the tail by an ascending
+                // scan from the lowest tail index reached by an input or by a kept head node.
+                let loff = self.loff;
+                let head_cnt = q.iter().filter(|&&v| v < loff && x[v].abs() > TOL).count();
+                let mut lo = m;
+                for &v in &start {
+                    if v >= loff {
+                        lo = lo.min(v);
+                    }
+                }
+                for &v in q.iter().filter(|&&v| v < loff && x[v].abs() > TOL) {
+                    for &y in &self.lcols[v] {
+                        if y >= loff {
+                            lo = lo.min(y);
+                        }
+                    }
+                }
+                let nnz_head = self.nnz_l - nnz_tail;
+                let e1 = (((nnz_head + 2 * d) as f64) * 7.0 * head_cnt as f64) / (loff + 1) as f64;
+                let mut e2 = (m - lo) as f64 * 2.0 + e1;
+                for v in lo..m {
+                    if x[v].abs() > TOL {
+                        e2 += self.lcols[v].len() as f64 * 2.0;
+                    }
+                }
+                e = e2 + e;
+            } else {
+                e = (((self.nnz_l + m) as f64 + m as f64 + m as f64) * 7.0 * count_l as f64) / (m + 1) as f64 + e;
             }
-            e = (((self.nnz_l + m) as f64 + m as f64 + m as f64) * 7.0 * count_l as f64) / (m + 1) as f64 + e;
             if m >= 250 && count_l * self.dthr > m {
                 // The reference's result is then dense and equals an ascending scan (PILOT4 call 219); the switch condition is
                 // inferred from the data, not read from `0x12a990`.
@@ -671,10 +699,11 @@ impl RefStruct {
         }
         // A dense result (the reference's `-1` count) is scanned by position index; a sparse one comes in the U solve's order.
         let dense = rows.len() * self.dthr > m
+            || self.lev_dense_ft
             || (!self.etas.is_empty() && count_l * self.dthr > m)
             || !(self.nuc.len() + spike.len() < self.i21 || self.dens * (spike.len() as f64) < 2.0 * m as f64);
         let inp: Vec<usize> = spike.iter().map(|e| e.0).collect();
-        let vec_dense = rows.len() * self.dthr > m || (!self.etas.is_empty() && count_l * self.dthr > m);
+        let vec_dense = rows.len() * self.dthr > m || self.lev_dense_ft || (!self.etas.is_empty() && count_l * self.dthr > m);
         self.work = self.u_work(&inp, &x, !dense, if vec_dense { None } else { Some(spike.len()) }) + e_l;
         self.last_dense = dense;
         self.last_ordered = dense || u_dense;

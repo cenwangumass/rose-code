@@ -29,11 +29,17 @@ pub struct Structure {
     /// work estimate.
     pub nuc_nnz: usize,
     pub nuc_work: f64,
+    /// Steps done when the doubleton pass starts (`L+0xc4`): the pass's own steps count in `phase` but not here.
+    pub loff: usize,
+    /// U-row nonzeros of the column pairs' second pivots, by step (`crate::lu_pairs::Overrides::unz`).
+    pub pair_unz: std::collections::HashMap<usize, usize>,
+    /// Column order of the U rows of the column pairs' pivots (`crate::lu_pairs::Overrides::urow`).
+    pub pair_urow: std::collections::HashMap<usize, Vec<usize>>,
     pub dense_n: usize,
 }
 
 pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Structure {
-    let (mut seq, mut phase, ov) = phases(m, cols);
+    let (mut seq, mut phase, ov, loff) = phases(m, cols);
     let nsing = seq.len();
     let done_r: HashSet<usize> = seq.iter().map(|&(r, _)| r).collect();
     let done_c: HashSet<usize> = seq.iter().map(|&(_, c)| c).collect();
@@ -68,6 +74,8 @@ pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Stru
         diag.push(pv);
         u_rows.push(Vec::new());
     }
+    let pair_unz = ov.unz.clone();
+    let pair_urow = ov.urow.clone();
     for (&s, &d) in &ov.diag {
         diag[s] = d;
     }
@@ -81,7 +89,7 @@ pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Stru
     l_vals.extend(nv);
     diag.extend(npiv);
     u_rows.extend(nu);
-    Structure { pivots: seq, phase, l_rows, l_vals, l_raw, diag, u_rows, nuc_nnz, nuc_work, dense_n: DENSE_N.with(|c| c.get()) }
+    Structure { pivots: seq, phase, l_rows, l_vals, l_raw, diag, u_rows, nuc_nnz, nuc_work, loff, pair_unz, pair_urow, dense_n: DENSE_N.with(|c| c.get()) }
 }
 
 impl Structure {
@@ -95,7 +103,31 @@ impl Structure {
         // The entries of the singleton steps' columns that go to U (rows pivoted before them), and with the Markowitz pivot
         // rows the off-diagonal U.
         let nnz_l_sing: usize = (0..nsing).map(|k| self.l_rows[k].len()).sum();
-        let u_sing = nnz_b - nsing - nnz_l_sing - self.nuc_nnz;
+        // The U entries of the singleton steps' rows: basis entries in a row pivoted in a singleton step, in a column pivoted
+        // later (the reference counts them directly; `nnz(B) - nsing - nnz_l_sing - nuc` differs when a pair step drops or
+        // creates L entries).
+        let u_sing = {
+            let mut step_r = vec![usize::MAX; self.pivots.len()];
+            let mut step_c = vec![usize::MAX; cols.len()];
+            for (k, &(r, c)) in self.pivots.iter().enumerate() {
+                step_r[r] = k;
+                step_c[c] = k;
+            }
+            let mut per = vec![0usize; nsing];
+            for (pos, c) in cols.iter().enumerate() {
+                for &i in &c.1 {
+                    if step_r[i] < nsing && step_c[pos] > step_r[i] {
+                        per[step_r[i]] += 1;
+                    }
+                }
+            }
+            // A column pair's second pivot row is updated by the first pivot's row: the reference counts the entries that
+            // result (fill included, cancelled ones left out).
+            for (&s, &n) in &self.pair_unz {
+                per[s] = n;
+            }
+            per.iter().sum::<usize>()
+        };
         let mut out = vec![
             (0xd4ded, 5.0 * m + 100.0 + 3.0 * (nnz_l_sing + u_sing) as f64),
             (0xd5300, 10.0 * m + 3.0 * nnz_b as f64 + 7.0 * self.nuc_nnz.max(1) as f64),
@@ -107,7 +139,9 @@ impl Structure {
             let n = self.dense_n as f64;
             out.push((0xd8973, 0.15 * n * (n + 1.0)));
         }
-        let nnz_lu = (nnz_l + u_sing + self.u_rows.iter().map(Vec::len).sum::<usize>()) as f64;
+        // The reference's U count leaves out the entries that cancelled to rounding noise (`|v| <= 1e-13`).
+        let u_rows_nnz: usize = self.u_rows.iter().flatten().filter(|e| e.1.abs() > 1e-13).count();
+        let nnz_lu = (nnz_l + u_sing + u_rows_nnz) as f64;
         // A size factor that ramps from 1 to 10 between 2e6 and 4e6 for 24 bytes per entry.
         let a = 24.0 * nnz_lu;
         let g = if a <= 2e6 { 1.0 } else if a < 4e6 { 1.0 + (a - 2e6) * 9.0 / 2e6 } else { 10.0 };
@@ -119,7 +153,7 @@ impl Structure {
     }
 }
 
-fn phases(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> (Vec<(usize, usize)>, Vec<u8>, crate::lu_pairs::Overrides) {
+fn phases(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> (Vec<(usize, usize)>, Vec<u8>, crate::lu_pairs::Overrides, usize) {
     let n = cols.len();
     let mut rc = vec![0usize; m];
     for (is_slack, idx, _) in cols {
@@ -226,10 +260,11 @@ fn phases(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> (Vec<(usize, usize
         }
     }
     let mut ov = crate::lu_pairs::Overrides::default();
+    let loff = seq.len();
     if m - seq.len() >= 50 && std::env::var_os("ROSE_NO_PAIRS").is_none() {
         ov = crate::lu_pairs::run(m, cols, &mut seq, &mut phase, &row_done3, &col_done3, &row_done, &col_done);
     }
-    (seq, phase, ov)
+    (seq, phase, ov, loff)
 }
 
 struct Node {

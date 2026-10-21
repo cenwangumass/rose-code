@@ -1323,6 +1323,7 @@ fn ratio_test(
     dist_down: &dyn Fn(usize) -> f64,
     dist_up: &dyn Fn(usize) -> f64,
     col_count: &dyn Fn(usize) -> Option<usize>,
+    is_free: &dyn Fn(usize) -> bool,
     passes: &mut Vec<(usize, usize)>,
 ) -> (Option<usize>, f64, f64) {
     let mut first = true;
@@ -1330,12 +1331,14 @@ fn ratio_test(
         let mut theta = own;
         let mut cands: Vec<(usize, f64)> = Vec::new();
         // Entries past the pivot tolerance with a bound in their direction (the reference counts those moving down
-        // whatever their bound), for the pass's work.
+        // unless the variable is free), for the pass's work.
         let mut eligible = 0usize;
         for (k, &(pos, a)) in entries.iter().enumerate() {
             if a > tol_p {
                 let d = dist_down(pos);
-                eligible += 1;
+                if !is_free(pos) {
+                    eligible += 1;
+                }
                 if d < INF {
                     let r = d / a;
                     if r <= theta {
@@ -1738,7 +1741,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             let mut passes = Vec::new();
             // Set up at `0x138722`: the weight applies from 500 rows (the field is 0 below that).
             let col_count = |pos: usize| { let j = basic[pos]; (m >= 500 && j < n).then(|| p.cols[j].len()) };
-            let res = ratio_test(opts.feasibility_tol, opts.pivot_tol, own, &entries, &down, &upd, &col_count, &mut passes);
+            let free = |pos: usize| { let j = basic[pos]; is_inf(lo[j]) && is_inf(up[j]) };
+            let res = ratio_test(opts.feasibility_tol, opts.pivot_tol, own, &entries, &down, &upd, &col_count, &free, &mut passes);
             if let Some(mi) = s.mirror.as_ref() {
                 // The reference's ratio test (`0xef960`): per pass, a scan of the FTRAN result and its stored candidates.
                 let dense = mi.last_dense();
@@ -1956,8 +1960,12 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                     Some(rank) => rank_dot(&p.cols[j], &rho, rank),
                     None => dot(&p.cols[j], &rho),
                 };
-                if arj.abs() > ROW_DROP_TOL && !s.is_fixed(j) {
-                    s.d[j] -= theta_d * arj;
+                if arj.abs() > ROW_DROP_TOL {
+                    if !s.is_fixed(j) {
+                        s.d[j] -= theta_d * arj;
+                    }
+                    // The reference keeps a basic slack's rounding-noise row product in the pivot row like any entry.
+                    changed.push(j);
                 }
                 continue;
             }
@@ -1969,7 +1977,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 None => dot(&p.cols[j], &rho),
             };
             // The reference's row product keeps the entries above its drop tolerance (`0x134d90`).
-            if arj.abs() <= ROW_DROP_TOL {
+                if arj.abs() <= ROW_DROP_TOL {
                 continue;
             }
             // The Devex update has its own, larger drop tolerance (`0x103d0d`); d and the list keep the row product's.
@@ -2065,7 +2073,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             let nn = p.n;
             let nnz_a: usize = p.cols[..nn].iter().map(Vec::len).sum();
             let rowlen = changed.iter().filter(|&&j| j >= nn || !s.is_fixed(j)).count() + 1;
-            let est = 2.0 * rowlen as f64 * ((m as f64 + m as f64 + nnz_a as f64) / (m + 1 + nn) as f64 + 1.5) + devex_est;
+                let est = 2.0 * rowlen as f64 * ((m as f64 + m as f64 + nnz_a as f64) / (m + 1 + nn) as f64 + 1.5) + devex_est;
             s.work.add_from(0x1040c7, 0x143ff9, est, crate::work::CTX);
         }
         // The reference's pivot row also carries the entering column (`0x102d20`).
