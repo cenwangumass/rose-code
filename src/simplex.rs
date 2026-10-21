@@ -824,6 +824,31 @@ impl<'a> Solver<'a> {
         q
     }
 
+    /// The reference's "Resetting Norm" (`0x102d20`, after the basis change): w = 1 and framework membership for every nonbasic
+    /// variable, w = 0 and no membership for the basic ones, then the candidate list is rebuilt by a full pass.
+    fn reset_norm(&mut self) {
+        let nm = self.p.n + self.p.m;
+        for j in 0..nm {
+            let nb = self.pos_of[j] == NONE;
+            self.w[j] = if nb { 1.0 } else { 0.0 };
+            self.in_r0[j] = nb;
+        }
+        self.level = 0;
+        self.list.clear();
+        for j in 0..nm {
+            if let Some(sc) = self.score(j) {
+                if thr(self.level) < sc {
+                    let b = bucket(sc);
+                    if b > self.level {
+                        self.level = b;
+                        self.list.clear();
+                    }
+                    self.list.push(j);
+                }
+            }
+        }
+    }
+
     /// Entries of the list the reference's scan looks at: all of them, except that it stops at a free variable (top bucket,
     /// nothing beats it), after the entries before it.
     fn scanned(&self, best: Option<usize>) -> usize {
@@ -908,6 +933,8 @@ const PHASE1_M: f64 = 1e6;
 
 /// Rounding guard for Devex weights of variables outside the reference framework (the reference's smallest observed weight is 3e-4).
 const W_MIN: f64 = 1e-12;
+/// Devex weight below which the reference resets the framework (`0x102d20`: an updated nonbasic weight below it, or the leaving weight at or below it).
+const NORM_RESET_TOL: f64 = 1e-10;
 
 impl<'a> Solver<'a> {
     fn sig(&self) -> Vec<i8> {
@@ -1826,6 +1853,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             Some(rank) => rank_dot(&p.cols[q], &rho, rank),
             None => dot(&p.cols[q], &rho),
         };
+        let mut norm_reset = false;
         let mut changed: Vec<usize> = Vec::new();
         for j in 0..n + m {
             if s.pos_of[j] != NONE || j == q {
@@ -1844,6 +1872,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 let ratio = arj / alpha_rq;
                 let vj = dot_lanes(&p.fcols[j], &u, col_off[j] & 1);
                 s.w[j] = ratio * ((wq * ratio - vj) - vj) + s.w[j];
+                if opts.faithful_weights && s.w[j] < NORM_RESET_TOL { norm_reset = true; }
                 let floor = if opts.faithful_weights { W_MIN } else { 1.0 };
                 s.w[j] = s.w[j].max(floor);
             }
@@ -1876,6 +1905,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             s.d[q] = if s.mirror.is_some() { s.d[q] - theta_d * if q < n { alpha_rq } else { arq_x } } else { 0.0 };
         }
         s.w[leave] = (wq / alpha_rq) / alpha_rq;
+        if opts.faithful_weights && s.w[leave] <= NORM_RESET_TOL { norm_reset = true; }
         s.w[leave] = s.w[leave].max(if opts.faithful_weights && !s.in_r0[leave] { W_MIN } else { 1.0 });
 
         // Basis change.
@@ -1934,7 +1964,11 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             s.work.add_from(0x1040c7, 0x143ff9, est, crate::work::CTX);
         }
         // The reference's pivot row also carries the entering column (`0x102d20`).
-        s.update_list(&changed, 1, 0x1442ab);
+        if norm_reset && opts.faithful_weights {
+            s.reset_norm();
+        } else {
+            s.update_list(&changed, 1, 0x1442ab);
+        }
         s.d[leave] -= leave_penalty;
         s.work.trig();
         if opts.record_trace {
