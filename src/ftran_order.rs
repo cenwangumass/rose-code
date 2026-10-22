@@ -2285,7 +2285,7 @@ impl RefStruct {
             for &(row, _) in self.spike.iter().filter(|e| e.0 != r && !old_rows.contains(&e.0)) {
                 if cnt[row] >= self.row_cap[row] {
                     // The growth is capped by the updates left before the refactorization (`0xf2cd1`: `F+0x188 - F+0x18c`).
-                    let left = (((m as f64).powf(0.7) as usize).max(20) + 1).saturating_sub(self.upd);
+                    let left = (self.upd_limit.unwrap_or(((m as f64).powf(0.7) as usize).max(20)) + 1).saturating_sub(self.upd);
                     let extra = (cnt[row] / 2).max(4).min(left);
                     fp_rows.push((row, cnt[row], self.row_cap[row], extra));
                     self.row_par[row] = (self.fill % 2) as u8;
