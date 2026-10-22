@@ -459,7 +459,7 @@ impl<'a> Dual<'a> {
             }
         }
         if crate::dump::on("p68") {
-            crate::dump::emit("p68", serde_json::json!({"n": self.refactorizations, "type": self.ptype, "ucol": fwd, "lcol": bwd, "p68": w}));
+            crate::dump::emit("p68", serde_json::json!({"n": self.refactorizations, "it": self.iters, "type": self.ptype, "ucol": fwd, "lcol": bwd, "p68": w}));
         }
         self.p68 = w;
     }
