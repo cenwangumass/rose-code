@@ -107,6 +107,17 @@ struct Dual<'a> {
     pending_alpha: Option<Vec<f64>>,
     /// Final status once the loop ends.
     status: Option<Status>,
+    /// Costs in force: the problem's costs plus the shifts of the ratio test (`*(P+0)`).
+    cost: Vec<f64>,
+    /// State of the reference's random generator (`0x88a870`, `0x88a8d0`), seeded 101.
+    rng: u64,
+    /// Perturbation flag `ctx+0x338`: 1 after a small cost shift, 2 after a large one or one against an infinite bound.
+    pert: u8,
+    /// Objective offset of the cost shifts (`ctx+0x130`).
+    obj_off: f64,
+    /// `ctx+0x3fc` (-1 once set): the second selection among the bound flips of the ratio test. Set at a refactorization (`0xe6dcc`) when the
+    /// perturbation flag is 3 or more or 3 iterations exceed the row count (`ctx+0x178`, which also sets it, is 0 in every capture).
+    flip_select: bool,
 }
 
 /// The start basis of the dual path (setup `0xe7531`; assignments at `0xed2e8` and `0xeb69f`, `replay/gdb_dual_crash.py`). The equality rows (fixed slack)
@@ -346,7 +357,7 @@ impl<'a> Dual<'a> {
     /// rows in the BTRAN output list (the clean-up pass of the primal path does the same, `Solver::set_d_from_y`).
     fn true_d(&mut self) -> Vec<f64> {
         let p = self.p;
-        let inp: Vec<(usize, f64)> = self.head.iter().enumerate().map(|(pos, &j)| (pos, p.cost[j])).filter(|e| e.1 != 0.0).collect();
+        let inp: Vec<(usize, f64)> = self.head.iter().enumerate().map(|(pos, &j)| (pos, self.cost[j])).filter(|e| e.1 != 0.0).collect();
         let out = self.mirror.btran(&inp, false, true);
         let mut y = vec![0.0; p.m];
         let mut rank = vec![usize::MAX; p.m];
@@ -359,7 +370,7 @@ impl<'a> Dual<'a> {
             if self.st[j] < 0 {
                 let mut e: Vec<(usize, f64)> = p.fcols[j].clone();
                 e.sort_by_key(|x| rank[x.0]);
-                let mut acc = p.cost[j];
+                let mut acc = self.cost[j];
                 for &(i, a) in &e {
                     acc -= y[i] * a;
                 }
@@ -755,7 +766,7 @@ impl<'a> Dual<'a> {
     }
 
     /// The bound-flipping Harris ratio test (`0xc74a0`, `ctx+0x468 != 0`), `specs/dual-simplex.md`.
-    fn ratio_test(&self, row: &[(usize, f64)], esi: usize, leave: usize, above: bool, xbr: f64) -> Ratio {
+    fn ratio_test(&mut self, row: &[(usize, f64)], esi: usize, leave: usize, above: bool, xbr: f64) -> Ratio {
         let p = self.p;
         let delta = DUAL_TOL;
         let (vlb, vub) = (p.lo[leave], p.up[leave]);
@@ -843,7 +854,8 @@ impl<'a> Dual<'a> {
             return Ratio { q: None, flips: Vec::new() };
         }
         if nn == 1 {
-            return Ratio { q: Some(lst[0]), flips: Vec::new() };
+            let (q, _) = self.shift_entering(row, &[lst[0]], lst[0], 0.0, 0.0);
+            return Ratio { q: Some(q), flips: Vec::new() };
         }
         let maxa = -minsd(xm13, xm9);
         let mut nflip = 0usize;
@@ -946,11 +958,24 @@ impl<'a> Dual<'a> {
         if kept.is_empty() {
             return Ratio { q: None, flips: Vec::new() };
         }
+        let (chosen, xm5) = self.select_entering(row, &kept, xm3);
+        let (mut chosen, xm5) = self.shift_entering(row, &kept, chosen, xm5, xm15);
+        let mut flips = lst[..b].to_vec();
+        if self.flip_select && !flips.is_empty() {
+            (chosen, flips) = self.select_among_flips(row, chosen, flips, xm5);
+        }
+        Ratio { q: Some(chosen), flips }
+    }
+}
+
+impl<'a> Dual<'a> {
+    /// Choice of the entering variable among the Harris-filtered candidates (`0xc89b3`): the smallest `a / w`, `w` the column count of a structural, 0.5 of a slack.
+    fn select_entering(&self, row: &[(usize, f64)], kept: &[usize], xm3: f64) -> (usize, f64) {
         let mut chosen = kept[0];
         let mut xm5 = 0.0f64;
-        for &e in &kept {
+        for &e in kept {
             let (j, av) = row[e];
-            let wgt = if j < self.n { p.cols[j].len() as f64 } else { 0.5 };
+            let wgt = if j < self.n { self.p.cols[j].len() as f64 } else { 0.5 };
             if xm3 * av < self.d[j] {
                 continue;
             }
@@ -959,7 +984,171 @@ impl<'a> Dual<'a> {
                 chosen = e;
             }
         }
-        Ratio { q: Some(chosen), flips: lst[..b].to_vec() }
+        (chosen, xm5)
+    }
+
+    /// The next value of the reference's random generator (`0x88a870`: 31 bits; `0x88a8d0`: that times 2^-31).
+    fn rng_int(&mut self) -> u32 {
+        self.rng = self.rng.wrapping_mul(0x5851f42d4c957f2d).wrapping_add(0x14057b7ef767814f);
+        let mut e = (self.rng >> 32) as u32;
+        e ^= e >> 11;
+        e ^= (e << 7) & 0x9d2c5680;
+        e ^= (e << 15) & 0xefc60000;
+        e ^= e >> 18;
+        e & 0x7fff_ffff
+    }
+
+    fn rng_double(&mut self) -> f64 {
+        self.rng_int() as f64 * 4.656612873077393e-10
+    }
+
+    fn raise_pert(&mut self, to: u8) {
+        self.pert = if to == 1 { if self.pert == 0 { 1 } else { self.pert } } else { self.pert.max(2) };
+    }
+
+    /// Cost shift of a nonbasic variable at a bound whose reduced cost has the wrong sign (`d' < -1e-13`; `0xcac52..0xcaeac`, `0xca1a0..0xca4c6`): with
+    /// `m = -d'`, `d'` grows by `m (1 + u)` with `u` uniform in [0, 1) when `m` is tiny (below 5e-4 delta, or below 0.05 delta with `0.1 delta` above the
+    /// range times `m`), else by `m ((r mod 500 + 111) / 1000 + 1)` with `r` an integer draw, so that `d'` becomes positive (0.1 to 0.6 of `m`). The cost
+    /// takes the shift (plus at the lower bound, minus at the upper), the objective offset the shift times the bound.
+    fn shift_cost(&mut self, j: usize) {
+        let delta = DUAL_TOL;
+        let m = -self.d[j];
+        let (lo, up) = (self.p.lo[j], self.p.up[j]);
+        let small = delta * 0.0005 > m || (delta * 0.05 > m && delta * 0.1 > (up - lo) * m);
+        let s = if small {
+            self.raise_pert(1);
+            let u = self.rng_double();
+            m * (u + 1.0)
+        } else {
+            self.raise_pert(2);
+            let r = self.rng_int() as i32;
+            m * ((((r % 500) + 111) as f64) / 1000.0 + 1.0)
+        };
+        self.d[j] += s;
+        if self.st[j] == LB {
+            self.cost[j] += s;
+            self.obj_off -= lo * s;
+            if -BIG >= lo {
+                self.raise_pert(2);
+            }
+        } else {
+            self.cost[j] -= s;
+            self.obj_off += up * s;
+            if up >= BIG {
+                self.raise_pert(2);
+            }
+        }
+    }
+
+    /// Treatment of the chosen entering variable's reduced cost (`0xcabc2`, `0xc8c12..0xc8e27`). A variable at a bound with `d' < -1e-13` is shifted; the other
+    /// candidates of the list with a negative `d'` are then shifted or zeroed, the Harris filter runs again on the new values (continuing from the bound
+    /// `xm15` reached, with `xm3 = xm15`) and the entering variable is chosen again. A `d'` in [-1e-13, 0) is zeroed; a free variable's is zeroed.
+    fn shift_entering(&mut self, row: &[(usize, f64)], kept: &[usize], chosen: usize, xm5: f64, mut xm15: f64) -> (usize, f64) {
+        let mut xm3;
+        let mut xm5 = xm5;
+        let delta = DUAL_TOL;
+        let mut chosen = chosen;
+        let mut kept: Vec<usize> = kept.to_vec();
+        for _ in 0..8 {
+            let j = row[chosen].0;
+            let dj = self.d[j];
+            if self.st[j] == LB || self.st[j] == UB {
+                if dj < -1e-13 {
+                    self.shift_cost(j);
+                    if self.d[j] == 0.0 {
+                        break;
+                    }
+                } else {
+                    if dj < 0.0 {
+                        self.d[j] = 0.0;
+                    }
+                    break;
+                }
+            } else if self.st[j] == FREE {
+                if dj.abs() > 1e-13 {
+                    self.raise_pert(if delta * 0.0005 > dj.abs() { 1 } else { 2 });
+                }
+                self.d[j] = 0.0;
+                break;
+            } else {
+                break;
+            }
+            xm3 = xm15;
+            let mut next: Vec<usize> = Vec::new();
+            for &e in &kept {
+                let (jj, av) = row[e];
+                if self.d[jj] < 0.0 {
+                    if self.st[jj] == LB || self.st[jj] == UB {
+                        if self.d[jj] < -1e-13 {
+                            self.shift_cost(jj);
+                        } else {
+                            self.d[jj] = 0.0;
+                        }
+                    } else if self.st[jj] == FREE {
+                        if self.d[jj].abs() > 1e-13 {
+                            self.raise_pert(if delta * 0.0005 > self.d[jj].abs() { 1 } else { 2 });
+                        }
+                        self.d[jj] = 0.0;
+                    }
+                }
+                let dj2 = self.d[jj];
+                if xm15 * av > dj2 {
+                    let r = (delta + dj2) / av;
+                    xm3 = maxsd(r, xm3);
+                    next.push(e);
+                    if dj2 >= 0.0 {
+                        xm15 = maxsd(r, xm15);
+                    }
+                }
+            }
+            if next.is_empty() {
+                chosen = kept[0];
+                xm5 = 0.0;
+            } else {
+                (chosen, xm5) = self.select_entering(row, &next, xm3);
+                kept = next;
+            }
+        }
+        (chosen, xm5)
+    }
+
+    /// Second selection among the bound-flip candidates once `ctx+0x3fc` is set (`0xc8ecf..0xc9439`): with `theta = d_q / a_q` of the chosen variable, a flipped
+    /// entry with `0 <= d <= theta a - 1000 delta` has the weight `(count + ((theta a - d) / delta)^0.25) (0.3 f + 0.7)` (count 0.5 for a slack, factor `f` 1
+    /// for continuous variables; the power term while `ctx+0x178 < 10`) and replaces the chosen one when `xm5 w > a` (`xm5` the best `a / w` so far, that of
+    /// the first selection at the start). The new entering variable keeps as flips the old flips (other than itself) with `d <= a theta'`.
+    fn select_among_flips(&mut self, row: &[(usize, f64)], chosen: usize, flips: Vec<usize>, xm5: f64) -> (usize, Vec<usize>) {
+        let delta = DUAL_TOL;
+        let (qj, aq) = row[chosen];
+        let theta = self.d[qj] / aq;
+        let tol = 1000.0 * delta;
+        let mut xm5 = xm5;
+        let mut best: Option<usize> = None;
+        for (k, &e) in flips.iter().enumerate() {
+            let (j, aj) = row[e];
+            let dj = self.d[j];
+            if 0.0 > dj {
+                continue;
+            }
+            let t = theta * aj;
+            if dj > t - tol {
+                continue;
+            }
+            let pw = ((t - dj) / delta).powf(0.25);
+            let w0 = if j < self.n { self.p.cols[j].len() as f64 + pw } else { pw + 0.5 };
+            let w = w0 * (1.0 * 0.3 + 0.7);
+            if xm5 * w > aj {
+                xm5 = aj / w;
+                best = Some(k);
+            }
+        }
+        let Some(k) = best else {
+            return (chosen, flips);
+        };
+        let qe = flips[k];
+        let (nj, na) = row[qe];
+        let theta2 = self.d[nj] / na;
+        let kept: Vec<usize> = flips.iter().copied().filter(|&e| e != qe && self.d[row[e].0] <= row[e].1 * theta2).collect();
+        (qe, kept)
     }
 }
 
@@ -1209,8 +1398,8 @@ impl<'a> Dual<'a> {
 
     /// The no-leaving-row handler (`0x1aa280`): a refactorization request, optimality or infeasibility.
     fn no_row(&mut self) {
-        if self.updates != 0 {
-            // `ctx+0x3f8 != 0` in all captures: confirm on a fresh factor.
+        if self.pert != 0 || self.updates != 0 {
+            // `ctx+0x3f8 != 0` in all captures: confirm on a fresh factor (`0x1aa280`; with a cost shift in force even on a fresh one, the shifts are removed then).
             self.request = 4;
         } else if self.level == 0 {
             self.status = Some(Status::Optimal);
@@ -1242,6 +1431,9 @@ impl<'a> Dual<'a> {
             }
         }
         self.level = (0..self.n + self.m).filter(|&j| self.st[j] == UB && p.up[j] >= BIG).count();
+        if !self.flip_select && (self.pert >= 3 || 3.0 * self.iters as f64 > self.m as f64) {
+            self.flip_select = true;
+        }
     }
 
     /// The post-iteration passes `0xf6c82..0xf6d0a`: factor update or refactorization, the dual update, the primal and weight update.
@@ -1273,6 +1465,12 @@ impl<'a> Dual<'a> {
             self.refactor()?;
         }
         if refactor {
+            if self.request == 4 {
+                // The cost shifts of the ratio test are removed at the confirming refactorization (`ctx+0x130` is cleared at `0xe6db7`).
+                self.cost.clone_from(&self.p.cost);
+                self.obj_off = 0.0;
+                self.pert = 0;
+            }
             if self.request == 0 {
                 self.request = 10;
             }
@@ -1328,10 +1526,17 @@ impl<'a> Dual<'a> {
                 self.thr *= 1.1;
             }
             // The pivot row leaves the list at the next pricing call whatever its value (`0xc0732`); its priority is refreshed for the entering variable.
+            // An entering variable that lands beyond its bound stays on the list with its infeasibility (BOEING2 call 57); a feasible one gets the distance
+            // from its lower bound and flag 3.
             let q = self.head[r];
-            let d = self.xb[r] - self.p.lo[q];
-            self.prio[r] = self.pri(r, d);
-            self.flags[r] = 3;
+            let fi = self.infeas(r);
+            if fi > self.ptol() {
+                self.prio[r] = self.pri(r, fi);
+            } else {
+                let d = self.xb[r] - self.p.lo[q];
+                self.prio[r] = self.pri(r, d);
+                self.flags[r] = 3;
+            }
             changed.pop();
             self.touch_rows(&changed);
         } else {
@@ -1433,6 +1638,11 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         upd_limit: None,
         pending_alpha: None,
         status: None,
+        cost: p.cost.clone(),
+        rng: 101,
+        pert: 0,
+        obj_off: 0.0,
+        flip_select: false,
     };
     // Initial statuses of the nonbasic variables: the dual-feasible bound (an infinite bound is the artificial one, value +-1e30).
     for j in 0..n + m {
@@ -1522,6 +1732,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     for j in 0..n + m {
         x[j] = if s.st[j] >= 0 { s.xb[s.st[j] as usize] } else { s.nonbasic_value(j) };
     }
+    s.cost.clone_from(&p.cost);
     let mut y: Vec<f64> = s.head.iter().map(|&j| p.cost[j]).collect();
     s.factor.btran(&mut y);
     let dtrue = s.true_d();
