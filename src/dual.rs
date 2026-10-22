@@ -860,6 +860,7 @@ struct Pivot {
     w: f64,
     /// Value of the entering variable before the basis change (`ctx+0x318`).
     t0: f64,
+    above: bool,
 }
 
 impl<'a> Dual<'a> {
@@ -1001,7 +1002,7 @@ impl<'a> Dual<'a> {
         // The factor's update is made by the post-iteration pass (it refactorizes instead when one is due).
         let alpha_vec = alpha_dense;
         self.pending_alpha = Some(alpha_vec);
-        Step::Pivot(Box::new(Pivot { r, leave, q, row, flips, col, tau, alpha, w: rho_norm(&rho), t0 }))
+        Step::Pivot(Box::new(Pivot { r, leave, q, row, flips, col, tau, alpha, w: rho_norm(&rho), t0, above }))
     }
 }
 
@@ -1074,7 +1075,8 @@ impl<'a> Dual<'a> {
                 let a = if pv.flips.contains(&j) { -a } else { a };
                 self.d[j] = self.d[j] - theta * a;
             }
-            self.d[pv.leave] = -theta;
+            // A leaving variable that becomes fixed keeps the true reduced cost, not the frame value.
+            self.d[pv.leave] = if self.st[pv.leave] == FIXED && pv.above { theta } else { -theta };
         } else if refactor {
             self.refactor()?;
         }
@@ -1251,7 +1253,11 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     }
     let dt = s.true_d();
     for j in 0..n + m {
-        if s.st[j] >= 0 || s.st[j] == FIXED || s.st[j] == FREE {
+        if s.st[j] >= 0 {
+            continue;
+        }
+        if s.st[j] == FIXED || s.st[j] == FREE {
+            s.d[j] = dt[j];
             continue;
         }
         if dt[j] < -DUAL_TOL {
@@ -1267,7 +1273,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     // Initial weights: the squared norms of the rows of B^-1.
     for r in 0..m {
         let out = s.mirror.btran(&[(r, 1.0)], false, false);
-        s.w[r] = out.iter().fold(0.0, |a, e| a + e.1 * e.1);
+        s.w[r] = rho_norm(&out);
     }
     s.recompute_xb();
     s.recompute_flags(false, false);
