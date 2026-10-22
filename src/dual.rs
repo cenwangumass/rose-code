@@ -169,6 +169,7 @@ pub(crate) fn dual_crash_basic(p: &Internal) -> Vec<usize> {
                 break;
             }
             let ratio = cost[j] / a;
+            
             let cnt = p.cols[j].len();
             if best_ratio - 1e-10 > ratio || (best_ratio + 1e-10 > ratio && cnt < best_count) {
                 best_ratio = ratio;
@@ -197,15 +198,22 @@ pub(crate) fn dual_crash_basic(p: &Internal) -> Vec<usize> {
         if marked[r] {
             continue;
         }
+        // Pass 2 (`0xeb5c0`, entry test `0xeb61b`, choice `0xed270`): a column with a cost left (above 1e-10) is passed over unless its lower bound is
+        // infinite; it must be nonbasic, |a| >= 1e-6 and have at most five entries. A column with an infinite lower bound has the key `count - 2m` (it
+        // wins over every other); the best key kept is the count of the best column, the key compared is the candidate's.
         let mut best: Option<usize> = None;
+        let (mut best_cnt, mut best_abs) = (5i64, 0.0f64);
         for &(j, a) in &row_cols[r] {
-            if taken[j] || cost[j] != 0.0 || p.up[j] - p.lo[j] <= 0.0 || p.cols[j].len() > 5 || a.abs() < 1e-6 {
+            let free_lb = p.lo[j] <= -BIG;
+            if (cost[j].abs() > 1e-10 && !free_lb) || taken[j] || a.abs() < 1e-6 || p.cols[j].len() > 5 {
                 continue;
             }
-            let a = a.abs();
-            let aa = |c: usize| p.cols[c].iter().find(|e| e.0 == r).map_or(0.0, |e| e.1.abs());
-            if best.map_or(true, |b| p.cols[j].len() < p.cols[b].len() || (p.cols[j].len() == p.cols[b].len() && a > aa(b))) {
+            let cnt = p.cols[j].len() as i64;
+            let key = if free_lb { cnt - 2 * m as i64 } else { cnt };
+            if key < best_cnt || (key == best_cnt && a.abs() > best_abs) {
                 best = Some(j);
+                best_cnt = cnt;
+                best_abs = a.abs();
             }
         }
         if let Some(j) = best {
@@ -251,7 +259,7 @@ impl<'a> Dual<'a> {
         let v = self.head[r];
         let x = self.xb[r];
         let (lo, up) = (self.p.lo[v], self.p.up[v]);
-        if x < lo {
+        if lo > -BIG && x < lo {
             lo - x
         } else if up < BIG && x > up {
             x - up
@@ -285,6 +293,50 @@ impl<'a> Dual<'a> {
         self.refactorizations += 1;
         self.updates = 0;
         self.slack_nb = (0..self.m).map(|i| self.st[self.n + i] < 0).collect();
+        Ok(())
+    }
+
+    /// The free-variable pivots of the setup (`0xe88xx`, before the iteration loop; `replay/gdb_dual_free.py`): every free nonbasic structural, in
+    /// ascending index, is pivoted into the basis. Its column is transformed; among the rows whose basic variable has a finite lower bound the entry of
+    /// largest magnitude wins (first in the result's order on ties; below `PIVOT_FLOOR` the variable is deferred, unexercised). The leaving variable
+    /// goes to its lower bound (fixed when the range is zero). The factor is updated, or refactorized when the work-based trigger is due.
+    fn free_pivots(&mut self) -> Result<(), SolveError> {
+        let (n, m) = (self.n, self.m);
+        let free: Vec<usize> = (0..n).filter(|&j| self.st[j] == FREE).collect();
+        for j in free {
+            let rows_q: Vec<usize> = self.p.fcols[j].iter().map(|&(i, _)| i).collect();
+            let vals_q: Vec<f64> = self.p.fcols[j].iter().map(|&(_, a)| a).collect();
+            let mut col_out = self.mirror.ftran(&rows_q, &vals_q);
+            if self.mirror.last_dense() {
+                col_out.sort_by_key(|e| e.0);
+            }
+            let mut best: Option<(usize, f64)> = None;
+            let mut mx = 0.0f64;
+            for &(pos, v) in &col_out {
+                if self.p.lo[self.head[pos]] > -BIG && v.abs() > mx {
+                    mx = v.abs();
+                    best = Some((pos, v));
+                }
+            }
+            let Some((r, _)) = best.filter(|_| mx >= PIVOT_FLOOR) else { continue };
+            let mut alpha = vec![0.0; m];
+            for &(i, v) in &col_out {
+                alpha[i] = v;
+            }
+            let leave = self.head[r];
+            self.st[leave] = if self.p.lo[leave] == self.p.up[leave] { FIXED } else { LB };
+            self.st[j] = r as i32;
+            self.head[r] = j;
+            self.iters += 1;
+            if self.mirror.refactor_due() {
+                self.refactor()?;
+            } else {
+                self.factor.update(r, alpha);
+                self.mirror.update(r);
+                self.mirror.upd_work.clear();
+                self.updates += 1;
+            }
+        }
         Ok(())
     }
 
@@ -1529,7 +1581,9 @@ impl<'a> Dual<'a> {
                 self.updates += 1;
             }
             // d update (`0xe45c0`).
-            self.work.add(0xe7000, 3.0 * pv.row.len() as f64, crate::work::CTX);
+            // The reference's row list also holds the leaving variable (rose's only when it is a slack).
+            let row_cnt = pv.row.len() + usize::from(pv.leave < self.n);
+            self.work.add(0xe7000, 3.0 * row_cnt as f64, crate::work::CTX);
             let aq = pv.row.iter().find(|e| e.0 == pv.q).unwrap().1;
             let theta = self.d[pv.q] / aq;
             for &(j, a) in &pv.row {
@@ -1738,6 +1792,13 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             LB
         };
     }
+    s.init_pricing_type();
+    let free_phase = (0..n).any(|j| s.st[j] == FREE);
+    if free_phase {
+        s.free_pivots()?;
+        s.refactor()?;
+    }
+    s.build_rrows();
     let dt = s.true_d();
     for j in 0..n + m {
         if s.st[j] >= 0 {
@@ -1754,9 +1815,9 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         }
         s.d[j] = if s.st[j] == UB { -dt[j] } else { dt[j] };
     }
-    s.init_pricing_type();
-    s.reset_pricing(&stc, &rows);
-    s.build_rrows();
+    if !free_phase {
+        s.reset_pricing(&stc, &rows);
+    }
     s.slack_nb = (0..m).map(|i| s.st[n + i] < 0).collect();
     s.level = (0..n + m).filter(|&j| s.st[j] == UB && p.up[j] >= BIG).count();
     // Initial weights: the squared norms of the rows of B^-1.
