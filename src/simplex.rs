@@ -41,6 +41,11 @@ pub struct SolveOptions {
     /// The simplex method (`crate::method::SolveMethod`). The dual method (`crate::dual`) reads `refactor_schedule` as the iteration counts after which
     /// the reference's work-based trigger refactorizes (the refactorizations of the no-leaving-row handler are modelled).
     pub method: crate::method::SolveMethod,
+    /// `PerturbValue` of the dual's cost perturbation (`crate::dual`, `reverse-engineer/specs/dual-simplex.md`): 0 turns it off (the controlled
+    /// profile), 0.0002 is the library default.
+    pub perturb: f64,
+    /// The objective scale the model's costs carry (set by `crate::scale::solve`); the dual's objective value divides by it.
+    pub obj_scale: f64,
 }
 
 impl Default for SolveOptions {
@@ -59,6 +64,8 @@ impl Default for SolveOptions {
             pricing0: false,
             scaling: false,
             method: crate::method::SolveMethod::Primal,
+            perturb: 0.0,
+            obj_scale: 1.0,
         }
     }
 }
@@ -76,7 +83,7 @@ impl SolveOptions {
 
     /// The reference's `dual-release` profile (`Method=1`, library defaults) as far as it is recovered: the dual loop on the scaled model.
     pub fn dual_release() -> Self {
-        SolveOptions { scaling: true, ..SolveOptions::dual() }
+        SolveOptions { scaling: true, perturb: 0.0002, ..SolveOptions::dual() }
     }
 
     /// The reference's release profile as far as it is recovered: the faithful options with the initial `SimplexPricing=0` pricing.

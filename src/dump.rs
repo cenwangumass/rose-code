@@ -65,3 +65,9 @@ pub fn emit(kind: &str, rec: serde_json::Value) {
 pub fn sparse(v: &[(usize, f64)]) -> serde_json::Value {
     serde_json::Value::Array(v.iter().map(|&(i, x)| serde_json::json!([i, x])).collect())
 }
+
+/// Whether the per-call dump `kind` is wanted for call `k`: `ROSE_FROM=k0` leaves out the calls before `k0` (a window of a long run).
+pub fn on_from(kind: &str, k: usize) -> bool {
+    static F: OnceLock<usize> = OnceLock::new();
+    on(kind) && k >= *F.get_or_init(|| std::env::var("ROSE_FROM").ok().and_then(|v| v.parse().ok()).unwrap_or(0))
+}

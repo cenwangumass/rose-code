@@ -9,6 +9,9 @@ fn main() {
         if let Some(sch) = a.get(3) {
             o.refactor_schedule = Some(sch.split(',').filter(|x| !x.is_empty()).map(|x| x.parse().unwrap()).collect());
         }
+        if let Ok(v) = std::env::var("ROSE_MAXIT") {
+            o.max_iterations = v.parse().unwrap();
+        }
         o
     } else if a[2] == "release" { SolveOptions::release() } else if a[2] == "faithful" { SolveOptions { faithful_weights: true, faithful_positions: true, faithful_ftran: true, ..SolveOptions::default() } } else { SolveOptions::plain() };
     let r = solve(&model, None, &opts).unwrap();

@@ -26,6 +26,17 @@ const ALPHA_TOL: f64 = 1e-10;
 const REL_PIVOT_TOL: f64 = 3e-6;
 const W_EPS: f64 = 1e-8;
 
+/// The reference's integer generator (`0x88a870`): a 64-bit congruential step, the high word tempered, 31 bits.
+fn lcg_int(state: &mut u64) -> u32 {
+    *state = state.wrapping_mul(0x5851f42d4c957f2d).wrapping_add(0x14057b7ef767814f);
+    let mut e = (*state >> 32) as u32;
+    e ^= e >> 11;
+    e ^= (e << 7) & 0x9d2c5680;
+    e ^= (e << 15) & 0xefc60000;
+    e ^= e >> 18;
+    e & 0x7fff_ffff
+}
+
 fn is_inf(v: f64) -> bool {
     v.abs() >= INF
 }
@@ -789,6 +800,7 @@ impl<'a> Dual<'a> {
     /// infeasible row below the threshold gets flag 0 and stays out of the list.
     fn recompute_flags(&mut self, big: bool, after_pivot: bool) {
         let ptol = self.ptol();
+        self.rebuilds = 40;
         let mut maxp = 0.0f64;
         let mut inf = vec![false; self.m];
         for r in 0..self.m {
@@ -853,8 +865,14 @@ impl<'a> Dual<'a> {
                         return Some(r);
                     }
                 }
-                // The list is exhausted: rebuild it (`0xbdc10`), the first entry is the argmax.
+                // The list is exhausted: rebuild it (`0xbdc10`), the first entry is the argmax. When the rebuild budget `P+0x38` (40 after every recompute) runs
+                // out, there is no row and a refactorization is requested instead (`0xcce9f..0xcceb5`, request 3; 80BAU3B call 1336).
                 self.rebuilds -= 1;
+                self.cursor = 0;
+                if self.rebuilds < 0 {
+                    self.request = 3;
+                    return None;
+                }
                 self.build_walk_list();
                 if self.walk_len == 0 {
                     return None;
@@ -1278,13 +1296,7 @@ impl<'a> Dual<'a> {
 
     /// The next value of the reference's random generator (`0x88a870`: 31 bits; `0x88a8d0`: that times 2^-31).
     fn rng_int(&mut self) -> u32 {
-        self.rng = self.rng.wrapping_mul(0x5851f42d4c957f2d).wrapping_add(0x14057b7ef767814f);
-        let mut e = (self.rng >> 32) as u32;
-        e ^= e >> 11;
-        e ^= (e << 7) & 0x9d2c5680;
-        e ^= (e << 15) & 0xefc60000;
-        e ^= e >> 18;
-        e & 0x7fff_ffff
+        lcg_int(&mut self.rng)
     }
 
     fn rng_double(&mut self) -> f64 {
@@ -1523,7 +1535,7 @@ impl<'a> Dual<'a> {
     fn iteration(&mut self, k: usize, dump: &mut Option<serde_json::Value>) -> Step {
         let p = self.p;
         let (n, m) = (self.n, self.m);
-        let snap = crate::dump::on("dsx").then(|| self.snapshot(k));
+        let snap = crate::dump::on_from("dsx", k).then(|| self.snapshot(k));
         self.work.trig();
         let row_sel = self.price();
         let Some(r) = row_sel else {
@@ -1895,7 +1907,6 @@ impl<'a> Dual<'a> {
         }
         // The test runs at every second refactorization (every fifth once the perturbation flag has reached 3).
         let period = if self.pert > 2 { 5 } else { 2 };
-        if std::env::var("DBGP").is_ok() { eprintln!("DBG PT c2c0={} c110={} c330={} c334={} c2b0={} it={} lvl={}/{}", self.refactorizations, self.prog_on as u8, self.stall, self.stall_snap, self.stall_it, self.iters, old_level, self.level); }
         if self.refactorizations % period != 1 {
             return;
         }
@@ -1929,12 +1940,15 @@ impl<'a> Dual<'a> {
     fn perturb(&mut self) {
         let p = self.p;
         let sc = self.pstep / 500.0;
+        // The perturbation has its own generator, seeded with the iteration count (`0x115220`, state = it + the `Seed` parameter); the generator of the
+        // cost shifts is not touched.
+        let mut g = self.iters as u64;
         let mut acc = 0.0f64;
         for j in 0..self.n + self.m {
             if self.st[j] >= 0 {
                 continue;
             }
-            let r = self.rng_int() as i32;
+            let r = lcg_int(&mut g) as i32;
             let count = if j < self.n { p.cols[j].len() as f64 } else { 1.0 };
             let f = 1.0f64;
             let x = count * (f * 0.3 + 0.7);
@@ -2346,7 +2360,9 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 s.post(Some(&pv), due)?;
             }
             Step::NoRow => {
-                s.no_row();
+                if s.request != 3 {
+                    s.no_row();
+                }
                 if let Some(stt) = s.status {
                     status = stt;
                     if stt == Status::Optimal && s.pert != 0 {

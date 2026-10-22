@@ -254,7 +254,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     if crate::dump::on("scale") {
         crate::dump::emit("scale", serde_json::json!({"col": sc.col, "row": sc.row}));
     }
-    let inner = SolveOptions { scaling: false, ..opts.clone() };
+    let inner = SolveOptions { scaling: false, obj_scale: sc.obj, ..opts.clone() };
     match sc.apply(model) {
         Some(scaled) => Ok(sc.unscale(model, crate::simplex::solve(&scaled, start, &inner)?)),
         None => crate::simplex::solve(model, start, &inner),
