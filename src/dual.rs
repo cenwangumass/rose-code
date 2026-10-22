@@ -109,6 +109,8 @@ struct Dual<'a> {
     status: Option<Status>,
     /// Costs in force: the problem's costs plus the shifts of the ratio test (`*(P+0)`).
     cost: Vec<f64>,
+    /// The accumulated cost shifts per variable: the reference keeps them apart and forms `cost = base + shift` (the sum of the shifts is rounded once).
+    cshift: Vec<f64>,
     /// State of the reference's random generator (`0x88a870`, `0x88a8d0`), seeded 101.
     rng: u64,
     /// Perturbation flag `ctx+0x338`: 1 after a small cost shift, 2 after a large one or one against an infinite bound.
@@ -1189,13 +1191,15 @@ impl<'a> Dual<'a> {
         };
         self.d[j] += s;
         if self.st[j] == LB {
-            self.cost[j] += s;
+            self.cshift[j] += s;
+            self.cost[j] = self.p.cost[j] + self.cshift[j];
             self.obj_off -= lo * s;
             if -BIG >= lo {
                 self.raise_pert(2);
             }
         } else {
-            self.cost[j] -= s;
+            self.cshift[j] -= s;
+            self.cost[j] = self.p.cost[j] + self.cshift[j];
             self.obj_off += up * s;
             if up >= BIG {
                 self.raise_pert(2);
@@ -1910,6 +1914,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         pending_alpha: None,
         status: None,
         cost: p.cost.clone(),
+        cshift: vec![0.0; p.cost.len()],
         rng: 101,
         pert: 0,
         obj_off: 0.0,
