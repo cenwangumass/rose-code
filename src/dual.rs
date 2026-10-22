@@ -1671,15 +1671,12 @@ impl<'a> Dual<'a> {
             }
             // The count of the result vector times 7 on the context's scale (`(7 * scale) * count`).
             self.work.add(0xce1ef, sol.len() as f64, 7.0 * crate::work::FAC);
-            let mut rhs = vec![0.0; m];
-            for (i, v) in sol {
-                rhs[i] = v;
-            }
+            // The x_B update and the touching follow the result list of the FTRAN in its own order (FIT2P call 44: the rows join the pricing list in that order).
             let mut changed = Vec::new();
-            for pos in 0..m {
-                if rhs[pos] != 0.0 {
-                    self.xb[pos] -= rhs[pos];
-                    changed.push(pos);
+            for (i, v) in sol {
+                if v != 0.0 {
+                    self.xb[i] -= v;
+                    changed.push(i);
                 }
             }
             for &j in &flips {
@@ -2056,6 +2053,9 @@ impl<'a> Dual<'a> {
     /// x_B and DSE weight update (`0xc0050`, fast path), bit for bit as in the spec.
     fn update_weights(&mut self, pv: &Pivot) {
         let (r, alpha, w) = (pv.r, pv.alpha, pv.w);
+        if crate::dump::on("dtau") {
+            crate::dump::emit("dtau", serde_json::json!({"r": r, "alpha": alpha, "w": w, "col": crate::dump::sparse(&pv.col), "tau": pv.tau}));
+        }
         if w == 0.0 {
             self.w[r] = W_EPS;
         } else {

@@ -780,11 +780,19 @@ impl RefStruct {
         // The inline dense joint loop of two dense vectors (`0x128c56..0x129152`) tests the raw value before the quotient: a tail column whose
         // raw value is at most the tolerance is zeroed even when the quotient exceeds it.
         let joint_dense = tau_dense && self.f2.borrow().col_n.is_none();
+        // The U stage `0x123690` solves the tail in one of three loops: the heap walk and the sparse-row loop zero a quotient of at most the tolerance, the dense
+        // slot loop (`0x12403b`: `m <= h33^2 c` or `5 h33^2 t > m - i21`, see `tau_u_work`) stores the quotient and only skips its scatter (FIT2P call 14
+        // keeps a tail value of 4e-16 that enters the row dots of the nucleus positions). A dense input (`tau_dense`) zeroes it (FIT2P call 49).
+        let keep_tiny = !tau_dense && self.tau_u_dense(&spike);
         for &c in &tail {
             tau_raw[c] = x[c].abs() > TOL;
             let xc = x[c] / self.diag[c];
-            if xc.abs() <= TOL || (joint_dense && !tau_raw[c]) {
+            if joint_dense && !tau_raw[c] {
                 x[c] = 0.0;
+                continue;
+            }
+            if xc.abs() <= TOL {
+                x[c] = if keep_tiny { xc } else { 0.0 };
                 continue;
             }
             x[c] = xc;
@@ -976,6 +984,16 @@ impl RefStruct {
         x1
     }
 
+    /// Whether the U stage of the second vector runs its dense slot loop (`0x123690`: `m <= h33^2 c` for a spike of `c` entries, or `5 h33^2 t > m - i21` for `t` tail entries).
+    fn tau_u_dense(&self, spike: &[(usize, f64)]) -> bool {
+        let (m, d) = (self.m as f64, self.h33);
+        if m <= (d * d) * spike.len() as f64 {
+            return true;
+        }
+        let t = spike.iter().filter(|e| self.kind[e.0] == -2).count() as f64;
+        ((5.0 * d) * d) * t > (self.m - self.i21) as f64
+    }
+
     /// Work of the tau solve's U stage (`0x123690`, which adds to `F+0x200`): `10 + 2 n + 6 c` for `n` needed positions and a spike of
     /// `c` entries; a dense spike (`m <= h33^2 c`) or one with many tail entries (`5 h33^2 t > m - i21`) books `3 (m - i21)` and `2 len` (its tail-row entries) per
     /// nonzero tail column (plus `2 t` in the second case) and `4 (m - i21)` at the end; otherwise the heap walk books `4 h33` per nonzero
@@ -994,6 +1012,7 @@ impl RefStruct {
                 e = 2.0 * t + e;
             }
         }
+        debug_assert_eq!(dense, self.tau_u_dense(spike));
         let fin;
         if dense {
             e = 3.0 * tail_rows + e;
