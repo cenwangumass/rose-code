@@ -324,7 +324,7 @@ pub(crate) fn ref_sort<T: Copy>(a: &mut [f64], idx: &mut [T]) {
         while hi - lo >= 100 && depth < 50 {
             let n = hi - lo;
             let (x, y, z) = (a[lo], a[lo + n / 2], a[hi - 1]);
-            let p = if (x > y) == (x < z) { x } else if (y > x) == (y < z) { y } else { z };
+            let p = if (y <= x && x <= z) || (z <= x && x <= y) { x } else if (x <= y && y <= z) || (z <= y && y <= x) { y } else { z };
             let (mut i, mut r, mut lp, mut rp) = (lo, hi, lo, 0usize);
             if lo < hi && p > a[lo] {
                 while i < hi && p > a[i] {
