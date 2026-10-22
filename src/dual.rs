@@ -1000,7 +1000,7 @@ impl<'a> Dual<'a> {
         let mut sel_sep = false;
         if nn == 1 {
             self.work.add(0xc7c4f, 5.0, crate::work::CTX);
-            let (q, _) = self.shift_entering(row, &[lst[0]], lst[0], 0.0, 0.0);
+            let (q, _) = self.shift_entering(row, &[lst[0]], lst[0], 0.0, 0.0, 0);
             return Ratio { q: Some(q), flips: Vec::new() };
         }
         let maxa = -minsd(xm13, xm9);
@@ -1119,7 +1119,7 @@ impl<'a> Dual<'a> {
         // The entries of the list that the second loop `0xc8a05` walks: the flips and the kept candidates (`r8d` at `0xc8b2e`).
         self.work.add(0xc8b67, 4.0 * (b + kept.len()) as f64, crate::work::CTX);
         let (chosen, xm5) = self.select_entering(row, &kept, xm3);
-        let (mut chosen, xm5) = self.shift_entering(row, &kept, chosen, xm5, xm15);
+        let (mut chosen, xm5) = self.shift_entering(row, &kept, chosen, xm5, xm15, b);
         let mut flips = lst[..b].to_vec();
         if self.flip_select && !flips.is_empty() {
             (chosen, flips) = self.select_among_flips(row, chosen, flips, xm5);
@@ -1203,7 +1203,7 @@ impl<'a> Dual<'a> {
     /// Treatment of the chosen entering variable's reduced cost (`0xcabc2`, `0xc8c12..0xc8e27`). A variable at a bound with `d' < -1e-13` is shifted; the other
     /// candidates of the list with a negative `d'` are then shifted or zeroed, the Harris filter runs again on the new values (continuing from the bound
     /// `xm15` reached, with `xm3 = xm15`) and the entering variable is chosen again. A `d'` in [-1e-13, 0) is zeroed; a free variable's is zeroed.
-    fn shift_entering(&mut self, row: &[(usize, f64)], kept: &[usize], chosen: usize, xm5: f64, mut xm15: f64) -> (usize, f64) {
+    fn shift_entering(&mut self, row: &[(usize, f64)], kept: &[usize], chosen: usize, xm5: f64, mut xm15: f64, nflips: usize) -> (usize, f64) {
         let mut xm3;
         let mut xm5 = xm5;
         let delta = DUAL_TOL;
@@ -1265,6 +1265,8 @@ impl<'a> Dual<'a> {
                 chosen = kept[0];
                 xm5 = 0.0;
             } else {
+                // The selection loop runs again over the compacted list and books its count (`0xc8b67`) like the first one.
+                self.work.add(0xc8b67, 4.0 * (nflips + next.len()) as f64, crate::work::CTX);
                 (chosen, xm5) = self.select_entering(row, &next, xm3);
                 kept = next;
             }
@@ -1451,7 +1453,9 @@ impl<'a> Dual<'a> {
                 None => ((e1 + self.mirror.tau_l.get()) + u1) + self.mirror.tau_u.get(),
             };
             self.work.add_from(0x129671, 0x120200, est, crate::work::FAC);
-            self.work.add(0x120114, 4.0 * rows_q.len() as f64 + rho_rows.len() as f64, crate::work::CTX);
+            // A slack column (`ctx+0x2fc >= n`, `0x11f788`) is not copied from the matrix: its `4 nnz` term is absent.
+            let copied = if q < self.n { rows_q.len() } else { 0 };
+            self.work.add(0x120114, 4.0 * copied as f64 + rho_rows.len() as f64, crate::work::CTX);
         }
         let mut tau_dense = vec![0.0; m];
         for &(i, v) in &tau_out {
@@ -1710,8 +1714,13 @@ impl<'a> Dual<'a> {
             self.flags_work();
         } else if let Some(pv) = pv {
             self.work.add(0xc0410, 3.0 * pv.col.len() as f64, crate::work::CTX);
-            let site = if self.value_mode { 0xc0c24 } else { 0xc06c7 };
-            self.work.add(site, 7.0 * pv.col.len() as f64, crate::work::CTX);
+            // With `ctx+0x2c8` set (huge infeasibilities: level != 0) the value-mode walk is the 8-per-entry loop `0xc09bd`.
+            if self.value_mode && self.level != 0 {
+                self.work.add(0xc09bd, 8.0 * pv.col.len() as f64, crate::work::CTX);
+            } else {
+                let site = if self.value_mode { 0xc0c24 } else { 0xc06c7 };
+                self.work.add(site, 7.0 * pv.col.len() as f64, crate::work::CTX);
+            }
             self.update_primal_and_weights(pv);
         }
         Ok(())
