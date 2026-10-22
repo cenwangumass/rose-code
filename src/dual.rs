@@ -632,6 +632,13 @@ impl<'a> Dual<'a> {
         }
         merged.extend_from_slice(&old[a..]);
         merged.extend_from_slice(&fresh[b..]);
+        // The work of the rebuild (`0xc26ec`: the rows by class, `0xc2761`: the waiting entries, `0xc2842`: the new ones, `0xc2ad4`: the merged list).
+        let (m, n1) = (self.m as f64, merged.len() as f64);
+        let old_len = self.walk_len.min(self.list.len());
+        self.work.add(0xc26ec, 3.0 * (m - n1) + (5.0 + if self.ptype == 1 { 1.0 } else { 0.0 }) * n1, crate::work::CTX);
+        self.work.add(0xc2761, 2.0 * old.len() as f64 + old_len as f64, crate::work::CTX);
+        self.work.add(0xc2842, 2.0 * fresh.len() as f64, crate::work::CTX);
+        self.work.add(0xc2ad4, n1, crate::work::CTX);
         for &r in &fresh {
             self.flags[r] = 0;
         }
@@ -886,7 +893,8 @@ impl<'a> Dual<'a> {
             11.5 * nr + 3.5 * p5 as f64 + 3.0 * d as f64
         };
         // Every slack entry of the result (the leaving one and the offered nonbasic ones) adds four.
-        self.work.add_from(0x135e92, 0xc5381, est + 4.0 * nslack as f64, crate::work::CTX);
+        let slack = if self.level != 0 { 4.0 * nslack as f64 } else { 0.0 };
+        self.work.add_from(0x135e92, 0xc5381, est + slack, crate::work::CTX);
     }
 
     /// The bound-flipping Harris ratio test (`0xc74a0`, `ctx+0x468 != 0`), `specs/dual-simplex.md`.
@@ -1430,7 +1438,10 @@ impl<'a> Dual<'a> {
             // The two-vector FTRAN books the L stages of both vectors and then the U stage of the column at the factor's scale
             // (`0x129671`, call `0x120200`); the wrapper `0x11f620` books `4 nnz(column) + nnz(rho)` (`0x120114`).
             let (e1, u1) = self.mirror.work_parts;
-            let est = ((e1 + self.mirror.tau_l.get()) + u1) + self.mirror.tau_u.get();
+            let est = match self.mirror.joint_u(&needed) {
+                Some(j) => (e1 + self.mirror.tau_l.get()) + j,
+                None => ((e1 + self.mirror.tau_l.get()) + u1) + self.mirror.tau_u.get(),
+            };
             self.work.add_from(0x129671, 0x120200, est, crate::work::FAC);
             self.work.add(0x120114, 4.0 * rows_q.len() as f64 + rho_rows.len() as f64, crate::work::CTX);
         }
@@ -1598,12 +1609,14 @@ impl<'a> Dual<'a> {
     }
 
     /// Work of the pricing setup after a refactorization: the list of infeasible rows (`5 m + 4 len`; `0xc4329` in the walk mode, `0xc1fe3` in the value mode)
-    /// and the closing pass over all variables (`0xbfed2` after a pivot, `0xbf981` after a call without a leaving row).
-    fn flags_work(&mut self, after_pivot: bool) {
+    /// and the closing pass over all variables.
+    fn flags_work(&mut self) {
         let (n, m) = (self.n as f64, self.m as f64);
         let site = if self.value_mode { 0xc1fe3 } else { 0xc4329 };
         self.work.add(site, 5.0 * m + 4.0 * self.list.len() as f64, crate::work::CTX);
-        self.work.add(if after_pivot { 0xbfed2 } else { 0xbf981 }, 2.0 * (n + m), crate::work::CTX);
+        // The closing pass (`0xbf5b0`): the variant for a nonzero tolerance level books `bfed2`, the other `bf981`; the perturbation flag adds one unit per variable.
+        let pert = if self.pert != 0 { 1.0 } else { 0.0 };
+        self.work.add(if self.level != 0 { 0xbfed2 } else { 0xbf981 }, (2.0 + pert) * (n + m), crate::work::CTX);
     }
 
     /// Level of the tolerance (`0xe45c0`, after a refactorization): with request 4 the nonbasic variables are first put on the dual-feasible bound.
@@ -1684,10 +1697,11 @@ impl<'a> Dual<'a> {
             self.request = 0;
             self.recompute_xb();
             self.recompute_flags(level_before != 0, pv.is_some());
-            self.flags_work(pv.is_some());
+            self.flags_work();
         } else if let Some(pv) = pv {
             self.work.add(0xc0410, 3.0 * pv.col.len() as f64, crate::work::CTX);
-            self.work.add(0xc06c7, 7.0 * pv.col.len() as f64, crate::work::CTX);
+            let site = if self.value_mode { 0xc0c24 } else { 0xc06c7 };
+            self.work.add(site, 7.0 * pv.col.len() as f64, crate::work::CTX);
             self.update_primal_and_weights(pv);
         }
         Ok(())
@@ -1939,7 +1953,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     s.recompute_xb();
     s.work.add(0xc391f, m as f64, crate::work::CTX);
     s.recompute_flags(false, false);
-    s.flags_work(true);
+    s.flags_work();
     let schedule = opts.refactor_schedule.clone();
     let mut trace = Vec::new();
     let mut k = 0usize;

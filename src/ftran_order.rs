@@ -68,6 +68,8 @@ pub struct RefStruct {
     pub tau_l: std::cell::Cell<f64>,
     /// The U-stage estimate of the last `ftran_needed` (`0x123690`).
     pub tau_u: std::cell::Cell<f64>,
+    /// What the last `ftran` and `ftran_needed` leave for the joint U stages of the two-vector FTRAN (`joint_u`).
+    f2: std::cell::RefCell<F2>,
     /// Fill of the reference's pool for etas and the row-wise copy of U (`F+0x160`), and the capacity of each row of that copy.
     /// Only the parity of `fill` matters: it decides the alignment of the next eta's value array.
     fill: usize,
@@ -98,6 +100,19 @@ pub struct RefStruct {
     pub bt_dense: bool,
     /// The factor object's update limit when the pricing lowered it (`F+0x188`, the dual path); the default is `max(20, m^0.7)`.
     pub upd_limit: Option<usize>,
+}
+
+/// The inputs of the joint U stages of the two-vector FTRAN: for the pivot column and for tau, the count of the L-stage list (`None`: dense, count -1)
+/// and the solved values (the tail entries are the values after the tail solve); for the column also the positions of the L-stage list.
+#[derive(Default)]
+struct F2 {
+    col_n: Option<usize>,
+    col_in: Vec<usize>,
+    x_col: Vec<f64>,
+    tau_n: Option<usize>,
+    x_tau: Vec<f64>,
+    /// Whether the raw value of tau at a tail column exceeded the tolerance before the division (the joint routines test it first).
+    tau_raw: Vec<bool>,
 }
 
 struct Eta {
@@ -377,6 +392,7 @@ impl RefStruct {
             keep_work: 0.0,
             tau_l: std::cell::Cell::new(0.0),
             tau_u: std::cell::Cell::new(0.0),
+            f2: std::cell::RefCell::new(F2::default()),
             scratch_peel: ((m as f64).powf(0.7) as usize).max(20).wrapping_add(ncols + 1) % 2,
             fill: 2 * (uc.iter().map(Vec::len).sum::<usize>() + nnz_l_tot),
             // A row lists its tail columns in the order of the factorization's U row (Markowitz steps), or in the order of the
@@ -711,8 +727,10 @@ impl RefStruct {
     /// stage value and divided by the diagonal, without a tolerance test. Does not touch the spike of the last `ftran`.
     pub fn ftran_needed(&self, rows: &[usize], vals: &[f64], needed: &[usize]) -> Vec<(usize, f64)> {
         let m = self.m;
-        let (spike, _, e_l) = self.lstage_num(rows, vals, false);
+        let (spike, count_l, e_l) = self.lstage_num(rows, vals, false);
         self.tau_l.set(e_l);
+        let tau_dense = rows.len() * self.dthr > self.m || self.lev_dense_ft || (!self.etas.is_empty() && count_l * self.dthr > self.m);
+        let tau_n = if tau_dense { None } else { Some(spike.len()) };
         let mut x = vec![0.0f64; m];
         let mut touched = vec![false; m];
         let mut tail: Vec<usize> = Vec::new();
@@ -735,7 +753,9 @@ impl RefStruct {
             }
         }
         tail.sort_unstable_by_key(|&p| std::cmp::Reverse(self.slot[p]));
+        let mut tau_raw = vec![false; m];
         for &c in &tail {
+            tau_raw[c] = x[c].abs() > TOL;
             let xc = x[c] / self.diag[c];
             if xc.abs() <= TOL {
                 x[c] = 0.0;
@@ -749,6 +769,12 @@ impl RefStruct {
             }
         }
         self.tau_u.set(self.tau_u_work(&spike, &x, needed.len()));
+        {
+            let mut f = self.f2.borrow_mut();
+            f.tau_n = tau_n;
+            f.x_tau = x.clone();
+            f.tau_raw = tau_raw;
+        }
         needed
             .iter()
             .map(|&p| {
@@ -764,6 +790,164 @@ impl RefStruct {
                 (p, v)
             })
             .collect()
+    }
+
+    /// The U-stage work of the two-vector FTRAN when the reference does not run the two single-vector U stages: the joint routine `0x12c300` (the
+    /// column is a sparse list and tau is not) or the inline dense one (`0x128742`, neither is). `None` for the usual pair. `out` holds the positions of the
+    /// column's result. The selection follows `0x1286c3..0x12873c`.
+    pub fn joint_u(&self, out: &[usize]) -> Option<f64> {
+        let f = self.f2.borrow();
+        let (m, i21) = (self.m, self.i21);
+        let ok = |n: Option<usize>| n.is_some_and(|n| self.nuc.len() + n < i21 || self.dens * (n as f64) < 2.0 * m as f64);
+        if ok(f.tau_n) {
+            return None;
+        }
+        Some(if ok(f.col_n) { self.third_work(&f, out) } else { self.dense_pair_work(&f, out) })
+    }
+
+    /// Work of the output stage of both joint routines: `(row length + 2) 2` for each result position of the nucleus list.
+    fn row_out_work(&self, out: &[usize]) -> f64 {
+        let mut e = 0.0f64;
+        for &p in out {
+            if self.kind[p] >= 0 {
+                e += (self.rowl[p].len() as f64 + 2.0) * 2.0;
+            }
+        }
+        e
+    }
+
+    /// The joint routine `0x12c300` (column: sparse list, tau: dense).
+    fn third_work(&self, f: &F2, out: &[usize]) -> f64 {
+        let (m, i21) = (self.m, self.i21);
+        let mf = m as f64;
+        let tail_rows = (m - i21) as f64;
+        let cin = f.col_in.len();
+        if cin == 0 {
+            return 0.0;
+        }
+        let tau_pass = |c: usize| f.x_tau[c] != 0.0 && f.tau_raw[c];
+        let col_pass = |c: usize| f.x_col[c] != 0.0;
+        let mut x2 = 0.0f64;
+        if let Some(c1) = f.tau_n.filter(|&c| c > 0) {
+            x2 = 2.0 * c1 as f64 + mf;
+        }
+        let (mut nuc_cnt, mut tail_cnt) = (0usize, 0usize);
+        let sparse_in = mf > cin as f64 * self.dens;
+        let mut nuc_in: Vec<usize> = Vec::new();
+        if sparse_in {
+            for &p in &f.col_in {
+                match self.kind[p] {
+                    -1 => {}
+                    -2 => tail_cnt += 1,
+                    _ => {
+                        nuc_cnt += 1;
+                        nuc_in.push(p);
+                    }
+                }
+            }
+        }
+        let nuc_len = self.nuc.len();
+        let use_dense_scan = !sparse_in || self.dens * (nuc_cnt + tail_cnt) as f64 > tail_rows + nuc_len as f64;
+        let mut x5 = 0.0f64;
+        let x1;
+        if use_dense_scan {
+            x2 += 5.0 * tail_rows;
+            if sparse_in {
+                x2 += 2.0 * (tail_cnt + nuc_cnt) as f64;
+            }
+            let mut x3 = tail_rows * 3.0 + x2;
+            for t in (i21..m).rev() {
+                let c = self.at[t];
+                if tau_pass(c) {
+                    x5 += (self.a[c].len() as f64 + 2.0) * 2.0;
+                }
+                if col_pass(c) {
+                    x3 += 2.0 * (self.a[c].len() + self.b[c].len()) as f64;
+                }
+            }
+            let x0 = 2.0 * nuc_len as f64 + x3;
+            x1 = 2.0 * out.len() as f64 + x0;
+        } else {
+            let (mut r9, mut r15) = (nuc_cnt, nuc_cnt);
+            let mut surv: Vec<usize> = Vec::new();
+            for t in (i21..m).rev() {
+                let c = self.at[t];
+                let (tp, cp) = (tau_pass(c), col_pass(c));
+                if tp || cp {
+                    r9 += self.a[c].len();
+                }
+                if tp {
+                    x5 += (self.a[c].len() as f64 + 2.0) * 2.0;
+                }
+                if cp {
+                    r15 += self.b[c].len();
+                    surv.push(c);
+                }
+            }
+            let mut x0 = tail_rows * 5.0;
+            x0 += x2;
+            x0 += r9 as f64 * 3.0;
+            if r15 as f64 * 2.5 > nuc_len as f64 {
+                x0 += nuc_cnt as f64;
+                for &c in &surv {
+                    x0 += self.b[c].len() as f64 * 2.0 + 4.0;
+                }
+                x0 += nuc_len as f64 * 2.4;
+            } else {
+                let mut seen = vec![false; m];
+                for &p in &nuc_in {
+                    seen[p] = true;
+                }
+                let mut touched = nuc_cnt;
+                for &c in &surv {
+                    x0 += self.b[c].len() as f64 * 2.0 + 4.0;
+                    for &j in &self.b[c] {
+                        if !seen[j] {
+                            seen[j] = true;
+                            touched += 1;
+                        }
+                    }
+                }
+                x0 += 3.0 * touched as f64;
+            }
+            x1 = 2.0 * out.len() as f64 + x0;
+        }
+        x5 + (x1 + self.row_out_work(out))
+    }
+
+    /// The inline dense routine of `0x125f50` (`0x128742`, both vectors dense).
+    fn dense_pair_work(&self, f: &F2, out: &[usize]) -> f64 {
+        let (m, i21) = (self.m, self.i21);
+        let mf = m as f64;
+        let mut x9 = 0.0f64;
+        if let Some(n) = f.col_n.filter(|&n| n > 0) {
+            x9 = mf + 2.0 * n as f64;
+        }
+        if let Some(n) = f.tau_n.filter(|&n| n > 0) {
+            x9 += mf + 2.0 * n as f64;
+        }
+        let mut x5 = 5.0 * (m - i21) as f64;
+        let mut x4 = 0.0f64;
+        for t in (i21..m).rev() {
+            let c = self.at[t];
+            if f.x_col[c] != 0.0 {
+                x5 += ((self.a[c].len() + self.b[c].len()) as f64 + 2.0) * 2.0;
+            }
+            if f.x_tau[c] != 0.0 && f.tau_raw[c] {
+                x4 += (self.a[c].len() as f64 + 2.0) * 2.0;
+            }
+        }
+        let last = if i21 == m { m as i64 - 1 } else { i21 as i64 - 1 };
+        let mut x1 = (m - i21) as f64;
+        x1 += last.max(0) as f64;
+        x1 *= 5.0;
+        x1 += x9;
+        x4 += self.row_out_work(out);
+        x1 += x5;
+        x1 += x4;
+        x1 += out.len() as f64;
+        x1 += out.len() as f64;
+        x1
     }
 
     /// Work of the tau solve's U stage (`0x123690`, which adds to `F+0x200`): `10 + 2 n + 6 c` for `n` needed positions and a spike of
@@ -888,6 +1072,7 @@ impl RefStruct {
         let inp: Vec<usize> = spike.iter().map(|e| e.0).collect();
         let vec_dense = rows.len() * self.dthr > m || self.lev_dense_ft || (!self.etas.is_empty() && count_l * self.dthr > m);
         let u_est = self.u_work(&inp, &x, !dense, if vec_dense { None } else { Some(spike.len()) });
+        *self.f2.borrow_mut() = F2 { col_n: if vec_dense { None } else { Some(spike.len()) }, col_in: inp.clone(), x_col: x.clone(), ..F2::default() };
         self.work = u_est + e_l;
         self.work_parts = (e_l, u_est);
         self.last_dense = dense;
