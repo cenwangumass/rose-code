@@ -635,7 +635,10 @@ impl<'a> Dual<'a> {
         // The work of the rebuild (`0xc26ec`: the rows by class, `0xc2761`: the waiting entries, `0xc2842`: the new ones, `0xc2ad4`: the merged list).
         let (m, n1) = (self.m as f64, merged.len() as f64);
         let old_len = self.walk_len.min(self.list.len());
-        self.work.add(0xc26ec, 3.0 * (m - n1) + (5.0 + if self.ptype == 1 { 1.0 } else { 0.0 }) * n1, crate::work::CTX);
+        // The loop over the rows (`0xc22f3` / `0xc24b7`) counts every row as feasible when `ctx+0x2c8` is 0 (the largest infeasibility sum at the last recompute is
+        // at most 1e20, i.e. the tolerance level is 0), so that the site books `3 m`.
+        let n_inf = if self.level != 0 { n1 } else { 0.0 };
+        self.work.add(0xc26ec, 3.0 * (m - n_inf) + (5.0 + if self.ptype == 1 { 1.0 } else { 0.0 }) * n_inf, crate::work::CTX);
         self.work.add(0xc2761, 2.0 * old.len() as f64 + old_len as f64, crate::work::CTX);
         self.work.add(0xc2842, 2.0 * fresh.len() as f64, crate::work::CTX);
         self.work.add(0xc2ad4, n1, crate::work::CTX);
@@ -873,7 +876,6 @@ impl<'a> Dual<'a> {
     fn row_product_work(&mut self, rho: &[(usize, f64)], nslack: usize) {
         let p5: usize = rho.iter().map(|e| self.rrows[e.0].len()).sum();
         let (n, m) = (self.n, self.m);
-        let nnz_a: usize = self.p.cols[..n].iter().map(Vec::len).sum();
         let mut seen = vec![false; n + m];
         let mut d = 0usize;
         for &(i, _) in rho {
@@ -887,7 +889,8 @@ impl<'a> Dual<'a> {
         let nr = rho.len() as f64;
         let est = if rho.len() == 1 {
             if rho[0].1.abs() < 1.0 { 10.5 + 5.0 * p5 as f64 } else { 10.5 + 4.0 * p5 as f64 }
-        } else if m * n <= rho.len() * 3 * nnz_a {
+        } else if (n as f64) < 1.8 * p5 as f64 {
+            // Columnwise in index order (the same test as `pivot_row`).
             8.5 * nr + 2.0 * p5 as f64 + 2.5 * n as f64
         } else {
             11.5 * nr + 3.5 * p5 as f64 + 3.0 * d as f64
@@ -997,6 +1000,7 @@ impl<'a> Dual<'a> {
         }
         let maxa = -minsd(xm13, xm9);
         let mut nflip = 0usize;
+        if std::env::var("DBGQ").is_ok() && leave == 734 && self.iters == 286 { eprintln!("PRE nn={} s0={} {:?}", nn, xmm10, (0..nn).map(|k| (lst[k], ratio_arr[k], con[k])).collect::<Vec<_>>()); }
         if bestc + xmm10 < 0.0 {
             let mut s = xmm10;
             let (mut lo, mut hi) = (0usize, nn - 1);
@@ -1049,6 +1053,7 @@ impl<'a> Dual<'a> {
             con.swap(0, b);
             lst.swap(0, b);
         }
+        if std::env::var("DBGQ").is_ok() && leave == 734 && self.iters == 286 { eprintln!("POST nflip={} {:?}", nflip, (0..nn).map(|k| lst[k]).collect::<Vec<_>>()); }
         let w5 = 5.0 * nn as f64;
         if sel == 0.0 {
             self.work.add(0xc7c4f, w5, crate::work::CTX);
@@ -1503,7 +1508,7 @@ impl<'a> Dual<'a> {
             let dense_est = if dense_in { Some(self.mirror.ftran_dense_work(&rhs)) } else { None };
             let sol = self.mirror.ftran_keep(&rows, &vals, dense_in);
             self.work.add_from(0x1219d6, 0x120673, dense_est.unwrap_or(self.mirror.keep_work), crate::work::FAC);
-            if self.mirror.last_dense() {
+            if dense_in || self.mirror.keep_dense {
                 self.work.add(0xce316, (m + sol.len()) as f64, crate::work::CTX);
             }
             // The count of the result vector times 7 on the context's scale (`(7 * scale) * count`).

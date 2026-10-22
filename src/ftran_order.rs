@@ -65,6 +65,8 @@ pub struct RefStruct {
     pub work_parts: (f64, f64),
     /// The work estimate of the last `ftran_keep`, which restores `work` itself.
     pub keep_work: f64,
+    /// Whether the result of the last `ftran_keep` was dense (the reference's count -1).
+    pub keep_dense: bool,
     pub tau_l: std::cell::Cell<f64>,
     /// The U-stage estimate of the last `ftran_needed` (`0x123690`).
     pub tau_u: std::cell::Cell<f64>,
@@ -390,6 +392,7 @@ impl RefStruct {
             work: 0.0,
             work_parts: (0.0, 0.0),
             keep_work: 0.0,
+            keep_dense: false,
             tau_l: std::cell::Cell::new(0.0),
             tau_u: std::cell::Cell::new(0.0),
             f2: std::cell::RefCell::new(F2::default()),
@@ -993,6 +996,7 @@ impl RefStruct {
         let saved = (self.spike.clone(), self.spike_used, self.last_alpha, self.last_dense, self.last_ordered, self.work);
         let out = self.ftran_with(rows, vals, dense);
         self.keep_work = self.work;
+        self.keep_dense = self.last_dense;
         (self.spike, self.spike_used, self.last_alpha, self.last_dense, self.last_ordered, self.work) = saved;
         out
     }
