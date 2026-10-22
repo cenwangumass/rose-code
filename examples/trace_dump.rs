@@ -4,8 +4,8 @@ use rose::{mps, solve, SolveOptions};
 fn main() {
     let a: Vec<String> = std::env::args().collect();
     let model = mps::parse(&std::fs::read_to_string(&a[1]).unwrap()).unwrap();
-    let opts = if a[2] == "dual" {
-        let mut o = SolveOptions::dual();
+    let opts = if a[2] == "dual" || a[2] == "dual-controlled" || a[2] == "dual-release" {
+        let mut o = if a[2] != "dual-release" { SolveOptions::dual() } else { SolveOptions::dual_release() };
         if let Some(sch) = a.get(3) {
             o.refactor_schedule = Some(sch.split(',').filter(|x| !x.is_empty()).map(|x| x.parse().unwrap()).collect());
         }

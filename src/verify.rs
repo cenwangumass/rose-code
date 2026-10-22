@@ -95,7 +95,8 @@ pub fn farkas_margin(model: &LpModel, y: &[f64]) -> f64 {
     let (mut gl, mut gu) = (0.0f64, 0.0f64);
     for j in 0..model.num_cols() {
         let g: f64 = model.col(j).map(|(i, a)| a * y[i]).sum();
-        if g == 0.0 {
+        // Rounding noise left by cancelling terms is not a coefficient: with an infinite bound it would make the combined range unbounded.
+        if g.abs() <= 1e-12 {
             continue;
         }
         // Bound attaining the minimum / maximum of g*x_j.

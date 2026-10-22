@@ -107,6 +107,9 @@ struct Dual<'a> {
     pending_alpha: Option<Vec<f64>>,
     /// Final status once the loop ends.
     status: Option<Status>,
+    /// Number of structural columns of the model (the length of a returned ray).
+    nm: usize,
+    ray: Option<Vec<f64>>,
     /// Costs in force: the problem's costs plus the shifts of the ratio test (`*(P+0)`).
     cost: Vec<f64>,
     /// The accumulated cost shifts per variable: the reference keeps them apart and forms `cost = base + shift` (the sum of the shifts is rounded once).
@@ -446,7 +449,7 @@ impl<'a> Dual<'a> {
                 // A fixed nonbasic variable that has a d (it left the basis, or the start gave it one) gets its true d like one at its lower bound
                 // (DEGEN2 d[700] after the refactorization at iteration 16); the fixed variables whose d is 0 keep it (PILOT4: 183 of 214).
                 if self.d[j] != 0.0 {
-                    self.d[j] = dt[j];
+                    self.d[j] = if j < self.n { self.cost[j] } else { dt[j] };
                 }
             } else if self.st[j] < 0 {
                 self.d[j] = if self.st[j] == UB { -dt[j] } else { dt[j] };
@@ -1372,8 +1375,9 @@ enum Step {
     Pivot(Box<Pivot>),
     /// No leaving row.
     NoRow,
-    /// The ratio test found no entering variable: the dual is unbounded (the primal infeasible).
-    Unbounded,
+    /// The ratio test found no entering variable: the dual is unbounded (the primal infeasible). Carries the BTRAN row `e_r' B^-1` (dense, by
+    /// row), which is the Farkas certificate.
+    Unbounded(Vec<f64>),
 }
 
 struct Pivot {
@@ -1431,7 +1435,14 @@ impl<'a> Dual<'a> {
                 s["q"] = serde_json::json!(-1);
             }
             *dump = rec;
-            return Step::Unbounded;
+            let mut y = vec![0.0; m];
+            for &(i, v) in &rho_full {
+                y[i] = v;
+            }
+            // Roundoff in a row with an infinite bound would void the certificate: entries at noise level are dropped.
+            let big = y.iter().fold(0.0f64, |a, v| a.max(v.abs()));
+            y.iter_mut().filter(|v| v.abs() <= 1e-11 * big).for_each(|v| *v = 0.0);
+            return Step::Unbounded(y);
         };
         let (q, aq_row) = row[qe];
         let flips: Vec<usize> = rt.flips.iter().map(|&e| row[e].0).collect();
@@ -1603,6 +1614,9 @@ impl<'a> Dual<'a> {
             // `ctx+0x3f8 != 0` in all captures: confirm on a fresh factor (`0x1aa280`). The cost shifts stay in force through the confirming refactorization
             // (`ctx+0x290` is 0, `0xe4891` is not taken) and are removed at the end of the solve.
             self.request = 4;
+        } else if self.free_infeasible() {
+            // A free nonbasic variable (never pivoted in: no basic variable with a finite lower bound) with a nonzero d.
+            self.dual_unbounded();
         } else if self.level == 0 {
             self.status = Some(Status::Optimal);
         } else {
@@ -1610,12 +1624,58 @@ impl<'a> Dual<'a> {
             for j in 0..self.n + self.m {
                 let bad = (self.st[j] == UB && p.up[j] >= BIG && self.d[j] > DUAL_TOL) || (self.st[j] == LB && p.lo[j] <= -BIG && self.d[j] > DUAL_TOL);
                 if bad {
-                    self.status = Some(Status::Infeasible);
+                    self.dual_unbounded();
                     return;
                 }
             }
-            self.level = 0;
+            // No artificial bound is required by its d (`ctx+0x290 = 1`, read in the reference but not observed): a refactorization puts those variables
+            // on their finite bound (`set_level`) and recomputes x_B without the sentinels.
+            self.request = 4;
         }
+    }
+
+    /// Nonbasic at an artificial (infinite, 1e30) bound: at the upper bound of a variable without one, or at the lower bound of a variable without one.
+    /// The recovered code of the reference counts the first kind only (`0xe5d5d`); the second occurs only with a lower bound of -1e30 and a finite upper
+    /// bound, which no corpus model has.
+    fn at_artificial(&self, j: usize) -> bool {
+        (self.st[j] == UB && self.p.up[j] >= BIG) || (self.st[j] == LB && self.p.lo[j] <= -BIG)
+    }
+
+    /// A free nonbasic variable has a reduced cost beyond the dual tolerance.
+    fn free_infeasible(&self) -> bool {
+        (0..self.n + self.m).any(|j| self.st[j] == FREE && self.d[j].abs() > DUAL_TOL)
+    }
+
+    /// The dual is infeasible (unbounded dual ray in the primal's terms): a nonbasic variable sits at an artificial bound with the wrong-signed d, or is free
+    /// with a nonzero d. The basic solution is primal feasible at the scale of the artificial bounds, so the point it describes is a finite point plus 1e30 times
+    /// a recession direction. That direction moves every nonbasic variable at an artificial bound away from its finite bound, every free one with a nonzero d
+    /// against its d, and the basic variables with them (the factor is fresh here). Whether the primal is feasible is for the caller to settle.
+    fn dual_unbounded(&mut self) {
+        let p = self.p;
+        let mut rhs = vec![0.0; self.m];
+        let mut ray = vec![0.0; self.n + self.m];
+        for k in 0..self.n + self.m {
+            let dir = if self.st[k] == UB && p.up[k] >= BIG {
+                1.0
+            } else if self.st[k] == LB && p.lo[k] <= -BIG {
+                -1.0
+            } else if self.st[k] == FREE && self.d[k].abs() > DUAL_TOL {
+                -self.d[k].signum()
+            } else {
+                continue;
+            };
+            ray[k] = dir;
+            for &(i, a) in &p.cols[k] {
+                rhs[i] -= a * dir;
+            }
+        }
+        self.factor.ftran(&mut rhs);
+        for (pos, &b) in self.head.iter().enumerate() {
+            ray[b] = rhs[pos];
+        }
+        ray.truncate(self.nm);
+        self.ray = Some(ray);
+        self.status = Some(Status::Unbounded);
     }
 
     /// Work of `0xe45c0` after a refactorization (site `0xe7000`): two copies of x_B and d's rows (`2 m`), the status pass (`m + 2 n`), a pass over all variables
@@ -1651,16 +1711,25 @@ impl<'a> Dual<'a> {
         let p = self.p;
         if self.request == 4 {
             for j in 0..self.n + self.m {
-                if self.st[j] == LB && self.d[j] < -DUAL_TOL {
+                let (lo_inf, up_inf) = (p.lo[j] <= -BIG, p.up[j] >= BIG);
+                if (self.st[j] == LB || self.st[j] == UB) && lo_inf && up_inf && self.d[j].abs() <= DUAL_TOL {
+                    // A free variable no longer tied to an artificial bound by its d goes back to the free status (value 0).
+                    self.st[j] = FREE;
+                    self.d[j] = 0.0;
+                } else if self.st[j] == LB && self.d[j] < -DUAL_TOL {
                     self.st[j] = UB;
                     self.d[j] = -self.d[j];
-                } else if self.st[j] == UB && p.up[j] >= BIG && self.d[j] <= DUAL_TOL {
+                } else if self.st[j] == UB && up_inf && self.d[j] <= DUAL_TOL {
                     self.st[j] = LB;
+                    self.d[j] = -self.d[j];
+                } else if self.st[j] == LB && lo_inf && !up_inf && self.d[j] <= DUAL_TOL {
+                    // The mirror of the previous rule for a variable without a lower bound.
+                    self.st[j] = UB;
                     self.d[j] = -self.d[j];
                 }
             }
         }
-        self.level = (0..self.n + self.m).filter(|&j| self.st[j] == UB && p.up[j] >= BIG).count();
+        self.level = (0..self.n + self.m).filter(|&j| self.at_artificial(j)).count();
         if !self.flip_select && (self.pert >= 3 || 3.0 * self.iters as f64 > self.m as f64) {
             self.flip_select = true;
         }
@@ -1915,6 +1984,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         upd_limit: None,
         pending_alpha: None,
         status: None,
+        nm: model.num_cols(),
+        ray: None,
         cost: p.cost.clone(),
         cshift: vec![0.0; p.cost.len()],
         rng: 101,
@@ -1957,6 +2028,13 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         if s.st[j] >= 0 {
             continue;
         }
+        if s.st[j] == FREE && dt[j].abs() > DUAL_TOL {
+            // A free variable the setup pivots could not bring into the basis (no basic variable with a finite lower bound in its column) and that is dual
+            // infeasible: it takes the artificial bound its d asks for, like any other variable without the bound it would need.
+            s.st[j] = if dt[j] > 0.0 { LB } else { UB };
+            s.d[j] = dt[j].abs();
+            continue;
+        }
         if s.st[j] == FIXED || s.st[j] == FREE {
             s.d[j] = dt[j];
             continue;
@@ -1965,6 +2043,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             s.st[j] = UB;
         } else if dt[j] > DUAL_TOL {
             s.st[j] = LB;
+        } else if p.lo[j] <= -BIG {
+            // A d within the tolerance does not tie the variable to the artificial bound: the finite upper bound (the mirror of the default LB for a
+            // variable with a finite lower bound; no corpus model has a variable without a lower bound and with an upper one).
+            s.st[j] = UB;
         }
         s.d[j] = if s.st[j] == UB { -dt[j] } else { dt[j] };
     }
@@ -1972,7 +2054,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         s.reset_pricing(&stc, &rows);
     }
     s.slack_nb = (0..m).map(|i| s.st[n + i] < 0).collect();
-    s.level = (0..n + m).filter(|&j| s.st[j] == UB && p.up[j] >= BIG).count();
+    s.level = (0..n + m).filter(|&j| s.at_artificial(j)).count();
     // Initial weights: the squared norms of the rows of B^-1.
     for r in 0..m {
         let out = s.mirror.btran(&[(r, 1.0)], false, false);
@@ -1986,6 +2068,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     let schedule = opts.refactor_schedule.clone();
     let mut trace = Vec::new();
     let mut k = 0usize;
+    let mut farkas = None;
     let status;
     loop {
         k += 1;
@@ -2029,11 +2112,34 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 }
                 s.post(None, false)?;
             }
-            Step::Unbounded => {
+            Step::Unbounded(y) => {
                 status = Status::Infeasible;
+                farkas = Some(y);
                 break;
             }
         }
+    }
+    if status == Status::Unbounded {
+        // The dual is infeasible (a nonbasic variable stayed at an artificial bound). That proves the primal unbounded only if it is feasible, and the point
+        // the dual loop holds is a finite point plus 1e30 times the ray, not a feasible point. The primal simplex decides: it returns a feasible point with
+        // its ray (unbounded) or a Farkas certificate (primal and dual infeasible). Another answer contradicts the dual loop.
+        let mut popts = opts.clone();
+        popts.method = crate::method::SolveMethod::Primal;
+        let mut r = crate::simplex::solve(model, None, &popts)?;
+        r.iterations += s.iters;
+        r.refactorizations += s.refactorizations;
+        match r.status {
+            Status::Unbounded => {
+                if let Some(ray) = s.ray.take() {
+                    if crate::verify::ray_improvement(model, &ray, 1e-9).is_some_and(|g| g > 0.0) {
+                        r.ray = Some(ray);
+                    }
+                }
+            }
+            Status::Infeasible => {}
+            _ => r.status = Status::NumericalFailure,
+        }
+        return Ok(r);
     }
     // Read-out.
     let sgn = if model.sense == Sense::Maximize { -1.0 } else { 1.0 };
@@ -2058,7 +2164,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         iterations: s.iters,
         refactorizations: s.refactorizations,
         trace,
-        farkas: None,
-        ray: None,
+        farkas,
+        ray: s.ray.take(),
     })
 }

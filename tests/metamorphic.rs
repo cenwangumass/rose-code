@@ -26,6 +26,11 @@ fn small() -> Vec<(String, LpModel)> {
     v
 }
 
+/// The methods every case runs under: the primal simplex and the dual simplex (the controlled profiles; pivot sequences differ).
+fn opts() -> Vec<SolveOptions> {
+    vec![SolveOptions::default(), SolveOptions::dual()]
+}
+
 fn fin(b: f64) -> bool {
     b.abs() < INF
 }
@@ -111,8 +116,8 @@ fn negate(m: &LpModel) -> LpModel {
     r
 }
 
-fn run(m: &LpModel, name: &str, what: &str) -> rose::SolveResult {
-    let r = solve(m, None, &SolveOptions::default()).unwrap();
+fn run(m: &LpModel, name: &str, what: &str, o: &SolveOptions) -> rose::SolveResult {
+    let r = solve(m, None, o).unwrap();
     if r.status == Status::Optimal {
         // scaled models have larger magnitudes, so use a mildly loose tolerance on the independent check
         if let Err(e) = verify::check(m, &r, 1e-6) {
@@ -125,13 +130,15 @@ fn run(m: &LpModel, name: &str, what: &str) -> rose::SolveResult {
 /// Solve the original and `t(model)`; objective of the transformed model must equal `f(original objective)`.
 fn case(what: &str, t: impl Fn(&LpModel) -> LpModel, f: impl Fn(f64) -> f64) {
     for (name, m) in small() {
-        let base = run(&m, &name, "base");
-        let r = run(&t(&m), &name, what);
-        assert_eq!(r.status, base.status, "{name} [{what}]: status");
-        if base.status == Status::Optimal {
-            let want = f(base.objective);
-            let err = (r.objective - want).abs() / (1.0 + want.abs());
-            assert!(err <= 1e-8, "{name} [{what}]: objective {} vs {} (rel {err:.2e})", r.objective, want);
+        for o in opts() {
+            let base = run(&m, &name, "base", &o);
+            let r = run(&t(&m), &name, what, &o);
+            assert_eq!(r.status, base.status, "{name} [{what}]: status");
+            if base.status == Status::Optimal {
+                let want = f(base.objective);
+                let err = (r.objective - want).abs() / (1.0 + want.abs());
+                assert!(err <= 1e-8, "{name} [{what}]: objective {} vs {} (rel {err:.2e})", r.objective, want);
+            }
         }
     }
 }
