@@ -1698,12 +1698,14 @@ impl<'a> Dual<'a> {
                 let row_cnt = pv.row.len() + usize::from(pv.leave < self.n);
                 self.work.add(0xe7000, 3.0 * row_cnt as f64, crate::work::CTX);
             }
+            let old_leave = self.d[pv.leave];
             for &(j, a) in &pv.row {
                 let a = if pv.flips.contains(&j) { -a } else { a };
                 self.d[j] = self.d[j] - theta * a;
             }
             // A leaving variable that becomes fixed keeps the true reduced cost, not the frame value.
-            self.d[pv.leave] = if self.st[pv.leave] == FIXED && pv.above { theta } else { -theta };
+            // The leaving variable is in the reference's row with the coefficient 1, so its stored d (0 up to the noise of the last recompute) takes the step too.
+            self.d[pv.leave] = if self.st[pv.leave] == FIXED && pv.above { theta } else { old_leave - theta };
         } else if refactor {
             self.refactor()?;
         }
