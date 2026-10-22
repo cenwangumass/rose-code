@@ -906,17 +906,18 @@ impl<'a> Dual<'a> {
             s["alpha_row"] = serde_json::json!(aq_row);
             s["flips"] = serde_json::json!(flips);
         }
-        // tau = B^-1 rho first, then the pivot column (the update keeps the spike of the last FTRAN).
+        // The reference's two-vector FTRAN: the pivot column first, then tau = B^-1 rho at the column's positions only.
+        let rows_q: Vec<usize> = p.fcols[q].iter().map(|&(i, _)| i).collect();
+        let vals_q: Vec<f64> = p.fcols[q].iter().map(|&(_, a)| a).collect();
+        let col_out = self.mirror.ftran(&rows_q, &vals_q);
         let rho_rows: Vec<usize> = rho.iter().map(|e| e.0).collect();
         let rho_vals: Vec<f64> = rho.iter().map(|e| e.1).collect();
-        let tau_out = self.mirror.ftran(&rho_rows, &rho_vals);
+        let needed: Vec<usize> = col_out.iter().map(|e| e.0).collect();
+        let tau_out = self.mirror.ftran_needed(&rho_rows, &rho_vals, &needed);
         let mut tau_dense = vec![0.0; m];
         for &(i, v) in &tau_out {
             tau_dense[i] = v;
         }
-        let rows_q: Vec<usize> = p.fcols[q].iter().map(|&(i, _)| i).collect();
-        let vals_q: Vec<f64> = p.fcols[q].iter().map(|&(_, a)| a).collect();
-        let col_out = self.mirror.ftran(&rows_q, &vals_q);
         let mut alpha_dense = vec![0.0; m];
         for &(i, v) in &col_out {
             alpha_dense[i] = v;
@@ -946,13 +947,28 @@ impl<'a> Dual<'a> {
         // Bound flips: x_B and the statuses (`0xcd720`).
         if !flips.is_empty() {
             let mut rhs = vec![0.0; m];
+            let mut touched: Vec<usize> = Vec::new();
+            let mut est = 0usize;
             for &j in &flips {
                 let delta = if self.st[j] == LB { p.up[j] - p.lo[j] } else { p.lo[j] - p.up[j] };
+                est += p.cols[j].len();
                 for &(i, a) in &p.cols[j] {
+                    if !touched.contains(&i) {
+                        touched.push(i);
+                    }
                     rhs[i] += a * delta;
                 }
             }
-            self.factor.ftran(&mut rhs);
+            // The reference's input vector (`0xcd720`): a dense one when twice the summed column counts exceed m, else the touched
+            // rows in order of first touch. Then the plain FTRAN of the factor.
+            let dense_in = 2 * est > m;
+            let rows: Vec<usize> = if dense_in { (0..m).filter(|&i| rhs[i] != 0.0).collect() } else { touched };
+            let vals: Vec<f64> = rows.iter().map(|&i| rhs[i]).collect();
+            let sol = self.mirror.ftran_keep(&rows, &vals, dense_in);
+            let mut rhs = vec![0.0; m];
+            for (i, v) in sol {
+                rhs[i] = v;
+            }
             let mut changed = Vec::new();
             for pos in 0..m {
                 if rhs[pos] != 0.0 {

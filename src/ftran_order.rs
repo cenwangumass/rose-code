@@ -653,6 +653,80 @@ impl RefStruct {
         self.ftran_with(rows, vals, false)
     }
 
+    /// The second vector of the reference's two-vector FTRAN (`0x125f50`, its U stage `0x123690`): `B^-1 a` at the positions of
+    /// the first vector's result only (`needed`), in that order. The L stage and the tail columns are solved as in `ftran`, the
+    /// tail columns scattering into tail rows only. A needed singleton position is `x / diag`, a needed tail position its solved
+    /// value, a needed nucleus position the row-wise dot product over the row copy (`rowl`), subtracted term by term from the L
+    /// stage value and divided by the diagonal, without a tolerance test. Does not touch the spike of the last `ftran`.
+    pub fn ftran_needed(&self, rows: &[usize], vals: &[f64], needed: &[usize]) -> Vec<(usize, f64)> {
+        let m = self.m;
+        let (spike, _, _) = self.lstage_num(rows, vals, false);
+        let mut x = vec![0.0f64; m];
+        let mut touched = vec![false; m];
+        let mut tail: Vec<usize> = Vec::new();
+        for &(p, v) in &spike {
+            x[p] = v;
+            touched[p] = true;
+            if self.kind[p] == -2 {
+                tail.push(p);
+            }
+        }
+        let mut k = 0;
+        while k < tail.len() {
+            let c = tail[k];
+            k += 1;
+            for &j in &self.a[c] {
+                if !touched[j] {
+                    touched[j] = true;
+                    tail.push(j);
+                }
+            }
+        }
+        tail.sort_unstable_by_key(|&p| std::cmp::Reverse(self.slot[p]));
+        for &c in &tail {
+            let xc = x[c] / self.diag[c];
+            if xc.abs() <= TOL {
+                x[c] = 0.0;
+                continue;
+            }
+            x[c] = xc;
+            for &(j, v) in &self.uc[c] {
+                if self.kind[j] == -2 {
+                    x[j] -= v * xc;
+                }
+            }
+        }
+        needed
+            .iter()
+            .map(|&p| {
+                let v = match self.kind[p] {
+                    -2 => x[p],
+                    -1 => x[p] / self.diag[p],
+                    _ => {
+                        let mut s = x[p];
+                        for &c in &self.rowl[p] {
+                            if let Some(e) = self.uc[c].iter().find(|e| e.0 == p) {
+                                s -= e.1 * x[c];
+                            }
+                        }
+                        s / self.diag[p]
+                    }
+                };
+                (p, v)
+            })
+            .collect()
+    }
+
+    /// A plain FTRAN (`0x1205d0`) between the pivot column's solve and the column replacement, e.g. the bound-flip update: the
+    /// result as `ftran` (`dense`: the input is a dense vector, as `ftran_basic`), but the spike of the pivot column and the
+    /// per-solve statistics stay as they were.
+    pub fn ftran_keep(&mut self, rows: &[usize], vals: &[f64], dense: bool) -> Vec<(usize, f64)> {
+        let saved = (self.spike.clone(), self.spike_used, self.last_alpha, self.last_dense, self.last_ordered, self.work);
+        let out = self.ftran_with(rows, vals, dense);
+        (self.spike, self.spike_used, self.last_alpha, self.last_dense, self.last_ordered, self.work) = saved;
+        out
+    }
+
     /// FTRAN of the right-hand side after a factorization: the reference always runs the dense L solve there, whatever the
     /// density, which fixes the order of the floating-point updates.
     pub fn ftran_basic(&mut self, rows: &[usize], vals: &[f64]) -> Vec<(usize, f64)> {
