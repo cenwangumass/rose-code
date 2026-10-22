@@ -1588,8 +1588,9 @@ impl<'a> Dual<'a> {
 
     /// The no-leaving-row handler (`0x1aa280`): a refactorization request, optimality or infeasibility.
     fn no_row(&mut self) {
-        if self.pert != 0 || self.updates != 0 {
-            // `ctx+0x3f8 != 0` in all captures: confirm on a fresh factor (`0x1aa280`; with a cost shift in force even on a fresh one, the shifts are removed then).
+        if self.updates != 0 {
+            // `ctx+0x3f8 != 0` in all captures: confirm on a fresh factor (`0x1aa280`). The cost shifts stay in force through the confirming refactorization
+            // (`ctx+0x290` is 0, `0xe4891` is not taken) and are removed at the end of the solve.
             self.request = 4;
         } else if self.level == 0 {
             self.status = Some(Status::Optimal);
@@ -1607,15 +1608,19 @@ impl<'a> Dual<'a> {
     }
 
     /// Work of `0xe45c0` after a refactorization (site `0xe7000`): two copies of x_B and d's rows (`2 m`), the status pass (`m + 2 n`), a pass over all variables
-    /// when the level was not zero, and the tail that is longer for the confirming refactorization (request 4 or 6). The perturbed variant (`ctx+0x338` != 0) is
-    /// not modelled.
+    /// when the level was not zero, and the tail that is longer for the confirming refactorization (request 4 or 6). With the perturbation flag set (`ctx+0x338`
+    /// != 0, kept to the end of the solve) the request-4 tail is the plain `1.5 n` and every such factorization adds `2 m + n` (the cost recompute with the shift
+    /// array, `0xe555c`; ADLITTLE, BOEING2, PILOT4).
     fn set_level_work(&mut self, level_was_set: bool) {
         let (n, m) = (self.n as f64, self.m as f64);
         let mut est = 2.0 * m + (m + 2.0 * n);
         if level_was_set {
             est += 0.5 * (n + m);
         }
-        est += if self.request == 4 || self.request == 6 { 2.0 * n + (n + m) } else { 1.5 * n };
+        est += if (self.request == 4 || self.request == 6) && self.pert == 0 { 2.0 * n + (n + m) } else { 1.5 * n };
+        if self.pert != 0 {
+            est += 2.0 * m + n;
+        }
         self.work.add(0xe7000, est, crate::work::CTX);
     }
 
@@ -1692,12 +1697,6 @@ impl<'a> Dual<'a> {
             self.refactor()?;
         }
         if refactor {
-            if self.request == 4 {
-                // The cost shifts of the ratio test are removed at the confirming refactorization (`ctx+0x130` is cleared at `0xe6db7`).
-                self.cost.clone_from(&self.p.cost);
-                self.obj_off = 0.0;
-                self.pert = 0;
-            }
             if self.request == 0 {
                 self.request = 10;
             }
@@ -1998,6 +1997,15 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 s.no_row();
                 if let Some(stt) = s.status {
                     status = stt;
+                    if stt == Status::Optimal && s.pert != 0 {
+                        // The end of the dual with the cost shifts in force (`ctx+0x338` != 0, `0xf7033`): the shifts are removed (status -1004) and the primal
+                        // clean-up starts with a factorization (`0x142350` from `0xe3ee1`), the reference's last one.
+                        s.cost.clone_from(&p.cost);
+                        s.obj_off = 0.0;
+                        s.pert = 0;
+                        s.refactor()?;
+                        s.recompute_xb();
+                    }
                     break;
                 }
                 s.post(None, false)?;
