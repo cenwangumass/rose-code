@@ -1548,6 +1548,16 @@ impl<'a> Solver<'a> {
         }
         if self.p0.as_ref().unwrap().bk.is_some() {
             // Bucket chains: the variables of each key in index order (`0xfecb0`, the loop that appends to `P+0x21c + 4 key`).
+            // Work of the bucket rebuild (`0xfecb0`): the score of every eligible structural books `3 len` (`0xffd5b`, in index
+            // order), then `7 n` (`0xffab4`), `4 m` (`0xff07e`) and `5 (n + m)` (`0xff207`).
+            for j in 0..self.p.n {
+                if self.p0_eligible(j) && !self.p.cols[j].is_empty() {
+                    self.work.add(0xffd5b, 3.0 * self.p.cols[j].len() as f64, crate::work::CTX);
+                }
+            }
+            self.work.add(0xffab4, 7.0 * self.p.n as f64, crate::work::CTX);
+            self.work.add(0xff07e, 4.0 * self.p.m as f64, crate::work::CTX);
+            self.work.add(0xff207, 5.0 * nm as f64, crate::work::CTX);
             let keys2: Vec<usize> = (0..nm)
                 .map(|j| {
                     if !self.p0_eligible(j) {
@@ -1748,9 +1758,13 @@ impl<'a> Solver<'a> {
         let mut nattr = 0usize;
         let mut visited = 0usize;
         let mut b = b0;
+        // Work of the scan (`0xfc693`): 100, 5 per step of the walk (an entry or the end of a chain), `2 len` per eligible structural and 6
+        // per entry of the visited chain in the relink pass.
+        let mut scan_est = 100.0f64;
         if b0 > 0 {
             let mut cur = bk.head[b];
             'scan: loop {
+                scan_est += 5.0;
                 if cur < 0 {
                     loop {
                         b -= 1;
@@ -1767,6 +1781,9 @@ impl<'a> Solver<'a> {
                 let j = cur as usize;
                 visited += 1;
                 if self.p0_eligible(j) {
+                    if j < n {
+                        scan_est += 2.0 * self.p.cols[j].len() as f64;
+                    }
                     let (s, free) = self.p0_score(j, &p0.y, &col_off);
                     p0.dstore[j] = s;
                     if free {
@@ -1846,6 +1863,7 @@ impl<'a> Solver<'a> {
         // Re-insert the visited entries by their new score.
         let mut cur = first;
         while cur >= 0 {
+            scan_est += 6.0;
             let j = cur as usize;
             let nxt = bk.next[j];
             bk.next[j] = -1;
@@ -1860,6 +1878,9 @@ impl<'a> Solver<'a> {
         }
         p0.bk = Some(bk);
         self.p0 = Some(p0);
+        if self.mirror.is_some() {
+            self.work.add(0xfc693, scan_est, crate::work::CTX);
+        }
         q
     }
 
@@ -3043,6 +3064,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         } else {
             s.x[leave] = x_before[0];
             s.unsnapped.insert(leave);
+            // `0x143f38`: the shift of a leaving variable that ends outside its bound also marks the shifted frame (`ctx+0x338` 0 -> 1).
+            if s.sw.active && s.sw.level == 0 {
+                s.sw.level = 1;
+            }
             let delta = bound - x_before[0];
             if s.rhs_shift.is_empty() {
                 s.rhs_shift = vec![0.0; p.m];

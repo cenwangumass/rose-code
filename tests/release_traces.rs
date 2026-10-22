@@ -126,6 +126,13 @@ fn degen3_release_matches_the_reference_decisions() {
     check("degen3");
 }
 
+/// 80BAU3B (bucket-chain list, shifted frame marked by `ctx+0x338` = 1, the bucket variant's work sites): all 13805 decisions and the
+/// returned solution.
+#[test]
+fn bau3b_release_matches_the_reference() {
+    check("80bau3b");
+}
+
 /// The scale factors against the reference's (`replay/gdb_scale_factors.py`, captured by `compare.py scale`; skipped where a
 /// capture is missing, as the captures are not under version control).
 #[test]

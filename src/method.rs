@@ -92,7 +92,7 @@ impl Method {
             }
         }
         self.perturb_due = false;
-        if self.factorizations % (self.level + 2) == 1 {
+        if self.factorizations % 2 == 1 && self.factorizations % (self.level + 2) == 1 {
             // The pricing driver (`0xfb207`) perturbs when the degenerate iterations since the snapshot exceed 0.9 of all of them.
             if self.pert > 0.0 && f64::from(self.degenerate - self.snap_degenerate) > (a - b) * 0.9 {
                 self.perturb_due = true;
