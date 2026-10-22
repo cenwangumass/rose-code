@@ -120,6 +120,10 @@ struct Dual<'a> {
     flip_select: bool,
     /// The reference's work counter (`ctx+0x118`); in the dual path every estimate is on the scale 1.3.
     work: crate::work::Work,
+    /// Entry count of the pivot column when the pending factorization follows a pivot (its weight update and spike discard are booked then).
+    pivot_cols: Option<usize>,
+    /// `nnz(A)` of the structural columns (`ctx+0x3d0`), for the time clause.
+    nnz_a: usize,
 }
 
 /// The start basis of the dual path (setup `0xe7531`; assignments at `0xed2e8` and `0xeb69f`, `replay/gdb_dual_crash.py`). The equality rows (fixed slack)
@@ -273,6 +277,7 @@ impl<'a> Dual<'a> {
     /// Factorize the basis (`0xd4190`): the positions follow the pivot order of the reference's LU; the weights move with their variables.
     fn refactor(&mut self) -> Result<(), SolveError> {
         let (order, st, rows) = reference_order(self.p, &self.head, self.refactorizations + 1);
+        let discard = if self.pivot_cols.is_some() { self.mirror.discard_work() } else { 0.0 };
         if crate::dump::on("luin") {
             crate::dump::emit("luin", serde_json::json!({"n": self.refactorizations, "cols": self.head, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "phase": st.phase}));
         }
@@ -288,6 +293,7 @@ impl<'a> Dual<'a> {
         self.reset_pricing(&st, &rows);
         self.mirror = RefStruct::fresh(self.m, self.n, &st, &rows);
         self.mirror.upd_limit = self.upd_limit;
+        self.factor_work(&st, &rows, discard);
         let cols: Vec<&Column> = self.head.iter().map(|&j| &self.p.cols[j]).collect();
         self.factor = Factor::new(self.m, &cols).map_err(|_| SolveError::SingularBasis)?;
         self.refactorizations += 1;
@@ -340,6 +346,37 @@ impl<'a> Dual<'a> {
         Ok(())
     }
 
+    /// The work of a factorization and the installation of its factor (`0xd4190` from `0xf34f2`, the update routine `0xf15c0`), after the fresh mirror is built:
+    /// the driver's sites, the spike discard and the weight update of the pivot that preceded it, then the factor object's own passes.
+    fn factor_work(&mut self, st: &crate::lu_order::Structure, rows: &[(bool, Vec<usize>, Vec<f64>)], discard: f64) {
+        use crate::work::{CTX, FAC};
+        let lu = st.work(rows, self.mirror.has_levels());
+        self.work.factor_driver(&lu, CTX);
+        for (site, est) in lu {
+            self.work.add(site, est, CTX);
+        }
+        if let Some(c) = self.pivot_cols.take() {
+            if discard > 0.0 {
+                self.work.add(0xf461f, discard, CTX);
+            }
+            self.work.add(0xbe793, 3.0 * c as f64, CTX);
+        }
+        let m3 = 3.0 * self.m as f64;
+        self.work.add(0xf48ae, m3, FAC);
+        // The scaled-priority pass `0x132460` (only with a pricing type above zero): `nnz(U)` and `3 m`.
+        if self.ptype > 0 {
+            let u = self.mirror.u_nnz();
+            if u > 0 {
+                self.work.add(0x1327dc, u as f64, FAC);
+            }
+            self.work.add(0x1329c1, m3, FAC);
+        }
+        for (site, est) in self.mirror.fresh_work() {
+            self.work.add(site, est, CTX);
+        }
+        self.work.factor_done();
+    }
+
     /// The row-wise copy of the nonbasic, non-fixed structurals (`ctx+0x1d0`), built once at the start, column by column in index order; the pivots update
     /// it in place and no factorization rebuilds it.
     fn build_rrows(&mut self) {
@@ -371,6 +408,11 @@ impl<'a> Dual<'a> {
                 }
             }
         }
+        let est = self.mirror.ftran_dense_work(&r);
+        self.work.add_from(0x1219d6, 0x120673, est, crate::work::FAC);
+        // `0xc142b`: the solution read-out sums the columns of the nonbasic variables at a nonzero value.
+        let cols: usize = (0..p.n).filter(|&j| self.st[j] < 0 && self.nonbasic_value(j) != 0.0).map(|j| p.cols[j].len()).sum();
+        self.work.add(0xc142b, 4.0 * p.m as f64 + 2.0 * cols as f64, crate::work::CTX);
         let rows: Vec<usize> = (0..p.m).filter(|&i| r[i] != 0.0).collect();
         let vals: Vec<f64> = rows.iter().map(|&i| r[i]).collect();
         let out = self.mirror.ftran_basic(&rows, &vals);
@@ -396,6 +438,7 @@ impl<'a> Dual<'a> {
     /// d recomputed from the costs after a factorization, in the reference frame.
     fn recompute_d(&mut self) {
         let dt = self.true_d();
+        self.work.add_from(0x12de50, 0xe53a7, self.mirror.work, crate::work::FAC);
         for j in 0..self.n + self.m {
             if self.st[j] == FIXED {
                 // The reference leaves the stored d of a fixed nonbasic variable alone at a refactorization.
@@ -1541,6 +1584,28 @@ impl<'a> Dual<'a> {
         }
     }
 
+    /// Work of `0xe45c0` after a refactorization (site `0xe7000`): two copies of x_B and d's rows (`2 m`), the status pass (`m + 2 n`), a pass over all variables
+    /// when the level was not zero, and the tail that is longer for the confirming refactorization (request 4 or 6). The perturbed variant (`ctx+0x338` != 0) is
+    /// not modelled.
+    fn set_level_work(&mut self, level_was_set: bool) {
+        let (n, m) = (self.n as f64, self.m as f64);
+        let mut est = 2.0 * m + (m + 2.0 * n);
+        if level_was_set {
+            est += 0.5 * (n + m);
+        }
+        est += if self.request == 4 || self.request == 6 { 2.0 * n + (n + m) } else { 1.5 * n };
+        self.work.add(0xe7000, est, crate::work::CTX);
+    }
+
+    /// Work of the pricing setup after a refactorization: the list of infeasible rows (`5 m + 4 len`; `0xc4329` in the walk mode, `0xc1fe3` in the value mode)
+    /// and the closing pass over all variables (`0xbfed2` after a pivot, `0xbf981` after a call without a leaving row).
+    fn flags_work(&mut self, after_pivot: bool) {
+        let (n, m) = (self.n as f64, self.m as f64);
+        let site = if self.value_mode { 0xc1fe3 } else { 0xc4329 };
+        self.work.add(site, 5.0 * m + 4.0 * self.list.len() as f64, crate::work::CTX);
+        self.work.add(if after_pivot { 0xbfed2 } else { 0xbf981 }, 2.0 * (n + m), crate::work::CTX);
+    }
+
     /// Level of the tolerance (`0xe45c0`, after a refactorization): with request 4 the nonbasic variables are first put on the dual-feasible bound.
     fn set_level(&mut self) {
         let p = self.p;
@@ -1564,12 +1629,16 @@ impl<'a> Dual<'a> {
     /// The post-iteration passes `0xf6c82..0xf6d0a`: factor update or refactorization, the dual update, the primal and weight update.
     fn post(&mut self, pv: Option<&Pivot>, schedule_due: bool) -> Result<(), SolveError> {
         let refactor = self.request != 0 || schedule_due;
+        if refactor {
+            self.work.decided(self.work.w);
+        }
         if let Some(pv) = pv {
             self.last_cap = pv.col.len();
             let alpha = self.pending_alpha.take().unwrap();
             if refactor {
                 // The weights of the pivot are updated before the factorization renumbers the positions; the basic solution is recomputed.
                 self.update_weights(pv);
+                self.pivot_cols = Some(pv.col.len());
                 self.refactor()?;
             } else {
                 self.factor.update(pv.r, alpha);
@@ -1582,10 +1651,13 @@ impl<'a> Dual<'a> {
             }
             // d update (`0xe45c0`).
             // The reference's row list also holds the leaving variable (rose's only when it is a slack).
-            let row_cnt = pv.row.len() + usize::from(pv.leave < self.n);
-            self.work.add(0xe7000, 3.0 * row_cnt as f64, crate::work::CTX);
             let aq = pv.row.iter().find(|e| e.0 == pv.q).unwrap().1;
             let theta = self.d[pv.q] / aq;
+            // A zero step skips the loop (`0xe4719`): no work.
+            if !refactor && theta != 0.0 {
+                let row_cnt = pv.row.len() + usize::from(pv.leave < self.n);
+                self.work.add(0xe7000, 3.0 * row_cnt as f64, crate::work::CTX);
+            }
             for &(j, a) in &pv.row {
                 let a = if pv.flips.contains(&j) { -a } else { a };
                 self.d[j] = self.d[j] - theta * a;
@@ -1607,10 +1679,12 @@ impl<'a> Dual<'a> {
             }
             self.recompute_d();
             let level_before = self.level;
+            self.set_level_work(level_before != 0);
             self.set_level();
             self.request = 0;
             self.recompute_xb();
             self.recompute_flags(level_before != 0, pv.is_some());
+            self.flags_work(pv.is_some());
         } else if let Some(pv) = pv {
             self.work.add(0xc0410, 3.0 * pv.col.len() as f64, crate::work::CTX);
             self.work.add(0xc06c7, 7.0 * pv.col.len() as f64, crate::work::CTX);
@@ -1685,6 +1759,34 @@ impl<'a> Dual<'a> {
 
 /// The squared norm of rho as the reference sums it (`0x11f9..0x11fa5`, the value `ctx+0x310`): sequentially up to 6 entries, else in the vectorised loop
 /// of eight entries per pass (four accumulators of two lanes, combined pairwise, then lane 0 + lane 1, then the tail).
+/// The initial weight of a dense BTRAN result (`0xc392b..0xc3b08`): the squares are summed over all `m` slots of the dense vector (zeros included), so
+/// each nonzero falls in the lane of its row index; the alignment peel was never needed in the captures (16-byte aligned buffers).
+fn rho_norm_dense(rho: &[(usize, f64)], m: usize) -> f64 {
+    let mut sq = vec![0.0f64; m];
+    for &(i, v) in rho {
+        sq[i] = v * v;
+    }
+    if m <= 6 {
+        return sq.iter().fold(0.0, |a, x| a + x);
+    }
+    let end = m - (m & 7);
+    let mut acc = [[0.0f64; 2]; 4];
+    let mut i = 0;
+    while i < end {
+        for q in 0..4 {
+            acc[q][0] += sq[i + 2 * q];
+            acc[q][1] += sq[i + 2 * q + 1];
+        }
+        i += 8;
+    }
+    let lane = |l: usize| (acc[0][l] + acc[1][l]) + (acc[2][l] + acc[3][l]);
+    let mut t = lane(0) + lane(1);
+    for x in &sq[end..] {
+        t += x;
+    }
+    t
+}
+
 fn rho_norm(rho: &[(usize, f64)]) -> f64 {
     let sq: Vec<f64> = rho.iter().map(|e| e.1 * e.1).collect();
     let n = sq.len();
@@ -1777,6 +1879,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         obj_off: 0.0,
         flip_select: false,
         work: crate::work::Work::dual(),
+        pivot_cols: None,
+        nnz_a: p.cols[..n].iter().map(Vec::len).sum(),
     };
     // Initial statuses of the nonbasic variables: the dual-feasible bound (an infinite bound is the artificial one, value +-1e30).
     for j in 0..n + m {
@@ -1793,6 +1897,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         };
     }
     s.init_pricing_type();
+    s.work.decided(s.work.w);
+    s.factor_work(&stc, &rows, 0.0);
     let free_phase = (0..n).any(|j| s.st[j] == FREE);
     if free_phase {
         s.free_pivots()?;
@@ -1800,6 +1906,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     }
     s.build_rrows();
     let dt = s.true_d();
+    s.work.add_from(0x12de50, 0xe53a7, s.mirror.work, crate::work::FAC);
+    s.request = 1;
+    s.set_level_work(false);
+    s.request = 0;
     for j in 0..n + m {
         if s.st[j] >= 0 {
             continue;
@@ -1823,10 +1933,13 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     // Initial weights: the squared norms of the rows of B^-1.
     for r in 0..m {
         let out = s.mirror.btran(&[(r, 1.0)], false, false);
-        s.w[r] = rho_norm(&out);
+        s.work.add_from(0x12de50, 0xc36f1, s.mirror.work, crate::work::FAC);
+        s.w[r] = if s.mirror.bt_dense { rho_norm_dense(&out, m) } else { rho_norm(&out) };
     }
     s.recompute_xb();
+    s.work.add(0xc391f, m as f64, crate::work::CTX);
     s.recompute_flags(false, false);
+    s.flags_work(true);
     let schedule = opts.refactor_schedule.clone();
     let mut trace = Vec::new();
     let mut k = 0usize;
@@ -1849,7 +1962,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 }
                 let due = match &schedule {
                     Some(sch) => sch.contains(&s.iters),
-                    None => s.mirror.refactor_due(),
+                    None => {
+                        let w_now = s.work.w;
+                        s.mirror.refactor_due() || s.work.clause_dual(s.updates, s.nnz_a, w_now)
+                    }
                 };
                 s.post(Some(&pv), due)?;
             }

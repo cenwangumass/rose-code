@@ -83,6 +83,12 @@ impl Work {
         upd % 10 == 9 && self.decided_once && w - self.w150 > 8.0 * self.w158 + 100.0 * nnz_a as f64
     }
 
+    /// The dual driver's time clause (`0xf8a96`): every tenth update (`F+0x18c % 10 == 9`), when the work since the last decision exceeds
+    /// `14 * w158 + 100 * nnz(A)` and a factorization has been costed (`ctx+0x158 > 0`).
+    pub fn clause_dual(&self, upd: usize, nnz_a: usize, w: f64) -> bool {
+        upd % 10 == 9 && self.w158 > 0.0 && w - self.w150 > 14.0 * self.w158 + 100.0 * nnz_a as f64
+    }
+
     /// The decision state `(w150, decided_once)`, to take a check back (the reference runs no check on a bound flip).
     pub fn decision_state(&self) -> (f64, bool) {
         (self.w150, self.decided_once)
