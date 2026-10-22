@@ -26,7 +26,8 @@ pub struct Factor {
 
 impl Factor {
     /// Factor the matrix whose column at position `p` is `cols[p]`. Returns the singular position on failure.
-    pub fn new(m: usize, cols: &[Column]) -> Result<Factor, usize> {
+    pub fn new<C: std::borrow::Borrow<Column>>(m: usize, cols: &[C]) -> Result<Factor, usize> {
+        let cols: Vec<&Column> = cols.iter().map(|c| c.borrow()).collect();
         // Eliminate sparser columns first (slack singletons first).
         let mut col_order: Vec<usize> = (0..m).collect();
         col_order.sort_by_key(|&p| (cols[p].len(), p));
@@ -36,30 +37,55 @@ impl Factor {
         let mut u: Vec<Vec<(usize, f64)>> = Vec::with_capacity(m);
         let mut diag = Vec::with_capacity(m);
         let mut row_count = vec![0usize; m];
-        for c in cols {
-            for &(r, _) in c {
+        for c in &cols {
+            for &(r, _) in c.iter() {
                 row_count[r] += 1;
             }
         }
         let mut w = vec![0.0f64; m];
+        // Rows whose `w` may be nonzero (marker plus list), visited in ascending order: the scans below see the same rows in the
+        // same order as full scans over `0..m` would, minus the ones that cannot contribute.
+        let mut touched_mark = vec![false; m];
+        let mut touched: Vec<usize> = Vec::new();
+        // Pivot steps whose pivot row is touched and not yet processed (min-heap): ascending step order as in the dense loop.
+        let mut step_mark = vec![false; m];
+        let mut heap: std::collections::BinaryHeap<std::cmp::Reverse<usize>> = std::collections::BinaryHeap::new();
         for k in 0..m {
             let p = col_order[k];
-            for &(r, a) in &cols[p] {
+            macro_rules! touch {
+                ($r:expr) => {{
+                    let r = $r;
+                    if !touched_mark[r] {
+                        touched_mark[r] = true;
+                        touched.push(r);
+                        let s = step_of_row[r];
+                        if s != NONE && !step_mark[s] {
+                            step_mark[s] = true;
+                            heap.push(std::cmp::Reverse(s));
+                        }
+                    }
+                }};
+            }
+            for &(r, a) in cols[p] {
                 w[r] += a;
+                touch!(r);
             }
             let mut ucol = Vec::new();
-            for j in 0..k {
+            while let Some(std::cmp::Reverse(j)) = heap.pop() {
+                step_mark[j] = false;
                 let t = w[pivot_row[j]];
                 if t != 0.0 {
                     ucol.push((j, t));
                     for &(r, lv) in &l[j] {
                         w[r] -= lv * t;
+                        touch!(r);
                     }
                 }
             }
+            touched.sort_unstable();
             // Threshold pivoting: among candidates within 0.1 of the maximum prefer the sparsest row.
             let mut maxabs = 0.0f64;
-            for r in 0..m {
+            for &r in &touched {
                 if step_of_row[r] == NONE {
                     maxabs = maxabs.max(w[r].abs());
                 }
@@ -68,7 +94,7 @@ impl Factor {
                 return Err(p);
             }
             let mut best = NONE;
-            for r in 0..m {
+            for &r in &touched {
                 if step_of_row[r] == NONE && w[r].abs() >= 0.1 * maxabs {
                     if best == NONE
                         || row_count[r] < row_count[best]
@@ -80,14 +106,16 @@ impl Factor {
             }
             let d = w[best];
             let mut lcol = Vec::new();
-            for r in 0..m {
+            for &r in &touched {
                 if step_of_row[r] == NONE && r != best && w[r].abs() > DROP {
                     lcol.push((r, w[r] / d));
                 }
             }
-            for r in 0..m {
+            for &r in &touched {
                 w[r] = 0.0;
+                touched_mark[r] = false;
             }
+            touched.clear();
             step_of_row[best] = k;
             pivot_row.push(best);
             l.push(lcol);

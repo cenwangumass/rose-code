@@ -162,6 +162,7 @@ impl RefStruct {
         let (mut sa, mut sb) = (0usize, 0usize);
         let mut xv = vec![0.0f64; m];
         let mut cnt = vec![0i32; m];
+        let mut epos = vec![usize::MAX; m];
         for t in i21..m {
             let c = st.pivots[t].1;
             let (_, idx, val) = &cols[c];
@@ -241,14 +242,21 @@ impl RefStruct {
                     ents.push((v, xv[v]));
                 }
             }
+            for (i, e) in ents.iter().enumerate() {
+                epos[e.0] = i;
+            }
             for &(sidx, vv) in &mk[c] {
                 if sidx < t {
-                    if let Some(e) = ents.iter_mut().find(|e| e.0 == sidx) {
-                        e.1 = vv;
+                    if epos[sidx] != usize::MAX {
+                        ents[epos[sidx]].1 = vv;
                     } else {
+                        epos[sidx] = ents.len();
                         ents.push((sidx, vv));
                     }
                 }
+            }
+            for e in &ents {
+                epos[e.0] = usize::MAX;
             }
             // The reference's tail columns hold no residues below the tolerance.
             ents.retain(|e| e.1.abs() > TOL);
@@ -338,6 +346,8 @@ impl RefStruct {
                     pos_of_col[c] = t;
                 }
                 let mut rl = vec![Vec::new(); m];
+                let mut stamp = vec![usize::MAX; m];
+                let all_pos: Vec<usize> = (0..m).filter(|&c| pos_of_col[c] != usize::MAX).map(|c| pos_of_col[c]).collect();
                 for y in 0..m {
                     if member[y].is_empty() {
                         continue;
@@ -345,11 +355,14 @@ impl RefStruct {
                     let order: Vec<usize> = if let Some(u) = st.pair_urow.get(&y) {
                         u.iter().map(|&c| pos_of_col[c]).collect()
                     } else if st.u_rows[y].is_empty() {
-                        (0..m).filter(|&c| pos_of_col[c] != usize::MAX).map(|c| pos_of_col[c]).collect()
+                        all_pos.clone()
                     } else {
                         st.u_rows[y].iter().map(|&(c, _)| pos_of_col[c]).collect()
                     };
-                    rl[y] = order.into_iter().filter(|t| member[y].contains(t)).collect();
+                    for &t in &member[y] {
+                        stamp[t] = y;
+                    }
+                    rl[y] = order.into_iter().filter(|&t| stamp[t] == y).collect();
                 }
                 rl
             },
@@ -1531,25 +1544,52 @@ impl RefStruct {
     fn eliminate(&self, r: usize) -> (Vec<(usize, f64)>, usize) {
         let m = self.m;
         let d0 = self.diag[r];
-        let mut rows: Vec<Vec<(usize, f64)>> = vec![Vec::new(); m];
+        // Row-wise copy of the tail columns' U entries (CSR), each row in ascending column order.
+        let mut rstart = vec![0usize; m + 1];
         for k in 0..m {
             if self.kind[k] == -2 {
-                for &(row, v) in &self.uc[k] {
-                    rows[row].push((k, v));
+                for &(row, _) in &self.uc[k] {
+                    rstart[row + 1] += 1;
                 }
             }
         }
+        for i in 0..m {
+            rstart[i + 1] += rstart[i];
+        }
+        let mut rfill = rstart.clone();
+        let mut rent = vec![(0usize, 0.0f64); rstart[m]];
+        for k in 0..m {
+            if self.kind[k] == -2 {
+                for &(row, v) in &self.uc[k] {
+                    rent[rfill[row]] = (k, v);
+                    rfill[row] += 1;
+                }
+            }
+        }
+        let rows = |i: usize| &rent[rstart[i]..rstart[i + 1]];
         let mut w = vec![0.0f64; m];
         let mut seen = vec![false; m];
         let mut heap: std::collections::BinaryHeap<std::cmp::Reverse<(usize, usize)>> = std::collections::BinaryHeap::new();
-        for &(k, v) in &rows[r] {
+        for &(k, v) in rows(r) {
             w[k] = v * (1.0 / d0);
             seen[k] = true;
             heap.push(std::cmp::Reverse((self.slot[k], k)));
         }
         let mut eta = Vec::new();
         // The reference's solve (`0x131760`) books 2 per entry of the row-wise copy of every accepted position, `r` first.
-        let rlen = |y: usize| (0..m).filter(|&x| self.kind[x] == -2 && (self.a[x].contains(&y) || self.b[x].contains(&y))).count();
+        let mut rcount = vec![0usize; m];
+        let mut stamp = vec![usize::MAX; m];
+        for x in 0..m {
+            if self.kind[x] == -2 {
+                for &y in self.a[x].iter().chain(&self.b[x]) {
+                    if stamp[y] != x {
+                        stamp[y] = x;
+                        rcount[y] += 1;
+                    }
+                }
+            }
+        }
+        let rlen = |y: usize| rcount[y];
         // Only positions in the tail (slot >= i21) are visited in the heap phase of the solve that books; the earlier ones are
         // handled in the list phase.
         let mut visited = if self.slot[r] >= self.i21 { rlen(r) } else { 0 };
@@ -1562,7 +1602,7 @@ impl RefStruct {
             if self.slot[k] >= self.i21 {
                 visited += rlen(k);
             }
-            for &(l, v) in &rows[k] {
+            for &(l, v) in rows(k) {
                 w[l] += c * v;
                 if !seen[l] {
                     seen[l] = true;

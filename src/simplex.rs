@@ -139,6 +139,27 @@ struct Internal {
     up: Vec<f64>,
     rhs: Vec<f64>,
     cost: Vec<f64>,
+    /// Row-wise copy of `cols` (all columns, slacks included): row `i` holds `(j, a)` in ascending `j`, a column's entries in its order.
+    rwise: Vec<Vec<(usize, f64)>>,
+    /// Offset of each column in the concatenated value array (prefix sums of the column lengths).
+    offs: Vec<usize>,
+}
+
+impl Internal {
+    /// `rank_dot(&cols[j], v, rank)` for every column at once, iterating only the rows with a rank (in rank order), so each
+    /// column's sum is accumulated in the same order from 0.0 as `rank_dot` does.
+    fn rank_products(&self, v: &[f64], rank: &[usize]) -> Vec<f64> {
+        let mut order: Vec<(usize, usize)> = (0..self.m).filter(|&i| rank[i] != usize::MAX).map(|i| (rank[i], i)).collect();
+        order.sort_unstable();
+        let mut acc = vec![0.0f64; self.n + self.m];
+        for &(_, i) in &order {
+            let vi = v[i];
+            for &(j, a) in &self.rwise[i] {
+                acc[j] = acc[j] + a * vi;
+            }
+        }
+        acc
+    }
 }
 
 fn is_inf(v: f64) -> bool {
@@ -187,7 +208,17 @@ fn build(model: &LpModel) -> Internal {
     let mut cost: Vec<f64> = model.obj.iter().map(|c| sgn * c).collect();
     cost.resize(n + m, 0.0);
     fcols.extend(cols[fcols.len()..].iter().cloned());
-    Internal { n, m, cols, fcols, lo, up, rhs, cost }
+    let mut rwise: Vec<Vec<(usize, f64)>> = vec![Vec::new(); m];
+    for (j, c) in cols.iter().enumerate() {
+        for &(i, a) in c {
+            rwise[i].push((j, a));
+        }
+    }
+    let mut offs = vec![0usize; n + m];
+    for j in 1..n + m {
+        offs[j] = offs[j - 1] + cols[j - 1].len();
+    }
+    Internal { n, m, cols, fcols, lo, up, rhs, cost, rwise, offs }
 }
 
 /// Crash basis of the reference (primal simplex setup, `0x1387d0`): each equality row (fixed slack) may receive one structural
@@ -714,7 +745,7 @@ impl<'a> Solver<'a> {
                 self.mirror = Some(mi);
             }
         }
-        let cols: Vec<Column> = self.basic.iter().map(|&j| self.p.cols[j].clone()).collect();
+        let cols: Vec<&Column> = self.basic.iter().map(|&j| &self.p.cols[j]).collect();
         self.factor = Factor::new(self.p.m, &cols).map_err(|_| SolveError::SingularBasis)?;
         self.refactorizations += 1;
         self.list.clear();
@@ -942,8 +973,9 @@ impl<'a> Solver<'a> {
         // row product when it is a slack, `alpha_rq` when structural (it is the entering column's pivot element, as in
         // the pivot-row update). Basic slacks outside the cost-change positions lose their raw row entry (rounding noise);
         // basic structurals are not touched.
+        let prods = p.rank_products(&rho, &rank);
         if q != NONE && !q_only {
-            self.d[q] = if q < n { self.d[q] - alpha_rq } else { self.d[q] - rank_dot(&p.cols[q], &rho, &rank) };
+            self.d[q] = if q < n { self.d[q] - alpha_rq } else { self.d[q] - prods[q] };
         }
         for j in n..n + m {
             if self.pos_of[j] != NONE && j != q {
@@ -959,7 +991,7 @@ impl<'a> Solver<'a> {
         }
         let mut changed: Vec<usize> = Vec::new();
         for j in 0..n + m {
-            let a = if self.pos_of[j] == NONE { rank_dot(&p.cols[j], &rho, &rank) } else { 0.0 };
+            let a = if self.pos_of[j] == NONE { prods[j] } else { 0.0 };
             if self.pos_of[j] == NONE && a.abs() > ROW_DROP_TOL {
                 self.d[j] -= a;
             }
@@ -1102,10 +1134,7 @@ impl<'a> Solver<'a> {
     /// `d_j = c_j - sum y_i a_ij`, subtracting the terms in the column's stored order (`0x1020a0`).
     fn set_d_from_y(&mut self, y: &[f64]) {
         let p = self.p;
-        let mut offs = vec![0usize; p.n + p.m];
-        for j in 1..p.n + p.m {
-            offs[j] = offs[j - 1] + p.cols[j - 1].len();
-        }
+        let offs = &p.offs;
         let col_off = |j: usize| offs[j] & 1;
         for j in 0..p.n + p.m {
             self.d[j] = if self.pos_of[j] == NONE {
@@ -1557,13 +1586,8 @@ impl<'a> Solver<'a> {
         }
     }
 
-    fn p0_col_offsets(&self) -> Vec<usize> {
-        let p = self.p;
-        let mut offs = vec![0usize; p.n + p.m];
-        for j in 1..p.n + p.m {
-            offs[j] = offs[j - 1] + p.cols[j - 1].len();
-        }
-        offs
+    fn p0_col_offsets(&self) -> &'a [usize] {
+        &self.p.offs
     }
 
     /// Recomputes the duals (a dense BTRAN of the basic costs), then scores every variable and sorts the list (`0xfb790`, `0xfecb0`).
@@ -2774,7 +2798,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         lu_work = st.work(&rows, mi.has_levels());
         lu_work.extend(mi.fresh_work());
 
-        let cols: Vec<Column> = s.basic.iter().map(|&j| s.p.cols[j].clone()).collect();
+        let cols: Vec<&Column> = s.basic.iter().map(|&j| &s.p.cols[j]).collect();
         s.factor = Factor::new(m, &cols).map_err(|_| SolveError::SingularBasis)?;
     }
     s.work.trig();
@@ -3395,10 +3419,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             }
             t
         };
-        let mut col_off = vec![0usize; n + m];
-        for j in 1..n + m {
-            col_off[j] = col_off[j - 1] + p.cols[j - 1].len();
-        }
+        let col_off = &p.offs;
         let rho_rank: Option<Vec<usize>> = rho_ref.as_ref().map(|rr| {
             let mut rank = vec![usize::MAX; m];
             for (k, &(i, _)) in rr.iter().enumerate() {
@@ -3410,8 +3431,9 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             rank
         });
         // The leaving variable takes part in the row update like any nonbasic: its row product is 1 up to rounding.
-        let leave_arj = match rho_rank.as_ref() {
-            Some(rank) => rank_dot(&p.cols[leave], &rho, rank),
+        let prods: Option<Vec<f64>> = rho_rank.as_ref().map(|rank| p.rank_products(&rho, rank));
+        let leave_arj = match prods.as_ref() {
+            Some(pr) => pr[leave],
             None => 1.0,
         };
         let theta_leave = match rho_rank.as_ref() {
@@ -3420,8 +3442,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         };
         // The entering variable takes part in the row update before it turns basic: a slack with its row product, a
         // structural with the pivot element (`alpha_rq`), so `d` ends as rounding noise (exactly 0.0 in most pivots).
-        let arq_x = match rho_rank.as_ref() {
-            Some(rank) => rank_dot(&p.cols[q], &rho, rank),
+        let arq_x = match prods.as_ref() {
+            Some(pr) => pr[q],
             None => dot(&p.cols[q], &rho),
         };
         let mut norm_reset = false;
@@ -3429,8 +3451,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         let mut rowvals: Vec<(usize, f64)> = Vec::new();
         for j in 0..n + m {
             if j >= n && j != q && j != leave && s.pos_of[j] != NONE && s.mirror.is_some() {
-                let arj = match rho_rank.as_ref() {
-                    Some(rank) => rank_dot(&p.cols[j], &rho, rank),
+                let arj = match prods.as_ref() {
+                    Some(pr) => pr[j],
                     None => dot(&p.cols[j], &rho),
                 };
                 if arj.abs() > ROW_DROP_TOL {
@@ -3446,8 +3468,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             if s.pos_of[j] != NONE || j == q {
                 continue;
             }
-            let arj = match rho_rank.as_ref() {
-                Some(rank) => rank_dot(&p.cols[j], &rho, rank),
+            let arj = match prods.as_ref() {
+                Some(pr) => pr[j],
                 None => dot(&p.cols[j], &rho),
             };
             // The reference's row product keeps the entries above its drop tolerance (`0x134d90`).
