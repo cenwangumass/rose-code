@@ -1,4 +1,4 @@
-//! `rose solve model.mps --output result.json [--basis-in b.json] [--basis-out b.json]`
+//! `rose solve model.mps --output result.json [--basis-in b.json] [--basis-out b.json] [--method primal|dual]`
 //! Progress goes to stderr; stdout stays empty so machine-readable output is only ever in the files.
 
 use rose::verify;
@@ -6,7 +6,7 @@ use rose::{mps, solve, Basis, SolveOptions, Status};
 use serde_json::{json, Value};
 
 fn usage() -> ! {
-    eprintln!("usage: rose solve <model.mps> [--output result.json] [--basis-in basis.json] [--basis-out basis.json] [--max-iterations N]");
+    eprintln!("usage: rose solve <model.mps> [--output result.json] [--basis-in basis.json] [--basis-out basis.json] [--max-iterations N] [--method primal|dual]");
     std::process::exit(2)
 }
 
@@ -36,6 +36,13 @@ fn main() {
             "--basis-in" => basis_in = Some(val.clone()),
             "--basis-out" => basis_out = Some(val.clone()),
             "--max-iterations" => opts.max_iterations = val.parse().unwrap_or_else(|_| usage()),
+            "--method" => {
+                opts.method = match val.as_str() {
+                    "primal" => rose::method::SolveMethod::Primal,
+                    "dual" => rose::method::SolveMethod::Dual,
+                    _ => usage(),
+                }
+            }
             _ => usage(),
         }
     }

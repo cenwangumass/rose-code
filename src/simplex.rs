@@ -38,6 +38,9 @@ pub struct SolveOptions {
     /// Scale the model the way the reference does by default (`ScaleFlag`, power-of-two factors, `crate::scale`) and unscale the
     /// result. Off by default; on in `SolveOptions::release()`.
     pub scaling: bool,
+    /// The simplex method (`crate::method::SolveMethod`). The dual method (`crate::dual`) reads `refactor_schedule` as the iteration counts after which
+    /// the reference's work-based trigger refactorizes (the refactorizations of the no-leaving-row handler are modelled).
+    pub method: crate::method::SolveMethod,
 }
 
 impl Default for SolveOptions {
@@ -55,6 +58,7 @@ impl Default for SolveOptions {
             faithful_ftran: true,
             pricing0: false,
             scaling: false,
+            method: crate::method::SolveMethod::Primal,
         }
     }
 }
@@ -63,6 +67,11 @@ impl SolveOptions {
     /// The solver without the reference-matching tie-breaking (own Devex floor, own basis position order, no FTRAN mirror).
     pub fn plain() -> Self {
         SolveOptions { faithful_weights: false, faithful_positions: false, faithful_ftran: false, ..SolveOptions::default() }
+    }
+
+    /// The reference's `dual-controlled` profile (`Method=1`, no scaling): the dual simplex of `crate::dual`.
+    pub fn dual() -> Self {
+        SolveOptions { method: crate::method::SolveMethod::Dual, ..SolveOptions::default() }
     }
 
     /// The reference's release profile as far as it is recovered: the faithful options with the initial `SimplexPricing=0` pricing.
@@ -129,16 +138,16 @@ impl std::error::Error for SolveError {}
 
 const NONE: usize = usize::MAX;
 
-struct Internal {
-    n: usize,
-    m: usize,
-    cols: Vec<Column>,
+pub(crate) struct Internal {
+    pub(crate) n: usize,
+    pub(crate) m: usize,
+    pub(crate) cols: Vec<Column>,
     /// The same columns in the model's entry order (the reference's LU structure and FTRAN depend on it).
-    fcols: Vec<Column>,
-    lo: Vec<f64>,
-    up: Vec<f64>,
-    rhs: Vec<f64>,
-    cost: Vec<f64>,
+    pub(crate) fcols: Vec<Column>,
+    pub(crate) lo: Vec<f64>,
+    pub(crate) up: Vec<f64>,
+    pub(crate) rhs: Vec<f64>,
+    pub(crate) cost: Vec<f64>,
     /// Row-wise copy of `cols` (all columns, slacks included): row `i` holds `(j, a)` in ascending `j`, a column's entries in its order.
     rwise: Vec<Vec<(usize, f64)>>,
     /// Offset of each column in the concatenated value array (prefix sums of the column lengths).
@@ -169,7 +178,7 @@ fn is_inf(v: f64) -> bool {
 /// Internal layout: structurals, then one range column per ranged inequality row (as the reference does), then
 /// one slack per row. A ranged row `rl <= a x <= ru` becomes `a x + s + g = ru` with `s` fixed at 0 and
 /// `g in [0, ru - rl]`; a ranged `>=` row uses `-1` for both unit columns.
-fn build(model: &LpModel) -> Internal {
+pub(crate) fn build(model: &LpModel) -> Internal {
     let (nm, m) = (model.num_cols(), model.num_rows());
     let mut cols: Vec<Column> = (0..nm).map(|j| model.col(j).collect()).collect();
     // The model keeps the file's entry order (the crash tie-break needs it); the solver works on columns sorted by row.
@@ -310,7 +319,7 @@ pub fn crash_basis(model: &LpModel) -> Basis {
 /// or more are partitioned around the median of three (the smaller side is sorted by a recursive call, the larger one goes on in
 /// the loop, at most 50 rounds); what is left, and every smaller range, is shell-sorted with gaps `n/2`, then `gap/2.2`, ending
 /// with 1 (a gap of 2 goes to 1). Ties therefore keep the input order only in the insertion-sort stage.
-fn ref_sort<T: Copy>(a: &mut [f64], idx: &mut [T]) {
+pub(crate) fn ref_sort<T: Copy>(a: &mut [f64], idx: &mut [T]) {
     fn quick<T: Copy>(a: &mut [f64], idx: &mut [T], mut lo: usize, mut hi: usize, mut depth: u32) {
         while hi - lo >= 100 && depth < 50 {
             let n = hi - lo;
@@ -2698,6 +2707,9 @@ fn repair_basis(p: &Internal, b: &mut Basis) -> Option<(usize, Vec<(u32, f64)>)>
 
 /// Solve starting from `start` (a primal feasible basis). `None` uses the all-slack basis with columns at their lower bounds.
 pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Result<SolveResult, SolveError> {
+    if opts.method == crate::method::SolveMethod::Dual {
+        return crate::dual::solve(model, start, opts);
+    }
     if opts.scaling {
         return crate::scale::solve(model, start, opts);
     }

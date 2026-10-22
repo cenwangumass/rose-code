@@ -26,6 +26,8 @@ pub const KINDS: &[(&str, &str, &str)] = &[
     ("ent2", "ENT2", "phase 2 ratio-test inputs: the signed FTRAN list, and distance to the lower bound, range and free flag per basis position"),
     ("bsolve", "BSOLVE", "basic-solution FTRAN (after a factorization): L-stage result, x after the tail columns, final x, kinds, slots, diag"),
     ("switch", "SWITCH", "method decision after each refactorization (`0x142500`): the counters it reads and whether it switched to Devex pricing"),
+    ("dcr", "DCR", "the dual start basis: the (column, row) assignments of the crash in order"),
+    ("dsx", "DSX", "each call of the dual iteration function: state at entry (head, x_B, d in the reference frame, W, status, flags, priorities, candidate list, threshold, mode, cursor) and the decision (row, leaving variable, entering variable, flips, pivot row, rho)"),
     ("fillparts", "FILLP", "per factor update: pool fill on entry, eta size, new column entries added, and the row growths (row, cnt, cap, extra)"),
 ];
 

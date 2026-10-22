@@ -2,6 +2,14 @@
 //! refactorization, switches to Devex pricing when a work estimate favours it. Rules: `reverse-engineer/specs/primal-simplex.md`,
 //! "Method switch" (method 2 is the second test of `decide`; see `crate::simplex::phase1_eefa0`). Captured inputs: `reverse-engineer/replay/gdb_switch.py`, `compare.py switch`.
 
+/// The simplex method a solve runs (`SolveOptions::method`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SolveMethod {
+    #[default]
+    Primal,
+    Dual,
+}
+
 /// Counters of the iteration step (`ctx+0x2a0`, `0x330`, `0x334`, `0x2b0`) and the decision made from them.
 #[derive(Clone, Debug, Default)]
 pub struct Method {
