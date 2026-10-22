@@ -1,4 +1,4 @@
-//! NEW FILE (NEXT.md C13). Metamorphic tests: transformed models must give the same optimal objective (up to the
+//! Metamorphic tests: transformed models must give the same optimal objective (up to the
 //! known effect of the transformation) and pass the independent check in `verify`. Pivot sequences may differ.
 //! Models: tests/fixtures/*.mps and reverse-engineer/corpus/fixtures/fx_*.mps (skipped if absent).
 
