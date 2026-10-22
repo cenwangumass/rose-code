@@ -110,3 +110,27 @@ fn invalid_basis_is_rejected() {
         assert!(solve(&model, Some(&bad), &o).is_err());
     }
 }
+
+#[test]
+fn iteration_limit_is_reported_with_a_finite_point() {
+    let model = fixture("blend.mps");
+    for o in opts() {
+        let r = solve(&model, None, &SolveOptions { max_iterations: 5, record_trace: false, ..o }).unwrap();
+        assert_eq!(r.status, Status::IterationLimit);
+        assert!(r.x.iter().all(|v| v.abs() < 1e20), "{:?}", r.x);
+    }
+}
+
+#[test]
+fn singular_supplied_basis_is_repaired() {
+    // Two identical columns both basic: the second leaves for the slack of the uncovered row.
+    let text = "NAME T\nROWS\n N obj\n L c1\n L c2\nCOLUMNS\n x obj -1 c1 1\n x c2 1\n y obj -2 c1 1\n y c2 1\nRHS\n rhs c1 4 c2 5\nENDATA\n";
+    let model = mps::parse(text).unwrap();
+    let singular = Basis { basic: vec![0, 1], at_upper: vec![false; 4] };
+    for o in opts() {
+        let r = solve(&model, Some(&singular), &o).unwrap();
+        assert_eq!(r.status, Status::Optimal);
+        assert!(close(r.objective, -8.0), "{}", r.objective);
+        verify::check(&model, &r, 1e-6).unwrap();
+    }
+}

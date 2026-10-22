@@ -2675,7 +2675,7 @@ fn ratio_test(
 /// reference's LU order leave the basis (nonbasic at their lower bound) and the slacks of the rows left without a pivot replace them.
 /// Returns the last variable dropped (highest basis position), which the reference keeps out of pricing until the basis is
 /// primal feasible (status -4 until `0x155139` adds 3 back).
-fn repair_basis(p: &Internal, b: &mut Basis) -> Option<(usize, Vec<(u32, f64)>)> {
+pub(crate) fn repair_basis(p: &Internal, b: &mut Basis) -> Option<(usize, Vec<(u32, f64)>)> {
     let (n, m) = (p.n, p.m);
     let cols: Vec<(bool, Vec<usize>, Vec<f64>)> = b
         .basic

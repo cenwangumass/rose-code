@@ -110,6 +110,8 @@ struct Dual<'a> {
     /// Number of structural columns of the model (the length of a returned ray).
     nm: usize,
     ray: Option<Vec<f64>>,
+    /// The read-out of a solve that stopped inside the artificial-bound phase takes the nonbasic variables at artificial bounds as 0 instead of +-1e30.
+    zero_artificial: bool,
     /// Costs in force: the problem's costs plus the shifts of the ratio test (`*(P+0)`).
     cost: Vec<f64>,
     /// The accumulated cost shifts per variable: the reference keeps them apart and forms `cost = base + shift` (the sum of the shifts is rounded once).
@@ -234,7 +236,108 @@ pub(crate) fn dual_crash_basic(p: &Internal) -> Vec<usize> {
             }
         }
     }
+    crash_pass3(p, &mut basic, &mut cost, &taken, &is_eq, &row_cols);
     basic
+}
+
+/// Pass 3 of the start basis (`0xeb7ee..0xeba97`, assignment `0xeb9db`; `replay/gdb_dual_crash3.py`): every row that is not an equality and still has its slack
+/// is looked at in ascending order, in the reference's row sign (a `>=` row is negated). The nonbasic status of a column is `at lower` when its cost is at
+/// least 1e-6, `at upper` otherwise (a fixed column keeps its bound). The row is abandoned when it has a basic column, a bound of 1e30 or more on a
+/// column, or a column with a zero cost and a zero bound that points the wrong way. Otherwise `sum = a x - rhs` at those bounds must exceed 1e-6.
+/// Candidates are the columns with `a cost < 0` and ratio `-cost / a`: a column with a bound above 1e-10 in absolute value competes for the largest ratio
+/// (`jmax`), the others for the smallest (`jmin`); the largest wins when it is smaller than the smallest, else (ties included) the smallest, and nothing is taken when
+/// the winner is missing (a smallest without a largest is dropped). The chosen column replaces the slack (`cost = 0`), the costs of the other columns of the row
+/// grow by `a ratio` and their statuses follow the sign of the cost.
+fn crash_pass3(p: &Internal, basic: &mut [usize], cost: &mut [f64], taken: &[bool], is_eq: &[bool], row_cols: &[Vec<(usize, f64)>]) {
+    let (n, m) = (p.n, p.m);
+    // -4 fixed, -1 at lower, -2 at upper, >= 0 basic in that row.
+    let mut st: Vec<i64> = (0..n + m)
+        .map(|j| if p.up[j] - p.lo[j] <= 0.0 { -4 } else if p.cost[j] >= 1e-6 { -1 } else { -2 })
+        .collect();
+    for (r, &j) in basic.iter().enumerate() {
+        if j < n {
+            st[j] = r as i64;
+            st[n + r] = -4;
+        }
+    }
+    let _ = taken;
+    for r in 0..m {
+        if is_eq[r] || basic[r] < n {
+            continue;
+        }
+        let sg = p.cols[n + r][0].1;
+        let (mut sum, mut max_r, mut min_r) = (0.0f64, 0.0f64, 1e100f64);
+        let (mut jmax, mut jmin): (Option<usize>, Option<usize>) = (None, None);
+        let mut abandoned = false;
+        for &(j, a0) in &row_cols[r] {
+            let a = sg * a0;
+            let bound = match st[j] {
+                -4 | -1 => p.lo[j],
+                -2 => p.up[j],
+                _ => {
+                    abandoned = true;
+                    break;
+                }
+            };
+            if bound.abs() >= BIG {
+                abandoned = true;
+                break;
+            }
+            sum += bound * a;
+            if st[j] == -4 {
+                continue;
+            }
+            let c = cost[j];
+            if bound.abs() <= 1e-10 && c == 0.0 {
+                if (st[j] == -1 && a < 0.0) || (st[j] == -2 && a > 0.0) {
+                    abandoned = true;
+                    break;
+                }
+                continue;
+            }
+            if a * c < 0.0 {
+                let ratio = -c / a;
+                if bound.abs() <= 1e-10 {
+                    if min_r > ratio {
+                        jmin = Some(j);
+                    }
+                    min_r = ratio.min(min_r);
+                } else {
+                    if ratio > max_r {
+                        jmax = Some(j);
+                    }
+                    max_r = ratio.max(max_r);
+                }
+            }
+        }
+        if abandoned || sum - sg * p.rhs[r] <= 1e-6 {
+            continue;
+        }
+        let (chosen, ratio) = if max_r >= min_r { (jmin, min_r) } else { (jmax, max_r) };
+        let Some(c) = chosen else { continue };
+        if crate::dump::on("dcr") {
+            crate::dump::emit("dcr", serde_json::json!({"col": c, "row": r, "pass": 3}));
+        }
+        for &(k, a0) in &row_cols[r] {
+            if k == c {
+                st[k] = r as i64;
+                cost[k] = 0.0;
+                continue;
+            }
+            cost[k] += sg * a0 * ratio;
+            if st[k] != -4 {
+                if cost[k] < 0.0 {
+                    if st[k] == -1 {
+                        st[k] = -2;
+                    }
+                } else if st[k] == -2 {
+                    st[k] = -1;
+                }
+            }
+        }
+        st[basic[r]] = -1;
+        basic[r] = c;
+    }
 }
 
 /// The reference's pivot order of the basis columns (`lu_order`), as in the primal path.
@@ -252,6 +355,9 @@ fn reference_order(p: &Internal, basic: &[usize], fac_no: usize) -> (Vec<usize>,
 
 impl<'a> Dual<'a> {
     fn nonbasic_value(&self, j: usize) -> f64 {
+        if self.zero_artificial && self.at_artificial(j) {
+            return 0.0;
+        }
         match self.st[j] {
             LB | FIXED => self.p.lo[j],
             UB => self.p.up[j],
@@ -1931,6 +2037,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             let mut b = b.clone();
             b.validate(n, m).map_err(SolveError::InvalidBasis)?;
             b.basic.sort_unstable();
+            // A singular basis loses the columns that get no pivot in the reference's LU order and takes the slacks of the uncovered rows instead.
+            crate::simplex::repair_basis(&p, &mut b);
             b
         }
         None => Basis { basic: dual_crash_basic(&p), at_upper: vec![false; n + m] },
@@ -1986,6 +2094,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         status: None,
         nm: model.num_cols(),
         ray: None,
+        zero_artificial: false,
         cost: p.cost.clone(),
         cshift: vec![0.0; p.cost.len()],
         rng: 101,
@@ -2120,26 +2229,29 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         }
     }
     if status == Status::Unbounded {
-        // The dual is infeasible (a nonbasic variable stayed at an artificial bound). That proves the primal unbounded only if it is feasible, and the point
-        // the dual loop holds is a finite point plus 1e30 times the ray, not a feasible point. The primal simplex decides: it returns a feasible point with
-        // its ray (unbounded) or a Farkas certificate (primal and dual infeasible). Another answer contradicts the dual loop.
-        let mut popts = opts.clone();
-        popts.method = crate::method::SolveMethod::Primal;
-        let mut r = crate::simplex::solve(model, None, &popts)?;
+        // The dual is infeasible (a nonbasic variable stayed at an artificial bound, or a free one has a nonzero d). That proves the primal unbounded only
+        // if it is feasible, and the point the dual loop holds is a finite point plus 1e30 times the ray, not a feasible point. A zero objective is dual
+        // feasible, so the dual simplex on it decides: a feasible point (unbounded) or a Farkas certificate (primal and dual infeasible).
+        let zero = LpModel { obj: vec![0.0; model.num_cols()], offset: 0.0, ..model.clone() };
+        let mut r = solve(&zero, start, opts)?;
         r.iterations += s.iters;
         r.refactorizations += s.refactorizations;
-        match r.status {
-            Status::Unbounded => {
-                if let Some(ray) = s.ray.take() {
-                    if crate::verify::ray_improvement(model, &ray, 1e-9).is_some_and(|g| g > 0.0) {
-                        r.ray = Some(ray);
-                    }
-                }
+        if r.status == Status::Optimal {
+            r.status = Status::Unbounded;
+            r.objective = model.objective(&r.x);
+            r.ray = s.ray.take().filter(|ray| crate::verify::ray_improvement(model, ray, 1e-9).is_some_and(|g| g > 0.0));
+            if r.ray.is_none() {
+                // The ray of the artificial-bound point did not verify; the primal simplex may still find one.
+                let mut popts = opts.clone();
+                popts.method = crate::method::SolveMethod::Primal;
+                r.ray = crate::simplex::solve(model, None, &popts)?.ray;
             }
-            Status::Infeasible => {}
-            _ => r.status = Status::NumericalFailure,
         }
         return Ok(r);
+    }
+    if status == Status::IterationLimit && s.level != 0 {
+        s.zero_artificial = true;
+        s.recompute_xb();
     }
     // Read-out.
     let sgn = if model.sense == Sense::Maximize { -1.0 } else { 1.0 };

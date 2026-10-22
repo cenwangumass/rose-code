@@ -154,13 +154,12 @@ fn compare_random_with(count: u64, max_m: u64, max_n: u64, feasible: bool) {
             Status::IterationLimit => 3,
             Status::NumericalFailure => 4,
         }] += 1;
-        if p.status == Status::NumericalFailure || verify::check(&model, &p, 1e-6).is_err() {
-            // The primal simplex gives up on some degenerate corners (e.g. a single free row with free columns); counted, not compared.
-            skipped += 1;
-            continue;
-        }
         if let Err(e) = verify::check(&model, &d, 1e-6) {
             bad.push(format!("seed {seed}: dual {:?} fails its check: {e}", d.status));
+        } else if p.status == Status::NumericalFailure || verify::check(&model, &p, 1e-6).is_err() {
+            // The primal simplex gives up on some degenerate corners (a single free row with free columns, unbounded feasible models) or returns a
+            // result that fails its check; the dual's verified result stands alone there, nothing to compare.
+            skipped += 1;
         } else if d.status != p.status {
             // Both infeasible and unbounded: either answer is a proof of its own; the check above vouches for the dual's.
             bad.push(format!("seed {seed}: primal {:?}, dual {:?}", p.status, d.status));
@@ -174,7 +173,7 @@ fn compare_random_with(count: u64, max_m: u64, max_n: u64, feasible: bool) {
         *kinds.entry(k).or_insert(0) += 1;
     }
     eprintln!("failure kinds: {kinds:?}");
-    eprintln!("dual statuses (optimal, infeasible, unbounded, limit, failure): {counts:?}, {skipped} models skipped (the primal simplex fails or fails its own check)");
+    eprintln!("dual statuses (optimal, infeasible, unbounded, limit, failure): {counts:?}, {skipped} models not compared (the primal simplex fails or fails its own check)");
     assert!(bad.is_empty(), "{} failures, first: {:#?}", bad.len(), &bad[..bad.len().min(25)]);
 }
 
