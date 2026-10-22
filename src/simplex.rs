@@ -659,7 +659,7 @@ impl<'a> Solver<'a> {
             }
             // The driver restart after a repaired basis (`0xcda5b`) factors like the starting factorization.
             let (order, st, rows) = self.reference_order(if self.restart { 1 } else { self.refactorizations + 1 });
-            crate::dump::emit("luin", serde_json::json!({"n": self.refactorizations, "cols": self.basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "phase": st.phase}));
+            if crate::dump::on("luin") { crate::dump::emit("luin", serde_json::json!({"n": self.refactorizations, "cols": self.basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "phase": st.phase})); }
             debug_assert_eq!(order.len(), self.basic.len());
             for (pos, &j) in order.iter().enumerate() {
                 self.pos_of[j] = pos;
@@ -1977,6 +1977,83 @@ impl<'a> Solver<'a> {
         }).collect()
     }
 
+    /// The reference's dual clean-up pass after a shifted primal optimum (`0xf6a00`): the unshifted basic solution may leave a bound by
+    /// more than the tolerance (FIT2P: one variable, 4.15e-4), and the reference then pivots with the dual simplex instead of re-entering
+    /// the primal phase 1 (2 pivots, counted in its iteration count; rose's phase 1 took 6 to reach the same basis). Textbook dual
+    /// simplex on the true costs: the leaving row is the largest bound violation, the entering variable the one with the least
+    /// `|d_j / alpha_rj|` (ties: the largest `|alpha_rj|`); every pivot is followed by the clean-up refactorization (ascending order),
+    /// which is the state the final solution is read from. Returns the number of pivots, or `None` when a row has no entering variable
+    /// (the caller then falls back to the primal phase 1).
+    fn dual_cleanup(&mut self) -> Result<Option<usize>, SolveError> {
+        let p = self.p;
+        let tol = self.opts.feasibility_tol;
+        let mut pivots = 0;
+        while pivots < 10 * p.m {
+            let sg = self.sig();
+            // Leaving row: the largest violation.
+            let mut best: Option<(usize, f64, bool)> = None;
+            for (r, &c) in sg.iter().enumerate() {
+                if c == 0 {
+                    continue;
+                }
+                let j = self.basic[r];
+                let (li, d) = (is_inf(p.lo[j]), self.dst[j]);
+                // `viol`: how far outside; `upper`: the bound it goes to.
+                let (viol, upper) = if li { (-d, true) } else if c < 0 { (-d, false) } else { (d - (p.up[j] - p.lo[j]), true) };
+                if best.is_none_or(|b| viol > b.1) {
+                    best = Some((r, viol, upper));
+                }
+            }
+            let Some((r, _, to_upper)) = best else { return Ok(Some(pivots)) };
+            let _ = tol;
+            // x_Br must increase when it goes to its lower bound, decrease when it goes to its upper one.
+            let sr = if to_upper { -1.0 } else { 1.0 };
+            let mut y: Vec<f64> = self.basic.iter().map(|&j| p.cost[j]).collect();
+            self.factor.btran(&mut y);
+            let mut rho = vec![0.0; p.m];
+            rho[r] = 1.0;
+            self.factor.btran(&mut rho);
+            let mut enter: Option<(usize, f64, f64)> = None;
+            for j in 0..p.n + p.m {
+                if self.pos_of[j] != NONE || self.is_fixed(j) {
+                    continue;
+                }
+                let alpha = dot(&p.cols[j], &rho);
+                if alpha.abs() <= 1e-9 {
+                    continue;
+                }
+                let (li, ui) = (is_inf(p.lo[j]), is_inf(p.up[j]));
+                let ok = if li && ui {
+                    true
+                } else if self.at_upper[j] && !ui || li {
+                    alpha * sr > 0.0
+                } else {
+                    alpha * sr < 0.0
+                };
+                if !ok {
+                    continue;
+                }
+                let ratio = (p.cost[j] - dot(&p.cols[j], &y)).abs() / alpha.abs();
+                let better = match enter {
+                    None => true,
+                    Some((_, br, ba)) => ratio < br || (ratio == br && alpha.abs() > ba),
+                };
+                if better {
+                    enter = Some((j, ratio, alpha.abs()));
+                }
+            }
+            let Some((q, _, _)) = enter else { return Ok(None) };
+            let leave = self.basic[r];
+            self.basic[r] = q;
+            self.pos_of[q] = r;
+            self.pos_of[leave] = NONE;
+            self.at_upper[leave] = to_upper;
+            self.refactor()?;
+            pivots += 1;
+        }
+        Ok(None)
+    }
+
     fn has_infeasible_basic(&self) -> bool {
         self.sig().iter().any(|&c| c != 0)
     }
@@ -2837,6 +2914,12 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                     if s.factor.num_updates() > 0 {
                         s.cleanup = s.mirror.is_some() && !s.rhs_shift.is_empty();
                         s.refactor()?;
+                        if s.cleanup && s.has_infeasible_basic() {
+                            // The dual clean-up pass; the primal phase 1 only when it finds no entering variable.
+                            if let Some(k) = s.dual_cleanup()? {
+                                iterations += k;
+                            }
+                        }
                         if s.has_infeasible_basic() {
                             continue;
                         }
