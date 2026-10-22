@@ -443,7 +443,27 @@ impl RefStruct {
                 }
                 c
             },
-            row_par: vec![0; m],
+            // A fresh factor lays the rows of the row-wise copy out contiguously: the nonempty rows of the nucleus in the order of their list index
+            // (`kind`), then the others by position, each row as long as its U entries (`ucol_len`); the parity of the start decides the alignment of the row's
+            // value array in the dot product of the second FTRAN vector.
+            row_par: {
+                let mut len = vec![0usize; m];
+                for col in &uc {
+                    for &(row, _) in col {
+                        len[row] += 1;
+                    }
+                }
+                let mut order: Vec<usize> = (0..m).filter(|&p| kind[p] >= 0 && len[p] > 0).collect();
+                order.sort_by_key(|&p| kind[p]);
+                order.extend((0..m).filter(|&p| kind[p] < 0 && len[p] > 0));
+                let mut par = vec![0u8; m];
+                let mut acc = 0usize;
+                for p in order {
+                    par[p] = (acc % 2) as u8;
+                    acc += len[p];
+                }
+                par
+            },
             upd_work: Vec::new(),
             h33,
             h34,
@@ -730,8 +750,6 @@ impl RefStruct {
     /// stage value and divided by the diagonal, without a tolerance test. Does not touch the spike of the last `ftran`.
     pub fn ftran_needed(&self, rows: &[usize], vals: &[f64], needed: &[usize]) -> Vec<(usize, f64)> {
         let m = self.m;
-        static CNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-        CNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let (spike, count_l, e_l) = self.lstage_num(rows, vals, false);
         self.tau_l.set(e_l);
         let tau_dense = rows.len() * self.dthr > self.m || self.lev_dense_ft || (!self.etas.is_empty() && count_l * self.dthr > self.m);
