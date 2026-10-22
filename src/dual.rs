@@ -995,7 +995,7 @@ impl<'a> Dual<'a> {
             self.work.add(0xc7c4f, 0.0, crate::work::CTX);
             return Ratio { q: None, flips: Vec::new() };
         }
-        // The partition passes of the selection book `3 (hi - lo + 4)` each; the store is separate (`0xcbcae`) when the final sum is below -1e19.
+        // The partition passes of the selection book `3 (hi - lo + 4)` each; the store is separate (`0xcbcae`) when the final sum is below minus the primal tolerance (`xmm9 = -1e19` at a nonzero level, else `-1e-6`, against `xmm10` at `0xcbc8d`).
         let mut sel = 0.0f64;
         let mut sel_sep = false;
         if nn == 1 {
@@ -1050,7 +1050,7 @@ impl<'a> Dual<'a> {
                 }
             }
             nflip = lo;
-            sel_sep = -1e19 > s;
+            sel_sep = -self.ptol() > s;
         } else if best_i > 0 {
             let b = best_i as usize;
             ratio_arr.swap(0, b);
@@ -1116,7 +1116,8 @@ impl<'a> Dual<'a> {
         if kept.is_empty() {
             return Ratio { q: None, flips: Vec::new() };
         }
-        self.work.add(0xc8b67, 4.0 * (b + 1) as f64, crate::work::CTX);
+        // The entries of the list that the second loop `0xc8a05` walks: the flips and the kept candidates (`r8d` at `0xc8b2e`).
+        self.work.add(0xc8b67, 4.0 * (b + kept.len()) as f64, crate::work::CTX);
         let (chosen, xm5) = self.select_entering(row, &kept, xm3);
         let (mut chosen, xm5) = self.shift_entering(row, &kept, chosen, xm5, xm15);
         let mut flips = lst[..b].to_vec();
@@ -1282,7 +1283,7 @@ impl<'a> Dual<'a> {
         let tol = 1000.0 * delta;
         let mut xm5 = xm5;
         let mut best: Option<usize> = None;
-        self.work.add(0xc92b8, 4.0 * flips.len() as f64, crate::work::CTX);
+        // The sites `0xc92b8` and `0xc9431` add to another accumulator than the driver's W (no write to W in any capture), so nothing is booked here.
         for (k, &e) in flips.iter().enumerate() {
             let (j, aj) = row[e];
             let dj = self.d[j];
@@ -1308,7 +1309,6 @@ impl<'a> Dual<'a> {
         let (nj, na) = row[qe];
         let theta2 = self.d[nj] / na;
         let kept: Vec<usize> = flips.iter().copied().filter(|&e| e != qe && self.d[row[e].0] <= row[e].1 * theta2).collect();
-        self.work.add(0xc9431, 4.0 * flips.len() as f64 + kept.len() as f64, crate::work::CTX);
         (qe, kept)
     }
 }
