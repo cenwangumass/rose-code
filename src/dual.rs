@@ -118,6 +118,8 @@ struct Dual<'a> {
     /// `ctx+0x3fc` (-1 once set): the second selection among the bound flips of the ratio test. Set at a refactorization (`0xe6dcc`) when the
     /// perturbation flag is 3 or more or 3 iterations exceed the row count (`ctx+0x178`, which also sets it, is 0 in every capture).
     flip_select: bool,
+    /// The reference's work counter (`ctx+0x118`); in the dual path every estimate is on the scale 1.3.
+    work: crate::work::Work,
 }
 
 /// The start basis of the dual path (setup `0xe7531`; assignments at `0xed2e8` and `0xeb69f`, `replay/gdb_dual_crash.py`). The equality rows (fixed slack)
@@ -765,6 +767,33 @@ impl<'a> Dual<'a> {
         (out, nst)
     }
 
+    /// Work of the row product (`0x134d90`, site `0x135e92`, same estimate as the primal path's `row_product_work`).
+    fn row_product_work(&mut self, rho: &[(usize, f64)], nslack: usize) {
+        let p5: usize = rho.iter().map(|e| self.rrows[e.0].len()).sum();
+        let (n, m) = (self.n, self.m);
+        let nnz_a: usize = self.p.cols[..n].iter().map(Vec::len).sum();
+        let mut seen = vec![false; n + m];
+        let mut d = 0usize;
+        for &(i, _) in rho {
+            for &j in &self.rrows[i] {
+                if !seen[j] {
+                    seen[j] = true;
+                    d += 1;
+                }
+            }
+        }
+        let nr = rho.len() as f64;
+        let est = if rho.len() == 1 {
+            if rho[0].1.abs() < 1.0 { 10.5 + 5.0 * p5 as f64 } else { 10.5 + 4.0 * p5 as f64 }
+        } else if m * n <= rho.len() * 3 * nnz_a {
+            8.5 * nr + 2.0 * p5 as f64 + 2.5 * n as f64
+        } else {
+            11.5 * nr + 3.5 * p5 as f64 + 3.0 * d as f64
+        };
+        // Every slack entry of the result (the leaving one and the offered nonbasic ones) adds four.
+        self.work.add_from(0x135e92, 0xc5381, est + 4.0 * nslack as f64, crate::work::CTX);
+    }
+
     /// The bound-flipping Harris ratio test (`0xc74a0`, `ctx+0x468 != 0`), `specs/dual-simplex.md`.
     fn ratio_test(&mut self, row: &[(usize, f64)], esi: usize, leave: usize, above: bool, xbr: f64) -> Ratio {
         let p = self.p;
@@ -850,10 +879,16 @@ impl<'a> Dual<'a> {
             }
         }
         let nn = lst.len();
+        self.work.add(0xc7bcd, 3.0 * cnt as f64, crate::work::CTX);
         if nn == 0 {
+            self.work.add(0xc7c4f, 0.0, crate::work::CTX);
             return Ratio { q: None, flips: Vec::new() };
         }
+        // The partition passes of the selection book `3 (hi - lo + 4)` each; the store is separate (`0xcbcae`) when the final sum is below -1e19.
+        let mut sel = 0.0f64;
+        let mut sel_sep = false;
         if nn == 1 {
+            self.work.add(0xc7c4f, 5.0, crate::work::CTX);
             let (q, _) = self.shift_entering(row, &[lst[0]], lst[0], 0.0, 0.0);
             return Ratio { q: Some(q), flips: Vec::new() };
         }
@@ -863,6 +898,7 @@ impl<'a> Dual<'a> {
             let mut s = xmm10;
             let (mut lo, mut hi) = (0usize, nn - 1);
             while lo < hi {
+                sel += (hi - lo + 4) as f64;
                 let (pr, pc) = (ratio_arr[lo], con[lo]);
                 let mut h = hi + 1;
                 let mut l = lo as isize - 1;
@@ -903,11 +939,21 @@ impl<'a> Dual<'a> {
                 }
             }
             nflip = lo;
+            sel_sep = -1e19 > s;
         } else if best_i > 0 {
             let b = best_i as usize;
             ratio_arr.swap(0, b);
             con.swap(0, b);
             lst.swap(0, b);
+        }
+        let w5 = 5.0 * nn as f64;
+        if sel == 0.0 {
+            self.work.add(0xc7c4f, w5, crate::work::CTX);
+        } else if sel_sep {
+            self.work.add(0xcbcae, 3.0 * sel, crate::work::CTX);
+            self.work.add(0xc7c4f, w5, crate::work::CTX);
+        } else {
+            self.work.add_merged(0xc7c4f, &[3.0 * sel, w5], crate::work::CTX);
         }
         if nflip > 0 && !(self.d[row[lst[nflip]].0] > delta) {
             nflip = 0;
@@ -936,6 +982,7 @@ impl<'a> Dual<'a> {
                 }
             }
         }
+        self.work.add(0xc82ee, 3.0 * (nn - b) as f64 + kept.len() as f64, crate::work::CTX);
         if kept.is_empty() && b > 0 {
             for t in 0..b {
                 let e = lst[t];
@@ -958,6 +1005,7 @@ impl<'a> Dual<'a> {
         if kept.is_empty() {
             return Ratio { q: None, flips: Vec::new() };
         }
+        self.work.add(0xc8b67, 4.0 * (b + 1) as f64, crate::work::CTX);
         let (chosen, xm5) = self.select_entering(row, &kept, xm3);
         let (mut chosen, xm5) = self.shift_entering(row, &kept, chosen, xm5, xm15);
         let mut flips = lst[..b].to_vec();
@@ -1123,6 +1171,7 @@ impl<'a> Dual<'a> {
         let tol = 1000.0 * delta;
         let mut xm5 = xm5;
         let mut best: Option<usize> = None;
+        self.work.add(0xc92b8, 4.0 * flips.len() as f64, crate::work::CTX);
         for (k, &e) in flips.iter().enumerate() {
             let (j, aj) = row[e];
             let dj = self.d[j];
@@ -1148,6 +1197,7 @@ impl<'a> Dual<'a> {
         let (nj, na) = row[qe];
         let theta2 = self.d[nj] / na;
         let kept: Vec<usize> = flips.iter().copied().filter(|&e| e != qe && self.d[row[e].0] <= row[e].1 * theta2).collect();
+        self.work.add(0xc9431, 4.0 * flips.len() as f64 + kept.len() as f64, crate::work::CTX);
         (qe, kept)
     }
 }
@@ -1229,6 +1279,7 @@ impl<'a> Dual<'a> {
         let p = self.p;
         let (n, m) = (self.n, self.m);
         let snap = crate::dump::on("dsx").then(|| self.snapshot(k));
+        self.work.trig();
         let row_sel = self.price();
         let Some(r) = row_sel else {
             if let Some(mut s) = snap {
@@ -1244,7 +1295,9 @@ impl<'a> Dual<'a> {
         let rho_full = self.mirror.btran(&[(r, 1.0)], true, false);
         let rho: Vec<(usize, f64)> = rho_full.iter().copied().filter(|e| e.1.abs() > DROP_TOL).collect();
         self.p60 = rho.len() as f64;
+        self.work.add_from(0x13174d, 0xc51dd, self.mirror.work, crate::work::FAC);
         let (row, esi) = self.pivot_row(&rho, leave, above);
+        self.row_product_work(&rho, row.len() - esi);
         let rt = self.ratio_test(&row, esi, leave, above, xbr);
         let mut rec = snap;
         if let Some(s) = rec.as_mut() {
@@ -1262,6 +1315,9 @@ impl<'a> Dual<'a> {
         };
         let (q, aq_row) = row[qe];
         let flips: Vec<usize> = rt.flips.iter().map(|&e| row[e].0).collect();
+        if !flips.is_empty() {
+            self.work.add(0xc561a, 7.0 * flips.len() as f64, crate::work::CTX);
+        }
         if let Some(s) = rec.as_mut() {
             s["q"] = serde_json::json!(q);
             s["alpha_row"] = serde_json::json!(aq_row);
@@ -1275,6 +1331,14 @@ impl<'a> Dual<'a> {
         let rho_vals: Vec<f64> = rho.iter().map(|e| e.1).collect();
         let needed: Vec<usize> = col_out.iter().map(|e| e.0).collect();
         let tau_out = self.mirror.ftran_needed(&rho_rows, &rho_vals, &needed);
+        {
+            // The two-vector FTRAN books the L stages of both vectors and then the U stage of the column at the factor's scale
+            // (`0x129671`, call `0x120200`); the wrapper `0x11f620` books `4 nnz(column) + nnz(rho)` (`0x120114`).
+            let (e1, u1) = self.mirror.work_parts;
+            let est = ((e1 + self.mirror.tau_l.get()) + u1) + self.mirror.tau_u.get();
+            self.work.add_from(0x129671, 0x120200, est, crate::work::FAC);
+            self.work.add(0x120114, 4.0 * rows_q.len() as f64 + rho_rows.len() as f64, crate::work::CTX);
+        }
         let mut tau_dense = vec![0.0; m];
         for &(i, v) in &tau_out {
             tau_dense[i] = v;
@@ -1326,9 +1390,18 @@ impl<'a> Dual<'a> {
             // The reference's input vector (`0xcd720`): a dense one when twice the summed column counts exceed m, else the touched
             // rows in order of first touch. Then the plain FTRAN of the factor.
             let dense_in = 2 * est > m;
+            // Work of `0xcd720`: the input vector (`4 sum len` for a list, `2 m` for a dense one, doubled) before the FTRAN.
+            self.work.add(0xcdbb5, 2.0 * if dense_in { 2.0 * m as f64 } else { 4.0 * est as f64 }, crate::work::CTX);
             let rows: Vec<usize> = if dense_in { (0..m).filter(|&i| rhs[i] != 0.0).collect() } else { touched };
             let vals: Vec<f64> = rows.iter().map(|&i| rhs[i]).collect();
+            let dense_est = if dense_in { Some(self.mirror.ftran_dense_work(&rhs)) } else { None };
             let sol = self.mirror.ftran_keep(&rows, &vals, dense_in);
+            self.work.add_from(0x1219d6, 0x120673, dense_est.unwrap_or(self.mirror.keep_work), crate::work::FAC);
+            if self.mirror.last_dense() {
+                self.work.add(0xce316, (m + sol.len()) as f64, crate::work::CTX);
+            }
+            // The count of the result vector times 7 on the context's scale (`(7 * scale) * count`).
+            self.work.add(0xce1ef, sol.len() as f64, 7.0 * crate::work::FAC);
             let mut rhs = vec![0.0; m];
             for (i, v) in sol {
                 rhs[i] = v;
@@ -1449,10 +1522,14 @@ impl<'a> Dual<'a> {
             } else {
                 self.factor.update(pv.r, alpha);
                 self.mirror.update(pv.r);
+                for (site, est, scale) in std::mem::take(&mut self.mirror.upd_work) {
+                    self.work.add(site, est, scale);
+                }
                 self.touch_pricing(pv.r, &pv.col);
                 self.updates += 1;
             }
-            // d update.
+            // d update (`0xe45c0`).
+            self.work.add(0xe7000, 3.0 * pv.row.len() as f64, crate::work::CTX);
             let aq = pv.row.iter().find(|e| e.0 == pv.q).unwrap().1;
             let theta = self.d[pv.q] / aq;
             for &(j, a) in &pv.row {
@@ -1481,6 +1558,8 @@ impl<'a> Dual<'a> {
             self.recompute_xb();
             self.recompute_flags(level_before != 0, pv.is_some());
         } else if let Some(pv) = pv {
+            self.work.add(0xc0410, 3.0 * pv.col.len() as f64, crate::work::CTX);
+            self.work.add(0xc06c7, 7.0 * pv.col.len() as f64, crate::work::CTX);
             self.update_primal_and_weights(pv);
         }
         Ok(())
@@ -1643,6 +1722,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         pert: 0,
         obj_off: 0.0,
         flip_select: false,
+        work: crate::work::Work::dual(),
     };
     // Initial statuses of the nonbasic variables: the dual-feasible bound (an infinite bound is the artificial one, value +-1e30).
     for j in 0..n + m {

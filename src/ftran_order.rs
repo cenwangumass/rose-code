@@ -61,6 +61,13 @@ pub struct RefStruct {
     first_eta: Vec<usize>,
     /// Estimate of the most recent `ftran` (`0x120740`) or `btran` (`0x12de60`), before the factor object's scale 1.3.
     pub work: f64,
+    /// The L-stage part and the U-stage part of `work` of the last `ftran`, and the L-stage estimate of the last `ftran_needed`.
+    pub work_parts: (f64, f64),
+    /// The work estimate of the last `ftran_keep`, which restores `work` itself.
+    pub keep_work: f64,
+    pub tau_l: std::cell::Cell<f64>,
+    /// The U-stage estimate of the last `ftran_needed` (`0x123690`).
+    pub tau_u: std::cell::Cell<f64>,
     /// Fill of the reference's pool for etas and the row-wise copy of U (`F+0x160`), and the capacity of each row of that copy.
     /// Only the parity of `fill` matters: it decides the alignment of the next eta's value array.
     fill: usize,
@@ -330,6 +337,10 @@ impl RefStruct {
             nnz_l: nnz_l_tot,
             first_eta: vec![usize::MAX; m],
             work: 0.0,
+            work_parts: (0.0, 0.0),
+            keep_work: 0.0,
+            tau_l: std::cell::Cell::new(0.0),
+            tau_u: std::cell::Cell::new(0.0),
             scratch_peel: ((m as f64).powf(0.7) as usize).max(20).wrapping_add(ncols + 1) % 2,
             fill: 2 * (uc.iter().map(Vec::len).sum::<usize>() + nnz_l_tot),
             // A row lists its tail columns in the order of the factorization's U row (Markowitz steps), or in the order of the
@@ -663,7 +674,8 @@ impl RefStruct {
     /// stage value and divided by the diagonal, without a tolerance test. Does not touch the spike of the last `ftran`.
     pub fn ftran_needed(&self, rows: &[usize], vals: &[f64], needed: &[usize]) -> Vec<(usize, f64)> {
         let m = self.m;
-        let (spike, _, _) = self.lstage_num(rows, vals, false);
+        let (spike, _, e_l) = self.lstage_num(rows, vals, false);
+        self.tau_l.set(e_l);
         let mut x = vec![0.0f64; m];
         let mut touched = vec![false; m];
         let mut tail: Vec<usize> = Vec::new();
@@ -699,6 +711,7 @@ impl RefStruct {
                 }
             }
         }
+        self.tau_u.set(self.tau_u_work(&spike, &x, needed.len()));
         needed
             .iter()
             .map(|&p| {
@@ -720,12 +733,49 @@ impl RefStruct {
             .collect()
     }
 
+    /// Work of the tau solve's U stage (`0x123690`, which adds to `F+0x200`): `10 + 2 n + 6 c` for `n` needed positions and a spike of
+    /// `c` entries; a dense spike (`m <= h33^2 c`) or one with many tail entries (`5 h33^2 t > m - i21`) books `3 (m - i21)` and `2 len` (its tail-row entries) per
+    /// nonzero tail column (plus `2 t` in the second case) and `4 (m - i21)` at the end; otherwise the heap walk books `4 h33` per nonzero
+    /// tail column and `4` per such column at the end. `(2 n) h34` is added last. `x` holds the solved tail values.
+    fn tau_u_work(&self, spike: &[(usize, f64)], x: &[f64], n: usize) -> f64 {
+        let m = self.m as f64;
+        let (cnt, nf) = (spike.len() as f64, n as f64);
+        let d = self.h33;
+        let tail_rows = (self.m - self.i21) as f64;
+        let mut e = ((10.0 + nf) + nf) + 6.0 * cnt;
+        let mut dense = m <= (d * d) * cnt;
+        if !dense {
+            let t = spike.iter().filter(|e| self.kind[e.0] == -2).count() as f64;
+            if ((5.0 * d) * d) * t > tail_rows {
+                dense = true;
+                e = 2.0 * t + e;
+            }
+        }
+        let fin;
+        if dense {
+            e = 3.0 * tail_rows + e;
+            for t in (self.i21..self.m).rev() {
+                let c = self.at[t];
+                if x[c] != 0.0 {
+                    e += self.a[c].len() as f64 * 2.0;
+                }
+            }
+            fin = tail_rows;
+        } else {
+            let nz = (self.i21..self.m).filter(|&t| x[self.at[t]] != 0.0).count() as f64;
+            e = (d * 4.0) * nz + e;
+            fin = nz;
+        }
+        ((nf + nf) * self.h34 + e) + 4.0 * fin
+    }
+
     /// A plain FTRAN (`0x1205d0`) between the pivot column's solve and the column replacement, e.g. the bound-flip update: the
     /// result as `ftran` (`dense`: the input is a dense vector, as `ftran_basic`), but the spike of the pivot column and the
     /// per-solve statistics stay as they were.
     pub fn ftran_keep(&mut self, rows: &[usize], vals: &[f64], dense: bool) -> Vec<(usize, f64)> {
         let saved = (self.spike.clone(), self.spike_used, self.last_alpha, self.last_dense, self.last_ordered, self.work);
         let out = self.ftran_with(rows, vals, dense);
+        self.keep_work = self.work;
         (self.spike, self.spike_used, self.last_alpha, self.last_dense, self.last_ordered, self.work) = saved;
         out
     }
@@ -804,7 +854,9 @@ impl RefStruct {
             || !(self.nuc.len() + spike.len() < self.i21 || self.dens * (spike.len() as f64) < 2.0 * m as f64);
         let inp: Vec<usize> = spike.iter().map(|e| e.0).collect();
         let vec_dense = rows.len() * self.dthr > m || self.lev_dense_ft || (!self.etas.is_empty() && count_l * self.dthr > m);
-        self.work = self.u_work(&inp, &x, !dense, if vec_dense { None } else { Some(spike.len()) }) + e_l;
+        let u_est = self.u_work(&inp, &x, !dense, if vec_dense { None } else { Some(spike.len()) });
+        self.work = u_est + e_l;
+        self.work_parts = (e_l, u_est);
         self.last_dense = dense;
         self.last_ordered = dense || u_dense;
         let ord = if dense || u_dense { (0..m).collect() } else { self.uorder(&inp, &x) };

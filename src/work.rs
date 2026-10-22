@@ -24,24 +24,44 @@ pub struct Work {
     /// Cost of the factorization in progress: the sum of the driver's own increments.
     fac_cost: f64,
     log: bool,
+    /// Scale of the solver context's estimates (`ctx+0x148`): 1.43 in the primal path, 1.3 in the dual.
+    ctx: f64,
 }
 
 impl Default for Work {
     fn default() -> Self {
-        Work { mute: false, w: 0.0, w150: 0.0, decided_once: false, w158: 0.0, fac_cost: 0.0, log: std::env::var_os("ROSE_WORK").is_some() }
+        Work { mute: false, w: 0.0, w150: 0.0, decided_once: false, w158: 0.0, fac_cost: 0.0, ctx: CTX, log: std::env::var_os("ROSE_WORK").is_some() }
     }
 }
 
 impl Work {
+    pub fn dual() -> Self {
+        Work { ctx: FAC, ..Work::default() }
+    }
+
     /// `W = est * scale + W`, in the reference's operation order.
     pub fn add(&mut self, site: u32, est: f64, scale: f64) {
         if self.mute {
             return;
         }
-        let d = est * scale;
+        let d = est * if scale == CTX { self.ctx } else { scale };
         self.w = d + self.w;
         if self.log {
             eprintln!("WINC {d:.4} {site:#x}");
+        }
+    }
+
+    /// Several increments the reference makes in one store (the register carries the sum): added one after the other, logged as one.
+    pub fn add_merged(&mut self, site: u32, ests: &[f64], scale: f64) {
+        if self.mute {
+            return;
+        }
+        let w0 = self.w;
+        for &e in ests {
+            self.w = e * if scale == CTX { self.ctx } else { scale } + self.w;
+        }
+        if self.log {
+            eprintln!("WINC {:.4} {site:#x}", self.w - w0);
         }
     }
 
@@ -50,7 +70,7 @@ impl Work {
         if self.mute {
             return;
         }
-        let d = est * scale;
+        let d = est * if scale == CTX { self.ctx } else { scale };
         self.w = d + self.w;
         if self.log {
             eprintln!("WINC {d:.4} {site:#x} {caller:#x}");
@@ -84,7 +104,7 @@ impl Work {
         self.fac_cost = 0.0;
         for &(site, est) in sites {
             if matches!(site, 0xd4ded | 0xd5300 | 0xd85e6 | 0xd8973 | 0xdc7b2 | 0xdcb7b) {
-                self.fac_cost += est * scale;
+                self.fac_cost += est * if scale == CTX { self.ctx } else { scale };
             }
         }
     }
