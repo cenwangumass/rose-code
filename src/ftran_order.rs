@@ -1853,7 +1853,7 @@ impl RefStruct {
             self.rowl[r].clear();
         }
         let mut newdiag = spk[r];
-        if !elim.is_empty() && !eta_cand.is_empty() {
+        if !elim.is_empty() {
             let mut ind = vec![r];
             let mut val = vec![1.0 / d0];
             for &(k, c) in &eta_cand {
@@ -1872,8 +1872,6 @@ impl RefStruct {
             let esz = ind.len();
             self.etas.push(Eta { idx: r, ind, val, peel });
             self.fill += esz;
-        } else if !elim.is_empty() && eta_cand.is_empty() {
-            self.upd_work.push((0xf1beb, 3.0, crate::work::CTX));
         }
         if k == 0 {
             // A new column without entries is a candidate for the scan (`0xf2e58`).
