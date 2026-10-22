@@ -74,6 +74,11 @@ impl SolveOptions {
         SolveOptions { method: crate::method::SolveMethod::Dual, ..SolveOptions::default() }
     }
 
+    /// The reference's `dual-release` profile (`Method=1`, library defaults) as far as it is recovered: the dual loop on the scaled model.
+    pub fn dual_release() -> Self {
+        SolveOptions { scaling: true, ..SolveOptions::dual() }
+    }
+
     /// The reference's release profile as far as it is recovered: the faithful options with the initial `SimplexPricing=0` pricing.
     pub fn release() -> Self {
         SolveOptions { pricing0: true, scaling: true, ..SolveOptions::default() }
@@ -1502,8 +1507,8 @@ impl<'a> Solver<'a> {
         let n = self.p.n;
         let rowlen = changed.iter().filter(|&&j| j >= n || !self.is_fixed(j)).count();
         let est = (rowlen + extra) as f64 * 4.0 + old_len as f64 + old_len as f64 + self.list.len() as f64 * 2.0;
-        if std::env::var_os("ROSE_WORK_DBG").is_some() {
-            eprintln!("UPD {caller:#x} changed {changed:?} old {old_len} new {:?} level {} est {est} extra {extra}", self.list, self.level);
+        if crate::dump::on("work") {
+            crate::dump::emit("work", serde_json::json!({"k": "upd", "caller": caller, "changed": changed, "old": old_len, "new": self.list, "level": self.level, "est": est, "extra": extra}));
         }
         self.work.add_from(0x1087b1, caller, est, crate::work::CTX);
     }
@@ -2707,11 +2712,11 @@ fn repair_basis(p: &Internal, b: &mut Basis) -> Option<(usize, Vec<(u32, f64)>)>
 
 /// Solve starting from `start` (a primal feasible basis). `None` uses the all-slack basis with columns at their lower bounds.
 pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Result<SolveResult, SolveError> {
-    if opts.method == crate::method::SolveMethod::Dual {
-        return crate::dual::solve(model, start, opts);
-    }
     if opts.scaling {
         return crate::scale::solve(model, start, opts);
+    }
+    if opts.method == crate::method::SolveMethod::Dual {
+        return crate::dual::solve(model, start, opts);
     }
     let p = build(model);
     let (n, m) = (p.n, p.m);

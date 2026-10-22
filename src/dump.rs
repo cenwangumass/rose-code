@@ -29,6 +29,7 @@ pub const KINDS: &[(&str, &str, &str)] = &[
     ("dcr", "DCR", "the dual start basis: the (column, row) assignments of the crash in order"),
     ("dsx", "DSX", "each call of the dual iteration function: state at entry (head, x_B, d in the reference frame, W, status, flags, priorities, candidate list, threshold, mode, cursor) and the decision (row, leaving variable, entering variable, flips, pivot row, rho)"),
     ("p68", "P68", "each reset of the pricing weights (`0x132460`): the type, the U and L column structure (steps) and the weights P+0x68 by position"),
+    ("work", "WORK", "the work counter W (`crate::work`): each increment (k inc: d, site, caller), each refactorization check (trig: W), the time clause (clause), and the smoothed factorization cost (w158); `ROSE_WORK=1` also selects it"),
     ("fillparts", "FILLP", "per factor update: pool fill on entry, eta size, new column entries added, and the row growths (row, cnt, cap, extra)"),
 ];
 

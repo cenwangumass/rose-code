@@ -3,12 +3,17 @@
 //! Each routine of the reference adds an estimate of its own loop trip counts, scaled by a per-object factor: 1.43 for the
 //! solver context (`ctx+0x148`) and 1.3 for the factor object (`F+0x1f8`). The refactorization trigger compares the work since
 //! the last factorization with the factorization's own cost. Sites are named by the module-relative address of the increment in
-//! the reference, so a log (`ROSE_WORK`) can be compared with a GDB capture (`replay/gdb_wwatch.py`).
+//! the reference, so a log (`ROSE_DUMP=work`, or `ROSE_WORK=1`, kind `work` in `crate::dump`) can be compared with a GDB capture (`replay/gdb_wwatch.py`).
 
 /// Scale of the solver context's estimates (`ctx+0x148`).
 pub const CTX: f64 = 1.43;
 /// Scale of the factor object's estimates (`F+0x1f8`).
 pub const FAC: f64 = 1.3;
+
+fn emit(rec: serde_json::Value) {
+    crate::dump::emit("work", rec);
+}
+use serde_json::json;
 
 pub struct Work {
     pub w: f64,
@@ -30,7 +35,7 @@ pub struct Work {
 
 impl Default for Work {
     fn default() -> Self {
-        Work { mute: false, w: 0.0, w150: 0.0, decided_once: false, w158: 0.0, fac_cost: 0.0, ctx: CTX, log: std::env::var_os("ROSE_WORK").is_some() }
+        Work { mute: false, w: 0.0, w150: 0.0, decided_once: false, w158: 0.0, fac_cost: 0.0, ctx: CTX, log: crate::dump::on("work") || std::env::var_os("ROSE_WORK").is_some() }
     }
 }
 
@@ -47,7 +52,7 @@ impl Work {
         let d = est * if scale == CTX { self.ctx } else { scale };
         self.w = d + self.w;
         if self.log {
-            eprintln!("WINC {d:.4} {site:#x}");
+            emit(json!({"k": "inc", "d": d, "site": site}));
         }
     }
 
@@ -61,7 +66,7 @@ impl Work {
             self.w = e * if scale == CTX { self.ctx } else { scale } + self.w;
         }
         if self.log {
-            eprintln!("WINC {:.4} {site:#x}", self.w - w0);
+            emit(json!({"k": "inc", "d": self.w - w0, "site": site}));
         }
     }
 
@@ -73,7 +78,7 @@ impl Work {
         let d = est * if scale == CTX { self.ctx } else { scale };
         self.w = d + self.w;
         if self.log {
-            eprintln!("WINC {d:.4} {site:#x} {caller:#x}");
+            emit(json!({"k": "inc", "d": d, "site": site, "caller": caller}));
         }
     }
 
@@ -88,7 +93,7 @@ impl Work {
     pub fn clause_dual(&self, upd: usize, nnz_a: usize, w: f64) -> bool {
         let due = upd % 10 == 9 && self.w158 > 0.0 && w - self.w150 > 14.0 * self.w158 + 100.0 * nnz_a as f64;
         if self.log && upd % 10 == 9 {
-            eprintln!("CLAUSE {{\"W\": {w}, \"w150\": {}, \"w158\": {}, \"U\": {upd}}}", self.w150, self.w158);
+            emit(json!({"k": "clause", "W": w, "w150": self.w150, "w158": self.w158, "U": upd}));
         }
         due
     }
@@ -124,7 +129,7 @@ impl Work {
         // The first factorization stores its cost as it is; later ones average it with the previous value.
         self.w158 = if self.w158 == 0.0 { self.fac_cost } else { 0.5 * (self.fac_cost + self.w158) };
         if self.log {
-            eprintln!("W158 {} cost {} w150 {}", self.w158, self.fac_cost, self.w150);
+            emit(json!({"k": "w158", "w158": self.w158, "cost": self.fac_cost, "w150": self.w150}));
         }
     }
 
@@ -145,7 +150,7 @@ impl Work {
     /// Marks the reference's refactorization check (`0x142350`), which separates the iterations in the logs.
     pub fn trig(&self) {
         if self.log {
-            eprintln!("TRIG {}", self.w);
+            emit(json!({"k": "trig", "W": self.w}));
         }
     }
 }
