@@ -72,6 +72,9 @@ pub struct RefStruct {
     /// Only the parity of `fill` matters: it decides the alignment of the next eta's value array.
     fill: usize,
     row_cap: Vec<usize>,
+    /// Parity of the start of each row in the row-wise copy (the value array of a row starts on a 16-byte boundary when it is 0): the rows of a
+    /// fresh factor start on multiples of 4, a row moved to the end of the pool starts at the fill of that moment.
+    row_par: Vec<u8>,
     /// The reference's row-wise copy: for each row, the tail columns whose A or B list holds it, in insertion order.
     rowl: Vec<Vec<usize>>,
     /// Alignment of the scratch eta behind each new diagonal (`ctx+0x1d0`): its value array sits `4 m` bytes after the index array in
@@ -107,6 +110,39 @@ struct Eta {
 }
 
 const TOL: f64 = 1e-13;
+
+/// The row-wise dot product of the second-vector U stage (`0x123690`, loop `0x1241ed`): `s` minus the products `(value, x)`. Below 8 terms, or
+/// when fewer than `peel + 8` are left, it is sequential; otherwise `peel` (0 or 1: the elements before the first 16-byte boundary of the
+/// value array) terms are subtracted one by one, then blocks of eight go to four two-lane accumulators (the first one starts with `s` in lane
+/// 0), combined as `(a0 + a1) + (a2 + a3)` lane-wise and then lane 0 + lane 1, and the last `(n - peel) % 8` terms are subtracted one by one.
+fn row_dot(s: f64, t: &[(f64, f64)], peel: usize) -> f64 {
+    let n = t.len();
+    let prod = |i: usize| t[i].0 * t[i].1;
+    if n < 8 || n < peel + 8 {
+        return (0..n).fold(s, |a, i| a - prod(i));
+    }
+    let mut s = s;
+    for i in 0..peel {
+        s -= prod(i);
+    }
+    let end = n - ((n - peel) & 7);
+    let mut acc = [[s, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]];
+    let mut i = peel;
+    while i < end {
+        for (q, a) in acc.iter_mut().enumerate() {
+            a[0] -= prod(i + 2 * q);
+            a[1] -= prod(i + 2 * q + 1);
+        }
+        i += 8;
+    }
+    let l = [acc[0][0] + acc[1][0], acc[0][1] + acc[1][1]];
+    let h = [acc[2][0] + acc[3][0], acc[2][1] + acc[3][1]];
+    let mut r = (l[0] + h[0]) + (l[1] + h[1]);
+    for i in end..n {
+        r -= prod(i);
+    }
+    r
+}
 
 /// Eta dot product as the reference evaluates it: the vectorised loop peels the elements before the first 16-byte boundary of
 /// the value array (`peel` is 0 or 1) and keeps eight lane-wise partial sums; below `peel + 8` terms it is sequential.
@@ -388,6 +424,7 @@ impl RefStruct {
                 }
                 c
             },
+            row_par: vec![0; m],
             upd_work: Vec::new(),
             h33,
             h34,
@@ -719,13 +756,9 @@ impl RefStruct {
                     -2 => x[p],
                     -1 => x[p] / self.diag[p],
                     _ => {
-                        let mut s = x[p];
-                        for &c in &self.rowl[p] {
-                            if let Some(e) = self.uc[c].iter().find(|e| e.0 == p) {
-                                s -= e.1 * x[c];
-                            }
-                        }
-                        s / self.diag[p]
+                        let terms: Vec<(f64, f64)> =
+                            self.rowl[p].iter().filter_map(|&c| self.uc[c].iter().find(|e| e.0 == p).map(|e| (e.1, x[c]))).collect();
+                        row_dot(x[p], &terms, self.row_par[p] as usize) / self.diag[p]
                     }
                 };
                 (p, v)
@@ -2070,6 +2103,7 @@ impl RefStruct {
                     let left = (((m as f64).powf(0.7) as usize).max(20) + 1).saturating_sub(self.upd);
                     let extra = (cnt[row] / 2).max(4).min(left);
                     fp_rows.push((row, cnt[row], self.row_cap[row], extra));
+                    self.row_par[row] = (self.fill % 2) as u8;
                     self.fill += cnt[row] + extra;
                     self.row_cap[row] = cnt[row] + extra;
                 }
