@@ -131,6 +131,20 @@ struct Dual<'a> {
     pivot_cols: Option<usize>,
     /// `nnz(A)` of the structural columns (`ctx+0x3d0`), for the time clause.
     nnz_a: usize,
+    /// Cost perturbation state (`reverse-engineer/specs/dual-simplex.md`, "Cost perturbation"): the scale `ctx+0x348` (0: off), the count of iterations
+    /// with an entering `d` of at most delta (`ctx+0x330`) with its value (`0x334`) and the iteration count (`0x2b0`) at the last stall check, the progress
+    /// flag `0x110`, the best objective `0x140`, the perturbations left `0x364`, the parameter value, the objective scale `ctx+0xd8` and the cost
+    /// base that perturbations accumulate in.
+    pstep: f64,
+    stall: i64,
+    stall_snap: i64,
+    stall_it: f64,
+    prog_on: bool,
+    best_obj: f64,
+    pert_left: i64,
+    pert_param: f64,
+    obj_scale: f64,
+    pcost: Vec<f64>,
 }
 
 /// The start basis of the dual path (setup `0xe7531`; assignments at `0xed2e8` and `0xeb69f`, `replay/gdb_dual_crash.py`). The equality rows (fixed slack)
@@ -262,7 +276,8 @@ fn crash_pass3(p: &Internal, basic: &mut [usize], cost: &mut [f64], taken: &[boo
     }
     let _ = taken;
     for r in 0..m {
-        if is_eq[r] || basic[r] < n {
+        // A free row (free slack) keeps its slack: a nonbasic free slack with a d would be dual infeasible for good (no evidence for such a row).
+        if is_eq[r] || basic[r] < n || (p.lo[n + r] <= -BIG && p.up[n + r] >= BIG) {
             continue;
         }
         let sg = p.cols[n + r][0].1;
@@ -1301,14 +1316,14 @@ impl<'a> Dual<'a> {
         self.d[j] += s;
         if self.st[j] == LB {
             self.cshift[j] += s;
-            self.cost[j] = self.p.cost[j] + self.cshift[j];
+            self.cost[j] = self.pcost[j] + self.cshift[j];
             self.obj_off -= lo * s;
             if -BIG >= lo {
                 self.raise_pert(2);
             }
         } else {
             self.cshift[j] -= s;
-            self.cost[j] = self.p.cost[j] + self.cshift[j];
+            self.cost[j] = self.pcost[j] + self.cshift[j];
             self.obj_off += up * s;
             if up >= BIG {
                 self.raise_pert(2);
@@ -1691,6 +1706,9 @@ impl<'a> Dual<'a> {
                 }
             }
         }
+        if self.d[q] <= DUAL_TOL {
+            self.stall += 1;
+        }
         self.iters += 1;
         *dump = rec;
         let _ = flips.len();
@@ -1813,7 +1831,7 @@ impl<'a> Dual<'a> {
     }
 
     /// Level of the tolerance (`0xe45c0`, after a refactorization): with request 4 the nonbasic variables are first put on the dual-feasible bound.
-    fn set_level(&mut self) {
+    fn set_level(&mut self, old_level: usize) {
         let p = self.p;
         if self.request == 4 {
             for j in 0..self.n + self.m {
@@ -1836,9 +1854,119 @@ impl<'a> Dual<'a> {
             }
         }
         self.level = (0..self.n + self.m).filter(|&j| self.at_artificial(j)).count();
+        self.stall_check(old_level);
         if !self.flip_select && (self.pert >= 3 || 3.0 * self.iters as f64 > self.m as f64) {
             self.flip_select = true;
         }
+    }
+
+    /// The dual objective as the reference keeps it (`ctx+0x118`): the working costs times the basic solution and the nonbasic values, plus the shift
+    /// offset, divided by the objective scale.
+    fn fresh_objective(&self) -> f64 {
+        let p = self.p;
+        let mut r = p.rhs.clone();
+        for j in 0..p.n + p.m {
+            if self.st[j] < 0 {
+                let v = self.nonbasic_value(j);
+                if v != 0.0 {
+                    for &(i, a) in &p.cols[j] {
+                        r[i] -= a * v;
+                    }
+                }
+            }
+        }
+        self.factor.ftran(&mut r);
+        let mut s = 0.0;
+        for (pos, &j) in self.head.iter().enumerate() {
+            s += self.cost[j] * r[pos];
+        }
+        for j in 0..p.n + p.m {
+            if self.st[j] < 0 {
+                s += self.cost[j] * self.nonbasic_value(j);
+            }
+        }
+        (s + self.obj_off) / self.obj_scale
+    }
+
+    /// The stall test of the refactorization post pass (`0xe60cc..0xe6237`) and the cost perturbation it triggers (`0xe6af8..0xe6cd7`, `0xe74b1`).
+    fn stall_check(&mut self, old_level: usize) {
+        if self.pstep <= 0.0 && self.pert_param <= 0.0 {
+            return;
+        }
+        // The test runs at every second refactorization (every fifth once the perturbation flag has reached 3).
+        let period = if self.pert > 2 { 5 } else { 2 };
+        if std::env::var("DBGP").is_ok() { eprintln!("DBG PT c2c0={} c110={} c330={} c334={} c2b0={} it={} lvl={}/{}", self.refactorizations, self.prog_on as u8, self.stall, self.stall_snap, self.stall_it, self.iters, old_level, self.level); }
+        if self.refactorizations % period != 1 {
+            return;
+        }
+        let mut trig = false;
+        if self.pstep > 0.0 && old_level <= self.level {
+            // More than 90 percent of the iterations since the last check had an entering d of at most delta.
+            trig = (self.stall - self.stall_snap) as f64 > 0.9 * (self.iters as f64 - self.stall_it);
+            if !trig && self.prog_on {
+                // No objective progress since the last check.
+                let obj = self.fresh_objective();
+                trig = 1e-13 * (obj.abs().min(1e10) + 1.0) + self.best_obj > obj;
+                if !trig {
+                    self.best_obj = maxsd(obj, self.best_obj);
+                }
+            }
+        } else if self.prog_on {
+            let obj = self.fresh_objective();
+            self.best_obj = maxsd(obj, self.best_obj);
+        }
+        if trig && self.pert >= 2 && !(self.pert == 3 && self.pstep >= 0.01) {
+            self.perturb();
+        }
+        self.stall_snap = self.stall;
+        self.stall_it = self.iters as f64;
+    }
+
+    /// The cost perturbation (`0xe6af8..0xe6cd7`, `0xe74b1..0xe7585`): every nonbasic variable draws an integer `r` (also those that stay unchanged), and
+    /// a variable at a bound moves its cost by `(r mod 250 + 1) (c348 / 500) log2(1 + count)` (count: the column count of a structural, 1 for a slack) in the
+    /// direction that increases `d'` (the cost goes up at the lower bound and down at a finite upper bound; a variable at an infinite upper bound with
+    /// `d' <= delta` is moved to its lower bound first). The scale grows threefold for the next perturbation.
+    fn perturb(&mut self) {
+        let p = self.p;
+        let sc = self.pstep / 500.0;
+        let mut acc = 0.0f64;
+        for j in 0..self.n + self.m {
+            if self.st[j] >= 0 {
+                continue;
+            }
+            let r = self.rng_int() as i32;
+            let count = if j < self.n { p.cols[j].len() as f64 } else { 1.0 };
+            let f = 1.0f64;
+            let x = count * (f * 0.3 + 0.7);
+            let xi = (((r % 250 + 1) as f64) * sc) * (x + 1.0).log2();
+            if self.st[j] == LB {
+                self.pcost[j] += xi;
+                self.cost[j] += xi;
+                self.d[j] += xi;
+                acc -= p.lo[j] * xi;
+            } else if self.st[j] == UB {
+                if p.up[j] < BIG {
+                    self.pcost[j] -= xi;
+                    self.cost[j] -= xi;
+                    self.d[j] += xi;
+                    acc += p.up[j] * xi;
+                } else if self.d[j] <= DUAL_TOL {
+                    self.d[j] = -self.d[j];
+                    self.pcost[j] += xi;
+                    self.cost[j] += xi;
+                    acc -= p.lo[j] * xi;
+                    self.d[j] += xi;
+                    self.st[j] = LB;
+                }
+            }
+        }
+        self.obj_off = acc + self.obj_off;
+        self.prog_on = false;
+        self.pert = 3;
+        self.best_obj = -1e100;
+        self.pert_left -= 1;
+        let x = 3.0 * self.pstep;
+        self.pstep = if self.pert_param == 0.0002 { minsd(0.01, x) } else { minsd(1000.0 * self.pert_param, x) };
     }
 
     /// The post-iteration passes `0xf6c82..0xf6d0a`: factor update or refactorization, the dual update, the primal and weight update.
@@ -1891,9 +2019,10 @@ impl<'a> Dual<'a> {
             self.recompute_d();
             let level_before = self.level;
             self.set_level_work(level_before != 0);
-            self.set_level();
+            self.set_level(level_before);
             self.request = 0;
             self.recompute_xb();
+            self.prog_on = self.level == 0;
             self.recompute_flags(level_before != 0, pv.is_some());
             self.flags_work();
         } else if let Some(pv) = pv {
@@ -2104,6 +2233,16 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         work: crate::work::Work::dual(),
         pivot_cols: None,
         nnz_a: p.cols[..n].iter().map(Vec::len).sum(),
+        pstep: opts.perturb,
+        stall: 0,
+        stall_snap: 0,
+        stall_it: 0.0,
+        prog_on: false,
+        best_obj: -1e100,
+        pert_left: 1_000_000_000,
+        pert_param: opts.perturb,
+        obj_scale: opts.obj_scale,
+        pcost: p.cost.clone(),
     };
     // Initial statuses of the nonbasic variables: the dual-feasible bound (an infinite bound is the artificial one, value +-1e30).
     for j in 0..n + m {
@@ -2145,7 +2284,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             continue;
         }
         if s.st[j] == FIXED || s.st[j] == FREE {
-            s.d[j] = dt[j];
+            s.d[j] = if s.st[j] == FIXED && j < n { s.cost[j] } else { dt[j] };
             continue;
         }
         if dt[j] < -DUAL_TOL {
@@ -2170,7 +2309,9 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         s.work.add_from(0x12de50, 0xc36f1, s.mirror.work, crate::work::FAC);
         s.w[r] = if s.mirror.bt_dense { rho_norm_dense(&out, m) } else { rho_norm(&out) };
     }
+    s.stall_check(0);
     s.recompute_xb();
+    s.prog_on = s.level == 0;
     s.work.add(0xc391f, m as f64, crate::work::CTX);
     s.recompute_flags(false, false);
     s.flags_work();
