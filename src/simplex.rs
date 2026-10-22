@@ -732,6 +732,10 @@ impl<'a> Solver<'a> {
                 bk.full = self.cleanup || self.refactorizations % bk.r8 == 1;
             }
         }
+        if !self.cleanup && self.p0.as_ref().is_some_and(|p0| p0.bk.as_ref().is_none_or(|bk| bk.full)) {
+            // `0xe4092` runs `0x145520` (duals, residual check, rebuild) after the factorization.
+            self.residual_check_work();
+        }
         if self.sw.active && !self.cleanup {
             self.method_decision(sw_avg);
             if self.sw.perturb_due {
@@ -1513,6 +1517,8 @@ impl<'a> Solver<'a> {
     fn p0_rebuild(&mut self) {
         if self.y_ref.is_none() {
             self.dual_btran_work();
+            // `0x145520` runs its residual check after the duals (the refactorization's own run is booked in `refactor`).
+            self.residual_check_work();
         }
         let y = self.y_ref.clone().unwrap();
         let nm = self.p.n + self.p.m;
@@ -2906,16 +2912,19 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             (pick.entry, pick.step, pick.pivot)
         } else {
             let (xs, basic, lo, up) = (&s.x, &s.basic, &p.lo, &p.up);
+            // After a perturbation the reference's Harris test (`0xef960`) reads the shifted distance array (`dst`), not `x_B`.
+            let perturbed = s.sw.level > 0;
+            let dst = &s.dst;
             let down = |pos: usize| {
                 let j = basic[pos];
-                if is_inf(lo[j]) { INF } else { xs[j] - lo[j] }
+                if is_inf(lo[j]) { INF } else if perturbed { dst[j] } else { xs[j] - lo[j] }
             };
             let upd = |pos: usize| {
                 let j = basic[pos];
-                if is_inf(up[j]) { INF } else { up[j] - xs[j] }
+                if is_inf(up[j]) { INF } else if perturbed { if is_inf(lo[j]) { dst[j] } else { (up[j] - lo[j]) - dst[j] } } else { up[j] - xs[j] }
             };
             if crate::dump::on("ent2") {
-                let dist: Vec<f64> = (0..m).map(|pos| { let j = basic[pos]; if is_inf(lo[j]) { xs[j] } else { xs[j] - lo[j] } }).collect();
+                let dist: Vec<f64> = (0..m).map(|pos| { let j = basic[pos]; if perturbed { dst[j] } else if is_inf(lo[j]) { xs[j] } else { xs[j] - lo[j] } }).collect();
                 let rng: Vec<Option<f64>> = (0..m).map(|pos| { let j = basic[pos]; (!is_inf(lo[j]) && !is_inf(up[j])).then_some(up[j] - lo[j]) }).collect();
                 let typ: String = (0..m).map(|pos| { let j = basic[pos]; if is_inf(lo[j]) && is_inf(up[j]) { 'F' } else { 'N' } }).collect();
                 crate::dump::emit("ent2", serde_json::json!({"iter": iterations, "q": q, "own": (own < INF).then_some(own),
@@ -2969,7 +2978,16 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             let counted = chosen.is_some_and(|k| !s.is_fixed(s.basic[entries[k].0])) && !(is_inf(p.lo[q]) && is_inf(p.up[q]));
             s.sw.iteration(chosen.is_none(), counted, step);
         }
-        let x_leave_before = chosen.map(|k| s.x[s.basic[entries[k].0]]);
+        // After a perturbation the leaving variable's position is judged in the shifted frame of the distance array.
+        let shifted_frame = s.sw.level > 0 && !s.rhs_shift.is_empty();
+        let x_leave_before = chosen.map(|k| {
+            let j = s.basic[entries[k].0];
+            if shifted_frame && !infeasible && !(is_inf(p.lo[j]) && is_inf(p.up[j])) {
+                if is_inf(p.lo[j]) { p.up[j] - s.dst[j] } else { p.lo[j] + s.dst[j] }
+            } else {
+                s.x[j]
+            }
+        });
         // Move the basic variables and the entering variable.
         // Phase 2 does not move the point by a negative Harris step (reference, PEROLD ratio calls 50, 82, 354, ...: the
         // basics stay as they are, the entering variable stays at its bound and the leaving one keeps its computed value).
