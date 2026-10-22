@@ -730,6 +730,8 @@ impl RefStruct {
     /// stage value and divided by the diagonal, without a tolerance test. Does not touch the spike of the last `ftran`.
     pub fn ftran_needed(&self, rows: &[usize], vals: &[f64], needed: &[usize]) -> Vec<(usize, f64)> {
         let m = self.m;
+        static CNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        CNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let (spike, count_l, e_l) = self.lstage_num(rows, vals, false);
         self.tau_l.set(e_l);
         let tau_dense = rows.len() * self.dthr > self.m || self.lev_dense_ft || (!self.etas.is_empty() && count_l * self.dthr > self.m);
@@ -757,10 +759,13 @@ impl RefStruct {
         }
         tail.sort_unstable_by_key(|&p| std::cmp::Reverse(self.slot[p]));
         let mut tau_raw = vec![false; m];
+        // The inline dense joint loop of two dense vectors (`0x128c56..0x129152`) tests the raw value before the quotient: a tail column whose
+        // raw value is at most the tolerance is zeroed even when the quotient exceeds it.
+        let joint_dense = tau_dense && self.f2.borrow().col_n.is_none();
         for &c in &tail {
             tau_raw[c] = x[c].abs() > TOL;
             let xc = x[c] / self.diag[c];
-            if xc.abs() <= TOL {
+            if xc.abs() <= TOL || (joint_dense && !tau_raw[c]) {
                 x[c] = 0.0;
                 continue;
             }
@@ -2286,7 +2291,8 @@ impl RefStruct {
                 }
             }
             // A row that already holds an entry of the old column takes the new entry in place.
-            for &(row, _) in self.spike.iter().filter(|e| e.0 != r && !old_rows.contains(&e.0)) {
+            // The rows are visited in the spike's order with the leaving column replaced by the last entry (`sp`).
+            for &row in sp.iter().filter(|&&y| y != r && !old_rows.contains(&y)) {
                 if cnt[row] >= self.row_cap[row] {
                     // The growth is capped by the updates left before the refactorization (`0xf2cd1`: `F+0x188 - F+0x18c`).
                     let left = (self.upd_limit.unwrap_or(((m as f64).powf(0.7) as usize).max(20)) + 1).saturating_sub(self.upd);
