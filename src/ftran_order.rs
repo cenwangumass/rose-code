@@ -86,6 +86,8 @@ pub struct RefStruct {
     last_ordered: bool,
     /// Whether the most recent `btran` returned a dense result (count `-1`): its L^T solve ran dense.
     pub bt_dense: bool,
+    /// The factor object's update limit when the pricing lowered it (`F+0x188`, the dual path); the default is `max(20, m^0.7)`.
+    pub upd_limit: Option<usize>,
 }
 
 struct Eta {
@@ -382,6 +384,7 @@ impl RefStruct {
             lev_dense_ft,
             last_dense: false,
             last_ordered: false,
+            upd_limit: None,
             bt_dense: false,
             row_cached: None,
             m,
@@ -881,8 +884,8 @@ impl RefStruct {
 
     pub fn refactor_due(&self) -> bool {
         let m = self.m as f64;
-        let maxupd = (m.powf(0.7) as usize).max(20);
-        if self.upd == maxupd {
+        let maxupd = self.upd_limit.unwrap_or((m.powf(0.7) as usize).max(20));
+        if self.upd >= maxupd {
             return true;
         }
         let c46c = m.powf(0.45) as usize;

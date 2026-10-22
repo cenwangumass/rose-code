@@ -28,6 +28,7 @@ pub const KINDS: &[(&str, &str, &str)] = &[
     ("switch", "SWITCH", "method decision after each refactorization (`0x142500`): the counters it reads and whether it switched to Devex pricing"),
     ("dcr", "DCR", "the dual start basis: the (column, row) assignments of the crash in order"),
     ("dsx", "DSX", "each call of the dual iteration function: state at entry (head, x_B, d in the reference frame, W, status, flags, priorities, candidate list, threshold, mode, cursor) and the decision (row, leaving variable, entering variable, flips, pivot row, rho)"),
+    ("p68", "P68", "each reset of the pricing weights (`0x132460`): the type, the U and L column structure (steps) and the weights P+0x68 by position"),
     ("fillparts", "FILLP", "per factor update: pool fill on entry, eta size, new column entries added, and the row growths (row, cnt, cap, extra)"),
 ];
 

@@ -72,6 +72,13 @@ struct Dual<'a> {
     iters: usize,
     // Pricing object P (`ctx+0x478`).
     prio: Vec<f64>,
+    /// Pricing type `P+0x44`: 0 plain dual steepest edge priorities, 1 scaled by `P70[var] / P68[row]`, 2 by `1 / P68[row]`.
+    ptype: u8,
+    /// Per-row weights `P+0x68` (by position) and per-variable constants `P+0x70` of the scaled priorities.
+    p68: Vec<f64>,
+    p70: Vec<f64>,
+    /// Touch increment `P+0x60`: the number of entries of the pivot row's BTRAN result.
+    p60: f64,
     flags: Vec<u8>,
     list: Vec<usize>,
     thr: f64,
@@ -94,6 +101,8 @@ struct Dual<'a> {
     last_cap: usize,
     /// Updates of the factor since the last refactorization.
     updates: usize,
+    /// The update limit of the factor object once the value mode has started (`F+0x188`).
+    upd_limit: Option<usize>,
     /// The pivot column of the last iteration by position (for the factor's update).
     pending_alpha: Option<Vec<f64>>,
     /// Final status once the loop ends.
@@ -255,7 +264,9 @@ impl<'a> Dual<'a> {
             self.w[pos] = wv[v];
         }
         self.head = order;
+        self.reset_pricing(&st, &rows);
         self.mirror = RefStruct::fresh(self.m, self.n, &st, &rows);
+        self.mirror.upd_limit = self.upd_limit;
         let cols: Vec<&Column> = self.head.iter().map(|&j| &self.p.cols[j]).collect();
         self.factor = Factor::new(self.m, &cols).map_err(|_| SolveError::SingularBasis)?;
         self.refactorizations += 1;
@@ -321,7 +332,9 @@ impl<'a> Dual<'a> {
     fn recompute_d(&mut self) {
         let dt = self.true_d();
         for j in 0..self.n + self.m {
-            if self.st[j] < 0 {
+            if self.st[j] == FIXED {
+                // The reference leaves the stored d of a fixed nonbasic variable alone at a refactorization.
+            } else if self.st[j] < 0 {
                 self.d[j] = if self.st[j] == UB { -dt[j] } else { dt[j] };
             } else {
                 self.d[j] = 0.0;
@@ -358,7 +371,114 @@ impl<'a> Dual<'a> {
 
     // ------------------------------------------------------------------ pricing object
 
-    /// `0xbdc10`: flags of all rows and the list of the infeasible ones sorted by `infeas^2 / W` (descending).
+    /// Priority of row `r` with primal infeasibility `f` (`0xc0861`, `0xc23fe`, `0xcdc9`): `f^2 / W[r]`, scaled by the pricing type
+    /// (the factor 1 of the reference's variable-class multiplier holds for continuous variables).
+    fn pri(&self, r: usize, f: f64) -> f64 {
+        let base = f * f / self.w[r];
+        match self.ptype {
+            1 => base * (self.p70[self.head[r]] / self.p68[r]),
+            2 => base / self.p68[r],
+            _ => base,
+        }
+    }
+
+    /// Setup of the pricing type (`0xe7f7c..0xe7fe5`, `SimplexPricing` -1): type 1 for m >= 100 and n >= 100 unless the matrix is dense
+    /// (more than 20 entries per column and m * nnz > 10 n^2); `P+0x70` is the column count plus the average count.
+    fn init_pricing_type(&mut self) {
+        let (n, m) = (self.n, self.m);
+        let nnz: usize = self.p.cols[..n].iter().map(|c| c.len()).sum();
+        let (nf, mf, z) = (n as f64, m as f64, nnz as f64);
+        self.ptype = if m >= 100 && n >= 100 && (z <= 20.0 * nf || mf * z <= 10.0 * nf * nf) { 1 } else { 0 };
+        if self.ptype > 0 {
+            let avg = z / nf;
+            self.p70 = (0..n + m).map(|j| (if j < n { self.p.cols[j].len() } else { 1 }) as f64 + avg).collect();
+        }
+    }
+
+    /// Reset of the row weights at a factorization (`0x132460`, from `0xf48fd`): in pivot order, `w_k = 1` combined with the U entries of column `k`
+    /// (rows above, descending) as `w + w_j - w w_j / m`, then backwards with the L entries of column `k`; the total decides between the
+    /// capped weights `min(0.1 m + 100, w + 100)` and (total above `m (0.1 m + 100)`, or type 2 already) the constant cap with type 2.
+    fn reset_pricing(&mut self, st: &crate::lu_order::Structure, cols: &[(bool, Vec<usize>, Vec<f64>)]) {
+        if self.ptype == 0 {
+            return;
+        }
+        let m = self.m;
+        let mut step_of_row = vec![usize::MAX; m];
+        let mut step_of_pos = vec![usize::MAX; m];
+        for (s, &(r, c)) in st.pivots.iter().enumerate() {
+            step_of_row[r] = s;
+            step_of_pos[c] = s;
+        }
+        // Forward lists (`0xf48fd` structure +0x70/+0x80): the earlier steps whose L column holds the row of step k, descending.
+        let mut fwd: Vec<Vec<usize>> = vec![Vec::new(); m];
+        for e in 0..m {
+            for &r in &st.l_rows[e] {
+                fwd[step_of_row[r]].push(e);
+            }
+        }
+        // Backward lists (+0xb0/+0xd0): the later steps in the pivot row of step k: nucleus rows with their fill (`u_rows`), the others with their
+        // original entries, by ascending basis position.
+        let mut row_pos: Vec<Vec<usize>> = vec![Vec::new(); m];
+        for (c, col) in cols.iter().enumerate() {
+            for &i in &col.1 {
+                row_pos[i].push(c);
+            }
+        }
+        let bwd: Vec<Vec<usize>> = (0..m)
+            .map(|k| {
+                if st.phase[k] != 0 {
+                    row_pos[st.pivots[k].0].iter().map(|&c| step_of_pos[c]).filter(|&t| t > k).collect()
+                } else {
+                    st.u_rows[k].iter().map(|&(c, _)| step_of_pos[c]).filter(|&t| t > k).collect()
+                }
+            })
+            .collect();
+        let n = m as f64;
+        let mut w = vec![1.0f64; m];
+        for k in 0..m {
+            fwd[k].sort_unstable_by(|a, b| b.cmp(a));
+            fwd[k].dedup();
+            for &j in &fwd[k] {
+                w[k] = (w[k] + w[j]) - (w[j] * w[k]) / n;
+            }
+        }
+        for k in (0..m).rev() {
+            for &j in &bwd[k] {
+                w[k] = (w[k] + w[j]) - (w[j] * w[k]) / n;
+            }
+        }
+        let total: f64 = w.iter().sum();
+        let cap = 0.1 * n + 100.0;
+        if self.ptype == 2 || total > n * cap {
+            self.ptype = 2;
+            w.iter_mut().for_each(|x| *x = cap);
+        } else {
+            for x in w.iter_mut() {
+                let v = *x + 100.0;
+                *x = if cap < v { cap } else { v };
+            }
+        }
+        if crate::dump::on("p68") {
+            crate::dump::emit("p68", serde_json::json!({"n": self.refactorizations, "type": self.ptype, "ucol": fwd, "lcol": bwd, "p68": w}));
+        }
+        self.p68 = w;
+    }
+
+    /// Touch of the row weights at a factor update (`0x132a10`, from `0xf2eb3`): the rows of the pivot column grow by the pivot row's entry count,
+    /// up to m / 2, and the pivot row is at least that count plus 100.
+    fn touch_pricing(&mut self, r: usize, col: &[(usize, f64)]) {
+        if self.ptype == 0 {
+            return;
+        }
+        let delta = self.p60;
+        let cap = self.m as f64 * 0.5;
+        for &(i, _) in col {
+            self.p68[i] = minsd(cap, self.p68[i] + delta);
+        }
+        self.p68[r] = maxsd(self.p68[r], 100.0 + delta);
+    }
+
+    /// `0xbdc10`: flags of all rows and the list of the infeasible ones sorted by priority (descending).
     fn build_walk_list(&mut self) {
         let ptol = self.ptol();
         let mut rows = Vec::new();
@@ -368,7 +488,7 @@ impl<'a> Dual<'a> {
             if f > ptol {
                 self.flags[r] = 0;
                 rows.push(r);
-                keys.push(-(f * f / self.w[r]));
+                keys.push(-self.pri(r, f));
             } else {
                 self.flags[r] = 2;
             }
@@ -386,7 +506,7 @@ impl<'a> Dual<'a> {
         let mut fresh: Vec<usize> = (0..self.m).filter(|&r| self.flags[r] == 1).collect();
         let key = |s: &Self, r: usize| {
             let f = s.infeas(r);
-            -(f * f / s.w[r])
+            -s.pri(r, f)
         };
         let mut keys: Vec<f64> = fresh.iter().map(|&r| key(self, r)).collect();
         ref_sort(&mut keys, &mut fresh);
@@ -423,7 +543,7 @@ impl<'a> Dual<'a> {
             let f = self.infeas(r);
             if f > ptol {
                 inf[r] = true;
-                self.prio[r] = f * f / self.w[r];
+                self.prio[r] = self.pri(r, f);
                 maxp = maxsd(maxp, self.prio[r]);
             }
         }
@@ -431,6 +551,19 @@ impl<'a> Dual<'a> {
             self.first_recompute = false;
             self.build_walk_list();
             return;
+        }
+        // The mode switch (`0xc0c29`): the value mode starts when 15 times the average of the changed-row counts exceeds m, or when the iteration
+        // count does; until then the walk list is rebuilt.
+        if !self.value_mode && !(15.0 * self.avg_touch > self.m as f64 || self.iters as f64 > self.m as f64) {
+            self.build_walk_list();
+            return;
+        }
+        if !self.value_mode {
+            // The value mode lowers the factor's update limit to max(20, m^0.65) (`0xc0cad`).
+            let lim = ((self.m as f64).powf(0.65) as usize).max(20);
+            let cur = self.mirror.upd_limit.unwrap_or(((self.m as f64).powf(0.7) as usize).max(20));
+            self.upd_limit = Some(lim.min(cur));
+            self.mirror.upd_limit = self.upd_limit;
         }
         self.value_mode = true;
         self.cursor = 0;
@@ -550,7 +683,7 @@ impl<'a> Dual<'a> {
             } else if f <= ptol {
                 self.flags[r] |= 2;
             } else {
-                self.prio[r] = f * f / self.w[r];
+                self.prio[r] = self.pri(r, f);
                 match self.flags[r] {
                     3 => self.flags[r] = 1,
                     1 => {}
@@ -747,9 +880,9 @@ impl<'a> Dual<'a> {
                     }
                 }
                 if s < 0.0 {
-                    s += con[lo..=h].iter().fold(0.0, |a, c| a + c);
+                    s = accumulate(s, &con[lo..=h], lo % 2, false);
                 } else {
-                    s -= con[h + 1..=hi].iter().fold(0.0, |a, c| a + c);
+                    s = accumulate(s, &con[h + 1..=hi], (h + 1) % 2, true);
                 }
                 if 0.0 > s {
                     lo = h + 1;
@@ -830,6 +963,44 @@ impl<'a> Dual<'a> {
     }
 }
 
+/// The running sum of the ratio test's selection (`0xcba58..0xcbc3a`): `s` plus (or minus) the entries of `c` in the reference's vectorized order. Fewer
+/// than `peel + 8` entries are added one by one. Otherwise `peel` entries (one when the first is at an odd index of the 16-byte aligned array, so that the
+/// pairs are aligned) go in one by one, then blocks of eight enter four two-lane accumulators (lane 0 of the first one starts at `s`), which are combined
+/// as `(a0 + a1) + (a2 + a3)` and then lane 0 + lane 1, and the remaining entries follow one by one.
+fn accumulate(s: f64, c: &[f64], peel: usize, sub: bool) -> f64 {
+    let step = |a: f64, x: f64| if sub { a - x } else { a + x };
+    let n = c.len();
+    let mut s = s;
+    if n < peel + 8 {
+        for &x in c {
+            s = step(s, x);
+        }
+        return s;
+    }
+    for &x in &c[..peel] {
+        s = step(s, x);
+    }
+    let vend = n - ((n - peel) & 7);
+    let mut acc = [[0.0f64; 2]; 4];
+    acc[0][0] = s;
+    let mut i = peel;
+    while i < vend {
+        for (q, a) in acc.iter_mut().enumerate() {
+            a[0] = step(a[0], c[i + 2 * q]);
+            a[1] = step(a[1], c[i + 2 * q + 1]);
+        }
+        i += 8;
+    }
+    let l0 = [acc[0][0] + acc[1][0], acc[0][1] + acc[1][1]];
+    let l2 = [acc[2][0] + acc[3][0], acc[2][1] + acc[3][1]];
+    let l = [l0[0] + l2[0], l0[1] + l2[1]];
+    s = l[0] + l[1];
+    for &x in &c[vend..] {
+        s = step(s, x);
+    }
+    s
+}
+
 /// `delta/a + ratio`: the reference adds two terms (not `(delta + d)/a`).
 #[allow(non_snake_case)]
 fn PIVOT_DELTA(delta: f64, v: f64, ratio: f64) -> f64 {
@@ -883,6 +1054,7 @@ impl<'a> Dual<'a> {
         // Pivot-row BTRAN, drop of the small entries.
         let rho_full = self.mirror.btran(&[(r, 1.0)], true, false);
         let rho: Vec<(usize, f64)> = rho_full.iter().copied().filter(|e| e.1.abs() > DROP_TOL).collect();
+        self.p60 = rho.len() as f64;
         let (row, esi) = self.pivot_row(&rho, leave, above);
         let rt = self.ratio_test(&row, esi, leave, above, xbr);
         let mut rec = snap;
@@ -939,8 +1111,11 @@ impl<'a> Dual<'a> {
             s["tau"] = crate::dump::sparse(&tau_out);
         }
         // Column without the pivot entry: the last entry moves into the pivot's slot.
+        // A dense FTRAN result (count -1) is compacted by an ascending scan that skips the pivot and the entries up to the drop tolerance (`0x12013c`).
         let mut col: Vec<(usize, f64)> = col_out.clone();
-        if let Some(k) = col.iter().position(|e| e.0 == r) {
+        if self.mirror.last_dense() {
+            col.retain(|e| e.0 != r && e.1.abs() > DROP_TOL);
+        } else if let Some(k) = col.iter().position(|e| e.0 == r) {
             col.swap_remove(k);
         }
         let tau: Vec<f64> = col.iter().map(|e| tau_dense[e.0]).collect();
@@ -1082,6 +1257,7 @@ impl<'a> Dual<'a> {
             } else {
                 self.factor.update(pv.r, alpha);
                 self.mirror.update(pv.r);
+                self.touch_pricing(pv.r, &pv.col);
                 self.updates += 1;
             }
             // d update.
@@ -1146,7 +1322,7 @@ impl<'a> Dual<'a> {
         // that average and than m^0.45 the threshold grows by 10 percent per iteration (before the rows are touched).
         let ninf = self.list.len() as f64;
         let it = self.iters as f64;
-        self.avg_touch = (2.0 * changed.len() as f64 + (it - 2.0) * self.avg_touch) / it;
+        self.avg_touch = (2.0 * pv.col.len() as f64 + (it - 2.0) * self.avg_touch) / it;
         if self.value_mode {
             if ninf > self.avg_touch.max((self.m as f64).powf(0.45).floor()) {
                 self.thr *= 1.1;
@@ -1154,7 +1330,7 @@ impl<'a> Dual<'a> {
             // The pivot row leaves the list at the next pricing call whatever its value (`0xc0732`); its priority is refreshed for the entering variable.
             let q = self.head[r];
             let d = self.xb[r] - self.p.lo[q];
-            self.prio[r] = d * d / self.w[r];
+            self.prio[r] = self.pri(r, d);
             self.flags[r] = 3;
             changed.pop();
             self.touch_rows(&changed);
@@ -1236,6 +1412,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         request: 0,
         iters: 0,
         prio: vec![0.0; m],
+        ptype: 0,
+        p68: Vec::new(),
+        p70: Vec::new(),
+        p60: 0.0,
         flags: vec![2; m],
         list: Vec::new(),
         thr: 0.0,
@@ -1250,6 +1430,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         avg_touch: 0.0,
         last_cap: 0,
         updates: 0,
+        upd_limit: None,
         pending_alpha: None,
         status: None,
     };
@@ -1283,6 +1464,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         }
         s.d[j] = if s.st[j] == UB { -dt[j] } else { dt[j] };
     }
+    s.init_pricing_type();
+    s.reset_pricing(&stc, &rows);
     s.build_rrows();
     s.slack_nb = (0..m).map(|i| s.st[n + i] < 0).collect();
     s.level = (0..n + m).filter(|&j| s.st[j] == UB && p.up[j] >= BIG).count();
