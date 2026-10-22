@@ -36,6 +36,8 @@ pub struct Structure {
     /// Column order of the U rows of the column pairs' pivots (`crate::lu_pairs::Overrides::urow`).
     pub pair_urow: std::collections::HashMap<usize, Vec<usize>>,
     pub dense_n: usize,
+    /// Rows of the factored matrix (the pivot count is smaller for a singular basis).
+    pub m: usize,
 }
 
 pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Structure {
@@ -89,14 +91,14 @@ pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Stru
     l_vals.extend(nv);
     diag.extend(npiv);
     u_rows.extend(nu);
-    Structure { pivots: seq, phase, l_rows, l_vals, l_raw, diag, u_rows, nuc_nnz, nuc_work, loff, pair_unz, pair_urow, dense_n: DENSE_N.with(|c| c.get()) }
+    Structure { pivots: seq, phase, l_rows, l_vals, l_raw, diag, u_rows, nuc_nnz, nuc_work, loff, pair_unz, pair_urow, dense_n: DENSE_N.with(|c| c.get()), m }
 }
 
 impl Structure {
     /// The factorization's increments of the reference's work counter (`0xd4190`, `crate::work`) as `(site, estimate)`, given
     /// the factored columns and whether the L solve levels are built (`crate::ftran_order`).
     pub fn work(&self, cols: &[(bool, Vec<usize>, Vec<f64>)], levels: bool) -> Vec<(u32, f64)> {
-        let m = self.pivots.len() as f64;
+        let m = self.m as f64;
         let nnz_b: usize = cols.iter().map(|c| if c.0 { 1 } else { c.1.len() }).sum();
         let nsing = self.phase.iter().filter(|&&p| p != 0).count();
         let nnz_l: usize = self.l_rows.iter().map(Vec::len).sum();
@@ -107,7 +109,7 @@ impl Structure {
         // later (the reference counts them directly; `nnz(B) - nsing - nnz_l_sing - nuc` differs when a pair step drops or
         // creates L entries).
         let u_sing = {
-            let mut step_r = vec![usize::MAX; self.pivots.len()];
+            let mut step_r = vec![usize::MAX; self.m];
             let mut step_c = vec![usize::MAX; cols.len()];
             for (k, &(r, c)) in self.pivots.iter().enumerate() {
                 step_r[r] = k;

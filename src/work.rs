@@ -98,6 +98,20 @@ impl Work {
         }
     }
 
+    /// Takes back the increments made since `w0` (a value of `w` read earlier): the scan that found nothing before the driver restart
+    /// books nothing in the reference.
+    pub fn rollback(&mut self, w0: f64) {
+        self.w = w0;
+    }
+
+    /// The driver restart: the check that precedes it is the first-check state again (`ctx+0x150` takes `W`, `ctx+0x158` starts over, so the
+    /// restart factorization stores its own cost instead of averaging it).
+    pub fn restart(&mut self) {
+        self.trig();
+        self.decided(self.w);
+        self.w158 = 0.0;
+    }
+
     /// Marks the reference's refactorization check (`0x142350`), which separates the iterations in the logs.
     pub fn trig(&self) {
         if self.log {

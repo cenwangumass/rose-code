@@ -421,6 +421,11 @@ struct Solver<'a> {
     /// Variable dropped last from a singular supplied basis: not priced until the basis is primal feasible.
     excluded: Option<usize>,
     restart: bool,
+    pre_restart: bool,
+    /// The duals were recomputed at the start of this iteration (the end of phase 1), so the scan that finds nothing does not recompute them again.
+    fresh_duals: bool,
+    /// The driver restarted inside the last pricing call: the refactorization check read before it is stale.
+    restarted: bool,
     basic: Vec<usize>,
     pos_of: Vec<usize>,
     at_upper: Vec<bool>,
@@ -678,7 +683,7 @@ impl<'a> Solver<'a> {
                     p0.window = (avg / 2).max(P0_WINDOW);
                 }
                 if let Some(old) = self.mirror.as_ref() {
-                    let est = if self.cleanup { old.discard_work_unused() } else { old.discard_work() };
+                    let est = if self.restart { 0.0 } else if self.cleanup || self.pre_restart { old.discard_work_unused() } else { old.discard_work() };
                     if est > 0.0 {
                         self.work.add(0xf461f, est, crate::work::CTX);
                     }
@@ -958,7 +963,7 @@ impl<'a> Solver<'a> {
             if self.pos_of[j] == NONE && a.abs() > ROW_DROP_TOL {
                 self.d[j] -= a;
             }
-            if (j >= n && rho[j - n] != 0.0) || (self.pos_of[j] == NONE && a.abs() > ROW_DROP_TOL) {
+            if ((j >= n && rho[j - n] != 0.0) || (self.pos_of[j] == NONE && a.abs() > ROW_DROP_TOL)) && self.excluded != Some(j) {
                 changed.push(j);
             }
         }
@@ -1015,7 +1020,7 @@ impl<'a> Solver<'a> {
     /// Work of the reduced-cost pass after the duals (`0x1020a0`, site `0x1021b0`).
     fn reduced_cost_work(&mut self) {
         let p = self.p;
-        let cols: usize = (0..p.n).filter(|&j| self.pos_of[j] == NONE && !self.is_fixed(j)).map(|j| p.cols[j].len()).sum();
+        let cols: usize = (0..p.n).filter(|&j| self.pos_of[j] == NONE && !self.is_fixed(j) && self.excluded != Some(j)).map(|j| p.cols[j].len()).sum();
         self.work.add(0x1021b0, 3.0 * (p.n + p.m + cols) as f64, crate::work::CTX);
     }
 
@@ -1205,7 +1210,7 @@ impl<'a> Solver<'a> {
         let (mut p5, mut d) = (0usize, 0usize);
         for &i in &nz {
             for &j in &self.rows[i] {
-                if ((self.pos_of[j] == NONE && j != q) || j == leave) && self.p.lo[j] != self.p.up[j] {
+                if ((self.pos_of[j] == NONE && j != q) || j == leave) && self.p.lo[j] != self.p.up[j] && self.excluded != Some(j) {
                     p5 += 1;
                     if !seen[j] {
                         seen[j] = true;
@@ -1321,18 +1326,61 @@ impl<'a> Solver<'a> {
     /// `price_faithful`, except that the variable dropped from a singular supplied basis stays out of the scan until the scan finds no
     /// other candidate; it is then admitted and the list rebuilt (the reference adds 3 to its status, -4 -> -1, in `0xcda5b`).
     fn price_admitting(&mut self) -> Option<usize> {
+        let w0 = self.work.w;
         let q = self.price_faithful();
-        if q.is_none() && self.excluded.take().is_some() {
+        if q.is_none() && self.excluded.is_some() {
+            // Without updates the scan books nothing (the driver's own list build, `0x138532` below, takes its place).
+            if self.factor.num_updates() == 0 {
+                self.work.rollback(w0);
+            }
+            // The scan found nothing: like the optimality exit, the reference first refactors when updates were made (`0xd4190`,
+            // the factorization before the status add of `0x155139`, the excluded variable still out of the row copy); only then
+            // does the driver restart below.
+            if self.factor.num_updates() > 0 {
+                // As at the optimality exit: the duals are recomputed once more when the scan finds nothing (`0x145520`).
+                if self.mirror.is_some() && !self.recomputed && !self.fresh_duals {
+                    self.dual_btran_work();
+                }
+                self.work.trig();
+                self.work.decided(self.work.w);
+                self.pre_restart = true;
+                let r = self.refactor();
+                self.pre_restart = false;
+                r.ok()?;
+            }
+            self.excluded = None;
+            // Admitting the variable rebuilds the candidate list (`0x138532`: one pass over all variables) and the row-wise copy
+            // (`0x132d88`: `2 nnz(A)`), before the driver restarts.
+            let nnz_a: usize = (0..self.p.n).map(|j| self.p.cols[j].len()).sum();
+            let nm = self.p.n + self.p.m;
+            self.work.add(0x138532, 2.0 * nm as f64, crate::work::CTX);
+            self.work.add(0x132d88, 2.0 * nnz_a as f64, crate::work::CTX);
+            // The rebuilt row-wise copy holds every nonbasic, non-fixed structural (the admitted one included), in index order.
+            self.rrows = vec![Vec::new(); self.p.m];
+            for j in 0..self.p.n {
+                if self.pos_of[j] == NONE && !self.is_fixed(j) {
+                    for &(i, _) in &self.p.cols[j] {
+                        self.rrows[i].push(j);
+                    }
+                }
+            }
+            self.work.restart();
             // The reference re-enters its driver, which rebuilds the basis in ascending column order and refactors.
             self.restart = true;
             let r = self.refactor();
             self.restart = false;
+            self.restarted = true;
             if r.is_err() {
                 return None;
             }
             self.list.clear();
             self.level = 0;
-            return self.price_faithful();
+            let w1 = self.work.w;
+            let q = self.price_faithful();
+            if q.is_none() {
+                self.work.rollback(w1);
+            }
+            return q;
         }
         q
     }
@@ -2589,7 +2637,7 @@ fn ratio_test(
 /// reference's LU order leave the basis (nonbasic at their lower bound) and the slacks of the rows left without a pivot replace them.
 /// Returns the last variable dropped (highest basis position), which the reference keeps out of pricing until the basis is
 /// primal feasible (status -4 until `0x155139` adds 3 back).
-fn repair_basis(p: &Internal, b: &mut Basis) -> Option<usize> {
+fn repair_basis(p: &Internal, b: &mut Basis) -> Option<(usize, Vec<(u32, f64)>)> {
     let (n, m) = (p.n, p.m);
     let cols: Vec<(bool, Vec<usize>, Vec<f64>)> = b
         .basic
@@ -2598,10 +2646,13 @@ fn repair_basis(p: &Internal, b: &mut Basis) -> Option<usize> {
         .collect();
     crate::lu_order::reset_pair_gate();
     crate::lu_order::set_factorization_number(1);
-    let piv = crate::lu_order::pivot_order(m, &cols);
+    let st = crate::lu_order::factor_structure(m, &cols);
+    let piv = st.pivots.clone();
     if piv.len() == m {
         return None;
     }
+    // The reference's first factorization (of the singular basis) counts its work like any other (`Structure::work` with the full row count).
+    let fwork = st.work(&cols, false);
     let mut row_done = vec![false; m];
     let mut pos_done = vec![false; m];
     for &(r, pos) in &piv {
@@ -2618,7 +2669,7 @@ fn repair_basis(p: &Internal, b: &mut Basis) -> Option<usize> {
         b.at_upper[n + r] = false;
         last = Some(out);
     }
-    last
+    last.map(|l| (l, fwork))
 }
 
 /// Solve starting from `start` (a primal feasible basis). `None` uses the all-slack basis with columns at their lower bounds.
@@ -2629,13 +2680,17 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     let p = build(model);
     let (n, m) = (p.n, p.m);
     let mut excluded = None;
+    let mut singular_work: Vec<(u32, f64)> = Vec::new();
     let basis = match start {
         Some(b) => {
             let mut b = b.clone();
             b.validate(n, m).map_err(SolveError::InvalidBasis)?;
             // The reference gets a basis as variable statuses, so its incoming position order is the variable order.
             b.basic.sort_unstable();
-            excluded = repair_basis(&p, &mut b);
+            if let Some((e, w)) = repair_basis(&p, &mut b) {
+                excluded = Some(e);
+                singular_work = w;
+            }
             b
         }
         // Cold start: the reference's crash basis (`crash_basis`).
@@ -2654,6 +2709,9 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         opts,
         excluded,
         restart: false,
+        pre_restart: false,
+        fresh_duals: false,
+        restarted: false,
         basic: basis.basic.clone(),
         pos_of,
         at_upper: basis.at_upper.clone(),
@@ -2696,7 +2754,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         for &(i, _) in &s.p.cols[j] {
             s.rows[i].push(j);
             // The reference's row-wise copy leaves out fixed columns.
-            if s.pos_of[j] == NONE && !s.is_fixed(j) {
+            if s.pos_of[j] == NONE && !s.is_fixed(j) && excluded != Some(j) {
                 s.rrows[i].push(j);
             }
         }
@@ -2721,6 +2779,15 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     }
     s.work.trig();
     s.work.decided(s.work.w);
+    if !singular_work.is_empty() && s.mirror.is_some() {
+        // The singular start basis: the driver factors it first (its cost enters the smoothed cost `ctx+0x158` and the factorization
+        // count), then the repaired basis.
+        s.work.factor_driver(&singular_work, crate::work::CTX);
+        for (site, est) in singular_work {
+            s.work.add(site, est, crate::work::CTX);
+        }
+        s.work.factor_done();
+    }
     s.work.factor_driver(&lu_work, crate::work::CTX);
     for (site, est) in lu_work {
         s.work.add(site, est, crate::work::CTX);
@@ -2805,6 +2872,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         }
         let infeasible = s.has_infeasible_basic();
         s.p1_tol_on = infeasible;
+        s.fresh_duals = false;
 
         if infeasible {
             let was = phase1;
@@ -2864,6 +2932,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             if !due && !s.p0.is_some() {
                 s.dual_btran_work();
                 s.recompute_dual();
+                s.fresh_duals = true;
             }
         }
         if false { let fr: Vec<usize> = (0..p.n + p.m).filter(|&j| s.pos_of[j] == NONE && is_inf(p.lo[j]) && is_inf(p.up[j])).collect(); eprintln!("FREE it={iterations} nfree={} list={} faithful={} first={:?}", fr.len(), s.list.len(), opts.faithful_weights, &fr[..fr.len().min(5)]); }
@@ -2906,13 +2975,14 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 }
                 None => {
                     // The reference recomputes the duals once more when the scan finds nothing (`0x145520`, with the residual check).
-                    if s.mirror.is_some() && !s.recomputed {
+                    if s.mirror.is_some() && !s.recomputed && !s.fresh_duals {
                         s.dual_btran_work();
                     }
                     // Before declaring optimality, rebuild the basic solution from a fresh factorization: drift in the updated
                     // values can hide a bound violation just above the tolerance.
                     if s.factor.num_updates() > 0 {
                         s.cleanup = s.mirror.is_some() && !s.rhs_shift.is_empty();
+                        s.work.trig();
                         s.refactor()?;
                         if s.cleanup && s.has_infeasible_basic() {
                             // The dual clean-up pass; the primal phase 1 only when it finds no entering variable.
@@ -2928,6 +2998,14 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 }
             }
         };
+        if std::mem::take(&mut s.restarted) && opts.refactor_schedule.is_none() {
+            // The check of this iteration reads the factor that the restart replaced: take it again from the new one.
+            if let Some(mi) = s.mirror.as_ref() {
+                let nnz_a: usize = p.cols[..p.n].iter().map(Vec::len).sum();
+                check_state = Some(s.work.decision_state());
+                chk = Some((mi.refactor_due(), mi.updates(), nnz_a));
+            }
+        }
         let mut alpha = vec![0.0; m];
         let dir = if s.d[q] < 0.0 { 1.0 } else { -1.0 };
         let mut ftran_out: Vec<(usize, f64)> = Vec::new();
@@ -3394,8 +3472,11 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
                 // The reference sums the row product in the order of the BTRAN output list.
                     s.d[j] -= theta_d * arj;
             }
-            changed.push(j);
-            rowvals.push((j, arj));
+            // The variable dropped from a singular start basis is not in the reference's row copy, so not in its pivot row.
+            if s.excluded != Some(j) {
+                changed.push(j);
+                rowvals.push((j, arj));
+            }
         }
         // The penalty leaves `d` of the leaving variable after the list update, which scores it with the penalty still in.
         let mut leave_penalty = 0.0;
