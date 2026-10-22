@@ -450,26 +450,30 @@ impl<'a> Dual<'a> {
         }
     }
 
-    /// d from the costs (`d_j = c_j - y a_j`, in the true frame) with y = B^-T c_B from the reference BTRAN; the terms are subtracted in the order of the
-    /// rows in the BTRAN output list (the clean-up pass of the primal path does the same, `Solver::set_d_from_y`).
+    /// d from the costs (`d_j = c_j - y a_j`, in the true frame) with y = B^-T c_B from the reference BTRAN; the terms are subtracted row by row in
+    /// ascending row order, as the reference's row-wise product `0x136b00` does (rows with |y| <= 1e-13 are skipped).
     fn true_d(&mut self) -> Vec<f64> {
         let p = self.p;
         let inp: Vec<(usize, f64)> = self.head.iter().enumerate().map(|(pos, &j)| (pos, self.cost[j])).filter(|e| e.1 != 0.0).collect();
         let out = self.mirror.btran(&inp, false, true);
+        if crate::dump::on("dual") {
+            crate::dump::emit("dual", serde_json::json!({"refactor": self.refactorizations, "iter": self.iters, "out": crate::dump::sparse(&out)}));
+        }
         let mut y = vec![0.0; p.m];
-        let mut rank = vec![usize::MAX; p.m];
-        for (k, &(i, v)) in out.iter().enumerate() {
+        for &(i, v) in out.iter() {
             y[i] = v;
-            rank[i] = k;
         }
         let mut d = vec![0.0; p.n + p.m];
         for j in 0..p.n + p.m {
             if self.st[j] < 0 {
+                // The reference accumulates row-wise (`0x136b00`): rows in ascending order, skipping |y_i| <= 1e-13 (`ctx+0x3a8`).
                 let mut e: Vec<(usize, f64)> = p.fcols[j].clone();
-                e.sort_by_key(|x| rank[x.0]);
+                e.sort_by_key(|x| x.0);
                 let mut acc = self.cost[j];
                 for &(i, a) in &e {
-                    acc -= y[i] * a;
+                    if y[i].abs() > DROP_TOL {
+                        acc -= y[i] * a;
+                    }
                 }
                 d[j] = acc;
             }
@@ -959,6 +963,7 @@ impl<'a> Dual<'a> {
             if v < -ALPHA_TOL {
                 let dj = self.d[j];
                 let ratio = dj / v;
+                if std::env::var("DBGP").is_ok() && leave == 1111 && (j == 77 || j == 75) { eprintln!("Q it={} j={} v={:e} d={:e} ratio={:e} bound={:e} lo={} up={}", self.iters, j, v, dj, ratio, bound, p.lo[j], p.up[j]); }
                 if bound > ratio {
                     xm9 = minsd(v, xm9);
                     continue;
@@ -1000,7 +1005,6 @@ impl<'a> Dual<'a> {
         }
         let maxa = -minsd(xm13, xm9);
         let mut nflip = 0usize;
-        if std::env::var("DBGQ").is_ok() && leave == 734 && self.iters == 286 { eprintln!("PRE nn={} s0={} {:?}", nn, xmm10, (0..nn).map(|k| (lst[k], ratio_arr[k], con[k])).collect::<Vec<_>>()); }
         if bestc + xmm10 < 0.0 {
             let mut s = xmm10;
             let (mut lo, mut hi) = (0usize, nn - 1);
@@ -1046,6 +1050,8 @@ impl<'a> Dual<'a> {
                 }
             }
             nflip = lo;
+            if std::env::var("DBGP").is_ok() && leave == 1111 { for k in 0..nn { let (j, v) = row[lst[k]]; if j < 80 || k < 9 { eprintln!("  k={} e={} j={} a={:e} d={:e} lo={} up={} st={} ratio={:e} c={:e}", k, lst[k], j, v, self.d[j], p.lo[j], p.up[j], self.st[j], ratio_arr[k], con[k]); } } }
+            if std::env::var("DBGP").is_ok() && leave == 1111 { eprintln!("P it={} nn={} nflip={} s={:e} xmm10={:e} lst={:?} ratio={:?} con={:?}", self.iters, nn, nflip, s, xmm10, &lst[..(nflip+3).min(nn)], &ratio_arr[..(nflip+3).min(nn)], &con[..(nflip+3).min(nn)]); }
             sel_sep = -1e19 > s;
         } else if best_i > 0 {
             let b = best_i as usize;
@@ -1053,7 +1059,6 @@ impl<'a> Dual<'a> {
             con.swap(0, b);
             lst.swap(0, b);
         }
-        if std::env::var("DBGQ").is_ok() && leave == 734 && self.iters == 286 { eprintln!("POST nflip={} {:?}", nflip, (0..nn).map(|k| lst[k]).collect::<Vec<_>>()); }
         let w5 = 5.0 * nn as f64;
         if sel == 0.0 {
             self.work.add(0xc7c4f, w5, crate::work::CTX);
