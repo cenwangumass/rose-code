@@ -1497,7 +1497,7 @@ impl<'a> Dual<'a> {
             for &j in &flips {
                 let delta = if self.st[j] == LB { p.up[j] - p.lo[j] } else { p.lo[j] - p.up[j] };
                 est += p.cols[j].len();
-                for &(i, a) in &p.cols[j] {
+                for &(i, a) in &p.fcols[j] {
                     if !touched.contains(&i) {
                         touched.push(i);
                     }
