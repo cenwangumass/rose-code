@@ -717,7 +717,12 @@ impl<'a> Solver<'a> {
             // The clean-up pass removes the shifts before it solves for the basic values.
             self.rhs_shift.clear();
         }
-        self.recompute_primal();
+        // The bucket-chain variant recomputes x_B and the distances only at its full refactorizations; at the others the
+        // reference keeps its updated values (and runs no dense FTRAN).
+        let keep_x = !self.cleanup && self.p0.as_ref().is_some_and(|p0| p0.bk.as_ref().is_some_and(|bk| self.refactorizations % bk.r8 != 1));
+        if !keep_x {
+            self.recompute_primal();
+        }
         if self.cleanup {
             self.cleanup_work();
         } else {
