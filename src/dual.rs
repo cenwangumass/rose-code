@@ -964,7 +964,6 @@ impl<'a> Dual<'a> {
             if v < -ALPHA_TOL {
                 let dj = self.d[j];
                 let ratio = dj / v;
-                if std::env::var("DBGP").is_ok() && leave == 1111 && (j == 77 || j == 75) { eprintln!("Q it={} j={} v={:e} d={:e} ratio={:e} bound={:e} lo={} up={}", self.iters, j, v, dj, ratio, bound, p.lo[j], p.up[j]); }
                 if bound > ratio {
                     xm9 = minsd(v, xm9);
                     continue;
@@ -1051,8 +1050,6 @@ impl<'a> Dual<'a> {
                 }
             }
             nflip = lo;
-            if std::env::var("DBGP").is_ok() && leave == 1111 { for k in 0..nn { let (j, v) = row[lst[k]]; if j < 80 || k < 9 { eprintln!("  k={} e={} j={} a={:e} d={:e} lo={} up={} st={} ratio={:e} c={:e}", k, lst[k], j, v, self.d[j], p.lo[j], p.up[j], self.st[j], ratio_arr[k], con[k]); } } }
-            if std::env::var("DBGP").is_ok() && leave == 1111 { eprintln!("P it={} nn={} nflip={} s={:e} xmm10={:e} lst={:?} ratio={:?} con={:?}", self.iters, nn, nflip, s, xmm10, &lst[..(nflip+3).min(nn)], &ratio_arr[..(nflip+3).min(nn)], &con[..(nflip+3).min(nn)]); }
             sel_sep = -1e19 > s;
         } else if best_i > 0 {
             let b = best_i as usize;
@@ -1572,6 +1569,9 @@ impl<'a> Dual<'a> {
         // The factor's update is made by the post-iteration pass (it refactorizes instead when one is due).
         let alpha_vec = alpha_dense;
         self.pending_alpha = Some(alpha_vec);
+        // The ratio test leaves the entries of the row list below 1e-10 in magnitude as exact zeros (RIN against ROUT of `0xc74a0`: 41376 entries on PEROLD,
+        // largest 9.9997e-11, smallest kept 1.0000751e-10), so that the d update does not see them.
+        let row: Vec<(usize, f64)> = row.into_iter().map(|(j, v)| (j, if v.abs() < ALPHA_TOL { 0.0 } else { v })).collect();
         Step::Pivot(Box::new(Pivot { r, leave, q, row, flips, col, tau, alpha, w: rho_norm(&rho), t0, above }))
     }
 }
