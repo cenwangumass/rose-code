@@ -441,8 +441,11 @@ impl<'a> Dual<'a> {
         self.work.add_from(0x12de50, 0xe53a7, self.mirror.work, crate::work::FAC);
         for j in 0..self.n + self.m {
             if self.st[j] == FIXED {
-                // A fixed nonbasic variable gets its true d like one at its lower bound (DEGEN2 d[700] after the refactorization at iteration 16).
-                self.d[j] = dt[j];
+                // A fixed nonbasic variable that has a d (it left the basis, or the start gave it one) gets its true d like one at its lower bound
+                // (DEGEN2 d[700] after the refactorization at iteration 16); the fixed variables whose d is 0 keep it (PILOT4: 183 of 214).
+                if self.d[j] != 0.0 {
+                    self.d[j] = dt[j];
+                }
             } else if self.st[j] < 0 {
                 self.d[j] = if self.st[j] == UB { -dt[j] } else { dt[j] };
             } else {
