@@ -152,8 +152,11 @@ fn iteration_limit_is_reported() {
 
 /// Features outside the recovered case are explicit errors, never a wrong answer.
 #[test]
-fn unsupported_models_are_explicit_errors() {
+fn release_profile_solves_afiro_in_the_reference_iteration_count() {
+    // `reverse-engineer/runs/afiro-barrier-release.json`: 7 iterations, objective -464.7531428 (the scaled model and the adaptive correctors).
     let afiro = mps::parse(MODELS[0].1).unwrap();
-    // The release profile (scaling) is not recovered.
-    assert!(matches!(solve(&afiro, None, &SolveOptions { scaling: true, ..SolveOptions::barrier() }), Err(rose::simplex::SolveError::Unsupported(_))));
+    let r = solve(&afiro, None, &SolveOptions { scaling: true, ..SolveOptions::barrier() }).unwrap();
+    assert_eq!(r.status, Status::Optimal);
+    assert_eq!(r.iterations, 7);
+    assert!((r.objective + 464.7531428).abs() < 1e-6, "{}", r.objective);
 }

@@ -222,6 +222,34 @@ impl Scaling {
         Some(s)
     }
 
+    /// The scaled data of every row and structural column without the check of [`Scaling::apply`]: the barrier builds a range column itself
+    /// with the scaled coefficient `R_i C_r` and bound `range / C_r` (`range_entries` hold the entries multiplied by `R_i`).
+    pub fn apply_loose(&self, model: &LpModel) -> LpModel {
+        let (nm, m) = (model.num_cols(), model.num_rows());
+        let mut s = model.clone();
+        for j in 0..nm {
+            let c = self.col[j];
+            s.obj[j] *= c;
+            s.obj[j] *= self.obj;
+            s.col_lo[j] = scale_bound(model.col_lo[j], 1.0 / c);
+            s.col_up[j] = scale_bound(model.col_up[j], 1.0 / c);
+            for p in model.col_start[j]..model.col_start[j + 1] {
+                s.val[p] = model.val[p] * self.row[model.row_idx[p]] * c;
+            }
+        }
+        for i in 0..m {
+            s.row_lo[i] = scale_bound(model.row_lo[i], self.row[i]);
+            s.row_up[i] = scale_bound(model.row_up[i], self.row[i]);
+            if let Some(r) = s.row_range.get_mut(i) {
+                *r *= self.row[i];
+            }
+        }
+        for e in s.range_entries.iter_mut() {
+            e.1 *= self.row[e.0];
+        }
+        s
+    }
+
     /// Maps a result of the scaled model back: `x = C x'`, `y = R y'`, `d = d' / C`; the objective, the basis and the
     /// iteration data are unchanged.
     pub fn unscale(&self, model: &LpModel, mut r: SolveResult) -> SolveResult {

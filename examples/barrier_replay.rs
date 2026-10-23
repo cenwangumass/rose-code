@@ -18,7 +18,10 @@ fn main() {
             std::process::exit(2);
         }
     };
-    let f = match barrier::std_form(&model, &s.sym.perm) {
+    // BARRIER_PROFILE=release: the release profile (scaled model, adaptive correctors; the whole solve from the MPS alone).
+    let release = std::env::var("BARRIER_PROFILE").map_or(false, |v| v == "release");
+    let sc = if release { Some(rose::scale::compute(&model)) } else { None };
+    let f = match barrier::std_form_scaled(&model, &s.sym.perm, sc.as_ref()) {
         Ok(f) => f,
         Err(e) => {
             println!("{e}");
@@ -31,7 +34,7 @@ fn main() {
             "b610": f.b, "b_file": f.b_file, "c": f.c, "ub": f.ub, "lo": f.ub_lo, "hi": f.ub_hi, "obj": f.offset, "const": f.cshift,
         }));
     }
-    let mut o = Options::default();
+    let mut o = Options { release, ..Options::default() };
     // PARAMS="K=V,...": the reference parameters the run is compared under (BarIterLimit).
     for kv in std::env::var("PARAMS").unwrap_or_default().split(',').filter(|t| !t.is_empty()) {
         if let Some(("BarIterLimit", v)) = kv.split_once('=') {

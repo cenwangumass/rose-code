@@ -1334,6 +1334,15 @@ fn solve305(a: &Amat, plan: &Plan, fac: &Factor, f: &StdForm, d: &[f64], rx: &[f
 /// `S = (e/5 + 8 NZ + 2 a (1 - b)) + ((OPS - e) + a b) / 30 + 75 n`, `a` = sum of the squared column counts of the non-dense columns (`b = 0`; the dense columns stay in `nnz(A)`),
 /// `e` = sum over supernodes of width < 5 of `F(c) - F(c - w)`, `F(x) = x (x + 1) (2 x + 1) / 6` (30 is the constant of the CPU path of the reference machine).
 pub fn ntry_first(f: &StdForm, sym: &Symbolic) -> usize {
+    if sym_rho_s(f, sym).0 <= 0.2 {
+        5
+    } else {
+        3
+    }
+}
+
+/// `(rho, S)` of [`ntry_first`]; `S = SYM+0x168` also scales the work of a factorization (the dense columns are nodes after the rows: `n = m + dense`).
+pub fn sym_rho_s(f: &StdForm, sym: &Symbolic) -> (f64, f64) {
     let ff = |t: i64| t * (t + 1) * (2 * t + 1) / 6;
     let a = (0..f.n2).filter(|j| !f.dense.contains(j)).map(|j| ((f.col_start[j + 1] - f.col_start[j]) as i64).pow(2)).sum::<i64>() as f64;
     let e = sym
@@ -1343,17 +1352,12 @@ pub fn ntry_first(f: &StdForm, sym: &Symbolic) -> usize {
         .filter(|(&w, _)| w > 0 && w < 5)
         .map(|(&w, &c)| ff(c) - ff(c - w))
         .sum::<i64>() as f64;
-    let (nz, ops, n) = (sym.nz as f64, sym.ops, f.m as f64);
+    let (nz, ops, n) = (sym.nz as f64, sym.ops, (f.m + f.dense.len()) as f64);
     let mut t = (e / 5.0 + 8.0 * nz) + 2.0 * a * (1.0 - 0.0);
     t = ((ops - e) + a * 0.0) / 30.0 + t;
     let s = (1.0 * t + 0.0) + n * 75.0;
     let nnz = f.row_idx.len() as f64;
-    let rho = (nnz * 2.0 * 2.0 + 2.0 * nz) / s;
-    if rho <= 0.2 {
-        5
-    } else {
-        3
-    }
+    ((nnz * 2.0 * 2.0 + 2.0 * nz) / s, s)
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------
@@ -1375,12 +1379,15 @@ pub struct CholSolver {
     fzx: Option<Vec<f64>>,
     /// `Q+0x770 / 0x780` of the last direction: the norms of its residual.
     norms: (f64, f64),
+    /// `NZ` and `S` of the symbolic factor (work model of the release profile) and the correction solves of the refinement since the last query.
+    nz_s: (f64, f64),
+    extra: std::cell::Cell<usize>,
 }
 
 impl CholSolver {
     /// `sym` is the symbolic factorization of the structure stage ([`crate::order::structure`]) the `StdForm` was permuted with.
     pub fn new(f: &StdForm, sym: &Symbolic) -> CholSolver {
-        CholSolver { plan: Plan::new(sym), rows: model_rows(f), a: Amat::new(f), d: Vec::new(), fac: None, ntry0: ntry_first(f, sym), nfac: 0, zx: Vec::new(), thr: 0.0, fzx: None, norms: (0.0, 0.0) }
+        CholSolver { plan: Plan::new(sym), rows: model_rows(f), a: Amat::new(f), d: Vec::new(), fac: None, ntry0: ntry_first(f, sym), nfac: 0, zx: Vec::new(), thr: 0.0, fzx: None, norms: (0.0, 0.0), nz_s: (sym.nz as f64, sym_rho_s(f, sym).1), extra: std::cell::Cell::new(0) }
     }
 
     fn solve(&self, f: &StdForm, rx: &[f64], ry: &[f64]) -> (Vec<f64>, Vec<f64>) {
@@ -1433,6 +1440,7 @@ impl CholSolver {
         let mut k = 0;
         while thr2 <= cur {
             let (cx, cy) = self.solve(f, &cols, &rows);
+            self.extra.set(self.extra.get() + 1);
             let cdx: Vec<f64> = cx.iter().zip(&dx).map(|(a, b)| a + b).collect();
             let cdy: Vec<f64> = cy.iter().zip(&dy).map(|(a, b)| a + b).collect();
             let (r2, c2) = self.residual(f, rx, ry, &cdx, &cdy);
@@ -1547,6 +1555,18 @@ impl NormalSolver for CholSolver {
 
     fn norms(&self) -> (f64, f64) {
         self.norms
+    }
+
+    fn work_info(&self, _f: &StdForm) -> Option<(f64, f64)> {
+        Some(self.nz_s)
+    }
+
+    fn refine_mode(&self, f: &StdForm) -> bool {
+        self.refining(f)
+    }
+
+    fn take_extra_solves(&mut self) -> usize {
+        self.extra.replace(0)
     }
 
     fn ntry(&mut self, it: i32, default: usize) -> usize {

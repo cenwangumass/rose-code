@@ -117,5 +117,8 @@ fn unsupported_inputs_are_explicit() {
     // an extra N row is ignored (the reference ignores it as well), so this one must solve
     assert_eq!(barrier(&free_row).status, Status::Optimal);
     let scaled = SolveOptions { scaling: true, ..SolveOptions::barrier() };
-    assert!(matches!(solve(&free_row, None, &scaled), Err(rose::simplex::SolveError::Unsupported(_))));
+    // the release profile (scaling on) is supported
+    let r = solve(&free_row, None, &scaled).unwrap();
+    assert_eq!(r.status, Status::Optimal);
+    assert!((r.objective - barrier(&free_row).objective).abs() < 1e-6);
 }

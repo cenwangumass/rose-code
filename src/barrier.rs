@@ -90,6 +90,10 @@ pub struct StdForm {
     pub dense: Vec<usize>,
     /// `k` of each dense column: its factor node is `m + k` (`SYM perm[m + r] - m`).
     pub dense_k: Vec<usize>,
+    /// The release profile's scale factors (`reverse-engineer/specs/barrier-release.md`, "Scaling") the data were scaled with, if any.
+    pub scaling: Option<crate::scale::Scaling>,
+    /// File row of the model for each scaled row factor and column of each range column in `scaling.col`: the range column `k` (RANGES order) is `scaling.col[n_struct + range_rank[k]]`.
+    pub range_rank: Vec<usize>,
 }
 
 /// `Q+0x648` (allocated at `0x2e5533`): for every column with an entry whose entries all lie within `1e-10` of the first, `s_j` = the first value
@@ -314,6 +318,20 @@ fn drop_implied_upper_bounds(m: usize, n: usize, sense: &[u8], col_start: &[usiz
 
 /// Conversion of a model to the solved form, with `perm[original row] = position` (the final `SYM` permutation of [`crate::order`]).
 pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> {
+    std_form_scaled(model, perm, None)
+}
+
+/// [`std_form`] of the model scaled with `sc` (release profile): `A' = R A C`, `c' = f C c`, `b' = R b`, bounds `/ C`; a range column has coefficient `R_i C_r` and bound `range / C_r`.
+pub fn std_form_scaled(model: &LpModel, perm: &[i64], sc: Option<&crate::scale::Scaling>) -> Result<StdForm, BarrierError> {
+    let orig = model;
+    let scaled_model;
+    let model = match sc {
+        Some(s) => {
+            scaled_model = s.apply_loose(model);
+            &scaled_model
+        }
+        None => model,
+    };
     let m = model.num_rows();
     let n_struct = model.num_cols();
     // The final permutation covers the rows, then the dense columns as nodes after them.
@@ -330,6 +348,18 @@ pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> 
             ranges.push((i, r));
         }
         r_last[i] = r;
+    }
+    // Scale factor of each range column: `Scaling::col` lists them after the structurals in row order (rows with two distinct finite bounds).
+    let mut range_rank = Vec::new();
+    if sc.is_some() {
+        let two_sided: Vec<usize> =
+            (0..m).filter(|&i| !is_inf(orig.row_lo[i]) && !is_inf(orig.row_up[i]) && orig.row_lo[i] != orig.row_up[i]).collect();
+        for &(i, _) in &ranges {
+            match two_sided.iter().position(|&t| t == i) {
+                Some(k) => range_rank.push(k),
+                None => return unsupported("scaled barrier with a ranged row of equal bounds"),
+            }
+        }
     }
     let mut row_of = vec![0usize; m];
     for (i, &p) in perm[..m].iter().enumerate() {
@@ -401,7 +431,16 @@ pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> 
     }
     for (k, &(i, r)) in ranges.iter().enumerate() {
         // L and G: |R|; E: R, or -R for R <= 0 (R = 0 gives -0.0).
-        ub_in[n_struct + k] = if model.row_kind[i] == b'E' { if r > 0.0 { r } else { -r } } else { r.abs() };
+        let r = match sc {
+            // The bound of a range column is the unscaled range over its column factor.
+            Some(_) => orig.range_entries.iter().find(|&&(t, _)| t == i).unwrap().1,
+            None => r,
+        };
+        let b = if model.row_kind[i] == b'E' { if r > 0.0 { r } else { -r } } else { r.abs() };
+        ub_in[n_struct + k] = match sc {
+            Some(s) => b / s.col[n_struct + range_rank[k]],
+            None => b,
+        };
     }
     // Matrix in permuted rows, entries ascending by position (range column: its row, coefficient +-1).
     let mut col_start = vec![0usize];
@@ -412,7 +451,12 @@ pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> 
             model.col(j).filter(|&(_, v)| v != 0.0).map(|(i, v)| (perm[i] as usize, sign[i] * v)).collect()
         } else {
             let i = ranges[j - n_struct].0;
-            vec![(perm[i] as usize, if model.row_kind[i] == b'G' { -1.0 } else { 1.0 })]
+            let u = if model.row_kind[i] == b'G' { -1.0 } else { 1.0 };
+            let u = match sc {
+                Some(s) => u * s.row[i] * s.col[n_struct + range_rank[j - n_struct]],
+                None => u,
+            };
+            vec![(perm[i] as usize, u)]
         };
         e.sort_by_key(|t| t.0);
         for (i, v) in e {
@@ -493,6 +537,8 @@ pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> 
         dense_k,
         ncomp,
         scale,
+        scaling: sc.cloned(),
+        range_rank,
     })
 }
 
@@ -867,8 +913,9 @@ fn step_pair(f: &StdForm, s: &State, d: &Direction, d2: Option<(&Direction, f64)
 
 /// `0x30ed50` pass 1 (C): weights `w_i = ((ntry-1-i)(1-wlo))/(ntry-1) + wlo`, `wlo = clamp(ap0 ad0, 0.01, 1)`; a weight replaces the best
 /// step only when `best * 1.0001 < step` (primal and dual separately). Returns `(best_p, best_d, wp, wd)`.
-fn select(f: &StdForm, s: &State, d: &Direction, d2: &Direction, ap0: f64, ad0: f64, ntry: usize, tk: &[(f64, f64, f64)]) -> (f64, f64, f64, f64) {
-    let wlo = (ap0 * ad0).min(1.0).max(0.01);
+fn select(f: &StdForm, s: &State, d: &Direction, d2: &Direction, ap0: f64, ad0: f64, ntry: usize, tk: &[(f64, f64, f64)], k: usize) -> (f64, f64, f64, f64) {
+    // `0x30ed95`: for a corrector k > 1 the smallest weight is 0 (the last trial keeps the steps so far).
+    let wlo = if k > 1 { 0.0 } else { (ap0 * ad0).min(1.0).max(0.01) };
     let (mut bp, mut bd) = (-1e100, -1e100);
     let (mut wp, mut wd) = (0.0, 0.0);
     for i in 0..ntry {
@@ -1584,6 +1631,18 @@ pub trait NormalSolver {
     fn ntry(&mut self, _it: i32, default: usize) -> usize {
         default
     }
+    /// Inputs of the release profile's work model (`NZ = SYM+0x38`, `S = SYM+0x168`; `None` for solvers without a symbolic factor).
+    fn work_info(&self, _f: &StdForm) -> Option<(f64, f64)> {
+        None
+    }
+    /// `SYM+0x178 == 1` after the last factorization (the solves refine their result).
+    fn refine_mode(&self, _f: &StdForm) -> bool {
+        false
+    }
+    /// Number of correction solves of the refinement since the last call.
+    fn take_extra_solves(&mut self) -> usize {
+        0
+    }
     /// The plain solve `(dx, dy)` for `rx` over the variables and `ry` over the rows (`0x305f10`; the homogeneous algorithm's solve with `(c, b)`).
     fn solve_raw(&mut self, _f: &StdForm, _rx: &[f64], _ry: &[f64]) -> Result<(Vec<f64>, Vec<f64>), BarrierError> {
         unsupported("the homogeneous algorithm needs the exact solver")
@@ -1831,11 +1890,13 @@ pub struct Options {
     /// Trial weights of the first corrector (`Q+0x29c`): 5 at iteration 0, 3 later (the adaptation rule is not decoded).
     pub ntry_first: usize,
     pub ntry_later: usize,
+    /// Release profile (`BarCorrectors = -1`): the corrector limit and the trial weights adapt (`reverse-engineer/specs/barrier-release.md`).
+    pub release: bool,
 }
 
 impl Default for Options {
     fn default() -> Options {
-        Options { tol: 1e-8, max_iter: 1000, ntry_first: 5, ntry_later: 3 }
+        Options { tol: 1e-8, max_iter: 1000, ntry_first: 5, ntry_later: 3, release: false }
     }
 }
 
@@ -1997,13 +2058,162 @@ impl Hsd {
     }
 }
 
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Release profile: Gondzio correctors, the work counter and the adaptation of the corrector count (`reverse-engineer/specs/barrier-release.md`).
+
+/// `0x2f0c86` (corrector `k >= 2`): the projection of a trial product `p` on `[target / 10, 10 target]`.
+fn centrality(target: f64, p: f64) -> f64 {
+    let (lo, hi) = (target / 10.0, 10.0 * target);
+    if lo > p {
+        lo - p
+    } else if p > hi {
+        (hi - p).max(-10.0 * target)
+    } else {
+        0.0
+    }
+}
+
+/// Right-hand side of corrector `k` for the direction `d` so far: `target - dx dz` (`steps = None`, `k = 1`) or, for `k >= 2` with the steps of the direction so far,
+/// the centrality correction of the stretched trial point `(dx ap~ + x)(dz ad~ + z)`, `ap~ = min(1.5 ap + 0.3, 1.001)`, `ad~ = min(0.3 + 1.5 ad, 1.001)`.
+fn corrector_rhs(f: &StdForm, s: &State, d: &Direction, target: f64, steps: Option<(f64, f64)>) -> Rhs {
+    let (n, n2) = (f.n(), f.n2);
+    let (rcx, rcu): (Vec<f64>, Vec<f64>) = match steps {
+        None => (
+            (0..n).map(|j| if f.flags[j] & 1 != 0 { target - d.dx[j] * d.dz[j] } else { 0.0 }).collect(),
+            (0..n2).map(|j| if f.flags[j] & 2 != 0 { target - d.du[j] * d.dv[j] } else { 0.0 }).collect(),
+        ),
+        Some((tp, td)) => {
+            let (apt, adt) = ((tp * 1.5 + 0.3).min(1.001), (0.3 + 1.5 * td).min(1.001));
+            (
+                (0..n).map(|j| if f.flags[j] & 1 != 0 { centrality(target, (d.dx[j] * apt + s.x[j]) * (d.dz[j] * adt + s.z[j])) } else { 0.0 }).collect(),
+                (0..n2).map(|j| if f.flags[j] & 2 != 0 { centrality(target, (d.du[j] * apt + s.u[j]) * (d.dv[j] * adt + s.v[j])) } else { 0.0 }).collect(),
+            )
+        }
+    };
+    Rhs { rp: vec![0.0; f.m], rd: vec![0.0; n], ru: vec![0.0; n2], rcx, rcu }
+}
+
+/// The work counter the driver reads through its timers: every site adds 0.75 times a count, a window adds 1.0 on top.
+struct Work {
+    m: f64,
+    nc: f64,
+    nub: f64,
+    nnz: f64,
+    nz: f64,
+    s: f64,
+    mode1: bool,
+    /// Totals of the windows: factor (`W138`), predictor (`W130`), first corrector (`W148`), later correctors (`W140`), update (`W128`).
+    t: [f64; 5],
+}
+
+const WORK_SCALE: f64 = 0.75;
+
+impl Work {
+    fn new(f: &StdForm, nz: f64, s: f64) -> Work {
+        Work { m: f.m as f64, nc: f.n2 as f64, nub: (f.ub_hi - f.ub_lo) as f64, nnz: f.row_idx.len() as f64, nz, s, mode1: false, t: [0.0; 5] }
+    }
+
+    fn add(&mut self, k: usize, sites: &[f64]) {
+        let mut w = 0.0;
+        for x in sites {
+            w = w + x;
+        }
+        self.t[k] = (self.t[k] + 1.0) + w;
+    }
+
+    /// The solve `0x30fc90` with `extra` correction solves of the refinement.
+    fn solve_sites(&self, extra: usize) -> Vec<f64> {
+        let blk = [WORK_SCALE * (2.0 * self.nnz), WORK_SCALE * (2.0 * self.nz), WORK_SCALE * (2.0 * self.nnz), (self.m * 11.0 + self.nc * 4.0) * WORK_SCALE];
+        let res = WORK_SCALE * (4.0 * self.nnz);
+        let mut v = Vec::new();
+        for _ in 0..=extra {
+            v.extend_from_slice(&blk);
+            if self.mode1 {
+                v.push(res);
+            }
+        }
+        v.push(((self.m + self.nc) * 5.0 + self.nub * 9.0) * WORK_SCALE);
+        v
+    }
+
+    fn step_site(&self) -> f64 {
+        (((self.m + self.nc) * 7.0) + self.nub * 6.0) * WORK_SCALE
+    }
+
+    fn rhs_site(&self) -> f64 {
+        (((self.m + self.nub) * 3.0) + self.nc * 13.0) * WORK_SCALE
+    }
+
+    fn factor(&mut self) {
+        let s = self.s * WORK_SCALE;
+        self.add(0, &[s]);
+    }
+
+    fn predictor(&mut self, extra: usize) {
+        let mut v = self.solve_sites(extra);
+        v.push(self.step_site());
+        self.add(1, &v);
+    }
+
+    fn corrector(&mut self, k: usize, trials: usize, extra: usize) {
+        let mut v = vec![self.rhs_site()];
+        v.extend(self.solve_sites(extra));
+        v.extend(std::iter::repeat(self.step_site()).take(trials));
+        self.add(if k == 1 { 2 } else { 3 }, &v);
+    }
+
+    fn update(&mut self) {
+        self.add(4, &[]);
+    }
+
+    fn ratio(&self) -> f64 {
+        let t = &self.t;
+        t[3] / (((t[0] + t[1]) + t[2]) + t[4])
+    }
+}
+
+/// `0x2e22bf`: `max(1, floor(log10(max(columns, 1))) - 2)`.
+fn corrector_cap(ncol: usize) -> usize {
+    let e = (ncol.max(1) as f64).log10().floor() as i64 - 2;
+    if e > 0 { e as usize } else { 1 }
+}
+
+/// `0x2e22bf..0x2e24d2`: the corrector limit `Q+0x298` and the trial weights `Q+0x29c` of the next iteration from the work ratio and the mean step product of the last three iterations.
+fn adapt_correctors(q298: usize, cap: usize, ratio: f64, avg: f64) -> (usize, usize) {
+    let (mut inc, mut dec) = (false, false);
+    if q298 < 20 && 0.25 > ratio {
+        inc = true;
+    } else if q298 < cap {
+        if 0.5 > ratio && 0.1 > avg {
+            inc = true;
+        } else if q298 > 1 && ratio > 0.25 && avg > 0.1 {
+            dec = true;
+        }
+    } else if q298 > cap {
+        dec = ratio > 0.25;
+    } else {
+        dec = q298 > 1 && ratio > 0.25 && avg > 0.1;
+    }
+    let r = if inc { q298 + 1 } else if dec { q298 - 1 } else { q298 };
+    (r, (r + 1).min(10).max(3))
+}
+
 /// Runs the barrier iteration on `f` with `solver` behind the factor and the solves.
 ///
 /// Gaps (H): the progress counters `Q+0x88/0xa8/0xf4` are modelled as "improved at every iteration" (true on the five models), `Q+0x5e0/0x5e8`
 /// as nonzero, `Q+0x1e8` as the best dual objective, `Q+0x220/0x228` as the norms of the iterate. They matter only in branches of
 /// `0x2e2fe0` that the corpus does not reach.
 pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<BarrierRun, BarrierError> {
-    let scale = 1.0;
+    // The objective scale `Q+0x158` (the release profile's `f`).
+    let scale = f.scaling.as_ref().map_or(1.0, |s| s.obj);
+    let release = o.release;
+    // Work model of the corrector adaptation (release only).
+    let mut work = if release {
+        let (nz, sv) = solver.work_info(f).ok_or_else(|| BarrierError::Unsupported("the release profile needs the exact solver".into()))?;
+        Some(Work::new(f, nz, sv))
+    } else {
+        None
+    };
     // The homogeneous self-dual scalars `Q+0x690 / 0x698` (kappa 0: not started; started after restart A) and the number of complementarity terms.
     let (mut tau, mut kappa) = (1.0f64, 0.0f64);
     let mut ncomp = f.ncomp();
@@ -2012,10 +2222,15 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
     let sc = setup_scalars(&f.b_file, &c_file, o.tol);
     // Starting point.
     solver.factor(f, &start_diag(f))?;
+    if let Some(wk) = work.as_mut() {
+        wk.factor();
+    }
     let w: Vec<f64> = (0..f.n()).map(|j| if j < f.n2 && f.flags[j] == 3 { 0.5 * f.ub[j] } else { 0.0 }).collect();
     let s1 = solver.start(f, StartKind::Primal { w: &w })?;
     let s2 = solver.start(f, StartKind::Dual)?;
-    let (mut st, _p3, _p4, _stage) = start_point(f, s1.clone(), s2.clone(), &sc, 0, 0.0);
+    let (mut st, p3_0, p4_0, _stage) = start_point(f, s1.clone(), s2.clone(), &sc, 0, 0.0);
+    // `Q+0x38` of the starting point: the floor of a type B restart is `max(1000, 10 Q+0x38)` (`0x2e2983`).
+    let q38 = p3_0.min(p4_0);
     let mut records = Vec::new();
     let res = residuals(f, &st, tau, kappa, ncomp, scale);
     let rec = IterRecord { it: -1, state: st.clone(), res: res.clone(), status: 1, dec: None };
@@ -2030,6 +2245,8 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
     let mut w5 = [1e100f64; 3];
     // `Q+0xf4`: the iteration after the last update with a step product above 5e-5; `Q+0xf8`: the iteration after the restart.
     let (mut qf4, mut qf8) = (0i32, 0i32);
+    // `Q+0x298` (corrector limit), `Q+0x29c` of the next iteration.
+    let (mut q298, mut ntry_next) = (1usize, 3usize);
     let mut it = 0;
     loop {
         let mut res = residuals(f, &st, tau, kappa, ncomp, scale);
@@ -2087,12 +2304,20 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
         // Predictor.
         let (zx, dd) = normal_diag(f, &st, res.q130);
         solver.factor_iter(f, &dd, &zx)?;
+        if let Some(wk) = work.as_mut() {
+            wk.factor();
+            wk.mode1 = solver.refine_mode(f);
+        }
         solver.prepare(&zx, ((res.q198 * res.q198 + res.q1a8 * res.q1a8).sqrt() / 10.0).max(1e-8));
         let rcx: Vec<f64> = (0..n).map(|j| if f.flags[j] & 1 != 0 { -(st.x[j] * st.z[j]) } else { 0.0 }).collect();
         let rcu: Vec<f64> = (0..n2).map(|j| if f.flags[j] & 2 != 0 { -(st.u[j] * st.v[j]) } else { 0.0 }).collect();
         let rhs = Rhs { rp: res.rp.clone(), rd: res.rd.clone(), ru: res.ru.clone(), rcx, rcu };
         let mut pred = solver.direction(f, &st, DirKind::Predictor, &rhs)?;
-        let (q770, q780) = solver.norms();
+        let (mut q770, mut q780) = solver.norms();
+        if let Some(wk) = work.as_mut() {
+            let extra = solver.take_extra_solves();
+            wk.predictor(extra);
+        }
         // Homogeneous step (`0x30fc90` with kappa > 0): the second solve with `(c, b)` (`0x3117e0`), `dtau = num / den`, `dx += dtau dx_s`, `dy += dtau dy_s`, then dz again.
         let mut hq = (0.0f64, 0.0f64);
         let mut hs: Option<Hsd> = None;
@@ -2114,28 +2339,64 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
             // `0x2e2047`: the last update with a step product above 5e-5 was not the previous iteration.
             target = res.q1f0 * 0.9;
         }
-        // Corrector.
-        let rcx2: Vec<f64> = (0..n).map(|j| if f.flags[j] & 1 != 0 { target - pred.dx[j] * pred.dz[j] } else { 0.0 }).collect();
-        let rcu2: Vec<f64> = (0..n2).map(|j| if f.flags[j] & 2 != 0 { target - pred.du[j] * pred.dv[j] } else { 0.0 }).collect();
-        let rhs2 = Rhs { rp: vec![0.0; f.m], rd: vec![0.0; n], ru: vec![0.0; n2], rcx: rcx2, rcu: rcu2 };
-        let mut corr = solver.direction(f, &st, DirKind::Corrector, &rhs2)?;
-        let (q778, q788) = solver.norms();
-        let mut hc = (0.0f64, 0.0f64);
-        if let Some(hd) = &hs {
-            hc = hd.apply(f, &st, &rhs2, &mut corr, 0.0, target - hq.0 * hq.1, tau, kappa);
+        // Corrector loop (`0x2e20e3..0x2e2276`): the direction so far starts as the predictor and becomes the combined direction after each selection.
+        if !release {
+            q298 = 1; // `0x2e20b5`: `Q+0x298 = max(BarCorrectors, 1)`
         }
-        let ntry = solver.ntry(it, if it == 0 { o.ntry_first } else { o.ntry_later });
-        let tks: Vec<(f64, f64, f64)> = if hsd { vec![(tau, hq.0, hc.0), (kappa, hq.1, hc.1)] } else { Vec::new() };
-        let (tp, td, wp, wd) = select(f, &st, &pred, &corr, ap0, ad0, ntry, &tks);
-        // `0x30f5xx..0x30fc3e`: the residual norms of the combined step.
-        let (q770, q780) = (q770.max(q778 * wp), q780.max(q788 * wd));
-        let comb = Direction {
-            dx: combine(&pred.dx, &corr.dx, wp),
-            dz: combine(&pred.dz, &corr.dz, wd),
-            dy: combine(&pred.dy[..f.m], &corr.dy[..f.m], wd),
-            du: combine(&pred.du, &corr.du, wp),
-            dv: combine(&pred.dv, &corr.dv, wd),
+        let ntry = solver.ntry(it, if it == 0 { o.ntry_first } else if release { ntry_next } else { o.ntry_later });
+        let (mut tp0, mut td0) = (ap0, ad0);
+        let mut dirk = pred.clone();
+        let mut k = 1usize;
+        let mut hc = (0.0f64, 0.0f64);
+        let (mut tp, mut td, mut wp, mut wd);
+        let comb = loop {
+            let rhs2 = corrector_rhs(f, &st, &dirk, target, if k > 1 { Some((tp0, td0)) } else { None });
+            let mut corr = solver.direction(f, &st, DirKind::Corrector, &rhs2)?;
+            let (q778, q788) = solver.norms();
+            let mut tks: Vec<(f64, f64, f64)> = Vec::new();
+            if let Some(hd) = &hs {
+                hc = hd.apply(f, &st, &rhs2, &mut corr, 0.0, target - hq.0 * hq.1, tau, kappa);
+                tks = vec![(tau, hq.0, hc.0), (kappa, hq.1, hc.1)];
+            }
+            (tp, td, wp, wd) = select(f, &st, &dirk, &corr, tp0, td0, ntry, &tks, k);
+            // `0x30f5xx..0x30fc3e`: the residual norms of the combined step.
+            (q770, q780) = (q770.max(q778 * wp), q780.max(q788 * wd));
+            let c = Direction {
+                dx: combine(&dirk.dx, &corr.dx, wp),
+                dz: combine(&dirk.dz, &corr.dz, wd),
+                dy: combine(&dirk.dy[..f.m], &corr.dy[..f.m], wd),
+                du: combine(&dirk.du, &corr.du, wp),
+                dv: combine(&dirk.dv, &corr.dv, wd),
+            };
+            // `0x2e2176..0x2e2276`: leave when both steps reach 1.001, when the step product of a corrector k > 1 is below 1e-100, when (k > max(Q+0x298 / 10, 1))
+            // the previous product exceeds 0.99 times the new one, or when a solve residual exceeds 1e30; the steps become `Q+0x5b8 / 0x5c8` in any case.
+            let mut stop = tp >= 1.001 && td >= 1.001;
+            if k > 1 && 1e-100 > td * tp {
+                stop = true;
+            }
+            if k > (q298 / 10).max(1) && tp0 * td0 > (0.99 * tp) * td {
+                stop = true;
+            }
+            if q770 > 1e30 || q780 > 1e30 {
+                stop = true;
+            }
+            (tp0, td0) = (tp, td);
+            if let Some(wk) = work.as_mut() {
+                let extra = solver.take_extra_solves();
+                wk.corrector(k, ntry - usize::from(k > 1 && ntry > 1), extra);
+            }
+            k += 1;
+            if stop || hsd || k > q298 {
+                break c;
+            }
+            dirk = c;
         };
+        // `0x2e22bf..0x2e24d2`: adaptation of the corrector limit and of the trial weights of the next iteration (release).
+        if let Some(wk) = work.as_mut() {
+            let avg = if it > 2 { (w5[0] + w5[1] + w5[2]) * (1.0 / 3.0) } else { 1.0 };
+            (q298, ntry_next) = adapt_correctors(q298, corrector_cap(f.n2), wk.ratio(), avg);
+            wk.update();
+        }
         // `0x2e24f0..0x2e2647`: with a small complementarity measure the steps are capped by the solve residuals against the iterate's.
         let (mut cp, mut cd) = (tp, td);
         if res.q1f8 < 1e-4 {
@@ -2190,7 +2451,8 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
             0.0
         };
         let mut restart = qf8 == 0 && 1e-3 > w5[2] && 1e-3 > w5[1] && 1e-3 > w5[0] && ratio3 > 0.98 && 1e-3 > q770 && 1e-3 > q780 && relgap > 1e-4;
-        let mut q30r = 1000.0;
+        // Type B restart floor `Q+0x30` (`0x2e2983`): `max(1000, 10 Q+0x38)`.
+        let mut q30r = (q38 * 10.0).max(1000.0);
         if !restart && !q2c {
             // Restart A (`0x2e2aa1`, once; reached whenever B does not fire): |x| or |y| of the updated iterate huge (1e15 times the data norms), or from
             // iteration 10 on above 1e8 times them while the primal (dual) residual history did not fall. The starting point's floor stays 0.
@@ -2212,8 +2474,16 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
                 q30r = 0.0;
             }
         }
+        if release && !restart && it > qf4 {
+            // `0x2e28ef..0x2e291f` (`BarCorrectors = -1`, no restart): the last update had a step product of at most 5e-5: at least 10 correctors and 10 trial weights next.
+            q298 = q298.max(10);
+            ntry_next = 10;
+        }
         if restart {
             (st, _, _, _) = start_point(f, s1.clone(), s2.clone(), &sc, 0, q30r);
+            if let Some(wk) = work.as_mut() {
+                wk.factor();
+            }
             qf8 = it + 1;
             let r = residuals(f, &st, tau, kappa, ncomp, scale);
             let mut rd = r.rd.clone();
@@ -2246,6 +2516,23 @@ pub fn solution(f: &StdForm, run: BarrierRun) -> Solution {
         .map(|j| (if f.flags[j] & 1 != 0 { run.state.z[j] } else { 0.0 }) - (if f.flags[j] & 2 != 0 { run.state.v[j] } else { 0.0 }))
         .collect();
     let mut objective = last.res.q130;
+    let mut x = x;
+    if let Some(sc) = &f.scaling {
+        // Release profile: `x = C x'`, `y = R y' / f`, `rc = rc' / (C f)` (powers of two; the objective is already in the units of the model).
+        for j in 0..f.n_struct {
+            x[j] *= sc.col[j];
+        }
+        for k in 0..f.range_rank.len() {
+            x[f.n_struct + k] *= sc.col[f.n_struct + f.range_rank[k]];
+        }
+        for (i, t) in y.iter_mut().enumerate() {
+            *t = *t * sc.row[i] / sc.obj;
+        }
+        for (j, t) in rc.iter_mut().enumerate() {
+            let c = if j < f.n_struct { sc.col[j] } else { sc.col[f.n_struct + f.range_rank[j - f.n_struct]] };
+            *t = *t / (c * sc.obj);
+        }
+    }
     if f.max_sign < 0.0 {
         y.iter_mut().for_each(|t| *t = -*t);
         rc.iter_mut().for_each(|t| *t = -*t);
@@ -2271,16 +2558,24 @@ pub fn solve_exact(model: &LpModel, o: &Options) -> Result<Solution, BarrierErro
     Ok(solution(&f, run))
 }
 
+/// The release profile of the reference (`reverse-engineer/specs/barrier-release.md`): the model scaled by [`crate::scale::compute`], adaptive correctors.
+pub fn solve_release(model: &LpModel, o: &Options) -> Result<Solution, BarrierError> {
+    let sc = crate::scale::compute(model);
+    let s = crate::order::structure(model, crate::order::DENSE_COL_MIN).map_err(|e| BarrierError::Unsupported(e.3.to_string()))?;
+    let f = std_form_scaled(model, &s.sym.perm, Some(&sc))?;
+    let mut solver = crate::chol::CholSolver::new(&f, &s.sym);
+    let o = Options { release: true, ..o.clone() };
+    let run = run(&f, &mut solver, &o)?;
+    Ok(solution(&f, run))
+}
+
 /// `Method::Barrier` of [`crate::solve`]: [`solve_exact`] with the options mapped (`barrier_tol`, `max_iterations`), the result in the public types.
 /// Status: optimal, the iteration limit (API 7), unbounded (code 5, API 5) and infeasible (code 3, never observed); infeasible-or-unbounded (code 0xd, API 12)
 /// and the other codes (6, 0xb) are reported as `NumericalFailure` (no certificate is produced).
 pub fn solve_method(model: &LpModel, opts: &crate::SolveOptions) -> Result<crate::SolveResult, crate::simplex::SolveError> {
     use crate::simplex::{SolveError, Status};
-    if opts.scaling {
-        return Err(SolveError::Unsupported("barrier with scaling (the release profile is not recovered)".into()));
-    }
     let o = Options { tol: opts.barrier_tol, max_iter: opts.max_iterations.min(i32::MAX as usize) as i32, ..Options::default() };
-    let sol = solve_exact(model, &o).map_err(|e| match e {
+    let sol = (if opts.scaling { solve_release(model, &o) } else { solve_exact(model, &o) }).map_err(|e| match e {
         BarrierError::Unsupported(s) | BarrierError::Solver(s) => SolveError::Unsupported(s),
     })?;
     let status = match sol.run.status {
