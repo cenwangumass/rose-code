@@ -90,6 +90,7 @@ fn main() {
         if basis_in.is_some() || basis_out.is_some() {
             fail("--method barrier has no basis (Crossover=0): --basis-in and --basis-out are not supported");
         }
+        return run_barrier(&model, &opts, output);
     }
     let start = basis_in.map(|p| {
         let v: Value = serde_json::from_str(&std::fs::read_to_string(&p).unwrap_or_else(|e| fail(&format!("cannot read {p}: {e}")))).unwrap_or_else(|e| fail(&format!("invalid basis file: {e}")));
@@ -167,6 +168,50 @@ fn run_pdhg(model: &rose::LpModel, popts: &rose::pdhg::PdhgOptions, output: Opti
         "x": r.x, "dual": r.dual, "reduced_cost": r.reduced_cost,
         "diagnostics": { "iterations": r.iterations, "restarts": r.restarts, "seconds": secs,
             "primal_residual": r.primal_residual, "dual_residual": r.dual_residual, "relative": r.relative },
+    });
+    let text = serde_json::to_string_pretty(&out).unwrap();
+    match output {
+        Some(p) => std::fs::write(&p, text).unwrap_or_else(|e| fail(&format!("cannot write {p}: {e}"))),
+        None => println!("{text}"),
+    }
+    std::process::exit(if r.status == Status::Optimal { 0 } else { 3 });
+}
+
+/// `--method barrier`: the barrier's own interior point (no crossover, so no basis). Progress goes to stderr; the JSON carries the point, the final
+/// residuals recomputed from the original model (`verify::check_optimal`) and the structure statistics.
+fn run_barrier(model: &rose::LpModel, opts: &SolveOptions, output: Option<String>) {
+    eprintln!("{}: {} rows, {} columns", model.name, model.num_rows(), model.num_cols());
+    let t = std::time::Instant::now();
+    let r = solve(model, None, opts).unwrap_or_else(|e| match e {
+        rose::simplex::SolveError::Unsupported(_) => fail(&e.to_string()),
+        _ => fail(&format!("invalid input: {e}")),
+    });
+    let secs = t.elapsed().as_secs_f64();
+    let status = match r.status {
+        Status::Optimal => "optimal",
+        Status::Infeasible => "infeasible",
+        Status::Unbounded => "unbounded",
+        Status::IterationLimit => "iteration_limit",
+        Status::NumericalFailure => "numerical_failure",
+    };
+    let have_point = matches!(r.status, Status::Optimal);
+    let rep = have_point.then(|| verify::check_optimal(model, &r));
+    let structure = rose::order::structure(model, rose::order::DENSE_COL_MIN).ok();
+    eprintln!("status {status}, objective {:.12e}, {} iterations, {secs:.3}s", r.objective, r.iterations);
+    let out = json!({
+        "version": 1,
+        "status": status,
+        "objective": if have_point { json!(r.objective) } else { Value::Null },
+        // like the reference, no solution vectors unless the status is optimal; there is no basis, certificate or ray
+        "x": if have_point { json!(r.x) } else { Value::Null },
+        "dual": if have_point { json!(r.dual) } else { Value::Null },
+        "reduced_cost": if have_point { json!(r.reduced_cost) } else { Value::Null },
+        "diagnostics": {
+            "iterations": r.iterations, "seconds": secs,
+            "primal_violation": rep.as_ref().map(|p| p.primal_violation), "dual_violation": rep.as_ref().map(|p| p.dual_violation),
+            "complementarity": rep.as_ref().map(|p| p.complementarity), "duality_gap": rep.as_ref().map(|p| p.duality_gap),
+            "aat_nnz": structure.as_ref().map(|s| s.pattern.nnz()), "factor_nnz": structure.as_ref().map(|s| s.sym.nz), "factor_ops": structure.as_ref().map(|s| s.sym.ops),
+        },
     });
     let text = serde_json::to_string_pretty(&out).unwrap();
     match output {

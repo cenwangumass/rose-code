@@ -10,6 +10,8 @@ use std::cell::Cell;
 thread_local! {
     /// Set by the `pdhg_*` tests: solve with `SolveOptions::pdhg()` (iteration limit 20000) and check at the first-order pass level.
     static PDHG: Cell<bool> = const { Cell::new(false) };
+    /// Set by the `barrier_*` tests: solve with `SolveOptions::barrier()` and check at the interior-point pass level (gap 1e-8 relative).
+    static BARRIER: Cell<bool> = const { Cell::new(false) };
 }
 
 fn load(path: String) -> Option<LpModel> {
@@ -24,7 +26,12 @@ fn small() -> Vec<(String, LpModel)> {
             v.push((n.to_string(), m));
         }
     }
+    // `fx_badscale` is left out of the barrier run: the reference's barrier stops at -4.99001868824 (7 iterations, `runs/fx_badscale-barrier-controlled.json`,
+    // rose agrees) against the optimum -5, and a transformed path stops elsewhere.
     for n in ["fx_tied", "fx_neardep", "fx_badscale", "fx_singular", "fx_warm", "fx_infeasible", "fx_unbounded"] {
+        if BARRIER.get() && n == "fx_badscale" {
+            continue;
+        }
         if let Some(m) = load(format!("{d}/../reverse-engineer/corpus/fixtures/{n}.mps")) {
             v.push((n.to_string(), m));
         }
@@ -33,9 +40,11 @@ fn small() -> Vec<(String, LpModel)> {
 }
 
 /// The methods every case runs under: the primal simplex and the dual simplex (the controlled profiles; pivot sequences differ),
-/// or the PDHG alone in the `pdhg_*` tests.
+/// or the PDHG alone in the `pdhg_*` tests and the barrier alone in the `barrier_*` tests.
 fn opts() -> Vec<SolveOptions> {
-    if PDHG.get() {
+    if BARRIER.get() {
+        vec![SolveOptions::barrier()]
+    } else if PDHG.get() {
         let mut o = SolveOptions::pdhg();
         o.pdhg.iter_limit = 20000.0;
         vec![o]
@@ -76,6 +85,7 @@ fn permute(m: &LpModel, p: &[usize], q: &[usize]) -> LpModel {
     r.row_range = p.iter().map(|&i| m.row_range[i]).collect();
     r.row_kind = p.iter().map(|&i| m.row_kind[i]).collect();
     r.range_order = m.range_order.iter().map(|&i| inv[i]).collect();
+    r.range_entries = m.range_entries.iter().map(|&(i, v)| (inv[i], v)).collect();
     r.obj = q.iter().map(|&j| m.obj[j]).collect();
     r.col_lo = q.iter().map(|&j| m.col_lo[j]).collect();
     r.col_up = q.iter().map(|&j| m.col_up[j]).collect();
@@ -102,6 +112,9 @@ fn scale_rows(m: &LpModel, s: f64, every: usize) -> LpModel {
         r.row_lo[i] = sc(m.row_lo[i], s);
         r.row_up[i] = sc(m.row_up[i], s);
         r.row_range[i] = m.row_range[i] * s;
+    }
+    for e in r.range_entries.iter_mut().filter(|e| e.0 % every == 0) {
+        e.1 *= s;
     }
     for k in 0..r.val.len() {
         if r.row_idx[k] % every == 0 {
@@ -134,12 +147,17 @@ fn negate(m: &LpModel) -> LpModel {
 }
 
 fn run(m: &LpModel, name: &str, what: &str, o: &SolveOptions) -> rose::SolveResult {
-    let r = solve(m, None, o).unwrap();
+    let r = solve(m, None, o).unwrap_or_else(|e| panic!("{name} [{what}]: {e:?}"));
     if r.status == Status::Optimal && PDHG.get() {
         // first-order result: every error of the independent report is small relative to the objective's magnitude
         let rep = verify::check_optimal(m, &r);
         let scale = 1.0 + r.objective.abs();
         assert!(rep.max_error() <= 1e-4 * scale.max(1e3), "{name} [{what}]: {rep:?}");
+    } else if r.status == Status::Optimal && BARRIER.get() {
+        // interior point (no basis): the independent report of the point, relative to the objective's magnitude
+        let rep = verify::check_optimal(m, &r);
+        let scale = 1.0 + r.objective.abs();
+        assert!(rep.max_error() <= 1e-6 * scale.max(1e3), "{name} [{what}]: {rep:?}");
     } else if r.status == Status::Optimal {
         // scaled models have larger magnitudes, so use a mildly loose tolerance on the independent check
         if let Err(e) = verify::check(m, &r, 1e-6) {
@@ -155,11 +173,17 @@ fn case(what: &str, t: impl Fn(&LpModel) -> LpModel, f: impl Fn(f64) -> f64) {
         for o in opts() {
             let base = run(&m, &name, "base", &o);
             let r = run(&t(&m), &name, what, &o);
-            assert_eq!(r.status, base.status, "{name} [{what}]: status");
+            // The barrier's infeasibility conclusion is code 3 (Infeasible) or 0xd (infeasible or unbounded, reported as NumericalFailure) depending on the path.
+            let infeasible = |s: Status| matches!(s, Status::Infeasible | Status::NumericalFailure);
+            if BARRIER.get() && infeasible(base.status) {
+                assert!(infeasible(r.status), "{name} [{what}]: status {:?} for {:?}", r.status, base.status);
+            } else {
+                assert_eq!(r.status, base.status, "{name} [{what}]: status");
+            }
             if base.status == Status::Optimal {
                 let want = f(base.objective);
                 let err = (r.objective - want).abs() / (1.0 + want.abs());
-                assert!(err <= if PDHG.get() { 1e-4 } else { 1e-8 }, "{name} [{what}]: objective {} vs {} (rel {err:.2e})", r.objective, want);
+                assert!(err <= if PDHG.get() { 1e-4 } else if BARRIER.get() { 1e-6 } else { 1e-8 }, "{name} [{what}]: objective {} vs {} (rel {err:.2e})", r.objective, want);
             }
         }
     }
@@ -203,6 +227,18 @@ fn objective_offset() {
 #[test]
 fn pdhg_permutation_scaling_negation_offset() {
     PDHG.set(true);
+    case("perm", |m| permute(m, &perm(m.num_rows(), 1), &perm(m.num_cols(), 2)), |z| z);
+    case("rows x7", |m| scale_rows(m, 7.0, 2), |z| z);
+    case("cols x3", |m| scale_cols(m, 3.0, 2), |z| z);
+    case("negate", negate, |z| -z);
+    case("offset +123.5", |m| LpModel { offset: m.offset + 123.5, ..m.clone() }, |z| z + 123.5);
+}
+
+/// The same transformations under the barrier: a permutation changes the ordering and the accumulation order, so only the optimum (to 1e-6 relative, the
+/// interior point's gap) and the status stay. `fx_infeasible` ends with the barrier's status 0xd (reported as numerical failure) before and after.
+#[test]
+fn barrier_permutation_scaling_negation_offset() {
+    BARRIER.set(true);
     case("perm", |m| permute(m, &perm(m.num_rows(), 1), &perm(m.num_cols(), 2)), |z| z);
     case("rows x7", |m| scale_rows(m, 7.0, 2), |z| z);
     case("cols x3", |m| scale_cols(m, 3.0, 2), |z| z);
