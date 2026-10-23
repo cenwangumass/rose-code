@@ -1,4 +1,4 @@
-//! `rose solve model.mps --output result.json [--basis-in b.json] [--basis-out b.json] [--method primal|dual]`
+//! `rose solve model.mps --output result.json [--basis-in b.json] [--basis-out b.json] [--method primal|dual] [--profile controlled|release]`
 //! Progress goes to stderr; stdout stays empty so machine-readable output is only ever in the files.
 
 use rose::verify;
@@ -6,7 +6,7 @@ use rose::{mps, solve, Basis, SolveOptions, Status};
 use serde_json::{json, Value};
 
 fn usage() -> ! {
-    eprintln!("usage: rose solve <model.mps> [--output result.json] [--basis-in basis.json] [--basis-out basis.json] [--max-iterations N] [--method primal|dual]");
+    eprintln!("usage: rose solve <model.mps> [--output result.json] [--basis-in basis.json] [--basis-out basis.json] [--max-iterations N] [--method primal|dual] [--profile controlled|release]");
     std::process::exit(2)
 }
 
@@ -27,7 +27,7 @@ fn main() {
     }
     let path = &args[1];
     let (mut output, mut basis_in, mut basis_out) = (None, None, None);
-    let mut opts = SolveOptions { record_trace: false, ..SolveOptions::default() };
+    let (mut dual, mut release, mut max_it) = (false, false, None);
     let mut it = args[2..].iter();
     while let Some(a) = it.next() {
         let val = it.next().unwrap_or_else(|| usage());
@@ -35,16 +35,33 @@ fn main() {
             "--output" => output = Some(val.clone()),
             "--basis-in" => basis_in = Some(val.clone()),
             "--basis-out" => basis_out = Some(val.clone()),
-            "--max-iterations" => opts.max_iterations = val.parse().unwrap_or_else(|_| usage()),
+            "--max-iterations" => max_it = Some(val.parse().unwrap_or_else(|_| usage())),
             "--method" => {
-                opts.method = match val.as_str() {
-                    "primal" => rose::method::SolveMethod::Primal,
-                    "dual" => rose::method::SolveMethod::Dual,
+                dual = match val.as_str() {
+                    "primal" => false,
+                    "dual" => true,
+                    _ => usage(),
+                }
+            }
+            "--profile" => {
+                release = match val.as_str() {
+                    "controlled" => false,
+                    "release" => true,
                     _ => usage(),
                 }
             }
             _ => usage(),
         }
+    }
+    let base = match (dual, release) {
+        (false, false) => SolveOptions::default(),
+        (false, true) => SolveOptions::release(),
+        (true, false) => SolveOptions::dual(),
+        (true, true) => SolveOptions::dual_release(),
+    };
+    let mut opts = SolveOptions { record_trace: false, ..base };
+    if let Some(n) = max_it {
+        opts.max_iterations = n;
     }
     let text = std::fs::read_to_string(path).unwrap_or_else(|e| fail(&format!("cannot read {path}: {e}")));
     let model = mps::parse(&text).unwrap_or_else(|e| fail(&format!("invalid input: {e}")));

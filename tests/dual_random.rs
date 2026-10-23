@@ -140,13 +140,19 @@ fn compare_random(count: u64, max_m: u64, max_n: u64) {
 }
 
 fn compare_random_with(count: u64, max_m: u64, max_n: u64, feasible: bool) {
+    for dual in [SolveOptions::dual(), SolveOptions::dual_release()] {
+        compare_random_profile(count, max_m, max_n, feasible, &dual);
+    }
+}
+
+fn compare_random_profile(count: u64, max_m: u64, max_n: u64, feasible: bool, dual: &SolveOptions) {
     let mut counts = [0usize; 5];
     let mut skipped = 0;
     let mut bad = vec![];
     for seed in 0..count {
         let model = random_model_with(seed, max_m, max_n, feasible);
         let p = solve(&model, None, &SolveOptions::default()).unwrap();
-        let d = solve(&model, None, &SolveOptions::dual()).unwrap();
+        let d = solve(&model, None, dual).unwrap();
         counts[match d.status {
             Status::Optimal => 0,
             Status::Infeasible => 1,
@@ -183,7 +189,7 @@ fn show() {
     let seed: u64 = std::env::var("SEED").unwrap().parse().unwrap();
     let model = random_model(seed);
     eprintln!("{model:#?}");
-    for o in [SolveOptions::default(), SolveOptions::dual()] {
+    for o in [SolveOptions::default(), SolveOptions::dual(), SolveOptions::dual_release()] {
         let r = solve(&model, None, &o).unwrap();
         eprintln!("{:?} obj {} it {} x {:?} farkas {:?} ray {:?} check {:?}", r.status, r.objective, r.iterations, r.x, r.farkas, r.ray, verify::check(&model, &r, 1e-6));
     }

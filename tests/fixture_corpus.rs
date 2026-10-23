@@ -91,3 +91,69 @@ fn singular_supplied_bases_are_repaired_like_the_reference() {
         assert_eq!((r.status, r.iterations, r.x.clone()), (Status::Optimal, iters, x.to_vec()), "{name}");
     }
 }
+
+/// The same fixtures under the dual method, both profiles (controlled `dual()` and `dual_release()`): statuses, certificates, objective and x to
+/// 1e-9, and `verify::check` of every result. Iteration counts are not asserted: the singular-basis and warm-start fixtures differ from the
+/// reference's counts (documented in the README, "Recovery gaps").
+#[test]
+fn fixtures_under_the_dual_method_are_correct() {
+    for o in [SolveOptions::dual(), SolveOptions::dual_release()] {
+        if let Some(m) = fixture("fx_infeasible") {
+            let r = solve(&m, None, &o).unwrap();
+            assert_eq!(r.status, Status::Infeasible);
+            assert!(r.farkas.is_some() && rose::verify::check(&m, &r, 1e-6).is_ok());
+        }
+        if let Some(m) = fixture("fx_unbounded") {
+            let r = solve(&m, None, &o).unwrap();
+            assert_eq!(r.status, Status::Unbounded);
+            assert!(r.ray.is_some() && rose::verify::check(&m, &r, 1e-6).is_ok());
+        }
+        for (name, x, z) in [("fx_neardep", vec![0.0, 4.0], -8.0), ("fx_badscale", vec![0.0, 5e-6], -5.0), ("fx_tied", vec![3.0, 1.0], -4.0)] {
+            if let Some(m) = fixture(name) {
+                let r = solve(&m, None, &o).unwrap();
+                assert_eq!(r.status, Status::Optimal, "{name}");
+                assert!((r.objective - z).abs() <= 1e-9 * z.abs().max(1.0), "{name}: {}", r.objective);
+                assert!(rose::verify::check(&m, &r, 1e-6).is_ok(), "{name}");
+                if name != "fx_tied" {
+                    assert!(r.x.iter().zip(&x).all(|(a, b)| (a - b).abs() <= 1e-9), "{name}: {:?}", r.x);
+                }
+            }
+        }
+        if let Some(m) = fixture("fx_warm") {
+            for up in [false, true] {
+                let b = Basis { basic: vec![2, 1], at_upper: vec![up, false, false, false] };
+                let r = solve(&m, Some(&b), &o).unwrap();
+                assert_eq!((r.status, r.x.clone()), (Status::Optimal, vec![3.0, 1.0]));
+                assert!(rose::verify::check(&m, &r, 1e-6).is_ok());
+            }
+        }
+        for (name, pairs) in [
+            ("fx_singular", vec![(0, 0), (1, 1)]),
+            ("fx_sing_dup_cross", vec![(0, 1), (1, 0)]),
+            ("fx_sing_dup_attr", vec![(0, 0), (1, 1)]),
+            ("fx_sing_dup_attr_ub", vec![(0, 0), (1, 1)]),
+            ("fx_sing_dup_ub", vec![(0, 0), (1, 1)]),
+            ("fx_sing_zero_col", vec![(0, 0), (1, 1)]),
+            ("fx_sing_zero_col2", vec![(0, 0), (1, 1)]),
+            ("fx_sing_slack_dup2", vec![(0, 1), (1, 0)]),
+            ("fx_sing_rank3", vec![(0, 0), (1, 1), (2, 2)]),
+            ("fx_sing_all_same3", vec![(0, 0), (1, 1), (2, 2)]),
+            ("fx_sing_dense4", vec![(0, 0), (1, 1), (2, 2), (3, 3)]),
+            ("fx_sing_two_pairs", vec![(0, 0), (1, 1), (2, 2), (3, 3)]),
+        ] {
+            let Some(m) = fixture(name) else { continue };
+            let (n, rows) = (m.num_cols(), m.num_rows());
+            let mut basic: Vec<usize> = (n..n + rows).collect();
+            for &(j, r) in &pairs {
+                basic[r] = j;
+            }
+            let b = Basis { basic, at_upper: vec![false; n + rows] };
+            let r = solve(&m, Some(&b), &o).unwrap();
+            assert_eq!(r.status, Status::Optimal, "{name}");
+            assert!(rose::verify::check(&m, &r, 1e-6).is_ok(), "{name}");
+            // The optimum is the same one the primal reaches from the same supplied basis (objective, not vertex: ties are legal).
+            let p = solve(&m, Some(&b), &SolveOptions::default()).unwrap();
+            assert!((r.objective - p.objective).abs() <= 1e-9 * p.objective.abs().max(1.0), "{name}: {} vs {}", r.objective, p.objective);
+        }
+    }
+}

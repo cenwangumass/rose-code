@@ -28,7 +28,7 @@ fn small() -> Vec<(String, LpModel)> {
 
 /// The methods every case runs under: the primal simplex and the dual simplex (the controlled profiles; pivot sequences differ).
 fn opts() -> Vec<SolveOptions> {
-    vec![SolveOptions::default(), SolveOptions::dual()]
+    vec![SolveOptions::default(), SolveOptions::dual(), SolveOptions::dual_release()]
 }
 
 fn fin(b: f64) -> bool {

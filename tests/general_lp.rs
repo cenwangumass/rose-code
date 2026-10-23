@@ -7,7 +7,7 @@ use rose::{mps, solve, Basis, LpModel, SolveOptions, Status};
 
 /// The methods every test runs under: the primal simplex and the dual simplex (the controlled profiles; pivot sequences differ).
 fn opts() -> Vec<SolveOptions> {
-    vec![SolveOptions::default(), SolveOptions::dual()]
+    vec![SolveOptions::default(), SolveOptions::dual(), SolveOptions::dual_release()]
 }
 
 fn fixture(name: &str) -> LpModel {
