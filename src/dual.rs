@@ -895,11 +895,13 @@ impl<'a> Dual<'a> {
         let mut best = 0.5 * self.thr;
         let mut row = None;
         let mut kept = Vec::with_capacity(self.list.len());
+        let (walked, mut removed) = (self.list.len(), 0usize);
         for &e in &self.list {
             if self.flags[e] >= 2 {
                 if self.flags[e] < 5 {
                     self.flags[e] = 2;
                 }
+                removed += 1;
                 continue;
             }
             if self.thr > self.prio[e] {
@@ -911,6 +913,11 @@ impl<'a> Dual<'a> {
                 best = self.prio[e];
                 row = Some(e);
             }
+        }
+        // The walk's work (`0xcce72`): 0.5 per entry kept, 1 per entry that left as feasible, 2 per other entry walked.
+        if walked > 0 {
+            let est = 0.5 * kept.len() as f64 + removed as f64 + 2.0 * (walked - removed) as f64;
+            self.work.add(0xcce72, est, crate::work::CTX);
         }
         self.list = kept;
         if row.is_none() {
