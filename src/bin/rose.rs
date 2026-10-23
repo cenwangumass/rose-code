@@ -6,7 +6,7 @@ use rose::{mps, solve, Basis, SolveOptions, Status};
 use serde_json::{json, Value};
 
 fn usage() -> ! {
-    eprintln!("usage: rose solve <model.mps> [--output result.json] [--basis-in basis.json] [--basis-out basis.json] [--max-iterations N] [--method primal|dual|pdhg] [--profile controlled|release] [--pdhg-iter-limit N] [--pdhg-rel-tol T] [--pdhg-abs-tol T] [--pdhg-conv-tol T] [--pdhg-seed N] [--pdhg-inject merit@N|reld@N|pobj@N]");
+    eprintln!("usage: rose solve <model.mps> [--output result.json] [--basis-in basis.json] [--basis-out basis.json] [--max-iterations N] [--method primal|dual|pdhg|barrier] [--profile controlled|release] [--pdhg-iter-limit N] [--pdhg-rel-tol T] [--pdhg-abs-tol T] [--pdhg-conv-tol T] [--pdhg-seed N] [--pdhg-inject merit@N|reld@N|pobj@N]");
     std::process::exit(2)
 }
 
@@ -65,7 +65,7 @@ fn main() {
         }
     }
     let dual = match method.as_str() {
-        "primal" | "pdhg" => false,
+        "primal" | "pdhg" | "barrier" => false,
         "dual" => true,
         _ => usage(),
     };
@@ -83,6 +83,13 @@ fn main() {
     let model = mps::parse(&text).unwrap_or_else(|e| fail(&format!("invalid input: {e}")));
     if method == "pdhg" {
         return run_pdhg(&model, &popts, output);
+    } else if method == "barrier" {
+        // The barrier's own point (no crossover): the controlled profile, BarIterLimit 1000 unless --max-iterations is given.
+        let max_iterations = if args.iter().any(|a| a == "--max-iterations") { opts.max_iterations } else { 1000 };
+        opts = SolveOptions { record_trace: false, max_iterations, ..SolveOptions::barrier() };
+        if basis_in.is_some() || basis_out.is_some() {
+            fail("--method barrier has no basis (Crossover=0): --basis-in and --basis-out are not supported");
+        }
     }
     let start = basis_in.map(|p| {
         let v: Value = serde_json::from_str(&std::fs::read_to_string(&p).unwrap_or_else(|e| fail(&format!("cannot read {p}: {e}")))).unwrap_or_else(|e| fail(&format!("invalid basis file: {e}")));
@@ -90,7 +97,10 @@ fn main() {
     });
     eprintln!("{}: {} rows, {} columns", model.name, model.num_rows(), model.num_cols());
     let t = std::time::Instant::now();
-    let r = solve(&model, start.as_ref(), &opts).unwrap_or_else(|e| fail(&format!("invalid input: {e}")));
+    let r = solve(&model, start.as_ref(), &opts).unwrap_or_else(|e| match e {
+        rose::simplex::SolveError::Unsupported(_) => fail(&e.to_string()),
+        _ => fail(&format!("invalid input: {e}")),
+    });
     let secs = t.elapsed().as_secs_f64();
     let status = match r.status {
         Status::Optimal => "optimal",

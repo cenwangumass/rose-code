@@ -717,9 +717,42 @@ fn dual_residual(f: &StdForm, s: &State, tau: f64) -> Vec<f64> {
         let vj = if f.flags[j] & 2 != 0 { s.v[j] } else { 0.0 };
         rd[j] = if j < end { tau * f.c[j] - ((zj + t) - vj) } else { ((tau * f.c[j] - t) - zj) + vj };
     }
-    for i in 0..m {
-        let t = if f.sense[i] != b'=' { s.y[i] } else { 0.0 };
-        rd[n2 + i] = -(s.z[n2 + i] + t);
+    // Slack part of `0x2ecde0` (C, DEGEN2 and the five models): four loops with different zero signs for '=' rows. m > 6, m >= 8: `peel` (parity of
+    // n2) elements `(-z) - t`, blocks of 8 `-(z + t)`, pairs `0 - (t + z)`, a last single `(0 - z) - t`; m = 7 or m + peel < 8: pairs and tail only;
+    // m <= 6: pairs and tail of `(-z) - t`.
+    let ts: Vec<f64> = (0..m).map(|i| if f.sense[i] != b'=' { s.y[i] } else { 0.0 }).collect();
+    let zs = &s.z[n2..n2 + m];
+    if m > 6 {
+        let mut peel = if m >= 8 { n2 & 1 } else { 0 };
+        if m >= 8 && m < peel + 8 {
+            peel = 0;
+        }
+        let end = if m >= 8 && m >= peel + 8 { m - ((m - peel) & 7) } else { 0 };
+        for i in 0..peel {
+            rd[n2 + i] = (-zs[i]) - ts[i];
+        }
+        for i in (if end != 0 { peel } else { 0 })..end {
+            rd[n2 + i] = -(zs[i] + ts[i]);
+        }
+        let mut k = end;
+        while m - k >= 2 {
+            rd[n2 + k] = 0.0 - (ts[k] + zs[k]);
+            rd[n2 + k + 1] = 0.0 - (ts[k + 1] + zs[k + 1]);
+            k += 2;
+        }
+        for i in k..m {
+            rd[n2 + i] = (0.0 - zs[i]) - ts[i];
+        }
+    } else {
+        let mut k = 0;
+        while m - k >= 2 {
+            rd[n2 + k] = (-zs[k]) - ts[k];
+            rd[n2 + k + 1] = (-zs[k + 1]) - ts[k + 1];
+            k += 2;
+        }
+        for i in k..m {
+            rd[n2 + i] = (-zs[i]) - ts[i];
+        }
     }
     rd
 }
@@ -805,20 +838,22 @@ pub fn start_diag(f: &StdForm) -> Vec<f64> {
     }).collect()
 }
 
-/// The diagonal of `A D A'` at an iterate (C, `BIT.D`): `1 / (z/x + v/u)`; 0 for the slack of an '=' row.
+/// The diagonal of `A D A'` at an iterate (C, `BIT.D`, `0x2ecde0`): `zx = z/x (+ v/u for a boxed column)`, `D = min(1 / zx, 1e12)` (0 where `zx` is not
+/// positive on a column; 0 for the slack of an '=' row).
 pub fn normal_diag(f: &StdForm, s: &State) -> Vec<f64> {
     (0..f.n()).map(|j| {
         let fl = f.flags[j];
         if fl & 1 == 0 {
             return 0.0;
         }
-        let mut t = s.z[j] / s.x[j];
+        let mut t = s.z[j] / s.x[j] + 0.0;
         if j < f.n2 && fl & 2 != 0 {
             t = t + s.v[j] / s.u[j];
-        } else {
-            t = t + 0.0;
         }
-        1.0 / t
+        if j < f.n2 && !(t > 0.0) {
+            return 0.0;
+        }
+        (1.0 / t).min(1e12)
     }).collect()
 }
 
@@ -1709,7 +1744,10 @@ pub struct Solution {
     pub run: BarrierRun,
     pub x: Vec<f64>,
     pub objective: f64,
+    /// Row duals in file row order (the row sign of a '>' row undone).
     pub y: Vec<f64>,
+    /// Reduced costs `z - v` of the model's columns.
+    pub rc: Vec<f64>,
 }
 
 pub fn solution(f: &StdForm, run: BarrierRun) -> Solution {
@@ -1719,7 +1757,10 @@ pub fn solution(f: &StdForm, run: BarrierRun) -> Solution {
     for k in 0..f.m {
         y[f.row_of[k]] = run.state.y[k] * if f.sense[k] == b'>' { -1.0 } else { 1.0 };
     }
-    Solution { objective: last.res.q130, x, y, run }
+    let rc = (0..f.n2)
+        .map(|j| (if f.flags[j] & 1 != 0 { run.state.z[j] } else { 0.0 }) - (if f.flags[j] & 2 != 0 { run.state.v[j] } else { 0.0 }))
+        .collect();
+    Solution { objective: last.res.q130, x, y, rc, run }
 }
 
 /// Convenience driver: structure (ordering) by [`crate::order::structure`], conversion, iteration with the given solver.
@@ -1728,6 +1769,47 @@ pub fn solve_with<S: NormalSolver>(model: &LpModel, solver: &mut S, o: &Options)
     let f = std_form(model, &s.sym.perm)?;
     let run = run(&f, solver, o)?;
     Ok(solution(&f, run))
+}
+
+/// [`solve_with`] with the bit-exact [`crate::chol::CholSolver`] (the controlled profile of the reference: `BarCorrectors = 1`, no scaling, `BarOrder = 0`).
+pub fn solve_exact(model: &LpModel, o: &Options) -> Result<Solution, BarrierError> {
+    let s = crate::order::structure(model, crate::order::DENSE_COL_MIN).map_err(|e| BarrierError::Unsupported(e.3.to_string()))?;
+    let f = std_form(model, &s.sym.perm)?;
+    let mut solver = crate::chol::CholSolver::new(&f, &s.sym);
+    let run = run(&f, &mut solver, o)?;
+    Ok(solution(&f, run))
+}
+
+/// `Method::Barrier` of [`crate::solve`]: [`solve_exact`] with the options mapped (`barrier_tol`, `max_iterations`), the result in the public types.
+/// Status: optimal and the iteration limit as in the reference; the codes of `0x2e2fe0` that were never observed (3 and 5 infeasible variants, 6, 0xb, 0xd)
+/// are reported as `NumericalFailure` (no certificate is produced, and the reference's mapping of them is not recovered).
+pub fn solve_method(model: &LpModel, opts: &crate::SolveOptions) -> Result<crate::SolveResult, crate::simplex::SolveError> {
+    use crate::simplex::{SolveError, Status};
+    if opts.scaling {
+        return Err(SolveError::Unsupported("barrier with scaling (the release profile is not recovered)".into()));
+    }
+    let o = Options { tol: opts.barrier_tol, max_iter: opts.max_iterations.min(i32::MAX as usize) as i32, ..Options::default() };
+    let sol = solve_exact(model, &o).map_err(|e| match e {
+        BarrierError::Unsupported(s) | BarrierError::Solver(s) => SolveError::Unsupported(s),
+    })?;
+    let status = match sol.run.status {
+        BarrierStatus::Optimal => Status::Optimal,
+        BarrierStatus::IterationLimit => Status::IterationLimit,
+        BarrierStatus::Other(_) => Status::NumericalFailure,
+    };
+    Ok(crate::SolveResult {
+        status,
+        objective: sol.objective,
+        x: sol.x,
+        dual: sol.y,
+        reduced_cost: sol.rc,
+        basis: crate::Basis::slack(model.num_cols(), model.num_rows()),
+        iterations: sol.run.iterations.max(0) as usize,
+        refactorizations: 0,
+        trace: Vec::new(),
+        farkas: None,
+        ray: None,
+    })
 }
 
 /// [`solve_with`] on the plain f64 [`DenseSolver`] (not bit-exact, tests at tolerance).

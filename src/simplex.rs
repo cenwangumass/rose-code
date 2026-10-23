@@ -21,6 +21,11 @@ pub enum Method {
     /// The restarted reflected Halpern PDHG (`crate::pdhg`), a first-order method: the result is approximate (tolerances in `SolveOptions::pdhg`),
     /// has no basis (`SolveResult::basis` is the all-slack placeholder; the start basis is ignored), no Farkas certificate and no ray.
     Pdhg,
+    /// The primal-dual interior point method of the reference's `Method=2`, `Crossover=0` (`crate::barrier`, `crate::chol`), the controlled profile
+    /// (`BarCorrectors=1`, no scaling, `BarOrder=0`), bit for bit on the models of `reverse-engineer/specs/barrier*.md`. The point is the barrier's own (no
+    /// crossover): `SolveResult::basis` is the all-slack placeholder, there is no Farkas certificate and no ray. Features outside the recovered LP case
+    /// (maximization, free or lower-unbounded columns, ranged or free rows, dense columns, partitioned orderings) return `SolveError::Unsupported`.
+    Barrier,
 }
 
 #[derive(Clone, Debug)]
@@ -60,6 +65,8 @@ pub struct SolveOptions {
     pub perturb: f64,
     /// The objective scale the model's costs carry (set by `crate::scale::solve`); the dual's objective value divides by it.
     pub obj_scale: f64,
+    /// `BarConvTol` of `Method::Barrier`.
+    pub barrier_tol: f64,
 }
 
 impl Default for SolveOptions {
@@ -81,11 +88,18 @@ impl Default for SolveOptions {
             scaling: false,
             perturb: 0.0,
             obj_scale: 1.0,
+            barrier_tol: 1e-8,
         }
     }
 }
 
 impl SolveOptions {
+    /// The barrier at the reference's `Method=2`, `Crossover=0` defaults as far as recovered: the controlled profile (`BarCorrectors=1`, `ScaleFlag=0`,
+    /// `BarOrder=0`), `BarConvTol=1e-8`, `BarIterLimit=1000`. The release profile (default scaling and corrector count) is not recovered.
+    pub fn barrier() -> Self {
+        SolveOptions { method: Method::Barrier, max_iterations: 1000, ..SolveOptions::default() }
+    }
+
     /// The PDHG at the reference's `Method=6` defaults (tolerances 1e-6, no iteration limit). The reference's controlled and release PDHG profiles are identical.
     pub fn pdhg() -> Self {
         SolveOptions { method: Method::Pdhg, ..SolveOptions::default() }
@@ -155,6 +169,8 @@ pub struct SolveResult {
 pub enum SolveError {
     InvalidBasis(String),
     SingularBasis,
+    /// A model feature or option outside the recovered case of the method (named); never answered approximately.
+    Unsupported(String),
 }
 
 impl std::fmt::Display for SolveError {
@@ -162,6 +178,7 @@ impl std::fmt::Display for SolveError {
         match self {
             SolveError::InvalidBasis(s) => write!(f, "invalid basis: {s}"),
             SolveError::SingularBasis => write!(f, "starting basis is singular"),
+            SolveError::Unsupported(s) => write!(f, "unsupported: {s}"),
         }
     }
 }
@@ -2754,6 +2771,9 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             farkas: None,
             ray: None,
         });
+    }
+    if opts.method == Method::Barrier {
+        return crate::barrier::solve_method(model, opts);
     }
     if opts.scaling {
         return crate::scale::solve(model, start, opts);

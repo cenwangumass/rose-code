@@ -1,7 +1,8 @@
-//! `ROSE_DUMP=barrier barrier_replay model.mps [solves.json]`: the barrier iteration on a model (`rose::barrier`), with the factor and the solves
-//! replayed from captured outputs (`solves.json`, written by `reverse-engineer/tools/compare.py trace --profile barrier-controlled --rose`;
-//! see `ReplaySolver::from_json`) or, without it, solved by the plain f64 `DenseSolver` (not bit-exact, tolerance only).
-//! Test-only: the replay file is the only coupling to the analysis tooling. Records (stderr): BMODEL (the converted form), then one BARRIER per iteration.
+//! `ROSE_DUMP=barrier[,barrier_factor] barrier_replay model.mps [solves.json|dense]`: the barrier iteration on a model (`rose::barrier`), with the factor and
+//! the solves replayed from captured outputs (`solves.json`, written by `reverse-engineer/tools/compare.py trace --profile barrier-controlled --rose`;
+//! see `ReplaySolver::from_json`), by the plain f64 `DenseSolver` (`dense`, not bit-exact, tolerance only) or, without a second argument, by the
+//! bit-exact `CholSolver` (`rose::chol`: the whole solve from the MPS alone). Records (stderr): BMODEL (the converted form), one BARRIER per iteration,
+//! and BRES (final x, dual, reduced cost, objective, in the model's own coordinates) for the bit-exact solver.
 use rose::barrier::{self, BarrierStatus, DenseSolver, Options, ReplaySolver};
 use rose::dump::{emit_tag, on};
 use rose::{mps, order};
@@ -31,7 +32,10 @@ fn main() {
         }));
     }
     let o = Options::default();
-    let run = if let Some(p) = a.get(2) {
+    let mut solver = rose::chol::CholSolver::new(&f, &s.sym);
+    let run = if a.get(2).map(String::as_str) == Some("dense") {
+        barrier::run(&f, &mut DenseSolver::default(), &o)
+    } else if let Some(p) = a.get(2) {
         let v: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(p).unwrap()).unwrap();
         let mut rs = ReplaySolver::from_json(&v);
         let r = barrier::run(&f, &mut rs, &o);
@@ -40,10 +44,14 @@ fn main() {
         }
         r
     } else {
-        barrier::run(&f, &mut DenseSolver::default(), &o)
+        barrier::run(&f, &mut solver, &o)
     };
     match run {
         Ok(r) => {
+            if on("barrier") && a.get(2).is_none() {
+                let sol = barrier::solution(&f, r.clone());
+                emit_tag("barrier", "BRES", json!({"x": sol.x, "pi": sol.y, "rc": sol.rc, "obj": sol.objective, "iters": r.iterations}));
+            }
             let last = r.records.last().unwrap();
             let st = match r.status {
                 BarrierStatus::Optimal => "optimal".to_string(),

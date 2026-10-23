@@ -2,6 +2,7 @@
 
 pub mod barrier;
 pub mod basis;
+pub mod chol;
 pub mod dual;
 pub mod dump;
 pub mod ftran_order;
