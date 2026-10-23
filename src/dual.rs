@@ -77,6 +77,8 @@ struct Dual<'a> {
     refactorizations: usize,
     /// The pricing mode `ctx+0x3ec`: 1 for dual steepest edge, 3 after the switch of `0xf770d` (weights restarted at 1).
     pmode: u8,
+    /// The number of infeasible rows at the last value-mode recompute (`P+0x3c`).
+    n_infeas: usize,
     /// The reference framework of mode 3 (`ctx+0x418`): the variables nonbasic when the weights were restarted.
     dflag: Vec<bool>,
     /// `SimplexPricing` left at its default (-1): the release profile, which may switch the pricing mode.
@@ -843,6 +845,7 @@ impl<'a> Dual<'a> {
         let thr_old = self.thr;
         // The count compared with the pivot column's entries is the number of infeasible rows (`[P+0x3c]`, `0xc1e8e`).
         let count = inf.iter().filter(|&&f| f).count();
+        self.n_infeas = count;
         let div = if after_pivot && count < self.last_cap || big { 1e5 } else { 1e3 };
         let new = maxp / div;
         self.thr = if thr_old != 0.0 && maxp > thr_old { maxsd(new, thr_old) } else { new };
@@ -1892,12 +1895,13 @@ impl<'a> Dual<'a> {
         self.work.add(0xe7000, est, crate::work::CTX);
     }
 
-    /// Work of the pricing setup after a refactorization: the list of infeasible rows (`5 m + 4 len`; `0xc4329` in the walk mode, `0xc1fe3` in the value mode)
+    /// Work of the pricing setup after a refactorization: the list of infeasible rows (`5 m + 4 len`, len the walk list or, in the value mode, the number of infeasible rows `P+0x3c`; `0xc4329` in the walk mode, `0xc1fe3` in the value mode)
     /// and the closing pass over all variables.
     fn flags_work(&mut self) {
         let (n, m) = (self.n as f64, self.m as f64);
         let site = if self.value_mode { 0xc1fe3 } else { 0xc4329 };
-        self.work.add(site, 5.0 * m + 4.0 * self.list.len() as f64, crate::work::CTX);
+        let listed = if self.value_mode { self.n_infeas } else { self.list.len() };
+        self.work.add(site, 5.0 * m + 4.0 * listed as f64, crate::work::CTX);
         // The closing pass (`0xbf5b0`): the variant for a nonzero tolerance level books `bfed2`, the other `bf981`; the perturbation flag adds one unit per variable.
         let pert = if self.pert != 0 { 1.0 } else { 0.0 };
         self.work.add(if self.level != 0 { 0xbfed2 } else { 0xbf981 }, (2.0 + pert) * (n + m), crate::work::CTX);
@@ -2293,6 +2297,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         rrows: vec![Vec::new(); m],
         refactorizations: 1,
         pmode: 1,
+        n_infeas: 0,
         dflag: Vec::new(),
         switch_enabled: opts.perturb > 0.0,
         level: 0,
