@@ -5,8 +5,6 @@
 //! model's rows in file order, with each dense column an extra node after the rows.
 //!
 //! Known gaps, reported as errors (never approximated):
-//! - the partition routine `0x325850` for connected components larger than `max(600, n/100)` (PEROLD, 80BAU3B, DEGEN3):
-//!   [`levels`] returns [`StructError::Partition`] unless the caller supplies the labels;
 //! - the quicksort partition of the sorter `0x8c8b70` for lists of 100 or more: [`StructError::SortLarge`] (not reached by the 12 models);
 //! - the dense-column threshold is not recovered: [`dense_columns`] takes the minimum column count as a parameter.
 use crate::model::LpModel;
@@ -14,8 +12,6 @@ use std::collections::VecDeque;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum StructError {
-    /// A connected component of this many nodes needs the partition routine `0x325850`, which is not decoded.
-    Partition(usize),
     /// The sorter `0x8c8b70` meets a list of 100 or more keys (quicksort partition, not decoded).
     SortLarge(usize),
 }
@@ -23,7 +19,6 @@ pub enum StructError {
 impl std::fmt::Display for StructError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            StructError::Partition(n) => write!(f, "partition routine 0x325850 needed for a component of {n} nodes (not decoded)"),
             StructError::SortLarge(n) => write!(f, "sorter 0x8c8b70 quicksort partition needed for {n} keys (not decoded)"),
         }
     }
@@ -136,8 +131,390 @@ pub fn dense_threshold(n: usize, nnz: usize) -> i64 {
 /// Labels of the partition routine `0x325850` for a component: `bisect(size, colptr, rowind)`, label 2 = vertex separator.
 pub type Bisect<'a> = &'a mut dyn FnMut(usize, &[usize], &[usize]) -> Vec<i64>;
 
+/// The generator `0x88a870` (31 bits): `state = state * 0x5851f42d4c957f2d + 0x14057b7ef767814f`, tempering of the high word.
+fn rand31(rng: &mut u64) -> u32 {
+    *rng = rng.wrapping_mul(0x5851f42d4c957f2d).wrapping_add(0x14057b7ef767814f);
+    let mut e = (*rng >> 32) as u32;
+    e ^= e >> 11;
+    e ^= (e << 7) & 0x9d2c5680;
+    e ^= (e << 15) & 0xefc60000;
+    e ^= e >> 18;
+    e & 0x7fffffff
+}
+
+/// Max-heap of items with integer keys (`0x887c20` ... `0x889290`): sift up while the key is greater than the parent's, sift down to the left child
+/// unless `key[left] < key[right]`, until the key is not smaller than the child's. `pos[item]` is the heap position or -1.
+struct Heap {
+    h: Vec<usize>,
+    k: Vec<i64>,
+    pos: Vec<i64>,
+}
+
+impl Heap {
+    fn new(n: usize) -> Self {
+        Heap { h: Vec::new(), k: Vec::new(), pos: vec![-1; n] }
+    }
+    fn clear(&mut self) {
+        for &it in &self.h {
+            self.pos[it] = -1;
+        }
+        self.h.clear();
+        self.k.clear();
+    }
+    fn top(&self) -> i64 {
+        self.h.first().map_or(-1, |&v| v as i64)
+    }
+    fn contains(&self, it: usize) -> bool {
+        self.pos[it] >= 0
+    }
+    fn swap(&mut self, a: usize, b: usize) {
+        self.h.swap(a, b);
+        self.k.swap(a, b);
+        self.pos[self.h[a]] = a as i64;
+        self.pos[self.h[b]] = b as i64;
+    }
+    fn up(&mut self, mut p: usize) {
+        while p > 0 {
+            let q = (p - 1) / 2;
+            if self.k[p] <= self.k[q] {
+                break;
+            }
+            self.swap(p, q);
+            p = q;
+        }
+    }
+    fn down(&mut self, mut p: usize) {
+        let n = self.h.len();
+        while 2 * p + 1 < n {
+            let mut c = 2 * p + 1;
+            if 2 * p + 2 < n && self.k[2 * p + 1] < self.k[2 * p + 2] {
+                c = 2 * p + 2;
+            }
+            if self.k[p] >= self.k[c] {
+                break;
+            }
+            self.swap(p, c);
+            p = c;
+        }
+    }
+    fn insert(&mut self, it: usize, key: i64) {
+        self.h.push(it);
+        self.k.push(key);
+        self.pos[it] = self.h.len() as i64 - 1;
+        self.up(self.h.len() - 1);
+    }
+    fn remove(&mut self, it: usize) {
+        let p = self.pos[it];
+        if p < 0 {
+            return;
+        }
+        let p = p as usize;
+        self.pos[it] = -1;
+        let n = self.h.len();
+        if p == n - 1 {
+            self.h.pop();
+            self.k.pop();
+            return;
+        }
+        self.h[p] = self.h[n - 1];
+        self.k[p] = self.k[n - 1];
+        self.h.pop();
+        self.k.pop();
+        self.pos[self.h[p]] = p as i64;
+        if p != 0 && self.k[p] > self.k[(p - 1) / 2] {
+            self.up(p);
+        } else {
+            self.down(p);
+        }
+    }
+    fn pop(&mut self) -> usize {
+        let it = self.h[0];
+        self.remove(it);
+        it
+    }
+    fn update(&mut self, it: usize, key: i64) {
+        let p = self.pos[it] as usize;
+        self.k[p] = key;
+        if p != 0 && key > self.k[(p - 1) / 2] {
+            self.up(p);
+        } else {
+            self.down(p);
+        }
+    }
+}
+
+/// One matching level of `0x325850`: vertices sorted by degree (counting sort, ascending index), every run of equal degree shuffled (Fisher-Yates from the end, one
+/// draw per element but the first); in that order each unmatched vertex is paired with its unmatched neighbour of smallest degree (first in adjacency order on ties)
+/// or stays alone. Returns `(cptr, members, cxadj, cadj, cvw)`; coarse vertices are numbered in order of creation.
+fn coarsen(n: usize, xadj: &[usize], adj: &[usize], vw: &[i64], rng: &mut u64) -> (Vec<usize>, Vec<usize>, Vec<usize>, Vec<usize>, Vec<i64>) {
+    let deg: Vec<usize> = (0..n).map(|v| xadj[v + 1] - xadj[v]).collect();
+    let mut cnt = vec![0usize; n + 1];
+    for &d in &deg {
+        cnt[d] += 1;
+    }
+    let mut s = 0;
+    for c in cnt.iter_mut() {
+        let t = *c;
+        *c = s;
+        s += t;
+    }
+    let mut order = vec![0usize; n];
+    for v in 0..n {
+        order[cnt[deg[v]]] = v;
+        cnt[deg[v]] += 1;
+    }
+    let mut a = 0;
+    while a < n {
+        let mut b = a + 1;
+        while b < n && deg[order[b]] == deg[order[a]] {
+            b += 1;
+        }
+        let (mut last, mut size) = (b - 1, b - a);
+        while last > a {
+            let j = rand31(rng) as usize % size;
+            order.swap(last, a + j);
+            last -= 1;
+            size -= 1;
+        }
+        a = b;
+    }
+    let mut matched = vec![usize::MAX; n];
+    let mut cptr = vec![0];
+    let mut members = Vec::new();
+    for &v in &order {
+        if matched[v] != usize::MAX {
+            continue;
+        }
+        let (mut best, mut bd) = (usize::MAX, n + 1);
+        for &u in &adj[xadj[v]..xadj[v + 1]] {
+            if matched[u] == usize::MAX && deg[u] < bd {
+                bd = deg[u];
+                best = u;
+            }
+        }
+        let c = cptr.len() - 1;
+        matched[v] = c;
+        members.push(v);
+        if best != usize::MAX {
+            matched[best] = c;
+            members.push(best);
+        }
+        cptr.push(members.len());
+    }
+    let cn = cptr.len() - 1;
+    let mut mark = vec![usize::MAX; cn];
+    let (mut cxadj, mut cadj, mut cvw) = (vec![0], Vec::new(), Vec::new());
+    for c in 0..cn {
+        mark[c] = c;
+        let mut w = 0;
+        for &v in &members[cptr[c]..cptr[c + 1]] {
+            w += vw[v];
+            for &u in &adj[xadj[v]..xadj[v + 1]] {
+                let cu = matched[u];
+                if mark[cu] != c {
+                    cadj.push(cu);
+                    mark[cu] = c;
+                }
+            }
+        }
+        cxadj.push(cadj.len());
+        cvw.push(w);
+    }
+    (cptr, members, cxadj, cadj, cvw)
+}
+
+/// Separator quality `p2 / (p0 p1)`; `100 (p0 + p1 + p2)` when a side is empty.
+fn separator_score(p0: i64, p1: i64, p2: i64) -> f64 {
+    if p0 != 0 && p1 != 0 {
+        p2 as f64 / (p0 as f64 * p1 as f64)
+    } else {
+        (p0 + p1 + p2) as f64 * 100.0
+    }
+}
+
+/// `0x327190`: Fiduccia-Mattheyses refinement of a vertex separator (labels 0 and 1 sides, 2 separator), in place. At most 10 passes. A pass shuffles the separator
+/// vertices (one draw per element), puts them in two heaps (key `w(v) - ed[other side][v]`: moving `v` to a side pulls its neighbours on the other side into the
+/// separator), and moves the best vertex of the side chosen by the balance rule (the lighter side if the other weighs more than `param` times as much, else the
+/// side with the smaller `p2 / (p0 p1)` after the move, ties to side 1). The best state of the pass (strictly smaller score) is kept and the later moves undone; a
+/// pass stops `min(500, 5 |separator|)` moves after its best, and no pass follows one without improvement. The reference tests `contains` with the moved vertex
+/// instead of the neighbour when it updates the key of a separator neighbour of the moved vertex, so that update never happens (checked against the generator state).
+fn refine(n: usize, xadj: &[usize], adj: &[usize], vw: &[i64], lab: &mut [i64], param: f64, rng: &mut u64) {
+    let mut pw = [0i64; 3];
+    let mut ed = [vec![0i64; n], vec![0i64; n]];
+    let mut nsep = 0usize;
+    for v in 0..n {
+        pw[lab[v] as usize] += vw[v];
+        if lab[v] == 2 {
+            nsep += 1;
+            for &u in &adj[xadj[v]..xadj[v + 1]] {
+                if lab[u] != 2 {
+                    ed[lab[u] as usize][v] += vw[u];
+                }
+            }
+        }
+    }
+    let ntry = (5 * nsep).min(500) as i64;
+    let mut heaps = [Heap::new(n), Heap::new(n)];
+    for _pass in 0..10 {
+        heaps[0].clear();
+        heaps[1].clear();
+        let mut sep: Vec<usize> = (0..n).filter(|&v| lab[v] == 2).collect();
+        for i in (0..sep.len()).rev() {
+            let j = rand31(rng) as usize % (i + 1);
+            sep.swap(i, j);
+        }
+        for &v in &sep {
+            heaps[0].insert(v, vw[v] - ed[1][v]);
+            heaps[1].insert(v, vw[v] - ed[0][v]);
+        }
+        let mut where_ = vec![-1i64; n];
+        let mut best_sc = separator_score(pw[0], pw[1], pw[2]);
+        let mut best = -1i64;
+        let (mut moves, mut pulled, mut poff): (Vec<usize>, Vec<usize>, Vec<usize>) = (Vec::new(), Vec::new(), Vec::new());
+        let mut k = 0usize;
+        while k < n {
+            if k as i64 - best > ntry {
+                break;
+            }
+            let (c0, c1) = (heaps[0].top(), heaps[1].top());
+            let side = if c0 < 0 {
+                1
+            } else if c1 < 0 {
+                0
+            } else if pw[1] as f64 > param * pw[0] as f64 {
+                0
+            } else if pw[0] as f64 > param * pw[1] as f64 {
+                1
+            } else {
+                let (a, b) = (c0 as usize, c1 as usize);
+                let s0 = separator_score(pw[0] + vw[a], pw[1] - ed[1][a], pw[2] - vw[a] + ed[1][a]);
+                let s1 = separator_score(pw[0] - ed[0][b], pw[1] + vw[b], pw[2] - vw[b] + ed[0][b]);
+                if s0 >= s1 { 1 } else { 0 }
+            };
+            if [c0, c1][side] < 0 {
+                break;
+            }
+            let other = 1 - side;
+            let v = heaps[side].pop();
+            heaps[other].remove(v);
+            moves.push(v);
+            poff.push(pulled.len());
+            lab[v] = side as i64;
+            where_[v] = k as i64;
+            pw[2] -= vw[v];
+            pw[side] += vw[v];
+            for &u in &adj[xadj[v]..xadj[v + 1]] {
+                if lab[u] == 2 {
+                    ed[side][u] += vw[v];
+                    if heaps[other].contains(v) {
+                        heaps[other].update(u, vw[u] - ed[side][u]);
+                    }
+                } else if lab[u] == other as i64 {
+                    lab[u] = 2;
+                    pw[other] -= vw[u];
+                    pulled.push(u);
+                    ed[0][u] = 0;
+                    ed[1][u] = 0;
+                    pw[2] += vw[u];
+                    for &x in &adj[xadj[u]..xadj[u + 1]] {
+                        if lab[x] == 2 {
+                            ed[other][x] -= vw[u];
+                            if heaps[side].contains(x) {
+                                heaps[side].update(x, vw[x] - ed[other][x]);
+                            }
+                        } else {
+                            ed[lab[x] as usize][u] += vw[x];
+                        }
+                    }
+                    if where_[u] == -1 {
+                        heaps[side].insert(u, vw[u] - ed[other][u]);
+                        where_[u] = -2;
+                    }
+                }
+            }
+            let sc = separator_score(pw[0], pw[1], pw[2]);
+            if best_sc > sc {
+                best_sc = sc;
+                best = k as i64;
+            }
+            k += 1;
+        }
+        poff.push(pulled.len());
+        for j in ((best + 1) as usize..k).rev() {
+            let v = moves[j];
+            let s = lab[v] as usize;
+            lab[v] = 2;
+            pw[s] -= vw[v];
+            ed[0][v] = 0;
+            ed[1][v] = 0;
+            pw[2] += vw[v];
+            for &x in &adj[xadj[v]..xadj[v + 1]] {
+                if lab[x] == 2 {
+                    ed[s][x] -= vw[v];
+                } else {
+                    ed[lab[x] as usize][v] += vw[x];
+                }
+            }
+            for &u in &pulled[poff[j]..poff[j + 1]] {
+                pw[2] -= vw[u];
+                pw[1 - s] += vw[u];
+                lab[u] = 1 - s as i64;
+                for &x in &adj[xadj[u]..xadj[u + 1]] {
+                    if lab[x] == 2 {
+                        ed[1 - s][x] += vw[u];
+                    }
+                }
+            }
+        }
+        if best == -1 {
+            break;
+        }
+    }
+}
+
+/// The partition `0x325850` of one component (`size` nodes, `colptr`/`rowind` its induced graph): a multilevel vertex separator. The graph is coarsened by
+/// [`coarsen`] until fewer than 100 vertices remain, the size stops shrinking or 19 levels exist; one draw gives `param = 5 u + 5`; the coarsest level starts with every
+/// vertex in the separator and each level is refined ([`refine`]) and projected to the next finer one. Label 2 is the separator. `rng` is the state of the
+/// generator `0x88a870` (0 at the start of a solve), advanced by every draw.
+pub fn partition(size: usize, colptr: &[usize], rowind: &[usize], rng: &mut u64) -> Vec<i64> {
+    let mut levels: Vec<(usize, Vec<usize>, Vec<usize>, Vec<i64>)> = vec![(size, colptr.to_vec(), rowind.to_vec(), vec![1; size])];
+    let mut maps: Vec<(Vec<usize>, Vec<usize>)> = Vec::new();
+    loop {
+        let (n, cptr, members, cxadj, cadj, cvw) = {
+            let (n, xa, ad, vw) = levels.last().unwrap();
+            let (cptr, members, cxadj, cadj, cvw) = coarsen(*n, xa, ad, vw, rng);
+            (*n, cptr, members, cxadj, cadj, cvw)
+        };
+        let cn = cvw.len();
+        maps.push((cptr, members));
+        levels.push((cn, cxadj, cadj, cvw));
+        if cn < 100 || cn == n || levels.len() - 1 >= 19 {
+            break;
+        }
+    }
+    let top = levels.len() - 1;
+    let param = (rand31(rng) as f64 * 4.656612873077393e-10) * 5.0 + 5.0;
+    let mut lab = vec![2i64; levels[top].0];
+    for l in (0..=top).rev() {
+        let (n, xa, ad, vw) = &levels[l];
+        refine(*n, xa, ad, vw, &mut lab, param, rng);
+        if l > 0 {
+            let (cptr, members) = &maps[l - 1];
+            let mut fine = vec![0i64; levels[l - 1].0];
+            for c in 0..*n {
+                for &m in &members[cptr[c]..cptr[c + 1]] {
+                    fine[m] = lab[c];
+                }
+            }
+            lab = fine;
+        }
+    }
+    lab
+}
+
 /// Driver `0x324330` (mode 3): the level flags handed to the core (-1 normal, -2 later, -3 dense-column nodes). A component of
-/// the -1 nodes larger than `max(600, n/100)` needs the partition routine: without `bisect` this is [`StructError::Partition`].
+/// the -1 nodes larger than `max(600, n/100)` goes through the partition routine [`partition`] (one generator, state 0, shared by the components);
+/// `bisect` replaces it.
 pub fn levels(p: &Pattern, n1: usize, bisect: Option<Bisect>) -> Result<Vec<i64>, StructError> {
     let n = p.n;
     let n1 = n1.min(n);
@@ -167,9 +544,14 @@ pub fn levels(p: &Pattern, n1: usize, bisect: Option<Bisect>) -> Result<Vec<i64>
     }
     let big = 600.max(n / 100);
     let mut bisect = bisect;
+    let mut rng = 0u64;
+    let mut default = |sz: usize, cp: &[usize], ri: &[usize]| partition(sz, cp, ri, &mut rng);
     for (c, &sz) in sizes.iter().enumerate() {
         if sz > big {
-            let Some(b) = bisect.as_mut() else { return Err(StructError::Partition(sz)) };
+            let b: Bisect = match bisect.as_mut() {
+                Some(b) => &mut **b,
+                None => &mut default,
+            };
             let nodes: Vec<usize> = (0..n).filter(|&i| comp[i] == c).collect();
             let mut loc = vec![usize::MAX; n];
             for (k, &v) in nodes.iter().enumerate() {
