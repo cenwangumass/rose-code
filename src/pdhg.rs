@@ -36,6 +36,8 @@ pub struct PdhgOptions {
 pub enum Inject {
     Merit,
     RelDual,
+    /// The primal objective set to 1e101 before the termination test: status 12.
+    Pobj,
 }
 
 impl Default for PdhgOptions {
@@ -884,12 +886,18 @@ pub fn solve(model: &LpModel, opts: &PdhgOptions) -> PdhgResult {
             just_restarted = false;
             if chk || st.total as f64 >= opts.iter_limit {
                 let mut o = st.residual(false);
+                if let Some((at, Inject::Pobj)) = opts.inject {
+                    if st.n8 == at {
+                        o.pobj = 1e101;
+                    }
+                }
                 status = st.status(&o, opts);
                 if let (Some((at, what)), 1) = (opts.inject, status) {
                     if st.n8 == at {
                         match what {
                             Inject::Merit => st.r = 0.0,
                             Inject::RelDual => o.rel_d = 0.0,
+                            Inject::Pobj => {}
                         }
                     }
                 }

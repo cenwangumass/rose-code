@@ -6,7 +6,7 @@ use rose::{mps, solve, Basis, SolveOptions, Status};
 use serde_json::{json, Value};
 
 fn usage() -> ! {
-    eprintln!("usage: rose solve <model.mps> [--output result.json] [--basis-in basis.json] [--basis-out basis.json] [--max-iterations N] [--method primal|dual|pdhg] [--profile controlled|release] [--pdhg-iter-limit N] [--pdhg-rel-tol T] [--pdhg-abs-tol T] [--pdhg-conv-tol T] [--pdhg-seed N] [--pdhg-inject merit@N|reld@N]");
+    eprintln!("usage: rose solve <model.mps> [--output result.json] [--basis-in basis.json] [--basis-out basis.json] [--max-iterations N] [--method primal|dual|pdhg] [--profile controlled|release] [--pdhg-iter-limit N] [--pdhg-rel-tol T] [--pdhg-abs-tol T] [--pdhg-conv-tol T] [--pdhg-seed N] [--pdhg-inject merit@N|reld@N|pobj@N]");
     std::process::exit(2)
 }
 
@@ -52,7 +52,12 @@ fn main() {
             "--pdhg-inject" => {
                 let (w, at) = val.split_once('@').unwrap_or_else(|| usage());
                 let at = at.parse().unwrap_or_else(|_| usage());
-                popts.inject = Some((at, if w == "merit" { rose::pdhg::Inject::Merit } else { rose::pdhg::Inject::RelDual }));
+                popts.inject = Some((at, match w {
+                    "merit" => rose::pdhg::Inject::Merit,
+                    "reld" => rose::pdhg::Inject::RelDual,
+                    "pobj" => rose::pdhg::Inject::Pobj,
+                    _ => usage(),
+                }));
             }
             "--pdhg-seed" => popts.seed = val.parse().unwrap_or_else(|_| usage()),
             "--pdhg-conv-tol" => popts.conv_tol = val.parse().unwrap_or_else(|_| usage()),

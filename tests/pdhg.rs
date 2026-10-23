@@ -18,7 +18,11 @@ fn check_with(name: &str, opts: PdhgOptions) {
     let model = mps::parse(&read(&format!("{name}.mps"))).unwrap();
     let fix: Value = serde_json::from_str(&read(&format!("{name}-pdhg-release.checks.json"))).unwrap();
     let r = solve(&model, &PdhgOptions { record_checks: true, ..opts });
-    let want_status = if fix["status"].as_f64() == Some(7.0) { Status::IterationLimit } else { Status::Optimal };
+    let want_status = match fix["status"].as_f64() {
+        Some(7.0) => Status::IterationLimit,
+        Some(12.0) => Status::NumericalFailure,
+        _ => Status::Optimal,
+    };
     assert_eq!(r.status, want_status, "{name}");
     assert_eq!(r.iterations, fix["iterations"].as_u64().unwrap(), "{name}: iterations");
     if let Some(z) = fix["objective"].as_f64() {
@@ -113,4 +117,10 @@ fn zero_merit_takes_rule_5_and_the_zero_dual_residual_takes_the_weight_fallback(
     // budget 1000) and relative dual residual = 0 at n8 = 700 (a restart with the primal weight reset to its initial value).
     check_with("adlittle_merit0", PdhgOptions { inject: Some((500, rose::pdhg::Inject::Merit)), ..PdhgOptions::default() });
     check_with("adlittle_reld0", PdhgOptions { inject: Some((700, rose::pdhg::Inject::RelDual)), ..PdhgOptions::default() });
+}
+
+#[test]
+fn a_huge_objective_value_stops_with_status_12() {
+    // Reference with the primal objective written to 1e101 at the residual test n8 = 300 (INJECT=pobj@300): the termination test returns 12.
+    check_with("sc50a_pobj_inf", PdhgOptions { inject: Some((300, rose::pdhg::Inject::Pobj)), ..PdhgOptions::default() });
 }
