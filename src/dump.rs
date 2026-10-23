@@ -34,6 +34,7 @@ pub const KINDS: &[(&str, &str, &str)] = &[
     ("work", "WORK", "the work counter W (`crate::work`): each increment (k inc: d, site, caller), each refactorization check (trig: W), the time clause (clause), and the smoothed factorization cost (w158); `ROSE_WORK=1` also selects it"),
     ("pdhg", "PDHG", "PDHG: the state at each residual test (every 100th iteration, and the iteration-limit exit): counters, eta, omega, merit R, the residual scalars and the status"),
     ("barrier_struct", "PAT", "barrier setup structure (`examples/barrier_struct`): records PAT (AA' pattern), SYMIN (n1, dense count), ORDIN (level flags), ORD, ORDFIX, SYM, and BSTRUCT (status: `unsupported` names an undecoded routine)"),
+    ("barrier", "BARRIER", "barrier iteration (`examples/barrier_replay`): per iteration the state at its start (x, z, y, u, v, mu, objectives, max residuals), the predictor steps ap/ad, mu_aff, target, the selected steps tp/td with their weights, gamma and the termination code"),
     ("fillparts", "FILLP", "per factor update: pool fill on entry, eta size, new column entries added, and the row growths (row, cnt, cap, extra)"),
 ];
 

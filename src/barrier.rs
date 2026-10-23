@@ -1,0 +1,1774 @@
+//! Barrier iteration of the reference (`reverse-engineer/specs/barrier-iteration.md`; port of `tools/barrier_iter.py`): conversion to the
+//! solved standard form, the starting point, residuals and scalars, the predictor / corrector decisions, the step-back update and the
+//! termination test `0x2e2fe0`. LP only: no free variables, ranges, lower-unbounded columns or cones (reported as [`BarrierError::Unsupported`]).
+//!
+//! The linear algebra behind the iteration (factor of `A D A'`, the solves of `0x305f10`) is the [`NormalSolver`] trait. The reference's
+//! supernodal Cholesky and its solves are not recovered bit for bit yet, so two implementations exist:
+//! - [`ReplaySolver`]: returns captured solve outputs, so that everything else can be compared bitwise per iteration
+//!   (`examples/barrier_replay.rs`, `tools/compare.py trace --profile barrier-controlled --rose`);
+//! - [`DenseSolver`]: a plain f64 dense `LDL'` for tests at tolerance. **Not bit-exact**: its results differ from the reference in the
+//!   last bits, so the iteration it drives is only as close to the reference as the solves are.
+//!
+//! No fused multiply-add anywhere: the reference's kernels use separate `mulsd/addsd` (SSE2 pairs, lane order in the helpers below).
+//! Confidence labels as in the spec: C = verified bit for bit against captures, H = read from code only.
+use crate::dump;
+use crate::model::{LpModel, Sense, INF};
+use serde_json::{json, Value};
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BarrierError {
+    /// A model feature outside the recovered LP case (named).
+    Unsupported(String),
+    /// A solver failure (singular system, replay exhausted, ...).
+    Solver(String),
+}
+
+impl std::fmt::Display for BarrierError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BarrierError::Unsupported(s) => write!(f, "unsupported: {s}"),
+            BarrierError::Solver(s) => write!(f, "solver: {s}"),
+        }
+    }
+}
+
+impl std::error::Error for BarrierError {}
+
+fn unsupported<T>(s: impl Into<String>) -> Result<T, BarrierError> {
+    Err(BarrierError::Unsupported(s.into()))
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Standard form (conversion `0x31af70`, `0x3548a0`).
+
+/// The solved problem `min c'x, A x + S s = b, 0 <= x (<= ub)` in the reference's layout. Variables: the model's columns in file order
+/// (`n2`), then one slack per row (`m`, flag 0 and no complementarity pair for an '=' row). Rows are in the supernodal elimination order
+/// (`SYM` perm), `A` columns keep their entries in ascending permuted row order. A '>' row is negated (row and right-hand side, sense kept).
+/// Lower bounds are shifted to 0 (`b -= A lo`, `const = c lo`, `ub -= lo`).
+#[derive(Debug, Clone)]
+pub struct StdForm {
+    pub m: usize,
+    pub n2: usize,
+    pub col_start: Vec<usize>,
+    pub row_idx: Vec<usize>,
+    pub val: Vec<f64>,
+    /// `b'='`, `b'<'` or `b'>'` per row (permuted order).
+    pub sense: Vec<u8>,
+    /// Flag per variable (`n2 + m`): bit 0 = lower bound 0 (pair x, z), bit 1 = upper bound (pair u = ub - x, v), `Q+0x640`.
+    pub flags: Vec<u8>,
+    /// Right-hand side `Q+0x610` (permuted rows).
+    pub b: Vec<f64>,
+    /// Right-hand side in file row order before the lower-bound shift, with the row sign (input of the setup scalars `0x2e4f10`: all zero on BORE3D).
+    pub b_file: Vec<f64>,
+    /// Costs of the columns, `Q+0x608`.
+    pub c: Vec<f64>,
+    /// Upper bounds after the shift (`Q+0x600`; [`INF`] where there is none).
+    pub ub: Vec<f64>,
+    /// `Q+0x630`, `Q+0x634`: the range of columns that holds the upper-bounded ones.
+    pub ub_lo: usize,
+    pub ub_hi: usize,
+    pub offset: f64,
+    /// `c . lower` of the shifted columns.
+    pub cshift: f64,
+    /// Lower bound removed from each column.
+    pub lower: Vec<f64>,
+    /// File row of each position (`inv[k]`).
+    pub row_of: Vec<usize>,
+}
+
+impl StdForm {
+    pub fn n(&self) -> usize {
+        self.n2 + self.m
+    }
+
+    /// Number of complementarity pairs (`Q+0x210`): flagged x/z entries plus u/v pairs.
+    pub fn ncomp(&self) -> usize {
+        self.flags.iter().map(|&f| (f & 1) as usize + ((f >> 1) & 1) as usize).sum()
+    }
+
+    pub fn has_ub(&self) -> bool {
+        self.ub_lo < self.ub_hi
+    }
+
+    /// `(A x)_i` over the columns only, accumulated column by column (`a x_j + out_i`).
+    fn ax_cols(&self, x: &[f64]) -> Vec<f64> {
+        let mut out = vec![0.0; self.m];
+        for j in 0..self.n2 {
+            for k in self.col_start[j]..self.col_start[j + 1] {
+                out[self.row_idx[k]] = self.val[k] * x[j] + out[self.row_idx[k]];
+            }
+        }
+        out
+    }
+
+    /// `Af x = A x + S x_slack` (slack added for the non-'=' rows).
+    fn af(&self, x: &[f64]) -> Vec<f64> {
+        let mut out = self.ax_cols(x);
+        for i in 0..self.m {
+            if self.sense[i] != b'=' {
+                out[i] = out[i] + x[self.n2 + i];
+            }
+        }
+        out
+    }
+
+    /// `(A' y)_j` of column `j`, entries summed sequentially from 0.
+    fn aty_col(&self, j: usize, y: &[f64]) -> f64 {
+        let mut t = 0.0;
+        for k in self.col_start[j]..self.col_start[j + 1] {
+            t = t + y[self.row_idx[k]] * self.val[k];
+        }
+        t
+    }
+}
+
+fn is_inf(v: f64) -> bool {
+    v.abs() >= INF
+}
+
+/// Conversion of a model to the solved form, with `perm[original row] = position` (the final `SYM` permutation of [`crate::order`]).
+pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> {
+    let m = model.num_rows();
+    let n2 = model.num_cols();
+    if model.sense == Sense::Maximize {
+        return unsupported("maximization");
+    }
+    if perm.len() != m {
+        return unsupported(format!("permutation of {} entries for {m} rows (dense columns in the ordering)", perm.len()));
+    }
+    let mut row_of = vec![0usize; m];
+    for (i, &p) in perm.iter().enumerate() {
+        row_of[p as usize] = i;
+    }
+    // Rows: sense, sign and right-hand side in file order.
+    let mut sense_file = vec![b'='; m];
+    let mut sign = vec![1.0; m];
+    // Right-hand side with the sign of the row (a '>' row gives `-lo`).
+    let mut b_file = vec![0.0; m];
+    for i in 0..m {
+        let (lo, up) = (model.row_lo[i], model.row_up[i]);
+        if is_inf(lo) && is_inf(up) {
+            return unsupported("free row");
+        }
+        if !is_inf(lo) && !is_inf(up) {
+            if lo != up {
+                return unsupported("ranged row");
+            }
+            b_file[i] = lo;
+        } else if is_inf(lo) {
+            sense_file[i] = b'<';
+            b_file[i] = up;
+        } else {
+            sense_file[i] = b'>';
+            sign[i] = -1.0;
+            b_file[i] = -lo;
+        }
+    }
+    // Columns: flags, shift.
+    let mut flags = vec![0u8; n2 + m];
+    let mut lower = vec![0.0; n2];
+    let mut ub = vec![INF; n2];
+    for j in 0..n2 {
+        let (lo, up) = (model.col_lo[j], model.col_up[j]);
+        if is_inf(lo) {
+            return unsupported("column without a lower bound");
+        }
+        if !is_inf(up) && up < lo {
+            return unsupported("inconsistent column bounds");
+        }
+        lower[j] = lo;
+        flags[j] = if is_inf(up) { 1 } else { 3 };
+        if !is_inf(up) {
+            ub[j] = up - lo;
+        }
+    }
+    for i in 0..m {
+        if sense_file[i] != b'=' {
+            flags[n2 + perm[i] as usize] = 1;
+        }
+    }
+    let ub_cols: Vec<usize> = (0..n2).filter(|&j| flags[j] & 2 != 0).collect();
+    let (ub_lo, ub_hi) = if ub_cols.is_empty() { (n2, n2) } else { (ub_cols[0], ub_cols[ub_cols.len() - 1] + 1) };
+    // Matrix in permuted rows, entries ascending by position.
+    let mut col_start = vec![0usize];
+    let mut row_idx = Vec::new();
+    let mut val = Vec::new();
+    for j in 0..n2 {
+        let mut e: Vec<(usize, f64)> = model.col(j).filter(|&(_, v)| v != 0.0).map(|(i, v)| (perm[i] as usize, sign[i] * v)).collect();
+        e.sort_by_key(|t| t.0);
+        for (i, v) in e {
+            row_idx.push(i);
+            val.push(v);
+        }
+        col_start.push(row_idx.len());
+    }
+    // Shift b by the lower bounds: b - A lower (column-ordered accumulation).
+    let mut b = vec![0.0; m];
+    for i in 0..m {
+        b[perm[i] as usize] = b_file[i];
+    }
+    let mut f = StdForm {
+        b_file: b_file.clone(),
+        m,
+        n2,
+        col_start,
+        row_idx,
+        val,
+        sense: (0..m).map(|k| sense_file[row_of[k]]).collect(),
+        flags,
+        b: Vec::new(),
+        c: model.obj.clone(),
+        ub,
+        ub_lo,
+        ub_hi,
+        offset: model.offset,
+        cshift: 0.0,
+        lower: lower.clone(),
+        row_of,
+    };
+    if lower.iter().any(|&l| l != 0.0) {
+        let al = f.ax_cols(&lower);
+        for i in 0..m {
+            b[i] = b[i] - al[i];
+        }
+        let mut cs = 0.0;
+        for j in 0..n2 {
+            cs = cs + f.c[j] * lower[j];
+        }
+        f.cshift = cs;
+    }
+    f.b = b;
+    Ok(f)
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// x87 extended-precision emulation for the compensated dot of `0x35adf0` (64-bit significand, round to nearest even; no overflow,
+// no denormals).
+
+#[derive(Clone, Copy, Debug)]
+struct Ext {
+    neg: bool,
+    /// Significand with the top bit set, or 0 for zero.
+    m: u64,
+    /// Value = m * 2^e.
+    e: i32,
+}
+
+impl Ext {
+    const ZERO: Ext = Ext { neg: false, m: 0, e: 0 };
+
+    fn from_f64(d: f64) -> Ext {
+        if d == 0.0 {
+            return Ext::ZERO;
+        }
+        let bits = d.to_bits();
+        let ex = ((bits >> 52) & 0x7ff) as i32;
+        let frac = bits & ((1u64 << 52) - 1);
+        let (mant, e) = if ex == 0 { (frac, -1074) } else { (frac | (1u64 << 52), ex - 1075) };
+        let lz = mant.leading_zeros();
+        Ext { neg: d < 0.0, m: mant << lz, e: e - lz as i32 }
+    }
+
+    /// Rounds `m * 2^e` (plus a sticky tail below the lowest bit when `sticky`) to 64 significant bits.
+    fn round(neg: bool, m: u128, e: i32, sticky: bool) -> Ext {
+        if m == 0 {
+            return Ext::ZERO;
+        }
+        let bits = 128 - m.leading_zeros() as i32;
+        if bits <= 64 {
+            let sh = 64 - bits;
+            return Ext { neg, m: (m << sh) as u64, e: e - sh };
+        }
+        let sh = (bits - 64) as u32;
+        let rem = m & ((1u128 << sh) - 1);
+        let half = 1u128 << (sh - 1);
+        let mut q = (m >> sh) as u64;
+        let mut e = e + sh as i32;
+        if rem > half || (rem == half && (sticky || q & 1 == 1)) {
+            let (nq, over) = q.overflowing_add(1);
+            q = nq;
+            if over {
+                q = 1u64 << 63;
+                e += 1;
+            }
+        }
+        Ext { neg, m: q, e }
+    }
+
+    fn mul_f64(a: f64, b: f64) -> Ext {
+        let (x, y) = (Ext::from_f64(a), Ext::from_f64(b));
+        if x.m == 0 || y.m == 0 {
+            return Ext::ZERO;
+        }
+        Ext::round(x.neg != y.neg, x.m as u128 * y.m as u128, x.e + y.e, false)
+    }
+
+    fn neg(self) -> Ext {
+        Ext { neg: !self.neg, ..self }
+    }
+
+    fn add(self, other: Ext) -> Ext {
+        if self.m == 0 {
+            return other;
+        }
+        if other.m == 0 {
+            return self;
+        }
+        // a = the larger magnitude (significands are normalized, so the exponent decides, then the significand).
+        let (a, b) = if (self.e, self.m) >= (other.e, other.m) { (self, other) } else { (other, self) };
+        let shift = (a.e - b.e) as u32;
+        let aa = (a.m as u128) << 62;
+        let (mut bb, mut sticky) = (0u128, true);
+        if shift < 126 {
+            let full = (b.m as u128) << 62;
+            bb = full >> shift;
+            sticky = shift > 0 && (full & ((1u128 << shift) - 1)) != 0;
+        }
+        if sticky {
+            bb |= 1;
+        }
+        let e = a.e - 62;
+        if a.neg == b.neg {
+            Ext::round(a.neg, aa + bb, e, false)
+        } else {
+            Ext::round(a.neg, aa - bb, e, false)
+        }
+    }
+
+    fn sub(self, other: Ext) -> Ext {
+        self.add(other.neg())
+    }
+
+    fn to_f64(self) -> f64 {
+        if self.m == 0 {
+            return 0.0;
+        }
+        let rem = self.m & 0x7ff;
+        let mut q = self.m >> 11;
+        let mut e = self.e + 11;
+        if rem > 0x400 || (rem == 0x400 && q & 1 == 1) {
+            q += 1;
+            if q == 1u64 << 53 {
+                q >>= 1;
+                e += 1;
+            }
+        }
+        let v = ldexp(q as f64, e);
+        if self.neg {
+            -v
+        } else {
+            v
+        }
+    }
+}
+
+fn ldexp(v: f64, e: i32) -> f64 {
+    let h = e / 2;
+    v * 2f64.powi(h) * 2f64.powi(e - h)
+}
+
+/// `0x35adf0`: Kahan summation in extended precision of the extended products `a_i b_i`:
+/// `t = a b; y = t - c; s' = s + y; c = (s' - s) - y` with every operation rounded to 64 bits (C).
+fn kahan_dot(a: &[f64], b: &[f64]) -> Ext {
+    let (mut s, mut c) = (Ext::ZERO, Ext::ZERO);
+    for i in 0..a.len() {
+        let t = Ext::mul_f64(a[i], b[i]);
+        let y = t.sub(c);
+        let sn = s.add(y);
+        c = sn.sub(s).sub(y);
+        s = sn;
+    }
+    s
+}
+
+/// `Q+0x1f0` (mu) of `0x2ecde0` (C): `r2 = x.z` over all entries, `r3 = u.v` over `[lo, hi)`, `s = double(r3 + double(r2 + 0))`,
+/// `mu = (tau kappa + s) / ncomp`.
+pub fn complementarity(x: &[f64], z: &[f64], u: &[f64], v: &[f64], lo: usize, hi: usize, tau: f64, kappa: f64, ncomp: usize) -> f64 {
+    let r2 = kahan_dot(x, z);
+    let r3 = kahan_dot(&u[lo..hi], &v[lo..hi]);
+    let c = r2.add(Ext::from_f64(0.0)).to_f64();
+    let d = r3.add(Ext::from_f64(c)).to_f64();
+    (tau * kappa + d) / ncomp as f64
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Double kernels.
+
+/// `0x311b80` (C): `sum a_i b_i`. `n < 8` (or `n < peel + 8`, `peel = parity & 1`): sequential; otherwise `peel` scalar products, blocks of 8 into
+/// four 2-lane accumulators (acc0 starts at the running sum), `(acc0 + acc1) + (acc2 + acc3)` per lane, lane 0 + lane 1, then the scalar tail.
+pub fn dot_lanes(a: &[f64], b: &[f64], parity: usize) -> f64 {
+    let n = a.len();
+    if n == 0 {
+        return 0.0;
+    }
+    let peel = parity & 1;
+    if n >= 8 && n >= peel + 8 {
+        let mut s = 0.0;
+        for i in 0..peel {
+            s = s + a[i] * b[i];
+        }
+        let mut acc = [[s, 0.0], [0.0, 0.0], [0.0, 0.0], [0.0, 0.0]];
+        let end = n - ((n - peel) & 7);
+        let mut k = peel;
+        while k < end {
+            for g in 0..4 {
+                for l in 0..2 {
+                    acc[g][l] = acc[g][l] + a[k + 2 * g + l] * b[k + 2 * g + l];
+                }
+            }
+            k += 8;
+        }
+        let t0 = [acc[0][0] + acc[1][0], acc[0][1] + acc[1][1]];
+        let t1 = [acc[2][0] + acc[3][0], acc[2][1] + acc[3][1]];
+        let t = [t0[0] + t1[0], t0[1] + t1[1]];
+        let mut s = t[0] + t[1];
+        for i in end..n {
+            s = s + a[i] * b[i];
+        }
+        return s;
+    }
+    let mut s = 0.0;
+    for i in 0..n {
+        s = s + a[i] * b[i];
+    }
+    s
+}
+
+/// `0x311d00`: `max |a_i|`.
+pub fn max_abs(a: &[f64]) -> f64 {
+    let mut m = 0.0;
+    for &v in a {
+        if v.abs() >= m {
+            m = v.abs();
+        }
+    }
+    m
+}
+
+/// The scalars of `0x2e4f10` (C): norms of `b` (rows in file order) and `c` (columns in file order) and the feasibility thresholds.
+#[derive(Debug, Clone, Copy)]
+pub struct Setup {
+    pub q160: f64,
+    pub q168: f64,
+    pub q170: f64,
+    pub q178: f64,
+    pub q260: f64,
+    pub q268: f64,
+    pub q270: f64,
+}
+
+pub fn setup_scalars(b_file: &[f64], c_file: &[f64], tol: f64) -> Setup {
+    let q160 = dot_lanes(b_file, b_file, 0).sqrt();
+    let q170 = dot_lanes(c_file, c_file, 0).sqrt();
+    Setup {
+        q160,
+        q168: max_abs(b_file),
+        q170,
+        q178: max_abs(c_file),
+        q260: ((b_file.len() as f64 + 1.0).sqrt() + q160) * tol,
+        q268: ((c_file.len() as f64 + 1.0).sqrt() + q170) * tol,
+        q270: 10.0 * tol,
+    }
+}
+
+/// Sum of `t(base + k)`, `k < count`, as `0x30c670` adds a block whose 16-byte alignment is the parity of `base`: fewer than 8 (or `8 + peel`)
+/// elements one by one onto `a0`; otherwise `peel` scalars first, blocks of 8 into four lane accumulators (lane `l` gets `t[k+l]` then
+/// `t[k+l+4]`, lane 0 starts at `a0`), `(a0 + a2) + (a1 + a3)`, then the scalar tail (C).
+fn lane_block(t: &dyn Fn(usize) -> f64, base: usize, count: usize, a0: f64) -> f64 {
+    let peel = base & 1;
+    if count >= 8 && count >= peel + 8 {
+        let mut a = [a0, 0.0, 0.0, 0.0];
+        for i in 0..peel {
+            a[0] = a[0] + t(base + i);
+        }
+        let end = count - ((count - peel) & 7);
+        let mut k = peel;
+        while k < end {
+            for l in 0..4 {
+                a[l] = a[l] + t(base + k + l) + t(base + k + l + 4);
+            }
+            k += 8;
+        }
+        let mut tot = (a[0] + a[2]) + (a[1] + a[3]);
+        for i in end..count {
+            tot = tot + t(base + i);
+        }
+        return tot;
+    }
+    let mut tot = a0;
+    for i in 0..count {
+        tot = tot + t(base + i);
+    }
+    tot
+}
+
+/// The current iterate (`Q+0x658` x, `0x668` z, `0x660` y, `0x670` u, `0x678` v). x, z have `n2 + m` entries, u, v `n2`, y `m`.
+#[derive(Debug, Clone)]
+pub struct State {
+    pub x: Vec<f64>,
+    pub z: Vec<f64>,
+    pub y: Vec<f64>,
+    pub u: Vec<f64>,
+    pub v: Vec<f64>,
+}
+
+/// A search direction: `dx`, `dz` over all variables, `dy` over the rows, `du`, `dv` over the columns.
+#[derive(Debug, Clone, Default)]
+pub struct Direction {
+    pub dx: Vec<f64>,
+    pub dy: Vec<f64>,
+    pub dz: Vec<f64>,
+    pub du: Vec<f64>,
+    pub dv: Vec<f64>,
+}
+
+/// `0x30c670` (C): mean complementarity after the trial step.
+fn mu_aff(f: &StdForm, s: &State, d: &Direction, ap: f64, ad: f64, ncomp: usize) -> f64 {
+    let t = |i: usize| (d.dx[i] * ap + s.x[i]) * (d.dz[i] * ad + s.z[i]);
+    let mut acc = 0.0;
+    for j in 0..f.n2 {
+        if f.flags[j] & 1 != 0 {
+            acc = acc + t(j);
+        }
+    }
+    let mut tot = lane_block(&t, f.n2, f.m, acc);
+    if f.has_ub() {
+        let tu = |j: usize| (d.du[j] * ap + s.u[j]) * (d.dv[j] * ad + s.v[j]);
+        tot = lane_block(&tu, f.ub_lo, f.ub_hi - f.ub_lo, tot);
+    }
+    tot / ncomp as f64
+}
+
+/// `0x2e0410` after `0x30c670` (C): `r = aff / max(mu, 1e-30)`, `sigma = r r min(r, 0.1)`, `target = mu sigma`.
+fn sigma_target(mu: f64, aff: f64) -> f64 {
+    let r = aff / mu.max(1e-30);
+    mu * (r * r * r.min(0.1))
+}
+
+/// `0x30c050` / `0x30ed50` (C): step to the boundary of `x + a d >= 0` over the flagged entries (and `u + a e` over `[lo, hi)`).
+fn ratio(x: &[f64], d: &dyn Fn(usize) -> f64, fl: &[u8], up: Option<(usize, usize, &[f64], &dyn Fn(usize) -> f64)>) -> f64 {
+    let mut a = 1.001;
+    for j in 0..x.len() {
+        if fl[j] & 1 != 0 {
+            let dj = d(j);
+            if a * dj + x[j] < 0.0 {
+                a = -(x[j] + (-1e-30)) / dj - 1e-13;
+            }
+        }
+    }
+    if let Some((lo, hi, u, e)) = up {
+        for j in lo..hi {
+            let dj = e(j);
+            if a * dj + u[j] < 0.0 {
+                a = -(u[j] + (-1e-30)) / dj - 1e-13;
+            }
+        }
+    }
+    if a <= 0.0 {
+        0.0
+    } else {
+        a
+    }
+}
+
+fn step_pair(f: &StdForm, s: &State, d: &Direction, d2: Option<(&Direction, f64)>, primal: bool) -> f64 {
+    // Direction d, or d + w d2 as `d2 w + d`.
+    if primal {
+        let dir = |j: usize| match d2 {
+            Some((e, w)) => e.dx[j] * w + d.dx[j],
+            None => d.dx[j],
+        };
+        let du = |j: usize| match d2 {
+            Some((e, w)) => e.du[j] * w + d.du[j],
+            None => d.du[j],
+        };
+        let up: Option<(usize, usize, &[f64], &dyn Fn(usize) -> f64)> = if f.has_ub() { Some((f.ub_lo, f.ub_hi, &s.u, &du)) } else { None };
+        ratio(&s.x, &dir, &f.flags, up)
+    } else {
+        let dir = |j: usize| match d2 {
+            Some((e, w)) => e.dz[j] * w + d.dz[j],
+            None => d.dz[j],
+        };
+        let dv = |j: usize| match d2 {
+            Some((e, w)) => e.dv[j] * w + d.dv[j],
+            None => d.dv[j],
+        };
+        let up: Option<(usize, usize, &[f64], &dyn Fn(usize) -> f64)> = if f.has_ub() { Some((f.ub_lo, f.ub_hi, &s.v, &dv)) } else { None };
+        ratio(&s.z, &dir, &f.flags, up)
+    }
+}
+
+/// `0x30ed50` pass 1 (C): weights `w_i = ((ntry-1-i)(1-wlo))/(ntry-1) + wlo`, `wlo = clamp(ap0 ad0, 0.01, 1)`; a weight replaces the best
+/// step only when `best * 1.0001 < step` (primal and dual separately). Returns `(best_p, best_d, wp, wd)`.
+fn select(f: &StdForm, s: &State, d: &Direction, d2: &Direction, ap0: f64, ad0: f64, ntry: usize) -> (f64, f64, f64, f64) {
+    let wlo = (ap0 * ad0).min(1.0).max(0.01);
+    let (mut bp, mut bd) = (-1e100, -1e100);
+    let (mut wp, mut wd) = (0.0, 0.0);
+    for i in 0..ntry {
+        let w = if ntry > 1 { (((ntry - 1 - i) as f64) * (1.0 - wlo)) / ((ntry - 1) as f64) + wlo } else { wlo };
+        let (ap, ad) = if w != 0.0 {
+            (step_pair(f, s, d, Some((d2, w)), true), step_pair(f, s, d, Some((d2, w)), false))
+        } else {
+            (ap0, ad0)
+        };
+        if bp * 1.0001 < ap {
+            bp = ap;
+            wp = w;
+        }
+        if bd * 1.0001 < ad {
+            bd = ad;
+            wd = w;
+        }
+    }
+    (bp, bd, wp, wd)
+}
+
+fn combine(d0: &[f64], d1: &[f64], w: f64) -> Vec<f64> {
+    (0..d0.len()).map(|j| d1[j] * w + d0[j]).collect()
+}
+
+/// `0x30d3e0` (C): step-back gamma and the update of x, z, y (u, v). `g0 = 1e-6` (no cones).
+/// Returns the new state and `(g, sp, sd)`.
+fn update(f: &StdForm, s: &State, d: &Direction, ap: f64, ad: f64, ncomp: usize) -> (State, (f64, f64, f64)) {
+    let g0 = 1e-6;
+    let steps = |g: f64| ((ap * (1.0 - g)).min(1.0), ((1.0 - g) * ad).min(1.0));
+    let (sp, sd) = steps(g0);
+    let (mut tot, mut minp) = (0.0, 1e100);
+    for j in 0..f.n() {
+        if f.flags[j] & 1 != 0 {
+            let p = (d.dx[j] * sp + s.x[j]) * (d.dz[j] * sd + s.z[j]);
+            minp = f64::min(minp, p);
+            tot = tot + p;
+        }
+    }
+    for j in f.ub_lo..f.ub_hi {
+        if f.flags[j] & 2 != 0 {
+            let p = (d.du[j] * sp + s.u[j]) * (d.dv[j] * sd + s.v[j]);
+            minp = f64::min(minp, p);
+            tot = tot + p;
+        }
+    }
+    tot = tot + (0.0 * sd + 0.0) * (0.0 * sp + 1.0);
+    tot = tot / ncomp as f64;
+    let mut g = g0;
+    if minp < 0.01 * tot {
+        let gg = (0.01 * g0 * tot) / minp;
+        if g0 <= gg {
+            g = gg;
+        }
+    }
+    g = g.min(0.5);
+    let (sp, sd) = steps(g);
+    let n = f.n();
+    let (mut x, mut z) = (vec![0.0; n], vec![0.0; n]);
+    for j in 0..n {
+        x[j] = sp * d.dx[j] + s.x[j];
+        z[j] = sd * d.dz[j] + s.z[j];
+        if f.flags[j] & 1 != 0 {
+            x[j] = x[j].max(1e-30);
+            z[j] = z[j].max(1e-30);
+        }
+    }
+    let y: Vec<f64> = (0..f.m).map(|i| d.dy[i] * sd + s.y[i]).collect();
+    let (mut u, mut v) = (s.u.clone(), s.v.clone());
+    for j in f.ub_lo..f.ub_hi {
+        if f.flags[j] & 2 != 0 {
+            u[j] = (sp * d.du[j] + s.u[j]).max(1e-30);
+            v[j] = (sd * d.dv[j] + s.v[j]).max(1e-30);
+        }
+    }
+    (State { x, z, y, u, v }, (g, sp, sd))
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Residuals and scalars of `0x2ecde0` (C).
+
+/// Residual vectors and scalars of one evaluation; scalar names are the reference's `Q` offsets.
+#[derive(Debug, Clone)]
+pub struct Residuals {
+    /// `tau b - Af x` (`Q+0x7a0`, m entries).
+    pub rp: Vec<f64>,
+    /// Dual residual (`Q+0x7a8`, n entries).
+    pub rd: Vec<f64>,
+    /// `ub tau - x - u` over `[lo, hi)` (zero elsewhere; n2 entries).
+    pub ru: Vec<f64>,
+    pub q130: f64,
+    pub q138: f64,
+    pub q140: f64,
+    pub q148: f64,
+    pub q198: f64,
+    pub q1a0: f64,
+    pub q1a8: f64,
+    pub q1b0: f64,
+    pub q1c0: f64,
+    pub q1d8: f64,
+    pub q1e0: f64,
+    pub q1f0: f64,
+    pub q1f8: f64,
+}
+
+fn dual_residual(f: &StdForm, s: &State, tau: f64) -> Vec<f64> {
+    let (n2, m) = (f.n2, f.m);
+    let mut rd = vec![0.0; n2 + m];
+    let end = if n2 >= 8 { n2 - (n2 & 7) } else { 0 };
+    for j in 0..n2 {
+        let t = f.aty_col(j, &s.y);
+        let zj = if f.flags[j] & 1 != 0 { s.z[j] } else { 0.0 };
+        let vj = if f.flags[j] & 2 != 0 { s.v[j] } else { 0.0 };
+        rd[j] = if j < end { tau * f.c[j] - ((zj + t) - vj) } else { ((tau * f.c[j] - t) - zj) + vj };
+    }
+    for i in 0..m {
+        let t = if f.sense[i] != b'=' { s.y[i] } else { 0.0 };
+        rd[n2 + i] = -(s.z[n2 + i] + t);
+    }
+    rd
+}
+
+/// `scale` is the objective scale `Q+0x158` (1 for the controlled profile).
+pub fn residuals(f: &StdForm, s: &State, tau: f64, kappa: f64, ncomp: usize, scale: f64) -> Residuals {
+    let (m, n2) = (f.m, f.n2);
+    let (lo, hi) = (f.ub_lo, f.ub_hi);
+    let ax = f.af(&s.x);
+    let rp: Vec<f64> = (0..m).map(|i| tau * f.b[i] - ax[i]).collect();
+    let rd = dual_residual(f, s, tau);
+    let mut ru = vec![0.0; n2];
+    for j in lo..hi {
+        if f.flags[j] & 2 != 0 {
+            ru[j] = (f.ub[j] * tau - s.x[j]) - s.u[j];
+        }
+    }
+    let q1a0 = dot_lanes(&rp, &rp, 0).sqrt();
+    let q1c0 = if hi > lo { dot_lanes(&ru[lo..hi], &ru[lo..hi], lo).sqrt() } else { 0.0 };
+    let q1b0 = dot_lanes(&rd, &rd, 0).sqrt();
+    let mut mx = 0.0;
+    for &t in rp.iter().chain((lo..hi).filter(|&j| f.flags[j] & 2 != 0).map(|j| &ru[j])) {
+        if mx <= t.abs() {
+            mx = t.abs();
+        }
+    }
+    let q1d8 = mx / tau;
+    let mut dm = 0.0;
+    for j in 0..n2 {
+        let mut d = rd[j];
+        if f.flags[j] & 1 == 0 || 0.0 <= d {
+            d = d.abs();
+        } else {
+            d = -(d + s.z[j]);
+            if d <= 0.0 {
+                d = 0.0;
+            }
+        }
+        if dm <= d {
+            dm = d;
+        }
+    }
+    for i in 0..m {
+        if f.sense[i] != b'=' && dm <= s.y[i] {
+            dm = s.y[i];
+        }
+    }
+    let q138 = dot_lanes(&s.x[..n2], &f.c, 0) + 0.0 + f.cshift * tau;
+    let q130 = (q138 / scale) / tau + f.offset;
+    let g = dot_lanes(&s.y, &f.b, 0) - if hi > lo { dot_lanes(&s.v[lo..hi], &f.ub[lo..hi], lo) } else { 0.0 };
+    let q148 = ((0.0 + g) - 0.0) + tau * f.cshift;
+    let q140 = (q148 / scale) / tau + f.offset;
+    let q1f0 = complementarity(&s.x, &s.z, &s.u, &s.v, lo, hi, tau, kappa, ncomp);
+    Residuals {
+        rp,
+        rd,
+        ru,
+        q130,
+        q138,
+        q140,
+        q148,
+        q198: q1a0 / tau,
+        q1a0,
+        q1a8: q1b0 / tau,
+        q1b0,
+        q1c0,
+        q1d8,
+        q1e0: dm / tau,
+        q1f0,
+        q1f8: (q1f0 / tau) / tau,
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Starting point `0x2e8ef0` (C, five models).
+
+/// The diagonal `D` of the starting-point factor: 1 for a column with a lower bound only, 0.5 with both bounds, 0 for the slack of an '=' row.
+pub fn start_diag(f: &StdForm) -> Vec<f64> {
+    f.flags.iter().map(|&fl| match fl {
+        1 => 1.0,
+        3 => 0.5,
+        _ => 0.0,
+    }).collect()
+}
+
+/// The diagonal of `A D A'` at an iterate (C, `BIT.D`): `1 / (z/x + v/u)`; 0 for the slack of an '=' row.
+pub fn normal_diag(f: &StdForm, s: &State) -> Vec<f64> {
+    (0..f.n()).map(|j| {
+        let fl = f.flags[j];
+        if fl & 1 == 0 {
+            return 0.0;
+        }
+        let mut t = s.z[j] / s.x[j];
+        if j < f.n2 && fl & 2 != 0 {
+            t = t + s.v[j] / s.u[j];
+        } else {
+            t = t + 0.0;
+        }
+        1.0 / t
+    }).collect()
+}
+
+/// `0x2eb560` (C): the shifts `(p3, p4)` of the starting point from the minima and sums over the flagged entries.
+fn start_scalars(f: &StdForm, x: &[f64], z: &[f64], u: &[f64], v: &[f64], q168: f64, q178: f64) -> (f64, f64) {
+    let (n2, n) = (f.n2, f.n());
+    let fl = &f.flags;
+    let (mut mx, mut mz) = (1e100, 1e100);
+    for j in 0..n {
+        if fl[j] & 1 != 0 {
+            if x[j] <= mx {
+                mx = x[j];
+            }
+            if z[j] <= mz {
+                mz = z[j];
+            }
+        }
+    }
+    for j in 0..n2 {
+        if fl[j] & 2 != 0 {
+            if u[j] <= mx {
+                mx = u[j];
+            }
+            if v[j] <= mz {
+                mz = v[j];
+            }
+        }
+    }
+    let mut dx0 = mx * -1.5;
+    if dx0 <= 1e-4 {
+        dx0 = 1e-4;
+    }
+    let mut dz0 = -1.5 * mz;
+    if dz0 <= 1e-4 {
+        dz0 = 1e-4;
+    }
+    let (mut sx, mut sz, mut sxz) = (0.0, 0.0, 0.0);
+    let mut acc = |a: f64, b: f64| {
+        sx = sx + a;
+        sz = sz + b;
+        sxz = sxz + a * b;
+    };
+    for j in 0..n2 {
+        if fl[j] & 1 != 0 {
+            acc(x[j] + dx0, z[j] + dz0);
+        }
+        if fl[j] & 2 != 0 {
+            acc(u[j] + dx0, v[j] + dz0);
+        }
+    }
+    for j in n2..n {
+        if fl[j] & 1 != 0 {
+            acc(x[j] + dx0, z[j] + dz0);
+        }
+    }
+    let (mut p3, mut p4) = (100.0, 100.0);
+    if 0.0 < sz {
+        p3 = (sxz * 0.5) / sz + dx0;
+    }
+    if 0.0 < sx {
+        p4 = dz0 + (sxz * 0.5) / sx;
+    }
+    let t = (q168 * 1.0001 * p3).sqrt();
+    if p3 <= t {
+        p3 = t;
+    }
+    let t = (q178 * 1.0001 * p4).sqrt();
+    if p4 <= t {
+        p4 = t;
+    }
+    // Floor Q+0x30 = 0 -> 0.1 for an LP.
+    let floor = 0.1;
+    if p3 <= floor {
+        p3 = floor;
+    }
+    if p4 <= floor {
+        p4 = floor;
+    }
+    (p3, p4)
+}
+
+fn start_dual_stage1(f: &StdForm) -> (Vec<f64>, Vec<f64>) {
+    let mut z = vec![0.0; f.n()];
+    let mut v = vec![0.0; f.n2];
+    for j in 0..f.n2 {
+        match f.flags[j] {
+            0 => {}
+            3 => {
+                let t = f.c[j] * 0.5;
+                z[j] = t;
+                v[j] = -t;
+            }
+            fl if fl & 1 == 0 => v[j] = -f.c[j],
+            _ => z[j] = f.c[j],
+        }
+    }
+    (z, v)
+}
+
+fn start_dual_stage2(f: &StdForm, r: &[f64]) -> (Vec<f64>, Vec<f64>) {
+    let mut z = vec![0.0; f.n()];
+    let mut v = vec![0.0; f.n2];
+    for j in 0..f.n2 {
+        let fl = f.flags[j];
+        if fl == 3 {
+            z[j] = -r[j];
+            v[j] = r[j];
+        } else if fl & 1 == 0 {
+            if fl & 2 != 0 {
+                v[j] = r[j];
+            }
+        } else {
+            z[j] = -r[j];
+        }
+    }
+    for i in 0..f.m {
+        z[f.n2 + i] = -r[f.n2 + i];
+    }
+    (z, v)
+}
+
+/// The starting point from the two solves of `0x305f10` (stage 1: `x~`, `y~`; stage 2: `r`, `y`), after the clamps and before the z reduction.
+/// `mode` is the parameter block word `+0x2bf0` (0 by default). Returns `(state, p3, p4, stage)`.
+pub fn start_point(f: &StdForm, s1: (Vec<f64>, Vec<f64>), s2: (Vec<f64>, Vec<f64>), sc: &Setup, mode: i32) -> (State, f64, f64, u8) {
+    let (n2, n) = (f.n2, f.n());
+    let mut x = s1.0;
+    let mut u = vec![0.0; n2];
+    for j in 0..n2 {
+        if f.flags[j] & 2 != 0 {
+            u[j] = f.ub[j] - x[j];
+        }
+    }
+    let (mut z, mut v) = start_dual_stage1(f);
+    let (mut p3, mut p4) = start_scalars(f, &x, &z, &u, &v, sc.q168, sc.q178);
+    let (mut stage, mut y) = (1u8, vec![0.0; f.m]);
+    if mode != 1 {
+        let (z2, v2) = start_dual_stage2(f, &s2.0);
+        let (q3, q4) = start_scalars(f, &x, &z2, &u, &v2, sc.q168, sc.q178);
+        if mode == 2 || q4 < p4 {
+            z = z2;
+            v = v2;
+            p3 = q3;
+            p4 = q4;
+            stage = 2;
+            y = s2.1[..f.m].to_vec();
+        }
+    }
+    for j in 0..n {
+        if f.flags[j] & 1 != 0 {
+            x[j] = (p3 + x[j]).min(1e10);
+            z[j] = (z[j] + p4).min(1e10);
+        } else {
+            x[j] = x[j].max(-1e10).min(1e10);
+        }
+    }
+    for j in 0..n2 {
+        if f.flags[j] & 2 != 0 {
+            u[j] = (p3 + u[j]).min(1e10);
+            v[j] = (v[j] + p4).min(1e10);
+        }
+    }
+    let y = y.into_iter().map(|t| t.max(-1e10).min(1e10)).collect();
+    (State { x, z, y, u, v }, p3, p4, stage)
+}
+
+/// `0x2f1560` (C): pulls z (and v) towards `mu / x` within the dual residual: for every flagged entry `d = mu/x - z`,
+/// `d <= 0: d = max(d, min(-1e-20, r))`, else `d = min(d, max(1e-20, r))`; `z += d; r -= d`. Slacks only when the flag is exactly 1.
+pub fn z_reduce(f: &StdForm, s: &mut State, r: &mut [f64], mu: f64) {
+    let clamp = |d: f64, rr: f64| if d <= 0.0 { d.max((-1e-20f64).min(rr)) } else { d.min(1e-20f64.max(rr)) };
+    for j in 0..f.n2 {
+        if f.flags[j] & 1 != 0 {
+            let d = clamp(mu / s.x[j] - s.z[j], r[j]);
+            s.z[j] = s.z[j] + d;
+            r[j] = r[j] - d;
+        }
+        if f.flags[j] & 2 != 0 {
+            let d = clamp(mu / s.u[j] - s.v[j], -r[j]);
+            s.v[j] = s.v[j] + d;
+            r[j] = r[j] + d;
+        }
+    }
+    for j in f.n2..f.n() {
+        if f.flags[j] == 1 {
+            let d = clamp(mu / s.x[j] - s.z[j], r[j]);
+            s.z[j] = s.z[j] + d;
+            r[j] = r[j] - d;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Termination `0x2e2fe0` (C for the continue and optimal returns of the corpus, H for the others).
+
+/// Inputs of the status test: the reference's `Q` and parameter-block words under their offsets.
+#[derive(Debug, Clone)]
+pub struct TermIn {
+    pub it: i32,
+    pub q130: f64,
+    pub q138: f64,
+    pub q140: f64,
+    pub q148: f64,
+    pub q128: f64,
+    pub q1e8: f64,
+    pub off: f64,
+    pub q1f0: f64,
+    pub q1f8: f64,
+    pub tol: f64,
+    pub ncomp: f64,
+    pub tau: f64,
+    pub kappa: f64,
+    pub q198: f64,
+    pub q1a8: f64,
+    pub q1d8: f64,
+    pub q1e0: f64,
+    pub q1a0: f64,
+    pub q1b0: f64,
+    pub q1c0: f64,
+    pub q1d0: f64,
+    pub q220: f64,
+    pub q228: f64,
+    pub q160: f64,
+    pub q170: f64,
+    pub q260: f64,
+    pub q268: f64,
+    pub q270: f64,
+    pub q278: f64,
+    pub q2a0: i32,
+    pub q5e0: f64,
+    pub q5e8: f64,
+    /// `Q+0x88`, `0xf8`, `0xa8`, `0xf4`: iteration of the last improvement of the progress measures (written by `0x2e39b0`, undecoded).
+    pub i88: i32,
+    pub if8: i32,
+    pub ia8: i32,
+    pub if4: i32,
+    /// `P+0x2dd4` (stall flag), `P+0x2460`, `P+0x2bbc` (iteration limit), `P+0x2c10`; time limit exceeded.
+    pub p2dd4: bool,
+    pub p2460: f64,
+    pub p2bbc: i32,
+    pub p2c10: i32,
+    pub time_up: bool,
+    /// Histories by iteration: `0x50` (Q198), `0x68` (Q1a8), `0x78` (Q1f8), `0x80` (Q1f0), each including the current iteration.
+    pub h50: Vec<f64>,
+    pub h68: Vec<f64>,
+    pub h78: Vec<f64>,
+    pub h80: Vec<f64>,
+}
+
+/// `0x2e2fe0`: 1 continue, 2 optimal, 3 / 5 infeasible variants, 6, 7 iteration limit, 0xb time, 0xd numerical. Returns `(code, deciding return number)`.
+pub fn status(t: &TermIn) -> (i32, u32) {
+    let it = t.it;
+    let iu = it as usize;
+    let nx = t.q220.sqrt();
+    let nz = t.q228.sqrt();
+    let gap = (t.q130 - t.q140).abs();
+    let mut relgap = gap / ((t.q130 - t.off).abs() + 1.0);
+    if t.q2a0 == 0 {
+        let alt = gap / (100.0 * t.q130.abs() + 1.0);
+        if relgap <= alt {
+            relgap = alt;
+        }
+    }
+    let c17 = (t.q1f0 * t.ncomp) / (t.q138.abs() + 1.0);
+    let c23 = (t.ncomp * t.q1f8) / (t.q130.abs() + 1.0);
+    let stall = (it > 0 && t.tol < t.q1f8 && t.h78[iu] < 0.5 * t.h78[iu - 1]) || t.p2dd4;
+    let n18 = (t.q198 * t.q198 + t.q1c0 * t.q1c0 + t.q1d0 * t.q1d0).sqrt();
+    let b6 = n18 < t.q260 || t.q1d8 < t.q270;
+    let b7 = t.q1a8 < t.q268 || t.q1e0 < t.q278;
+    let tol = t.tol;
+    if it > 5 && 1e20 < t.q1f0 && 0.99 * t.h80[iu - 1] < t.q1f0 {
+        return (0xd, 1);
+    }
+    if 1e100 < t.q1f8 || 1e100 < t.q220 || 1e100 < t.q228 {
+        return (0xd, 2);
+    }
+    for v in [t.q1f8, t.q220, t.q228] {
+        if v.is_nan() || v.is_infinite() {
+            return (0xd, 3);
+        }
+    }
+    if t.q128 < t.q1e8 {
+        return (6, 4);
+    }
+    let kap_small = t.kappa < 100.0 * tol * t.tau;
+    let a = relgap < tol && c23 < 100.0 * tol && b6 && b7 && kap_small && !stall;
+    let b = c17 < tol && c23 < 100.0 * tol && relgap < 0.1 && b6 && b7 && !stall;
+    let c = relgap < tol && c17 < tol && b6 && b7 && it > 1 && !t.p2dd4 && 0.5 * t.h78[iu - 1] < t.h78[iu];
+    let d = c17 < tol && t.p2dd4 && t.q1d8 < t.p2460 && kap_small;
+    let e = t.q1f8 < 1e-16 && b6 && b7;
+    if a || b || c || d || e {
+        return (2, 5);
+    }
+    if t.q1f0 < tol && t.tau < tol && 1e6 * t.tau < t.kappa && t.q1a0 < t.q260 && t.q1b0 < t.q268 {
+        if 1e-10 < t.q148 && t.q138 < -1e-10 {
+            return (5 - 2 * (-t.q138 < t.q148) as i32, 6);
+        }
+        if 1e-10 < t.q148 {
+            return (3, 7);
+        }
+        if t.q138 < -1e-10 {
+            return (5, 8);
+        }
+    }
+    if t.tau < tol && t.q1d8 < 0.01 * t.p2460 * nx && t.q138 < -1000.0 * tol * nx {
+        return (5, 9);
+    }
+    if t.tau < tol && 1e6 * t.tau < t.kappa && t.q1e0 < 0.01 * t.p2460 * nz && 1000.0 * tol * nz < t.q148 {
+        return (3, 10);
+    }
+    if it > 10 && t.kappa < 100.0 * tol * t.tau && relgap < 10.0 * tol && b6 && b7 && 0.8 * t.h80[iu - 3] < t.q1f0 {
+        return (2, 11);
+    }
+    if t.p2bbc <= it {
+        return (7, 12);
+    }
+    if t.time_up {
+        return (0xb, 13);
+    }
+    if t.p2bbc != 1000 && t.p2c10 == 0 {
+        return (1, 14);
+    }
+    if t.if8.max(t.i88) + 200 < it {
+        return (0xd, 15);
+    }
+    let d1 = t.q160 + 1.0;
+    let d2 = 1.0 + t.q170;
+    let m = |j: usize| (t.h50[j] / d1).max(t.h68[j] / d2);
+    let late;
+    if it < 11 {
+        if it > 5 {
+            if m(iu) < 0.9 * m(iu - 5) && t.q1f0 <= 0.99 * t.h78[iu - 5] {
+                return (1, 16);
+            }
+            if m(iu) < 0.9 * m(iu - 1) && t.q1f0 <= 0.99 * t.h78[iu - 1] {
+                return (1, 17);
+            }
+            late = t.if8 + 0x14 < it;
+        } else if it > 1 {
+            if m(iu) < 0.9 * m(iu - 1) && t.q1f0 <= 0.99 * t.h78[iu - 1] {
+                return (1, 18);
+            }
+            late = t.if8 + 0x14 < it;
+        } else {
+            late = it > t.if8 + 0x14;
+        }
+    } else {
+        if 1e-10 < t.q1f0 && t.q1f0 < t.h80[iu - 10] * 0.9 {
+            return (1, 19);
+        }
+        if m(iu) < 0.9 * m(iu - 5) && t.q1f0 <= 0.99 * t.h78[iu - 5] {
+            return (1, 20);
+        }
+        if m(iu) < 0.9 * m(iu - 1) && t.q1f0 <= 0.99 * t.h78[iu - 1] {
+            return (1, 21);
+        }
+        late = t.if8 + 0x14 < it;
+    }
+    if late {
+        let lim = if t.q2a0 != 0 { t.if4 + 4 } else { t.if4 };
+        if t.q2a0 != 0 && lim < it {
+            return (0xd, 22);
+        }
+        if t.if4 + 0x13 < it {
+            return (0xd, 23);
+        }
+    }
+    if it > 0x1e {
+        if t.q2a0 != 0 && t.i88 + 9 < it && t.ia8 + 9 < it && t.if8 <= t.i88 && t.if8 <= t.ia8 {
+            return (0xd, 24);
+        }
+        if it > 0x32 && t.i88 + 9 < it && t.ia8 + 9 < it && t.if8 <= t.i88 && t.if8 <= t.ia8 {
+            return (0xd, 25);
+        }
+    }
+    if (t.ncomp < 1.0 || 1e-16 <= t.q1f8) && (t.q5e0 != 0.0 || t.q5e8 != 0.0 || it <= t.if8 + 2) {
+        return (1, 26);
+    }
+    (0xd, 27)
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Linear algebra behind the iteration.
+
+/// Right-hand sides of one direction solve (`Af dx = rp`, `Af'dy + dz - dv = rd`, `dx + du = ru`, `z dx + x dz = rcx`, `v du + u dv = rcu`).
+#[derive(Debug, Clone)]
+pub struct Rhs {
+    pub rp: Vec<f64>,
+    pub rd: Vec<f64>,
+    pub ru: Vec<f64>,
+    pub rcx: Vec<f64>,
+    pub rcu: Vec<f64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DirKind {
+    Predictor,
+    Corrector,
+}
+
+/// The two solves of the starting point (`0x2e8ef0`, factor with `D = start_diag`).
+#[derive(Debug, Clone, Copy)]
+pub enum StartKind<'a> {
+    /// `A D A' y = b - Af w`, returns `(x = w + D Af' y, y)` (`w` = half the upper bound of a boxed column).
+    Primal { w: &'a [f64] },
+    /// `A D A' y = Af D c`, returns `(r = Af' y - c, y)` over all `n` variables.
+    Dual,
+}
+
+/// Factor of `Af D Af'` and the solves with it (`0x2f1720` + `0x30fc90` / `0x305f10`).
+pub trait NormalSolver {
+    fn factor(&mut self, f: &StdForm, d: &[f64]) -> Result<(), BarrierError>;
+    fn start(&mut self, f: &StdForm, kind: StartKind) -> Result<(Vec<f64>, Vec<f64>), BarrierError>;
+    fn direction(&mut self, f: &StdForm, s: &State, kind: DirKind, rhs: &Rhs) -> Result<Direction, BarrierError>;
+    /// Number of trial weights of the corrector selection at iteration `it` (`Q+0x29c`). The reference's adaptation rule is not decoded
+    /// (5 at iteration 0 and 3 later on AFIRO, SC50A, BLEND, BORE3D, DEGEN2; 3 at iteration 0 on ADLITTLE), so a replaying solver supplies it.
+    fn ntry(&mut self, _it: i32, default: usize) -> usize {
+        default
+    }
+}
+
+/// Plain f64 dense `LDL'` of `Af D Af'` in the permuted row order. **Not bit-exact** with the reference (its supernodal accumulation order
+/// is not recovered); for tests at tolerance only. A pivot below `1e-13` times the largest diagonal is treated as a dependent row (its
+/// unknown is set to 0).
+#[derive(Default)]
+pub struct DenseSolver {
+    d: Vec<f64>,
+    l: Vec<f64>,
+    dinv: Vec<f64>,
+    m: usize,
+}
+
+impl DenseSolver {
+    fn solve_normal(&self, g: &[f64]) -> Vec<f64> {
+        let m = self.m;
+        let mut w = g.to_vec();
+        for k in 0..m {
+            for i in k + 1..m {
+                w[i] -= self.l[i * m + k] * w[k];
+            }
+        }
+        for k in 0..m {
+            w[k] *= self.dinv[k];
+        }
+        for k in (0..m).rev() {
+            for i in k + 1..m {
+                w[k] -= self.l[i * m + k] * w[i];
+            }
+        }
+        w
+    }
+
+    /// `Af theta v` for a vector over the variables.
+    fn af_theta(&self, f: &StdForm, v: &[f64]) -> Vec<f64> {
+        let mut out = vec![0.0; f.m];
+        for j in 0..f.n2 {
+            for k in f.col_start[j]..f.col_start[j + 1] {
+                out[f.row_idx[k]] += f.val[k] * self.d[j] * v[j];
+            }
+        }
+        for i in 0..f.m {
+            if f.sense[i] != b'=' {
+                out[i] += self.d[f.n2 + i] * v[f.n2 + i];
+            }
+        }
+        out
+    }
+
+    fn at_y(f: &StdForm, y: &[f64]) -> Vec<f64> {
+        let mut t = vec![0.0; f.n()];
+        for j in 0..f.n2 {
+            t[j] = f.aty_col(j, y);
+        }
+        for i in 0..f.m {
+            if f.sense[i] != b'=' {
+                t[f.n2 + i] = y[i];
+            }
+        }
+        t
+    }
+}
+
+impl NormalSolver for DenseSolver {
+    fn factor(&mut self, f: &StdForm, d: &[f64]) -> Result<(), BarrierError> {
+        let m = f.m;
+        self.m = m;
+        self.d = d.to_vec();
+        let mut a = vec![0.0; m * m];
+        for j in 0..f.n2 {
+            let r = f.col_start[j]..f.col_start[j + 1];
+            for p in r.clone() {
+                for q in r.clone() {
+                    a[f.row_idx[p] * m + f.row_idx[q]] += f.val[p] * d[j] * f.val[q];
+                }
+            }
+        }
+        for i in 0..m {
+            if f.sense[i] != b'=' {
+                a[i * m + i] += d[f.n2 + i];
+            }
+        }
+        let maxd = (0..m).map(|i| a[i * m + i]).fold(0.0, f64::max);
+        let mut l = vec![0.0; m * m];
+        let mut dinv = vec![0.0; m];
+        let mut dd = vec![0.0; m];
+        for k in 0..m {
+            let mut piv = a[k * m + k];
+            for t in 0..k {
+                piv -= l[k * m + t] * l[k * m + t] * dd[t];
+            }
+            if piv <= 1e-13 * maxd {
+                continue; // dependent row: dinv = 0, column of L = 0
+            }
+            dd[k] = piv;
+            dinv[k] = 1.0 / piv;
+            for i in k + 1..m {
+                let mut s = a[i * m + k];
+                for t in 0..k {
+                    s -= l[i * m + t] * l[k * m + t] * dd[t];
+                }
+                l[i * m + k] = s / piv;
+            }
+        }
+        self.l = l;
+        self.dinv = dinv;
+        Ok(())
+    }
+
+    fn start(&mut self, f: &StdForm, kind: StartKind) -> Result<(Vec<f64>, Vec<f64>), BarrierError> {
+        let n = f.n();
+        match kind {
+            StartKind::Primal { w } => {
+                let aw = f.af(w);
+                let g: Vec<f64> = (0..f.m).map(|i| f.b[i] - aw[i]).collect();
+                let y = self.solve_normal(&g);
+                let t = Self::at_y(f, &y);
+                let x = (0..n).map(|j| w[j] + self.d[j] * t[j]).collect();
+                Ok((x, y))
+            }
+            StartKind::Dual => {
+                let mut cf = f.c.clone();
+                cf.resize(n, 0.0);
+                let g = self.af_theta(f, &cf);
+                let y = self.solve_normal(&g);
+                let t = Self::at_y(f, &y);
+                let r = (0..n).map(|j| t[j] - cf[j]).collect();
+                Ok((r, y))
+            }
+        }
+    }
+
+    fn direction(&mut self, f: &StdForm, s: &State, _kind: DirKind, rhs: &Rhs) -> Result<Direction, BarrierError> {
+        let (n, n2, m) = (f.n(), f.n2, f.m);
+        let mut w = vec![0.0; n];
+        for j in 0..n {
+            if f.flags[j] & 1 != 0 {
+                w[j] = rhs.rd[j] - rhs.rcx[j] / s.x[j];
+                if j < n2 && f.flags[j] & 2 != 0 {
+                    w[j] += rhs.rcu[j] / s.u[j] - s.v[j] * rhs.ru[j] / s.u[j];
+                }
+            }
+        }
+        let aw = self.af_theta(f, &w);
+        let g: Vec<f64> = (0..m).map(|i| rhs.rp[i] + aw[i]).collect();
+        let dy = self.solve_normal(&g);
+        let t = Self::at_y(f, &dy);
+        let mut dir = Direction { dx: vec![0.0; n], dy, dz: vec![0.0; n], du: vec![0.0; n2], dv: vec![0.0; n2] };
+        for j in 0..n {
+            if f.flags[j] & 1 != 0 {
+                dir.dx[j] = self.d[j] * (t[j] - w[j]);
+                dir.dz[j] = (rhs.rcx[j] - s.z[j] * dir.dx[j]) / s.x[j];
+                if j < n2 && f.flags[j] & 2 != 0 {
+                    dir.du[j] = rhs.ru[j] - dir.dx[j];
+                    dir.dv[j] = (rhs.rcu[j] - s.v[j] * dir.du[j]) / s.u[j];
+                }
+            }
+        }
+        Ok(dir)
+    }
+}
+
+/// Captured solve outputs fed back in the order the iteration asks for them (starting point: primal, dual; then predictor and corrector per
+/// iteration). Test-only input of `examples/barrier_replay.rs`; the factor call is ignored.
+#[derive(Default)]
+pub struct ReplaySolver {
+    starts: Vec<(Vec<f64>, Vec<f64>)>,
+    dirs: Vec<Direction>,
+    ntry: Vec<Option<usize>>,
+    ns: usize,
+    nd: usize,
+}
+
+fn floats(v: &Value) -> Vec<f64> {
+    v.as_array().map(|a| a.iter().map(|x| x.as_f64().unwrap()).collect()).unwrap_or_default()
+}
+
+fn direction_json(v: &Value, sfx: &str) -> Direction {
+    Direction {
+        dx: floats(&v[format!("dx{sfx}")]),
+        dy: floats(&v[format!("dy{sfx}")]),
+        dz: floats(&v[format!("dz{sfx}")]),
+        du: floats(&v[format!("du{sfx}")]),
+        dv: floats(&v[format!("dv{sfx}")]),
+    }
+}
+
+impl ReplaySolver {
+    /// `{"start": {"x1", "y1", "r2", "y2"}, "iters": [{"pred": {dx, dy, dz, du, dv}, "corr": {dx2, dy2, dz2, du2, dv2}, "ntry": n}, ...]}`
+    /// (`dy` over the rows, `du`, `dv` over the columns, the others over all variables; `ntry` optional).
+    pub fn from_json(v: &Value) -> ReplaySolver {
+        let s = &v["start"];
+        let starts = vec![(floats(&s["x1"]), floats(&s["y1"])), (floats(&s["r2"]), floats(&s["y2"]))];
+        let mut dirs = Vec::new();
+        let mut ntry = Vec::new();
+        for it in v["iters"].as_array().map(|a| a.as_slice()).unwrap_or(&[]) {
+            dirs.push(direction_json(&it["pred"], ""));
+            dirs.push(direction_json(&it["corr"], "2"));
+            ntry.push(it["ntry"].as_u64().map(|n| n as usize));
+        }
+        ReplaySolver { starts, dirs, ntry, ns: 0, nd: 0 }
+    }
+
+    /// Whether every recorded solve was used.
+    pub fn consumed(&self) -> bool {
+        self.ns == self.starts.len() && self.nd == self.dirs.len()
+    }
+}
+
+impl NormalSolver for ReplaySolver {
+    fn factor(&mut self, _f: &StdForm, _d: &[f64]) -> Result<(), BarrierError> {
+        Ok(())
+    }
+
+    fn start(&mut self, _f: &StdForm, _kind: StartKind) -> Result<(Vec<f64>, Vec<f64>), BarrierError> {
+        let r = self.starts.get(self.ns).cloned().ok_or_else(|| BarrierError::Solver("replay: no more starting-point solves".into()))?;
+        self.ns += 1;
+        Ok(r)
+    }
+
+    fn direction(&mut self, _f: &StdForm, _s: &State, _kind: DirKind, _rhs: &Rhs) -> Result<Direction, BarrierError> {
+        let r = self.dirs.get(self.nd).cloned().ok_or_else(|| BarrierError::Solver("replay: no more direction solves".into()))?;
+        self.nd += 1;
+        Ok(r)
+    }
+
+    fn ntry(&mut self, it: i32, default: usize) -> usize {
+        self.ntry.get(it as usize).copied().flatten().unwrap_or(default)
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// The iteration.
+
+#[derive(Debug, Clone, Copy)]
+pub struct Options {
+    /// `BarConvTol` (`Q+0x258`).
+    pub tol: f64,
+    /// Iteration limit (`P+0x2bbc`).
+    pub max_iter: i32,
+    /// Trial weights of the first corrector (`Q+0x29c`): 5 at iteration 0, 3 later (the adaptation rule is not decoded).
+    pub ntry_first: usize,
+    pub ntry_later: usize,
+}
+
+impl Default for Options {
+    fn default() -> Options {
+        Options { tol: 1e-8, max_iter: 1000, ntry_first: 5, ntry_later: 3 }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BarrierStatus {
+    Optimal,
+    IterationLimit,
+    /// A status code of `0x2e2fe0` that this port does not interpret further (3 / 5 infeasible variants, 6, 0xb, 0xd).
+    Other(i32),
+}
+
+/// Per-iteration decisions (`BPRED` / `BAFF` / `BCORR` / `BSEL` / `BUPD` of the reference captures).
+#[derive(Debug, Clone, Default)]
+pub struct Decisions {
+    pub ap: f64,
+    pub ad: f64,
+    pub aff: f64,
+    pub target: f64,
+    pub tp: f64,
+    pub td: f64,
+    pub wp: f64,
+    pub wd: f64,
+    pub ntry: usize,
+    pub gamma: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct IterRecord {
+    pub it: i32,
+    pub state: State,
+    pub res: Residuals,
+    pub status: i32,
+    /// Absent at the starting point (it = -1) and at the final iteration.
+    pub dec: Option<Decisions>,
+}
+
+#[derive(Debug, Clone)]
+pub struct BarrierRun {
+    pub status: BarrierStatus,
+    pub iterations: i32,
+    pub state: State,
+    pub records: Vec<IterRecord>,
+}
+
+fn vec_json(v: &[f64]) -> Value {
+    json!(v)
+}
+
+fn emit_record(r: &IterRecord) {
+    let k = "barrier";
+    if !dump::on(k) {
+        return;
+    }
+    let mut rec = json!({
+        "it": r.it, "x": vec_json(&r.state.x), "z": vec_json(&r.state.z), "y": vec_json(&r.state.y),
+        "u": vec_json(&r.state.u), "v": vec_json(&r.state.v), "mu": r.res.q1f0, "pobj": r.res.q130, "dobj": r.res.q140,
+        "rp": r.res.q1d8, "rd": r.res.q1e0, "status": r.status,
+    });
+    if let Some(d) = &r.dec {
+        let o = rec.as_object_mut().unwrap();
+        for (name, v) in [("ap", d.ap), ("ad", d.ad), ("aff", d.aff), ("target", d.target), ("tp", d.tp), ("td", d.td), ("wp", d.wp), ("wd", d.wd), ("gamma", d.gamma)] {
+            o.insert(name.into(), json!(v));
+        }
+        o.insert("ntry".into(), json!(d.ntry));
+    }
+    dump::emit(k, rec);
+}
+
+fn term_input(f: &StdForm, sc: &Setup, o: &Options, it: i32, res: &Residuals, ncomp: usize, h: &Hist, best_dual: f64, q5: (f64, f64)) -> TermIn {
+    TermIn {
+        it,
+        q130: res.q130,
+        q138: res.q138,
+        q140: res.q140,
+        q148: res.q148,
+        q128: 1e100,
+        q1e8: best_dual,
+        off: f.offset,
+        q1f0: res.q1f0,
+        q1f8: res.q1f8,
+        tol: o.tol,
+        ncomp: ncomp as f64,
+        tau: 1.0,
+        kappa: 0.0,
+        q198: res.q198,
+        q1a8: res.q1a8,
+        q1d8: res.q1d8,
+        q1e0: res.q1e0,
+        q1a0: res.q1a0,
+        q1b0: res.q1b0,
+        q1c0: res.q1c0,
+        q1d0: 0.0,
+        q220: h.x2,
+        q228: h.z2,
+        q160: sc.q160,
+        q170: sc.q170,
+        q260: sc.q260,
+        q268: sc.q268,
+        q270: sc.q270,
+        q278: sc.q270,
+        q2a0: 0,
+        q5e0: q5.0,
+        q5e8: q5.1,
+        i88: it,
+        if8: 0,
+        ia8: it,
+        if4: it,
+        p2dd4: false,
+        p2460: 1e-6,
+        p2bbc: o.max_iter,
+        p2c10: 0,
+        time_up: false,
+        h50: h.h50.clone(),
+        h68: h.h68.clone(),
+        h78: h.h78.clone(),
+        h80: h.h80.clone(),
+    }
+}
+
+#[derive(Default)]
+struct Hist {
+    h50: Vec<f64>,
+    h68: Vec<f64>,
+    h78: Vec<f64>,
+    h80: Vec<f64>,
+    /// `Q+0x220` (|x|^2): the reference's value lags the iterate (undecoded); only the 1e100 / NaN tests read it.
+    x2: f64,
+    z2: f64,
+}
+
+/// Runs the barrier iteration on `f` with `solver` behind the factor and the solves.
+///
+/// Gaps (H): the progress counters `Q+0x88/0xa8/0xf4` are modelled as "improved at every iteration" (true on the five models), `Q+0x5e0/0x5e8`
+/// as nonzero, `Q+0x1e8` as the best dual objective, `Q+0x220/0x228` as the norms of the iterate. They matter only in branches of
+/// `0x2e2fe0` that the corpus does not reach.
+pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<BarrierRun, BarrierError> {
+    let (tau, kappa, scale) = (1.0, 0.0, 1.0);
+    let ncomp = f.ncomp();
+    let c_file = f.c.clone();
+    let sc = setup_scalars(&f.b_file, &c_file, o.tol);
+    // Starting point.
+    solver.factor(f, &start_diag(f))?;
+    let w: Vec<f64> = (0..f.n()).map(|j| if j < f.n2 && f.flags[j] == 3 { 0.5 * f.ub[j] } else { 0.0 }).collect();
+    let s1 = solver.start(f, StartKind::Primal { w: &w })?;
+    let s2 = solver.start(f, StartKind::Dual)?;
+    let (mut st, _p3, _p4, _stage) = start_point(f, s1, s2, &sc, 0);
+    let mut records = Vec::new();
+    let res = residuals(f, &st, tau, kappa, ncomp, scale);
+    let rec = IterRecord { it: -1, state: st.clone(), res: res.clone(), status: 1, dec: None };
+    emit_record(&rec);
+    records.push(rec);
+    let mut rd = res.rd.clone();
+    z_reduce(f, &mut st, &mut rd, res.q1f0);
+
+    let mut h = Hist::default();
+    let mut best_dual = -1e100;
+    let mut q5 = (1e100, 1e100);
+    let mut it = 0;
+    loop {
+        let res = residuals(f, &st, tau, kappa, ncomp, scale);
+        h.h50.push(res.q198);
+        h.h68.push(res.q1a8);
+        h.h78.push(res.q1f8);
+        h.h80.push(res.q1f0);
+        h.x2 = dot_lanes(&st.x, &st.x, 0);
+        h.z2 = dot_lanes(&st.z, &st.z, 0);
+        if res.q148 > best_dual && it > 0 {
+            best_dual = res.q148;
+        }
+        let ti = term_input(f, &sc, o, it, &res, ncomp, &h, best_dual, q5);
+        let (code, _why) = status(&ti);
+        if code != 1 || it >= o.max_iter + 1 {
+            let rec = IterRecord { it, state: st.clone(), res, status: code, dec: None };
+            emit_record(&rec);
+            records.push(rec);
+            let status = match code {
+                2 => BarrierStatus::Optimal,
+                7 => BarrierStatus::IterationLimit,
+                c => BarrierStatus::Other(c),
+            };
+            return Ok(BarrierRun { status, iterations: it, state: st, records });
+        }
+        // Predictor.
+        solver.factor(f, &normal_diag(f, &st))?;
+        let n = f.n();
+        let n2 = f.n2;
+        let rcx: Vec<f64> = (0..n).map(|j| if f.flags[j] & 1 != 0 { -(st.x[j] * st.z[j]) } else { 0.0 }).collect();
+        let rcu: Vec<f64> = (0..n2).map(|j| if f.flags[j] & 2 != 0 { -(st.u[j] * st.v[j]) } else { 0.0 }).collect();
+        let rhs = Rhs { rp: res.rp.clone(), rd: res.rd.clone(), ru: res.ru.clone(), rcx, rcu };
+        let pred = solver.direction(f, &st, DirKind::Predictor, &rhs)?;
+        let ap0 = step_pair(f, &st, &pred, None, true);
+        let ad0 = step_pair(f, &st, &pred, None, false);
+        let aff = mu_aff(f, &st, &pred, ap0, ad0, ncomp);
+        let target = sigma_target(res.q1f0, aff);
+        // Corrector.
+        let rcx2: Vec<f64> = (0..n).map(|j| if f.flags[j] & 1 != 0 { target - pred.dx[j] * pred.dz[j] } else { 0.0 }).collect();
+        let rcu2: Vec<f64> = (0..n2).map(|j| if f.flags[j] & 2 != 0 { target - pred.du[j] * pred.dv[j] } else { 0.0 }).collect();
+        let rhs2 = Rhs { rp: vec![0.0; f.m], rd: vec![0.0; n], ru: vec![0.0; n2], rcx: rcx2, rcu: rcu2 };
+        let corr = solver.direction(f, &st, DirKind::Corrector, &rhs2)?;
+        let ntry = solver.ntry(it, if it == 0 { o.ntry_first } else { o.ntry_later });
+        let (tp, td, wp, wd) = select(f, &st, &pred, &corr, ap0, ad0, ntry);
+        let comb = Direction {
+            dx: combine(&pred.dx, &corr.dx, wp),
+            dz: combine(&pred.dz, &corr.dz, wd),
+            dy: combine(&pred.dy[..f.m], &corr.dy[..f.m], wd),
+            du: combine(&pred.du, &corr.du, wp),
+            dv: combine(&pred.dv, &corr.dv, wd),
+        };
+        let (next, (g, _sp, _sd)) = update(f, &st, &comb, tp, td, ncomp);
+        let dec = Decisions { ap: ap0, ad: ad0, aff, target, tp, td, wp, wd, ntry, gamma: g };
+        let rec = IterRecord { it, state: st.clone(), res, status: code, dec: Some(dec) };
+        emit_record(&rec);
+        records.push(rec);
+        q5 = (1.0, if it == 0 { 1e100 } else { 1.0 });
+        st = next;
+        it += 1;
+    }
+}
+
+/// The solution of the model's own columns (undoing the lower-bound shift), the objective (`Q+0x130`) and the row duals in file order.
+#[derive(Debug, Clone)]
+pub struct Solution {
+    pub run: BarrierRun,
+    pub x: Vec<f64>,
+    pub objective: f64,
+    pub y: Vec<f64>,
+}
+
+pub fn solution(f: &StdForm, run: BarrierRun) -> Solution {
+    let x: Vec<f64> = (0..f.n2).map(|j| run.state.x[j] + f.lower[j]).collect();
+    let last = run.records.last().unwrap();
+    let mut y = vec![0.0; f.m];
+    for k in 0..f.m {
+        y[f.row_of[k]] = run.state.y[k] * if f.sense[k] == b'>' { -1.0 } else { 1.0 };
+    }
+    Solution { objective: last.res.q130, x, y, run }
+}
+
+/// Convenience driver: structure (ordering) by [`crate::order::structure`], conversion, iteration with the given solver.
+pub fn solve_with<S: NormalSolver>(model: &LpModel, solver: &mut S, o: &Options) -> Result<Solution, BarrierError> {
+    let s = crate::order::structure(model, crate::order::DENSE_COL_MIN).map_err(|e| BarrierError::Unsupported(e.3.to_string()))?;
+    let f = std_form(model, &s.sym.perm)?;
+    let run = run(&f, solver, o)?;
+    Ok(solution(&f, run))
+}
+
+/// [`solve_with`] on the plain f64 [`DenseSolver`] (not bit-exact, tests at tolerance).
+pub fn solve_dense(model: &LpModel) -> Result<Solution, BarrierError> {
+    solve_with(model, &mut DenseSolver::default(), &Options::default())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ext_rounds_to_64_bits() {
+        // 1 + 2^-64 is a tie in 64 bits and rounds to even (1); 1 + 3 * 2^-64 rounds up to 1 + 2^-62.
+        let one = Ext::from_f64(1.0);
+        let t = Ext::from_f64(2f64.powi(-64));
+        assert_eq!(one.add(t).to_f64(), 1.0);
+        let e = one.add(Ext::from_f64(3.0 * 2f64.powi(-64)));
+        assert_eq!(e.sub(one).to_f64(), 2f64.powi(-62));
+        // Product of two doubles is exact in 106 bits and rounded once to 64.
+        let a = 1.0 + 2f64.powi(-52);
+        let p = Ext::mul_f64(a, a);
+        assert_eq!(p.sub(Ext::from_f64(1.0)).to_f64(), 2f64.powi(-51));
+        // Cancellation is exact.
+        assert_eq!(Ext::from_f64(3.5).sub(Ext::from_f64(3.5)).to_f64(), 0.0);
+        assert_eq!(Ext::from_f64(-2.0).add(Ext::from_f64(0.75)).to_f64(), -1.25);
+    }
+
+    #[test]
+    fn kahan_dot_is_more_accurate_than_double() {
+        let a = [1.0, 1e-17, 1e-17, -1.0];
+        let b = [1.0, 1.0, 1.0, 1.0];
+        let seq = a.iter().zip(&b).fold(0.0, |s, (x, y)| s + x * y);
+        assert_eq!(seq, 0.0);
+        assert!((kahan_dot(&a, &b).to_f64() - 2e-17).abs() < 1e-19);
+    }
+
+    #[test]
+    fn dot_lanes_matches_sequential_below_eight() {
+        let a: Vec<f64> = (0..7).map(|i| 0.1 * i as f64 + 0.3).collect();
+        let s: f64 = a.iter().fold(0.0, |s, v| s + v * v);
+        assert_eq!(dot_lanes(&a, &a, 0), s);
+    }
+}
