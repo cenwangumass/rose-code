@@ -6,7 +6,7 @@
 //!
 //! Known gaps, reported as errors (never approximated):
 //! - the quicksort partition of the sorter `0x8c8b70` for lists of 100 or more: [`StructError::SortLarge`] (not reached by the 12 models);
-//! - the dense-column threshold is not recovered: [`dense_columns`] takes the minimum column count as a parameter.
+//! - the cost scan `0x31bc1a` of the dense-column rule (columns between the two dense thresholds): [`StructError::DenseScan`] (not reached by the 12 models).
 use crate::model::LpModel;
 use std::collections::VecDeque;
 
@@ -14,12 +14,15 @@ use std::collections::VecDeque;
 pub enum StructError {
     /// The sorter `0x8c8b70` meets a list of 100 or more keys (quicksort partition, not decoded).
     SortLarge(usize),
+    /// A column count between the two dense thresholds starts the cost scan `0x31bc1a` (not decoded).
+    DenseScan,
 }
 
 impl std::fmt::Display for StructError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             StructError::SortLarge(n) => write!(f, "sorter 0x8c8b70 quicksort partition needed for {n} keys (not decoded)"),
+            StructError::DenseScan => write!(f, "dense-column cost scan 0x31bc1a needed (not decoded)"),
         }
     }
 }
@@ -67,14 +70,55 @@ fn columns(m: &LpModel) -> Vec<Vec<usize>> {
     (0..m.num_cols()).map(|j| m.col(j).filter(|&(_, v)| v != 0.0).map(|(i, _)| i).collect()).collect()
 }
 
-/// The columns taken as dense, ascending. The reference's threshold (`P+0x218`) is not recovered; the data only bound it
-/// (49 nonzeros is not dense, 389 is), so `min_nnz` is a parameter and the default [`DENSE_COL_MIN`] is a placeholder inside that range.
+/// The dense columns of the model conversion `0x31af70` (`P+0x218`; port of `dense_columns` of `tools/barrier_order.py`, `specs/barrier.md` "Dense columns").
+/// With `nrows < 1000` there are none. Otherwise: the histogram of the column counts is walked from `d = 0` with `S` = sum of `d'^2 hist[d']` (double) over
+/// `d' < d` and `T` = number of columns with count `>= d`; the first `d` with `hist[d] > 0`, `d^2 > S` and `d > 5 T` is the cut (none: `int(max(50 nnz /
+/// max(ncols, 1), 500))`). Dense = columns with count `>= cut`. A column with `int(max(10 nnz / max(ncols, 1), 100)) <= count < cut` starts a cost scan
+/// (`0x31bc1a`) that is not decoded ([`StructError::DenseScan`]; no model reaches it).
+pub fn dense_rule(m: &LpModel) -> Result<Vec<usize>, StructError> {
+    let nrows = m.num_rows();
+    if nrows < 1000 {
+        return Ok(Vec::new());
+    }
+    let cnt: Vec<usize> = columns(m).iter().map(|c| c.len()).collect();
+    let (nc, nnz) = (cnt.len(), cnt.iter().sum::<usize>());
+    let mut hist = vec![0usize; nrows + 1];
+    for &c in &cnt {
+        hist[c] += 1;
+    }
+    let (mut cut, mut s, mut t) = (None, 0.0f64, nc);
+    for d in 0..=nrows {
+        let h = hist[d];
+        let sq = d as f64 * d as f64;
+        if h > 0 && sq > s && d as f64 > t as f64 * 5.0 {
+            cut = Some(d);
+            break;
+        }
+        s += sq * h as f64;
+        t -= h;
+    }
+    let avg = nnz as f64 / nc.max(1) as f64;
+    let cut = cut.unwrap_or_else(|| (50.0 * avg).max(500.0) as usize);
+    let thr2 = (10.0 * avg).max(100.0) as usize;
+    if cnt.iter().any(|&c| c >= thr2 && c < cut) {
+        return Err(StructError::DenseScan);
+    }
+    Ok(cnt.iter().enumerate().filter(|&(_, &c)| c >= cut).map(|(j, _)| j).collect())
+}
+
+/// The columns taken as dense, ascending: the reference's rule ([`dense_rule`]) when `min_nnz` is [`DENSE_AUTO`], else every column with at least
+/// `min_nnz` nonzeros (tests). Panics when the rule reaches the undecoded cost scan.
 pub fn dense_columns(m: &LpModel, min_nnz: usize) -> Vec<usize> {
+    if min_nnz == DENSE_AUTO {
+        return dense_rule(m).unwrap_or_else(|e| panic!("{e}"));
+    }
     columns(m).iter().enumerate().filter(|(_, c)| c.len() >= min_nnz).map(|(j, _)| j).collect()
 }
 
-/// Placeholder for the unrecovered dense-column threshold (between 50 and 389 nonzeros on the captured models).
-pub const DENSE_COL_MIN: usize = 100;
+/// `min_nnz` value that selects the reference's dense-column rule.
+pub const DENSE_AUTO: usize = 0;
+/// Kept name of [`DENSE_AUTO`] for the callers that pass the default.
+pub const DENSE_COL_MIN: usize = DENSE_AUTO;
 
 /// The `AA'` pattern the ordering gets (`PAT` of the captures): rows in file order, dense columns left out of the `AA'` part and
 /// added as nodes `rows + k` adjacent to the rows of their column. Returns the pattern and `n1` (= rows).
@@ -1070,7 +1114,17 @@ pub struct Structure {
 
 /// Runs the stage with the dense columns chosen by [`dense_columns`]`(m, dense_min)`. Errors name the undecoded routine reached.
 pub fn structure(m: &LpModel, dense_min: usize) -> Result<Structure, (Pattern, usize, Vec<usize>, StructError)> {
-    let dense = dense_columns(m, dense_min);
+    let dense = if dense_min == DENSE_AUTO {
+        match dense_rule(m) {
+            Ok(d) => d,
+            Err(e) => {
+                let (pattern, n1) = aat_pattern(m, &[]);
+                return Err((pattern, n1, Vec::new(), e));
+            }
+        }
+    } else {
+        dense_columns(m, dense_min)
+    };
     let (pattern, n1) = aat_pattern(m, &dense);
     let run = || -> Result<(Vec<i64>, OrderResult, Symbolic), StructError> {
         let lv = levels(&pattern, n1, None)?;

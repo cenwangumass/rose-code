@@ -76,3 +76,36 @@ fn partition_matches_reference_labels() {
     let lab = order::partition(fx["size"].as_u64().unwrap() as usize, &colptr, &rowind, &mut rng);
     assert_eq!(lab, ints(&fx["labels"]));
 }
+
+/// Dense-column rule of `0x31af70` (`order::dense_rule`): below 1000 rows none; otherwise the histogram cut (here the two 1000-entry columns among 20
+/// singletons: cut 1000), and a column between the two thresholds reaches the undecoded cost scan.
+#[test]
+fn dense_rule_cut() {
+    let mps = |rows: usize, dense: &[usize], extra: usize| {
+        let mut t = String::from("NAME T\nROWS\n N obj\n");
+        for i in 0..rows {
+            t += &format!(" L r{i}\n");
+        }
+        t += "COLUMNS\n";
+        for (k, &c) in dense.iter().enumerate() {
+            for i in 0..c {
+                t += &format!(" d{k} r{i} 1\n");
+            }
+        }
+        for k in 0..extra {
+            t += &format!(" s{k} r{} 1\n", k % rows);
+        }
+        t += "RHS\n";
+        for i in 0..rows {
+            t += &format!(" rhs r{i} 1\n");
+        }
+        t + "ENDATA\n"
+    };
+    let m = rose::mps::parse(&mps(1000, &[1000, 1000], 20)).unwrap();
+    assert_eq!(order::dense_rule(&m).unwrap(), vec![0, 1]);
+    let m = rose::mps::parse(&mps(999, &[999, 999], 20)).unwrap();
+    assert!(order::dense_rule(&m).unwrap().is_empty());
+    // Two full columns plus 100 columns of 150 entries and 5000 singletons: cut 1000, thr2 = 100, so the 150-entry columns reach the cost scan.
+    let m = rose::mps::parse(&mps(1000, &[vec![1000; 2], vec![150; 100]].concat(), 5000)).unwrap();
+    assert!(matches!(order::dense_rule(&m), Err(order::StructError::DenseScan)));
+}
