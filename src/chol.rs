@@ -891,6 +891,8 @@ pub struct Factor {
     pub rcp: Vec<f64>,
     /// Parity of the element offset of each supernode's storage in the one contiguous, 16-byte aligned factor array (the solves' peels depend on it).
     pub par: Vec<usize>,
+    /// `SYM+0x100`: the smallest `|pivot| / |assembled diagonal|` over the columns with a nonzero diagonal.
+    pub minratio: f64,
 }
 
 /// `A D A' = L diag(d) L'` from the model and `D` (`n2 + m` entries: columns, then slacks): per supernode in column order the assembly, the children's
@@ -902,6 +904,7 @@ pub fn numeric_factor(f: &StdForm, rows: &[Vec<(usize, usize)>], plan: &Plan, d:
     let mut diag = vec![0.0; m];
     let mut rcp = vec![0.0; m];
     let mut mp = vec![NONE; m];
+    let mut minratio = 1e300f64;
     for (k, s) in plan.sns.iter().enumerate() {
         let (col, w, c) = (s.col, s.w, s.c);
         for (t, &r) in s.rows.iter().enumerate() {
@@ -919,6 +922,9 @@ pub fn numeric_factor(f: &StdForm, rows: &[Vec<(usize, usize)>], plan: &Plan, d:
         for t in 0..w {
             diag[col + t] = dd[t];
             rcp[col + t] = rc[t];
+            if orig[t] != 0.0 {
+                minratio = minratio.min(dd[t].abs() / orig[t].abs());
+            }
         }
         if let Some(cb) = on_sn.as_deref_mut() {
             cb(k, s, &pk, &dd);
@@ -935,7 +941,7 @@ pub fn numeric_factor(f: &StdForm, rows: &[Vec<(usize, usize)>], plan: &Plan, d:
         par.push(off & 1);
         off += v.len();
     }
-    Factor { n: m, vals, diag, rcp, par }
+    Factor { n: m, vals, diag, rcp, par, minratio }
 }
 
 /// Sum of the rounded products `term(i)`, `i < n`, as `0x2ec200` / `0x2ec480` add them, accumulator starting at 0: fewer than 8 terms (or fewer than
@@ -1222,16 +1228,80 @@ pub struct CholSolver {
     fac: Option<Factor>,
     ntry0: usize,
     nfac: usize,
+    /// `Q+0x800` (`z/x`, plus `v/u`) of the current iterate and the refinement threshold `Q+0x280`, set by [`NormalSolver::prepare`].
+    zx: Vec<f64>,
+    thr: f64,
+    /// `Q+0x770 / 0x780` of the last direction: the norms of its residual.
+    norms: (f64, f64),
 }
 
 impl CholSolver {
     /// `sym` is the symbolic factorization of the structure stage ([`crate::order::structure`]) the `StdForm` was permuted with.
     pub fn new(f: &StdForm, sym: &Symbolic) -> CholSolver {
-        CholSolver { plan: Plan::new(sym), rows: model_rows(f), a: Amat::new(f), d: Vec::new(), fac: None, ntry0: ntry_first(f, sym), nfac: 0 }
+        CholSolver { plan: Plan::new(sym), rows: model_rows(f), a: Amat::new(f), d: Vec::new(), fac: None, ntry0: ntry_first(f, sym), nfac: 0, zx: Vec::new(), thr: 0.0, norms: (0.0, 0.0) }
     }
 
     fn solve(&self, f: &StdForm, rx: &[f64], ry: &[f64]) -> (Vec<f64>, Vec<f64>) {
         solve305(&self.a, &self.plan, self.fac.as_ref().expect("factor before solve"), f, &self.d, rx, ry)
+    }
+
+    /// `SYM+0x178 == 1` (`0x2f1720`): free columns remain, or the smallest pivot ratio is below `1e-10` (dense columns and scaling are not modelled).
+    fn refining(&self, f: &StdForm) -> bool {
+        (0..f.n2).any(|j| f.flags[j] == 0) || self.fac.as_ref().map_or(false, |x| x.minratio < 1e-10)
+    }
+
+    /// `0x311d70`, the residual of a solve `(dx, dy)` for `(rx, ry)`: `rows = ry - Af dx` and `cols = rx - (Af' dy - zx dx)` in blocks of 8 from index 0,
+    /// `(rx - cols) + zx dx` in the scalar tail (`n mod 8` entries).
+    fn residual(&self, f: &StdForm, rx: &[f64], ry: &[f64], dx: &[f64], dy: &[f64]) -> (Vec<f64>, Vec<f64>) {
+        let (m, n2, n) = (f.m, f.n2, f.n());
+        let mut rows = f.ax_cols(dx);
+        let mut cols = vec![0.0; n];
+        for j in 0..n2 {
+            cols[j] = f.aty_col(j, dy);
+        }
+        for i in 0..m {
+            if f.sense[i] != b'=' {
+                rows[i] = rows[i] + dx[n2 + i];
+                cols[n2 + i] = dy[i];
+            }
+        }
+        let rows: Vec<f64> = (0..m).map(|i| ry[i] - rows[i]).collect();
+        let end = if n >= 8 { n - (n & 7) } else { 0 };
+        let cols = (0..n).map(|j| if j < end { rx[j] - (cols[j] - self.zx[j] * dx[j]) } else { (rx[j] - cols[j]) + self.zx[j] * dx[j] }).collect();
+        (rows, cols)
+    }
+
+    /// The refinement loop of `0x311d70`: while `thr^2 <= |rows|^2 + |cols|^2` and fewer than 5 accepted corrections, solve for the residual and accept
+    /// the corrected pair if `0.99 cur > cand`. Returns `(dx, dy, |rows|, |cols|)`.
+    fn refine(&self, f: &StdForm, rx: &[f64], ry: &[f64], mut dx: Vec<f64>, mut dy: Vec<f64>) -> (Vec<f64>, Vec<f64>, f64, f64) {
+        let norm = |v: &[f64]| crate::barrier::dot_lanes(v, v, 0).sqrt();
+        let (mut rows, mut cols) = self.residual(f, rx, ry, &dx, &dy);
+        let (mut nr, mut nc) = (norm(&rows), norm(&cols));
+        let mut cur = nc * nc + nr * nr;
+        let thr2 = self.thr * self.thr;
+        let mut k = 0;
+        while thr2 <= cur {
+            let (cx, cy) = self.solve(f, &cols, &rows);
+            let cdx: Vec<f64> = cx.iter().zip(&dx).map(|(a, b)| a + b).collect();
+            let cdy: Vec<f64> = cy.iter().zip(&dy).map(|(a, b)| a + b).collect();
+            let (r2, c2) = self.residual(f, rx, ry, &cdx, &cdy);
+            let (nr2, nc2) = (norm(&r2), norm(&c2));
+            let cand = nr2 * nr2 + nc2 * nc2;
+            if !(0.99 * cur > cand) {
+                break;
+            }
+            dx = cdx;
+            dy = cdy;
+            (rows, cols) = (r2, c2);
+            nr = nr2;
+            nc = nc2;
+            cur = cand;
+            k += 1;
+            if k >= 5 {
+                break;
+            }
+        }
+        (dx, dy, nr, nc)
     }
 }
 
@@ -1287,7 +1357,14 @@ impl NormalSolver for CholSolver {
                 rx[j] = (rhs.rcu[j] - rhs.ru[j] * s.v[j]) / s.u[j] + rx[j];
             }
         }
-        let (dx, dy) = self.solve(f, &rx, &rhs.rp);
+        let (mut dx, mut dy) = self.solve(f, &rx, &rhs.rp);
+        self.norms = (0.0, 0.0);
+        if self.refining(f) {
+            let (a, b, nr, nc) = self.refine(f, &rx, &rhs.rp, dx, dy);
+            dx = a;
+            dy = b;
+            self.norms = (nr, nc);
+        }
         let mut dz = vec![0.0; n];
         for j in 0..n {
             if f.flags[j] & 1 != 0 {
@@ -1303,6 +1380,15 @@ impl NormalSolver for CholSolver {
             }
         }
         Ok(Direction { dx, dy, dz, du, dv })
+    }
+
+    fn prepare(&mut self, zx: &[f64], thr: f64) {
+        self.zx = zx.to_vec();
+        self.thr = thr;
+    }
+
+    fn norms(&self) -> (f64, f64) {
+        self.norms
     }
 
     fn ntry(&mut self, it: i32, default: usize) -> usize {

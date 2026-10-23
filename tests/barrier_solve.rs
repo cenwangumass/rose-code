@@ -1,12 +1,12 @@
 //! The whole barrier solve from the MPS alone (`rose::barrier` with the bit-exact `rose::chol::CholSolver`) against the reference
 //! (`tests/fixtures/barrier-solve-controlled.json`, written by `reverse-engineer/tools/make_barrier_solve_fixture.py`): every iteration's state and
 //! decisions, and the returned x, duals, reduced costs and objective, agree bit for bit on AFIRO, SC50A, BLEND, ADLITTLE, BORE3D, DEGEN2, BOEING2 (ranged
-//! rows, implied upper bounds dropped) and the two ranged-row fixtures (`fx_bar_rngL`, `fx_bar_rngGE`: L, G and E rows, R of both signs and 0).
+//! rows, implied upper bounds dropped), PILOT4 (free columns, refinement, step caps, restart) and the two ranged-row fixtures (`fx_bar_rngL`, `fx_bar_rngGE`: L, G and E rows, R of both signs and 0).
 use rose::barrier::{self, BarrierStatus, Options};
 use rose::{mps, solve, SolveOptions, Status};
 use serde_json::Value;
 
-const MODELS: [(&str, &str); 9] = [
+const MODELS: [(&str, &str); 10] = [
     ("afiro", include_str!("fixtures/afiro.mps")),
     ("sc50a", include_str!("fixtures/sc50a.mps")),
     ("blend", include_str!("fixtures/blend.mps")),
@@ -16,6 +16,7 @@ const MODELS: [(&str, &str); 9] = [
     ("boeing2", include_str!("fixtures/boeing2.mps")),
     ("fx_bar_rngL", include_str!("fixtures/fx_bar_rngL.mps")),
     ("fx_bar_rngGE", include_str!("fixtures/fx_bar_rngGE.mps")),
+    ("pilot4", include_str!("fixtures/pilot4.mps")),
 ];
 
 fn floats(v: &Value) -> Vec<f64> {
@@ -120,9 +121,6 @@ fn unsupported_models_are_explicit_errors() {
     let mut max = afiro.clone();
     max.sense = rose::Sense::Maximize;
     assert!(unsupported(&max));
-    let mut free = afiro.clone();
-    free.col_lo[0] = -1e30;
-    assert!(unsupported(&free));
     // A row ranged twice (the later entry wins in the bounds, the reference's columns are not recovered for it).
     let twice = mps::parse(&include_str!("fixtures/fx_bar_rngL.mps").replace("RANGES\n", "RANGES\n    rng2      r1                 1\n")).unwrap();
     assert!(twice.range_dup);

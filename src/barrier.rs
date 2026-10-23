@@ -1,6 +1,6 @@
 //! Barrier iteration of the reference (`reverse-engineer/specs/barrier-iteration.md`; port of `tools/barrier_iter.py`): conversion to the
 //! solved standard form, the starting point, residuals and scalars, the predictor / corrector decisions, the step-back update and the
-//! termination test `0x2e2fe0`. LP only: no free variables, ranges, lower-unbounded columns or cones (reported as [`BarrierError::Unsupported`]).
+//! termination test `0x2e2fe0`. LP only: free and lower-unbounded columns are converted (implied bounds, regularised D, refinement); maximization, dense columns and cones (reported as [`BarrierError::Unsupported`]).
 //!
 //! The linear algebra behind the iteration (factor of `A D A'`, the solves of `0x305f10`) is the [`NormalSolver`] trait. The reference's
 //! supernodal Cholesky and its solves are not recovered bit for bit yet, so two implementations exist:
@@ -98,7 +98,7 @@ impl StdForm {
     }
 
     /// `(A x)_i` over the columns only, accumulated column by column (`a x_j + out_i`).
-    fn ax_cols(&self, x: &[f64]) -> Vec<f64> {
+    pub(crate) fn ax_cols(&self, x: &[f64]) -> Vec<f64> {
         let mut out = vec![0.0; self.m];
         for j in 0..self.n2 {
             for k in self.col_start[j]..self.col_start[j + 1] {
@@ -120,7 +120,7 @@ impl StdForm {
     }
 
     /// `(A' y)_j` of column `j`, entries summed sequentially from 0.
-    fn aty_col(&self, j: usize, y: &[f64]) -> f64 {
+    pub(crate) fn aty_col(&self, j: usize, y: &[f64]) -> f64 {
         let mut t = 0.0;
         for k in self.col_start[j]..self.col_start[j + 1] {
             t = t + y[self.row_idx[k]] * self.val[k];
@@ -133,8 +133,90 @@ fn is_inf(v: f64) -> bool {
     v.abs() >= INF
 }
 
-/// Bound classification `0x3283f0` (port of `classify_bounds` of `tools/barrier_model.py`, the part for columns with a lower bound: the implied bounds of
-/// free columns are not modelled, such a column is refused earlier). Inputs: the converted model (rows permuted, '>' rows negated, so every non-'=' row is a
+/// Implied bounds of the free columns (`0x3283f0`, port of the first part of `classify_bounds` of `tools/barrier_model.py`; only when a column has neither bound).
+/// Two sweeps over the rows into work copies `lo`, `hi` of the bounds. For a row and each `s` in (-1 ('=' rows only), +1): `t_k = s a_k`;
+/// `acc` = sum in entry order of `t_k lo_k` (`t_k > 0`, `lo_k > -INF`) or `t_k hi_k` (`t_k <= 0`, `hi_k < INF`), the other entries counted as infinite;
+/// `slack = s rhs - acc`, skipped if `slack < -1e-6`. No infinite entry: per entry `t > 1e-6`: `hi_k = min(hi_k, slack/t + lo_k)`; `t < -1e-6`:
+/// `lo_k = max(lo_k, slack/t + hi_k)`. One infinite entry (the first with `t > 0` and `lo <= -INF`, or `t < 0` and `hi >= INF`): `t > 1e-6`: `hi_k = slack/t`;
+/// `t < -1e-6`: `lo_k = slack/t`. Then every column still free whose smaller implied `|bound|` is below `1e6` gets `lb = lo - 0.01` if `|hi| > |lo|`, else
+/// `ub = hi + 0.01`.
+fn free_column_bounds(m: usize, n: usize, sense: &[u8], col_start: &[usize], row_idx: &[usize], val: &[f64], b: &[f64], lb: &mut [f64], ub: &mut [f64]) {
+    if !(0..n).any(|j| lb[j] <= -INF && ub[j] >= INF) {
+        return;
+    }
+    let mut rows: Vec<Vec<(usize, f64)>> = vec![Vec::new(); m];
+    for j in 0..n {
+        for q in col_start[j]..col_start[j + 1] {
+            rows[row_idx[q]].push((j, val[q]));
+        }
+    }
+    let (mut lo, mut hi) = (lb.to_vec(), ub.to_vec());
+    for _sweep in 0..2 {
+        for i in 0..m {
+            for s in [-1.0f64, 1.0] {
+                if s == -1.0 && sense[i] != b'=' {
+                    continue;
+                }
+                let (mut acc, mut ninf) = (0.0f64, 0usize);
+                for &(j, a) in &rows[i] {
+                    let t = a * s;
+                    if t > 0.0 {
+                        if lo[j] > -INF {
+                            acc = acc + lo[j] * t;
+                        } else {
+                            ninf += 1;
+                        }
+                    } else if hi[j] < INF {
+                        acc = acc + t * hi[j];
+                    } else {
+                        ninf += 1;
+                    }
+                }
+                let slack = s * b[i] - acc;
+                if -1e-6 > slack {
+                    continue;
+                }
+                if ninf == 0 {
+                    for &(j, a) in &rows[i] {
+                        let t = s * a;
+                        if t > 1e-6 {
+                            hi[j] = hi[j].min(slack / t + lo[j]);
+                        } else if -1e-6 > t {
+                            lo[j] = lo[j].max(slack / t + hi[j]);
+                        }
+                    }
+                } else if ninf == 1 {
+                    let mut found = None;
+                    for &(j, a) in &rows[i] {
+                        let t = s * a;
+                        if (t > 0.0 && -INF >= lo[j]) || (0.0 > t && hi[j] >= INF) {
+                            found = Some((j, t));
+                            break;
+                        }
+                    }
+                    if let Some((j, t)) = found {
+                        if t > 1e-6 {
+                            hi[j] = slack / t;
+                        } else if -1e-6 > t {
+                            lo[j] = slack / t;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    for j in 0..n {
+        if lb[j] <= -INF && ub[j] >= INF && lo[j].abs().min(hi[j].abs()) < 1e6 {
+            if hi[j].abs() > lo[j].abs() {
+                lb[j] = lo[j] - 0.01;
+            } else {
+                ub[j] = hi[j] + 0.01;
+            }
+        }
+    }
+}
+
+/// Bound classification `0x3283f0` (port of the second part of `classify_bounds` of `tools/barrier_model.py`: the implied upper bounds; the free columns come before, [`free_column_bounds`]). Inputs: the converted model (rows permuted, '>' rows negated, so every non-'=' row is a
 /// '<=' row), the right-hand side before the lower-bound shift, bounds with `INF` as infinity. Per row, in order: `mn = sum a>0: a lb + a<=0: a ub`,
 /// `mx` the reverse (column order, an infinite bound enters as the number `1e30`), `up = rhs - mn`, `lo = mx - rhs` (`1e100` for non-'=' rows). For every
 /// entry whose bounds are both finite, `w = ub - lb`: `a > 1e-4`: the upper bound is dropped (set to `1e100`, which also sets `lo = 1e100`) if
@@ -244,17 +326,14 @@ pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> 
     // Columns: the model's, then the range columns; bounds as the file gives them.
     let nr = model.range_entries.len();
     let n2 = n_struct + nr;
-    let mut lower = vec![0.0; n2];
+    let mut lb_in = vec![0.0; n2];
     let mut ub_in = vec![INF; n2];
     for j in 0..n_struct {
         let (lo, up) = (model.col_lo[j], model.col_up[j]);
-        if is_inf(lo) {
-            return unsupported("column without a lower bound");
-        }
-        if !is_inf(up) && up < lo {
+        if !is_inf(lo) && !is_inf(up) && up < lo {
             return unsupported("inconsistent column bounds");
         }
-        lower[j] = lo;
+        lb_in[j] = if is_inf(lo) { -INF } else { lo };
         if !is_inf(up) {
             ub_in[j] = up;
         }
@@ -286,15 +365,23 @@ pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> 
     for i in 0..m {
         b[perm[i] as usize] = b_file[i];
     }
-    // Bound classification: upper bounds implied by the rows are dropped (the complementarity pairs count the bounds present before).
+    // Bound classification: implied bounds of the free columns, then the upper bounds implied by the rows are dropped (the complementarity pairs count the
+    // bounds present before).
+    let mut lb_cls = lb_in.clone();
     let mut ub_cls = ub_in.clone();
-    drop_implied_upper_bounds(m, n2, &sense, &col_start, &row_idx, &val, &b, &lower, &mut ub_cls);
+    free_column_bounds(m, n2, &sense, &col_start, &row_idx, &val, &b, &mut lb_cls, &mut ub_cls);
+    drop_implied_upper_bounds(m, n2, &sense, &col_start, &row_idx, &val, &b, &lb_cls, &mut ub_cls);
+    let mut lower = vec![0.0; n2];
     let mut flags = vec![0u8; n2 + m];
     let mut ub = vec![INF; n2];
     for j in 0..n2 {
-        flags[j] = if ub_cls[j] < INF { 3 } else { 1 };
+        let has_lb = lb_cls[j] > -INF;
+        if has_lb {
+            lower[j] = lb_cls[j];
+        }
+        flags[j] = u8::from(has_lb) | if ub_cls[j] < INF { 2 } else { 0 };
         if ub_cls[j] < INF {
-            ub[j] = ub_cls[j] - lower[j];
+            ub[j] = if has_lb { ub_cls[j] - lb_cls[j] } else { ub_cls[j] };
         }
     }
     for k in 0..m {
@@ -302,7 +389,7 @@ pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> 
             flags[n2 + k] = 1;
         }
     }
-    let ncomp = n2 + ub_in.iter().filter(|&&u| u < INF).count() + sense.iter().filter(|&&s| s != b'=').count();
+    let ncomp = lb_in.iter().filter(|&&l| l > -INF).count() + ub_in.iter().filter(|&&u| u < INF).count() + sense.iter().filter(|&&s| s != b'=').count();
     let ub_cols: Vec<usize> = (0..n2).filter(|&j| flags[j] & 2 != 0).collect();
     let (ub_lo, ub_hi) = if ub_cols.is_empty() { (n2, n2) } else { (ub_cols[0], ub_cols[ub_cols.len() - 1] + 1) };
     // Shift b by the lower bounds: one entry at a time in column order, `b_i = b_i - a_ij lo_j`.
@@ -929,36 +1016,51 @@ pub fn residuals(f: &StdForm, s: &State, tau: f64, kappa: f64, ncomp: usize, sca
 // ---------------------------------------------------------------------------------------------------------------------------------
 // Starting point `0x2e8ef0` (C, five models).
 
-/// The diagonal `D` of the starting-point factor: 1 for a column with a lower bound only, 0.5 with both bounds, 0 for the slack of an '=' row.
+/// The diagonal `D` of the starting-point factor: 1 for a column with a lower bound only (or an upper bound only), 0.5 with both bounds, `1e-6` for a free
+/// column, 0 for the slack of an '=' row, 1 for the other slacks.
 pub fn start_diag(f: &StdForm) -> Vec<f64> {
-    f.flags.iter().map(|&fl| match fl {
-        1 => 1.0,
-        3 => 0.5,
-        _ => 0.0,
+    (0..f.n()).map(|j| match (j < f.n2, f.flags[j]) {
+        (true, 3) => 0.5,
+        (true, 0) => 1e-6,
+        (true, _) => 1.0,
+        (false, 0) => 0.0,
+        (false, _) => 1.0,
     }).collect()
 }
 
-/// The diagonal of `A D A'` at an iterate (C, `BIT.D`, `0x2ecde0`): `zx = z/x (+ v/u for a boxed column)`, `D = min(1 / zx, 1e12)` (0 where `zx` is not
-/// positive on a column; 0 for the slack of an '=' row).
-pub fn normal_diag(f: &StdForm, s: &State) -> Vec<f64> {
-    (0..f.n()).map(|j| {
+/// `zx = Q+0x800` and the diagonal `D` of `A D A'` at an iterate (`0x2ecde0`, C): `zx = z/x (+ v/u for a boxed column)`, `D = min(1 / zx, 1e12)`. A column
+/// with `zx <= 0` (a free column) gets `zx = 0` and `D = 1 / min(max((|pobj| + 1) 1e-8 / max(|x|, 1e-10)^2, 1e-12), 1e-6)`; the slack of an '=' row 0 and 0.
+pub fn normal_diag(f: &StdForm, s: &State, pobj: f64) -> (Vec<f64>, Vec<f64>) {
+    let n = f.n();
+    let (mut zx, mut d) = (vec![0.0; n], vec![0.0; n]);
+    let reg = (pobj.abs() + 1.0) * 1e-8;
+    for j in 0..n {
         let fl = f.flags[j];
-        if fl & 1 == 0 {
-            return 0.0;
+        if j < f.n2 {
+            let mut t = 0.0;
+            if fl & 1 != 0 {
+                t = s.z[j] / s.x[j] + 0.0;
+            }
+            if fl & 2 != 0 {
+                t = t + s.v[j] / s.u[j];
+            }
+            if t > 0.0 {
+                zx[j] = t;
+                d[j] = (1.0 / t).min(1e12);
+            } else {
+                let a = s.x[j].abs().max(1e-10);
+                d[j] = 1.0 / (reg / (a * a)).max(1e-12).min(1e-6);
+            }
+        } else if fl != 0 {
+            zx[j] = s.z[j] / s.x[j];
+            d[j] = (1.0 / zx[j]).min(1e12);
         }
-        let mut t = s.z[j] / s.x[j] + 0.0;
-        if j < f.n2 && fl & 2 != 0 {
-            t = t + s.v[j] / s.u[j];
-        }
-        if j < f.n2 && !(t > 0.0) {
-            return 0.0;
-        }
-        (1.0 / t).min(1e12)
-    }).collect()
+    }
+    (zx, d)
 }
 
 /// `0x2eb560` (C): the shifts `(p3, p4)` of the starting point from the minima and sums over the flagged entries.
-fn start_scalars(f: &StdForm, x: &[f64], z: &[f64], u: &[f64], v: &[f64], q168: f64, q178: f64) -> (f64, f64) {
+fn start_scalars(f: &StdForm, x: &[f64], z: &[f64], u: &[f64], v: &[f64], q168: f64, q178: f64, q30: f64) -> (f64, f64) {
     let (n2, n) = (f.n2, f.n());
     let fl = &f.flags;
     let (mut mx, mut mz) = (1e100, 1e100);
@@ -1024,8 +1126,8 @@ fn start_scalars(f: &StdForm, x: &[f64], z: &[f64], u: &[f64], v: &[f64], q168: 
     if p4 <= t {
         p4 = t;
     }
-    // Floor Q+0x30 = 0 -> 0.1 for an LP.
-    let floor = 0.1;
+    // Floor Q+0x30 (0 -> 0.1 for an LP; 1000 at the restart).
+    let floor = if q30 == 0.0 { 0.1 } else { q30 };
     if p3 <= floor {
         p3 = floor;
     }
@@ -1077,7 +1179,7 @@ fn start_dual_stage2(f: &StdForm, r: &[f64]) -> (Vec<f64>, Vec<f64>) {
 
 /// The starting point from the two solves of `0x305f10` (stage 1: `x~`, `y~`; stage 2: `r`, `y`), after the clamps and before the z reduction.
 /// `mode` is the parameter block word `+0x2bf0` (0 by default). Returns `(state, p3, p4, stage)`.
-pub fn start_point(f: &StdForm, s1: (Vec<f64>, Vec<f64>), s2: (Vec<f64>, Vec<f64>), sc: &Setup, mode: i32) -> (State, f64, f64, u8) {
+pub fn start_point(f: &StdForm, s1: (Vec<f64>, Vec<f64>), s2: (Vec<f64>, Vec<f64>), sc: &Setup, mode: i32, q30: f64) -> (State, f64, f64, u8) {
     let (n2, n) = (f.n2, f.n());
     let mut x = s1.0;
     let mut u = vec![0.0; n2];
@@ -1087,11 +1189,11 @@ pub fn start_point(f: &StdForm, s1: (Vec<f64>, Vec<f64>), s2: (Vec<f64>, Vec<f64
         }
     }
     let (mut z, mut v) = start_dual_stage1(f);
-    let (mut p3, mut p4) = start_scalars(f, &x, &z, &u, &v, sc.q168, sc.q178);
+    let (mut p3, mut p4) = start_scalars(f, &x, &z, &u, &v, sc.q168, sc.q178, q30);
     let (mut stage, mut y) = (1u8, vec![0.0; f.m]);
     if mode != 1 {
         let (z2, v2) = start_dual_stage2(f, &s2.0);
-        let (q3, q4) = start_scalars(f, &x, &z2, &u, &v2, sc.q168, sc.q178);
+        let (q3, q4) = start_scalars(f, &x, &z2, &u, &v2, sc.q168, sc.q178, q30);
         if mode == 2 || q4 < p4 {
             z = z2;
             v = v2;
@@ -1366,6 +1468,12 @@ pub trait NormalSolver {
     fn factor(&mut self, f: &StdForm, d: &[f64]) -> Result<(), BarrierError>;
     fn start(&mut self, f: &StdForm, kind: StartKind) -> Result<(Vec<f64>, Vec<f64>), BarrierError>;
     fn direction(&mut self, f: &StdForm, s: &State, kind: DirKind, rhs: &Rhs) -> Result<Direction, BarrierError>;
+    /// Per iteration, before the directions: `Q+0x800` (`zx`) and the refinement threshold `Q+0x280` for the solvers that refine.
+    fn prepare(&mut self, _zx: &[f64], _thr: f64) {}
+    /// `Q+0x770 / 0x780` of the last direction: the norms of its solve residual (0 where the solver does not refine).
+    fn norms(&self) -> (f64, f64) {
+        (0.0, 0.0)
+    }
     /// Number of trial weights of the corrector selection at iteration `it` (`Q+0x29c`). The reference's adaptation rule is not decoded
     /// (5 at iteration 0 and 3 later on AFIRO, SC50A, BLEND, BORE3D, DEGEN2; 3 at iteration 0 on ADLITTLE), so a replaying solver supplies it.
     fn ntry(&mut self, _it: i32, default: usize) -> usize {
@@ -1764,7 +1872,7 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
     let w: Vec<f64> = (0..f.n()).map(|j| if j < f.n2 && f.flags[j] == 3 { 0.5 * f.ub[j] } else { 0.0 }).collect();
     let s1 = solver.start(f, StartKind::Primal { w: &w })?;
     let s2 = solver.start(f, StartKind::Dual)?;
-    let (mut st, _p3, _p4, _stage) = start_point(f, s1, s2, &sc, 0);
+    let (mut st, _p3, _p4, _stage) = start_point(f, s1.clone(), s2.clone(), &sc, 0, 0.0);
     let mut records = Vec::new();
     let res = residuals(f, &st, tau, kappa, ncomp, scale);
     let rec = IterRecord { it: -1, state: st.clone(), res: res.clone(), status: 1, dec: None };
@@ -1775,10 +1883,18 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
 
     let mut h = Hist::default();
     let mut best_dual = -1e100;
-    let mut q5 = (1e100, 1e100);
+    // `Q+0x5e0 / 0x5e8 / 0x5f0`: the step products of the last three iterations.
+    let mut w5 = [1e100f64; 3];
+    // `Q+0xf4`: the iteration after the last update with a step product above 5e-5; `Q+0xf8`: the iteration after the restart.
+    let (mut qf4, mut qf8) = (0i32, 0i32);
     let mut it = 0;
     loop {
-        let res = residuals(f, &st, tau, kappa, ncomp, scale);
+        let mut res = residuals(f, &st, tau, kappa, ncomp, scale);
+        if it > 10 && h.h78[it as usize - 1] > 0.99 * h.h78[it as usize - 2] {
+            // `0x2ecde0` at `0x2eed95`: complementarity decreased by less than 1% over the last iteration: the z reduction of the starting point with the
+            // current mu, after the scalars were computed.
+            z_reduce(f, &mut st, &mut res.rd, res.q1f0);
+        }
         h.h50.push(res.q198);
         h.h68.push(res.q1a8);
         h.h78.push(res.q1f8);
@@ -1788,7 +1904,7 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
         if res.q148 > best_dual && it > 0 {
             best_dual = res.q148;
         }
-        let ti = term_input(f, &sc, o, it, &res, ncomp, &h, best_dual, q5);
+        let ti = term_input(f, &sc, o, it, &res, ncomp, &h, best_dual, (w5[0], w5[1]));
         let (code, _why) = status(&ti);
         if code != 1 || it >= o.max_iter + 1 {
             let rec = IterRecord { it, state: st.clone(), res, status: code, dec: None };
@@ -1802,24 +1918,34 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
             return Ok(BarrierRun { status, iterations: it, state: st, records });
         }
         // Predictor.
-        solver.factor(f, &normal_diag(f, &st))?;
+        let (zx, dd) = normal_diag(f, &st, res.q130);
+        solver.factor(f, &dd)?;
+        solver.prepare(&zx, ((res.q198 * res.q198 + res.q1a8 * res.q1a8).sqrt() / 10.0).max(1e-8));
         let n = f.n();
         let n2 = f.n2;
         let rcx: Vec<f64> = (0..n).map(|j| if f.flags[j] & 1 != 0 { -(st.x[j] * st.z[j]) } else { 0.0 }).collect();
         let rcu: Vec<f64> = (0..n2).map(|j| if f.flags[j] & 2 != 0 { -(st.u[j] * st.v[j]) } else { 0.0 }).collect();
         let rhs = Rhs { rp: res.rp.clone(), rd: res.rd.clone(), ru: res.ru.clone(), rcx, rcu };
         let pred = solver.direction(f, &st, DirKind::Predictor, &rhs)?;
+        let (q770, q780) = solver.norms();
         let ap0 = step_pair(f, &st, &pred, None, true);
         let ad0 = step_pair(f, &st, &pred, None, false);
         let aff = mu_aff(f, &st, &pred, ap0, ad0, ncomp);
-        let target = sigma_target(res.q1f0, aff);
+        let mut target = sigma_target(res.q1f0, aff);
+        if it > qf4 {
+            // `0x2e2047`: the last update with a step product above 5e-5 was not the previous iteration.
+            target = res.q1f0 * 0.9;
+        }
         // Corrector.
         let rcx2: Vec<f64> = (0..n).map(|j| if f.flags[j] & 1 != 0 { target - pred.dx[j] * pred.dz[j] } else { 0.0 }).collect();
         let rcu2: Vec<f64> = (0..n2).map(|j| if f.flags[j] & 2 != 0 { target - pred.du[j] * pred.dv[j] } else { 0.0 }).collect();
         let rhs2 = Rhs { rp: vec![0.0; f.m], rd: vec![0.0; n], ru: vec![0.0; n2], rcx: rcx2, rcu: rcu2 };
         let corr = solver.direction(f, &st, DirKind::Corrector, &rhs2)?;
+        let (q778, q788) = solver.norms();
         let ntry = solver.ntry(it, if it == 0 { o.ntry_first } else { o.ntry_later });
         let (tp, td, wp, wd) = select(f, &st, &pred, &corr, ap0, ad0, ntry);
+        // `0x30f5xx..0x30fc3e`: the residual norms of the combined step.
+        let (q770, q780) = (q770.max(q778 * wp), q780.max(q788 * wd));
         let comb = Direction {
             dx: combine(&pred.dx, &corr.dx, wp),
             dz: combine(&pred.dz, &corr.dz, wd),
@@ -1827,13 +1953,53 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
             du: combine(&pred.du, &corr.du, wp),
             dv: combine(&pred.dv, &corr.dv, wd),
         };
-        let (next, (g, _sp, _sd)) = update(f, &st, &comb, tp, td, ncomp);
+        // `0x2e24f0..0x2e2647`: with a small complementarity measure the steps are capped by the solve residuals against the iterate's.
+        let (mut cp, mut cd) = (tp, td);
+        if res.q1f8 < 1e-4 {
+            let t1 = (res.q198 * 1.2).max(sc.q260);
+            if q770 > t1 {
+                cp = cp.min(t1 / q770);
+            }
+            let t2 = (res.q1a8 * 1.2).max(sc.q268);
+            if q780 > t2 {
+                cd = cd.min(t2 / q780);
+            }
+        }
+        w5 = [cp * cd, w5[0], w5[1]];
+        let (next, (g, _sp, _sd)) = update(f, &st, &comb, cp, cd, ncomp);
         let dec = Decisions { ap: ap0, ad: ad0, aff, target, tp, td, wp, wd, ntry, gamma: g };
+        let (q1d8, q1e0, q138, q1f0) = (res.q1d8, res.q1e0, res.q138, res.q1f0);
         let rec = IterRecord { it, state: st.clone(), res, status: code, dec: Some(dec) };
         emit_record(&rec);
         records.push(rec);
-        q5 = (1.0, if it == 0 { 1e100 } else { 1.0 });
         st = next;
+        // `0x30d3e0` prologue: Q+0xf4 = it + 1 when the step product is above 5e-5.
+        if (cp * (1.0 - 1e-6)).min(1.0) * ((1.0 - 1e-6) * cd).min(1.0) > 5e-5 {
+            qf4 = it + 1;
+        }
+        // `0x2e2711..0x2e29d5`: restart of the starting point (only before the first restart): the last three step products below 1e-3, complementarity
+        // stalled (the log gap history over 3 iterations), both solve residuals below 1e-3 and a relative gap above 1e-4.
+        let mut relgap = ncomp as f64 * q1f0 / (q138.abs() + 1.0);
+        if 1e-7 > q1d8 && 1e-7 > q1e0 {
+            relgap = relgap * 0.1;
+        }
+        let ratio3 = if it - qf8 >= 3 {
+            let den = h.h78[it as usize - 3];
+            if den != 0.0 {
+                h.h78[it as usize] / den
+            } else {
+                1.0
+            }
+        } else {
+            0.0
+        };
+        if qf8 == 0 && 1e-3 > w5[2] && 1e-3 > w5[1] && 1e-3 > w5[0] && ratio3 > 0.98 && 1e-3 > q770 && 1e-3 > q780 && relgap > 1e-4 {
+            (st, _, _, _) = start_point(f, s1.clone(), s2.clone(), &sc, 0, 1000.0);
+            qf8 = it + 1;
+            let r = residuals(f, &st, tau, kappa, ncomp, scale);
+            let mut rd = r.rd.clone();
+            z_reduce(f, &mut st, &mut rd, r.q1f0);
+        }
         it += 1;
     }
 }

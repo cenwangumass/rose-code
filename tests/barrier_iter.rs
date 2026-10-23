@@ -120,7 +120,8 @@ fn unsupported_models_are_reported() {
     max.sense = rose::Sense::Maximize;
     let s = order::structure(&model, order::DENSE_COL_MIN).unwrap();
     assert!(matches!(barrier::std_form(&max, &s.sym.perm), Err(barrier::BarrierError::Unsupported(_))));
+    // A free column is converted (implied bounds, flag 0 when none is tight enough).
     let mut free = model.clone();
     free.col_lo[0] = -1e30;
-    assert!(matches!(barrier::std_form(&free, &s.sym.perm), Err(barrier::BarrierError::Unsupported(_))));
+    assert!(barrier::std_form(&free, &s.sym.perm).is_ok());
 }
