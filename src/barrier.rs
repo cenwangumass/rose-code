@@ -316,6 +316,19 @@ fn drop_implied_upper_bounds(m: usize, n: usize, sense: &[u8], col_start: &[usiz
     }
 }
 
+/// The range columns of the barrier conversion as `(row, upper bound)` in column order: RANGES order, the first entry of a row, bound `R` for an `E` row
+/// with `R > 0`, else `|R|` (`-R` for an `E` row with `R <= 0`).
+pub fn range_columns(model: &LpModel) -> Vec<(usize, f64)> {
+    let mut v: Vec<(usize, f64)> = Vec::new();
+    for &(i, r) in &model.range_entries {
+        if !v.iter().any(|&(k, _)| k == i) {
+            let kind = model.row_kind.get(i).copied().unwrap_or(b'L');
+            v.push((i, if kind == b'E' { if r > 0.0 { r } else { -r } } else { r.abs() }));
+        }
+    }
+    v
+}
+
 /// Conversion of a model to the solved form, with `perm[original row] = position` (the final `SYM` permutation of [`crate::order`]).
 pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> {
     std_form_scaled(model, perm, None)
@@ -349,18 +362,8 @@ pub fn std_form_scaled(model: &LpModel, perm: &[i64], sc: Option<&crate::scale::
         }
         r_last[i] = r;
     }
-    // Scale factor of each range column: `Scaling::col` lists them after the structurals in row order (rows with two distinct finite bounds).
-    let mut range_rank = Vec::new();
-    if sc.is_some() {
-        let two_sided: Vec<usize> =
-            (0..m).filter(|&i| !is_inf(orig.row_lo[i]) && !is_inf(orig.row_up[i]) && orig.row_lo[i] != orig.row_up[i]).collect();
-        for &(i, _) in &ranges {
-            match two_sided.iter().position(|&t| t == i) {
-                Some(k) => range_rank.push(k),
-                None => return unsupported("scaled barrier with a ranged row of equal bounds"),
-            }
-        }
-    }
+    // `Scaling::col` lists the range columns after the structurals in the order of `ranges` (see [`range_columns`]).
+    let range_rank: Vec<usize> = (0..ranges.len()).collect();
     let mut row_of = vec![0usize; m];
     for (i, &p) in perm[..m].iter().enumerate() {
         row_of[p as usize] = i;
@@ -2558,9 +2561,9 @@ pub fn solve_exact(model: &LpModel, o: &Options) -> Result<Solution, BarrierErro
     Ok(solution(&f, run))
 }
 
-/// The release profile of the reference (`reverse-engineer/specs/barrier-release.md`): the model scaled by [`crate::scale::compute`], adaptive correctors.
+/// The release profile of the reference (`reverse-engineer/specs/barrier-release.md`): the model scaled by [`crate::scale::compute_with_ranges`] over [`range_columns`], adaptive correctors.
 pub fn solve_release(model: &LpModel, o: &Options) -> Result<Solution, BarrierError> {
-    let sc = crate::scale::compute(model);
+    let sc = crate::scale::compute_with_ranges(model, &range_columns(model));
     let s = crate::order::structure(model, crate::order::DENSE_COL_MIN).map_err(|e| BarrierError::Unsupported(e.3.to_string()))?;
     let f = std_form_scaled(model, &s.sym.perm, Some(&sc))?;
     let mut solver = crate::chol::CholSolver::new(&f, &s.sym);

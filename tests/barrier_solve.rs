@@ -105,6 +105,7 @@ fn maximization_doubled_ranges_and_homogeneous_statuses_match_reference_bitwise(
     let fx: Value = serde_json::from_str(include_str!("fixtures/barrier-solve-fx.json")).unwrap();
     check_solve(&fx, "fx_bar_max", include_str!("fixtures/fx_bar_max.mps"), BarrierStatus::Optimal);
     check_solve(&fx, "fx_bar_rngdup", include_str!("fixtures/fx_bar_rngdup.mps"), BarrierStatus::Optimal);
+    check_solve(&fx, "fx_bar_rngord", include_str!("fixtures/fx_bar_rngord.mps"), BarrierStatus::Optimal);
     check_solve(&fx, "fx_unbounded", include_str!("fixtures/fx_unbounded.mps"), BarrierStatus::Other(5));
     check_solve(&fx, "fx_infeasible", include_str!("fixtures/fx_infeasible.mps"), BarrierStatus::Other(0xd));
     for (text, status) in [(include_str!("fixtures/fx_unbounded.mps"), Status::Unbounded), (include_str!("fixtures/fx_infeasible.mps"), Status::NumericalFailure)] {
@@ -159,4 +160,26 @@ fn release_profile_solves_afiro_in_the_reference_iteration_count() {
     assert_eq!(r.status, Status::Optimal);
     assert_eq!(r.iterations, 7);
     assert!((r.objective + 464.7531428).abs() < 1e-6, "{}", r.objective);
+}
+
+/// The release profile on ranged rows of every kind: the range columns are scaled in RANGES order (first entry per row, an `E` row with `R = 0` included),
+/// which differs from the row order in `fx_bar_rngord`; read-out and iteration count bit for bit (`tests/fixtures/barrier-solve-release.json`).
+#[test]
+fn release_profile_scales_range_columns_in_ranges_order() {
+    let fx: Value = serde_json::from_str(include_str!("fixtures/barrier-solve-release.json")).unwrap();
+    for (name, text) in [
+        ("fx_bar_rngL", include_str!("fixtures/fx_bar_rngL.mps")),
+        ("fx_bar_rngGE", include_str!("fixtures/fx_bar_rngGE.mps")),
+        ("fx_bar_rngdup", include_str!("fixtures/fx_bar_rngdup.mps")),
+        ("fx_bar_rngord", include_str!("fixtures/fx_bar_rngord.mps")),
+    ] {
+        let model = mps::parse(text).unwrap();
+        let sol = barrier::solve_release(&model, &Options::default()).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let run = &fx[name]["run"];
+        assert_eq!(run["iters"].as_i64().unwrap() as i32, sol.run.iterations, "{name} iterations");
+        same(name, "x (read-out)", 0, &floats(&run["x"]), &sol.x);
+        same(name, "pi (read-out)", 0, &floats(&run["pi"]), &sol.y);
+        same(name, "rc (read-out)", 0, &floats(&run["rc"]), &sol.rc);
+        scalar(name, "objective", 0, &run["obj"], sol.objective);
+    }
 }

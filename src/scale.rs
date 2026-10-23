@@ -55,18 +55,25 @@ fn damped(target: f64, old: f64, thr: f64) -> (f64, bool) {
 
 /// The reference's scale factors of `model` (ScaleFlag default, no objective scaling).
 pub fn compute(model: &LpModel) -> Scaling {
+    let ranges: Vec<(usize, f64)> = (0..model.num_rows())
+        .filter(|&i| !is_inf(model.row_lo[i]) && !is_inf(model.row_up[i]) && model.row_lo[i] != model.row_up[i])
+        .map(|i| (i, model.row_up[i] - model.row_lo[i]))
+        .collect();
+    compute_with_ranges(model, &ranges)
+}
+
+/// [`compute`] with the range columns given as `(row, upper bound)` in column order (the barrier's: RANGES order, first entry per row, an `E` row with
+/// `R = 0` included, bound `|R|`).
+pub fn compute_with_ranges(model: &LpModel, ranges: &[(usize, f64)]) -> Scaling {
     let (nm, m) = (model.num_cols(), model.num_rows());
-    // Columns: structurals, then one unit column per ranged row.
+    // Columns: structurals, then one unit column per range column.
     let mut cols: Vec<Vec<(usize, f64)>> = (0..nm).map(|j| model.col(j).map(|(i, a)| (i, a.abs())).collect()).collect();
     let mut lo = model.col_lo.clone();
     let mut up = model.col_up.clone();
-    for i in 0..m {
-        let (rl, ru) = (model.row_lo[i], model.row_up[i]);
-        if !is_inf(rl) && !is_inf(ru) && rl != ru {
-            cols.push(vec![(i, 1.0)]);
-            lo.push(0.0);
-            up.push(ru - rl);
-        }
+    for &(i, ub) in ranges {
+        cols.push(vec![(i, 1.0)]);
+        lo.push(0.0);
+        up.push(ub);
     }
     let n = cols.len();
     let mut col = vec![1.0f64; n];

@@ -95,9 +95,14 @@ impl Default for SolveOptions {
 
 impl SolveOptions {
     /// The barrier at the reference's `Method=2`, `Crossover=0` defaults as far as recovered: the controlled profile (`BarCorrectors=1`, `ScaleFlag=0`,
-    /// `BarOrder=0`), `BarConvTol=1e-8`, `BarIterLimit=1000`. The release profile (default scaling and corrector count) is not recovered.
+    /// `BarOrder=0`), `BarConvTol=1e-8`, `BarIterLimit=1000`.
     pub fn barrier() -> Self {
         SolveOptions { method: Method::Barrier, max_iterations: 1000, ..SolveOptions::default() }
+    }
+
+    /// The barrier at the reference's release defaults (`ScaleFlag` default scaling, adaptive `BarCorrectors`), `specs/barrier-release.md`.
+    pub fn barrier_release() -> Self {
+        SolveOptions { scaling: true, ..SolveOptions::barrier() }
     }
 
     /// The PDHG at the reference's `Method=6` defaults (tolerances 1e-6, no iteration limit). The reference's controlled and release PDHG profiles are identical.

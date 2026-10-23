@@ -6,7 +6,7 @@ use rose::{mps, solve, Basis, SolveOptions, Status};
 use serde_json::{json, Value};
 
 fn usage() -> ! {
-    eprintln!("usage: rose solve <model.mps> [--output result.json] [--basis-in basis.json] [--basis-out basis.json] [--max-iterations N] [--method primal|dual|pdhg|barrier] [--profile controlled|release] [--pdhg-iter-limit N] [--pdhg-rel-tol T] [--pdhg-abs-tol T] [--pdhg-conv-tol T] [--pdhg-seed N] [--pdhg-inject merit@N|reld@N|pobj@N]");
+    eprintln!("usage: rose solve <model.mps> [--output result.json] [--basis-in basis.json] [--basis-out basis.json] [--max-iterations N] [--method primal|dual|pdhg|barrier] [--profile controlled|release] [--barrier-profile release|controlled] [--pdhg-iter-limit N] [--pdhg-rel-tol T] [--pdhg-abs-tol T] [--pdhg-conv-tol T] [--pdhg-seed N] [--pdhg-inject merit@N|reld@N|pobj@N]");
     std::process::exit(2)
 }
 
@@ -29,6 +29,7 @@ fn main() {
     let (mut output, mut basis_in, mut basis_out) = (None, None, None);
     let (mut release, mut max_it) = (false, None);
     let mut method = String::from("primal");
+    let mut barrier_profile = String::from("release");
     let mut popts = rose::pdhg::PdhgOptions::default();
     let mut it = args[2..].iter();
     while let Some(a) = it.next() {
@@ -61,6 +62,7 @@ fn main() {
             }
             "--pdhg-seed" => popts.seed = val.parse().unwrap_or_else(|_| usage()),
             "--pdhg-conv-tol" => popts.conv_tol = val.parse().unwrap_or_else(|_| usage()),
+            "--barrier-profile" => barrier_profile = val.clone(),
             _ => usage(),
         }
     }
@@ -84,9 +86,10 @@ fn main() {
     if method == "pdhg" {
         return run_pdhg(&model, &popts, output);
     } else if method == "barrier" {
-        // The barrier's own point (no crossover): the controlled profile, BarIterLimit 1000 unless --max-iterations is given.
+        // The barrier's own point (no crossover): the release profile unless --barrier-profile controlled, BarIterLimit 1000 unless --max-iterations is given.
         let max_iterations = if args.iter().any(|a| a == "--max-iterations") { opts.max_iterations } else { 1000 };
-        opts = SolveOptions { record_trace: false, max_iterations, ..SolveOptions::barrier() };
+        let base = if barrier_profile == "controlled" { SolveOptions::barrier() } else { SolveOptions::barrier_release() };
+        opts = SolveOptions { record_trace: false, max_iterations, ..base };
         if basis_in.is_some() || basis_out.is_some() {
             fail("--method barrier has no basis (Crossover=0): --basis-in and --basis-out are not supported");
         }

@@ -20,7 +20,7 @@ fn main() {
     };
     // BARRIER_PROFILE=release: the release profile (scaled model, adaptive correctors; the whole solve from the MPS alone).
     let release = std::env::var("BARRIER_PROFILE").map_or(false, |v| v == "release");
-    let sc = if release { Some(rose::scale::compute(&model)) } else { None };
+    let sc = if release { Some(rose::scale::compute_with_ranges(&model, &rose::barrier::range_columns(&model))) } else { None };
     let f = match barrier::std_form_scaled(&model, &s.sym.perm, sc.as_ref()) {
         Ok(f) => f,
         Err(e) => {
