@@ -67,3 +67,21 @@ fn a_model_without_rows_is_solved_at_its_bounds() {
     assert_eq!(r.status, Status::Optimal);
     assert_eq!((r.x.clone(), r.objective, r.iterations), (vec![0.0, 5.0], -5.0, 0));
 }
+
+#[test]
+fn nonzero_seed_perturbs_the_start_point() {
+    // Reference (Seed=1, pdhg-release): AFIRO 602 iterations, SC50A 1562; the seed's value does not matter.
+    for (name, iters, seed) in [("afiro", 602, 1), ("afiro", 602, 7), ("sc50a", 1562, 1)] {
+        let model = mps::parse(&read(&format!("{name}.mps"))).unwrap();
+        let r = solve(&model, &PdhgOptions { seed, ..PdhgOptions::default() });
+        assert_eq!((r.status, r.iterations), (Status::Optimal, iters), "{name} seed {seed}");
+    }
+}
+
+#[test]
+fn solve_options_select_the_method() {
+    let model = mps::parse(&read("afiro.mps")).unwrap();
+    let r = rose::solve(&model, None, &rose::SolveOptions::pdhg()).unwrap();
+    assert_eq!((r.status, r.iterations), (Status::Optimal, 593));
+    assert!(rose::verify::check_optimal(&model, &r).max_error() < 1e-3);
+}

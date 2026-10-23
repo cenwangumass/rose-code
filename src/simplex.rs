@@ -9,8 +9,25 @@ use crate::basis::Basis;
 use crate::lu::{Column, Factor};
 use crate::model::{LpModel, Sense, INF};
 
+/// Algorithm behind `solve`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum Method {
+    /// The primal simplex (the default).
+    #[default]
+    Primal,
+    /// The dual simplex (`crate::dual`). It reads `SolveOptions::refactor_schedule` as the iteration counts after which the reference's
+    /// work-based trigger refactorizes (the refactorizations of the no-leaving-row handler are modelled).
+    Dual,
+    /// The restarted reflected Halpern PDHG (`crate::pdhg`), a first-order method: the result is approximate (tolerances in `SolveOptions::pdhg`),
+    /// has no basis (`SolveResult::basis` is the all-slack placeholder; the start basis is ignored), no Farkas certificate and no ray.
+    Pdhg,
+}
+
 #[derive(Clone, Debug)]
 pub struct SolveOptions {
+    pub method: Method,
+    /// Options of `Method::Pdhg`.
+    pub pdhg: crate::pdhg::PdhgOptions,
     pub feasibility_tol: f64,
     pub optimality_tol: f64,
     pub pivot_tol: f64,
@@ -38,9 +55,6 @@ pub struct SolveOptions {
     /// Scale the model the way the reference does by default (`ScaleFlag`, power-of-two factors, `crate::scale`) and unscale the
     /// result. Off by default; on in `SolveOptions::release()`.
     pub scaling: bool,
-    /// The simplex method (`crate::method::SolveMethod`). The dual method (`crate::dual`) reads `refactor_schedule` as the iteration counts after which
-    /// the reference's work-based trigger refactorizes (the refactorizations of the no-leaving-row handler are modelled).
-    pub method: crate::method::SolveMethod,
     /// `PerturbValue` of the dual's cost perturbation (`crate::dual`, `reverse-engineer/specs/dual-simplex.md`): 0 turns it off (the controlled
     /// profile), 0.0002 is the library default.
     pub perturb: f64,
@@ -51,6 +65,8 @@ pub struct SolveOptions {
 impl Default for SolveOptions {
     fn default() -> Self {
         SolveOptions {
+            method: Method::Primal,
+            pdhg: crate::pdhg::PdhgOptions::default(),
             feasibility_tol: 1e-6,
             optimality_tol: 1e-7,
             pivot_tol: 1e-9,
@@ -63,7 +79,6 @@ impl Default for SolveOptions {
             faithful_ftran: true,
             pricing0: false,
             scaling: false,
-            method: crate::method::SolveMethod::Primal,
             perturb: 0.0,
             obj_scale: 1.0,
         }
@@ -71,6 +86,11 @@ impl Default for SolveOptions {
 }
 
 impl SolveOptions {
+    /// The PDHG at the reference's `Method=6` defaults (tolerances 1e-6, no iteration limit). The reference's controlled and release PDHG profiles are identical.
+    pub fn pdhg() -> Self {
+        SolveOptions { method: Method::Pdhg, ..SolveOptions::default() }
+    }
+
     /// The solver without the reference-matching tie-breaking (own Devex floor, own basis position order, no FTRAN mirror).
     pub fn plain() -> Self {
         SolveOptions { faithful_weights: false, faithful_positions: false, faithful_ftran: false, ..SolveOptions::default() }
@@ -78,7 +98,7 @@ impl SolveOptions {
 
     /// The reference's `dual-controlled` profile (`Method=1`, no scaling): the dual simplex of `crate::dual`.
     pub fn dual() -> Self {
-        SolveOptions { method: crate::method::SolveMethod::Dual, ..SolveOptions::default() }
+        SolveOptions { method: Method::Dual, ..SolveOptions::default() }
     }
 
     /// The reference's `dual-release` profile (`Method=1`, library defaults) as far as it is recovered: the dual loop on the scaled model.
@@ -2719,10 +2739,26 @@ pub(crate) fn repair_basis(p: &Internal, b: &mut Basis) -> Option<(usize, Vec<(u
 
 /// Solve starting from `start` (a primal feasible basis). `None` uses the all-slack basis with columns at their lower bounds.
 pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Result<SolveResult, SolveError> {
+    if opts.method == Method::Pdhg {
+        let r = crate::pdhg::solve(model, &opts.pdhg);
+        return Ok(SolveResult {
+            status: r.status,
+            objective: r.objective,
+            basis: Basis::slack(model.num_cols(), model.num_rows()),
+            x: r.x,
+            dual: r.dual,
+            reduced_cost: r.reduced_cost,
+            iterations: r.iterations as usize,
+            refactorizations: 0,
+            trace: Vec::new(),
+            farkas: None,
+            ray: None,
+        });
+    }
     if opts.scaling {
         return crate::scale::solve(model, start, opts);
     }
-    if opts.method == crate::method::SolveMethod::Dual {
+    if opts.method == Method::Dual {
         return crate::dual::solve(model, start, opts);
     }
     let p = build(model);

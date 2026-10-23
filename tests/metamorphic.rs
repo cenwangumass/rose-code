@@ -5,6 +5,12 @@
 use rose::model::{Sense, INF};
 use rose::verify;
 use rose::{mps, solve, LpModel, SolveOptions, Status};
+use std::cell::Cell;
+
+thread_local! {
+    /// Set by the `pdhg_*` tests: solve with `SolveOptions::pdhg()` (iteration limit 20000) and check at the first-order pass level.
+    static PDHG: Cell<bool> = const { Cell::new(false) };
+}
 
 fn load(path: String) -> Option<LpModel> {
     std::fs::read_to_string(path).ok().map(|t| mps::parse(&t).unwrap())
@@ -26,9 +32,16 @@ fn small() -> Vec<(String, LpModel)> {
     v
 }
 
-/// The methods every case runs under: the primal simplex and the dual simplex (the controlled profiles; pivot sequences differ).
+/// The methods every case runs under: the primal simplex and the dual simplex (the controlled profiles; pivot sequences differ),
+/// or the PDHG alone in the `pdhg_*` tests.
 fn opts() -> Vec<SolveOptions> {
-    vec![SolveOptions::default(), SolveOptions::dual(), SolveOptions::dual_release()]
+    if PDHG.get() {
+        let mut o = SolveOptions::pdhg();
+        o.pdhg.iter_limit = 20000.0;
+        vec![o]
+    } else {
+        vec![SolveOptions::default(), SolveOptions::dual(), SolveOptions::dual_release()]
+    }
 }
 
 fn fin(b: f64) -> bool {
@@ -118,7 +131,12 @@ fn negate(m: &LpModel) -> LpModel {
 
 fn run(m: &LpModel, name: &str, what: &str, o: &SolveOptions) -> rose::SolveResult {
     let r = solve(m, None, o).unwrap();
-    if r.status == Status::Optimal {
+    if r.status == Status::Optimal && PDHG.get() {
+        // first-order result: every error of the independent report is small relative to the objective's magnitude
+        let rep = verify::check_optimal(m, &r);
+        let scale = 1.0 + r.objective.abs();
+        assert!(rep.max_error() <= 1e-4 * scale.max(1e3), "{name} [{what}]: {rep:?}");
+    } else if r.status == Status::Optimal {
         // scaled models have larger magnitudes, so use a mildly loose tolerance on the independent check
         if let Err(e) = verify::check(m, &r, 1e-6) {
             panic!("{name} [{what}]: check failed: {e}");
@@ -137,7 +155,7 @@ fn case(what: &str, t: impl Fn(&LpModel) -> LpModel, f: impl Fn(f64) -> f64) {
             if base.status == Status::Optimal {
                 let want = f(base.objective);
                 let err = (r.objective - want).abs() / (1.0 + want.abs());
-                assert!(err <= 1e-8, "{name} [{what}]: objective {} vs {} (rel {err:.2e})", r.objective, want);
+                assert!(err <= if PDHG.get() { 1e-4 } else { 1e-8 }, "{name} [{what}]: objective {} vs {} (rel {err:.2e})", r.objective, want);
             }
         }
     }
@@ -175,4 +193,15 @@ fn negated_objective_with_sense_switch() {
 fn objective_offset() {
     case("offset +123.5", |m| LpModel { offset: m.offset + 123.5, ..m.clone() }, |z| z + 123.5);
     case("offset -7 then negate", |m| negate(&LpModel { offset: m.offset - 7.0, ..m.clone() }), |z| -(z - 7.0));
+}
+
+/// The same transformations under the PDHG: other accumulation orders and scalings change the path, so only the optimum (to 1e-4 relative) and the status stay.
+#[test]
+fn pdhg_permutation_scaling_negation_offset() {
+    PDHG.set(true);
+    case("perm", |m| permute(m, &perm(m.num_rows(), 1), &perm(m.num_cols(), 2)), |z| z);
+    case("rows x7", |m| scale_rows(m, 7.0, 2), |z| z);
+    case("cols x3", |m| scale_cols(m, 3.0, 2), |z| z);
+    case("negate", negate, |z| -z);
+    case("offset +123.5", |m| LpModel { offset: m.offset + 123.5, ..m.clone() }, |z| z + 123.5);
 }

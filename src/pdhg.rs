@@ -24,11 +24,14 @@ pub struct PdhgOptions {
     pub conv_tol: f64,
     /// Keep one record per residual test in `PdhgResult::checks` (the fields of the `ROSE_DUMP=pdhg` record).
     pub record_checks: bool,
+    /// The `Seed` parameter: any nonzero value starts the primal iterate at `clamp(1e-6 * u_j, lb, ub)` with `u_j` the first draws of the generator (the power
+    /// iteration's start vector follows in the same stream); the value itself does not matter (reference: Seed 1 and 7 give the same run).
+    pub seed: i32,
 }
 
 impl Default for PdhgOptions {
     fn default() -> Self {
-        PdhgOptions { iter_limit: f64::INFINITY, rel_tol: 1e-6, abs_tol: 1e-6, conv_tol: 1e-6, record_checks: false }
+        PdhgOptions { iter_limit: f64::INFINITY, rel_tol: 1e-6, abs_tol: 1e-6, conv_tol: 1e-6, record_checks: false, seed: 0 }
     }
 }
 
@@ -749,9 +752,14 @@ pub fn solve(model: &LpModel, opts: &PdhgOptions) -> PdhgResult {
     let nb = scaled_norm(&a.b, &a.rinv);
     let nc = scaled_norm(&a.c, &a.cinv);
     let omega = if nb > 0.0 && nc > 0.0 { nc / nb } else { 1.0 };
-    let x0: Vec<f64> = (0..n).map(|j| 0f64.max(a.lb[j]).min(a.ub[j])).collect();
-    let ncons = (0..n).filter(|&j| a.lb[j] > -BIG || a.ub[j] < BIG).count() + a.eq.iter().filter(|&&e| !e).count();
     let mut rng = Rng(0);
+    let x0: Vec<f64> = (0..n)
+        .map(|j| {
+            let v = if opts.seed != 0 { rng.next() * 1e-6 } else { 0.0 };
+            v.max(a.lb[j]).min(a.ub[j])
+        })
+        .collect();
+    let ncons = (0..n).filter(|&j| a.lb[j] > -BIG || a.ub[j] < BIG).count() + a.eq.iter().filter(|&&e| !e).count();
     let pv: Vec<f64> = (0..m).map(|_| rng.next()).collect();
     let mut st = State {
         a: &a,

@@ -2497,7 +2497,7 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             if r.ray.is_none() {
                 // The ray of the artificial-bound point did not verify; the primal simplex may still find one.
                 let mut popts = opts.clone();
-                popts.method = crate::method::SolveMethod::Primal;
+                popts.method = crate::simplex::Method::Primal;
                 r.ray = crate::simplex::solve(model, None, &popts)?.ray;
             }
         }
