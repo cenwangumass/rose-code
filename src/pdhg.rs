@@ -240,12 +240,15 @@ fn row_side(v: f64) -> f64 {
 /// residuals; the reference never treats a row side as infinite); the other side of an L or G row is infinite unless a range makes it finite.
 fn row_sides(model: &LpModel, i: usize) -> (f64, f64) {
     let ranged = model.row_range.get(i).is_some_and(|&r| r > 0.0);
-    match model.row_kind.get(i) {
+    // Gurobi's own infinity: a side beyond 1e100 is stored as +-1e100.
+    let c = |v: f64| if v.is_finite() { v.clamp(-1e100, 1e100) } else { v };
+    let (lo, up) = match model.row_kind.get(i) {
         Some(&b'L') => (if ranged { model.row_lo[i] } else { row_side(model.row_lo[i]) }, model.row_up[i]),
         Some(&b'G') => (model.row_lo[i], if ranged { model.row_up[i] } else { row_side(model.row_up[i]) }),
         Some(_) => (model.row_lo[i], model.row_up[i]),
         None => (row_side(model.row_lo[i]), row_side(model.row_up[i])),
-    }
+    };
+    (c(lo), c(up))
 }
 
 fn build(model: &LpModel) -> Internal {

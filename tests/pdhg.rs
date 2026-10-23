@@ -130,3 +130,9 @@ fn a_long_run_takes_rule_5_and_the_weight_fallback_without_injection() {
     // pdhg_e3 to the limit 300000 (PDHGIterLimit): 271 restarts by rule 5 (merit 0 from a negative radicand) and 3 resets of the primal weight, all as in the reference.
     check_with("pdhg_e3_long", PdhgOptions { iter_limit: 300000.0, ..PdhgOptions::default() });
 }
+
+#[test]
+fn a_row_side_of_1e102_drives_the_objective_past_1e100_and_stops_with_status_12() {
+    // Row sides beyond 1e100 are stored as 1e100; no injection involved (pdhg_e29). The reference returns no solution vectors with this status.
+    check_with("pdhg_e29", PdhgOptions { iter_limit: 3000.0, ..PdhgOptions::default() });
+}
