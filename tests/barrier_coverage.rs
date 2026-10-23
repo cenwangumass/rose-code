@@ -5,7 +5,7 @@
 //! Unsupported or different from the primal result, on purpose:
 //! - `fx_infeasible`: the barrier ends with its status 0xd (API status 12, infeasible or unbounded), reported as `NumericalFailure`; no certificate.
 //! - `fx_badscale`: the reference's barrier stops at -4.99001868824 after 7 iterations (optimum -5); rose agrees with the reference, not with the optimum.
-//! - scaling (the release profile) is `SolveError::Unsupported`; an extra N row is ignored like the reference does (`unsupported_inputs_are_explicit`).
+//! - an extra N row is ignored like the reference does (`unsupported_inputs_are_explicit`).
 
 use rose::verify;
 use rose::{mps, solve, LpModel, SolveOptions, Status};
