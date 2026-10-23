@@ -628,10 +628,11 @@ impl<'a> State<'a> {
         let t = cr * 2.0 * self.eta;
         let s = ddx * self.omega + ddy / self.omega;
         let r2 = t + s;
+        // `0x368395`: a negative (or NaN) radicand is not rooted and R is stored as 0.
         if r2 >= 0.0 {
             r2.sqrt()
         } else {
-            r2
+            0.0
         }
     }
 
@@ -878,12 +879,25 @@ pub fn solve(model: &LpModel, opts: &PdhgOptions) -> PdhgResult {
                         restarts += 1;
                         just_restarted = true;
                         // a continued power iteration while the step size estimate has not converged
-                        if st.ptol < st.perr {
-                            let b = (0.1 * st.total as f64 - st.power_iters as f64) as i64;
-                            if b > 100 {
+                        // (`0x365ee6`: a merit of 0 gives a budget of 1000 and first tightens a converged tolerance, `0x366b7e`)
+                        let b = if st.r == 0.0 {
+                            if st.ptol >= st.perr {
+                                st.ptol = (0.1 * st.ptol).max(1e-16);
+                            }
+                            1000
+                        } else {
+                            (0.1 * st.total as f64 - st.power_iters as f64) as i64
+                        };
+                        {
+                            if st.ptol < st.perr && b > 100 {
                                 let left = opts.iter_limit - st.total as f64;
                                 let b = if b as f64 >= left { left.max(0.0) as u64 } else { b as u64 };
                                 st.power(b, false);
+                                // the termination test after the chunk (`0x36a7d0`) can only stop on the iteration limit here
+                                if st.total as f64 >= opts.iter_limit {
+                                    status = 7;
+                                    break;
+                                }
                             }
                         }
                     }

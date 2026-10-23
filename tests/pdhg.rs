@@ -11,12 +11,19 @@ fn read(name: &str) -> String {
 }
 
 fn check_model(name: &str) {
+    check_with(name, PdhgOptions::default());
+}
+
+fn check_with(name: &str, opts: PdhgOptions) {
     let model = mps::parse(&read(&format!("{name}.mps"))).unwrap();
     let fix: Value = serde_json::from_str(&read(&format!("{name}-pdhg-release.checks.json"))).unwrap();
-    let r = solve(&model, &PdhgOptions { record_checks: true, ..PdhgOptions::default() });
-    assert_eq!(r.status, Status::Optimal, "{name}");
+    let r = solve(&model, &PdhgOptions { record_checks: true, ..opts });
+    let want_status = if fix["status"].as_f64() == Some(7.0) { Status::IterationLimit } else { Status::Optimal };
+    assert_eq!(r.status, want_status, "{name}");
     assert_eq!(r.iterations, fix["iterations"].as_u64().unwrap(), "{name}: iterations");
-    assert_eq!(r.objective, fix["objective"].as_f64().unwrap(), "{name}: objective");
+    if let Some(z) = fix["objective"].as_f64() {
+        assert_eq!(r.objective, z, "{name}: objective");
+    }
     let want = fix["checks"].as_array().unwrap();
     assert_eq!(r.checks.len(), want.len(), "{name}: number of tests");
     for (i, (got, exp)) in r.checks.iter().zip(want).enumerate() {
@@ -84,4 +91,10 @@ fn solve_options_select_the_method() {
     let r = rose::solve(&model, None, &rose::SolveOptions::pdhg()).unwrap();
     assert_eq!((r.status, r.iterations), (Status::Optimal, 593));
     assert!(rose::verify::check_optimal(&model, &r).max_error() < 1e-3);
+}
+
+#[test]
+fn tight_tolerances_and_limit_exit_inside_the_power_iteration() {
+    // pdhg_e3 at PDHGAbsTol = PDHGRelTol = PDHGConvTol = 1e-9, PDHGIterLimit 8000: restarts whose continued power iteration runs into the limit.
+    check_with("pdhg_e3_tight", PdhgOptions { abs_tol: 1e-9, rel_tol: 1e-9, conv_tol: 1e-9, iter_limit: 8000.0, ..PdhgOptions::default() });
 }
