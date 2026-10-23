@@ -81,6 +81,28 @@ pub struct StdForm {
     pub row_of: Vec<usize>,
     /// Number of complementarity pairs (`Q+0x210`): lower bounds, the upper bounds present before the implied ones were dropped, and the inequality slacks.
     pub ncomp: usize,
+    /// `Q+0x648` ([`uniform_scale`]): per column the common value of its entries, 0 for the others; `None` when the reference frees the vector.
+    pub scale: Option<Vec<f64>>,
+}
+
+/// `Q+0x648` (allocated at `0x2e5533`): for every column with an entry whose entries all lie within `1e-10` of the first, `s_j` = the first value
+/// (0 otherwise). The vector is freed (`None`) when `2 nc > sum over the uniform columns of count^2` (`0x2e56e8`; DEGEN3 keeps it).
+pub fn uniform_scale(n2: usize, col_start: &[usize], val: &[f64]) -> Option<Vec<f64>> {
+    let mut s = vec![0.0; n2];
+    let mut tot = 0.0f64;
+    for j in 0..n2 {
+        let (a, e) = (col_start[j], col_start[j + 1]);
+        if e == a {
+            continue;
+        }
+        let v0 = val[a];
+        if (a + 1..e).all(|k| (v0 - val[k]).abs() <= 1e-10) {
+            s[j] = v0;
+            let c = (e - a) as f64;
+            tot = tot + c * c;
+        }
+    }
+    if 2.0 * n2 as f64 > tot { None } else { Some(s) }
 }
 
 impl StdForm {
@@ -119,8 +141,25 @@ impl StdForm {
         out
     }
 
-    /// `(A' y)_j` of column `j`, entries summed sequentially from 0.
+    /// `(A' y)_j` of column `j`, entries summed sequentially from 0. A scaled column (`Q+0x648[j] != 0`) sums `y_i s_j` in two accumulators (even and
+    /// odd positions, added at the end), then the last entry of an odd count.
     pub(crate) fn aty_col(&self, j: usize, y: &[f64]) -> f64 {
+        if let Some(sc) = self.scale.as_ref().map(|v| v[j]).filter(|&v| v != 0.0) {
+            let (a, cn) = (self.col_start[j], self.col_start[j + 1] - self.col_start[j]);
+            let (mut ev, mut od) = (0.0, 0.0);
+            for k in 0..cn - (cn & 1) {
+                if k % 2 == 0 {
+                    ev = ev + y[self.row_idx[a + k]] * sc;
+                } else {
+                    od = od + y[self.row_idx[a + k]] * sc;
+                }
+            }
+            let mut t = ev + od;
+            if cn & 1 == 1 {
+                t = t + y[self.row_idx[a + cn - 1]] * sc;
+            }
+            return t;
+        }
         let mut t = 0.0;
         for k in self.col_start[j]..self.col_start[j + 1] {
             t = t + y[self.row_idx[k]] * self.val[k];
@@ -405,6 +444,7 @@ pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> 
             cshift = cshift + c[j] * l;
         }
     }
+    let scale = uniform_scale(n2, &col_start, &val);
     Ok(StdForm {
         b_file,
         m,
@@ -425,6 +465,7 @@ pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> 
         lower,
         row_of,
         ncomp,
+        scale,
     })
 }
 

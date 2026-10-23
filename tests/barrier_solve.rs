@@ -1,12 +1,12 @@
 //! The whole barrier solve from the MPS alone (`rose::barrier` with the bit-exact `rose::chol::CholSolver`) against the reference
 //! (`tests/fixtures/barrier-solve-controlled.json`, written by `reverse-engineer/tools/make_barrier_solve_fixture.py`): every iteration's state and
 //! decisions, and the returned x, duals, reduced costs and objective, agree bit for bit on AFIRO, SC50A, BLEND, ADLITTLE, BORE3D, DEGEN2, BOEING2 (ranged
-//! rows, implied upper bounds dropped), PILOT4 (free columns, refinement, step caps, restart) and the two ranged-row fixtures (`fx_bar_rngL`, `fx_bar_rngGE`: L, G and E rows, R of both signs and 0).
+//! rows, implied upper bounds dropped), PILOT4 (free columns, refinement, step caps, restart), DEGEN3 (scaled columns `Q+0x648`, supernodes cut to 192 columns, generic assembly of the root) and the two ranged-row fixtures (`fx_bar_rngL`, `fx_bar_rngGE`: L, G and E rows, R of both signs and 0).
 use rose::barrier::{self, BarrierStatus, Options};
 use rose::{mps, solve, SolveOptions, Status};
 use serde_json::Value;
 
-const MODELS: [(&str, &str); 10] = [
+const MODELS: [(&str, &str); 11] = [
     ("afiro", include_str!("fixtures/afiro.mps")),
     ("sc50a", include_str!("fixtures/sc50a.mps")),
     ("blend", include_str!("fixtures/blend.mps")),
@@ -17,6 +17,7 @@ const MODELS: [(&str, &str); 10] = [
     ("fx_bar_rngL", include_str!("fixtures/fx_bar_rngL.mps")),
     ("fx_bar_rngGE", include_str!("fixtures/fx_bar_rngGE.mps")),
     ("pilot4", include_str!("fixtures/pilot4.mps")),
+    ("degen3", include_str!("fixtures/degen3.mps")),
 ];
 
 fn floats(v: &Value) -> Vec<f64> {

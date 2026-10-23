@@ -7,7 +7,7 @@
 //! (no iterator sums, no auto-vectorised reductions: Rust never contracts `a * b + c` into an fma by itself).
 //!
 //! Gaps (never approximated): regularisation and 2x2 pivots of `0x2f1940` (never triggered in the corpus; this port has the normal pivot test
-//! only), dense columns, free variables, the scaled variant of `0x2f83e0`, the iterative refinement of `0x30fc90`.
+//! only), dense columns, free variables, the iterative refinement of `0x30fc90`.
 use crate::barrier::{BarrierError, DirKind, Direction, NormalSolver, Rhs, StartKind, State, StdForm};
 use crate::dump;
 use crate::order::Symbolic;
@@ -48,8 +48,17 @@ impl Plan {
         let mut sns: Vec<Supernode> = Vec::new();
         for j in 0..n {
             if sym.width[j] > 0 {
-                let (c, off) = (sym.count[j] as usize, sym.rowoff[j] as usize);
-                sns.push(Supernode { col: j, w: sym.width[j] as usize, c, rows: sym.idx[off..off + c].iter().map(|&r| r as usize).collect(), upd: Vec::new() });
+                // Numeric supernodes (SYM width2, `0x302277..0x3023e4`): a symbolic supernode of width W is cut into chunks of at most 192 columns (240 when
+                // the chunk's remaining row count is >= 0x780); a later chunk keeps the tail of the row list. The other cap (`0x302277`, r9d: a function of
+                // the flops and SYM+0x48/0x60, at least 8) is >= 240 on every captured model and not decoded.
+                let (c0, roff, wt) = (sym.count[j] as usize, sym.rowoff[j] as usize, sym.width[j] as usize);
+                let mut off = 0;
+                while off < wt {
+                    let cap = if c0 - off >= 0x780 { 240 } else { 192 };
+                    let w = (wt - off).min(cap);
+                    sns.push(Supernode { col: j + off, w, c: c0 - off, rows: sym.idx[roff + off..roff + c0].iter().map(|&r| r as usize).collect(), upd: Vec::new() });
+                    off += w;
+                }
             }
         }
         // sn_of[column] = supernode index.
@@ -130,6 +139,47 @@ pub fn assemble(f: &StdForm, rows: &[Vec<(usize, usize)>], d: &[f64], mp: &[usiz
             }
             let dd = d[cj];
             let mut j = pos;
+            let sj = f.scale.as_ref().map_or(0.0, |v| v[cj]);
+            if sj != 0.0 {
+                // Scaled column (`Q+0x648[cj] != 0`): every contribution is the number (s s) d (triples) or s (d s) (the rest), added without a product with A.
+                let (sv3, sv1) = ((sj * sj) * dd, sj * (dd * sj));
+                while j + 2 < l24 {
+                    let (a, b, cc) = (mp[idx[j]], mp[idx[j + 1]], mp[idx[j + 2]]);
+                    mm[a * w + a] = sv3 + mm[a * w + a];
+                    mm[b * w + a] = sv3 + mm[b * w + a];
+                    mm[b * w + b] = sv3 + mm[b * w + b];
+                    for q in j + 2..l24 {
+                        let mq = mp[idx[q]];
+                        add_m(&mut mm, &mut r, w, a, mq, sv3);
+                        add_m(&mut mm, &mut r, w, b, mq, sv3);
+                        add_m(&mut mm, &mut r, w, cc, mq, sv3);
+                    }
+                    for q in l24..e {
+                        let mq = mp[idx[q]];
+                        if mq < n1 {
+                            add_m(&mut mm, &mut r, w, a, mq, sv3);
+                            add_m(&mut mm, &mut r, w, b, mq, sv3);
+                            add_m(&mut mm, &mut r, w, cc, mq, sv3);
+                        }
+                    }
+                    j += 3;
+                }
+                while j < l24 {
+                    let a = mp[idx[j]];
+                    mm[a * w + a] = sv1 + mm[a * w + a];
+                    for q in j + 1..l24 {
+                        add_m(&mut mm, &mut r, w, a, mp[idx[q]], sv1);
+                    }
+                    for q in l24..e {
+                        let mq = mp[idx[q]];
+                        if mq < n1 {
+                            add_m(&mut mm, &mut r, w, a, mq, sv1);
+                        }
+                    }
+                    j += 1;
+                }
+                continue;
+            }
             while j + 2 < l24 {
                 let (a, b, cc) = (mp[idx[j]], mp[idx[j + 1]], mp[idx[j + 2]]);
                 let (a0, a1, a2) = (val[j], val[j + 1], val[j + 2]);
@@ -191,7 +241,9 @@ pub fn assemble_generic(f: &StdForm, rows: &[Vec<(usize, usize)>], d: &[f64], mp
         let a = i - col;
         for &(cj, pos) in &rows[i] {
             let e = st[cj + 1];
-            let t = d[cj] * val[pos];
+            let sj = f.scale.as_ref().map_or(0.0, |v| v[cj]);
+            // Scaled column (`0x2f81fd`): every contribution is the number (s s) D[cj].
+            let t = if sj != 0.0 { (sj * sj) * d[cj] } else { d[cj] * val[pos] };
             for q in pos..e {
                 let rr = idx[q];
                 let m = mp[rr];
@@ -200,7 +252,7 @@ pub fn assemble_generic(f: &StdForm, rows: &[Vec<(usize, usize)>], d: &[f64], mp
                         seen[m] = true;
                         touched.push(m);
                     }
-                    acc[m] = val[q] * t + acc[m];
+                    acc[m] = if sj != 0.0 { t + acc[m] } else { val[q] * t + acc[m] };
                 }
             }
         }
@@ -1161,7 +1213,15 @@ impl Amat {
         let mut out = Vec::with_capacity(self.nc + self.m);
         for j in 0..self.nc {
             let (s, e) = (f.col_start[j], f.col_start[j + 1]);
-            out.push(if e > s { dot8(e - s, s & 1, &|q| f.val[s + q] * y[f.row_idx[s + q]]) } else { 0.0 });
+            let sj = f.scale.as_ref().map_or(0.0, |v| v[j]);
+            out.push(if sj != 0.0 {
+                // scaled branch (`Q+0x648[j] != 0`): the common value replaces the entries, no alignment peel
+                dot8(e - s, 0, &|q| y[f.row_idx[s + q]] * sj)
+            } else if e > s {
+                dot8(e - s, s & 1, &|q| f.val[s + q] * y[f.row_idx[s + q]])
+            } else {
+                0.0
+            });
         }
         for i in 0..self.m {
             out.push(if f.sense[i] == b'=' { 0.0 } else { y[i] });
@@ -1254,7 +1314,16 @@ impl CholSolver {
     /// `(rx - cols) + zx dx` in the scalar tail (`n mod 8` entries).
     fn residual(&self, f: &StdForm, rx: &[f64], ry: &[f64], dx: &[f64], dy: &[f64]) -> (Vec<f64>, Vec<f64>) {
         let (m, n2, n) = (f.m, f.n2, f.n());
-        let mut rows = f.ax_cols(dx);
+        let mut rows = vec![0.0; m];
+        for j in 0..n2 {
+            let sj = f.scale.as_ref().map_or(0.0, |v| v[j]);
+            let t = dx[j] * sj;
+            for k in f.col_start[j]..f.col_start[j + 1] {
+                let i = f.row_idx[k];
+                // scaled variant of `0x2ecab0`: `dx_j s_j` is added to every row of the column
+                rows[i] = if sj != 0.0 { rows[i] + t } else { f.val[k] * dx[j] + rows[i] };
+            }
+        }
         let mut cols = vec![0.0; n];
         for j in 0..n2 {
             cols[j] = f.aty_col(j, dy);
