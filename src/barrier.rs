@@ -73,6 +73,8 @@ pub struct StdForm {
     pub ub_lo: usize,
     pub ub_hi: usize,
     pub offset: f64,
+    /// -1 for a maximization model (solved as the minimization of the negated objective), else 1.
+    pub max_sign: f64,
     /// `c . lower` of the shifted columns.
     pub cshift: f64,
     /// Lower bound removed from each column.
@@ -83,6 +85,11 @@ pub struct StdForm {
     pub ncomp: usize,
     /// `Q+0x648` ([`uniform_scale`]): per column the common value of its entries, 0 for the others; `None` when the reference frees the vector.
     pub scale: Option<Vec<f64>>,
+    /// Dense columns of the model conversion (`P+0x218`, [`crate::order::dense_rule`]), ascending. A dense column is a node of the factor (`m + dense_k`),
+    /// not a term of `A D A'`.
+    pub dense: Vec<usize>,
+    /// `k` of each dense column: its factor node is `m + k` (`SYM perm[m + r] - m`).
+    pub dense_k: Vec<usize>,
 }
 
 /// `Q+0x648` (allocated at `0x2e5533`): for every column with an entry whose entries all lie within `1e-10` of the first, `s_j` = the first value
@@ -309,22 +316,28 @@ fn drop_implied_upper_bounds(m: usize, n: usize, sense: &[u8], col_start: &[usiz
 pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> {
     let m = model.num_rows();
     let n_struct = model.num_cols();
-    if model.sense == Sense::Maximize {
-        return unsupported("maximization");
+    // The final permutation covers the rows, then the dense columns as nodes after them.
+    let dense = crate::order::dense_rule(model).map_err(|e| BarrierError::Unsupported(e.to_string()))?;
+    if perm.len() != m + dense.len() {
+        return unsupported(format!("permutation of {} entries for {m} rows and {} dense columns", perm.len(), dense.len()));
     }
-    if perm.len() != m {
-        return unsupported(format!("permutation of {} entries for {m} rows (dense columns in the ordering)", perm.len()));
-    }
-    if model.range_dup {
-        return unsupported("two RANGES entries for a row");
+    let dense_k: Vec<usize> = (0..dense.len()).map(|r| perm[m + r] as usize - m).collect();
+    // A row given twice in RANGES keeps its first entry (the later ones are ignored by the reference); `r_last` is the entry the model's row bounds were built from.
+    let mut ranges: Vec<(usize, f64)> = Vec::new();
+    let mut r_last = vec![0.0; m];
+    for &(i, r) in &model.range_entries {
+        if !ranges.iter().any(|&(k, _)| k == i) {
+            ranges.push((i, r));
+        }
+        r_last[i] = r;
     }
     let mut row_of = vec![0usize; m];
-    for (i, &p) in perm.iter().enumerate() {
+    for (i, &p) in perm[..m].iter().enumerate() {
         row_of[p as usize] = i;
     }
     // Ranged rows (RANGES order): an equality row plus a range column with upper bound |R| (coefficient +1; -1 for a G row).
     let mut is_range = vec![false; m];
-    for &(i, _) in &model.range_entries {
+    for &(i, _) in &ranges {
         if model.row_kind.get(i).is_none() {
             return unsupported("ranged row of unknown type");
         }
@@ -339,7 +352,16 @@ pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> 
         let (lo, up) = (model.row_lo[i], model.row_up[i]);
         if is_range[i] {
             // L: [r - |R|, r], rhs r = row_up; G: [r, r + |R|], rhs r = row_lo; E: [r, r + R] or [r + R, r], rhs row_up.
-            b_file[i] = if model.row_kind[i] == b'G' { lo } else { up };
+            b_file[i] = if model.row_kind[i] == b'G' {
+                lo
+            } else if model.row_kind[i] == b'E' {
+                // E: [r, r + R] (R > 0) or [r + R, r] with the last entry R_last; the rhs is r, plus the first entry R when it is positive.
+                let r = if r_last[i] > 0.0 { lo } else { up };
+                let r1 = ranges.iter().find(|&&(k, _)| k == i).unwrap().1;
+                if r1 > 0.0 { r + r1 } else { r }
+            } else {
+                up
+            };
             if is_inf(lo) || is_inf(up) {
                 return unsupported("ranged row with an infinite side");
             }
@@ -363,7 +385,7 @@ pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> 
         }
     }
     // Columns: the model's, then the range columns; bounds as the file gives them.
-    let nr = model.range_entries.len();
+    let nr = ranges.len();
     let n2 = n_struct + nr;
     let mut lb_in = vec![0.0; n2];
     let mut ub_in = vec![INF; n2];
@@ -377,7 +399,7 @@ pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> 
             ub_in[j] = up;
         }
     }
-    for (k, &(i, r)) in model.range_entries.iter().enumerate() {
+    for (k, &(i, r)) in ranges.iter().enumerate() {
         // L and G: |R|; E: R, or -R for R <= 0 (R = 0 gives -0.0).
         ub_in[n_struct + k] = if model.row_kind[i] == b'E' { if r > 0.0 { r } else { -r } } else { r.abs() };
     }
@@ -389,7 +411,7 @@ pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> 
         let mut e: Vec<(usize, f64)> = if j < n_struct {
             model.col(j).filter(|&(_, v)| v != 0.0).map(|(i, v)| (perm[i] as usize, sign[i] * v)).collect()
         } else {
-            let i = model.range_entries[j - n_struct].0;
+            let i = ranges[j - n_struct].0;
             vec![(perm[i] as usize, if model.row_kind[i] == b'G' { -1.0 } else { 1.0 })]
         };
         e.sort_by_key(|t| t.0);
@@ -433,7 +455,9 @@ pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> 
     let (ub_lo, ub_hi) = if ub_cols.is_empty() { (n2, n2) } else { (ub_cols[0], ub_cols[ub_cols.len() - 1] + 1) };
     // Shift b by the lower bounds: one entry at a time in column order, `b_i = b_i - a_ij lo_j`.
     let mut cshift = 0.0;
-    let mut c = model.obj.clone();
+    // Maximization: the reference minimises the negated objective (c and the constant negated); the read-out negates the objective, the duals and the reduced costs back.
+    let max_sign = if model.sense == Sense::Maximize { -1.0 } else { 1.0 };
+    let mut c: Vec<f64> = if max_sign < 0.0 { model.obj.iter().map(|v| -v).collect() } else { model.obj.clone() };
     c.resize(n2, 0.0);
     for j in 0..n2 {
         let l = lower[j];
@@ -460,10 +484,13 @@ pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> 
         ub,
         ub_lo,
         ub_hi,
-        offset: model.offset,
+        offset: if max_sign < 0.0 { -model.offset } else { model.offset },
+        max_sign,
         cshift,
         lower,
         row_of,
+        dense,
+        dense_k,
         ncomp,
         scale,
     })
@@ -751,7 +778,7 @@ pub struct Direction {
 }
 
 /// `0x30c670` (C): mean complementarity after the trial step.
-fn mu_aff(f: &StdForm, s: &State, d: &Direction, ap: f64, ad: f64, ncomp: usize) -> f64 {
+fn mu_aff(f: &StdForm, s: &State, d: &Direction, ap: f64, ad: f64, ncomp: usize, hk: Option<(f64, f64, f64, f64)>) -> f64 {
     let t = |i: usize| (d.dx[i] * ap + s.x[i]) * (d.dz[i] * ad + s.z[i]);
     let mut acc = 0.0;
     for j in 0..f.n2 {
@@ -764,6 +791,10 @@ fn mu_aff(f: &StdForm, s: &State, d: &Direction, ap: f64, ad: f64, ncomp: usize)
         let tu = |j: usize| (d.du[j] * ap + s.u[j]) * (d.dv[j] * ad + s.v[j]);
         tot = lane_block(&tu, f.ub_lo, f.ub_hi - f.ub_lo, tot);
     }
+    if let Some((dtau, dkap, tau, kappa)) = hk {
+        // Homogeneous term: `(dkappa ad + kappa)(dtau ap + tau)`.
+        tot = (dkap * ad + kappa) * (dtau * ap + tau) + tot;
+    }
     tot / ncomp as f64
 }
 
@@ -774,7 +805,7 @@ fn sigma_target(mu: f64, aff: f64) -> f64 {
 }
 
 /// `0x30c050` / `0x30ed50` (C): step to the boundary of `x + a d >= 0` over the flagged entries (and `u + a e` over `[lo, hi)`).
-fn ratio(x: &[f64], d: &dyn Fn(usize) -> f64, fl: &[u8], up: Option<(usize, usize, &[f64], &dyn Fn(usize) -> f64)>) -> f64 {
+fn ratio(x: &[f64], d: &dyn Fn(usize) -> f64, fl: &[u8], up: Option<(usize, usize, &[f64], &dyn Fn(usize) -> f64)>, tk: &[(f64, f64, f64)], w: f64) -> f64 {
     let mut a = 1.001;
     for j in 0..x.len() {
         if fl[j] & 1 != 0 {
@@ -792,6 +823,13 @@ fn ratio(x: &[f64], d: &dyn Fn(usize) -> f64, fl: &[u8], up: Option<(usize, usiz
             }
         }
     }
+    // The homogeneous scalars tau and kappa (value, direction, corrector direction) are tested after the columns, like further entries.
+    for &(t, e0, e1) in tk {
+        let dj = e1 * w + e0;
+        if a * dj + t < 0.0 {
+            a = -(t + (-1e-30)) / dj - 1e-13;
+        }
+    }
     if a <= 0.0 {
         0.0
     } else {
@@ -799,7 +837,8 @@ fn ratio(x: &[f64], d: &dyn Fn(usize) -> f64, fl: &[u8], up: Option<(usize, usiz
     }
 }
 
-fn step_pair(f: &StdForm, s: &State, d: &Direction, d2: Option<(&Direction, f64)>, primal: bool) -> f64 {
+fn step_pair(f: &StdForm, s: &State, d: &Direction, d2: Option<(&Direction, f64)>, primal: bool, tk: &[(f64, f64, f64)]) -> f64 {
+    let w = d2.map_or(0.0, |(_, w)| w);
     // Direction d, or d + w d2 as `d2 w + d`.
     if primal {
         let dir = |j: usize| match d2 {
@@ -811,7 +850,7 @@ fn step_pair(f: &StdForm, s: &State, d: &Direction, d2: Option<(&Direction, f64)
             None => d.du[j],
         };
         let up: Option<(usize, usize, &[f64], &dyn Fn(usize) -> f64)> = if f.has_ub() { Some((f.ub_lo, f.ub_hi, &s.u, &du)) } else { None };
-        ratio(&s.x, &dir, &f.flags, up)
+        ratio(&s.x, &dir, &f.flags, up, tk, w)
     } else {
         let dir = |j: usize| match d2 {
             Some((e, w)) => e.dz[j] * w + d.dz[j],
@@ -822,20 +861,20 @@ fn step_pair(f: &StdForm, s: &State, d: &Direction, d2: Option<(&Direction, f64)
             None => d.dv[j],
         };
         let up: Option<(usize, usize, &[f64], &dyn Fn(usize) -> f64)> = if f.has_ub() { Some((f.ub_lo, f.ub_hi, &s.v, &dv)) } else { None };
-        ratio(&s.z, &dir, &f.flags, up)
+        ratio(&s.z, &dir, &f.flags, up, tk, w)
     }
 }
 
 /// `0x30ed50` pass 1 (C): weights `w_i = ((ntry-1-i)(1-wlo))/(ntry-1) + wlo`, `wlo = clamp(ap0 ad0, 0.01, 1)`; a weight replaces the best
 /// step only when `best * 1.0001 < step` (primal and dual separately). Returns `(best_p, best_d, wp, wd)`.
-fn select(f: &StdForm, s: &State, d: &Direction, d2: &Direction, ap0: f64, ad0: f64, ntry: usize) -> (f64, f64, f64, f64) {
+fn select(f: &StdForm, s: &State, d: &Direction, d2: &Direction, ap0: f64, ad0: f64, ntry: usize, tk: &[(f64, f64, f64)]) -> (f64, f64, f64, f64) {
     let wlo = (ap0 * ad0).min(1.0).max(0.01);
     let (mut bp, mut bd) = (-1e100, -1e100);
     let (mut wp, mut wd) = (0.0, 0.0);
     for i in 0..ntry {
         let w = if ntry > 1 { (((ntry - 1 - i) as f64) * (1.0 - wlo)) / ((ntry - 1) as f64) + wlo } else { wlo };
         let (ap, ad) = if w != 0.0 {
-            (step_pair(f, s, d, Some((d2, w)), true), step_pair(f, s, d, Some((d2, w)), false))
+            (step_pair(f, s, d, Some((d2, w)), true, tk), step_pair(f, s, d, Some((d2, w)), false, tk))
         } else {
             (ap0, ad0)
         };
@@ -855,9 +894,20 @@ fn combine(d0: &[f64], d1: &[f64], w: f64) -> Vec<f64> {
     (0..d0.len()).map(|j| d1[j] * w + d0[j]).collect()
 }
 
+/// The homogeneous scalars of an update: `(tau, kappa, dtau, dkappa, dtau of the dual step)`.
+type HsdStep = (f64, f64, f64, f64, f64);
+
+/// New homogeneous scalars after an update: `tau` after the primal step, `kappa`, and `tau` after the dual step.
+#[derive(Debug, Clone, Copy)]
+struct HsdOut {
+    tau: f64,
+    kappa: f64,
+    tau_d: f64,
+}
+
 /// `0x30d3e0` (C): step-back gamma and the update of x, z, y (u, v). `g0 = 1e-6` (no cones).
-/// Returns the new state and `(g, sp, sd)`.
-fn update(f: &StdForm, s: &State, d: &Direction, ap: f64, ad: f64, ncomp: usize) -> (State, (f64, f64, f64)) {
+/// Returns the new state, `(g, sp, sd)` and, with the homogeneous scalars `hk`, their new values.
+fn update(f: &StdForm, s: &State, d: &Direction, ap: f64, ad: f64, ncomp: usize, hk: Option<HsdStep>) -> (State, (f64, f64, f64), Option<HsdOut>) {
     let g0 = 1e-6;
     let steps = |g: f64| ((ap * (1.0 - g)).min(1.0), ((1.0 - g) * ad).min(1.0));
     let (sp, sd) = steps(g0);
@@ -876,7 +926,9 @@ fn update(f: &StdForm, s: &State, d: &Direction, ap: f64, ad: f64, ncomp: usize)
             tot = tot + p;
         }
     }
-    tot = tot + (0.0 * sd + 0.0) * (0.0 * sp + 1.0);
+    // Trial term of the homogeneous scalars `(dkappa sd + kappa)(dtau sp + tau)` (`0 * 1` without them).
+    let (tau0, kap0, dtau, dkap) = hk.map_or((1.0, 0.0, 0.0, 0.0), |h| (h.0, h.1, h.2, h.3));
+    tot = tot + (dkap * sd + kap0) * (dtau * sp + tau0);
     tot = tot / ncomp as f64;
     let mut g = g0;
     if minp < 0.01 * tot {
@@ -886,7 +938,15 @@ fn update(f: &StdForm, s: &State, d: &Direction, ap: f64, ad: f64, ncomp: usize)
         }
     }
     g = g.min(0.5);
-    let (sp, sd) = steps(g);
+    let (mut sp, mut sd) = steps(g);
+    if kap0 > 0.0 {
+        // `0x30dc2d`: while the trial `tau kappa` product is below 0.01 of the mean, g grows tenfold (at most 0.5).
+        while g < 0.5 && 0.01 * tot > (dkap * sd + kap0) * (dtau * sp + tau0) {
+            g = (g * 10.0).min(0.5);
+            (sp, sd) = steps(g);
+        }
+    }
+    let hout = hk.map(|h| HsdOut { tau: dtau * sp + tau0, kappa: dkap * sp + kap0, tau_d: h.4 * sd + tau0 });
     let n = f.n();
     let (mut x, mut z) = (vec![0.0; n], vec![0.0; n]);
     for j in 0..n {
@@ -905,7 +965,7 @@ fn update(f: &StdForm, s: &State, d: &Direction, ap: f64, ad: f64, ncomp: usize)
             v[j] = (sd * d.dv[j] + s.v[j]).max(1e-30);
         }
     }
-    (State { x, z, y, u, v }, (g, sp, sd))
+    (State { x, z, y, u, v }, (g, sp, sd), hout)
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------
@@ -1507,6 +1567,10 @@ pub enum StartKind<'a> {
 /// Factor of `Af D Af'` and the solves with it (`0x2f1720` + `0x30fc90` / `0x305f10`).
 pub trait NormalSolver {
     fn factor(&mut self, f: &StdForm, d: &[f64]) -> Result<(), BarrierError>;
+    /// The factor of an iteration: `zx` (`Q+0x800`) is also the diagonal `-zx` of the dense-column nodes (the starting point's factors use `-1/D`).
+    fn factor_iter(&mut self, f: &StdForm, d: &[f64], _zx: &[f64]) -> Result<(), BarrierError> {
+        self.factor(f, d)
+    }
     fn start(&mut self, f: &StdForm, kind: StartKind) -> Result<(Vec<f64>, Vec<f64>), BarrierError>;
     fn direction(&mut self, f: &StdForm, s: &State, kind: DirKind, rhs: &Rhs) -> Result<Direction, BarrierError>;
     /// Per iteration, before the directions: `Q+0x800` (`zx`) and the refinement threshold `Q+0x280` for the solvers that refine.
@@ -1519,6 +1583,10 @@ pub trait NormalSolver {
     /// (5 at iteration 0 and 3 later on AFIRO, SC50A, BLEND, BORE3D, DEGEN2; 3 at iteration 0 on ADLITTLE), so a replaying solver supplies it.
     fn ntry(&mut self, _it: i32, default: usize) -> usize {
         default
+    }
+    /// The plain solve `(dx, dy)` for `rx` over the variables and `ry` over the rows (`0x305f10`; the homogeneous algorithm's solve with `(c, b)`).
+    fn solve_raw(&mut self, _f: &StdForm, _rx: &[f64], _ry: &[f64]) -> Result<(Vec<f64>, Vec<f64>), BarrierError> {
+        unsupported("the homogeneous algorithm needs the exact solver")
     }
 }
 
@@ -1836,7 +1904,7 @@ fn emit_record(r: &IterRecord) {
     dump::emit(k, rec);
 }
 
-fn term_input(f: &StdForm, sc: &Setup, o: &Options, it: i32, res: &Residuals, ncomp: usize, h: &Hist, best_dual: f64, q5: (f64, f64)) -> TermIn {
+fn term_input(f: &StdForm, sc: &Setup, o: &Options, it: i32, res: &Residuals, ncomp: usize, h: &Hist, best_dual: f64, q5: (f64, f64), tk: (f64, f64)) -> TermIn {
     TermIn {
         it,
         q130: res.q130,
@@ -1850,8 +1918,8 @@ fn term_input(f: &StdForm, sc: &Setup, o: &Options, it: i32, res: &Residuals, nc
         q1f8: res.q1f8,
         tol: o.tol,
         ncomp: ncomp as f64,
-        tau: 1.0,
-        kappa: 0.0,
+        tau: tk.0,
+        kappa: tk.1,
         q198: res.q198,
         q1a8: res.q1a8,
         q1d8: res.q1d8,
@@ -1898,14 +1966,48 @@ struct Hist {
     z2: f64,
 }
 
+/// The second solve of the homogeneous algorithm (`0x3117e0`: `(c, b)`) and `den = kappa / tau + b'dy_s - c'dx_s`.
+struct Hsd {
+    cx: Vec<f64>,
+    dxs: Vec<f64>,
+    dys: Vec<f64>,
+    den: f64,
+}
+
+impl Hsd {
+    /// `0x30fc90` with kappa > 0: `num = ((G - b'dy) + c'dx) + Rk / tau`, `dtau = num / den`, `dx += dtau dx_s`, `dy += dtau dy_s`, `dz = (rcx - z dx) / x`
+    /// again; returns `(dtau, dkappa = (Rk - dtau kappa) / tau)`.
+    fn apply(&self, f: &StdForm, s: &State, rhs: &Rhs, d: &mut Direction, g: f64, rk: f64, tau: f64, kappa: f64) -> (f64, f64) {
+        let (m, n) = (f.m, f.n());
+        let num = ((g - dot_lanes(&f.b[..m], &d.dy[..m], 0)) + dot_lanes(&self.cx, &d.dx, 0)) + rk / tau;
+        let dtau = num / self.den;
+        let dkap = (rk - dtau * kappa) / tau;
+        for j in 0..n {
+            d.dx[j] = d.dx[j] + dtau * self.dxs[j];
+        }
+        for i in 0..m {
+            d.dy[i] = d.dy[i] + dtau * self.dys[i];
+        }
+        for j in 0..n {
+            if f.flags[j] & 1 != 0 {
+                d.dz[j] = (rhs.rcx[j] - s.z[j] * d.dx[j]) / s.x[j];
+            }
+        }
+        (dtau, dkap)
+    }
+}
+
 /// Runs the barrier iteration on `f` with `solver` behind the factor and the solves.
 ///
 /// Gaps (H): the progress counters `Q+0x88/0xa8/0xf4` are modelled as "improved at every iteration" (true on the five models), `Q+0x5e0/0x5e8`
 /// as nonzero, `Q+0x1e8` as the best dual objective, `Q+0x220/0x228` as the norms of the iterate. They matter only in branches of
 /// `0x2e2fe0` that the corpus does not reach.
 pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<BarrierRun, BarrierError> {
-    let (tau, kappa, scale) = (1.0, 0.0, 1.0);
-    let ncomp = f.ncomp();
+    let scale = 1.0;
+    // The homogeneous self-dual scalars `Q+0x690 / 0x698` (kappa 0: not started; started after restart A) and the number of complementarity terms.
+    let (mut tau, mut kappa) = (1.0f64, 0.0f64);
+    let mut ncomp = f.ncomp();
+    let mut q2c = false;
     let c_file = f.c.clone();
     let sc = setup_scalars(&f.b_file, &c_file, o.tol);
     // Starting point.
@@ -1945,7 +2047,7 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
         if res.q148 > best_dual && it > 0 {
             best_dual = res.q148;
         }
-        let ti = term_input(f, &sc, o, it, &res, ncomp, &h, best_dual, (w5[0], w5[1]));
+        let ti = term_input(f, &sc, o, it, &res, ncomp, &h, best_dual, (w5[0], w5[1]), (tau, kappa));
         let (code, _why) = status(&ti);
         if code != 1 || it >= o.max_iter + 1 {
             let rec = IterRecord { it, state: st.clone(), res, status: code, dec: None };
@@ -1958,20 +2060,55 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
             };
             return Ok(BarrierRun { status, iterations: it, state: st, records });
         }
+        let (n, n2, m) = (f.n(), f.n2, f.m);
+        // The reference's iteration record (`BIT`) is taken before the homogeneous start recomputes the scalars.
+        let res_bit = res.clone();
+        if q2c && kappa == 0.0 {
+            // `0x2ebf20` (homogeneous start after restart A): tau = 1, kappa = max(c'x - b'y + v.ub, 1) and sqrt(kappa mu) when mu > 0, one more
+            // complementarity term (`Q+0x210`), `0x2ecde0` again.
+            if f.has_ub() {
+                return unsupported("the homogeneous algorithm with upper-bounded columns");
+            }
+            tau = 1.0;
+            let g = dot_lanes(&f.c[..n2], &st.x[..n2], 0) - dot_lanes(&f.b[..m], &st.y[..m], 0);
+            kappa = g.max(1.0);
+            if res.q1f0 > 0.0 {
+                kappa = (kappa * res.q1f0).sqrt();
+            }
+            ncomp += 1;
+            res = residuals(f, &st, tau, kappa, ncomp, scale);
+            let i = it as usize;
+            h.h50[i] = res.q198;
+            h.h68[i] = res.q1a8;
+            h.h78[i] = res.q1f8;
+            h.h80[i] = res.q1f0;
+        }
+        let hsd = kappa > 0.0;
         // Predictor.
         let (zx, dd) = normal_diag(f, &st, res.q130);
-        solver.factor(f, &dd)?;
+        solver.factor_iter(f, &dd, &zx)?;
         solver.prepare(&zx, ((res.q198 * res.q198 + res.q1a8 * res.q1a8).sqrt() / 10.0).max(1e-8));
-        let n = f.n();
-        let n2 = f.n2;
         let rcx: Vec<f64> = (0..n).map(|j| if f.flags[j] & 1 != 0 { -(st.x[j] * st.z[j]) } else { 0.0 }).collect();
         let rcu: Vec<f64> = (0..n2).map(|j| if f.flags[j] & 2 != 0 { -(st.u[j] * st.v[j]) } else { 0.0 }).collect();
         let rhs = Rhs { rp: res.rp.clone(), rd: res.rd.clone(), ru: res.ru.clone(), rcx, rcu };
-        let pred = solver.direction(f, &st, DirKind::Predictor, &rhs)?;
+        let mut pred = solver.direction(f, &st, DirKind::Predictor, &rhs)?;
         let (q770, q780) = solver.norms();
-        let ap0 = step_pair(f, &st, &pred, None, true);
-        let ad0 = step_pair(f, &st, &pred, None, false);
-        let aff = mu_aff(f, &st, &pred, ap0, ad0, ncomp);
+        // Homogeneous step (`0x30fc90` with kappa > 0): the second solve with `(c, b)` (`0x3117e0`), `dtau = num / den`, `dx += dtau dx_s`, `dy += dtau dy_s`, then dz again.
+        let mut hq = (0.0f64, 0.0f64);
+        let mut hs: Option<Hsd> = None;
+        if hsd {
+            let mut cx = f.c.clone();
+            cx.resize(n, 0.0);
+            let (dxs, dys) = solver.solve_raw(f, &cx, &f.b)?;
+            let den = ((kappa / tau) + dot_lanes(&f.b[..m], &dys[..m], 0)) - dot_lanes(&cx, &dxs, 0);
+            let hd = Hsd { cx, dxs, dys, den };
+            hq = hd.apply(f, &st, &rhs, &mut pred, (kappa - res.q148) + res.q138, -tau * kappa, tau, kappa);
+            hs = Some(hd);
+        }
+        let tkp: Vec<(f64, f64, f64)> = if hsd { vec![(tau, hq.0, 0.0), (kappa, hq.1, 0.0)] } else { Vec::new() };
+        let ap0 = step_pair(f, &st, &pred, None, true, &tkp);
+        let ad0 = step_pair(f, &st, &pred, None, false, &tkp);
+        let aff = mu_aff(f, &st, &pred, ap0, ad0, ncomp, if hsd { Some((hq.0, hq.1, tau, kappa)) } else { None });
         let mut target = sigma_target(res.q1f0, aff);
         if it > qf4 {
             // `0x2e2047`: the last update with a step product above 5e-5 was not the previous iteration.
@@ -1981,10 +2118,15 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
         let rcx2: Vec<f64> = (0..n).map(|j| if f.flags[j] & 1 != 0 { target - pred.dx[j] * pred.dz[j] } else { 0.0 }).collect();
         let rcu2: Vec<f64> = (0..n2).map(|j| if f.flags[j] & 2 != 0 { target - pred.du[j] * pred.dv[j] } else { 0.0 }).collect();
         let rhs2 = Rhs { rp: vec![0.0; f.m], rd: vec![0.0; n], ru: vec![0.0; n2], rcx: rcx2, rcu: rcu2 };
-        let corr = solver.direction(f, &st, DirKind::Corrector, &rhs2)?;
+        let mut corr = solver.direction(f, &st, DirKind::Corrector, &rhs2)?;
         let (q778, q788) = solver.norms();
+        let mut hc = (0.0f64, 0.0f64);
+        if let Some(hd) = &hs {
+            hc = hd.apply(f, &st, &rhs2, &mut corr, 0.0, target - hq.0 * hq.1, tau, kappa);
+        }
         let ntry = solver.ntry(it, if it == 0 { o.ntry_first } else { o.ntry_later });
-        let (tp, td, wp, wd) = select(f, &st, &pred, &corr, ap0, ad0, ntry);
+        let tks: Vec<(f64, f64, f64)> = if hsd { vec![(tau, hq.0, hc.0), (kappa, hq.1, hc.1)] } else { Vec::new() };
+        let (tp, td, wp, wd) = select(f, &st, &pred, &corr, ap0, ad0, ntry, &tks);
         // `0x30f5xx..0x30fc3e`: the residual norms of the combined step.
         let (q770, q780) = (q770.max(q778 * wp), q780.max(q788 * wd));
         let comb = Direction {
@@ -2007,10 +2149,23 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
             }
         }
         w5 = [cp * cd, w5[0], w5[1]];
-        let (next, (g, _sp, _sd)) = update(f, &st, &comb, cp, cd, ncomp);
+        // Combination words `Q+0x720..0x750` (`0x30fb8d`): dtau and dkappa of the primal (wp) and dual (wd) candidates.
+        let hk = if hsd { Some((tau, kappa, hq.0 + wp * hc.0, hq.1 + wp * hc.1, hq.0 + wd * hc.0)) } else { None };
+        let (mut next, (g, _sp, _sd), hout) = update(f, &st, &comb, cp, cd, ncomp, hk);
+        if let Some(h) = hout {
+            // `0x30e619`: the dual iterate is scaled by tau_p / tau_d when the two differ.
+            if h.tau != h.tau_d {
+                let sc_ = h.tau / h.tau_d;
+                next.z.iter_mut().for_each(|t| *t *= sc_);
+                next.y.iter_mut().for_each(|t| *t *= sc_);
+                next.v.iter_mut().for_each(|t| *t *= sc_);
+            }
+            tau = h.tau;
+            kappa = h.kappa;
+        }
         let dec = Decisions { ap: ap0, ad: ad0, aff, target, tp, td, wp, wd, ntry, gamma: g };
         let (q1d8, q1e0, q138, q1f0) = (res.q1d8, res.q1e0, res.q138, res.q1f0);
-        let rec = IterRecord { it, state: st.clone(), res, status: code, dec: Some(dec) };
+        let rec = IterRecord { it, state: st.clone(), res: res_bit, status: code, dec: Some(dec) };
         emit_record(&rec);
         records.push(rec);
         st = next;
@@ -2034,8 +2189,31 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
         } else {
             0.0
         };
-        if qf8 == 0 && 1e-3 > w5[2] && 1e-3 > w5[1] && 1e-3 > w5[0] && ratio3 > 0.98 && 1e-3 > q770 && 1e-3 > q780 && relgap > 1e-4 {
-            (st, _, _, _) = start_point(f, s1.clone(), s2.clone(), &sc, 0, 1000.0);
+        let mut restart = qf8 == 0 && 1e-3 > w5[2] && 1e-3 > w5[1] && 1e-3 > w5[0] && ratio3 > 0.98 && 1e-3 > q770 && 1e-3 > q780 && relgap > 1e-4;
+        let mut q30r = 1000.0;
+        if !restart && !q2c {
+            // Restart A (`0x2e2aa1`, once; reached whenever B does not fire): |x| or |y| of the updated iterate huge (1e15 times the data norms), or from
+            // iteration 10 on above 1e8 times them while the primal (dual) residual history did not fall. The starting point's floor stays 0.
+            let (nx, ny) = (dot_lanes(&st.x, &st.x, 0).sqrt(), dot_lanes(&st.y, &st.y, 0).sqrt());
+            let (t1, t2) = (sc.q168.max(1.0), sc.q178.max(1.0));
+            let (mut fp, mut fd) = (false, false);
+            if it >= 2 {
+                let i = it as usize;
+                fp = sc.q270 > q1d8 || 0.9 * h.h50[i - 2] > h.h50[i];
+                fd = sc.q270 > q1e0 || 0.9 * h.h68[i - 2] > h.h68[i];
+            }
+            if nx > 1e15 * t1 || ny > 1e15 * t2 {
+                restart = true;
+            } else if it >= 10 {
+                restart = (nx > 1e8 * t1 && !fp) || (ny > 1e8 * t2 && !fd);
+            }
+            if restart {
+                q2c = true;
+                q30r = 0.0;
+            }
+        }
+        if restart {
+            (st, _, _, _) = start_point(f, s1.clone(), s2.clone(), &sc, 0, q30r);
             qf8 = it + 1;
             let r = residuals(f, &st, tau, kappa, ncomp, scale);
             let mut rd = r.rd.clone();
@@ -2064,10 +2242,16 @@ pub fn solution(f: &StdForm, run: BarrierRun) -> Solution {
     for k in 0..f.m {
         y[f.row_of[k]] = run.state.y[k] * if f.sense[k] == b'>' { -1.0 } else { 1.0 };
     }
-    let rc = (0..f.n2)
+    let mut rc: Vec<f64> = (0..f.n2)
         .map(|j| (if f.flags[j] & 1 != 0 { run.state.z[j] } else { 0.0 }) - (if f.flags[j] & 2 != 0 { run.state.v[j] } else { 0.0 }))
         .collect();
-    Solution { objective: last.res.q130, x, y, rc, run }
+    let mut objective = last.res.q130;
+    if f.max_sign < 0.0 {
+        y.iter_mut().for_each(|t| *t = -*t);
+        rc.iter_mut().for_each(|t| *t = -*t);
+        objective = -objective;
+    }
+    Solution { objective, x, y, rc, run }
 }
 
 /// Convenience driver: structure (ordering) by [`crate::order::structure`], conversion, iteration with the given solver.
@@ -2088,8 +2272,8 @@ pub fn solve_exact(model: &LpModel, o: &Options) -> Result<Solution, BarrierErro
 }
 
 /// `Method::Barrier` of [`crate::solve`]: [`solve_exact`] with the options mapped (`barrier_tol`, `max_iterations`), the result in the public types.
-/// Status: optimal and the iteration limit as in the reference; the codes of `0x2e2fe0` that were never observed (3 and 5 infeasible variants, 6, 0xb, 0xd)
-/// are reported as `NumericalFailure` (no certificate is produced, and the reference's mapping of them is not recovered).
+/// Status: optimal, the iteration limit (API 7), unbounded (code 5, API 5) and infeasible (code 3, never observed); infeasible-or-unbounded (code 0xd, API 12)
+/// and the other codes (6, 0xb) are reported as `NumericalFailure` (no certificate is produced).
 pub fn solve_method(model: &LpModel, opts: &crate::SolveOptions) -> Result<crate::SolveResult, crate::simplex::SolveError> {
     use crate::simplex::{SolveError, Status};
     if opts.scaling {
@@ -2102,6 +2286,9 @@ pub fn solve_method(model: &LpModel, opts: &crate::SolveOptions) -> Result<crate
     let status = match sol.run.status {
         BarrierStatus::Optimal => Status::Optimal,
         BarrierStatus::IterationLimit => Status::IterationLimit,
+        // 5: unbounded (API 5, fx_unbounded); 3: infeasible (never observed); 0xd: infeasible or unbounded (API 12, fx_infeasible), reported like PDHG's 12.
+        BarrierStatus::Other(5) => Status::Unbounded,
+        BarrierStatus::Other(3) => Status::Infeasible,
         BarrierStatus::Other(_) => Status::NumericalFailure,
     };
     Ok(crate::SolveResult {

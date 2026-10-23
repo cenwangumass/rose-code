@@ -114,12 +114,13 @@ fn dense_solver_reaches_the_reference_optimum() {
 }
 
 #[test]
-fn unsupported_models_are_reported() {
+fn converted_models_are_accepted() {
     let model = mps::parse(include_str!("fixtures/afiro.mps")).unwrap();
     let mut max = model.clone();
     max.sense = rose::Sense::Maximize;
     let s = order::structure(&model, order::DENSE_COL_MIN).unwrap();
-    assert!(matches!(barrier::std_form(&max, &s.sym.perm), Err(barrier::BarrierError::Unsupported(_))));
+    // Maximization is converted (c and the offset negated; the solution negates the objective, y and rc back).
+    assert!(barrier::std_form(&max, &s.sym.perm).is_ok());
     // A free column is converted (implied bounds, flag 0 when none is tight enough).
     let mut free = model.clone();
     free.col_lo[0] = -1e30;

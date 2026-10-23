@@ -31,7 +31,13 @@ fn main() {
             "b610": f.b, "b_file": f.b_file, "c": f.c, "ub": f.ub, "lo": f.ub_lo, "hi": f.ub_hi, "obj": f.offset, "const": f.cshift,
         }));
     }
-    let o = Options::default();
+    let mut o = Options::default();
+    // PARAMS="K=V,...": the reference parameters the run is compared under (BarIterLimit).
+    for kv in std::env::var("PARAMS").unwrap_or_default().split(',').filter(|t| !t.is_empty()) {
+        if let Some(("BarIterLimit", v)) = kv.split_once('=') {
+            o.max_iter = v.parse().expect("BarIterLimit");
+        }
+    }
     let mut solver = rose::chol::CholSolver::new(&f, &s.sym);
     let run = if a.get(2).map(String::as_str) == Some("dense") {
         barrier::run(&f, &mut DenseSolver::default(), &o)
@@ -50,7 +56,12 @@ fn main() {
         Ok(r) => {
             if on("barrier") && a.get(2).is_none() {
                 let sol = barrier::solution(&f, r.clone());
-                emit_tag("barrier", "BRES", json!({"x": sol.x, "pi": sol.y, "rc": sol.rc, "obj": sol.objective, "iters": r.iterations}));
+                let code = match r.status {
+                    BarrierStatus::Optimal => 2,
+                    BarrierStatus::IterationLimit => 7,
+                    BarrierStatus::Other(c) => c,
+                };
+                emit_tag("barrier", "BRES", json!({"x": sol.x, "pi": sol.y, "rc": sol.rc, "obj": sol.objective, "iters": r.iterations, "status": code}));
             }
             let last = r.records.last().unwrap();
             let st = match r.status {

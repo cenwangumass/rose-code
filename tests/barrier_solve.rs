@@ -1,7 +1,7 @@
 //! The whole barrier solve from the MPS alone (`rose::barrier` with the bit-exact `rose::chol::CholSolver`) against the reference
 //! (`tests/fixtures/barrier-solve-controlled.json`, written by `reverse-engineer/tools/make_barrier_solve_fixture.py`): every iteration's state and
 //! decisions, and the returned x, duals, reduced costs and objective, agree bit for bit on AFIRO, SC50A, BLEND, ADLITTLE, BORE3D, DEGEN2, BOEING2 (ranged
-//! rows, implied upper bounds dropped), PILOT4 (free columns, refinement, step caps, restart), DEGEN3 (scaled columns `Q+0x648`, supernodes cut to 192 columns, generic assembly of the root) and the two ranged-row fixtures (`fx_bar_rngL`, `fx_bar_rngGE`: L, G and E rows, R of both signs and 0).
+//! rows, implied upper bounds dropped), PILOT4 (free columns, refinement, step caps, restart), DEGEN3 (scaled columns `Q+0x648`, supernodes cut to 192 columns, generic assembly of the root) and the two ranged-row fixtures (`fx_bar_rngL`, `fx_bar_rngGE`: L, G and E rows, R of both signs and 0). FIT2P (25 dense columns as factor nodes, regularising pivots, refinement; the 2.2 MB model is not copied) is checked from the analysis repository's corpus when it is present.
 use rose::barrier::{self, BarrierStatus, Options};
 use rose::{mps, solve, SolveOptions, Status};
 use serde_json::Value;
@@ -48,43 +48,79 @@ fn scalar(name: &str, field: &str, it: i64, want: &Value, got: f64) {
     }
 }
 
+fn check_whole_solve(fx: &Value, name: &str, text: &str) {
+    check_solve(fx, name, text, BarrierStatus::Optimal);
+}
+
+fn check_solve(fx: &Value, name: &str, text: &str, status: BarrierStatus) {
+    let model = mps::parse(text).unwrap();
+    let sol = barrier::solve_exact(&model, &Options::default()).unwrap_or_else(|e| panic!("{name}: {e}"));
+    assert_eq!(sol.run.status, status, "{name}");
+    for want in fx[name]["expect"].as_array().unwrap() {
+        let it = want["it"].as_i64().unwrap();
+        let got = sol.run.records.iter().find(|r| r.it as i64 == it).unwrap_or_else(|| panic!("{name}: no record for iteration {it}"));
+        for (f, v) in [("x", &got.state.x), ("z", &got.state.z), ("y", &got.state.y), ("u", &got.state.u), ("v", &got.state.v)] {
+            if let Some(h) = want.get(f) {
+                assert_eq!(h.as_str().unwrap(), hash_f64(v), "{name} it {it} {f}: differs from the reference (compare.py trace --rose --solve shows where)");
+            }
+        }
+        scalar(name, "mu", it, &want["mu"], got.res.q1f0);
+        scalar(name, "pobj", it, &want["pobj"], got.res.q130);
+        scalar(name, "dobj", it, &want["dobj"], got.res.q140);
+        if let Some(s) = want["status"].as_i64() {
+            assert_eq!(s as i32, got.status, "{name} it {it}: status");
+        }
+        if want.get("tp").is_some() {
+            let d = got.dec.as_ref().unwrap_or_else(|| panic!("{name} it {it}: no decisions"));
+            for (f, v) in [("ap", d.ap), ("ad", d.ad), ("aff", d.aff), ("target", d.target), ("tp", d.tp), ("td", d.td)] {
+                scalar(name, f, it, &want[f], v);
+            }
+            assert_eq!(want["ntry"].as_u64().unwrap() as usize, d.ntry, "{name} it {it}: ntry");
+        }
+    }
+    let run = &fx[name]["run"];
+    assert_eq!(run["iters"].as_i64().unwrap() as i32, sol.run.iterations, "{name} iterations");
+    if run.get("x").is_none() {
+        return; // no solution returned (unbounded, infeasible)
+    }
+    // x and rc cover the model's columns and the range columns of the ranged rows.
+    same(name, "x (read-out)", 0, &floats(&run["x"]), &sol.x);
+    same(name, "pi (read-out)", 0, &floats(&run["pi"]), &sol.y);
+    same(name, "rc (read-out)", 0, &floats(&run["rc"]), &sol.rc);
+    scalar(name, "objective", 0, &run["obj"], sol.objective);
+}
+
 #[test]
 fn whole_solves_match_reference_bitwise() {
     let fx: Value = serde_json::from_str(include_str!("fixtures/barrier-solve-controlled.json")).unwrap();
     for (name, text) in MODELS {
-        let model = mps::parse(text).unwrap();
-        let sol = barrier::solve_exact(&model, &Options::default()).unwrap_or_else(|e| panic!("{name}: {e}"));
-        assert_eq!(sol.run.status, BarrierStatus::Optimal, "{name}");
-        for want in fx[name]["expect"].as_array().unwrap() {
-            let it = want["it"].as_i64().unwrap();
-            let got = sol.run.records.iter().find(|r| r.it as i64 == it).unwrap_or_else(|| panic!("{name}: no record for iteration {it}"));
-            for (f, v) in [("x", &got.state.x), ("z", &got.state.z), ("y", &got.state.y), ("u", &got.state.u), ("v", &got.state.v)] {
-                if let Some(h) = want.get(f) {
-                    assert_eq!(h.as_str().unwrap(), hash_f64(v), "{name} it {it} {f}: differs from the reference (compare.py trace --rose --solve shows where)");
-                }
-            }
-            scalar(name, "mu", it, &want["mu"], got.res.q1f0);
-            scalar(name, "pobj", it, &want["pobj"], got.res.q130);
-            scalar(name, "dobj", it, &want["dobj"], got.res.q140);
-            if let Some(s) = want["status"].as_i64() {
-                assert_eq!(s as i32, got.status, "{name} it {it}: status");
-            }
-            if want.get("tp").is_some() {
-                let d = got.dec.as_ref().unwrap_or_else(|| panic!("{name} it {it}: no decisions"));
-                for (f, v) in [("ap", d.ap), ("ad", d.ad), ("aff", d.aff), ("target", d.target), ("tp", d.tp), ("td", d.td)] {
-                    scalar(name, f, it, &want[f], v);
-                }
-                assert_eq!(want["ntry"].as_u64().unwrap() as usize, d.ntry, "{name} it {it}: ntry");
-            }
-        }
-        let run = &fx[name]["run"];
-        assert_eq!(run["iters"].as_i64().unwrap() as i32, sol.run.iterations, "{name} iterations");
-        // x and rc cover the model's columns and the range columns of the ranged rows.
-        same(name, "x (read-out)", 0, &floats(&run["x"]), &sol.x);
-        same(name, "pi (read-out)", 0, &floats(&run["pi"]), &sol.y);
-        same(name, "rc (read-out)", 0, &floats(&run["rc"]), &sol.rc);
-        scalar(name, "objective", 0, &run["obj"], sol.objective);
+        check_whole_solve(&fx, name, text);
     }
+}
+
+/// Maximization, a row ranged twice (the first entry wins), restart A with the homogeneous self-dual algorithm (`fx_unbounded`: status 5 after 14
+/// iterations) and an infeasible model (status 0xd, API 12 after 9 iterations); `tests/fixtures/barrier-solve-fx.json`.
+#[test]
+fn maximization_doubled_ranges_and_homogeneous_statuses_match_reference_bitwise() {
+    let fx: Value = serde_json::from_str(include_str!("fixtures/barrier-solve-fx.json")).unwrap();
+    check_solve(&fx, "fx_bar_max", include_str!("fixtures/fx_bar_max.mps"), BarrierStatus::Optimal);
+    check_solve(&fx, "fx_bar_rngdup", include_str!("fixtures/fx_bar_rngdup.mps"), BarrierStatus::Optimal);
+    check_solve(&fx, "fx_unbounded", include_str!("fixtures/fx_unbounded.mps"), BarrierStatus::Other(5));
+    check_solve(&fx, "fx_infeasible", include_str!("fixtures/fx_infeasible.mps"), BarrierStatus::Other(0xd));
+    for (text, status) in [(include_str!("fixtures/fx_unbounded.mps"), Status::Unbounded), (include_str!("fixtures/fx_infeasible.mps"), Status::NumericalFailure)] {
+        let r = solve(&mps::parse(text).unwrap(), None, &SolveOptions::barrier()).unwrap();
+        assert_eq!(r.status, status);
+    }
+}
+
+/// FIT2P, from the analysis repository's corpus (skipped where it is absent).
+#[test]
+fn fit2p_matches_reference_bitwise_when_the_corpus_is_present() {
+    let Ok(text) = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../reverse-engineer/corpus/netlib/mps/fit2p.mps")) else {
+        return;
+    };
+    let fx: Value = serde_json::from_str(include_str!("fixtures/barrier-solve-controlled.json")).unwrap();
+    check_whole_solve(&fx, "fit2p", &text);
 }
 
 /// The public entry point: `Method::Barrier` returns the same solution in the `SolveResult` fields.
@@ -117,15 +153,7 @@ fn iteration_limit_is_reported() {
 /// Features outside the recovered case are explicit errors, never a wrong answer.
 #[test]
 fn unsupported_models_are_explicit_errors() {
-    let unsupported = |model: &rose::LpModel| matches!(solve(model, None, &SolveOptions::barrier()), Err(rose::simplex::SolveError::Unsupported(_)));
     let afiro = mps::parse(MODELS[0].1).unwrap();
-    let mut max = afiro.clone();
-    max.sense = rose::Sense::Maximize;
-    assert!(unsupported(&max));
-    // A row ranged twice (the later entry wins in the bounds, the reference's columns are not recovered for it).
-    let twice = mps::parse(&include_str!("fixtures/fx_bar_rngL.mps").replace("RANGES\n", "RANGES\n    rng2      r1                 1\n")).unwrap();
-    assert!(twice.range_dup);
-    assert!(unsupported(&twice));
     // The release profile (scaling) is not recovered.
     assert!(matches!(solve(&afiro, None, &SolveOptions { scaling: true, ..SolveOptions::barrier() }), Err(rose::simplex::SolveError::Unsupported(_))));
 }

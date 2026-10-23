@@ -94,6 +94,18 @@ impl Plan {
 
 /// Row-wise view of the column storage: `rows[i]` = `(column, position in the column storage)` in column order.
 pub fn model_rows(f: &StdForm) -> Vec<Vec<(usize, usize)>> {
+    let mut rows = model_rows_all(f);
+    if !f.dense.is_empty() {
+        // The dense columns are nodes of the factor, not terms of `A D A'`.
+        for r in rows.iter_mut() {
+            r.retain(|&(j, _)| !f.dense.contains(&j));
+        }
+    }
+    rows
+}
+
+/// [`model_rows`] with every column (the products `A w` read the dense columns too).
+fn model_rows_all(f: &StdForm) -> Vec<Vec<(usize, usize)>> {
     let mut rows = vec![Vec::new(); f.m];
     for j in 0..f.n2 {
         for q in f.col_start[j]..f.col_start[j + 1] {
@@ -696,17 +708,32 @@ fn dot_update(mm: &[f64], w: usize, i: usize, j: usize, temp: &[f64]) -> f64 {
 }
 
 /// The pivot test of `0x2f1940` (normal mode): `|orig| 1e-16 < |d|` keeps `d` with reciprocal `1 / d`, else `d = 0` and reciprocal 0.
-fn pivot(dj: f64, orig: f64) -> (f64, f64) {
-    if orig.abs() * 1e-16 < dj.abs() {
-        (dj, 1.0 / dj)
-    } else {
-        (0.0, 0.0)
+fn pivot(dj: f64, orig: f64, reg: Option<(usize, usize)>) -> (f64, f64) {
+    match reg {
+        None => {
+            if orig.abs() * 1e-16 < dj.abs() {
+                (dj, 1.0 / dj)
+            } else {
+                (0.0, 0.0)
+            }
+        }
+        // Regularising mode (`SYM+0x110 == 1`, dense columns): `tau = clamp(|orig| 1e-10, 1e-12, 1e-6)`; a pivot of magnitude `<= tau` becomes `tau`
+        // (`-tau` when negative on a dense node, a column `>= n1`). `reg = (global column, n1)`.
+        Some((gc, n1)) => {
+            let tau = (orig.abs() * 1e-10).max(1e-12).min(1e-6);
+            if tau < dj.abs() {
+                (dj, 1.0 / dj)
+            } else {
+                let d = if gc < n1 || 0.0 <= dj { tau } else { -tau };
+                (d, 1.0 / d)
+            }
+        }
     }
 }
 
 /// In-place `LDL'` of the `w x w` row-major block (left looking, column by column; `M[i][j] = (M[i][j] + sum_k L[i][k] temp[k]) / d_j` with
 /// `temp[k] = (-L[j][k]) d[k]`); the diagonal becomes `d`. Returns `(d, reciprocals)`.
-fn dense_ldl(mm: &mut [f64], w: usize, orig: &[f64]) -> (Vec<f64>, Vec<f64>) {
+fn dense_ldl(mm: &mut [f64], w: usize, orig: &[f64], reg: Option<(usize, usize)>) -> (Vec<f64>, Vec<f64>) {
     let mut d = vec![0.0; w];
     let mut rcp = vec![0.0; w];
     let mut temp = vec![0.0; w];
@@ -716,7 +743,7 @@ fn dense_ldl(mm: &mut [f64], w: usize, orig: &[f64]) -> (Vec<f64>, Vec<f64>) {
                 mm[i * w + j] = dot_update(mm, w, i, j, &temp);
             }
             if i == j {
-                let (dj, rj) = pivot(mm[j * w + j], orig[j]);
+                let (dj, rj) = pivot(mm[j * w + j], orig[j], reg.map(|(c0, n1)| (c0 + j, n1)));
                 d[j] = dj;
                 rcp[j] = rj;
                 mm[j * w + j] = dj;
@@ -734,11 +761,11 @@ fn dense_ldl(mm: &mut [f64], w: usize, orig: &[f64]) -> (Vec<f64>, Vec<f64>) {
 }
 
 /// The block has no nonzero below the diagonal: pivots only, `L = I`.
-fn diag_only(mm: &mut [f64], w: usize, orig: &[f64]) -> (Vec<f64>, Vec<f64>) {
+fn diag_only(mm: &mut [f64], w: usize, orig: &[f64], reg: Option<(usize, usize)>) -> (Vec<f64>, Vec<f64>) {
     let mut d = vec![0.0; w];
     let mut rcp = vec![0.0; w];
     for j in 0..w {
-        let (dj, rj) = pivot(mm[j * w + j], orig[j]);
+        let (dj, rj) = pivot(mm[j * w + j], orig[j], reg.map(|(c0, n1)| (c0 + j, n1)));
         d[j] = dj;
         rcp[j] = rj;
         mm[j * w + j] = dj;
@@ -748,9 +775,9 @@ fn diag_only(mm: &mut [f64], w: usize, orig: &[f64]) -> (Vec<f64>, Vec<f64>) {
 
 /// After the updates: `LDL'` of `M`, then the rectangle `R` := `(L^-1 R')'` scaled by `1/d` (reciprocal 0 -> 1): DTRSM when `M` has a nonzero below the
 /// diagonal, else only the scaling. Returns `(d, reciprocals)`; `M` (lower triangle, diagonal = d) and `R` are updated in place.
-fn factor_block(mm: &mut [f64], r: &mut [f64], w: usize, c: usize, orig: &[f64]) -> (Vec<f64>, Vec<f64>) {
+fn factor_block(mm: &mut [f64], r: &mut [f64], w: usize, c: usize, orig: &[f64], reg: Option<(usize, usize)>) -> (Vec<f64>, Vec<f64>) {
     let dense = (1..w).any(|i| (0..i).any(|j| mm[i * w + j] != 0.0));
-    let (d, rcp) = if dense { dense_ldl(mm, w, orig) } else { diag_only(mm, w, orig) };
+    let (d, rcp) = if dense { dense_ldl(mm, w, orig, reg) } else { diag_only(mm, w, orig, reg) };
     let rows = c - w;
     if rows != 0 {
         if dense {
@@ -949,27 +976,67 @@ pub struct Factor {
 
 /// `A D A' = L diag(d) L'` from the model and `D` (`n2 + m` entries: columns, then slacks): per supernode in column order the assembly, the children's
 /// updates (ascending), the block factorization.
-pub fn numeric_factor(f: &StdForm, rows: &[Vec<(usize, usize)>], plan: &Plan, d: &[f64], mut on_sn: Option<&mut dyn FnMut(usize, &Supernode, &[f64], &[f64])>) -> Factor {
+pub fn numeric_factor(f: &StdForm, rows: &[Vec<(usize, usize)>], plan: &Plan, d: &[f64], zx: Option<&[f64]>, mut on_sn: Option<&mut dyn FnMut(usize, &Supernode, &[f64], &[f64])>) -> Factor {
     let m = f.m;
+    // Dense columns: the factor has `nt = m + nd` nodes (the dense nodes last), pivots regularise (`SYM+0x110`, `Q+0x218 > 0`), and every sparse supernode is
+    // assembled by the generic routine; the dense supernode starts from the diagonal `-1/D[j]` of its columns, and a row's dense-node entries are the raw
+    // coefficients `A[i][j]` (no `D`). The diagonal of a dense node is `-zx_j` (`z/x + v/u` of the iterate; the starting point has no `zx`: `-1/D_j`, as for a
+    // clamped `D = 1e12`).
+    let nt = plan.n;
+    let reg = !f.dense.is_empty();
+    let mut dnode_col = vec![NONE; nt];
+    // Per dense column its coefficient in every row (0 where absent), indexed by the node `m + k`.
+    let mut dval: Vec<Vec<f64>> = vec![Vec::new(); nt];
+    for (r, &j) in f.dense.iter().enumerate() {
+        dnode_col[m + f.dense_k[r]] = j;
+        let mut v = vec![0.0; m];
+        for q in f.col_start[j]..f.col_start[j + 1] {
+            v[f.row_idx[q]] = f.val[q];
+        }
+        dval[m + f.dense_k[r]] = v;
+    }
     let mut vals: Vec<Vec<f64>> = Vec::with_capacity(plan.sns.len());
     let mut dvec: Vec<Vec<f64>> = Vec::with_capacity(plan.sns.len());
-    let mut diag = vec![0.0; m];
-    let mut rcp = vec![0.0; m];
-    let mut mp = vec![NONE; m];
+    let mut diag = vec![0.0; nt];
+    let mut rcp = vec![0.0; nt];
+    let mut mp = vec![NONE; nt];
     let mut minratio = 1e300f64;
     for (k, s) in plan.sns.iter().enumerate() {
         let (col, w, c) = (s.col, s.w, s.c);
         for (t, &r) in s.rows.iter().enumerate() {
             mp[r] = t;
         }
-        let (mut mm, mut r) = if w >= 3 && c * w <= 30000 { assemble(f, rows, d, &mp, col, w, c) } else { assemble_generic(f, rows, d, &mp, col, w, c) };
+        let (mut mm, mut r) = if reg && col >= m {
+            let mut mm = vec![0.0; w * w];
+            for t in 0..w {
+                let jd = dnode_col[col + t];
+                mm[t * w + t] = match zx {
+                    Some(z) if z[jd] > 0.0 && d[jd] != 1e12 => -z[jd],
+                    _ => -1.0 / d[jd],
+                };
+            }
+            (mm, vec![0.0; (c - w) * w])
+        } else if !reg && w >= 3 && c * w <= 30000 {
+            assemble(f, rows, d, &mp, col, w, c)
+        } else {
+            assemble_generic(f, rows, d, &mp, col, w, c)
+        };
+        if reg && col < m {
+            for (t, &rr) in s.rows.iter().enumerate() {
+                if rr >= m && t >= w {
+                    for a in 0..w {
+                        r[(t - w) * w + a] = dval[rr][col + a];
+                    }
+                }
+            }
+        }
         let orig: Vec<f64> = (0..w).map(|i| mm[i * w + i]).collect();
         for &ci in &s.upd {
             let cs = &plan.sns[ci];
             let ch = Child { w: cs.w, c: cs.c, rows: &cs.rows, packed: &vals[ci], d: &dvec[ci] };
             child_update(&ch, w, col, plan.sym80, &mp, &mut mm, &mut r);
         }
-        let (dd, rc) = factor_block(&mut mm, &mut r, w, c, &orig);
+        let (dd, rc) = factor_block(&mut mm, &mut r, w, c, &orig, if reg { Some((col, m)) } else { None });
         let pk = pack(&mm, &r, w);
         for t in 0..w {
             diag[col + t] = dd[t];
@@ -993,7 +1060,7 @@ pub fn numeric_factor(f: &StdForm, rows: &[Vec<(usize, usize)>], plan: &Plan, d:
         par.push(off & 1);
         off += v.len();
     }
-    Factor { n: m, vals, diag, rcp, par, minratio }
+    Factor { n: nt, vals, diag, rcp, par, minratio }
 }
 
 /// Sum of the rounded products `term(i)`, `i < n`, as `0x2ec200` / `0x2ec480` add them, accumulator starting at 0: fewer than 8 terms (or fewer than
@@ -1180,7 +1247,7 @@ pub struct Amat {
 
 impl Amat {
     pub fn new(f: &StdForm) -> Amat {
-        let rows = model_rows(f);
+        let rows = model_rows_all(f);
         let mut rstart = Vec::with_capacity(f.m + 1);
         let (mut ridx, mut rval) = (Vec::new(), Vec::new());
         for r in &rows {
@@ -1234,16 +1301,29 @@ impl Amat {
 /// (`0x2ec480`), `dx = (s - rx) D`. Returns `(dx, dy)`.
 fn solve305(a: &Amat, plan: &Plan, fac: &Factor, f: &StdForm, d: &[f64], rx: &[f64], ry: &[f64]) -> (Vec<f64>, Vec<f64>) {
     let n = f.n();
-    let w: Vec<f64> = (0..n).map(|j| rx[j] * d[j]).collect();
+    // Dense columns (`SYM+0x138 == 0`): `w_j = 0`; the right-hand side of node `m + k` is the raw `rx_j`; the nodes' solution is `dx_j`.
+    let mut is_dense = vec![false; n];
+    for &j in &f.dense {
+        is_dense[j] = true;
+    }
+    let w: Vec<f64> = (0..n).map(|j| if is_dense[j] { 0.0 } else { rx[j] * d[j] }).collect();
     let t = a.aw(f, &w);
     let mut x: Vec<f64> = (0..f.m).map(|i| ry[i] + t[i]).collect();
+    x.resize(fac.n, 0.0);
+    for (r, &j) in f.dense.iter().enumerate() {
+        x[f.m + f.dense_k[r]] = rx[j];
+    }
     forward(plan, fac, &mut x);
     for i in 0..fac.n {
         x[i] = x[i] * fac.rcp[i];
     }
     backward(plan, fac, &mut x);
-    let s = a.aty(f, &x);
-    let dx = (0..n).map(|j| (s[j] - rx[j]) * d[j]).collect();
+    let s = a.aty(f, &x[..f.m]);
+    let mut dx: Vec<f64> = (0..n).map(|j| if is_dense[j] { s[j] } else { (s[j] - rx[j]) * d[j] }).collect();
+    for (r, &j) in f.dense.iter().enumerate() {
+        dx[j] = x[f.m + f.dense_k[r]];
+    }
+    x.truncate(f.m);
     (dx, x)
 }
 
@@ -1251,11 +1331,11 @@ fn solve305(a: &Amat, plan: &Plan, fac: &Factor, f: &StdForm, d: &[f64], rx: &[f
 // ntry of the first iteration.
 
 /// `ntry` of the first iteration (`0x2e4f10` tail at `0x3040a0`): 5 when `rho = (4 nnz(A) + 2 NZ) / S <= 0.2`, else 3, with `NZ = SYM+0x38`,
-/// `S = (e/5 + 8 NZ + 2 a (1 - b)) + ((OPS - e) + a b) / 30 + 75 n`, `a` = sum of the squared column counts (no dense columns, `b = 0`),
+/// `S = (e/5 + 8 NZ + 2 a (1 - b)) + ((OPS - e) + a b) / 30 + 75 n`, `a` = sum of the squared column counts of the non-dense columns (`b = 0`; the dense columns stay in `nnz(A)`),
 /// `e` = sum over supernodes of width < 5 of `F(c) - F(c - w)`, `F(x) = x (x + 1) (2 x + 1) / 6` (30 is the constant of the CPU path of the reference machine).
 pub fn ntry_first(f: &StdForm, sym: &Symbolic) -> usize {
     let ff = |t: i64| t * (t + 1) * (2 * t + 1) / 6;
-    let a = (0..f.n2).map(|j| ((f.col_start[j + 1] - f.col_start[j]) as i64).pow(2)).sum::<i64>() as f64;
+    let a = (0..f.n2).filter(|j| !f.dense.contains(j)).map(|j| ((f.col_start[j + 1] - f.col_start[j]) as i64).pow(2)).sum::<i64>() as f64;
     let e = sym
         .width
         .iter()
@@ -1291,6 +1371,8 @@ pub struct CholSolver {
     /// `Q+0x800` (`z/x`, plus `v/u`) of the current iterate and the refinement threshold `Q+0x280`, set by [`NormalSolver::prepare`].
     zx: Vec<f64>,
     thr: f64,
+    /// `zx` of the factor being computed (iteration factors only).
+    fzx: Option<Vec<f64>>,
     /// `Q+0x770 / 0x780` of the last direction: the norms of its residual.
     norms: (f64, f64),
 }
@@ -1298,7 +1380,7 @@ pub struct CholSolver {
 impl CholSolver {
     /// `sym` is the symbolic factorization of the structure stage ([`crate::order::structure`]) the `StdForm` was permuted with.
     pub fn new(f: &StdForm, sym: &Symbolic) -> CholSolver {
-        CholSolver { plan: Plan::new(sym), rows: model_rows(f), a: Amat::new(f), d: Vec::new(), fac: None, ntry0: ntry_first(f, sym), nfac: 0, zx: Vec::new(), thr: 0.0, norms: (0.0, 0.0) }
+        CholSolver { plan: Plan::new(sym), rows: model_rows(f), a: Amat::new(f), d: Vec::new(), fac: None, ntry0: ntry_first(f, sym), nfac: 0, zx: Vec::new(), thr: 0.0, fzx: None, norms: (0.0, 0.0) }
     }
 
     fn solve(&self, f: &StdForm, rx: &[f64], ry: &[f64]) -> (Vec<f64>, Vec<f64>) {
@@ -1307,7 +1389,7 @@ impl CholSolver {
 
     /// `SYM+0x178 == 1` (`0x2f1720`): free columns remain, or the smallest pivot ratio is below `1e-10` (dense columns and scaling are not modelled).
     fn refining(&self, f: &StdForm) -> bool {
-        (0..f.n2).any(|j| f.flags[j] == 0) || self.fac.as_ref().map_or(false, |x| x.minratio < 1e-10)
+        (0..f.n2).any(|j| f.flags[j] == 0) || !f.dense.is_empty() || self.fac.as_ref().map_or(false, |x| x.minratio < 1e-10)
     }
 
     /// `0x311d70`, the residual of a solve `(dx, dy)` for `(rx, ry)`: `rows = ry - Af dx` and `cols = rx - (Af' dy - zx dx)` in blocks of 8 from index 0,
@@ -1375,6 +1457,13 @@ impl CholSolver {
 }
 
 impl NormalSolver for CholSolver {
+    fn factor_iter(&mut self, f: &StdForm, d: &[f64], zx: &[f64]) -> Result<(), BarrierError> {
+        self.fzx = Some(zx.to_vec());
+        let r = self.factor(f, d);
+        self.fzx = None;
+        r
+    }
+
     fn factor(&mut self, f: &StdForm, d: &[f64]) -> Result<(), BarrierError> {
         self.d = d.to_vec();
         let fno = self.nfac;
@@ -1384,7 +1473,7 @@ impl NormalSolver for CholSolver {
             dump::emit_tag("barrier_factor", "FSN", json!({"f": fno, "col": s.col, "w": s.w, "c": s.c, "rows": s.rows}));
             dump::emit_tag("barrier_factor", "FOUT", json!({"f": fno, "col": s.col, "packed": pk, "piv": piv}));
         };
-        let fac = if on { numeric_factor(f, &self.rows, &self.plan, d, Some(&mut cb)) } else { numeric_factor(f, &self.rows, &self.plan, d, None) };
+        let fac = if on { numeric_factor(f, &self.rows, &self.plan, d, self.fzx.as_deref(), Some(&mut cb)) } else { numeric_factor(f, &self.rows, &self.plan, d, self.fzx.as_deref(), None) };
         self.fac = Some(fac);
         Ok(())
     }
@@ -1467,6 +1556,10 @@ impl NormalSolver for CholSolver {
             default
         }
     }
+
+    fn solve_raw(&mut self, f: &StdForm, rx: &[f64], ry: &[f64]) -> Result<(Vec<f64>, Vec<f64>), BarrierError> {
+        Ok(self.solve(f, rx, ry))
+    }
 }
 
 #[cfg(test)]
@@ -1519,7 +1612,7 @@ mod tests {
         for t in fixture()["ldl"].as_array().unwrap() {
             let w = t["w"].as_u64().unwrap() as usize;
             let mut mm = floats(&t["M"]);
-            let (d, rcp) = dense_ldl(&mut mm, w, &floats(&t["orig"]));
+            let (d, rcp) = dense_ldl(&mut mm, w, &floats(&t["orig"]), None);
             let lower: Vec<f64> = (0..w).flat_map(|i| (0..=i).map(move |j| (i, j))).map(|(i, j)| mm[i * w + j]).collect();
             assert_bits(&format!("ldl w {w}"), &floats(&t["out"]), &lower);
             assert_bits("d", &floats(&t["d"]), &d);
@@ -1536,7 +1629,7 @@ mod tests {
         let f = crate::barrier::std_form(&model, &s.sym.perm).unwrap();
         let plan = Plan::new(&s.sym);
         let d: Vec<f64> = (0..f.n()).map(|j| if f.flags[j] & 1 != 0 { 1.0 + 0.01 * j as f64 } else { 0.0 }).collect();
-        let fac = numeric_factor(&f, &model_rows(&f), &plan, &d, None);
+        let fac = numeric_factor(&f, &model_rows(&f), &plan, &d, None, None);
         let m = f.m;
         // Dense A D A'.
         let mut a = vec![0.0; m * m];
