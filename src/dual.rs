@@ -75,6 +75,12 @@ struct Dual<'a> {
     /// Row-wise copy of the nonbasic, non-fixed structurals in the reference's storage order.
     rrows: Vec<Vec<usize>>,
     refactorizations: usize,
+    /// The pricing mode `ctx+0x3ec`: 1 for dual steepest edge, 3 after the switch of `0xf770d` (weights restarted at 1).
+    pmode: u8,
+    /// The reference framework of mode 3 (`ctx+0x418`): the variables nonbasic when the weights were restarted.
+    dflag: Vec<bool>,
+    /// `SimplexPricing` left at its default (-1): the release profile, which may switch the pricing mode.
+    switch_enabled: bool,
     /// Tolerance level (`ctx+0x2cc`): the number of nonbasic variables at an artificial upper bound.
     level: usize,
     /// Pending refactorization request (`ctx+0x294`).
@@ -1023,6 +1029,62 @@ impl<'a> Dual<'a> {
         (out, nst)
     }
 
+    /// The second FTRAN vector of the pricing mode 3 (`0xc57d8..0xc58c4`, `0x11faf9..0x11fcd0`): the entries of the pivot row whose variable was basic when the
+    /// weights restarted, in the true frame (the leaving variable with 1), combined column by column into a dense vector in the order of the list; the
+    /// entries above 1e-13 in magnitude, in the order of their first touch, are the vector. Returns it with the squared norm of the list and the work of
+    /// the wrapper without the column copy (`0x120114`: 4 per list entry, 2 per column entry of the structurals, 2 per touched row, 2 per kept row).
+    fn framework_rhs(&self, row: &[(usize, f64)], leave: usize, above: bool) -> (Vec<usize>, Vec<f64>, f64, f64) {
+        let p = self.p;
+        let sdir = if above { -1.0 } else { 1.0 };
+        let mut list: Vec<(usize, f64)> = Vec::new();
+        for &(j, a) in row {
+            if self.dflag[j] {
+                continue;
+            }
+            let a = if a.abs() < ALPHA_TOL { 0.0 } else { a };
+            let s = if self.st[j] == UB { -1.0 } else { 1.0 };
+            list.push((j, a * (s * sdir)));
+        }
+        if leave < self.n && !self.dflag[leave] {
+            list.push((leave, 1.0));
+        }
+        let w = rho_norm(&list);
+        let mut dense = vec![0.0f64; self.m];
+        let mut seen = vec![false; self.m];
+        let mut order: Vec<usize> = Vec::new();
+        let mut work = 4.0 * list.len() as f64;
+        for &(j, v) in &list {
+            if j >= self.n {
+                let i = j - self.n;
+                if !seen[i] {
+                    seen[i] = true;
+                    order.push(i);
+                }
+                dense[i] += p.fcols[j][0].1 * v;
+            } else {
+                work += 2.0 * p.fcols[j].len() as f64;
+                for &(i, a) in &p.fcols[j] {
+                    if !seen[i] {
+                        seen[i] = true;
+                        order.push(i);
+                    }
+                    dense[i] = a * v + dense[i];
+                }
+            }
+        }
+        let mut rows = Vec::new();
+        let mut vals = Vec::new();
+        let order_len = order.len();
+        for i in order {
+            if dense[i].abs() > 1e-13 {
+                rows.push(i);
+                vals.push(dense[i]);
+            }
+        }
+        work += 2.0 * order_len as f64 + 2.0 * rows.len() as f64;
+        (rows, vals, w, work)
+    }
+
     /// Work of the row product (`0x134d90`, site `0x135e92`, same estimate as the primal path's `row_product_work`).
     fn row_product_work(&mut self, rho: &[(usize, f64)], nslack: usize) {
         let p5: usize = rho.iter().map(|e| self.rrows[e.0].len()).sum();
@@ -1590,8 +1652,11 @@ impl<'a> Dual<'a> {
         let rows_q: Vec<usize> = p.fcols[q].iter().map(|&(i, _)| i).collect();
         let vals_q: Vec<f64> = p.fcols[q].iter().map(|&(_, a)| a).collect();
         let col_out = self.mirror.ftran(&rows_q, &vals_q);
-        let rho_rows: Vec<usize> = rho.iter().map(|e| e.0).collect();
-        let rho_vals: Vec<f64> = rho.iter().map(|e| e.1).collect();
+        // Mode 3: the second vector is not rho but the combination of the columns of the row's entries that were basic when the weights restarted
+        // (`0xc57d8`, `0x11f620`), and its squared norm is the weight of the pivot row.
+        let (rho_rows, rho_vals, w_row, vec_work) = if self.pmode == 3 { self.framework_rhs(&row, leave, above) } else {
+            (rho.iter().map(|e| e.0).collect::<Vec<usize>>(), rho.iter().map(|e| e.1).collect::<Vec<f64>>(), rho_norm(&rho), rho.len() as f64)
+        };
         let needed: Vec<usize> = col_out.iter().map(|e| e.0).collect();
         let tau_out = self.mirror.ftran_needed(&rho_rows, &rho_vals, &needed);
         {
@@ -1605,7 +1670,7 @@ impl<'a> Dual<'a> {
             self.work.add_from(0x129671, 0x120200, est, crate::work::FAC);
             // A slack column (`ctx+0x2fc >= n`, `0x11f788`) is not copied from the matrix: its `4 nnz` term is absent.
             let copied = if q < self.n { rows_q.len() } else { 0 };
-            self.work.add(0x120114, 4.0 * copied as f64 + rho_rows.len() as f64, crate::work::CTX);
+            self.work.add(0x120114, 4.0 * copied as f64 + vec_work, crate::work::CTX);
         }
         let mut tau_dense = vec![0.0; m];
         for &(i, v) in &tau_out {
@@ -1627,7 +1692,7 @@ impl<'a> Dual<'a> {
         if let Some(s) = rec.as_mut() {
             s["alpha_col"] = serde_json::json!(alpha);
             s["tau_r"] = serde_json::json!(tau_dense[r]);
-            s["w"] = serde_json::json!(rho_norm(&rho));
+            s["w"] = serde_json::json!(w_row);
             s["col"] = crate::dump::sparse(&col_out);
             s["tau"] = crate::dump::sparse(&tau_out);
         }
@@ -1726,7 +1791,7 @@ impl<'a> Dual<'a> {
         // The ratio test leaves the entries of the row list below 1e-10 in magnitude as exact zeros (RIN against ROUT of `0xc74a0`: 41376 entries on PEROLD,
         // largest 9.9997e-11, smallest kept 1.0000751e-10), so that the d update does not see them.
         let row: Vec<(usize, f64)> = row.into_iter().map(|(j, v)| (j, if v.abs() < ALPHA_TOL { 0.0 } else { v })).collect();
-        Step::Pivot(Box::new(Pivot { r, leave, q, row, flips, col, tau, alpha, w: rho_norm(&rho), t0, above }))
+        Step::Pivot(Box::new(Pivot { r, leave, q, row, flips, col, tau, alpha, w: w_row, t0, above }))
     }
 }
 
@@ -1896,6 +1961,23 @@ impl<'a> Dual<'a> {
         (s + self.obj_off) / self.obj_scale
     }
 
+    /// The pricing switch after a factorization (`0xf770d..0xf82c5`, release profile only): at every third factorization, with the steepest-edge pricing
+    /// still on, more than m + 1000 iterations done and fewer than 100 m structurals, the weights restart at 1 and the mode becomes 3 ("simplex pricing
+    /// changes from 1 to 3"). The pricing update formulas stay those of the steepest edge.
+    fn pricing_switch(&mut self) {
+        if !self.switch_enabled || self.pmode != 1 || self.refactorizations % 3 != 0 {
+            return;
+        }
+        let m = self.m as f64;
+        if self.iters as f64 > m + 1000.0 && (self.n as f64) < 100.0 * m {
+            self.pmode = 3;
+            self.dflag = self.st.iter().map(|&t| t < 0).collect();
+            for w in self.w.iter_mut() {
+                *w = 1.0;
+            }
+        }
+    }
+
     /// The stall test of the refactorization post pass (`0xe60cc..0xe6237`) and the cost perturbation it triggers (`0xe6af8..0xe6cd7`, `0xe74b1`).
     fn stall_check(&mut self, old_level: usize) {
         if self.pstep <= 0.0 && self.pert_param <= 0.0 {
@@ -2023,6 +2105,7 @@ impl<'a> Dual<'a> {
             self.refactor()?;
         }
         if refactor {
+            self.pricing_switch();
             if self.request == 0 {
                 self.request = 10;
             }
@@ -2209,6 +2292,9 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         factor,
         rrows: vec![Vec::new(); m],
         refactorizations: 1,
+        pmode: 1,
+        dflag: Vec::new(),
+        switch_enabled: opts.perturb > 0.0,
         level: 0,
         request: 0,
         iters: 0,
