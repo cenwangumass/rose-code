@@ -1,4 +1,4 @@
-//! `rose solve model.mps --output result.json [--basis-in b.json] [--basis-out b.json] [--method primal|dual] [--profile controlled|release]`
+//! `rose solve model.mps --output result.json [--basis-in b.json] [--basis-out b.json] [--method primal|dual|pdhg] [--profile controlled|release]`
 //! Progress goes to stderr; stdout stays empty so machine-readable output is only ever in the files.
 
 use rose::verify;
@@ -6,7 +6,7 @@ use rose::{mps, solve, Basis, SolveOptions, Status};
 use serde_json::{json, Value};
 
 fn usage() -> ! {
-    eprintln!("usage: rose solve <model.mps> [--output result.json] [--basis-in basis.json] [--basis-out basis.json] [--max-iterations N] [--method primal|dual] [--profile controlled|release]");
+    eprintln!("usage: rose solve <model.mps> [--output result.json] [--basis-in basis.json] [--basis-out basis.json] [--max-iterations N] [--method primal|dual|pdhg] [--profile controlled|release] [--pdhg-iter-limit N] [--pdhg-rel-tol T] [--pdhg-abs-tol T] [--pdhg-conv-tol T]");
     std::process::exit(2)
 }
 
@@ -27,7 +27,9 @@ fn main() {
     }
     let path = &args[1];
     let (mut output, mut basis_in, mut basis_out) = (None, None, None);
-    let (mut dual, mut release, mut max_it) = (false, false, None);
+    let (mut release, mut max_it) = (false, None);
+    let mut method = String::from("primal");
+    let mut popts = rose::pdhg::PdhgOptions::default();
     let mut it = args[2..].iter();
     while let Some(a) = it.next() {
         let val = it.next().unwrap_or_else(|| usage());
@@ -36,13 +38,7 @@ fn main() {
             "--basis-in" => basis_in = Some(val.clone()),
             "--basis-out" => basis_out = Some(val.clone()),
             "--max-iterations" => max_it = Some(val.parse().unwrap_or_else(|_| usage())),
-            "--method" => {
-                dual = match val.as_str() {
-                    "primal" => false,
-                    "dual" => true,
-                    _ => usage(),
-                }
-            }
+            "--method" => method = val.clone(),
             "--profile" => {
                 release = match val.as_str() {
                     "controlled" => false,
@@ -50,9 +46,18 @@ fn main() {
                     _ => usage(),
                 }
             }
+            "--pdhg-iter-limit" => popts.iter_limit = val.parse().unwrap_or_else(|_| usage()),
+            "--pdhg-rel-tol" => popts.rel_tol = val.parse().unwrap_or_else(|_| usage()),
+            "--pdhg-abs-tol" => popts.abs_tol = val.parse().unwrap_or_else(|_| usage()),
+            "--pdhg-conv-tol" => popts.conv_tol = val.parse().unwrap_or_else(|_| usage()),
             _ => usage(),
         }
     }
+    let dual = match method.as_str() {
+        "primal" | "pdhg" => false,
+        "dual" => true,
+        _ => usage(),
+    };
     let base = match (dual, release) {
         (false, false) => SolveOptions::default(),
         (false, true) => SolveOptions::release(),
@@ -65,6 +70,9 @@ fn main() {
     }
     let text = std::fs::read_to_string(path).unwrap_or_else(|e| fail(&format!("cannot read {path}: {e}")));
     let model = mps::parse(&text).unwrap_or_else(|e| fail(&format!("invalid input: {e}")));
+    if method == "pdhg" {
+        return run_pdhg(&model, &popts, output);
+    }
     let start = basis_in.map(|p| {
         let v: Value = serde_json::from_str(&std::fs::read_to_string(&p).unwrap_or_else(|e| fail(&format!("cannot read {p}: {e}")))).unwrap_or_else(|e| fail(&format!("invalid basis file: {e}")));
         basis_from_json(&v).unwrap_or_else(|| fail("invalid basis file"))
@@ -112,4 +120,34 @@ fn main() {
 fn fail(msg: &str) -> ! {
     eprintln!("error: {msg}");
     std::process::exit(1)
+}
+
+/// `--method pdhg`: the reflected restarted Halpern PDHG (`rose::pdhg`); no basis.
+fn run_pdhg(model: &rose::LpModel, popts: &rose::pdhg::PdhgOptions, output: Option<String>) {
+    eprintln!("{}: {} rows, {} columns", model.name, model.num_rows(), model.num_cols());
+    let t = std::time::Instant::now();
+    let r = rose::pdhg::solve(model, popts);
+    let secs = t.elapsed().as_secs_f64();
+    let status = match r.status {
+        Status::Optimal => "optimal",
+        Status::IterationLimit => "iteration_limit",
+        Status::Infeasible => "infeasible",
+        Status::Unbounded => "unbounded",
+        _ => "numerical_failure",
+    };
+    eprintln!("status {status}, objective {:.12e}, {} iterations, {} restarts, {secs:.3}s", r.objective, r.iterations, r.restarts);
+    let out = json!({
+        "version": 1,
+        "status": status,
+        "objective": if r.status == Status::Optimal { json!(r.objective) } else { Value::Null },
+        "x": r.x, "dual": r.dual, "reduced_cost": r.reduced_cost,
+        "diagnostics": { "iterations": r.iterations, "restarts": r.restarts, "seconds": secs,
+            "primal_residual": r.primal_residual, "dual_residual": r.dual_residual, "relative": r.relative },
+    });
+    let text = serde_json::to_string_pretty(&out).unwrap();
+    match output {
+        Some(p) => std::fs::write(&p, text).unwrap_or_else(|e| fail(&format!("cannot write {p}: {e}"))),
+        None => println!("{text}"),
+    }
+    std::process::exit(if r.status == Status::Optimal { 0 } else { 3 });
 }

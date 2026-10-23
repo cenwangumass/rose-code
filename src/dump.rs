@@ -32,6 +32,7 @@ pub const KINDS: &[(&str, &str, &str)] = &[
     ("dtau", "DTAU", "each dual pivot at the weight update: leaving position, alpha, w (rho norm), the pivot column without the pivot entry (position, value) and tau at the same positions"),
     ("p68", "P68", "each reset of the pricing weights (`0x132460`): the type, the U and L column structure (steps) and the weights P+0x68 by position"),
     ("work", "WORK", "the work counter W (`crate::work`): each increment (k inc: d, site, caller), each refactorization check (trig: W), the time clause (clause), and the smoothed factorization cost (w158); `ROSE_WORK=1` also selects it"),
+    ("pdhg", "PDHG", "PDHG: the state at each residual test (every 100th iteration, and the iteration-limit exit): counters, eta, omega, merit R, the residual scalars and the status"),
     ("fillparts", "FILLP", "per factor update: pool fill on entry, eta size, new column entries added, and the row growths (row, cnt, cap, extra)"),
 ];
 

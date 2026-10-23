@@ -23,6 +23,10 @@ pub struct LpModel {
     /// The range `|R|` of a ranged row as the file gives it (0 for none, or when absent); the solver's range column is `[0, row_range]`,
     /// which differs in the last bits from `row_up - row_lo`. Used only when it agrees with the bounds.
     pub row_range: Vec<f64>,
+    /// The row type letters the file gives (`b'E'`, `b'L'`, `b'G'`); empty when unknown. A ranged G row is told from the other ranged rows only here.
+    pub row_kind: Vec<u8>,
+    /// The ranged rows in the order of the RANGES section (the order of the reference's range columns); empty when unknown (row order is used).
+    pub range_order: Vec<usize>,
     /// Column `j` holds `row_idx[col_start[j]..col_start[j + 1]]` with matching `val`.
     pub col_start: Vec<usize>,
     pub row_idx: Vec<usize>,

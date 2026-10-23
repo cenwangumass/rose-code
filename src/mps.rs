@@ -44,6 +44,7 @@ pub fn parse(text: &str) -> Result<LpModel, MpsError> {
     let mut rhs: Vec<f64> = Vec::new();
     let mut obj_rhs = 0.0;
     let mut range: Vec<Option<f64>> = Vec::new();
+    let mut range_order: Vec<usize> = Vec::new();
     let mut lo: Vec<f64> = Vec::new();
     let mut up: Vec<f64> = Vec::new();
     let mut objsense_next = false;
@@ -140,6 +141,9 @@ pub fn parse(text: &str) -> Result<LpModel, MpsError> {
                         if section == "RHS" {
                             rhs[i] = v;
                         } else {
+                            if range[i].is_none() && v != 0.0 {
+                                range_order.push(i);
+                            }
                             range[i] = Some(v);
                         }
                     } else if !ignored_rows.contains_key(pair[0]) {
@@ -228,6 +232,8 @@ pub fn parse(text: &str) -> Result<LpModel, MpsError> {
         row_lo,
         row_up,
         row_range,
+        row_kind: rows.iter().map(|r| match r.1 { RowKind::E => b'E', RowKind::L => b'L', RowKind::G => b'G' }).collect(),
+        range_order,
         col_start,
         row_idx,
         val,

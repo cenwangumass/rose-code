@@ -111,6 +111,8 @@ fn random_model_with(seed: u64, max_m: u64, max_n: u64, feasible: bool) -> LpMod
         row_lo,
         row_up,
         row_range,
+        row_kind: Vec::new(),
+        range_order: Vec::new(),
         col_start,
         row_idx,
         val,
