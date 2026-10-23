@@ -124,3 +124,9 @@ fn a_huge_objective_value_stops_with_status_12() {
     // Reference with the primal objective written to 1e101 at the residual test n8 = 300 (INJECT=pobj@300): the termination test returns 12.
     check_with("sc50a_pobj_inf", PdhgOptions { inject: Some((300, rose::pdhg::Inject::Pobj)), ..PdhgOptions::default() });
 }
+
+#[test]
+fn a_long_run_takes_rule_5_and_the_weight_fallback_without_injection() {
+    // pdhg_e3 to the limit 300000 (PDHGIterLimit): 271 restarts by rule 5 (merit 0 from a negative radicand) and 3 resets of the primal weight, all as in the reference.
+    check_with("pdhg_e3_long", PdhgOptions { iter_limit: 300000.0, ..PdhgOptions::default() });
+}
