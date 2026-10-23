@@ -2225,7 +2225,9 @@ impl RefStruct {
         if !bare {
             self.kind[r] = -2;
         }
-        let keep = (old != -2 && av.is_empty()) || (old == -2 && !moved);
+        // A demotion (`conv`) happens only when the spike references the tail, so the new column is not kept in place even when the demoted column was
+        // the spike's only tail entry (FIT2P call 2263: column 175, the reference creates the row eta of the leaving column).
+        let keep = (old != -2 && av.is_empty() && conv.is_none()) || (old == -2 && !moved);
         // Row r of U: the tail columns that reference r (`0xf2a51`), unless the column stays in its slot.
         let refs = (0..m).filter(|&x| x != r && self.kind[x] == -2 && (self.a[x].contains(&r) || self.b[x].contains(&r))).count();
         if refs > 0 && !(keep && !moved) {

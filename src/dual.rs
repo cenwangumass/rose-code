@@ -835,9 +835,8 @@ impl<'a> Dual<'a> {
         // and the list is not shorter than the pivot column's entry count (always, after a no-row call); an existing threshold below the maximum
         // priority is only ever raised.
         let thr_old = self.thr;
-        let new5 = maxp / 1e5;
-        let thr5 = if thr_old != 0.0 && maxp > thr_old { maxsd(new5, thr_old) } else { new5 };
-        let count = (0..self.m).filter(|&r| inf[r] && self.prio[r] >= thr5).count();
+        // The count compared with the pivot column's entries is the number of infeasible rows (`[P+0x3c]`, `0xc1e8e`).
+        let count = inf.iter().filter(|&&f| f).count();
         let div = if after_pivot && count < self.last_cap || big { 1e5 } else { 1e3 };
         let new = maxp / div;
         self.thr = if thr_old != 0.0 && maxp > thr_old { maxsd(new, thr_old) } else { new };
