@@ -10,6 +10,7 @@ pub mod lu_pairs;
 pub mod method;
 pub mod model;
 pub mod mps;
+pub mod order;
 pub mod pdhg;
 pub mod scale;
 pub mod simplex;

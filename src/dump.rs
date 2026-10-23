@@ -33,6 +33,7 @@ pub const KINDS: &[(&str, &str, &str)] = &[
     ("p68", "P68", "each reset of the pricing weights (`0x132460`): the type, the U and L column structure (steps) and the weights P+0x68 by position"),
     ("work", "WORK", "the work counter W (`crate::work`): each increment (k inc: d, site, caller), each refactorization check (trig: W), the time clause (clause), and the smoothed factorization cost (w158); `ROSE_WORK=1` also selects it"),
     ("pdhg", "PDHG", "PDHG: the state at each residual test (every 100th iteration, and the iteration-limit exit): counters, eta, omega, merit R, the residual scalars and the status"),
+    ("barrier_struct", "PAT", "barrier setup structure (`examples/barrier_struct`): records PAT (AA' pattern), SYMIN (n1, dense count), ORDIN (level flags), ORD, ORDFIX, SYM, and BSTRUCT (status: `unsupported` names an undecoded routine)"),
     ("fillparts", "FILLP", "per factor update: pool fill on entry, eta size, new column entries added, and the row growths (row, cnt, cap, extra)"),
 ];
 
@@ -73,4 +74,11 @@ pub fn sparse(v: &[(usize, f64)]) -> serde_json::Value {
 pub fn on_from(kind: &str, k: usize) -> bool {
     static F: OnceLock<usize> = OnceLock::new();
     on(kind) && k >= *F.get_or_init(|| std::env::var("ROSE_FROM").ok().and_then(|v| v.parse().ok()).unwrap_or(0))
+}
+
+/// Writes one record of `kind` under an explicit tag (kinds that emit several record types).
+pub fn emit_tag(kind: &str, tag: &str, rec: serde_json::Value) {
+    debug_assert!(KINDS.iter().any(|k| k.0 == kind), "unknown dump kind {kind}");
+    let line = format!("{tag} {}\n", serde_json::to_string(&rec).unwrap());
+    std::io::Write::write_all(&mut std::io::stderr().lock(), line.as_bytes()).unwrap();
 }
