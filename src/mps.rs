@@ -45,6 +45,8 @@ pub fn parse(text: &str) -> Result<LpModel, MpsError> {
     let mut obj_rhs = 0.0;
     let mut range: Vec<Option<f64>> = Vec::new();
     let mut range_order: Vec<usize> = Vec::new();
+    let mut range_entries: Vec<(usize, f64)> = Vec::new();
+    let mut range_dup = false;
     let mut lo: Vec<f64> = Vec::new();
     let mut up: Vec<f64> = Vec::new();
     let mut objsense_next = false;
@@ -144,6 +146,10 @@ pub fn parse(text: &str) -> Result<LpModel, MpsError> {
                             if range[i].is_none() && v != 0.0 {
                                 range_order.push(i);
                             }
+                            if range[i].is_some() {
+                                range_dup = true;
+                            }
+                            range_entries.push((i, v));
                             range[i] = Some(v);
                         }
                     } else if !ignored_rows.contains_key(pair[0]) {
@@ -234,6 +240,8 @@ pub fn parse(text: &str) -> Result<LpModel, MpsError> {
         row_range,
         row_kind: rows.iter().map(|r| match r.1 { RowKind::E => b'E', RowKind::L => b'L', RowKind::G => b'G' }).collect(),
         range_order,
+        range_entries,
+        range_dup,
         col_start,
         row_idx,
         val,

@@ -42,13 +42,18 @@ fn unsupported<T>(s: impl Into<String>) -> Result<T, BarrierError> {
 // Standard form (conversion `0x31af70`, `0x3548a0`).
 
 /// The solved problem `min c'x, A x + S s = b, 0 <= x (<= ub)` in the reference's layout. Variables: the model's columns in file order
-/// (`n2`), then one slack per row (`m`, flag 0 and no complementarity pair for an '=' row). Rows are in the supernodal elimination order
-/// (`SYM` perm), `A` columns keep their entries in ascending permuted row order. A '>' row is negated (row and right-hand side, sense kept).
-/// Lower bounds are shifted to 0 (`b -= A lo`, `const = c lo`, `ub -= lo`).
+/// (`n_struct`), the range columns of the ranged rows (appended in RANGES order, `n2 = n_struct + ranges`), then one slack per row (`m`, flag 0 and no
+/// complementarity pair for an '=' row). Rows are in the supernodal elimination order (`SYM` perm), `A` columns keep their entries in ascending permuted row
+/// order. A ranged row is an equality row plus its range column (`MPS_Rg<row>`, cost 0, bounds `[0, |R|]`, coefficient +1 for `L` and `E` rows, -1 for `G`);
+/// a '>' row is negated (row and right-hand side, sense kept). Lower bounds are shifted to 0 (`b -= A lo`, `const = c lo`, `ub -= lo`); upper bounds
+/// implied by the rows are dropped (`classify_bounds`).
 #[derive(Debug, Clone)]
 pub struct StdForm {
     pub m: usize,
+    /// Columns of the solved problem: the model's, then the range columns.
     pub n2: usize,
+    /// The model's own columns (the first `n_struct` of `n2`).
+    pub n_struct: usize,
     pub col_start: Vec<usize>,
     pub row_idx: Vec<usize>,
     pub val: Vec<f64>,
@@ -74,6 +79,8 @@ pub struct StdForm {
     pub lower: Vec<f64>,
     /// File row of each position (`inv[k]`).
     pub row_of: Vec<usize>,
+    /// Number of complementarity pairs (`Q+0x210`): lower bounds, the upper bounds present before the implied ones were dropped, and the inequality slacks.
+    pub ncomp: usize,
 }
 
 impl StdForm {
@@ -81,9 +88,9 @@ impl StdForm {
         self.n2 + self.m
     }
 
-    /// Number of complementarity pairs (`Q+0x210`): flagged x/z entries plus u/v pairs.
+    /// Number of complementarity pairs (`Q+0x210`).
     pub fn ncomp(&self) -> usize {
-        self.flags.iter().map(|&f| (f & 1) as usize + ((f >> 1) & 1) as usize).sum()
+        self.ncomp
     }
 
     pub fn has_ub(&self) -> bool {
@@ -126,19 +133,81 @@ fn is_inf(v: f64) -> bool {
     v.abs() >= INF
 }
 
+/// Bound classification `0x3283f0` (port of `classify_bounds` of `tools/barrier_model.py`, the part for columns with a lower bound: the implied bounds of
+/// free columns are not modelled, such a column is refused earlier). Inputs: the converted model (rows permuted, '>' rows negated, so every non-'=' row is a
+/// '<=' row), the right-hand side before the lower-bound shift, bounds with `INF` as infinity. Per row, in order: `mn = sum a>0: a lb + a<=0: a ub`,
+/// `mx` the reverse (column order, an infinite bound enters as the number `1e30`), `up = rhs - mn`, `lo = mx - rhs` (`1e100` for non-'=' rows). For every
+/// entry whose bounds are both finite, `w = ub - lb`: `a > 1e-4`: the upper bound is dropped (set to `1e100`, which also sets `lo = 1e100`) if
+/// `0.9999 a w > up` or the row has no entry with `a <= 0` and `a w > up - 1e-10`; `a < -1e-4`: dropped (sets `up = 1e100`) if `0.9999 a w > lo` or the row
+/// has no entry with `a > 0` and `a w > lo - 1e-10`. Later rows see the dropped bounds.
+fn drop_implied_upper_bounds(m: usize, n: usize, sense: &[u8], col_start: &[usize], row_idx: &[usize], val: &[f64], b: &[f64], lb: &[f64], ub: &mut [f64]) {
+    let mut rows: Vec<Vec<(usize, f64)>> = vec![Vec::new(); m];
+    for j in 0..n {
+        for q in col_start[j]..col_start[j + 1] {
+            rows[row_idx[q]].push((j, val[q]));
+        }
+    }
+    let big = 1e100;
+    for i in 0..m {
+        let (mut npos, mut nneg) = (0usize, 0usize);
+        let (mut mn, mut mx) = (0.0f64, 0.0f64);
+        for &(j, a) in &rows[i] {
+            if a > 0.0 {
+                npos += 1;
+                mn += a * lb[j];
+                mx += a * ub[j];
+            } else {
+                nneg += 1;
+                mn += a * ub[j];
+                mx += a * lb[j];
+            }
+        }
+        let mut up = b[i] - mn;
+        let mut lo = mx - b[i];
+        if sense[i] != b'=' {
+            lo = big;
+        }
+        for &(j, a) in &rows[i] {
+            let w = ub[j] - lb[j];
+            if lb[j] > -INF && ub[j] < INF {
+                if a > 1e-4 {
+                    if 0.9999 * a * w > up || (nneg == 0 && a * w > up - 1e-10) {
+                        ub[j] = big;
+                        lo = big;
+                    }
+                } else if a < -1e-4 && (0.9999 * a * w > lo || (npos == 0 && a * w > lo - 1e-10)) {
+                    ub[j] = big;
+                    up = big;
+                }
+            }
+        }
+    }
+}
+
 /// Conversion of a model to the solved form, with `perm[original row] = position` (the final `SYM` permutation of [`crate::order`]).
 pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> {
     let m = model.num_rows();
-    let n2 = model.num_cols();
+    let n_struct = model.num_cols();
     if model.sense == Sense::Maximize {
         return unsupported("maximization");
     }
     if perm.len() != m {
         return unsupported(format!("permutation of {} entries for {m} rows (dense columns in the ordering)", perm.len()));
     }
+    if model.range_dup {
+        return unsupported("two RANGES entries for a row");
+    }
     let mut row_of = vec![0usize; m];
     for (i, &p) in perm.iter().enumerate() {
         row_of[p as usize] = i;
+    }
+    // Ranged rows (RANGES order): an equality row plus a range column with upper bound |R| (coefficient +1; -1 for a G row).
+    let mut is_range = vec![false; m];
+    for &(i, _) in &model.range_entries {
+        if model.row_kind.get(i).is_none() {
+            return unsupported("ranged row of unknown type");
+        }
+        is_range[i] = true;
     }
     // Rows: sense, sign and right-hand side in file order.
     let mut sense_file = vec![b'='; m];
@@ -147,12 +216,20 @@ pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> 
     let mut b_file = vec![0.0; m];
     for i in 0..m {
         let (lo, up) = (model.row_lo[i], model.row_up[i]);
+        if is_range[i] {
+            // L: [r - |R|, r], rhs r = row_up; G: [r, r + |R|], rhs r = row_lo; E: [r, r + R] or [r + R, r], rhs row_up.
+            b_file[i] = if model.row_kind[i] == b'G' { lo } else { up };
+            if is_inf(lo) || is_inf(up) {
+                return unsupported("ranged row with an infinite side");
+            }
+            continue;
+        }
         if is_inf(lo) && is_inf(up) {
             return unsupported("free row");
         }
         if !is_inf(lo) && !is_inf(up) {
             if lo != up {
-                return unsupported("ranged row");
+                return unsupported("ranged row without a RANGES entry");
             }
             b_file[i] = lo;
         } else if is_inf(lo) {
@@ -164,11 +241,12 @@ pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> 
             b_file[i] = -lo;
         }
     }
-    // Columns: flags, shift.
-    let mut flags = vec![0u8; n2 + m];
+    // Columns: the model's, then the range columns; bounds as the file gives them.
+    let nr = model.range_entries.len();
+    let n2 = n_struct + nr;
     let mut lower = vec![0.0; n2];
-    let mut ub = vec![INF; n2];
-    for j in 0..n2 {
+    let mut ub_in = vec![INF; n2];
+    for j in 0..n_struct {
         let (lo, up) = (model.col_lo[j], model.col_up[j]);
         if is_inf(lo) {
             return unsupported("column without a lower bound");
@@ -177,24 +255,25 @@ pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> 
             return unsupported("inconsistent column bounds");
         }
         lower[j] = lo;
-        flags[j] = if is_inf(up) { 1 } else { 3 };
         if !is_inf(up) {
-            ub[j] = up - lo;
+            ub_in[j] = up;
         }
     }
-    for i in 0..m {
-        if sense_file[i] != b'=' {
-            flags[n2 + perm[i] as usize] = 1;
-        }
+    for (k, &(i, r)) in model.range_entries.iter().enumerate() {
+        // L and G: |R|; E: R, or -R for R <= 0 (R = 0 gives -0.0).
+        ub_in[n_struct + k] = if model.row_kind[i] == b'E' { if r > 0.0 { r } else { -r } } else { r.abs() };
     }
-    let ub_cols: Vec<usize> = (0..n2).filter(|&j| flags[j] & 2 != 0).collect();
-    let (ub_lo, ub_hi) = if ub_cols.is_empty() { (n2, n2) } else { (ub_cols[0], ub_cols[ub_cols.len() - 1] + 1) };
-    // Matrix in permuted rows, entries ascending by position.
+    // Matrix in permuted rows, entries ascending by position (range column: its row, coefficient +-1).
     let mut col_start = vec![0usize];
     let mut row_idx = Vec::new();
     let mut val = Vec::new();
     for j in 0..n2 {
-        let mut e: Vec<(usize, f64)> = model.col(j).filter(|&(_, v)| v != 0.0).map(|(i, v)| (perm[i] as usize, sign[i] * v)).collect();
+        let mut e: Vec<(usize, f64)> = if j < n_struct {
+            model.col(j).filter(|&(_, v)| v != 0.0).map(|(i, v)| (perm[i] as usize, sign[i] * v)).collect()
+        } else {
+            let i = model.range_entries[j - n_struct].0;
+            vec![(perm[i] as usize, if model.row_kind[i] == b'G' { -1.0 } else { 1.0 })]
+        };
         e.sort_by_key(|t| t.0);
         for (i, v) in e {
             row_idx.push(i);
@@ -202,43 +281,64 @@ pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> 
         }
         col_start.push(row_idx.len());
     }
-    // Shift b by the lower bounds: b - A lower (column-ordered accumulation).
+    let sense: Vec<u8> = (0..m).map(|k| sense_file[row_of[k]]).collect();
     let mut b = vec![0.0; m];
     for i in 0..m {
         b[perm[i] as usize] = b_file[i];
     }
-    let mut f = StdForm {
-        b_file: b_file.clone(),
+    // Bound classification: upper bounds implied by the rows are dropped (the complementarity pairs count the bounds present before).
+    let mut ub_cls = ub_in.clone();
+    drop_implied_upper_bounds(m, n2, &sense, &col_start, &row_idx, &val, &b, &lower, &mut ub_cls);
+    let mut flags = vec![0u8; n2 + m];
+    let mut ub = vec![INF; n2];
+    for j in 0..n2 {
+        flags[j] = if ub_cls[j] < INF { 3 } else { 1 };
+        if ub_cls[j] < INF {
+            ub[j] = ub_cls[j] - lower[j];
+        }
+    }
+    for k in 0..m {
+        if sense[k] != b'=' {
+            flags[n2 + k] = 1;
+        }
+    }
+    let ncomp = n2 + ub_in.iter().filter(|&&u| u < INF).count() + sense.iter().filter(|&&s| s != b'=').count();
+    let ub_cols: Vec<usize> = (0..n2).filter(|&j| flags[j] & 2 != 0).collect();
+    let (ub_lo, ub_hi) = if ub_cols.is_empty() { (n2, n2) } else { (ub_cols[0], ub_cols[ub_cols.len() - 1] + 1) };
+    // Shift b by the lower bounds: one entry at a time in column order, `b_i = b_i - a_ij lo_j`.
+    let mut cshift = 0.0;
+    let mut c = model.obj.clone();
+    c.resize(n2, 0.0);
+    for j in 0..n2 {
+        let l = lower[j];
+        if l != 0.0 {
+            for q in col_start[j]..col_start[j + 1] {
+                b[row_idx[q]] = b[row_idx[q]] - val[q] * l;
+            }
+            cshift = cshift + c[j] * l;
+        }
+    }
+    Ok(StdForm {
+        b_file,
         m,
         n2,
+        n_struct,
         col_start,
         row_idx,
         val,
-        sense: (0..m).map(|k| sense_file[row_of[k]]).collect(),
+        sense,
         flags,
-        b: Vec::new(),
-        c: model.obj.clone(),
+        b,
+        c,
         ub,
         ub_lo,
         ub_hi,
         offset: model.offset,
-        cshift: 0.0,
-        lower: lower.clone(),
+        cshift,
+        lower,
         row_of,
-    };
-    if lower.iter().any(|&l| l != 0.0) {
-        let al = f.ax_cols(&lower);
-        for i in 0..m {
-            b[i] = b[i] - al[i];
-        }
-        let mut cs = 0.0;
-        for j in 0..n2 {
-            cs = cs + f.c[j] * lower[j];
-        }
-        f.cshift = cs;
-    }
-    f.b = b;
-    Ok(f)
+        ncomp,
+    })
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------
@@ -1738,7 +1838,7 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
     }
 }
 
-/// The solution of the model's own columns (undoing the lower-bound shift), the objective (`Q+0x130`) and the row duals in file order.
+/// The solution of the solved columns (the model's, then the range columns; the lower-bound shift undone), the objective (`Q+0x130`) and the row duals in file order.
 #[derive(Debug, Clone)]
 pub struct Solution {
     pub run: BarrierRun,
@@ -1751,7 +1851,7 @@ pub struct Solution {
 }
 
 pub fn solution(f: &StdForm, run: BarrierRun) -> Solution {
-    let x: Vec<f64> = (0..f.n2).map(|j| run.state.x[j] + f.lower[j]).collect();
+    let x: Vec<f64> = (0..f.n2).map(|j| if f.lower[j] != 0.0 { run.state.x[j] + f.lower[j] } else { run.state.x[j] }).collect();
     let last = run.records.last().unwrap();
     let mut y = vec![0.0; f.m];
     for k in 0..f.m {
@@ -1800,9 +1900,9 @@ pub fn solve_method(model: &LpModel, opts: &crate::SolveOptions) -> Result<crate
     Ok(crate::SolveResult {
         status,
         objective: sol.objective,
-        x: sol.x,
+        x: sol.x[..model.num_cols()].to_vec(),
         dual: sol.y,
-        reduced_cost: sol.rc,
+        reduced_cost: sol.rc[..model.num_cols()].to_vec(),
         basis: crate::Basis::slack(model.num_cols(), model.num_rows()),
         iterations: sol.run.iterations.max(0) as usize,
         refactorizations: 0,

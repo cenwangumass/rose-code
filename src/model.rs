@@ -27,6 +27,10 @@ pub struct LpModel {
     pub row_kind: Vec<u8>,
     /// The ranged rows in the order of the RANGES section (the order of the reference's range columns); empty when unknown (row order is used).
     pub range_order: Vec<usize>,
+    /// Every RANGES entry on a constraint row, `(row, R)` in file order, zeros and signs as given (the barrier's range columns follow the entries).
+    pub range_entries: Vec<(usize, f64)>,
+    /// A row has two RANGES entries (the later one wins in the bounds; `crate::barrier::std_form` refuses such a file).
+    pub range_dup: bool,
     /// Column `j` holds `row_idx[col_start[j]..col_start[j + 1]]` with matching `val`.
     pub col_start: Vec<usize>,
     pub row_idx: Vec<usize>,

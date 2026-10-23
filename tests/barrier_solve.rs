@@ -1,17 +1,21 @@
 //! The whole barrier solve from the MPS alone (`rose::barrier` with the bit-exact `rose::chol::CholSolver`) against the reference
 //! (`tests/fixtures/barrier-solve-controlled.json`, written by `reverse-engineer/tools/make_barrier_solve_fixture.py`): every iteration's state and
-//! decisions, and the returned x, duals, reduced costs and objective, agree bit for bit on AFIRO, SC50A, BLEND, ADLITTLE, BORE3D and DEGEN2.
+//! decisions, and the returned x, duals, reduced costs and objective, agree bit for bit on AFIRO, SC50A, BLEND, ADLITTLE, BORE3D, DEGEN2, BOEING2 (ranged
+//! rows, implied upper bounds dropped) and the two ranged-row fixtures (`fx_bar_rngL`, `fx_bar_rngGE`: L, G and E rows, R of both signs and 0).
 use rose::barrier::{self, BarrierStatus, Options};
 use rose::{mps, solve, SolveOptions, Status};
 use serde_json::Value;
 
-const MODELS: [(&str, &str); 6] = [
+const MODELS: [(&str, &str); 9] = [
     ("afiro", include_str!("fixtures/afiro.mps")),
     ("sc50a", include_str!("fixtures/sc50a.mps")),
     ("blend", include_str!("fixtures/blend.mps")),
     ("adlittle", include_str!("fixtures/adlittle.mps")),
     ("bore3d", include_str!("fixtures/bore3d.mps")),
     ("degen2", include_str!("fixtures/degen2.mps")),
+    ("boeing2", include_str!("fixtures/boeing2.mps")),
+    ("fx_bar_rngL", include_str!("fixtures/fx_bar_rngL.mps")),
+    ("fx_bar_rngGE", include_str!("fixtures/fx_bar_rngGE.mps")),
 ];
 
 fn floats(v: &Value) -> Vec<f64> {
@@ -73,6 +77,7 @@ fn whole_solves_match_reference_bitwise() {
         }
         let run = &fx[name]["run"];
         assert_eq!(run["iters"].as_i64().unwrap() as i32, sol.run.iterations, "{name} iterations");
+        // x and rc cover the model's columns and the range columns of the ranged rows.
         same(name, "x (read-out)", 0, &floats(&run["x"]), &sol.x);
         same(name, "pi (read-out)", 0, &floats(&run["pi"]), &sol.y);
         same(name, "rc (read-out)", 0, &floats(&run["rc"]), &sol.rc);
@@ -90,9 +95,11 @@ fn method_barrier_returns_the_reference_solution() {
         assert_eq!(r.status, Status::Optimal, "{name}");
         let run = &fx[name]["run"];
         assert_eq!(run["iters"].as_u64().unwrap() as usize, r.iterations, "{name}");
-        same(name, "x", 0, &floats(&run["x"]), &r.x);
+        // The public vectors cover the model's own columns: the reference's x and rc also hold the range columns, after them.
+        let (x, rc) = (floats(&run["x"]), floats(&run["rc"]));
+        same(name, "x", 0, &x[..model.num_cols()], &r.x);
         same(name, "dual", 0, &floats(&run["pi"]), &r.dual);
-        same(name, "reduced_cost", 0, &floats(&run["rc"]), &r.reduced_cost);
+        same(name, "reduced_cost", 0, &rc[..model.num_cols()], &r.reduced_cost);
         scalar(name, "objective", 0, &run["obj"], r.objective);
     }
 }
@@ -109,8 +116,6 @@ fn iteration_limit_is_reported() {
 #[test]
 fn unsupported_models_are_explicit_errors() {
     let unsupported = |model: &rose::LpModel| matches!(solve(model, None, &SolveOptions::barrier()), Err(rose::simplex::SolveError::Unsupported(_)));
-    // BOEING2 has ranged rows.
-    assert!(unsupported(&mps::parse(include_str!("fixtures/boeing2.mps")).unwrap()));
     let afiro = mps::parse(MODELS[0].1).unwrap();
     let mut max = afiro.clone();
     max.sense = rose::Sense::Maximize;
@@ -118,6 +123,10 @@ fn unsupported_models_are_explicit_errors() {
     let mut free = afiro.clone();
     free.col_lo[0] = -1e30;
     assert!(unsupported(&free));
+    // A row ranged twice (the later entry wins in the bounds, the reference's columns are not recovered for it).
+    let twice = mps::parse(&include_str!("fixtures/fx_bar_rngL.mps").replace("RANGES\n", "RANGES\n    rng2      r1                 1\n")).unwrap();
+    assert!(twice.range_dup);
+    assert!(unsupported(&twice));
     // The release profile (scaling) is not recovered.
     assert!(matches!(solve(&afiro, None, &SolveOptions { scaling: true, ..SolveOptions::barrier() }), Err(rose::simplex::SolveError::Unsupported(_))));
 }
