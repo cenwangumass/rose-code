@@ -108,7 +108,10 @@ fn main() {
         "version": 1,
         "status": status,
         "objective": if r.status == Status::Optimal { json!(r.objective) } else { Value::Null },
-        "x": r.x, "dual": r.dual, "reduced_cost": r.reduced_cost,
+        // like the reference, which returns no solution vectors unless the status is optimal; `PdhgResult` keeps the last iterate for library users
+        "x": if r.status == Status::Optimal { json!(r.x) } else { Value::Null },
+        "dual": if r.status == Status::Optimal { json!(r.dual) } else { Value::Null },
+        "reduced_cost": if r.status == Status::Optimal { json!(r.reduced_cost) } else { Value::Null },
         "basis": basis_to_json(&r.basis),
         "farkas": r.farkas, "ray": r.ray,
         "diagnostics": { "iterations": r.iterations, "refactorizations": r.refactorizations, "seconds": secs, "check": check.err() },
