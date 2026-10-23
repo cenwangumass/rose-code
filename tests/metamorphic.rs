@@ -73,6 +73,9 @@ fn permute(m: &LpModel, p: &[usize], q: &[usize]) -> LpModel {
     r.row_lo = p.iter().map(|&i| m.row_lo[i]).collect();
     r.row_up = p.iter().map(|&i| m.row_up[i]).collect();
     r.row_names = p.iter().map(|&i| m.row_names[i].clone()).collect();
+    r.row_range = p.iter().map(|&i| m.row_range[i]).collect();
+    r.row_kind = p.iter().map(|&i| m.row_kind[i]).collect();
+    r.range_order = m.range_order.iter().map(|&i| inv[i]).collect();
     r.obj = q.iter().map(|&j| m.obj[j]).collect();
     r.col_lo = q.iter().map(|&j| m.col_lo[j]).collect();
     r.col_up = q.iter().map(|&j| m.col_up[j]).collect();
@@ -98,6 +101,7 @@ fn scale_rows(m: &LpModel, s: f64, every: usize) -> LpModel {
     for i in (0..m.num_rows()).step_by(every) {
         r.row_lo[i] = sc(m.row_lo[i], s);
         r.row_up[i] = sc(m.row_up[i], s);
+        r.row_range[i] = m.row_range[i] * s;
     }
     for k in 0..r.val.len() {
         if r.row_idx[k] % every == 0 {

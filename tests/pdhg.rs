@@ -98,3 +98,19 @@ fn tight_tolerances_and_limit_exit_inside_the_power_iteration() {
     // pdhg_e3 at PDHGAbsTol = PDHGRelTol = PDHGConvTol = 1e-9, PDHGIterLimit 8000: restarts whose continued power iteration runs into the limit.
     check_with("pdhg_e3_tight", PdhgOptions { abs_tol: 1e-9, rel_tol: 1e-9, conv_tol: 1e-9, iter_limit: 8000.0, ..PdhgOptions::default() });
 }
+
+#[test]
+fn row_sides_at_and_above_1e20_are_used_as_written() {
+    // Right-hand sides 1e30 (pdhg_e17, never infinite for a row) and a range of 1e30 on an L row (pdhg_e22, a range column with no upper bound), limit 3000.
+    for name in ["pdhg_e17", "pdhg_e22"] {
+        check_with(name, PdhgOptions { iter_limit: 3000.0, ..PdhgOptions::default() });
+    }
+}
+
+#[test]
+fn zero_merit_takes_rule_5_and_the_zero_dual_residual_takes_the_weight_fallback() {
+    // Reference with the state written by a debugger at one residual test (replay/gdb_pdhg_checks.py INJECT): merit R = 0 at n8 = 500 (restart rule 5, power-iteration
+    // budget 1000) and relative dual residual = 0 at n8 = 700 (a restart with the primal weight reset to its initial value).
+    check_with("adlittle_merit0", PdhgOptions { inject: Some((500, rose::pdhg::Inject::Merit)), ..PdhgOptions::default() });
+    check_with("adlittle_reld0", PdhgOptions { inject: Some((700, rose::pdhg::Inject::RelDual)), ..PdhgOptions::default() });
+}

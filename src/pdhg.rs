@@ -27,11 +27,20 @@ pub struct PdhgOptions {
     /// The `Seed` parameter: any nonzero value starts the primal iterate at `clamp(1e-6 * u_j, lb, ub)` with `u_j` the first draws of the generator (the power
     /// iteration's start vector follows in the same stream); the value itself does not matter (reference: Seed 1 and 7 give the same run).
     pub seed: i32,
+    /// Differential-test hook (`reverse-engineer/replay/gdb_pdhg_checks.py`, `INJECT`): at the residual test with `n8 == at`, set the merit R (`Merit`: restart
+    /// rule 5, the R == 0 power-iteration budget) or the relative dual residual (`RelDual`: ratio 0, the primal-weight fallback) to 0 before the rule runs.
+    pub inject: Option<(u64, Inject)>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Inject {
+    Merit,
+    RelDual,
 }
 
 impl Default for PdhgOptions {
     fn default() -> Self {
-        PdhgOptions { iter_limit: f64::INFINITY, rel_tol: 1e-6, abs_tol: 1e-6, conv_tol: 1e-6, record_checks: false, seed: 0 }
+        PdhgOptions { iter_limit: f64::INFINITY, rel_tol: 1e-6, abs_tol: 1e-6, conv_tol: 1e-6, record_checks: false, seed: 0, inject: None }
     }
 }
 
@@ -216,6 +225,27 @@ fn finite_up(v: f64) -> f64 {
     }
 }
 
+/// A row side that is not the file's right-hand side: infinite from the model's own infinity (1e30).
+fn row_side(v: f64) -> f64 {
+    if v.abs() >= crate::model::INF {
+        v.signum() * f64::INFINITY
+    } else {
+        v
+    }
+}
+
+/// The sides of row `i` as the reference uses them. The right-hand side is used as written, even 1e20 or 1e30 or 1e100 (it enters ||b|| and the
+/// residuals; the reference never treats a row side as infinite); the other side of an L or G row is infinite unless a range makes it finite.
+fn row_sides(model: &LpModel, i: usize) -> (f64, f64) {
+    let ranged = model.row_range.get(i).is_some_and(|&r| r > 0.0);
+    match model.row_kind.get(i) {
+        Some(&b'L') => (if ranged { model.row_lo[i] } else { row_side(model.row_lo[i]) }, model.row_up[i]),
+        Some(&b'G') => (model.row_lo[i], if ranged { model.row_up[i] } else { row_side(model.row_up[i]) }),
+        Some(_) => (model.row_lo[i], model.row_up[i]),
+        None => (row_side(model.row_lo[i]), row_side(model.row_up[i])),
+    }
+}
+
 fn build(model: &LpModel) -> Internal {
     let n0 = model.num_cols();
     let m0 = model.num_rows();
@@ -228,7 +258,7 @@ fn build(model: &LpModel) -> Internal {
     // (internal row, sign, width) of the range columns, by original row
     let mut slack: Vec<Option<(usize, f64, f64)>> = vec![None; m0];
     for i in 0..m0 {
-        let (lo, up) = (finite_lo(model.row_lo[i]), finite_up(model.row_up[i]));
+        let (lo, up) = row_sides(model, i);
         if lo == f64::NEG_INFINITY && up == f64::INFINITY {
             continue;
         }
@@ -294,7 +324,7 @@ fn build(model: &LpModel) -> Internal {
     };
     for i in order {
         let (r, sg, w) = slack[i].unwrap();
-        cols.push(Col { ent: vec![(r, sg)], c: 0.0, lb: 0.0, ub: w });
+        cols.push(Col { ent: vec![(r, sg)], c: 0.0, lb: 0.0, ub: finite_up(w) });
     }
     Internal { m, cols, eq, neg, b, row_map, flip, norig: n0, sense, offset: sense * model.offset }
 }
@@ -418,7 +448,7 @@ impl Scaled {
                 *v *= f;
             }
         }
-        let b: Vec<f64> = (0..m).map(|i| r[i] * p.b[i]).collect();
+        let b: Vec<f64> = (0..m).map(|i| if p.b[i].abs() >= 1e30 { p.b[i] } else { r[i] * p.b[i] }).collect();
         let lb = (0..n).map(|j| if p.cols[j].lb > f64::NEG_INFINITY { p.cols[j].lb / c[j] } else { -BIG }).collect();
         let ub = (0..n).map(|j| if p.cols[j].ub < f64::INFINITY { p.cols[j].ub / c[j] } else { BIG }).collect();
         let cinv = c.iter().map(|v| 1.0 / v).collect();
@@ -721,7 +751,7 @@ fn trivial(model: &LpModel) -> PdhgResult {
         x.push(if v.is_finite() { v } else { 0.0 });
     }
     for i in 0..model.num_rows() {
-        let (lo, up) = (finite_lo(model.row_lo[i]), finite_up(model.row_up[i]));
+        let (lo, up) = (row_side(model.row_lo[i]), row_side(model.row_up[i]));
         if model.val.is_empty() && (0.0 < lo || 0.0 > up) {
             status = Status::Infeasible;
         }
@@ -853,9 +883,17 @@ pub fn solve(model: &LpModel, opts: &PdhgOptions) -> PdhgResult {
             st.k += 1;
             just_restarted = false;
             if chk || st.total as f64 >= opts.iter_limit {
-                let o = st.residual(false);
-                st.res = o;
+                let mut o = st.residual(false);
                 status = st.status(&o, opts);
+                if let (Some((at, what)), 1) = (opts.inject, status) {
+                    if st.n8 == at {
+                        match what {
+                            Inject::Merit => st.r = 0.0,
+                            Inject::RelDual => o.rel_d = 0.0,
+                        }
+                    }
+                }
+                st.res = o;
                 if opts.record_checks || dump::on("pdhg") {
                     let rule = if chk && status == 1 { st.restart_rule() } else { 0 };
                     let rec = serde_json::json!({"total": st.total, "n8": st.n8, "k": st.k, "status": status, "rule": rule, "eta": st.eta, "omega": st.omega,
