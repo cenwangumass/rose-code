@@ -1077,8 +1077,13 @@ impl<'a> Solver<'a> {
             if before.mode == 0 {
                 self.primal_full_work();
                 self.reduced_cost_work();
+                // The reduced-cost pass (`0x1021b0`) recomputes the nonbasic d sequentially in stored column order, not with the
+                // `pricing0` eight-lane kernel.
+                self.recompute_dual();
             }
             self.reset_weights();
+            self.sw.ratio_sum = 0.0;
+            self.sw.ratio_cnt = 1;
             self.list.clear();
             self.level = 0;
         }
@@ -4334,6 +4339,12 @@ pub fn solve(
         }
         s.w[leave] = (wq / alpha_rq) / alpha_rq;
         if m2 {
+            // `0x104b4d`: the error of the stored weight of the entering variable against the recomputed one, larger over smaller.
+            let ws = s.w[q];
+            s.sw.ratio_sum += if wq > ws { wq / ws } else { ws / wq };
+            s.sw.ratio_cnt += 1;
+        }
+        if m2 {
             // Mode 2: the leaving weight is floored at 1 and the pivot-row loop then reaches the leaving variable with its row product.
             let wl = s.w[leave].max(1.0);
             s.w[leave] = wl;
@@ -4442,7 +4453,13 @@ pub fn solve(
             s.p1_tol_on = s.has_infeasible_basic();
         }
         // The reference's pivot row also carries the entering column (`0x102d20`).
-        if norm_reset && opts.faithful_weights {
+        // Mode 2 restarts the weights when the average error exceeds 3 (`0x10882c`, before the list update).
+        let m2_reset = m2 && s.sw.ratio_sum / f64::from(s.sw.ratio_cnt) > 3.0;
+        if m2_reset {
+            s.sw.ratio_sum = 0.0;
+            s.sw.ratio_cnt = 1;
+        }
+        if (norm_reset && opts.faithful_weights) || m2_reset {
             // The reset sets the weights; the candidate list keeps its entries and level and takes the normal update.
             s.reset_weights();
             s.update_list(&changed, 1, 0x1442ab);

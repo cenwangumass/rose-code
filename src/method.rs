@@ -24,6 +24,10 @@ pub struct Method {
     pub pert: f64,
     /// The last `decide` found the perturbation due (`0xfb207..0xfb283`): the caller runs `Solver::perturb`.
     pub perturb_due: bool,
+    /// Mode 2's weight-error average (`ctx+0x408`, `ctx+0x410`): the sum of `max(wq / w_q, w_q / wq)` over the iterations since the weights
+    /// were initialised, and the count (starting at 1). The weights restart when the average exceeds 3 (`0x10882c`).
+    pub ratio_sum: f64,
+    pub ratio_cnt: u32,
 }
 
 /// What the decision reads from the factor and the model.
