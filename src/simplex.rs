@@ -3168,6 +3168,7 @@ pub(crate) fn repair_basis(p: &Internal, b: &mut Basis) -> Option<(usize, Vec<(u
         })
         .collect();
     crate::lu_order::reset_pair_gate();
+    crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
     crate::lu_order::set_factorization_number(1);
     let st = crate::lu_order::factor_structure(m, &cols);
     let piv = st.pivots.clone();
@@ -3316,6 +3317,7 @@ pub fn solve(
     if opts.faithful_ftran && opts.faithful_positions {
         // The reference factorizes the starting basis before the first iteration and numbers the positions by pivot step.
         crate::lu_order::reset_pair_gate();
+        crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
         let (order, st, rows) = s.reference_order(1);
         for (pos, &j) in order.iter().enumerate() {
             s.pos_of[j] = pos;

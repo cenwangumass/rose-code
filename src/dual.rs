@@ -2685,6 +2685,7 @@ pub fn solve(
     };
     basis.validate(n, m).map_err(SolveError::InvalidBasis)?;
     crate::lu_order::reset_pair_gate();
+    crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
     let (order, stc, rows) = reference_order(&p, &basis.basic, 1);
     let mirror = RefStruct::fresh(m, n, &stc, &rows);
     let cols: Vec<&Column> = order.iter().map(|&j| &p.cols[j]).collect();

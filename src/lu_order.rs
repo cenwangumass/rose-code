@@ -430,6 +430,13 @@ thread_local! {
     /// factorizations including the running one.
     static PAIR_GATE: std::cell::Cell<(i64, i64)> = std::cell::Cell::new((0, 0));
     static FAC_NO: std::cell::Cell<i64> = std::cell::Cell::new(1);
+    /// The model's columns and constraint nonzeros, which size the reference's pool (`pool_cap`).
+    static POOL_DIMS: std::cell::Cell<(usize, usize)> = std::cell::Cell::new((0, 0));
+}
+
+/// Sets the model's column count and constraint nonzeros for the pool capacity; call it with `reset_pair_gate`.
+pub fn set_pool_dims(n: usize, nnz_a: usize) {
+    POOL_DIMS.with(|c| c.set((n, nnz_a)));
 }
 
 /// Start of a solve: the gate word starts at 0 (parameter `[env+0x2450]` neither 0 nor 1; `0x2f7e1+0x4e7`), no attempts.
@@ -973,21 +980,50 @@ fn search(s: &mut Nucleus) -> Option<(usize, f64)> {
     best.map(|b| (b, count as f64 * last_bound))
 }
 
-/// The fill of the reference's double pool at the start of the factorization (`0xd4190`): twice the row count times the smaller of
-/// `m/2 + 2` and a power of the average column length. The nucleus nodes take 4 doubles per entry after it, so the dense work array
+/// The reference's `g` of the pool formulas: `d` raised to a power that grows with the row or column count `cnt`.
+fn pool_g(d: f64, cnt: usize) -> f64 {
+    if cnt < 500 {
+        d * d
+    } else if cnt < 3000 {
+        d * d.sqrt()
+    } else if cnt < 10000 {
+        d * d.sqrt().sqrt()
+    } else {
+        d
+    }
+}
+
+/// Capacity in doubles of the reference's pool (`0xe3130`, the factor object's constructor, stored at `+0x158`), from the model's rows `a`,
+/// columns `b` and constraint nonzeros `nz` (parameter `[+0x50] = 5`, parameter `[+0x44]` = 0): `trunc(0.75 E) + 1`. Verified on 10 models
+/// (a < 3000 and b < 3000 only; larger sizes follow `pool_g` and are untested).
+fn pool_cap(a: usize, b: usize, nz: usize) -> usize {
+    let (af, bf, nzf) = (a as f64, b as f64, nz as f64);
+    let k = 5.0;
+    let x6 = if a < b {
+        ((a / 2 + 2) as f64).min(pool_g(nzf / bf, a)) * af
+    } else {
+        0.5 * nzf + ((b / 2) as f64).min(pool_g(nzf / af, b)) * bf
+    };
+    let r8 = (x6 as i64 + 1) as f64;
+    let e = if nzf > 10.0 * bf {
+        r8 * 6.0 + af * 30.0 * k
+    } else if a < b {
+        r8 * 6.0 + af * 3.0 * nzf * k / bf
+    } else {
+        r8 * 6.0 + af * 3.0 * (af + nzf) * k / (af + bf + 1.0)
+    };
+    (e * 0.75) as usize + 1
+}
+
+/// The fill of the reference's double pool at the start of the factorization (`0xd4190`, `0xd4508`): `max(cap / 5, 2 min(m/2 + 2, g) m)`
+/// with `cap` the pool capacity (`pool_cap`). The nucleus nodes take 4 doubles per entry after it, so the dense work array
 /// starts at an odd or even double by this parity, which fixes how its vectorised dot products peel (row strides are in doubles).
 fn pool_fill(m: usize, nnz_b: usize) -> usize {
     let avg = nnz_b as f64 / m as f64;
-    let g = if m < 500 {
-        avg * avg
-    } else if m < 3000 {
-        avg * avg.sqrt()
-    } else if m < 10000 {
-        avg * avg.sqrt().sqrt()
-    } else {
-        avg
-    };
-    (2.0 * ((m / 2 + 2) as f64).min(g) * m as f64) as usize
+    let g = pool_g(avg, m);
+    let (n, nz) = POOL_DIMS.with(|c| c.get());
+    let from_cap = (pool_cap(m, n, nz) / 5) as f64;
+    from_cap.max(2.0 * ((m / 2 + 2) as f64).min(g) * m as f64) as usize
 }
 
 fn dot_lanes<const W: usize>(mut acc: f64, a: &[f64], b: &[f64], peel: usize) -> f64 {
