@@ -1930,6 +1930,11 @@ pub trait NormalSolver {
         0
     }
 
+    /// `Q+0x790 / 0x798` of the last [`NormalSolver::solve_raw`]: the norms of its refinement residual.
+    fn raw_norms(&self) -> (f64, f64) {
+        (0.0, 0.0)
+    }
+
     /// The plain solve `(dx, dy)` for `rx` over the variables and `ry` over the rows (`0x305f10`; the homogeneous algorithm's solve with `(c, b)`).
     fn solve_raw(
         &mut self,
@@ -2284,6 +2289,8 @@ pub struct BarrierRun {
     pub status: BarrierStatus,
     pub iterations: i32,
     pub state: State,
+    /// `Q+0x690` at the end: the homogeneous scale of the iterate (1 unless the homogeneous algorithm ran).
+    pub tau: f64,
     pub records: Vec<IterRecord>,
 }
 
@@ -2394,8 +2401,11 @@ struct Hist {
     z2: f64,
 }
 
-/// The second solve of the homogeneous algorithm (`0x3117e0`: `(c, b)`) and `den = kappa / tau + b'dy_s - c'dx_s`.
+/// The second solve of the homogeneous algorithm (`0x3117e0`: `(c, b)`, with `c_j - v_j ub_j / u_j` on the upper-bounded columns) and
+/// `den = (kappa / tau + b'dy_s) - c'dx_s`, plus `((v ub) (ub - dx_s)) / u` per upper-bounded column.
 struct Hsd {
+    /// `Q+0x790 / 0x798`.
+    norms: (f64, f64),
     cx: Vec<f64>,
     dxs: Vec<f64>,
     dys: Vec<f64>,
@@ -2403,8 +2413,44 @@ struct Hsd {
 }
 
 impl Hsd {
-    /// `0x30fc90` with kappa > 0: `num = ((G - b'dy) + c'dx) + Rk / tau`, `dtau = num / den`, `dx += dtau dx_s`, `dy += dtau dy_s`, `dz = (rcx - z dx) / x`
-    /// again; returns `(dtau, dkappa = (Rk - dtau kappa) / tau)`.
+    /// The second solve (`0x3117e0`): `rx = c` over the columns, 0 over the slacks, minus `(v ub) / u` on the upper-bounded columns; `ry = b`.
+    fn solve(
+        f: &StdForm,
+        s: &State,
+        solver: &mut dyn NormalSolver,
+        kappa: f64,
+        tau: f64,
+    ) -> Result<Hsd, BarrierError> {
+        let (m, n) = (f.m, f.n());
+        let mut cx = f.c.clone();
+        cx.resize(n, 0.0);
+        let mut rxs = cx.clone();
+        for j in f.ub_lo..f.ub_hi {
+            if f.flags[j] & 2 != 0 {
+                rxs[j] = rxs[j] - (s.v[j] * f.ub[j]) / s.u[j];
+            }
+        }
+        let (dxs, dys) = solver.solve_raw(f, &rxs, &f.b)?;
+        let mut den =
+            ((kappa / tau) + dot_lanes(&f.b[..m], &dys[..m], 0)) - dot_lanes(&cx, &dxs, 0);
+        // `0x3107ea`: the upper-bounded columns add `((v ub) (ub - dx_s)) / u`.
+        for j in f.ub_lo..f.ub_hi {
+            if f.flags[j] & 2 != 0 {
+                den = den + ((s.v[j] * f.ub[j]) * (f.ub[j] - dxs[j])) / s.u[j];
+            }
+        }
+        Ok(Hsd {
+            norms: solver.raw_norms(),
+            cx,
+            dxs,
+            dys,
+            den,
+        })
+    }
+
+    /// `0x30fc90` with kappa > 0: `num = ((G - b'dy) + c'dx) + Rk / tau` plus `(((rcu - (ru - dx) v) ub) / u` per upper-bounded column, `dtau = num / den`
+    /// (0 when `|den| <= 1e-30`), `dx += dtau dx_s`, `dy += dtau dy_s`, `du = (ru - dx) + dtau ub`, `dv = (rcu - v du) / u`, `dz = (rcx - z dx) / x` again;
+    /// returns `(dtau, dkappa = (Rk - dtau kappa) / tau)`.
     fn apply(
         &self,
         f: &StdForm,
@@ -2417,15 +2463,35 @@ impl Hsd {
         kappa: f64,
     ) -> (f64, f64) {
         let (m, n) = (f.m, f.n());
-        let num =
+        let mut num =
             ((g - dot_lanes(&f.b[..m], &d.dy[..m], 0)) + dot_lanes(&self.cx, &d.dx, 0)) + rk / tau;
-        let dtau = num / self.den;
+        for j in f.ub_lo..f.ub_hi {
+            if f.flags[j] & 2 != 0 {
+                let du1 = rhs.ru[j] - d.dx[j];
+                num = num + ((rhs.rcu[j] - du1 * s.v[j]) * f.ub[j]) / s.u[j];
+            }
+        }
+        let dtau = if self.den.abs() <= 1e-30 {
+            0.0
+        } else {
+            num / self.den
+        };
         let dkap = (rk - dtau * kappa) / tau;
         for j in 0..n {
             d.dx[j] = d.dx[j] + dtau * self.dxs[j];
         }
         for i in 0..m {
             d.dy[i] = d.dy[i] + dtau * self.dys[i];
+        }
+        for j in f.ub_lo..f.ub_hi {
+            if f.flags[j] & 2 != 0 {
+                let du = (rhs.ru[j] - d.dx[j]) + dtau * f.ub[j];
+                d.du[j] = du;
+                d.dv[j] = (rhs.rcu[j] - s.v[j] * du) / s.u[j];
+            } else {
+                d.du[j] = 0.0;
+                d.dv[j] = 0.0;
+            }
         }
         for j in 0..n {
             if f.flags[j] & 1 != 0 {
@@ -2762,6 +2828,7 @@ pub fn run<S: NormalSolver>(
                 status,
                 iterations: it,
                 state: st,
+                tau,
                 records,
             });
         }
@@ -2771,11 +2838,12 @@ pub fn run<S: NormalSolver>(
         if q2c && kappa == 0.0 {
             // `0x2ebf20` (homogeneous start after restart A): tau = 1, kappa = max(c'x - b'y + v.ub, 1) and sqrt(kappa mu) when mu > 0, one more
             // complementarity term (`Q+0x210`), `0x2ecde0` again.
-            if f.has_ub() {
-                return unsupported("the homogeneous algorithm with upper-bounded columns");
-            }
             tau = 1.0;
-            let g = dot_lanes(&f.c[..n2], &st.x[..n2], 0) - dot_lanes(&f.b[..m], &st.y[..m], 0);
+            // `0x2ec0b7..0x2ec16d`: `((c'x - b'y) + v.ub over [lo, hi))`.
+            let mut g = dot_lanes(&f.c[..n2], &st.x[..n2], 0) - dot_lanes(&f.b[..m], &st.y[..m], 0);
+            if f.ub_hi > f.ub_lo {
+                g = g + dot_lanes(&st.v[f.ub_lo..f.ub_hi], &f.ub[f.ub_lo..f.ub_hi], f.ub_lo);
+            }
             kappa = g.max(1.0);
             if res.q1f0 > 0.0 {
                 kappa = (kappa * res.q1f0).sqrt();
@@ -2835,12 +2903,7 @@ pub fn run<S: NormalSolver>(
         let mut hq = (0.0f64, 0.0f64);
         let mut hs: Option<Hsd> = None;
         if hsd {
-            let mut cx = f.c.clone();
-            cx.resize(n, 0.0);
-            let (dxs, dys) = solver.solve_raw(f, &cx, &f.b)?;
-            let den =
-                ((kappa / tau) + dot_lanes(&f.b[..m], &dys[..m], 0)) - dot_lanes(&cx, &dxs, 0);
-            let hd = Hsd { cx, dxs, dys, den };
+            let hd = Hsd::solve(f, &st, solver, kappa, tau)?;
             hq = hd.apply(
                 f,
                 &st,
@@ -2851,6 +2914,9 @@ pub fn run<S: NormalSolver>(
                 tau,
                 kappa,
             );
+            // `0x310fba`: the residual norms of the direction grow by those of the second solve times `dtau`.
+            q770 = hd.norms.0 * hq.0 + q770;
+            q780 = hd.norms.1 * hq.0 + q780;
             hs = Some(hd);
         }
         let tkp: Vec<(f64, f64, f64)> = if hsd {
@@ -2906,7 +2972,7 @@ pub fn run<S: NormalSolver>(
                 if k > 1 { Some((tp0, td0)) } else { None },
             );
             let mut corr = solver.direction(f, &st, DirKind::Corrector, &rhs2)?;
-            let (q778, q788) = solver.norms();
+            let (mut q778, mut q788) = solver.norms();
             let mut tks: Vec<(f64, f64, f64)> = Vec::new();
             if let Some(hd) = &hs {
                 hc = hd.apply(
@@ -2919,6 +2985,8 @@ pub fn run<S: NormalSolver>(
                     tau,
                     kappa,
                 );
+                q778 = hd.norms.0 * hc.0 + q778;
+                q788 = hd.norms.1 * hc.0 + q788;
                 tks = vec![(tau, hq.0, hc.0), (kappa, hq.1, hc.1)];
             }
             (tp, td, wp, wd) = select(f, &st, &dirk, &corr, tp0, td0, ntry, &tks, k);
@@ -3110,28 +3178,35 @@ pub struct Solution {
 }
 
 pub fn solution(f: &StdForm, run: BarrierRun) -> Solution {
+    // The homogeneous algorithm's iterate is `tau` times the solution: x, y, z, v are multiplied by `1 / tau` first.
+    let itau = if run.tau != 1.0 {
+        Some(1.0 / run.tau)
+    } else {
+        None
+    };
+    let sc = |t: f64| itau.map_or(t, |i| t * i);
     let x: Vec<f64> = (0..f.n2)
         .map(|j| {
             if f.lower[j] != 0.0 {
-                run.state.x[j] + f.lower[j]
+                sc(run.state.x[j]) + f.lower[j]
             } else {
-                run.state.x[j]
+                sc(run.state.x[j])
             }
         })
         .collect();
     let last = run.records.last().unwrap();
     let mut y = vec![0.0; f.m];
     for k in 0..f.m {
-        y[f.row_of[k]] = run.state.y[k] * if f.sense[k] == b'>' { -1.0 } else { 1.0 };
+        y[f.row_of[k]] = sc(run.state.y[k]) * if f.sense[k] == b'>' { -1.0 } else { 1.0 };
     }
     let mut rc: Vec<f64> = (0..f.n2)
         .map(|j| {
             (if f.flags[j] & 1 != 0 {
-                run.state.z[j]
+                sc(run.state.z[j])
             } else {
                 0.0
             }) - (if f.flags[j] & 2 != 0 {
-                run.state.v[j]
+                sc(run.state.v[j])
             } else {
                 0.0
             })

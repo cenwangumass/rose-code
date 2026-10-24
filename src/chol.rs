@@ -1677,6 +1677,8 @@ pub struct CholSolver {
     fzx: Option<Vec<f64>>,
     /// `Q+0x770 / 0x780` of the last direction: the norms of its residual.
     norms: (f64, f64),
+    /// `Q+0x790 / 0x798`: the norms of the residual of the homogeneous algorithm's second solve.
+    raw_norms: (f64, f64),
     /// `NZ` and `S` of the symbolic factor (work model of the release profile) and the correction solves of the refinement since the last query.
     nz_s: (f64, f64),
     extra: std::cell::Cell<usize>,
@@ -1697,6 +1699,7 @@ impl CholSolver {
             thr: 0.0,
             fzx: None,
             norms: (0.0, 0.0),
+            raw_norms: (0.0, 0.0),
             nz_s: (sym.nz as f64, sym_rho_s(f, sym).1),
             extra: std::cell::Cell::new(0),
         }
@@ -1960,7 +1963,22 @@ impl NormalSolver for CholSolver {
         rx: &[f64],
         ry: &[f64],
     ) -> Result<(Vec<f64>, Vec<f64>), BarrierError> {
-        Ok(self.solve(f, rx, ry))
+        // `0x3117e0`: the same refinement as the direction solves (`0x311d70`), norms to `Q+0x790 / 0x798`; its correction solves are not charged.
+        let (mut dx, mut dy) = self.solve(f, rx, ry);
+        self.raw_norms = (0.0, 0.0);
+        if self.refining(f) {
+            let extra = self.extra.get();
+            let (a, b, nr, nc) = self.refine(f, rx, ry, dx, dy);
+            self.extra.set(extra);
+            dx = a;
+            dy = b;
+            self.raw_norms = (nr, nc);
+        }
+        Ok((dx, dy))
+    }
+
+    fn raw_norms(&self) -> (f64, f64) {
+        self.raw_norms
     }
 }
 

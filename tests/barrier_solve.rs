@@ -170,6 +170,13 @@ fn maximization_doubled_ranges_and_homogeneous_statuses_match_reference_bitwise(
         include_str!("fixtures/fx_unbounded.mps"),
         BarrierStatus::Other(5),
     );
+    // Restart A with an upper-bounded column: the homogeneous algorithm's du / dv terms (status 5 after 17 iterations).
+    check_solve(
+        &fx,
+        "fx_bar_ubhsd",
+        include_str!("fixtures/fx_bar_ubhsd.mps"),
+        BarrierStatus::Other(5),
+    );
     check_solve(
         &fx,
         "fx_infeasible",
@@ -200,6 +207,21 @@ fn fit2p_matches_reference_bitwise_when_the_corpus_is_present() {
     let fx: Value =
         serde_json::from_str(include_str!("fixtures/barrier-solve-controlled.json")).unwrap();
     check_whole_solve(&fx, "fit2p", &text);
+}
+
+/// GREENBEA, from the analysis repository's corpus (skipped where it is absent): restart A at iteration 73, then the homogeneous algorithm with upper-bounded
+/// columns, refinement of both solves and the read-out divided by tau (128 iterations).
+#[test]
+fn greenbea_matches_reference_bitwise_when_the_corpus_is_present() {
+    let Ok(text) = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../reverse-engineer/corpus/netlib/mps/greenbea.mps"
+    )) else {
+        return;
+    };
+    let fx: Value =
+        serde_json::from_str(include_str!("fixtures/barrier-solve-controlled.json")).unwrap();
+    check_whole_solve(&fx, "greenbea", &text);
 }
 
 /// The public entry point: `Method::Barrier` returns the same solution in the `SolveResult` fields.
