@@ -642,7 +642,7 @@ fn dgemm_t_n(
     }
 }
 
-const TRSM_LL0_MIN: usize = 13; // m >= 13 and m % 12 != 4 use dtrsm_kernel_ll_0
+const TRSM_LL0_MIN: usize = 13; // m >= 13, except m % 4 == 0 && m <= 88 (dtrsm_left_ker): dtrsm_kernel_ll_0
 const TRSM_LL0_BLOCK: usize = 12;
 
 /// DTRSM with a single right-hand-side column (`n == 1`) is routed by `mkl_blas_dtrsm` to `mkl_blas_avx2_dtrsv_utu` (0x1ced5b0, incx = 1):
@@ -752,7 +752,7 @@ fn dtrsv_utu_unit(l: &[f64], w: usize, b: &[f64]) -> Vec<f64> {
 }
 
 /// DTRSM('L','U','T','U') on right-hand-side column `col` of `n` (B has ldb = w), `A = L` the unit lower triangle of the row-major `w x w` block:
-/// the solution column `L^-1 b`. `w >= 13` and `w % 12 != 4`: `dtrsm_kernel_ll_0` (rows 0..11 an fnma chain from b; then tiles of 12, 4, 2, 1 rows
+/// the solution column `L^-1 b`. `w >= 13` unless `w % 4 == 0 && w <= 88`: `dtrsm_kernel_ll_0` (rows 0..11 an fnma chain from b; then tiles of 12, 4, 2, 1 rows
 /// whose update from all solved rows is an fma accumulator from 0 (structure per tile and column kernel), `x_i = b_i + u_i`, then the in-tile chain).
 /// Smaller `w`: `mkl_blas_avx2_dtrsm_left` (`dtrsm_left_ker`, see the three branches).
 fn dtrsm_llu_col(l: &[f64], w: usize, b: &[f64], col: usize, n: usize) -> Vec<f64> {
@@ -760,7 +760,7 @@ fn dtrsm_llu_col(l: &[f64], w: usize, b: &[f64], col: usize, n: usize) -> Vec<f6
         return dtrsv_utu_unit(l, w, b);
     }
     let mut x = b.to_vec();
-    if w >= TRSM_LL0_MIN && w % 12 != 4 {
+    if w >= TRSM_LL0_MIN && !(w % 4 == 0 && w <= 88) {
         let ck = col_kernel(n, col);
         for i in 0..TRSM_LL0_BLOCK {
             let mut v = x[i];
