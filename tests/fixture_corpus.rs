@@ -230,3 +230,44 @@ fn fixtures_under_the_dual_method_are_correct() {
         }
     }
 }
+
+/// Infeasible Netlib models (`netlib.org/lp/infeas`): every simplex profile ends `Infeasible` with a certificate that `verify::check` accepts
+/// (the primal release profile once ended `Optimal` here). In the primal controlled profile a certificate that uses an inequality row has the reference's
+/// signs (`y >= 0` on a row with only a lower side), as the reference's `FarkasDual` of `inf_galenet` ([0, 0, 0, 0, 1, 0, 1, 1]) does.
+#[test]
+fn infeasible_models_end_infeasible_in_every_simplex_profile() {
+    for name in ["inf_galenet", "inf_itest6", "fx_infeasible"] {
+        let path = format!("{}/tests/fixtures/{name}.mps", env!("CARGO_MANIFEST_DIR"));
+        let m = match std::fs::read_to_string(&path) {
+            Ok(t) => mps::parse(&t).unwrap(),
+            Err(_) => fixture(name).unwrap(),
+        };
+        for (profile, o) in [
+            ("primal", SolveOptions::default()),
+            ("primal release", SolveOptions::release()),
+            ("dual", SolveOptions::dual()),
+            ("dual release", SolveOptions::dual_release()),
+        ] {
+            let r = solve(&m, None, &o).unwrap();
+            assert_eq!(r.status, Status::Infeasible, "{name} {profile}");
+            assert!(
+                rose::verify::check(&m, &r, 1e-6).is_ok(),
+                "{name} {profile}"
+            );
+        }
+    }
+    let m = mps::parse(
+        &std::fs::read_to_string(format!(
+            "{}/tests/fixtures/inf_galenet.mps",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap(),
+    )
+    .unwrap();
+    let y = solve(&m, None, &SolveOptions::default())
+        .unwrap()
+        .farkas
+        .unwrap();
+    assert_eq!(y.len(), 8);
+    assert!(y[4] > 0.0 && y[6] > 0.0 && y[7] > 0.0, "{y:?}");
+}

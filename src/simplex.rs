@@ -3584,7 +3584,22 @@ pub fn solve(
                             continue;
                         }
                     }
-                    break Status::Optimal;
+                    if infeasible && s.has_infeasible_basic() {
+                        // The scan found no improving column in phase 1 on a basis that is still infeasible: the pure sum of infeasibilities
+                        // either continues the search or proves infeasibility with the multipliers as certificate (as without the scan).
+                        let y = s.composite_dual(true);
+                        s.list.clear();
+                        s.level = 0;
+                        match s.price_admitting() {
+                            Some(q) => q,
+                            None => {
+                                farkas = Some(y.iter().map(|v| -v).collect());
+                                break Status::Infeasible;
+                            }
+                        }
+                    } else {
+                        break Status::Optimal;
+                    }
                 }
             }
         };
@@ -4432,6 +4447,23 @@ pub fn solve(
     }
     let nm = model.num_cols();
     let x: Vec<f64> = s.x[..nm].to_vec();
+    // The reference's primal (controlled profile) returns a certificate that uses an inequality row in its own convention (`verify::farkas_margins`:
+    // `y >= 0` on rows with only a lower side, `<= 0` on rows with only an upper side); with equality rows only, as in the release profile and
+    // the dual method, the opposite signs.
+    let farkas = farkas.map(|y| {
+        let one_sided = (0..model.num_rows())
+            .any(|i| y[i] != 0.0 && (is_inf(model.row_lo[i]) || is_inf(model.row_up[i])));
+        let neg: Vec<f64> = y.iter().map(|v| -v).collect();
+        let (a, a_neg) = (
+            crate::verify::farkas_margins(model, &y).0,
+            crate::verify::farkas_margins(model, &neg).0,
+        );
+        if !opts.pricing0 && one_sided && a_neg > 0.0 && a_neg > a {
+            neg
+        } else {
+            y
+        }
+    });
     Ok(SolveResult {
         status,
         objective: model.objective(&x),

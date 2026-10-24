@@ -106,9 +106,17 @@ pub fn check_optimal(model: &LpModel, r: &SolveResult) -> Report {
 /// Margin by which `y` proves infeasibility: positive if `y'A x` over the column box cannot meet `y'r` over the
 /// row ranges. The multipliers are scaled to unit max-norm first.
 pub fn farkas_margin(model: &LpModel, y: &[f64]) -> f64 {
+    let (a, b) = farkas_margins(model, y);
+    a.max(b)
+}
+
+/// The two forms of `farkas_margin`: `(a, b)` with `a` = the row side from below exceeds the column side from above (`y'r > y'Ax`, the reference's
+/// `FarkasDual` convention: `y >= 0` on rows with only a lower side, `<= 0` on rows with only an upper side) and `b` = the column side from below
+/// exceeds the row side from above (the opposite signs, which rose's primal and the dual method return).
+pub fn farkas_margins(model: &LpModel, y: &[f64]) -> (f64, f64) {
     let scale = y.iter().fold(0.0f64, |a, v| a.max(v.abs()));
     if scale == 0.0 {
-        return 0.0;
+        return (0.0, 0.0);
     }
     let y: Vec<f64> = y.iter().map(|v| v / scale).collect();
     let (mut gl, mut gu) = (0.0f64, 0.0f64);
@@ -153,7 +161,7 @@ pub fn farkas_margin(model: &LpModel, y: &[f64]) -> f64 {
             ru = INF
         }
     }
-    (gl - ru).max(rl - gu)
+    (rl - gu, gl - ru)
 }
 
 /// Margin of an unbounded-ray certificate: `Some(-c'r)` (positive means the objective improves along the ray) if
