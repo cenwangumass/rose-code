@@ -2539,8 +2539,12 @@ impl<'a> Dual<'a> {
             }
             // A leaving variable that becomes fixed keeps the true reduced cost, not the frame value.
             // The leaving variable is in the reference's row with the coefficient 1, so its stored d (0 up to the noise of the last recompute) takes the step too.
+            // `0xe45c0` (`0xe47c7..0xe47ff`): the leaving variable is the row entry with coefficient +1 (leaving below) or -1 (above, the row is negated);
+            // a status -2 (at the upper bound) variable then has its d negated, so for it d = -(old - theta') with theta' = -theta (GROW7 release call 311).
             self.d[pv.leave] = if self.st[pv.leave] == FIXED && pv.above {
                 theta
+            } else if self.st[pv.leave] == UB {
+                -(old_leave + -1.0 * -theta)
             } else {
                 old_leave - theta
             };
@@ -2562,6 +2566,11 @@ impl<'a> Dual<'a> {
             self.prog_on = self.level == 0;
             self.recompute_flags(level_before != 0, pv.is_some());
             self.flags_work();
+            // The recompute pass `0xbf5b0` (called from `0xf6d0f`) runs the no-leaving-row handler itself when the pricing is in the list-walk mode
+            // (`P+0x40 == 0`) and the list is empty (`P+0x3c == 0`, `0xbffbe`): no pricing call follows (RECIPE call 46).
+            if !self.value_mode && self.list.is_empty() && self.status.is_none() {
+                self.no_row();
+            }
         } else if let Some(pv) = pv {
             self.work
                 .add(0xc0410, 3.0 * pv.col.len() as f64, crate::work::CTX);
@@ -2950,26 +2959,28 @@ pub fn solve(
                 if s.request != 3 {
                     s.no_row();
                 }
-                if let Some(stt) = s.status {
-                    status = stt;
-                    if stt == Status::Optimal && s.pert != 0 {
-                        // The end of the dual with the cost shifts in force (`ctx+0x338` != 0, `0xf7033`): the shifts are removed (status -1004) and the primal
-                        // clean-up starts with a factorization (`0x142350` from `0xe3ee1`), the reference's last one.
-                        s.cost.clone_from(&p.cost);
-                        s.obj_off = 0.0;
-                        s.pert = 0;
-                        s.refactor()?;
-                        s.recompute_xb(0);
-                    }
-                    break;
+                if s.status.is_none() {
+                    s.post(None, false)?;
                 }
-                s.post(None, false)?;
             }
             Step::Unbounded(y) => {
                 status = Status::Infeasible;
                 farkas = Some(y);
                 break;
             }
+        }
+        if let Some(stt) = s.status {
+            status = stt;
+            if stt == Status::Optimal && s.pert != 0 {
+                // The end of the dual with the cost shifts in force (`ctx+0x338` != 0, `0xf7033`): the shifts are removed (status -1004) and the primal
+                // clean-up starts with a factorization (`0x142350` from `0xe3ee1`), the reference's last one.
+                s.cost.clone_from(&p.cost);
+                s.obj_off = 0.0;
+                s.pert = 0;
+                s.refactor()?;
+                s.recompute_xb(0);
+            }
+            break;
         }
     }
     if status == Status::Optimal && dropped.is_some() {
