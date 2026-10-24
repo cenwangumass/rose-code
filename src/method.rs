@@ -62,7 +62,7 @@ impl Method {
     }
 
     /// The decision after a factorization (`0x142500`, the work-based branch for the default parameters; state 10 or 2): `true` enters Devex
-    /// pricing (mode 1 or 2; the weights are initialised again). Afterwards the snapshot of the pricing driver (`0xfb207`) is taken on odd factorization counts.
+    /// pricing (mode 1 or 2; the weights are initialised again). Afterwards the snapshot of the pricing driver (`0xfb207`) is taken when the factorization count mod (level + 2) is 1.
     pub fn decide(&mut self, inp: &Inputs) -> bool {
         self.factorizations += 1;
         let (a, b) = (self.iters, self.snap_iters);
@@ -98,7 +98,7 @@ impl Method {
             }
         }
         self.perturb_due = false;
-        if self.factorizations % 2 == 1 && self.factorizations % (self.level + 2) == 1 {
+        if self.factorizations % (self.level + 2) == 1 {
             // The pricing driver (`0xfb207`) perturbs when the degenerate iterations since the snapshot exceed 0.9 of all of them.
             if self.pert > 0.0 && f64::from(self.degenerate - self.snap_degenerate) > (a - b) * 0.9
             {
