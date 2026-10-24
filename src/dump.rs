@@ -35,6 +35,7 @@ pub const KINDS: &[(&str, &str, &str)] = &[
     ("pdhg", "PDHG", "PDHG: the state at each residual test (every 100th iteration, and the iteration-limit exit): counters, eta, omega, merit R, the residual scalars and the status"),
     ("barrier_struct", "PAT", "barrier setup structure (`examples/barrier_struct`): records PAT (AA' pattern), SYMIN (n1, dense count), ORDIN (level flags), ORD, ORDFIX, SYM, and BSTRUCT (status: `unsupported` names an undecoded routine)"),
     ("barrier", "BARRIER", "barrier iteration (`examples/barrier_replay`): per iteration the state at its start (x, z, y, u, v, mu, objectives, max residuals), the predictor steps ap/ad, mu_aff, target, the selected steps tp/td with their weights, gamma and the termination code"),
+    ("barrier_adapt", "AD", "release barrier: per iteration the work-window totals (`w138` factor, `w130` predictor, `w148` first corrector, `w140` later correctors, `w128` update), the ratio, the mean step product, the corrector limit before and after, and the trial weights of the next iteration (shaped like `replay/gdb_barrier_adapt.py`)"),
     ("barrier_factor", "FSN", "barrier numeric factor (`crate::chol`), per factor f (0 = starting point, then one per iteration) and supernode in column order: FSN (f, col, w, c, row list) and FOUT (f, col, packed factor values, pivots), shaped like the captures of `replay/gdb_barrier_chol.py`; `compare.py chol --rose`"),
     ("fillparts", "FILLP", "per factor update: pool fill on entry, eta size, new column entries added, and the row growths (row, cnt, cap, extra)"),
 ];

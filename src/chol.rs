@@ -1963,13 +1963,11 @@ impl NormalSolver for CholSolver {
         rx: &[f64],
         ry: &[f64],
     ) -> Result<(Vec<f64>, Vec<f64>), BarrierError> {
-        // `0x3117e0`: the same refinement as the direction solves (`0x311d70`), norms to `Q+0x790 / 0x798`; its correction solves are not charged.
+        // `0x3117e0`: the same refinement as the direction solves (`0x311d70`), norms to `Q+0x790 / 0x798`; the correction solves count in `take_extra_solves`.
         let (mut dx, mut dy) = self.solve(f, rx, ry);
         self.raw_norms = (0.0, 0.0);
         if self.refining(f) {
-            let extra = self.extra.get();
             let (a, b, nr, nc) = self.refine(f, rx, ry, dx, dy);
-            self.extra.set(extra);
             dx = a;
             dy = b;
             self.raw_norms = (nr, nc);

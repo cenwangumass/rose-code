@@ -1090,6 +1090,7 @@ fn select(
     ad0: f64,
     ntry: usize,
     tk: &[(f64, f64, f64)],
+    tkd: &[(f64, f64, f64)],
     k: usize,
 ) -> (f64, f64, f64, f64) {
     // `0x30ed95`: for a corrector k > 1 the smallest weight is 0 (the last trial keeps the steps so far).
@@ -1109,7 +1110,7 @@ fn select(
         let (ap, ad) = if w != 0.0 {
             (
                 step_pair(f, s, d, Some((d2, w)), true, tk),
-                step_pair(f, s, d, Some((d2, w)), false, tk),
+                step_pair(f, s, d, Some((d2, w)), false, tkd),
             )
         } else {
             (ap0, ad0)
@@ -2288,7 +2289,11 @@ pub struct IterRecord {
 pub struct BarrierRun {
     pub status: BarrierStatus,
     pub iterations: i32,
+    /// The returned iterate (`Q+0xc8..0xe0`, saved by `0x2e39b0`): `x`, `y`, `z`, `v` multiplied by `1 / tau` of the iteration they come from (the last one
+    /// for an optimal or unbounded end, else the best one). `u` is not saved.
     pub state: State,
+    /// Objective `Q+0x130` of the returned iterate.
+    pub objective: f64,
     /// `Q+0x690` at the end: the homogeneous scale of the iterate (1 unless the homogeneous algorithm ran).
     pub tau: f64,
     pub records: Vec<IterRecord>,
@@ -2339,6 +2344,7 @@ fn term_input(
     best_dual: f64,
     q5: (f64, f64),
     tk: (f64, f64),
+    qf: (i32, i32),
 ) -> TermIn {
     TermIn {
         it,
@@ -2363,8 +2369,8 @@ fn term_input(
         q1b0: res.q1b0,
         q1c0: res.q1c0,
         q1d0: 0.0,
-        q220: h.x2,
-        q228: h.z2,
+        q220: h.nrm.x2,
+        q228: h.nrm.y2,
         q160: sc.q160,
         q170: sc.q170,
         q260: sc.q260,
@@ -2374,10 +2380,10 @@ fn term_input(
         q2a0: 0,
         q5e0: q5.0,
         q5e8: q5.1,
-        i88: it,
-        if8: 0,
-        ia8: it,
-        if4: it,
+        i88: h.q88,
+        if8: qf.1,
+        ia8: h.qa8,
+        if4: qf.0,
         p2dd4: false,
         p2460: 1e-6,
         p2bbc: o.max_iter,
@@ -2390,15 +2396,151 @@ fn term_input(
     }
 }
 
-#[derive(Default)]
+/// Norms of the updated iterate (`Q+0x220..0x240`, written by `0x30d3e0` before the dual iterate is rescaled): `x.x`, `y.y`, `z.z`, `max |x|`, `max |z|`.
+#[derive(Default, Clone, Copy)]
+struct Norms {
+    x2: f64,
+    y2: f64,
+    z2: f64,
+    xinf: f64,
+    zinf: f64,
+}
+
+/// The iterate saved by `0x2e39b0` (`Q+0xc8..0xe0`): `x`, `y`, `z`, `v` multiplied by `1 / tau`, and the iteration it comes from.
+struct Saved {
+    state: State,
+    it: i32,
+}
+
+/// The histories of `0x2e39b0` by iteration (`Q+0x48..0x80`: `Q+0x130`, `0x198`, `0x1a0`, `0x140`, `0x1a8`, `0x1b0`, `0x1f8`, `0x1f0`), their running minima
+/// (`Q+0x90, 0x98, 0xa0, 0xb0, 0xb8, 0xc0`), the iterations of the best primal and dual measures (`Q+0x88`, `Q+0xa8`) and the saved iterate.
 struct Hist {
+    h48: Vec<f64>,
     h50: Vec<f64>,
+    h58: Vec<f64>,
+    h60: Vec<f64>,
     h68: Vec<f64>,
+    h70: Vec<f64>,
     h78: Vec<f64>,
     h80: Vec<f64>,
-    /// `Q+0x220` (|x|^2): the reference's value lags the iterate (undecoded); only the 1e100 / NaN tests read it.
-    x2: f64,
-    z2: f64,
+    mins: [f64; 6],
+    q88: i32,
+    qa8: i32,
+    saved: Option<Saved>,
+    nrm: Norms,
+}
+
+impl Hist {
+    fn new() -> Hist {
+        Hist {
+            h48: Vec::new(),
+            h50: Vec::new(),
+            h58: Vec::new(),
+            h60: Vec::new(),
+            h68: Vec::new(),
+            h70: Vec::new(),
+            h78: Vec::new(),
+            h80: Vec::new(),
+            mins: [1e100; 6],
+            q88: -1,
+            qa8: -1,
+            saved: None,
+            nrm: Norms::default(),
+        }
+    }
+
+    /// `0x2e39b0` stores of the iteration `it` (`push`: the first call of the iteration appends, the final call overwrites) and the running minima.
+    fn record(&mut self, it: usize, r: &Residuals, push: bool) {
+        let vals = [
+            r.q130, r.q198, r.q1a0, r.q140, r.q1a8, r.q1b0, r.q1f8, r.q1f0,
+        ];
+        let hs = [
+            &mut self.h48,
+            &mut self.h50,
+            &mut self.h58,
+            &mut self.h60,
+            &mut self.h68,
+            &mut self.h70,
+            &mut self.h78,
+            &mut self.h80,
+        ];
+        for (h, v) in hs.into_iter().zip(vals) {
+            if push {
+                h.push(v);
+            } else {
+                h[it] = v;
+            }
+        }
+        let m = &mut self.mins;
+        m[0] = f64::min(m[0], r.q198);
+        m[1] = f64::min(m[1], r.q1a8);
+        m[2] = f64::min(m[2], r.q1f8);
+        m[3] = f64::min(m[3], r.q1a0);
+        m[4] = f64::min(m[4], r.q1b0);
+        m[5] = f64::min(m[5], r.q1f0);
+    }
+}
+
+/// `0x2e39b0` saving: `x`, `y`, `z`, `v` multiplied by `1 / tau` (`1.0 / Q+0x690`, also for `tau = 1`).
+fn save_iterate(st: &State, tau: f64, it: i32) -> Saved {
+    let itau = 1.0 / tau;
+    let sc = |a: &[f64]| a.iter().map(|t| t * itau).collect::<Vec<f64>>();
+    Saved {
+        state: State {
+            x: sc(&st.x),
+            z: sc(&st.z),
+            y: sc(&st.y),
+            u: Vec::new(),
+            v: sc(&st.v),
+        },
+        it,
+    }
+}
+
+/// `maxsd dst, src`: `dst` if `dst > src`, else `src`.
+fn maxsd(a: f64, b: f64) -> f64 {
+    if a > b {
+        a
+    } else {
+        b
+    }
+}
+
+/// `0x2e4850` (primal: histories `0x50`, `0x68`, `0x78`, minima `Q+0x90 / 0x98`) and `0x2e4a70` (dual: `0x58`, `0x70`, `0x80`, `Q+0xb0 / 0xb8`): whether the
+/// current iteration beats iteration `best` (or none is saved yet). `b1 = |b| + 1`, `c1 = |c| + 1`, `prod = Q+0x220 Q+0x230`.
+#[allow(clippy::too_many_arguments)]
+fn better(
+    best: i32,
+    it: usize,
+    hp: &[f64],
+    hd: &[f64],
+    hg: &[f64],
+    mins: (f64, f64),
+    b1: f64,
+    c1: f64,
+    ncomp: f64,
+    prod: f64,
+) -> bool {
+    if best < 0 {
+        return true;
+    }
+    let bi = best as usize;
+    let (cur_gap_num, best_gap_num) = (hg[it] * ncomp, hg[bi] * ncomp);
+    let (best_p, best_d) = (hp[bi] / b1, hd[bi] / c1);
+    let (cur_p, cur_d) = (hp[it] / b1, hd[it] / c1);
+    let mm = maxsd(mins.0 / b1, mins.1 / c1);
+    let cur_res = maxsd(cur_p, cur_d);
+    let best_gap = best_gap_num / (prod.sqrt() + 1.0);
+    let cur_gap = cur_gap_num / (1.0 + prod.sqrt());
+    let best_m = maxsd(maxsd(best_p, best_d), best_gap);
+    let cur_m = maxsd(cur_res, cur_gap);
+    if best_m - 1e-10 > cur_m {
+        return true;
+    }
+    if 10.0 * mm > cur_res && 0.1 * best_gap > cur_gap {
+        return true;
+    }
+    100.0 * mm > cur_res && 0.01 * best_gap > cur_gap
 }
 
 /// The second solve of the homogeneous algorithm (`0x3117e0`: `(c, b)`, with `c_j - v_j ub_j / u_j` on the upper-bounded columns) and
@@ -2646,6 +2788,23 @@ impl Work {
         (((self.m + self.nub) * 3.0) + self.nc * 13.0) * WORK_SCALE
     }
 
+    /// The homogeneous algorithm's second solve (`0x3117e0` calling `0x305f10` and the refinement: the solve sites without the closing vector site) and, in every
+    /// direction call with kappa > 0, the site `(4 m + 12 nc + 10 nub)` of the `dtau` update (`0x31100d`), added to the window `k` (no extra 1.0).
+    fn hsd_second_solve(&mut self, extra: usize) {
+        let mut v = self.solve_sites(extra);
+        v.pop();
+        let mut w = 0.0;
+        for x in v {
+            w = w + x;
+        }
+        self.t[1] = self.t[1] + w;
+    }
+
+    fn hsd_site(&mut self, k: usize) {
+        let w = ((self.m * 4.0) + (self.nc * 12.0) + (self.nub * 10.0)) * WORK_SCALE;
+        self.t[k] = self.t[k] + w;
+    }
+
     fn factor(&mut self) {
         let s = self.s * WORK_SCALE;
         self.add(0, &[s]);
@@ -2771,7 +2930,9 @@ pub fn run<S: NormalSolver>(
     let mut rd = res.rd.clone();
     z_reduce(f, &mut st, &mut rd, res.q1f0);
 
-    let mut h = Hist::default();
+    let mut h = Hist::new();
+    // `Q+0x220` of the starting point (`0x2eb2ea`); the other norms are 0 until the first update.
+    h.nrm.x2 = dot_lanes(&st.x, &st.x, 0);
     let mut best_dual = -1e100;
     // `Q+0x5e0 / 0x5e8 / 0x5f0`: the step products of the last three iterations.
     let mut w5 = [1e100f64; 3];
@@ -2787,12 +2948,42 @@ pub fn run<S: NormalSolver>(
             // current mu, after the scalars were computed.
             z_reduce(f, &mut st, &mut res.rd, res.q1f0);
         }
-        h.h50.push(res.q198);
-        h.h68.push(res.q1a8);
-        h.h78.push(res.q1f8);
-        h.h80.push(res.q1f0);
-        h.x2 = dot_lanes(&st.x, &st.x, 0);
-        h.z2 = dot_lanes(&st.z, &st.z, 0);
+        // `0x2e39b0` (first call of the iteration): histories, minima, and the iterate is saved when the primal measure beats the saved one; the dual measure
+        // then sets `Q+0xa8`.
+        h.record(it as usize, &res, true);
+        {
+            let (b1, c1) = (sc.q160 + 1.0, sc.q170 + 1.0);
+            let (iu, nc, prod) = (it as usize, ncomp as f64, h.nrm.x2 * h.nrm.z2);
+            if better(
+                h.q88,
+                iu,
+                &h.h50,
+                &h.h68,
+                &h.h78,
+                (h.mins[0], h.mins[1]),
+                b1,
+                c1,
+                nc,
+                prod,
+            ) {
+                h.saved = Some(save_iterate(&st, tau, it));
+                h.q88 = it;
+            }
+            if better(
+                h.qa8,
+                iu,
+                &h.h58,
+                &h.h70,
+                &h.h80,
+                (h.mins[3], h.mins[4]),
+                b1,
+                c1,
+                nc,
+                prod,
+            ) {
+                h.qa8 = it;
+            }
+        }
         if res.q148 > best_dual && it > 0 {
             best_dual = res.q148;
         }
@@ -2807,9 +2998,11 @@ pub fn run<S: NormalSolver>(
             best_dual,
             (w5[0], w5[1]),
             (tau, kappa),
+            (qf4, qf8),
         );
         let (code, _why) = status(&ti);
         if code != 1 || it >= o.max_iter + 1 {
+            let ti_res = res.clone();
             let rec = IterRecord {
                 it,
                 state: st.clone(),
@@ -2819,15 +3012,50 @@ pub fn run<S: NormalSolver>(
             };
             emit_record(&rec);
             records.push(rec);
+            // After the status test (`0x2e2b98..0x2e2ce8`): an optimal or unbounded end saves the current iterate; any other end keeps the best saved one unless its
+            // relative gap exceeds 0.1; an end with code 0xd is reclassified as optimal when the residuals and the gap are small.
+            let force = if code == 2 || code == 5 {
+                true
+            } else if h.q88 >= 0 && h.q88 < it {
+                let i = h.q88 as usize;
+                let (p, d) = (h.h48[i], h.h60[i]);
+                (p - d).abs() / (p.abs() + 1.0) > 0.1
+            } else {
+                false
+            };
+            if force {
+                h.record(it as usize, &ti_res, false);
+                h.saved = Some(save_iterate(&st, tau, it));
+                h.q88 = it;
+            }
+            let mut code = code;
+            if code == 0xd {
+                let a = ti_res.q1d8 / (h.nrm.xinf + 1.0);
+                let b = ti_res.q1e0 / (h.nrm.zinf + 1.0);
+                let g = f64::min(
+                    ncomp as f64 * ti_res.q1f8,
+                    (ti_res.q130 - ti_res.q140).abs(),
+                );
+                let h2 = g / maxsd(1.0, f64::min(ti_res.q130.abs(), ti_res.q140.abs()));
+                if o.tol > a && o.tol > b && 10.0 * o.tol > h2 {
+                    code = 2;
+                }
+            }
             let status = match code {
                 2 => BarrierStatus::Optimal,
                 7 => BarrierStatus::IterationLimit,
                 c => BarrierStatus::Other(c),
             };
+            let (sv, sit) = match h.saved.take() {
+                Some(sv) => (sv.state, sv.it),
+                None => (save_iterate(&st, tau, it).state, it),
+            };
+            let objective = h.h48.get(sit as usize).copied().unwrap_or(ti_res.q130);
             return Ok(BarrierRun {
                 status,
                 iterations: it,
-                state: st,
+                state: sv,
+                objective,
                 tau,
                 records,
             });
@@ -2904,6 +3132,11 @@ pub fn run<S: NormalSolver>(
         let mut hs: Option<Hsd> = None;
         if hsd {
             let hd = Hsd::solve(f, &st, solver, kappa, tau)?;
+            if let Some(wk) = work.as_mut() {
+                let extra = solver.take_extra_solves();
+                wk.hsd_second_solve(extra);
+                wk.hsd_site(1);
+            }
             hq = hd.apply(
                 f,
                 &st,
@@ -2962,6 +3195,8 @@ pub fn run<S: NormalSolver>(
         let mut dirk = pred.clone();
         let mut k = 1usize;
         let mut hc = (0.0f64, 0.0f64);
+        // `Q+0x720 / 0x740` (primal) and `Q+0x730 / 0x750` (dual): dtau and dkappa of the direction so far; each selection adds its corrector's with the weights.
+        let (mut dtp, mut dkp, mut dtd, mut dkd) = (hq.0, hq.1, hq.0, hq.1);
         let (mut tp, mut td, mut wp, mut wd);
         let comb = loop {
             let rhs2 = corrector_rhs(
@@ -2973,23 +3208,30 @@ pub fn run<S: NormalSolver>(
             );
             let mut corr = solver.direction(f, &st, DirKind::Corrector, &rhs2)?;
             let (mut q778, mut q788) = solver.norms();
-            let mut tks: Vec<(f64, f64, f64)> = Vec::new();
+            let (mut tks, mut tkd): (Vec<(f64, f64, f64)>, Vec<(f64, f64, f64)>) =
+                (Vec::new(), Vec::new());
             if let Some(hd) = &hs {
-                hc = hd.apply(
-                    f,
-                    &st,
-                    &rhs2,
-                    &mut corr,
-                    0.0,
-                    target - hq.0 * hq.1,
-                    tau,
-                    kappa,
-                );
+                // `0x2f0230`: `Rk = target - dtau dkappa` (k = 1) or the centrality correction of the stretched trial product
+                // `(dtau apt + tau)(dkappa apt + kappa)`.
+                let rk = if k > 1 {
+                    let apt = (tp0 * 1.5 + 0.3).min(1.001);
+                    centrality(target, (dtp * apt + tau) * (dkp * apt + kappa))
+                } else {
+                    target - dtp * dkp
+                };
+                hc = hd.apply(f, &st, &rhs2, &mut corr, 0.0, rk, tau, kappa);
                 q778 = hd.norms.0 * hc.0 + q778;
                 q788 = hd.norms.1 * hc.0 + q788;
-                tks = vec![(tau, hq.0, hc.0), (kappa, hq.1, hc.1)];
+                tks = vec![(tau, dtp, hc.0), (kappa, dkp, hc.1)];
+                tkd = vec![(tau, dtd, hc.0), (kappa, dkd, hc.1)];
             }
-            (tp, td, wp, wd) = select(f, &st, &dirk, &corr, tp0, td0, ntry, &tks, k);
+            (tp, td, wp, wd) = select(f, &st, &dirk, &corr, tp0, td0, ntry, &tks, &tkd, k);
+            if hs.is_some() {
+                dtp = hc.0 * wp + dtp;
+                dkp = hc.1 * wp + dkp;
+                dtd = hc.0 * wd + dtd;
+                dkd = hc.1 * wd + dkd;
+            }
             // `0x30f5xx..0x30fc3e`: the residual norms of the combined step.
             (q770, q780) = (q770.max(q778 * wp), q780.max(q788 * wd));
             let c = Direction {
@@ -3015,9 +3257,12 @@ pub fn run<S: NormalSolver>(
             if let Some(wk) = work.as_mut() {
                 let extra = solver.take_extra_solves();
                 wk.corrector(k, ntry - usize::from(k > 1 && ntry > 1), extra);
+                if hs.is_some() {
+                    wk.hsd_site(if k == 1 { 2 } else { 3 });
+                }
             }
             k += 1;
-            if stop || hsd || k > q298 {
+            if stop || k > q298 {
                 break c;
             }
             dirk = c;
@@ -3029,7 +3274,16 @@ pub fn run<S: NormalSolver>(
             } else {
                 1.0
             };
+            let q298_before = q298;
             (q298, ntry_next) = adapt_correctors(q298, corrector_cap(f.n2), wk.ratio(), avg);
+            if crate::dump::on("barrier_adapt") {
+                crate::dump::emit_tag(
+                    "barrier_adapt",
+                    "AD",
+                    json!({"it": it, "w138": wk.t[0], "w130": wk.t[1], "w148": wk.t[2], "w140": wk.t[3], "w128": wk.t[4],
+                           "ratio": wk.ratio(), "avg": avg, "q298_before": q298_before, "q298": q298, "q29c": ntry_next}),
+                );
+            }
             wk.update();
         }
         // `0x2e24f0..0x2e2647`: with a small complementarity measure the steps are capped by the solve residuals against the iterate's.
@@ -3047,17 +3301,19 @@ pub fn run<S: NormalSolver>(
         w5 = [cp * cd, w5[0], w5[1]];
         // Combination words `Q+0x720..0x750` (`0x30fb8d`): dtau and dkappa of the primal (wp) and dual (wd) candidates.
         let hk = if hsd {
-            Some((
-                tau,
-                kappa,
-                hq.0 + wp * hc.0,
-                hq.1 + wp * hc.1,
-                hq.0 + wd * hc.0,
-            ))
+            Some((tau, kappa, dtp, dkp, dtd))
         } else {
             None
         };
         let (mut next, (g, _sp, _sd), hout) = update(f, &st, &comb, cp, cd, ncomp, hk);
+        // `Q+0x220..0x240` (`0x30ebbf`): norms of the updated iterate, before the dual iterate is rescaled.
+        h.nrm = Norms {
+            x2: dot_lanes(&next.x, &next.x, 0),
+            y2: dot_lanes(&next.y, &next.y, 0),
+            z2: dot_lanes(&next.z, &next.z, 0),
+            xinf: max_abs(&next.x),
+            zinf: max_abs(&next.z),
+        };
         if let Some(h) = hout {
             // `0x30e619`: the dual iterate is scaled by tau_p / tau_d when the two differ.
             if h.tau != h.tau_d {
@@ -3157,6 +3413,7 @@ pub fn run<S: NormalSolver>(
                 wk.factor();
             }
             qf8 = it + 1;
+            h.nrm.x2 = dot_lanes(&st.x, &st.x, 0);
             let r = residuals(f, &st, tau, kappa, ncomp, scale);
             let mut rd = r.rd.clone();
             z_reduce(f, &mut st, &mut rd, r.q1f0);
@@ -3178,41 +3435,34 @@ pub struct Solution {
 }
 
 pub fn solution(f: &StdForm, run: BarrierRun) -> Solution {
-    // The homogeneous algorithm's iterate is `tau` times the solution: x, y, z, v are multiplied by `1 / tau` first.
-    let itau = if run.tau != 1.0 {
-        Some(1.0 / run.tau)
-    } else {
-        None
-    };
-    let sc = |t: f64| itau.map_or(t, |i| t * i);
+    // `run.state` is the saved iterate, already multiplied by `1 / tau`.
     let x: Vec<f64> = (0..f.n2)
         .map(|j| {
             if f.lower[j] != 0.0 {
-                sc(run.state.x[j]) + f.lower[j]
+                run.state.x[j] + f.lower[j]
             } else {
-                sc(run.state.x[j])
+                run.state.x[j]
             }
         })
         .collect();
-    let last = run.records.last().unwrap();
     let mut y = vec![0.0; f.m];
     for k in 0..f.m {
-        y[f.row_of[k]] = sc(run.state.y[k]) * if f.sense[k] == b'>' { -1.0 } else { 1.0 };
+        y[f.row_of[k]] = run.state.y[k] * if f.sense[k] == b'>' { -1.0 } else { 1.0 };
     }
     let mut rc: Vec<f64> = (0..f.n2)
         .map(|j| {
             (if f.flags[j] & 1 != 0 {
-                sc(run.state.z[j])
+                run.state.z[j]
             } else {
                 0.0
             }) - (if f.flags[j] & 2 != 0 {
-                sc(run.state.v[j])
+                run.state.v[j]
             } else {
                 0.0
             })
         })
         .collect();
-    let mut objective = last.res.q130;
+    let mut objective = run.objective;
     let mut x = x;
     if let Some(sc) = &f.scaling {
         // Release profile: `x = C x'`, `y = R y' / f`, `rc = rc' / (C f)` (powers of two; the objective is already in the units of the model).
