@@ -2858,6 +2858,24 @@ fn phase1_ratio(
             };
         }
         let pa = val(best).abs();
+        // The iteration step (`0x143b8c`..`0x143cf8`) picks the bound the leaving variable ends at from the step: a type B variable
+        // (below its lower bound) ends at the lower bound when `|d / alpha - step| < 2 tolH (step + 1)`, a type A variable (above
+        // its upper bound) at the upper one when `|(d - r) / alpha - step| < 2 tolH (step + 1)`, and the update moves by that
+        // bound's step (PILOT.JA iteration 13: both breakpoints of a range of 1e-5 are within the tolerance, the search picked
+        // the upper one and the reference moves to the lower).
+        match frames[best] {
+            Some((d, _, b'B', _)) if (d / val(best) - step).abs() < 2.0 * tol_h * (step + 1.0) => {
+                step = d / val(best);
+                to_upper = false;
+            }
+            Some((d, r, b'A', _))
+                if (r < inf && ((d - r) / val(best) - step).abs() < 2.0 * tol_h * (step + 1.0)) =>
+            {
+                step = (d - r) / val(best);
+                to_upper = true;
+            }
+            _ => {}
+        }
         // A mirrored variable reaches the opposite bound of the original frame.
         let mirrored = matches!(frames[best], Some((_, _, _, true)));
         let pick = Phase1Pick {
