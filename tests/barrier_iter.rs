@@ -15,7 +15,11 @@ const MODELS: [(&str, &str); 5] = [
 ];
 
 fn floats(v: &Value) -> Vec<f64> {
-    v.as_array().unwrap().iter().map(|x| x.as_f64().unwrap()).collect()
+    v.as_array()
+        .unwrap()
+        .iter()
+        .map(|x| x.as_f64().unwrap())
+        .collect()
 }
 
 fn std_form(text: &str) -> StdForm {
@@ -27,19 +31,28 @@ fn std_form(text: &str) -> StdForm {
 fn same(name: &str, field: &str, it: i64, want: &[f64], got: &[f64]) {
     assert_eq!(want.len(), got.len(), "{name} it {it} {field}: length");
     for (j, (w, g)) in want.iter().zip(got).enumerate() {
-        assert_eq!(w.to_bits(), g.to_bits(), "{name} it {it} {field}[{j}]: reference {w:e} rose {g:e}");
+        assert_eq!(
+            w.to_bits(),
+            g.to_bits(),
+            "{name} it {it} {field}[{j}]: reference {w:e} rose {g:e}"
+        );
     }
 }
 
 fn scalar(name: &str, field: &str, it: i64, want: &Value, got: f64) {
     if let Some(w) = want.as_f64() {
-        assert_eq!(w.to_bits(), got.to_bits(), "{name} it {it} {field}: reference {w:e} rose {got:e}");
+        assert_eq!(
+            w.to_bits(),
+            got.to_bits(),
+            "{name} it {it} {field}: reference {w:e} rose {got:e}"
+        );
     }
 }
 
 #[test]
 fn replayed_iterations_match_reference_bitwise() {
-    let fx: Value = serde_json::from_str(include_str!("fixtures/barrier-iter-controlled.json")).unwrap();
+    let fx: Value =
+        serde_json::from_str(include_str!("fixtures/barrier-iter-controlled.json")).unwrap();
     for (name, text) in MODELS {
         let f = std_form(text);
         let expect = fx[name]["expect"].as_array().unwrap();
@@ -47,13 +60,20 @@ fn replayed_iterations_match_reference_bitwise() {
         let mut rs = ReplaySolver::from_json(&fx[name]["solves"]);
         // A truncated fixture stops at the iteration limit (the last expected iteration + 1); the iterations before it are compared.
         let niter = fx[name]["solves"]["iters"].as_array().unwrap().len() as i32;
-        let opts = Options { max_iter: if whole { 1000 } else { niter }, ..Options::default() };
+        let opts = Options {
+            max_iter: if whole { 1000 } else { niter },
+            ..Options::default()
+        };
         let run = barrier::run(&f, &mut rs, &opts).unwrap_or_else(|e| panic!("{name}: {e}"));
         assert!(rs.consumed(), "{name}: recorded solves left over");
         let mut checked = 0;
         for want in expect {
             let it = want["it"].as_i64().unwrap();
-            let got = run.records.iter().find(|r| r.it as i64 == it).unwrap_or_else(|| panic!("{name}: no record for iteration {it}"));
+            let got = run
+                .records
+                .iter()
+                .find(|r| r.it as i64 == it)
+                .unwrap_or_else(|| panic!("{name}: no record for iteration {it}"));
             same(name, "x", it, &floats(&want["x"]), &got.state.x);
             same(name, "z", it, &floats(&want["z"]), &got.state.z);
             same(name, "y", it, &floats(&want["y"]), &got.state.y);
@@ -68,14 +88,21 @@ fn replayed_iterations_match_reference_bitwise() {
                 assert_eq!(s as i32, got.status, "{name} it {it}: status");
             }
             if want.get("tp").is_some() {
-                let d = got.dec.as_ref().unwrap_or_else(|| panic!("{name} it {it}: no decisions"));
+                let d = got
+                    .dec
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("{name} it {it}: no decisions"));
                 scalar(name, "ap", it, &want["ap"], d.ap);
                 scalar(name, "ad", it, &want["ad"], d.ad);
                 scalar(name, "aff", it, &want["aff"], d.aff);
                 scalar(name, "target", it, &want["target"], d.target);
                 scalar(name, "tp", it, &want["tp"], d.tp);
                 scalar(name, "td", it, &want["td"], d.td);
-                assert_eq!(want["ntry"].as_u64().unwrap() as usize, d.ntry, "{name} it {it}: ntry");
+                assert_eq!(
+                    want["ntry"].as_u64().unwrap() as usize,
+                    d.ntry,
+                    "{name} it {it}: ntry"
+                );
             }
             checked += 1;
         }
@@ -100,15 +127,28 @@ fn dense_solver_reaches_the_reference_optimum() {
         let sol = barrier::solve_dense(&model).unwrap_or_else(|e| panic!("{name}: {e}"));
         assert_eq!(sol.run.status, BarrierStatus::Optimal, "{name}");
         assert_eq!(sol.run.iterations, iters, "{name} iterations");
-        assert!((sol.objective - obj).abs() <= 1e-9 * obj.abs().max(1.0), "{name}: {} vs {obj}", sol.objective);
+        assert!(
+            (sol.objective - obj).abs() <= 1e-9 * obj.abs().max(1.0),
+            "{name}: {} vs {obj}",
+            sol.objective
+        );
         // The returned point is feasible for the rows (file order, original columns).
         let ax = model.activities(&sol.x);
         for i in 0..model.num_rows() {
             let tol = 1e-5 * (1.0 + ax[i].abs());
-            assert!(ax[i] >= model.row_lo[i] - tol && ax[i] <= model.row_up[i] + tol, "{name} row {i}: {} not in [{}, {}]", ax[i], model.row_lo[i], model.row_up[i]);
+            assert!(
+                ax[i] >= model.row_lo[i] - tol && ax[i] <= model.row_up[i] + tol,
+                "{name} row {i}: {} not in [{}, {}]",
+                ax[i],
+                model.row_lo[i],
+                model.row_up[i]
+            );
         }
         for j in 0..model.num_cols() {
-            assert!(sol.x[j] >= model.col_lo[j] - 1e-6 && sol.x[j] <= model.col_up[j] + 1e-6, "{name} col {j}");
+            assert!(
+                sol.x[j] >= model.col_lo[j] - 1e-6 && sol.x[j] <= model.col_up[j] + 1e-6,
+                "{name} col {j}"
+            );
         }
     }
 }

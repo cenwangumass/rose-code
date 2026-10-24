@@ -7,11 +7,19 @@ use rose::{mps, solve, Basis, LpModel, SolveOptions, Status};
 
 /// The methods every test runs under: the primal simplex and the dual simplex (the controlled profiles; pivot sequences differ).
 fn opts() -> Vec<SolveOptions> {
-    vec![SolveOptions::default(), SolveOptions::dual(), SolveOptions::dual_release()]
+    vec![
+        SolveOptions::default(),
+        SolveOptions::dual(),
+        SolveOptions::dual_release(),
+    ]
 }
 
 fn fixture(name: &str) -> LpModel {
-    let text = std::fs::read_to_string(format!("{}/tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"))).unwrap();
+    let text = std::fs::read_to_string(format!(
+        "{}/tests/fixtures/{name}",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap();
     mps::parse(&text).unwrap()
 }
 
@@ -106,7 +114,10 @@ fn warm_start_from_optimal_basis_takes_no_iterations() {
 fn invalid_basis_is_rejected() {
     for o in opts() {
         let model = fixture("afiro.mps");
-        let bad = Basis { basic: vec![0; model.num_rows()], at_upper: vec![false; model.num_rows() + model.num_cols()] };
+        let bad = Basis {
+            basic: vec![0; model.num_rows()],
+            at_upper: vec![false; model.num_rows() + model.num_cols()],
+        };
         assert!(solve(&model, Some(&bad), &o).is_err());
     }
 }
@@ -115,7 +126,16 @@ fn invalid_basis_is_rejected() {
 fn iteration_limit_is_reported_with_a_finite_point() {
     let model = fixture("blend.mps");
     for o in opts() {
-        let r = solve(&model, None, &SolveOptions { max_iterations: 5, record_trace: false, ..o }).unwrap();
+        let r = solve(
+            &model,
+            None,
+            &SolveOptions {
+                max_iterations: 5,
+                record_trace: false,
+                ..o
+            },
+        )
+        .unwrap();
         assert_eq!(r.status, Status::IterationLimit);
         assert!(r.x.iter().all(|v| v.abs() < 1e20), "{:?}", r.x);
     }
@@ -126,7 +146,10 @@ fn singular_supplied_basis_is_repaired() {
     // Two identical columns both basic: the second leaves for the slack of the uncovered row.
     let text = "NAME T\nROWS\n N obj\n L c1\n L c2\nCOLUMNS\n x obj -1 c1 1\n x c2 1\n y obj -2 c1 1\n y c2 1\nRHS\n rhs c1 4 c2 5\nENDATA\n";
     let model = mps::parse(text).unwrap();
-    let singular = Basis { basic: vec![0, 1], at_upper: vec![false; 4] };
+    let singular = Basis {
+        basic: vec![0, 1],
+        at_upper: vec![false; 4],
+    };
     for o in opts() {
         let r = solve(&model, Some(&singular), &o).unwrap();
         assert_eq!(r.status, Status::Optimal);

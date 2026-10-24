@@ -43,14 +43,22 @@ fn kinds() -> &'static [String] {
     static K: OnceLock<Vec<String>> = OnceLock::new();
     K.get_or_init(|| {
         std::env::var("ROSE_DUMP")
-            .map(|v| v.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
+            .map(|v| {
+                v.split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect()
+            })
             .unwrap_or_default()
     })
 }
 
 /// Whether the dump `kind` is selected.
 pub fn on(kind: &str) -> bool {
-    debug_assert!(KINDS.iter().any(|k| k.0 == kind), "unknown dump kind {kind}");
+    debug_assert!(
+        KINDS.iter().any(|k| k.0 == kind),
+        "unknown dump kind {kind}"
+    );
     kinds().iter().any(|k| k == kind || k == "all")
 }
 
@@ -75,12 +83,21 @@ pub fn sparse(v: &[(usize, f64)]) -> serde_json::Value {
 /// Whether the per-call dump `kind` is wanted for call `k`: `ROSE_FROM=k0` leaves out the calls before `k0` (a window of a long run).
 pub fn on_from(kind: &str, k: usize) -> bool {
     static F: OnceLock<usize> = OnceLock::new();
-    on(kind) && k >= *F.get_or_init(|| std::env::var("ROSE_FROM").ok().and_then(|v| v.parse().ok()).unwrap_or(0))
+    on(kind)
+        && k >= *F.get_or_init(|| {
+            std::env::var("ROSE_FROM")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0)
+        })
 }
 
 /// Writes one record of `kind` under an explicit tag (kinds that emit several record types).
 pub fn emit_tag(kind: &str, tag: &str, rec: serde_json::Value) {
-    debug_assert!(KINDS.iter().any(|k| k.0 == kind), "unknown dump kind {kind}");
+    debug_assert!(
+        KINDS.iter().any(|k| k.0 == kind),
+        "unknown dump kind {kind}"
+    );
     let line = format!("{tag} {}\n", serde_json::to_string(&rec).unwrap());
     std::io::Write::write_all(&mut std::io::stderr().lock(), line.as_bytes()).unwrap();
 }

@@ -19,7 +19,9 @@ fn err<T>(msg: impl Into<String>) -> Result<T, MpsError> {
 }
 
 fn num(tok: &str) -> Result<f64, MpsError> {
-    tok.parse::<f64>().or_else(|_| tok.replace(['d', 'D'], "e").parse::<f64>()).map_err(|_| MpsError(format!("bad number {tok:?}")))
+    tok.parse::<f64>()
+        .or_else(|_| tok.replace(['d', 'D'], "e").parse::<f64>())
+        .map_err(|_| MpsError(format!("bad number {tok:?}")))
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -62,7 +64,11 @@ pub fn parse(text: &str) -> Result<LpModel, MpsError> {
                 "NAME" => name = toks.get(1).map(|s| s.to_string()).unwrap_or_default(),
                 "OBJSENSE" => {
                     if let Some(t) = toks.get(1) {
-                        sense = if t.to_ascii_uppercase().starts_with("MAX") { Sense::Maximize } else { Sense::Minimize };
+                        sense = if t.to_ascii_uppercase().starts_with("MAX") {
+                            Sense::Maximize
+                        } else {
+                            Sense::Minimize
+                        };
                     } else {
                         objsense_next = true;
                     }
@@ -75,7 +81,11 @@ pub fn parse(text: &str) -> Result<LpModel, MpsError> {
         match section.as_str() {
             "OBJSENSE" => {
                 if objsense_next || !toks.is_empty() {
-                    sense = if toks[0].to_ascii_uppercase().starts_with("MAX") { Sense::Maximize } else { Sense::Minimize };
+                    sense = if toks[0].to_ascii_uppercase().starts_with("MAX") {
+                        Sense::Maximize
+                    } else {
+                        Sense::Minimize
+                    };
                     objsense_next = false;
                 }
             }
@@ -94,7 +104,14 @@ pub fn parse(text: &str) -> Result<LpModel, MpsError> {
                     }
                     "E" | "L" | "G" => {
                         row_ix.insert(rname.clone(), rows.len());
-                        rows.push((rname, match kind.as_str() { "E" => RowKind::E, "L" => RowKind::L, _ => RowKind::G }));
+                        rows.push((
+                            rname,
+                            match kind.as_str() {
+                                "E" => RowKind::E,
+                                "L" => RowKind::L,
+                                _ => RowKind::G,
+                            },
+                        ));
                         rhs.push(0.0);
                         range.push(None);
                     }
@@ -129,7 +146,11 @@ pub fn parse(text: &str) -> Result<LpModel, MpsError> {
                 }
             }
             "RHS" | "RANGES" => {
-                let body: &[&str] = if toks.len() % 2 == 1 { &toks[1..] } else { &toks[..] };
+                let body: &[&str] = if toks.len() % 2 == 1 {
+                    &toks[1..]
+                } else {
+                    &toks[..]
+                };
                 for pair in body.chunks(2) {
                     if pair.len() != 2 {
                         return err(format!("bad {section} line {raw:?}"));
@@ -168,7 +189,9 @@ pub fn parse(text: &str) -> Result<LpModel, MpsError> {
                 } else {
                     return err(format!("bad BOUNDS line {raw:?}"));
                 };
-                let j = *col_ix.get(cname).ok_or_else(|| MpsError(format!("unknown column {cname}")))?;
+                let j = *col_ix
+                    .get(cname)
+                    .ok_or_else(|| MpsError(format!("unknown column {cname}")))?;
                 match kind.as_str() {
                     "UP" => {
                         let v = val.unwrap();
@@ -191,7 +214,11 @@ pub fn parse(text: &str) -> Result<LpModel, MpsError> {
                     "BV" => {
                         return err("binary variables are not supported (continuous LP only)");
                     }
-                    "LI" | "UI" | "SC" => return err(format!("bound type {kind} is not supported (continuous LP only)")),
+                    "LI" | "UI" | "SC" => {
+                        return err(format!(
+                            "bound type {kind} is not supported (continuous LP only)"
+                        ))
+                    }
                     _ => return err(format!("bad bound type {kind}")),
                 }
             }
@@ -238,7 +265,14 @@ pub fn parse(text: &str) -> Result<LpModel, MpsError> {
         row_lo,
         row_up,
         row_range,
-        row_kind: rows.iter().map(|r| match r.1 { RowKind::E => b'E', RowKind::L => b'L', RowKind::G => b'G' }).collect(),
+        row_kind: rows
+            .iter()
+            .map(|r| match r.1 {
+                RowKind::E => b'E',
+                RowKind::L => b'L',
+                RowKind::G => b'G',
+            })
+            .collect(),
         range_order,
         range_entries,
         range_dup,

@@ -12,7 +12,10 @@ pub struct Basis {
 impl Basis {
     /// All-slack basis with every column at its lower bound.
     pub fn slack(n: usize, m: usize) -> Basis {
-        Basis { basic: (n..n + m).collect(), at_upper: vec![false; n + m] }
+        Basis {
+            basic: (n..n + m).collect(),
+            at_upper: vec![false; n + m],
+        }
     }
 
     pub fn validate(&self, n: usize, m: usize) -> Result<(), String> {

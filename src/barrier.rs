@@ -113,7 +113,11 @@ pub fn uniform_scale(n2: usize, col_start: &[usize], val: &[f64]) -> Option<Vec<
             tot = tot + c * c;
         }
     }
-    if 2.0 * n2 as f64 > tot { None } else { Some(s) }
+    if 2.0 * n2 as f64 > tot {
+        None
+    } else {
+        Some(s)
+    }
 }
 
 impl StdForm {
@@ -190,7 +194,17 @@ fn is_inf(v: f64) -> bool {
 /// `lo_k = max(lo_k, slack/t + hi_k)`. One infinite entry (the first with `t > 0` and `lo <= -INF`, or `t < 0` and `hi >= INF`): `t > 1e-6`: `hi_k = slack/t`;
 /// `t < -1e-6`: `lo_k = slack/t`. Then every column still free whose smaller implied `|bound|` is below `1e6` gets `lb = lo - 0.01` if `|hi| > |lo|`, else
 /// `ub = hi + 0.01`.
-fn free_column_bounds(m: usize, n: usize, sense: &[u8], col_start: &[usize], row_idx: &[usize], val: &[f64], b: &[f64], lb: &mut [f64], ub: &mut [f64]) {
+fn free_column_bounds(
+    m: usize,
+    n: usize,
+    sense: &[u8],
+    col_start: &[usize],
+    row_idx: &[usize],
+    val: &[f64],
+    b: &[f64],
+    lb: &mut [f64],
+    ub: &mut [f64],
+) {
     if !(0..n).any(|j| lb[j] <= -INF && ub[j] >= INF) {
         return;
     }
@@ -272,7 +286,17 @@ fn free_column_bounds(m: usize, n: usize, sense: &[u8], col_start: &[usize], row
 /// entry whose bounds are both finite, `w = ub - lb`: `a > 1e-4`: the upper bound is dropped (set to `1e100`, which also sets `lo = 1e100`) if
 /// `0.9999 a w > up` or the row has no entry with `a <= 0` and `a w > up - 1e-10`; `a < -1e-4`: dropped (sets `up = 1e100`) if `0.9999 a w > lo` or the row
 /// has no entry with `a > 0` and `a w > lo - 1e-10`. Later rows see the dropped bounds.
-fn drop_implied_upper_bounds(m: usize, n: usize, sense: &[u8], col_start: &[usize], row_idx: &[usize], val: &[f64], b: &[f64], lb: &[f64], ub: &mut [f64]) {
+fn drop_implied_upper_bounds(
+    m: usize,
+    n: usize,
+    sense: &[u8],
+    col_start: &[usize],
+    row_idx: &[usize],
+    val: &[f64],
+    b: &[f64],
+    lb: &[f64],
+    ub: &mut [f64],
+) {
     let mut rows: Vec<Vec<(usize, f64)>> = vec![Vec::new(); m];
     for j in 0..n {
         for q in col_start[j]..col_start[j + 1] {
@@ -323,7 +347,18 @@ pub fn range_columns(model: &LpModel) -> Vec<(usize, f64)> {
     for &(i, r) in &model.range_entries {
         if !v.iter().any(|&(k, _)| k == i) {
             let kind = model.row_kind.get(i).copied().unwrap_or(b'L');
-            v.push((i, if kind == b'E' { if r > 0.0 { r } else { -r } } else { r.abs() }));
+            v.push((
+                i,
+                if kind == b'E' {
+                    if r > 0.0 {
+                        r
+                    } else {
+                        -r
+                    }
+                } else {
+                    r.abs()
+                },
+            ));
         }
     }
     v
@@ -335,7 +370,11 @@ pub fn std_form(model: &LpModel, perm: &[i64]) -> Result<StdForm, BarrierError> 
 }
 
 /// [`std_form`] of the model scaled with `sc` (release profile): `A' = R A C`, `c' = f C c`, `b' = R b`, bounds `/ C`; a range column has coefficient `R_i C_r` and bound `range / C_r`.
-pub fn std_form_scaled(model: &LpModel, perm: &[i64], sc: Option<&crate::scale::Scaling>) -> Result<StdForm, BarrierError> {
+pub fn std_form_scaled(
+    model: &LpModel,
+    perm: &[i64],
+    sc: Option<&crate::scale::Scaling>,
+) -> Result<StdForm, BarrierError> {
     let orig = model;
     let scaled_model;
     let model = match sc {
@@ -348,9 +387,14 @@ pub fn std_form_scaled(model: &LpModel, perm: &[i64], sc: Option<&crate::scale::
     let m = model.num_rows();
     let n_struct = model.num_cols();
     // The final permutation covers the rows, then the dense columns as nodes after them.
-    let dense = crate::order::dense_rule(model).map_err(|e| BarrierError::Unsupported(e.to_string()))?;
+    let dense =
+        crate::order::dense_rule(model).map_err(|e| BarrierError::Unsupported(e.to_string()))?;
     if perm.len() != m + dense.len() {
-        return unsupported(format!("permutation of {} entries for {m} rows and {} dense columns", perm.len(), dense.len()));
+        return unsupported(format!(
+            "permutation of {} entries for {m} rows and {} dense columns",
+            perm.len(),
+            dense.len()
+        ));
     }
     let dense_k: Vec<usize> = (0..dense.len()).map(|r| perm[m + r] as usize - m).collect();
     // A row given twice in RANGES keeps its first entry (the later ones are ignored by the reference); `r_last` is the entry the model's row bounds were built from.
@@ -391,7 +435,11 @@ pub fn std_form_scaled(model: &LpModel, perm: &[i64], sc: Option<&crate::scale::
                 // E: [r, r + R] (R > 0) or [r + R, r] with the last entry R_last; the rhs is r, plus the first entry R when it is positive.
                 let r = if r_last[i] > 0.0 { lo } else { up };
                 let r1 = ranges.iter().find(|&&(k, _)| k == i).unwrap().1;
-                if r1 > 0.0 { r + r1 } else { r }
+                if r1 > 0.0 {
+                    r + r1
+                } else {
+                    r
+                }
             } else {
                 up
             };
@@ -439,7 +487,15 @@ pub fn std_form_scaled(model: &LpModel, perm: &[i64], sc: Option<&crate::scale::
             Some(_) => orig.range_entries.iter().find(|&&(t, _)| t == i).unwrap().1,
             None => r,
         };
-        let b = if model.row_kind[i] == b'E' { if r > 0.0 { r } else { -r } } else { r.abs() };
+        let b = if model.row_kind[i] == b'E' {
+            if r > 0.0 {
+                r
+            } else {
+                -r
+            }
+        } else {
+            r.abs()
+        };
         ub_in[n_struct + k] = match sc {
             Some(s) => b / s.col[n_struct + range_rank[k]],
             None => b,
@@ -451,7 +507,11 @@ pub fn std_form_scaled(model: &LpModel, perm: &[i64], sc: Option<&crate::scale::
     let mut val = Vec::new();
     for j in 0..n2 {
         let mut e: Vec<(usize, f64)> = if j < n_struct {
-            model.col(j).filter(|&(_, v)| v != 0.0).map(|(i, v)| (perm[i] as usize, sign[i] * v)).collect()
+            model
+                .col(j)
+                .filter(|&(_, v)| v != 0.0)
+                .map(|(i, v)| (perm[i] as usize, sign[i] * v))
+                .collect()
         } else {
             let i = ranges[j - n_struct].0;
             let u = if model.row_kind[i] == b'G' { -1.0 } else { 1.0 };
@@ -477,8 +537,28 @@ pub fn std_form_scaled(model: &LpModel, perm: &[i64], sc: Option<&crate::scale::
     // bounds present before).
     let mut lb_cls = lb_in.clone();
     let mut ub_cls = ub_in.clone();
-    free_column_bounds(m, n2, &sense, &col_start, &row_idx, &val, &b, &mut lb_cls, &mut ub_cls);
-    drop_implied_upper_bounds(m, n2, &sense, &col_start, &row_idx, &val, &b, &lb_cls, &mut ub_cls);
+    free_column_bounds(
+        m,
+        n2,
+        &sense,
+        &col_start,
+        &row_idx,
+        &val,
+        &b,
+        &mut lb_cls,
+        &mut ub_cls,
+    );
+    drop_implied_upper_bounds(
+        m,
+        n2,
+        &sense,
+        &col_start,
+        &row_idx,
+        &val,
+        &b,
+        &lb_cls,
+        &mut ub_cls,
+    );
     let mut lower = vec![0.0; n2];
     let mut flags = vec![0u8; n2 + m];
     let mut ub = vec![INF; n2];
@@ -489,7 +569,11 @@ pub fn std_form_scaled(model: &LpModel, perm: &[i64], sc: Option<&crate::scale::
         }
         flags[j] = u8::from(has_lb) | if ub_cls[j] < INF { 2 } else { 0 };
         if ub_cls[j] < INF {
-            ub[j] = if has_lb { ub_cls[j] - lb_cls[j] } else { ub_cls[j] };
+            ub[j] = if has_lb {
+                ub_cls[j] - lb_cls[j]
+            } else {
+                ub_cls[j]
+            };
         }
     }
     for k in 0..m {
@@ -497,14 +581,28 @@ pub fn std_form_scaled(model: &LpModel, perm: &[i64], sc: Option<&crate::scale::
             flags[n2 + k] = 1;
         }
     }
-    let ncomp = lb_in.iter().filter(|&&l| l > -INF).count() + ub_in.iter().filter(|&&u| u < INF).count() + sense.iter().filter(|&&s| s != b'=').count();
+    let ncomp = lb_in.iter().filter(|&&l| l > -INF).count()
+        + ub_in.iter().filter(|&&u| u < INF).count()
+        + sense.iter().filter(|&&s| s != b'=').count();
     let ub_cols: Vec<usize> = (0..n2).filter(|&j| flags[j] & 2 != 0).collect();
-    let (ub_lo, ub_hi) = if ub_cols.is_empty() { (n2, n2) } else { (ub_cols[0], ub_cols[ub_cols.len() - 1] + 1) };
+    let (ub_lo, ub_hi) = if ub_cols.is_empty() {
+        (n2, n2)
+    } else {
+        (ub_cols[0], ub_cols[ub_cols.len() - 1] + 1)
+    };
     // Shift b by the lower bounds: one entry at a time in column order, `b_i = b_i - a_ij lo_j`.
     let mut cshift = 0.0;
     // Maximization: the reference minimises the negated objective (c and the constant negated); the read-out negates the objective, the duals and the reduced costs back.
-    let max_sign = if model.sense == Sense::Maximize { -1.0 } else { 1.0 };
-    let mut c: Vec<f64> = if max_sign < 0.0 { model.obj.iter().map(|v| -v).collect() } else { model.obj.clone() };
+    let max_sign = if model.sense == Sense::Maximize {
+        -1.0
+    } else {
+        1.0
+    };
+    let mut c: Vec<f64> = if max_sign < 0.0 {
+        model.obj.iter().map(|v| -v).collect()
+    } else {
+        model.obj.clone()
+    };
     c.resize(n2, 0.0);
     for j in 0..n2 {
         let l = lower[j];
@@ -531,7 +629,11 @@ pub fn std_form_scaled(model: &LpModel, perm: &[i64], sc: Option<&crate::scale::
         ub,
         ub_lo,
         ub_hi,
-        offset: if max_sign < 0.0 { -model.offset } else { model.offset },
+        offset: if max_sign < 0.0 {
+            -model.offset
+        } else {
+            model.offset
+        },
         max_sign,
         cshift,
         lower,
@@ -559,7 +661,11 @@ struct Ext {
 }
 
 impl Ext {
-    const ZERO: Ext = Ext { neg: false, m: 0, e: 0 };
+    const ZERO: Ext = Ext {
+        neg: false,
+        m: 0,
+        e: 0,
+    };
 
     fn from_f64(d: f64) -> Ext {
         if d == 0.0 {
@@ -568,9 +674,17 @@ impl Ext {
         let bits = d.to_bits();
         let ex = ((bits >> 52) & 0x7ff) as i32;
         let frac = bits & ((1u64 << 52) - 1);
-        let (mant, e) = if ex == 0 { (frac, -1074) } else { (frac | (1u64 << 52), ex - 1075) };
+        let (mant, e) = if ex == 0 {
+            (frac, -1074)
+        } else {
+            (frac | (1u64 << 52), ex - 1075)
+        };
         let lz = mant.leading_zeros();
-        Ext { neg: d < 0.0, m: mant << lz, e: e - lz as i32 }
+        Ext {
+            neg: d < 0.0,
+            m: mant << lz,
+            e: e - lz as i32,
+        }
     }
 
     /// Rounds `m * 2^e` (plus a sticky tail below the lowest bit when `sticky`) to 64 significant bits.
@@ -581,7 +695,11 @@ impl Ext {
         let bits = 128 - m.leading_zeros() as i32;
         if bits <= 64 {
             let sh = 64 - bits;
-            return Ext { neg, m: (m << sh) as u64, e: e - sh };
+            return Ext {
+                neg,
+                m: (m << sh) as u64,
+                e: e - sh,
+            };
         }
         let sh = (bits - 64) as u32;
         let rem = m & ((1u128 << sh) - 1);
@@ -608,7 +726,10 @@ impl Ext {
     }
 
     fn neg(self) -> Ext {
-        Ext { neg: !self.neg, ..self }
+        Ext {
+            neg: !self.neg,
+            ..self
+        }
     }
 
     fn add(self, other: Ext) -> Ext {
@@ -619,7 +740,11 @@ impl Ext {
             return self;
         }
         // a = the larger magnitude (significands are normalized, so the exponent decides, then the significand).
-        let (a, b) = if (self.e, self.m) >= (other.e, other.m) { (self, other) } else { (other, self) };
+        let (a, b) = if (self.e, self.m) >= (other.e, other.m) {
+            (self, other)
+        } else {
+            (other, self)
+        };
         let shift = (a.e - b.e) as u32;
         let aa = (a.m as u128) << 62;
         let (mut bb, mut sticky) = (0u128, true);
@@ -687,7 +812,17 @@ fn kahan_dot(a: &[f64], b: &[f64]) -> Ext {
 
 /// `Q+0x1f0` (mu) of `0x2ecde0` (C): `r2 = x.z` over all entries, `r3 = u.v` over `[lo, hi)`, `s = double(r3 + double(r2 + 0))`,
 /// `mu = (tau kappa + s) / ncomp`.
-pub fn complementarity(x: &[f64], z: &[f64], u: &[f64], v: &[f64], lo: usize, hi: usize, tau: f64, kappa: f64, ncomp: usize) -> f64 {
+pub fn complementarity(
+    x: &[f64],
+    z: &[f64],
+    u: &[f64],
+    v: &[f64],
+    lo: usize,
+    hi: usize,
+    tau: f64,
+    kappa: f64,
+    ncomp: usize,
+) -> f64 {
     let r2 = kahan_dot(x, z);
     let r3 = kahan_dot(&u[lo..hi], &v[lo..hi]);
     let c = r2.add(Ext::from_f64(0.0)).to_f64();
@@ -827,7 +962,15 @@ pub struct Direction {
 }
 
 /// `0x30c670` (C): mean complementarity after the trial step.
-fn mu_aff(f: &StdForm, s: &State, d: &Direction, ap: f64, ad: f64, ncomp: usize, hk: Option<(f64, f64, f64, f64)>) -> f64 {
+fn mu_aff(
+    f: &StdForm,
+    s: &State,
+    d: &Direction,
+    ap: f64,
+    ad: f64,
+    ncomp: usize,
+    hk: Option<(f64, f64, f64, f64)>,
+) -> f64 {
     let t = |i: usize| (d.dx[i] * ap + s.x[i]) * (d.dz[i] * ad + s.z[i]);
     let mut acc = 0.0;
     for j in 0..f.n2 {
@@ -854,7 +997,14 @@ fn sigma_target(mu: f64, aff: f64) -> f64 {
 }
 
 /// `0x30c050` / `0x30ed50` (C): step to the boundary of `x + a d >= 0` over the flagged entries (and `u + a e` over `[lo, hi)`).
-fn ratio(x: &[f64], d: &dyn Fn(usize) -> f64, fl: &[u8], up: Option<(usize, usize, &[f64], &dyn Fn(usize) -> f64)>, tk: &[(f64, f64, f64)], w: f64) -> f64 {
+fn ratio(
+    x: &[f64],
+    d: &dyn Fn(usize) -> f64,
+    fl: &[u8],
+    up: Option<(usize, usize, &[f64], &dyn Fn(usize) -> f64)>,
+    tk: &[(f64, f64, f64)],
+    w: f64,
+) -> f64 {
     let mut a = 1.001;
     for j in 0..x.len() {
         if fl[j] & 1 != 0 {
@@ -886,7 +1036,14 @@ fn ratio(x: &[f64], d: &dyn Fn(usize) -> f64, fl: &[u8], up: Option<(usize, usiz
     }
 }
 
-fn step_pair(f: &StdForm, s: &State, d: &Direction, d2: Option<(&Direction, f64)>, primal: bool, tk: &[(f64, f64, f64)]) -> f64 {
+fn step_pair(
+    f: &StdForm,
+    s: &State,
+    d: &Direction,
+    d2: Option<(&Direction, f64)>,
+    primal: bool,
+    tk: &[(f64, f64, f64)],
+) -> f64 {
     let w = d2.map_or(0.0, |(_, w)| w);
     // Direction d, or d + w d2 as `d2 w + d`.
     if primal {
@@ -898,7 +1055,11 @@ fn step_pair(f: &StdForm, s: &State, d: &Direction, d2: Option<(&Direction, f64)
             Some((e, w)) => e.du[j] * w + d.du[j],
             None => d.du[j],
         };
-        let up: Option<(usize, usize, &[f64], &dyn Fn(usize) -> f64)> = if f.has_ub() { Some((f.ub_lo, f.ub_hi, &s.u, &du)) } else { None };
+        let up: Option<(usize, usize, &[f64], &dyn Fn(usize) -> f64)> = if f.has_ub() {
+            Some((f.ub_lo, f.ub_hi, &s.u, &du))
+        } else {
+            None
+        };
         ratio(&s.x, &dir, &f.flags, up, tk, w)
     } else {
         let dir = |j: usize| match d2 {
@@ -909,22 +1070,47 @@ fn step_pair(f: &StdForm, s: &State, d: &Direction, d2: Option<(&Direction, f64)
             Some((e, w)) => e.dv[j] * w + d.dv[j],
             None => d.dv[j],
         };
-        let up: Option<(usize, usize, &[f64], &dyn Fn(usize) -> f64)> = if f.has_ub() { Some((f.ub_lo, f.ub_hi, &s.v, &dv)) } else { None };
+        let up: Option<(usize, usize, &[f64], &dyn Fn(usize) -> f64)> = if f.has_ub() {
+            Some((f.ub_lo, f.ub_hi, &s.v, &dv))
+        } else {
+            None
+        };
         ratio(&s.z, &dir, &f.flags, up, tk, w)
     }
 }
 
 /// `0x30ed50` pass 1 (C): weights `w_i = ((ntry-1-i)(1-wlo))/(ntry-1) + wlo`, `wlo = clamp(ap0 ad0, 0.01, 1)`; a weight replaces the best
 /// step only when `best * 1.0001 < step` (primal and dual separately). Returns `(best_p, best_d, wp, wd)`.
-fn select(f: &StdForm, s: &State, d: &Direction, d2: &Direction, ap0: f64, ad0: f64, ntry: usize, tk: &[(f64, f64, f64)], k: usize) -> (f64, f64, f64, f64) {
+fn select(
+    f: &StdForm,
+    s: &State,
+    d: &Direction,
+    d2: &Direction,
+    ap0: f64,
+    ad0: f64,
+    ntry: usize,
+    tk: &[(f64, f64, f64)],
+    k: usize,
+) -> (f64, f64, f64, f64) {
     // `0x30ed95`: for a corrector k > 1 the smallest weight is 0 (the last trial keeps the steps so far).
-    let wlo = if k > 1 { 0.0 } else { (ap0 * ad0).min(1.0).max(0.01) };
+    let wlo = if k > 1 {
+        0.0
+    } else {
+        (ap0 * ad0).min(1.0).max(0.01)
+    };
     let (mut bp, mut bd) = (-1e100, -1e100);
     let (mut wp, mut wd) = (0.0, 0.0);
     for i in 0..ntry {
-        let w = if ntry > 1 { (((ntry - 1 - i) as f64) * (1.0 - wlo)) / ((ntry - 1) as f64) + wlo } else { wlo };
+        let w = if ntry > 1 {
+            (((ntry - 1 - i) as f64) * (1.0 - wlo)) / ((ntry - 1) as f64) + wlo
+        } else {
+            wlo
+        };
         let (ap, ad) = if w != 0.0 {
-            (step_pair(f, s, d, Some((d2, w)), true, tk), step_pair(f, s, d, Some((d2, w)), false, tk))
+            (
+                step_pair(f, s, d, Some((d2, w)), true, tk),
+                step_pair(f, s, d, Some((d2, w)), false, tk),
+            )
         } else {
             (ap0, ad0)
         };
@@ -957,7 +1143,15 @@ struct HsdOut {
 
 /// `0x30d3e0` (C): step-back gamma and the update of x, z, y (u, v). `g0 = 1e-6` (no cones).
 /// Returns the new state, `(g, sp, sd)` and, with the homogeneous scalars `hk`, their new values.
-fn update(f: &StdForm, s: &State, d: &Direction, ap: f64, ad: f64, ncomp: usize, hk: Option<HsdStep>) -> (State, (f64, f64, f64), Option<HsdOut>) {
+fn update(
+    f: &StdForm,
+    s: &State,
+    d: &Direction,
+    ap: f64,
+    ad: f64,
+    ncomp: usize,
+    hk: Option<HsdStep>,
+) -> (State, (f64, f64, f64), Option<HsdOut>) {
     let g0 = 1e-6;
     let steps = |g: f64| ((ap * (1.0 - g)).min(1.0), ((1.0 - g) * ad).min(1.0));
     let (sp, sd) = steps(g0);
@@ -996,7 +1190,11 @@ fn update(f: &StdForm, s: &State, d: &Direction, ap: f64, ad: f64, ncomp: usize,
             (sp, sd) = steps(g);
         }
     }
-    let hout = hk.map(|h| HsdOut { tau: dtau * sp + tau0, kappa: dkap * sp + kap0, tau_d: h.4 * sd + tau0 });
+    let hout = hk.map(|h| HsdOut {
+        tau: dtau * sp + tau0,
+        kappa: dkap * sp + kap0,
+        tau_d: h.4 * sd + tau0,
+    });
     let n = f.n();
     let (mut x, mut z) = (vec![0.0; n], vec![0.0; n]);
     for j in 0..n {
@@ -1053,19 +1251,29 @@ fn dual_residual(f: &StdForm, s: &State, tau: f64) -> Vec<f64> {
         let t = f.aty_col(j, &s.y);
         let zj = if f.flags[j] & 1 != 0 { s.z[j] } else { 0.0 };
         let vj = if f.flags[j] & 2 != 0 { s.v[j] } else { 0.0 };
-        rd[j] = if j < end { tau * f.c[j] - ((zj + t) - vj) } else { ((tau * f.c[j] - t) - zj) + vj };
+        rd[j] = if j < end {
+            tau * f.c[j] - ((zj + t) - vj)
+        } else {
+            ((tau * f.c[j] - t) - zj) + vj
+        };
     }
     // Slack part of `0x2ecde0` (C, DEGEN2 and the five models): four loops with different zero signs for '=' rows. m > 6, m >= 8: `peel` (parity of
     // n2) elements `(-z) - t`, blocks of 8 `-(z + t)`, pairs `0 - (t + z)`, a last single `(0 - z) - t`; m = 7 or m + peel < 8: pairs and tail only;
     // m <= 6: pairs and tail of `(-z) - t`.
-    let ts: Vec<f64> = (0..m).map(|i| if f.sense[i] != b'=' { s.y[i] } else { 0.0 }).collect();
+    let ts: Vec<f64> = (0..m)
+        .map(|i| if f.sense[i] != b'=' { s.y[i] } else { 0.0 })
+        .collect();
     let zs = &s.z[n2..n2 + m];
     if m > 6 {
         let mut peel = if m >= 8 { n2 & 1 } else { 0 };
         if m >= 8 && m < peel + 8 {
             peel = 0;
         }
-        let end = if m >= 8 && m >= peel + 8 { m - ((m - peel) & 7) } else { 0 };
+        let end = if m >= 8 && m >= peel + 8 {
+            m - ((m - peel) & 7)
+        } else {
+            0
+        };
         for i in 0..peel {
             rd[n2 + i] = (-zs[i]) - ts[i];
         }
@@ -1096,7 +1304,14 @@ fn dual_residual(f: &StdForm, s: &State, tau: f64) -> Vec<f64> {
 }
 
 /// `scale` is the objective scale `Q+0x158` (1 for the controlled profile).
-pub fn residuals(f: &StdForm, s: &State, tau: f64, kappa: f64, ncomp: usize, scale: f64) -> Residuals {
+pub fn residuals(
+    f: &StdForm,
+    s: &State,
+    tau: f64,
+    kappa: f64,
+    ncomp: usize,
+    scale: f64,
+) -> Residuals {
     let (m, n2) = (f.m, f.n2);
     let (lo, hi) = (f.ub_lo, f.ub_hi);
     let ax = f.af(&s.x);
@@ -1109,10 +1324,17 @@ pub fn residuals(f: &StdForm, s: &State, tau: f64, kappa: f64, ncomp: usize, sca
         }
     }
     let q1a0 = dot_lanes(&rp, &rp, 0).sqrt();
-    let q1c0 = if hi > lo { dot_lanes(&ru[lo..hi], &ru[lo..hi], lo).sqrt() } else { 0.0 };
+    let q1c0 = if hi > lo {
+        dot_lanes(&ru[lo..hi], &ru[lo..hi], lo).sqrt()
+    } else {
+        0.0
+    };
     let q1b0 = dot_lanes(&rd, &rd, 0).sqrt();
     let mut mx = 0.0;
-    for &t in rp.iter().chain((lo..hi).filter(|&j| f.flags[j] & 2 != 0).map(|j| &ru[j])) {
+    for &t in rp
+        .iter()
+        .chain((lo..hi).filter(|&j| f.flags[j] & 2 != 0).map(|j| &ru[j]))
+    {
         if mx <= t.abs() {
             mx = t.abs();
         }
@@ -1140,7 +1362,12 @@ pub fn residuals(f: &StdForm, s: &State, tau: f64, kappa: f64, ncomp: usize, sca
     }
     let q138 = dot_lanes(&s.x[..n2], &f.c, 0) + 0.0 + f.cshift * tau;
     let q130 = (q138 / scale) / tau + f.offset;
-    let g = dot_lanes(&s.y, &f.b, 0) - if hi > lo { dot_lanes(&s.v[lo..hi], &f.ub[lo..hi], lo) } else { 0.0 };
+    let g = dot_lanes(&s.y, &f.b, 0)
+        - if hi > lo {
+            dot_lanes(&s.v[lo..hi], &f.ub[lo..hi], lo)
+        } else {
+            0.0
+        };
     let q148 = ((0.0 + g) - 0.0) + tau * f.cshift;
     let q140 = (q148 / scale) / tau + f.offset;
     let q1f0 = complementarity(&s.x, &s.z, &s.u, &s.v, lo, hi, tau, kappa, ncomp);
@@ -1170,13 +1397,15 @@ pub fn residuals(f: &StdForm, s: &State, tau: f64, kappa: f64, ncomp: usize, sca
 /// The diagonal `D` of the starting-point factor: 1 for a column with a lower bound only (or an upper bound only), 0.5 with both bounds, `1e-6` for a free
 /// column, 0 for the slack of an '=' row, 1 for the other slacks.
 pub fn start_diag(f: &StdForm) -> Vec<f64> {
-    (0..f.n()).map(|j| match (j < f.n2, f.flags[j]) {
-        (true, 3) => 0.5,
-        (true, 0) => 1e-6,
-        (true, _) => 1.0,
-        (false, 0) => 0.0,
-        (false, _) => 1.0,
-    }).collect()
+    (0..f.n())
+        .map(|j| match (j < f.n2, f.flags[j]) {
+            (true, 3) => 0.5,
+            (true, 0) => 1e-6,
+            (true, _) => 1.0,
+            (false, 0) => 0.0,
+            (false, _) => 1.0,
+        })
+        .collect()
 }
 
 /// `zx = Q+0x800` and the diagonal `D` of `A D A'` at an iterate (`0x2ecde0`, C): `zx = z/x (+ v/u for a boxed column)`, `D = min(1 / zx, 1e12)`. A column
@@ -1211,7 +1440,16 @@ pub fn normal_diag(f: &StdForm, s: &State, pobj: f64) -> (Vec<f64>, Vec<f64>) {
 }
 
 /// `0x2eb560` (C): the shifts `(p3, p4)` of the starting point from the minima and sums over the flagged entries.
-fn start_scalars(f: &StdForm, x: &[f64], z: &[f64], u: &[f64], v: &[f64], q168: f64, q178: f64, q30: f64) -> (f64, f64) {
+fn start_scalars(
+    f: &StdForm,
+    x: &[f64],
+    z: &[f64],
+    u: &[f64],
+    v: &[f64],
+    q168: f64,
+    q178: f64,
+    q30: f64,
+) -> (f64, f64) {
     let (n2, n) = (f.n2, f.n());
     let fl = &f.flags;
     let (mut mx, mut mz) = (1e100, 1e100);
@@ -1330,7 +1568,14 @@ fn start_dual_stage2(f: &StdForm, r: &[f64]) -> (Vec<f64>, Vec<f64>) {
 
 /// The starting point from the two solves of `0x305f10` (stage 1: `x~`, `y~`; stage 2: `r`, `y`), after the clamps and before the z reduction.
 /// `mode` is the parameter block word `+0x2bf0` (0 by default). Returns `(state, p3, p4, stage)`.
-pub fn start_point(f: &StdForm, s1: (Vec<f64>, Vec<f64>), s2: (Vec<f64>, Vec<f64>), sc: &Setup, mode: i32, q30: f64) -> (State, f64, f64, u8) {
+pub fn start_point(
+    f: &StdForm,
+    s1: (Vec<f64>, Vec<f64>),
+    s2: (Vec<f64>, Vec<f64>),
+    sc: &Setup,
+    mode: i32,
+    q30: f64,
+) -> (State, f64, f64, u8) {
     let (n2, n) = (f.n2, f.n());
     let mut x = s1.0;
     let mut u = vec![0.0; n2];
@@ -1375,7 +1620,13 @@ pub fn start_point(f: &StdForm, s1: (Vec<f64>, Vec<f64>), s2: (Vec<f64>, Vec<f64
 /// `0x2f1560` (C): pulls z (and v) towards `mu / x` within the dual residual: for every flagged entry `d = mu/x - z`,
 /// `d <= 0: d = max(d, min(-1e-20, r))`, else `d = min(d, max(1e-20, r))`; `z += d; r -= d`. Slacks only when the flag is exactly 1.
 pub fn z_reduce(f: &StdForm, s: &mut State, r: &mut [f64], mu: f64) {
-    let clamp = |d: f64, rr: f64| if d <= 0.0 { d.max((-1e-20f64).min(rr)) } else { d.min(1e-20f64.max(rr)) };
+    let clamp = |d: f64, rr: f64| {
+        if d <= 0.0 {
+            d.max((-1e-20f64).min(rr))
+        } else {
+            d.min(1e-20f64.max(rr))
+        }
+    };
     for j in 0..f.n2 {
         if f.flags[j] & 1 != 0 {
             let d = clamp(mu / s.x[j] - s.z[j], r[j]);
@@ -1492,7 +1743,13 @@ pub fn status(t: &TermIn) -> (i32, u32) {
     let kap_small = t.kappa < 100.0 * tol * t.tau;
     let a = relgap < tol && c23 < 100.0 * tol && b6 && b7 && kap_small && !stall;
     let b = c17 < tol && c23 < 100.0 * tol && relgap < 0.1 && b6 && b7 && !stall;
-    let c = relgap < tol && c17 < tol && b6 && b7 && it > 1 && !t.p2dd4 && 0.5 * t.h78[iu - 1] < t.h78[iu];
+    let c = relgap < tol
+        && c17 < tol
+        && b6
+        && b7
+        && it > 1
+        && !t.p2dd4
+        && 0.5 * t.h78[iu - 1] < t.h78[iu];
     let d = c17 < tol && t.p2dd4 && t.q1d8 < t.p2460 && kap_small;
     let e = t.q1f8 < 1e-16 && b6 && b7;
     if a || b || c || d || e {
@@ -1512,10 +1769,20 @@ pub fn status(t: &TermIn) -> (i32, u32) {
     if t.tau < tol && t.q1d8 < 0.01 * t.p2460 * nx && t.q138 < -1000.0 * tol * nx {
         return (5, 9);
     }
-    if t.tau < tol && 1e6 * t.tau < t.kappa && t.q1e0 < 0.01 * t.p2460 * nz && 1000.0 * tol * nz < t.q148 {
+    if t.tau < tol
+        && 1e6 * t.tau < t.kappa
+        && t.q1e0 < 0.01 * t.p2460 * nz
+        && 1000.0 * tol * nz < t.q148
+    {
         return (3, 10);
     }
-    if it > 10 && t.kappa < 100.0 * tol * t.tau && relgap < 10.0 * tol && b6 && b7 && 0.8 * t.h80[iu - 3] < t.q1f0 {
+    if it > 10
+        && t.kappa < 100.0 * tol * t.tau
+        && relgap < 10.0 * tol
+        && b6
+        && b7
+        && 0.8 * t.h80[iu - 3] < t.q1f0
+    {
         return (2, 11);
     }
     if t.p2bbc <= it {
@@ -1621,8 +1888,15 @@ pub trait NormalSolver {
     fn factor_iter(&mut self, f: &StdForm, d: &[f64], _zx: &[f64]) -> Result<(), BarrierError> {
         self.factor(f, d)
     }
-    fn start(&mut self, f: &StdForm, kind: StartKind) -> Result<(Vec<f64>, Vec<f64>), BarrierError>;
-    fn direction(&mut self, f: &StdForm, s: &State, kind: DirKind, rhs: &Rhs) -> Result<Direction, BarrierError>;
+    fn start(&mut self, f: &StdForm, kind: StartKind)
+        -> Result<(Vec<f64>, Vec<f64>), BarrierError>;
+    fn direction(
+        &mut self,
+        f: &StdForm,
+        s: &State,
+        kind: DirKind,
+        rhs: &Rhs,
+    ) -> Result<Direction, BarrierError>;
     /// Per iteration, before the directions: `Q+0x800` (`zx`) and the refinement threshold `Q+0x280` for the solvers that refine.
     fn prepare(&mut self, _zx: &[f64], _thr: f64) {}
     /// `Q+0x770 / 0x780` of the last direction: the norms of its solve residual (0 where the solver does not refine).
@@ -1647,7 +1921,12 @@ pub trait NormalSolver {
         0
     }
     /// The plain solve `(dx, dy)` for `rx` over the variables and `ry` over the rows (`0x305f10`; the homogeneous algorithm's solve with `(c, b)`).
-    fn solve_raw(&mut self, _f: &StdForm, _rx: &[f64], _ry: &[f64]) -> Result<(Vec<f64>, Vec<f64>), BarrierError> {
+    fn solve_raw(
+        &mut self,
+        _f: &StdForm,
+        _rx: &[f64],
+        _ry: &[f64],
+    ) -> Result<(Vec<f64>, Vec<f64>), BarrierError> {
         unsupported("the homogeneous algorithm needs the exact solver")
     }
 }
@@ -1759,7 +2038,11 @@ impl NormalSolver for DenseSolver {
         Ok(())
     }
 
-    fn start(&mut self, f: &StdForm, kind: StartKind) -> Result<(Vec<f64>, Vec<f64>), BarrierError> {
+    fn start(
+        &mut self,
+        f: &StdForm,
+        kind: StartKind,
+    ) -> Result<(Vec<f64>, Vec<f64>), BarrierError> {
         let n = f.n();
         match kind {
             StartKind::Primal { w } => {
@@ -1782,7 +2065,13 @@ impl NormalSolver for DenseSolver {
         }
     }
 
-    fn direction(&mut self, f: &StdForm, s: &State, _kind: DirKind, rhs: &Rhs) -> Result<Direction, BarrierError> {
+    fn direction(
+        &mut self,
+        f: &StdForm,
+        s: &State,
+        _kind: DirKind,
+        rhs: &Rhs,
+    ) -> Result<Direction, BarrierError> {
         let (n, n2, m) = (f.n(), f.n2, f.m);
         let mut w = vec![0.0; n];
         for j in 0..n {
@@ -1797,7 +2086,13 @@ impl NormalSolver for DenseSolver {
         let g: Vec<f64> = (0..m).map(|i| rhs.rp[i] + aw[i]).collect();
         let dy = self.solve_normal(&g);
         let t = Self::at_y(f, &dy);
-        let mut dir = Direction { dx: vec![0.0; n], dy, dz: vec![0.0; n], du: vec![0.0; n2], dv: vec![0.0; n2] };
+        let mut dir = Direction {
+            dx: vec![0.0; n],
+            dy,
+            dz: vec![0.0; n],
+            du: vec![0.0; n2],
+            dv: vec![0.0; n2],
+        };
         for j in 0..n {
             if f.flags[j] & 1 != 0 {
                 dir.dx[j] = self.d[j] * (t[j] - w[j]);
@@ -1824,7 +2119,9 @@ pub struct ReplaySolver {
 }
 
 fn floats(v: &Value) -> Vec<f64> {
-    v.as_array().map(|a| a.iter().map(|x| x.as_f64().unwrap()).collect()).unwrap_or_default()
+    v.as_array()
+        .map(|a| a.iter().map(|x| x.as_f64().unwrap()).collect())
+        .unwrap_or_default()
 }
 
 fn direction_json(v: &Value, sfx: &str) -> Direction {
@@ -1842,7 +2139,10 @@ impl ReplaySolver {
     /// (`dy` over the rows, `du`, `dv` over the columns, the others over all variables; `ntry` optional).
     pub fn from_json(v: &Value) -> ReplaySolver {
         let s = &v["start"];
-        let starts = vec![(floats(&s["x1"]), floats(&s["y1"])), (floats(&s["r2"]), floats(&s["y2"]))];
+        let starts = vec![
+            (floats(&s["x1"]), floats(&s["y1"])),
+            (floats(&s["r2"]), floats(&s["y2"])),
+        ];
         let mut dirs = Vec::new();
         let mut ntry = Vec::new();
         for it in v["iters"].as_array().map(|a| a.as_slice()).unwrap_or(&[]) {
@@ -1850,7 +2150,13 @@ impl ReplaySolver {
             dirs.push(direction_json(&it["corr"], "2"));
             ntry.push(it["ntry"].as_u64().map(|n| n as usize));
         }
-        ReplaySolver { starts, dirs, ntry, ns: 0, nd: 0 }
+        ReplaySolver {
+            starts,
+            dirs,
+            ntry,
+            ns: 0,
+            nd: 0,
+        }
     }
 
     /// Whether every recorded solve was used.
@@ -1864,20 +2170,41 @@ impl NormalSolver for ReplaySolver {
         Ok(())
     }
 
-    fn start(&mut self, _f: &StdForm, _kind: StartKind) -> Result<(Vec<f64>, Vec<f64>), BarrierError> {
-        let r = self.starts.get(self.ns).cloned().ok_or_else(|| BarrierError::Solver("replay: no more starting-point solves".into()))?;
+    fn start(
+        &mut self,
+        _f: &StdForm,
+        _kind: StartKind,
+    ) -> Result<(Vec<f64>, Vec<f64>), BarrierError> {
+        let r =
+            self.starts.get(self.ns).cloned().ok_or_else(|| {
+                BarrierError::Solver("replay: no more starting-point solves".into())
+            })?;
         self.ns += 1;
         Ok(r)
     }
 
-    fn direction(&mut self, _f: &StdForm, _s: &State, _kind: DirKind, _rhs: &Rhs) -> Result<Direction, BarrierError> {
-        let r = self.dirs.get(self.nd).cloned().ok_or_else(|| BarrierError::Solver("replay: no more direction solves".into()))?;
+    fn direction(
+        &mut self,
+        _f: &StdForm,
+        _s: &State,
+        _kind: DirKind,
+        _rhs: &Rhs,
+    ) -> Result<Direction, BarrierError> {
+        let r = self
+            .dirs
+            .get(self.nd)
+            .cloned()
+            .ok_or_else(|| BarrierError::Solver("replay: no more direction solves".into()))?;
         self.nd += 1;
         Ok(r)
     }
 
     fn ntry(&mut self, it: i32, default: usize) -> usize {
-        self.ntry.get(it as usize).copied().flatten().unwrap_or(default)
+        self.ntry
+            .get(it as usize)
+            .copied()
+            .flatten()
+            .unwrap_or(default)
     }
 }
 
@@ -1899,7 +2226,13 @@ pub struct Options {
 
 impl Default for Options {
     fn default() -> Options {
-        Options { tol: 1e-8, max_iter: 1000, ntry_first: 5, ntry_later: 3, release: false }
+        Options {
+            tol: 1e-8,
+            max_iter: 1000,
+            ntry_first: 5,
+            ntry_later: 3,
+            release: false,
+        }
     }
 }
 
@@ -1960,7 +2293,17 @@ fn emit_record(r: &IterRecord) {
     });
     if let Some(d) = &r.dec {
         let o = rec.as_object_mut().unwrap();
-        for (name, v) in [("ap", d.ap), ("ad", d.ad), ("aff", d.aff), ("target", d.target), ("tp", d.tp), ("td", d.td), ("wp", d.wp), ("wd", d.wd), ("gamma", d.gamma)] {
+        for (name, v) in [
+            ("ap", d.ap),
+            ("ad", d.ad),
+            ("aff", d.aff),
+            ("target", d.target),
+            ("tp", d.tp),
+            ("td", d.td),
+            ("wp", d.wp),
+            ("wd", d.wd),
+            ("gamma", d.gamma),
+        ] {
             o.insert(name.into(), json!(v));
         }
         o.insert("ntry".into(), json!(d.ntry));
@@ -1968,7 +2311,18 @@ fn emit_record(r: &IterRecord) {
     dump::emit(k, rec);
 }
 
-fn term_input(f: &StdForm, sc: &Setup, o: &Options, it: i32, res: &Residuals, ncomp: usize, h: &Hist, best_dual: f64, q5: (f64, f64), tk: (f64, f64)) -> TermIn {
+fn term_input(
+    f: &StdForm,
+    sc: &Setup,
+    o: &Options,
+    it: i32,
+    res: &Residuals,
+    ncomp: usize,
+    h: &Hist,
+    best_dual: f64,
+    q5: (f64, f64),
+    tk: (f64, f64),
+) -> TermIn {
     TermIn {
         it,
         q130: res.q130,
@@ -2041,9 +2395,20 @@ struct Hsd {
 impl Hsd {
     /// `0x30fc90` with kappa > 0: `num = ((G - b'dy) + c'dx) + Rk / tau`, `dtau = num / den`, `dx += dtau dx_s`, `dy += dtau dy_s`, `dz = (rcx - z dx) / x`
     /// again; returns `(dtau, dkappa = (Rk - dtau kappa) / tau)`.
-    fn apply(&self, f: &StdForm, s: &State, rhs: &Rhs, d: &mut Direction, g: f64, rk: f64, tau: f64, kappa: f64) -> (f64, f64) {
+    fn apply(
+        &self,
+        f: &StdForm,
+        s: &State,
+        rhs: &Rhs,
+        d: &mut Direction,
+        g: f64,
+        rk: f64,
+        tau: f64,
+        kappa: f64,
+    ) -> (f64, f64) {
         let (m, n) = (f.m, f.n());
-        let num = ((g - dot_lanes(&f.b[..m], &d.dy[..m], 0)) + dot_lanes(&self.cx, &d.dx, 0)) + rk / tau;
+        let num =
+            ((g - dot_lanes(&f.b[..m], &d.dy[..m], 0)) + dot_lanes(&self.cx, &d.dx, 0)) + rk / tau;
         let dtau = num / self.den;
         let dkap = (rk - dtau * kappa) / tau;
         for j in 0..n {
@@ -2078,22 +2443,66 @@ fn centrality(target: f64, p: f64) -> f64 {
 
 /// Right-hand side of corrector `k` for the direction `d` so far: `target - dx dz` (`steps = None`, `k = 1`) or, for `k >= 2` with the steps of the direction so far,
 /// the centrality correction of the stretched trial point `(dx ap~ + x)(dz ad~ + z)`, `ap~ = min(1.5 ap + 0.3, 1.001)`, `ad~ = min(0.3 + 1.5 ad, 1.001)`.
-fn corrector_rhs(f: &StdForm, s: &State, d: &Direction, target: f64, steps: Option<(f64, f64)>) -> Rhs {
+fn corrector_rhs(
+    f: &StdForm,
+    s: &State,
+    d: &Direction,
+    target: f64,
+    steps: Option<(f64, f64)>,
+) -> Rhs {
     let (n, n2) = (f.n(), f.n2);
     let (rcx, rcu): (Vec<f64>, Vec<f64>) = match steps {
         None => (
-            (0..n).map(|j| if f.flags[j] & 1 != 0 { target - d.dx[j] * d.dz[j] } else { 0.0 }).collect(),
-            (0..n2).map(|j| if f.flags[j] & 2 != 0 { target - d.du[j] * d.dv[j] } else { 0.0 }).collect(),
+            (0..n)
+                .map(|j| {
+                    if f.flags[j] & 1 != 0 {
+                        target - d.dx[j] * d.dz[j]
+                    } else {
+                        0.0
+                    }
+                })
+                .collect(),
+            (0..n2)
+                .map(|j| {
+                    if f.flags[j] & 2 != 0 {
+                        target - d.du[j] * d.dv[j]
+                    } else {
+                        0.0
+                    }
+                })
+                .collect(),
         ),
         Some((tp, td)) => {
             let (apt, adt) = ((tp * 1.5 + 0.3).min(1.001), (0.3 + 1.5 * td).min(1.001));
             (
-                (0..n).map(|j| if f.flags[j] & 1 != 0 { centrality(target, (d.dx[j] * apt + s.x[j]) * (d.dz[j] * adt + s.z[j])) } else { 0.0 }).collect(),
-                (0..n2).map(|j| if f.flags[j] & 2 != 0 { centrality(target, (d.du[j] * apt + s.u[j]) * (d.dv[j] * adt + s.v[j])) } else { 0.0 }).collect(),
+                (0..n)
+                    .map(|j| {
+                        if f.flags[j] & 1 != 0 {
+                            centrality(target, (d.dx[j] * apt + s.x[j]) * (d.dz[j] * adt + s.z[j]))
+                        } else {
+                            0.0
+                        }
+                    })
+                    .collect(),
+                (0..n2)
+                    .map(|j| {
+                        if f.flags[j] & 2 != 0 {
+                            centrality(target, (d.du[j] * apt + s.u[j]) * (d.dv[j] * adt + s.v[j]))
+                        } else {
+                            0.0
+                        }
+                    })
+                    .collect(),
             )
         }
     };
-    Rhs { rp: vec![0.0; f.m], rd: vec![0.0; n], ru: vec![0.0; n2], rcx, rcu }
+    Rhs {
+        rp: vec![0.0; f.m],
+        rd: vec![0.0; n],
+        ru: vec![0.0; n2],
+        rcx,
+        rcu,
+    }
 }
 
 /// The work counter the driver reads through its timers: every site adds 0.75 times a count, a window adds 1.0 on top.
@@ -2113,7 +2522,16 @@ const WORK_SCALE: f64 = 0.75;
 
 impl Work {
     fn new(f: &StdForm, nz: f64, s: f64) -> Work {
-        Work { m: f.m as f64, nc: f.n2 as f64, nub: (f.ub_hi - f.ub_lo) as f64, nnz: f.row_idx.len() as f64, nz, s, mode1: false, t: [0.0; 5] }
+        Work {
+            m: f.m as f64,
+            nc: f.n2 as f64,
+            nub: (f.ub_hi - f.ub_lo) as f64,
+            nnz: f.row_idx.len() as f64,
+            nz,
+            s,
+            mode1: false,
+            t: [0.0; 5],
+        }
     }
 
     fn add(&mut self, k: usize, sites: &[f64]) {
@@ -2126,7 +2544,12 @@ impl Work {
 
     /// The solve `0x30fc90` with `extra` correction solves of the refinement.
     fn solve_sites(&self, extra: usize) -> Vec<f64> {
-        let blk = [WORK_SCALE * (2.0 * self.nnz), WORK_SCALE * (2.0 * self.nz), WORK_SCALE * (2.0 * self.nnz), (self.m * 11.0 + self.nc * 4.0) * WORK_SCALE];
+        let blk = [
+            WORK_SCALE * (2.0 * self.nnz),
+            WORK_SCALE * (2.0 * self.nz),
+            WORK_SCALE * (2.0 * self.nnz),
+            (self.m * 11.0 + self.nc * 4.0) * WORK_SCALE,
+        ];
         let res = WORK_SCALE * (4.0 * self.nnz);
         let mut v = Vec::new();
         for _ in 0..=extra {
@@ -2178,7 +2601,11 @@ impl Work {
 /// `0x2e22bf`: `max(1, floor(log10(max(columns, 1))) - 2)`.
 fn corrector_cap(ncol: usize) -> usize {
     let e = (ncol.max(1) as f64).log10().floor() as i64 - 2;
-    if e > 0 { e as usize } else { 1 }
+    if e > 0 {
+        e as usize
+    } else {
+        1
+    }
 }
 
 /// `0x2e22bf..0x2e24d2`: the corrector limit `Q+0x298` and the trial weights `Q+0x29c` of the next iteration from the work ratio and the mean step product of the last three iterations.
@@ -2197,7 +2624,13 @@ fn adapt_correctors(q298: usize, cap: usize, ratio: f64, avg: f64) -> (usize, us
     } else {
         dec = q298 > 1 && ratio > 0.25 && avg > 0.1;
     }
-    let r = if inc { q298 + 1 } else if dec { q298 - 1 } else { q298 };
+    let r = if inc {
+        q298 + 1
+    } else if dec {
+        q298 - 1
+    } else {
+        q298
+    };
     (r, (r + 1).min(10).max(3))
 }
 
@@ -2206,13 +2639,19 @@ fn adapt_correctors(q298: usize, cap: usize, ratio: f64, avg: f64) -> (usize, us
 /// Gaps (H): the progress counters `Q+0x88/0xa8/0xf4` are modelled as "improved at every iteration" (true on the five models), `Q+0x5e0/0x5e8`
 /// as nonzero, `Q+0x1e8` as the best dual objective, `Q+0x220/0x228` as the norms of the iterate. They matter only in branches of
 /// `0x2e2fe0` that the corpus does not reach.
-pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<BarrierRun, BarrierError> {
+pub fn run<S: NormalSolver>(
+    f: &StdForm,
+    solver: &mut S,
+    o: &Options,
+) -> Result<BarrierRun, BarrierError> {
     // The objective scale `Q+0x158` (the release profile's `f`).
     let scale = f.scaling.as_ref().map_or(1.0, |s| s.obj);
     let release = o.release;
     // Work model of the corrector adaptation (release only).
     let mut work = if release {
-        let (nz, sv) = solver.work_info(f).ok_or_else(|| BarrierError::Unsupported("the release profile needs the exact solver".into()))?;
+        let (nz, sv) = solver.work_info(f).ok_or_else(|| {
+            BarrierError::Unsupported("the release profile needs the exact solver".into())
+        })?;
         Some(Work::new(f, nz, sv))
     } else {
         None
@@ -2228,7 +2667,15 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
     if let Some(wk) = work.as_mut() {
         wk.factor();
     }
-    let w: Vec<f64> = (0..f.n()).map(|j| if j < f.n2 && f.flags[j] == 3 { 0.5 * f.ub[j] } else { 0.0 }).collect();
+    let w: Vec<f64> = (0..f.n())
+        .map(|j| {
+            if j < f.n2 && f.flags[j] == 3 {
+                0.5 * f.ub[j]
+            } else {
+                0.0
+            }
+        })
+        .collect();
     let s1 = solver.start(f, StartKind::Primal { w: &w })?;
     let s2 = solver.start(f, StartKind::Dual)?;
     let (mut st, p3_0, p4_0, _stage) = start_point(f, s1.clone(), s2.clone(), &sc, 0, 0.0);
@@ -2236,7 +2683,13 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
     let q38 = p3_0.min(p4_0);
     let mut records = Vec::new();
     let res = residuals(f, &st, tau, kappa, ncomp, scale);
-    let rec = IterRecord { it: -1, state: st.clone(), res: res.clone(), status: 1, dec: None };
+    let rec = IterRecord {
+        it: -1,
+        state: st.clone(),
+        res: res.clone(),
+        status: 1,
+        dec: None,
+    };
     emit_record(&rec);
     records.push(rec);
     let mut rd = res.rd.clone();
@@ -2267,10 +2720,27 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
         if res.q148 > best_dual && it > 0 {
             best_dual = res.q148;
         }
-        let ti = term_input(f, &sc, o, it, &res, ncomp, &h, best_dual, (w5[0], w5[1]), (tau, kappa));
+        let ti = term_input(
+            f,
+            &sc,
+            o,
+            it,
+            &res,
+            ncomp,
+            &h,
+            best_dual,
+            (w5[0], w5[1]),
+            (tau, kappa),
+        );
         let (code, _why) = status(&ti);
         if code != 1 || it >= o.max_iter + 1 {
-            let rec = IterRecord { it, state: st.clone(), res, status: code, dec: None };
+            let rec = IterRecord {
+                it,
+                state: st.clone(),
+                res,
+                status: code,
+                dec: None,
+            };
             emit_record(&rec);
             records.push(rec);
             let status = match code {
@@ -2278,7 +2748,12 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
                 7 => BarrierStatus::IterationLimit,
                 c => BarrierStatus::Other(c),
             };
-            return Ok(BarrierRun { status, iterations: it, state: st, records });
+            return Ok(BarrierRun {
+                status,
+                iterations: it,
+                state: st,
+                records,
+            });
         }
         let (n, n2, m) = (f.n(), f.n2, f.m);
         // The reference's iteration record (`BIT`) is taken before the homogeneous start recomputes the scalars.
@@ -2311,10 +2786,35 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
             wk.factor();
             wk.mode1 = solver.refine_mode(f);
         }
-        solver.prepare(&zx, ((res.q198 * res.q198 + res.q1a8 * res.q1a8).sqrt() / 10.0).max(1e-8));
-        let rcx: Vec<f64> = (0..n).map(|j| if f.flags[j] & 1 != 0 { -(st.x[j] * st.z[j]) } else { 0.0 }).collect();
-        let rcu: Vec<f64> = (0..n2).map(|j| if f.flags[j] & 2 != 0 { -(st.u[j] * st.v[j]) } else { 0.0 }).collect();
-        let rhs = Rhs { rp: res.rp.clone(), rd: res.rd.clone(), ru: res.ru.clone(), rcx, rcu };
+        solver.prepare(
+            &zx,
+            ((res.q198 * res.q198 + res.q1a8 * res.q1a8).sqrt() / 10.0).max(1e-8),
+        );
+        let rcx: Vec<f64> = (0..n)
+            .map(|j| {
+                if f.flags[j] & 1 != 0 {
+                    -(st.x[j] * st.z[j])
+                } else {
+                    0.0
+                }
+            })
+            .collect();
+        let rcu: Vec<f64> = (0..n2)
+            .map(|j| {
+                if f.flags[j] & 2 != 0 {
+                    -(st.u[j] * st.v[j])
+                } else {
+                    0.0
+                }
+            })
+            .collect();
+        let rhs = Rhs {
+            rp: res.rp.clone(),
+            rd: res.rd.clone(),
+            ru: res.ru.clone(),
+            rcx,
+            rcu,
+        };
         let mut pred = solver.direction(f, &st, DirKind::Predictor, &rhs)?;
         let (mut q770, mut q780) = solver.norms();
         if let Some(wk) = work.as_mut() {
@@ -2328,15 +2828,41 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
             let mut cx = f.c.clone();
             cx.resize(n, 0.0);
             let (dxs, dys) = solver.solve_raw(f, &cx, &f.b)?;
-            let den = ((kappa / tau) + dot_lanes(&f.b[..m], &dys[..m], 0)) - dot_lanes(&cx, &dxs, 0);
+            let den =
+                ((kappa / tau) + dot_lanes(&f.b[..m], &dys[..m], 0)) - dot_lanes(&cx, &dxs, 0);
             let hd = Hsd { cx, dxs, dys, den };
-            hq = hd.apply(f, &st, &rhs, &mut pred, (kappa - res.q148) + res.q138, -tau * kappa, tau, kappa);
+            hq = hd.apply(
+                f,
+                &st,
+                &rhs,
+                &mut pred,
+                (kappa - res.q148) + res.q138,
+                -tau * kappa,
+                tau,
+                kappa,
+            );
             hs = Some(hd);
         }
-        let tkp: Vec<(f64, f64, f64)> = if hsd { vec![(tau, hq.0, 0.0), (kappa, hq.1, 0.0)] } else { Vec::new() };
+        let tkp: Vec<(f64, f64, f64)> = if hsd {
+            vec![(tau, hq.0, 0.0), (kappa, hq.1, 0.0)]
+        } else {
+            Vec::new()
+        };
         let ap0 = step_pair(f, &st, &pred, None, true, &tkp);
         let ad0 = step_pair(f, &st, &pred, None, false, &tkp);
-        let aff = mu_aff(f, &st, &pred, ap0, ad0, ncomp, if hsd { Some((hq.0, hq.1, tau, kappa)) } else { None });
+        let aff = mu_aff(
+            f,
+            &st,
+            &pred,
+            ap0,
+            ad0,
+            ncomp,
+            if hsd {
+                Some((hq.0, hq.1, tau, kappa))
+            } else {
+                None
+            },
+        );
         let mut target = sigma_target(res.q1f0, aff);
         if it > qf4 {
             // `0x2e2047`: the last update with a step product above 5e-5 was not the previous iteration.
@@ -2346,19 +2872,43 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
         if !release {
             q298 = 1; // `0x2e20b5`: `Q+0x298 = max(BarCorrectors, 1)`
         }
-        let ntry = solver.ntry(it, if it == 0 { o.ntry_first } else if release { ntry_next } else { o.ntry_later });
+        let ntry = solver.ntry(
+            it,
+            if it == 0 {
+                o.ntry_first
+            } else if release {
+                ntry_next
+            } else {
+                o.ntry_later
+            },
+        );
         let (mut tp0, mut td0) = (ap0, ad0);
         let mut dirk = pred.clone();
         let mut k = 1usize;
         let mut hc = (0.0f64, 0.0f64);
         let (mut tp, mut td, mut wp, mut wd);
         let comb = loop {
-            let rhs2 = corrector_rhs(f, &st, &dirk, target, if k > 1 { Some((tp0, td0)) } else { None });
+            let rhs2 = corrector_rhs(
+                f,
+                &st,
+                &dirk,
+                target,
+                if k > 1 { Some((tp0, td0)) } else { None },
+            );
             let mut corr = solver.direction(f, &st, DirKind::Corrector, &rhs2)?;
             let (q778, q788) = solver.norms();
             let mut tks: Vec<(f64, f64, f64)> = Vec::new();
             if let Some(hd) = &hs {
-                hc = hd.apply(f, &st, &rhs2, &mut corr, 0.0, target - hq.0 * hq.1, tau, kappa);
+                hc = hd.apply(
+                    f,
+                    &st,
+                    &rhs2,
+                    &mut corr,
+                    0.0,
+                    target - hq.0 * hq.1,
+                    tau,
+                    kappa,
+                );
                 tks = vec![(tau, hq.0, hc.0), (kappa, hq.1, hc.1)];
             }
             (tp, td, wp, wd) = select(f, &st, &dirk, &corr, tp0, td0, ntry, &tks, k);
@@ -2396,7 +2946,11 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
         };
         // `0x2e22bf..0x2e24d2`: adaptation of the corrector limit and of the trial weights of the next iteration (release).
         if let Some(wk) = work.as_mut() {
-            let avg = if it > 2 { (w5[0] + w5[1] + w5[2]) * (1.0 / 3.0) } else { 1.0 };
+            let avg = if it > 2 {
+                (w5[0] + w5[1] + w5[2]) * (1.0 / 3.0)
+            } else {
+                1.0
+            };
             (q298, ntry_next) = adapt_correctors(q298, corrector_cap(f.n2), wk.ratio(), avg);
             wk.update();
         }
@@ -2414,7 +2968,17 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
         }
         w5 = [cp * cd, w5[0], w5[1]];
         // Combination words `Q+0x720..0x750` (`0x30fb8d`): dtau and dkappa of the primal (wp) and dual (wd) candidates.
-        let hk = if hsd { Some((tau, kappa, hq.0 + wp * hc.0, hq.1 + wp * hc.1, hq.0 + wd * hc.0)) } else { None };
+        let hk = if hsd {
+            Some((
+                tau,
+                kappa,
+                hq.0 + wp * hc.0,
+                hq.1 + wp * hc.1,
+                hq.0 + wd * hc.0,
+            ))
+        } else {
+            None
+        };
         let (mut next, (g, _sp, _sd), hout) = update(f, &st, &comb, cp, cd, ncomp, hk);
         if let Some(h) = hout {
             // `0x30e619`: the dual iterate is scaled by tau_p / tau_d when the two differ.
@@ -2427,9 +2991,26 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
             tau = h.tau;
             kappa = h.kappa;
         }
-        let dec = Decisions { ap: ap0, ad: ad0, aff, target, tp, td, wp, wd, ntry, gamma: g };
+        let dec = Decisions {
+            ap: ap0,
+            ad: ad0,
+            aff,
+            target,
+            tp,
+            td,
+            wp,
+            wd,
+            ntry,
+            gamma: g,
+        };
         let (q1d8, q1e0, q138, q1f0) = (res.q1d8, res.q1e0, res.q138, res.q1f0);
-        let rec = IterRecord { it, state: st.clone(), res: res_bit, status: code, dec: Some(dec) };
+        let rec = IterRecord {
+            it,
+            state: st.clone(),
+            res: res_bit,
+            status: code,
+            dec: Some(dec),
+        };
         emit_record(&rec);
         records.push(rec);
         st = next;
@@ -2453,13 +3034,23 @@ pub fn run<S: NormalSolver>(f: &StdForm, solver: &mut S, o: &Options) -> Result<
         } else {
             0.0
         };
-        let mut restart = qf8 == 0 && 1e-3 > w5[2] && 1e-3 > w5[1] && 1e-3 > w5[0] && ratio3 > 0.98 && 1e-3 > q770 && 1e-3 > q780 && relgap > 1e-4;
+        let mut restart = qf8 == 0
+            && 1e-3 > w5[2]
+            && 1e-3 > w5[1]
+            && 1e-3 > w5[0]
+            && ratio3 > 0.98
+            && 1e-3 > q770
+            && 1e-3 > q780
+            && relgap > 1e-4;
         // Type B restart floor `Q+0x30` (`0x2e2983`): `max(1000, 10 Q+0x38)`.
         let mut q30r = (q38 * 10.0).max(1000.0);
         if !restart && !q2c {
             // Restart A (`0x2e2aa1`, once; reached whenever B does not fire): |x| or |y| of the updated iterate huge (1e15 times the data norms), or from
             // iteration 10 on above 1e8 times them while the primal (dual) residual history did not fall. The starting point's floor stays 0.
-            let (nx, ny) = (dot_lanes(&st.x, &st.x, 0).sqrt(), dot_lanes(&st.y, &st.y, 0).sqrt());
+            let (nx, ny) = (
+                dot_lanes(&st.x, &st.x, 0).sqrt(),
+                dot_lanes(&st.y, &st.y, 0).sqrt(),
+            );
             let (t1, t2) = (sc.q168.max(1.0), sc.q178.max(1.0));
             let (mut fp, mut fd) = (false, false);
             if it >= 2 {
@@ -2509,14 +3100,32 @@ pub struct Solution {
 }
 
 pub fn solution(f: &StdForm, run: BarrierRun) -> Solution {
-    let x: Vec<f64> = (0..f.n2).map(|j| if f.lower[j] != 0.0 { run.state.x[j] + f.lower[j] } else { run.state.x[j] }).collect();
+    let x: Vec<f64> = (0..f.n2)
+        .map(|j| {
+            if f.lower[j] != 0.0 {
+                run.state.x[j] + f.lower[j]
+            } else {
+                run.state.x[j]
+            }
+        })
+        .collect();
     let last = run.records.last().unwrap();
     let mut y = vec![0.0; f.m];
     for k in 0..f.m {
         y[f.row_of[k]] = run.state.y[k] * if f.sense[k] == b'>' { -1.0 } else { 1.0 };
     }
     let mut rc: Vec<f64> = (0..f.n2)
-        .map(|j| (if f.flags[j] & 1 != 0 { run.state.z[j] } else { 0.0 }) - (if f.flags[j] & 2 != 0 { run.state.v[j] } else { 0.0 }))
+        .map(|j| {
+            (if f.flags[j] & 1 != 0 {
+                run.state.z[j]
+            } else {
+                0.0
+            }) - (if f.flags[j] & 2 != 0 {
+                run.state.v[j]
+            } else {
+                0.0
+            })
+        })
         .collect();
     let mut objective = last.res.q130;
     let mut x = x;
@@ -2532,7 +3141,11 @@ pub fn solution(f: &StdForm, run: BarrierRun) -> Solution {
             *t = *t * sc.row[i] / sc.obj;
         }
         for (j, t) in rc.iter_mut().enumerate() {
-            let c = if j < f.n_struct { sc.col[j] } else { sc.col[f.n_struct + f.range_rank[j - f.n_struct]] };
+            let c = if j < f.n_struct {
+                sc.col[j]
+            } else {
+                sc.col[f.n_struct + f.range_rank[j - f.n_struct]]
+            };
             *t = *t / (c * sc.obj);
         }
     }
@@ -2541,12 +3154,23 @@ pub fn solution(f: &StdForm, run: BarrierRun) -> Solution {
         rc.iter_mut().for_each(|t| *t = -*t);
         objective = -objective;
     }
-    Solution { objective, x, y, rc, run }
+    Solution {
+        objective,
+        x,
+        y,
+        rc,
+        run,
+    }
 }
 
 /// Convenience driver: structure (ordering) by [`crate::order::structure`], conversion, iteration with the given solver.
-pub fn solve_with<S: NormalSolver>(model: &LpModel, solver: &mut S, o: &Options) -> Result<Solution, BarrierError> {
-    let s = crate::order::structure(model, crate::order::DENSE_COL_MIN).map_err(|e| BarrierError::Unsupported(e.3.to_string()))?;
+pub fn solve_with<S: NormalSolver>(
+    model: &LpModel,
+    solver: &mut S,
+    o: &Options,
+) -> Result<Solution, BarrierError> {
+    let s = crate::order::structure(model, crate::order::DENSE_COL_MIN)
+        .map_err(|e| BarrierError::Unsupported(e.3.to_string()))?;
     let f = std_form(model, &s.sym.perm)?;
     let run = run(&f, solver, o)?;
     Ok(solution(&f, run))
@@ -2554,7 +3178,8 @@ pub fn solve_with<S: NormalSolver>(model: &LpModel, solver: &mut S, o: &Options)
 
 /// [`solve_with`] with the bit-exact [`crate::chol::CholSolver`] (the controlled profile of the reference: `BarCorrectors = 1`, no scaling, `BarOrder = 0`).
 pub fn solve_exact(model: &LpModel, o: &Options) -> Result<Solution, BarrierError> {
-    let s = crate::order::structure(model, crate::order::DENSE_COL_MIN).map_err(|e| BarrierError::Unsupported(e.3.to_string()))?;
+    let s = crate::order::structure(model, crate::order::DENSE_COL_MIN)
+        .map_err(|e| BarrierError::Unsupported(e.3.to_string()))?;
     let f = std_form(model, &s.sym.perm)?;
     let mut solver = crate::chol::CholSolver::new(&f, &s.sym);
     let run = run(&f, &mut solver, o)?;
@@ -2564,10 +3189,14 @@ pub fn solve_exact(model: &LpModel, o: &Options) -> Result<Solution, BarrierErro
 /// The release profile of the reference (`reverse-engineer/specs/barrier-release.md`): the model scaled by [`crate::scale::compute_with_ranges`] over [`range_columns`], adaptive correctors.
 pub fn solve_release(model: &LpModel, o: &Options) -> Result<Solution, BarrierError> {
     let sc = crate::scale::compute_with_ranges(model, &range_columns(model));
-    let s = crate::order::structure(model, crate::order::DENSE_COL_MIN).map_err(|e| BarrierError::Unsupported(e.3.to_string()))?;
+    let s = crate::order::structure(model, crate::order::DENSE_COL_MIN)
+        .map_err(|e| BarrierError::Unsupported(e.3.to_string()))?;
     let f = std_form_scaled(model, &s.sym.perm, Some(&sc))?;
     let mut solver = crate::chol::CholSolver::new(&f, &s.sym);
-    let o = Options { release: true, ..o.clone() };
+    let o = Options {
+        release: true,
+        ..o.clone()
+    };
     let run = run(&f, &mut solver, &o)?;
     Ok(solution(&f, run))
 }
@@ -2575,10 +3204,22 @@ pub fn solve_release(model: &LpModel, o: &Options) -> Result<Solution, BarrierEr
 /// `Method::Barrier` of [`crate::solve`]: [`solve_exact`] with the options mapped (`barrier_tol`, `max_iterations`), the result in the public types.
 /// Status: optimal, the iteration limit (API 7), unbounded (code 5, API 5) and infeasible (code 3, never observed); infeasible-or-unbounded (code 0xd, API 12)
 /// and the other codes (6, 0xb) are reported as `NumericalFailure` (no certificate is produced).
-pub fn solve_method(model: &LpModel, opts: &crate::SolveOptions) -> Result<crate::SolveResult, crate::simplex::SolveError> {
+pub fn solve_method(
+    model: &LpModel,
+    opts: &crate::SolveOptions,
+) -> Result<crate::SolveResult, crate::simplex::SolveError> {
     use crate::simplex::{SolveError, Status};
-    let o = Options { tol: opts.barrier_tol, max_iter: opts.max_iterations.min(i32::MAX as usize) as i32, ..Options::default() };
-    let sol = (if opts.scaling { solve_release(model, &o) } else { solve_exact(model, &o) }).map_err(|e| match e {
+    let o = Options {
+        tol: opts.barrier_tol,
+        max_iter: opts.max_iterations.min(i32::MAX as usize) as i32,
+        ..Options::default()
+    };
+    let sol = (if opts.scaling {
+        solve_release(model, &o)
+    } else {
+        solve_exact(model, &o)
+    })
+    .map_err(|e| match e {
         BarrierError::Unsupported(s) | BarrierError::Solver(s) => SolveError::Unsupported(s),
     })?;
     let status = match sol.run.status {

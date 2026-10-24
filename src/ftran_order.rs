@@ -182,7 +182,8 @@ fn dot(x: &[f64], c: &[f64], peel: usize) -> f64 {
         lanes[(i - peel) & 7] += t(i);
     }
     // The compiled reduction adds the four packed accumulators pairwise: (l0+l2 | l1+l3) + (l4+l6 | l5+l7), then the two halves.
-    let mut tot = ((lanes[0] + lanes[2]) + (lanes[4] + lanes[6])) + ((lanes[1] + lanes[3]) + (lanes[5] + lanes[7]));
+    let mut tot = ((lanes[0] + lanes[2]) + (lanes[4] + lanes[6]))
+        + ((lanes[1] + lanes[3]) + (lanes[5] + lanes[7]));
     for i in n8..n {
         tot += t(i);
     }
@@ -191,7 +192,12 @@ fn dot(x: &[f64], c: &[f64], peel: usize) -> f64 {
 
 impl RefStruct {
     /// Fresh factor from the pivot sequence; `cols[pos]` is the basis column at incoming position `pos` as `(is_slack, rows, values)`.
-    pub fn fresh(m: usize, ncols: usize, st: &Structure, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> RefStruct {
+    pub fn fresh(
+        m: usize,
+        ncols: usize,
+        st: &Structure,
+        cols: &[(bool, Vec<usize>, Vec<f64>)],
+    ) -> RefStruct {
         let mut step = vec![usize::MAX; m];
         for (s, &(r, _)) in st.pivots.iter().enumerate() {
             step[r] = s;
@@ -209,7 +215,11 @@ impl RefStruct {
         for s in i21..m {
             kind[s] = -2;
         }
-        let lcols: Vec<Vec<usize>> = st.l_rows.iter().map(|rows| rows.iter().map(|&r| step[r]).collect()).collect();
+        let lcols: Vec<Vec<usize>> = st
+            .l_rows
+            .iter()
+            .map(|rows| rows.iter().map(|&r| step[r]).collect())
+            .collect();
         let lvals = st.l_vals.clone();
         // pivot-row values of the Markowitz steps, by column
         let mut mk: Vec<Vec<(usize, f64)>> = vec![Vec::new(); m];
@@ -292,7 +302,11 @@ impl RefStruct {
                     // A singleton-phase column subtracts `(x * a) / d` with the raw entry `a`, not `x * (a / d)`; the
                     // multiplier is the only form known for pair overrides and nucleus columns.
                     let a = st.l_raw[v][e];
-                    xv[y] -= if a.is_nan() { lvals[v][e] * x } else { (x * a) / st.diag[v] };
+                    xv[y] -= if a.is_nan() {
+                        lvals[v][e] * x
+                    } else {
+                        (x * a) / st.diag[v]
+                    };
                 }
             }
             let mut ents: Vec<(usize, f64)> = Vec::new();
@@ -330,7 +344,11 @@ impl RefStruct {
                 xv[v] = 0.0;
             }
             ents.sort_unstable_by_key(|e| e.0);
-            let av: Vec<usize> = ents.iter().map(|e| e.0).filter(|&x| kind[x] == -2).collect();
+            let av: Vec<usize> = ents
+                .iter()
+                .map(|e| e.0)
+                .filter(|&x| kind[x] == -2)
+                .collect();
             let mut bv: Vec<usize> = ents.iter().map(|e| e.0).filter(|&x| kind[x] >= 0).collect();
             bv.sort_unstable_by_key(|&x| std::cmp::Reverse(kind[x]));
             sa += av.len();
@@ -342,14 +360,26 @@ impl RefStruct {
         }
         let nt = m - i21;
         let nn = nuc.len();
-        let h33 = if nt > 0 { (sa + nt) as f64 / nt as f64 } else { 1.5 };
-        let h34 = if nn > 0 { (sb + nn) as f64 / nn as f64 } else { 1.5 };
+        let h33 = if nt > 0 {
+            (sa + nt) as f64 / nt as f64
+        } else {
+            1.5
+        };
+        let h34 = if nn > 0 {
+            (sb + nn) as f64 / nn as f64
+        } else {
+            1.5
+        };
         let nnz: usize = lcols.iter().map(|c| c.len()).sum();
         let dthr = if nnz <= m {
             2
         } else {
             let t = 5.0 * ((nnz as f64 / m as f64) + 1.0).powi(2);
-            if (m as f64) > t { t as usize } else { m }
+            if (m as f64) > t {
+                t as usize
+            } else {
+                m
+            }
         };
         let mut lev_dense = false;
         let mut lev_built = false;
@@ -369,7 +399,11 @@ impl RefStruct {
                 lev_dense_ft = (maxlev as f64) >= 0.1 * m as f64;
                 lev_dense = lev_dense_ft;
                 lev_built = true;
-                if !lev_dense_ft && outer { Some(lev) } else { None }
+                if !lev_dense_ft && outer {
+                    Some(lev)
+                } else {
+                    None
+                }
             } else {
                 None
             }
@@ -377,7 +411,10 @@ impl RefStruct {
         let nnz_l_tot: usize = lcols.iter().map(|c| c.len()).sum();
         let perm = step;
         let znz = (nnz + sa + sb + 2 * m) as f64;
-        let mark0 = (i21..m).rev().find(|&t| kind[t] == -2 && a[t].is_empty() && b[t].is_empty()).unwrap_or(i21.min(m - 1));
+        let mark0 = (i21..m)
+            .rev()
+            .find(|&t| kind[t] == -2 && a[t].is_empty() && b[t].is_empty())
+            .unwrap_or(i21.min(m - 1));
         RefStruct {
             upd: 0,
             sum_alpha: 0.0,
@@ -396,7 +433,10 @@ impl RefStruct {
             tau_l: std::cell::Cell::new(0.0),
             tau_u: std::cell::Cell::new(0.0),
             f2: std::cell::RefCell::new(F2::default()),
-            scratch_peel: ((m as f64).powf(0.7) as usize).max(20).wrapping_add(ncols + 1) % 2,
+            scratch_peel: ((m as f64).powf(0.7) as usize)
+                .max(20)
+                .wrapping_add(ncols + 1)
+                % 2,
             fill: 2 * (uc.iter().map(Vec::len).sum::<usize>() + nnz_l_tot),
             // A row lists its tail columns in the order of the factorization's U row (Markowitz steps), or in the order of the
             // basis columns for a row of the singleton phases.
@@ -415,7 +455,10 @@ impl RefStruct {
                 }
                 let mut rl = vec![Vec::new(); m];
                 let mut stamp = vec![usize::MAX; m];
-                let all_pos: Vec<usize> = (0..m).filter(|&c| pos_of_col[c] != usize::MAX).map(|c| pos_of_col[c]).collect();
+                let all_pos: Vec<usize> = (0..m)
+                    .filter(|&c| pos_of_col[c] != usize::MAX)
+                    .map(|c| pos_of_col[c])
+                    .collect();
                 for y in 0..m {
                     if member[y].is_empty() {
                         continue;
@@ -453,7 +496,8 @@ impl RefStruct {
                         len[row] += 1;
                     }
                 }
-                let mut order: Vec<usize> = (0..m).filter(|&p| kind[p] >= 0 && len[p] > 0).collect();
+                let mut order: Vec<usize> =
+                    (0..m).filter(|&p| kind[p] >= 0 && len[p] > 0).collect();
                 order.sort_by_key(|&p| kind[p]);
                 order.extend((0..m).filter(|&p| kind[p] < 0 && len[p] > 0));
                 let mut par = vec![0u8; m];
@@ -540,7 +584,12 @@ impl RefStruct {
 
     /// L solve (Kahn order) and row etas on the entering column; returns the nonzero list the U solve receives, with values.
     /// Also returns the work estimate of the L stage and the row etas (`0x12bd30` / `0x12a990` and the eta loop of `0x120740`).
-    fn lstage_num(&self, rows: &[usize], vals: &[f64], force_dense: bool) -> (Vec<(usize, f64)>, usize, f64) {
+    fn lstage_num(
+        &self,
+        rows: &[usize],
+        vals: &[f64],
+        force_dense: bool,
+    ) -> (Vec<(usize, f64)>, usize, f64) {
         let m = self.m;
         let mut e = 0.0f64;
         let mut x = vec![0.0f64; self.m];
@@ -654,7 +703,9 @@ impl RefStruct {
                 }
                 e = e2 + e;
             } else {
-                e = (((self.nnz_l + m) as f64 + m as f64 + m as f64) * 7.0 * count_l as f64) / (m + 1) as f64 + e;
+                e = (((self.nnz_l + m) as f64 + m as f64 + m as f64) * 7.0 * count_l as f64)
+                    / (m + 1) as f64
+                    + e;
             }
             if m >= 250 && count_l * self.dthr > m {
                 // The reference's result is then dense and equals an ascending scan (PILOT4 call 219); the switch condition is
@@ -732,9 +783,21 @@ impl RefStruct {
         }
         // A dense vector goes on as the raw array: the reference keeps the sub-tolerance residues of the L and eta stages.
         if dense_l || (!self.etas.is_empty() && count_l * self.dthr > m) {
-            return ((0..m).filter(|&v| x[v] != 0.0).map(|v| (v, x[v])).collect(), count_l, e);
+            return (
+                (0..m).filter(|&v| x[v] != 0.0).map(|v| (v, x[v])).collect(),
+                count_l,
+                e,
+            );
         }
-        (order.into_iter().filter(|&v| x[v].abs() > TOL).map(|v| (v, x[v])).collect(), count_l, e)
+        (
+            order
+                .into_iter()
+                .filter(|&v| x[v].abs() > TOL)
+                .map(|v| (v, x[v]))
+                .collect(),
+            count_l,
+            e,
+        )
     }
 
     /// FTRAN of a sparse column: the nonzeros `(position, value)` of `B^-1 a` in the reference's output order. The spike is kept
@@ -748,11 +811,18 @@ impl RefStruct {
     /// tail columns scattering into tail rows only. A needed singleton position is `x / diag`, a needed tail position its solved
     /// value, a needed nucleus position the row-wise dot product over the row copy (`rowl`), subtracted term by term from the L
     /// stage value and divided by the diagonal, without a tolerance test. Does not touch the spike of the last `ftran`.
-    pub fn ftran_needed(&self, rows: &[usize], vals: &[f64], needed: &[usize]) -> Vec<(usize, f64)> {
+    pub fn ftran_needed(
+        &self,
+        rows: &[usize],
+        vals: &[f64],
+        needed: &[usize],
+    ) -> Vec<(usize, f64)> {
         let m = self.m;
         let (spike, count_l, e_l) = self.lstage_num(rows, vals, false);
         self.tau_l.set(e_l);
-        let tau_dense = rows.len() * self.dthr > self.m || self.lev_dense_ft || (!self.etas.is_empty() && count_l * self.dthr > self.m);
+        let tau_dense = rows.len() * self.dthr > self.m
+            || self.lev_dense_ft
+            || (!self.etas.is_empty() && count_l * self.dthr > self.m);
         let tau_n = if tau_dense { None } else { Some(spike.len()) };
         let mut x = vec![0.0f64; m];
         let mut touched = vec![false; m];
@@ -816,8 +886,12 @@ impl RefStruct {
                     -2 => x[p],
                     -1 => x[p] / self.diag[p],
                     _ => {
-                        let terms: Vec<(f64, f64)> =
-                            self.rowl[p].iter().filter_map(|&c| self.uc[c].iter().find(|e| e.0 == p).map(|e| (e.1, x[c]))).collect();
+                        let terms: Vec<(f64, f64)> = self.rowl[p]
+                            .iter()
+                            .filter_map(|&c| {
+                                self.uc[c].iter().find(|e| e.0 == p).map(|e| (e.1, x[c]))
+                            })
+                            .collect();
                         row_dot(x[p], &terms, self.row_par[p] as usize) / self.diag[p]
                     }
                 };
@@ -832,11 +906,17 @@ impl RefStruct {
     pub fn joint_u(&self, out: &[usize]) -> Option<f64> {
         let f = self.f2.borrow();
         let (m, i21) = (self.m, self.i21);
-        let ok = |n: Option<usize>| n.is_some_and(|n| self.nuc.len() + n < i21 || self.dens * (n as f64) < 2.0 * m as f64);
+        let ok = |n: Option<usize>| {
+            n.is_some_and(|n| self.nuc.len() + n < i21 || self.dens * (n as f64) < 2.0 * m as f64)
+        };
         if ok(f.tau_n) {
             return None;
         }
-        Some(if ok(f.col_n) { self.third_work(&f, out) } else { self.dense_pair_work(&f, out) })
+        Some(if ok(f.col_n) {
+            self.third_work(&f, out)
+        } else {
+            self.dense_pair_work(&f, out)
+        })
     }
 
     /// Work of the output stage of both joint routines: `(row length + 2) 2` for each result position of the nucleus list.
@@ -881,7 +961,8 @@ impl RefStruct {
             }
         }
         let nuc_len = self.nuc.len();
-        let use_dense_scan = !sparse_in || self.dens * (nuc_cnt + tail_cnt) as f64 > tail_rows + nuc_len as f64;
+        let use_dense_scan =
+            !sparse_in || self.dens * (nuc_cnt + tail_cnt) as f64 > tail_rows + nuc_len as f64;
         let mut x5 = 0.0f64;
         let x1;
         if use_dense_scan {
@@ -971,7 +1052,11 @@ impl RefStruct {
                 x4 += (self.a[c].len() as f64 + 2.0) * 2.0;
             }
         }
-        let last = if i21 == m { m as i64 - 1 } else { i21 as i64 - 1 };
+        let last = if i21 == m {
+            m as i64 - 1
+        } else {
+            i21 as i64 - 1
+        };
         let mut x1 = (m - i21) as f64;
         x1 += last.max(0) as f64;
         x1 *= 5.0;
@@ -1035,11 +1120,25 @@ impl RefStruct {
     /// result as `ftran` (`dense`: the input is a dense vector, as `ftran_basic`), but the spike of the pivot column and the
     /// per-solve statistics stay as they were.
     pub fn ftran_keep(&mut self, rows: &[usize], vals: &[f64], dense: bool) -> Vec<(usize, f64)> {
-        let saved = (self.spike.clone(), self.spike_used, self.last_alpha, self.last_dense, self.last_ordered, self.work);
+        let saved = (
+            self.spike.clone(),
+            self.spike_used,
+            self.last_alpha,
+            self.last_dense,
+            self.last_ordered,
+            self.work,
+        );
         let out = self.ftran_with(rows, vals, dense);
         self.keep_work = self.work;
         self.keep_dense = self.last_dense;
-        (self.spike, self.spike_used, self.last_alpha, self.last_dense, self.last_ordered, self.work) = saved;
+        (
+            self.spike,
+            self.spike_used,
+            self.last_alpha,
+            self.last_dense,
+            self.last_ordered,
+            self.work,
+        ) = saved;
         out
     }
 
@@ -1079,7 +1178,8 @@ impl RefStruct {
         // The dense U routine (`0x121ef0`) tests the raw value first; the sparse one (`0x1223e0`, at `0x12297b`) only the quotient.
         let u_dense = rows.len() * self.dthr > m
             || (!self.etas.is_empty() && count_l * self.dthr > m)
-            || !(self.nuc.len() + spike.len() < self.i21 || self.dens * (spike.len() as f64) < 2.0 * m as f64)
+            || !(self.nuc.len() + spike.len() < self.i21
+                || self.dens * (spike.len() as f64) < 2.0 * m as f64)
             || self.lev_dense_ft;
         let bs = force_dense && crate::dump::on("bsolve");
         let x_l = if bs { x.clone() } else { Vec::new() };
@@ -1104,26 +1204,50 @@ impl RefStruct {
         for p in 0..m {
             if touched[p] && self.kind[p] != -2 {
                 let v = x[p] / self.diag[p];
-                x[p] = if (u_dense && x[p].abs() <= TOL) || v.abs() <= TOL { 0.0 } else { v };
+                x[p] = if (u_dense && x[p].abs() <= TOL) || v.abs() <= TOL {
+                    0.0
+                } else {
+                    v
+                };
             }
         }
         if bs {
-            crate::dump::emit("bsolve", serde_json::json!({"l": x_l, "tail_done": x_t, "x": x, "tail": tail, "kind": self.kind, "slot": self.slot, "diag": self.diag, "u_dense": u_dense, "uc": self.uc, "lcols": self.lcols, "lvals": self.lvals, "perm": self.perm, "rows": rows, "vals": vals}));
+            crate::dump::emit(
+                "bsolve",
+                serde_json::json!({"l": x_l, "tail_done": x_t, "x": x, "tail": tail, "kind": self.kind, "slot": self.slot, "diag": self.diag, "u_dense": u_dense, "uc": self.uc, "lcols": self.lcols, "lvals": self.lvals, "perm": self.perm, "rows": rows, "vals": vals}),
+            );
         }
         // A dense result (the reference's `-1` count) is scanned by position index; a sparse one comes in the U solve's order.
         let dense = rows.len() * self.dthr > m
             || self.lev_dense_ft
             || (!self.etas.is_empty() && count_l * self.dthr > m)
-            || !(self.nuc.len() + spike.len() < self.i21 || self.dens * (spike.len() as f64) < 2.0 * m as f64);
+            || !(self.nuc.len() + spike.len() < self.i21
+                || self.dens * (spike.len() as f64) < 2.0 * m as f64);
         let inp: Vec<usize> = spike.iter().map(|e| e.0).collect();
-        let vec_dense = rows.len() * self.dthr > m || self.lev_dense_ft || (!self.etas.is_empty() && count_l * self.dthr > m);
-        let u_est = self.u_work(&inp, &x, !dense, if vec_dense { None } else { Some(spike.len()) });
-        *self.f2.borrow_mut() = F2 { col_n: if vec_dense { None } else { Some(spike.len()) }, col_in: inp.clone(), x_col: x.clone(), ..F2::default() };
+        let vec_dense = rows.len() * self.dthr > m
+            || self.lev_dense_ft
+            || (!self.etas.is_empty() && count_l * self.dthr > m);
+        let u_est = self.u_work(
+            &inp,
+            &x,
+            !dense,
+            if vec_dense { None } else { Some(spike.len()) },
+        );
+        *self.f2.borrow_mut() = F2 {
+            col_n: if vec_dense { None } else { Some(spike.len()) },
+            col_in: inp.clone(),
+            x_col: x.clone(),
+            ..F2::default()
+        };
         self.work = u_est + e_l;
         self.work_parts = (e_l, u_est);
         self.last_dense = dense;
         self.last_ordered = dense || u_dense;
-        let ord = if dense || u_dense { (0..m).collect() } else { self.uorder(&inp, &x) };
+        let ord = if dense || u_dense {
+            (0..m).collect()
+        } else {
+            self.uorder(&inp, &x)
+        };
         let mut out: Vec<(usize, f64)> = Vec::new();
         let mut done = vec![false; m];
         for &p in &ord {
@@ -1159,7 +1283,15 @@ impl RefStruct {
     /// `(nucleus list length, first tail slot, dens)`; for diagnostics against the reference's `i3`, `i21` and `(hdr33+hdr34)^2`.
     /// The fresh factor's numerics for the `luout` dump: the diagonal and each position's L column `(position, value)`.
     pub fn numerics(&self) -> (&[f64], Vec<Vec<(usize, f64)>>) {
-        let l = (0..self.m).map(|v| self.lcols[v].iter().copied().zip(self.lvals[v].iter().copied()).collect()).collect();
+        let l = (0..self.m)
+            .map(|v| {
+                self.lcols[v]
+                    .iter()
+                    .copied()
+                    .zip(self.lvals[v].iter().copied())
+                    .collect()
+            })
+            .collect();
         (&self.diag, l)
     }
 
@@ -1217,7 +1349,12 @@ impl RefStruct {
     /// etas in reverse, the L^T solve, then the rows. Returns `(row, value)` with the reference's drops, and leaves its work
     /// estimate in `work`. `direct` is the update-saving entry (`0x131710`), which goes to the sparse U^T solve without the density
     /// test unless the first position's U^T row is empty. `dense_in` passes the input as a dense vector (count `-1`).
-    pub fn btran(&mut self, inp: &[(usize, f64)], direct: bool, dense_in: bool) -> Vec<(usize, f64)> {
+    pub fn btran(
+        &mut self,
+        inp: &[(usize, f64)],
+        direct: bool,
+        dense_in: bool,
+    ) -> Vec<(usize, f64)> {
         let m = self.m;
         let mut ut: Vec<Vec<(usize, f64)>> = vec![Vec::new(); m];
         for c in 0..m {
@@ -1251,7 +1388,11 @@ impl RefStruct {
             }
             for &(p, v) in inp {
                 let d = v / self.diag[p];
-                let tail = if self.h33 > 5.0 { self.kind[p] == -2 } else { self.slot[p] >= self.i21 };
+                let tail = if self.h33 > 5.0 {
+                    self.kind[p] == -2
+                } else {
+                    self.slot[p] >= self.i21
+                };
                 if tail {
                     if self.h33 <= 5.0 || d.abs() > TOL {
                         lowest = lowest.min(self.slot[p]);
@@ -1399,7 +1540,11 @@ impl RefStruct {
             if d >= 6 && m < 10 * d * d && n1 < 2 * d && 10 * d < nnz_tail && cnt > 0 {
                 hi = l.iter().filter(|&&i| i >= nseq).count();
             }
-            let dn = if d > 0 { nnz_tail as f64 * 0.5 / d as f64 } else { 0.0 };
+            let dn = if d > 0 {
+                nnz_tail as f64 * 0.5 / d as f64
+            } else {
+                0.0
+            };
             if hi as f64 * dn * dn > d as f64 {
                 // Partial: inputs in the middle range directly, then the top range and the first-phase range, both descending.
                 let mut el = cnt as f64 * 3.0;
@@ -1426,7 +1571,11 @@ impl RefStruct {
                     w[i] = x[i];
                 }
                 el = (n1 as f64 - nseq as f64 + maxi as f64) * 2.0 + el;
-                let ranges: Vec<usize> = if nseq <= maxi { (nseq..=maxi).rev().collect() } else { Vec::new() };
+                let ranges: Vec<usize> = if nseq <= maxi {
+                    (nseq..=maxi).rev().collect()
+                } else {
+                    Vec::new()
+                };
                 for i in ranges.into_iter().chain((0..n1).rev()) {
                     let v = w[i];
                     if v.abs() > TOL {
@@ -1539,9 +1688,17 @@ impl RefStruct {
         if self.bt_dense {
             // The dense result keeps the sub-tolerance entries the L^T pass left in place.
             // and lists them by ascending row.
-            return (0..m).filter_map(|r| { let i = self.perm[r]; (x[i] != 0.0).then(|| (r, x[i])) }).collect();
+            return (0..m)
+                .filter_map(|r| {
+                    let i = self.perm[r];
+                    (x[i] != 0.0).then(|| (r, x[i]))
+                })
+                .collect();
         }
-        res.into_iter().filter(|&i| x[i] != 0.0).map(|i| (row_of[i], x[i])).collect()
+        res.into_iter()
+            .filter(|&i| x[i] != 0.0)
+            .map(|i| (row_of[i], x[i]))
+            .collect()
     }
 
     /// Density threshold of the solves (`F+0x104`).
@@ -1592,7 +1749,11 @@ impl RefStruct {
     /// Work of discarding the pending FTRAN spike when the clean-up pass factorizes after the last iteration: the spike counts only if no
     /// column replacement has used it (a bound flip was the last FTRAN).
     pub fn discard_work_unused(&self) -> f64 {
-        if self.spike_used { 0.0 } else { 2.0 * self.spike.len() as f64 }
+        if self.spike_used {
+            0.0
+        } else {
+            2.0 * self.spike.len() as f64
+        }
     }
 
     /// `nnz(U)` of the fresh factor (the reference's `F+0xb0` pointer array total): the factor size less `nnz(L)` and the two diagonals.
@@ -1617,8 +1778,24 @@ impl RefStruct {
 
     /// U-stage state of the most recent solve for the `ustage` dump: the spike (the L-stage result), the diagonal, the tail
     /// columns' U entries and the slots.
-    pub fn ustage_state(&self) -> (&[(usize, f64)], &[f64], &[Vec<(usize, f64)>], &[usize], &[i64], usize) {
-        (&self.spike, &self.diag, &self.uc, &self.slot, &self.kind, self.i21)
+    pub fn ustage_state(
+        &self,
+    ) -> (
+        &[(usize, f64)],
+        &[f64],
+        &[Vec<(usize, f64)>],
+        &[usize],
+        &[i64],
+        usize,
+    ) {
+        (
+            &self.spike,
+            &self.diag,
+            &self.uc,
+            &self.slot,
+            &self.kind,
+            self.i21,
+        )
     }
 
     pub fn last_dense(&self) -> bool {
@@ -1710,7 +1887,11 @@ impl RefStruct {
             let e = full_tail(0.0);
             return i3 as f64 + i3 as f64 + e;
         }
-        let tail: Vec<usize> = inp.iter().copied().filter(|&p| self.kind[p] == -2).collect();
+        let tail: Vec<usize> = inp
+            .iter()
+            .copied()
+            .filter(|&p| self.kind[p] == -2)
+            .collect();
         let nuc_in = inp.iter().filter(|&&p| self.kind[p] >= 0).count();
         if d2 * ((nuc_in + tail.len()) as f64) > (i3 + (m - i21)) as f64 {
             let e = (2 * (nuc_in + tail.len())) as f64;
@@ -1799,19 +1980,33 @@ impl RefStruct {
             }
         }
         let n = inp_d.len();
-        let sing: Vec<usize> = inp_d.iter().copied().filter(|&x| self.kind[x] == -1).collect();
-        let tri: Vec<usize> = inp_d.iter().copied().filter(|&x| self.kind[x] == -2).collect();
-        let nuc: Vec<usize> = inp_d.iter().copied().filter(|&x| self.kind[x] >= 0).collect();
+        let sing: Vec<usize> = inp_d
+            .iter()
+            .copied()
+            .filter(|&x| self.kind[x] == -1)
+            .collect();
+        let tri: Vec<usize> = inp_d
+            .iter()
+            .copied()
+            .filter(|&x| self.kind[x] == -2)
+            .collect();
+        let nuc: Vec<usize> = inp_d
+            .iter()
+            .copied()
+            .filter(|&x| self.kind[x] >= 0)
+            .collect();
         let i3 = self.nuc.len();
         let d2 = self.dens;
-        let by_slot_desc = |v: &mut Vec<usize>| v.sort_unstable_by_key(|&x| std::cmp::Reverse(self.slot[x]));
+        let by_slot_desc =
+            |v: &mut Vec<usize>| v.sort_unstable_by_key(|&x| std::cmp::Reverse(self.slot[x]));
         let nuc_sorted = |set: Vec<usize>| {
             let mut v = set;
             v.sort_unstable_by_key(|&x| self.kind[x]);
             v
         };
         let mut have = vec![false; m];
-        let dense = (m as f64) <= (n as f64) * d2 || d2 * ((nuc.len() + tri.len()) as f64) > (i3 + (m - self.i21)) as f64;
+        let dense = (m as f64) <= (n as f64) * d2
+            || d2 * ((nuc.len() + tri.len()) as f64) > (i3 + (m - self.i21)) as f64;
         if dense {
             let mut t: Vec<usize> = tri.clone();
             for &x in &tri {
@@ -1864,7 +2059,12 @@ impl RefStruct {
         }
         let mut nm = vec![false; m];
         let mut lst: Vec<usize> = Vec::new();
-        for &y in nuc.iter().chain(order.iter().filter(|&&k| x[k] != 0.0).flat_map(|&k| self.b[k].iter())) {
+        for &y in nuc.iter().chain(
+            order
+                .iter()
+                .filter(|&&k| x[k] != 0.0)
+                .flat_map(|&k| self.b[k].iter()),
+        ) {
             if !nm[y] {
                 nm[y] = true;
                 lst.push(y);
@@ -1893,14 +2093,21 @@ impl RefStruct {
     /// reference update); when a column's list is as long as the distance to the hole the rest of the range shifts down instead.
     fn walk(&mut self, r: usize, hole: usize, mut cur: usize) {
         // Column lengths leave out row r, which the reference has already removed from U.
-        let len = |s: &Self, pos: usize| s.a[pos].iter().chain(&s.b[pos]).filter(|&&x| x != r).count();
+        let len = |s: &Self, pos: usize| {
+            s.a[pos]
+                .iter()
+                .chain(&s.b[pos])
+                .filter(|&&x| x != r)
+                .count()
+        };
         // The reference's work: each jump scans the column (2 per entry and 5) on the factor's scale; the final shift
         // moves the slots in between.
         let mut jumps = 0.0;
         while cur != hole {
             let pos = self.at[cur];
             if len(self, pos) >= cur - hole {
-                self.upd_work.push((0xf3d83, 2.0 * (cur - hole) as f64, crate::work::CTX));
+                self.upd_work
+                    .push((0xf3d83, 2.0 * (cur - hole) as f64, crate::work::CTX));
                 let occ = self.at[hole];
                 for t in hole..cur {
                     self.at[t] = self.at[t + 1];
@@ -1928,7 +2135,8 @@ impl RefStruct {
         }
         if jumps > 0.0 {
             // Stored before the shift.
-            let at = self.upd_work.len() - usize::from(self.upd_work.last().is_some_and(|w| w.0 == 0xf3d83));
+            let at = self.upd_work.len()
+                - usize::from(self.upd_work.last().is_some_and(|w| w.0 == 0xf3d83));
             self.upd_work.insert(at, (0xf3ca4, jumps, crate::work::FAC));
         }
     }
@@ -1962,7 +2170,8 @@ impl RefStruct {
         let rows = |i: usize| &rent[rstart[i]..rstart[i + 1]];
         let mut w = vec![0.0f64; m];
         let mut seen = vec![false; m];
-        let mut heap: std::collections::BinaryHeap<std::cmp::Reverse<(usize, usize)>> = std::collections::BinaryHeap::new();
+        let mut heap: std::collections::BinaryHeap<std::cmp::Reverse<(usize, usize)>> =
+            std::collections::BinaryHeap::new();
         for &(k, v) in rows(r) {
             w[k] = v * (1.0 / d0);
             seen[k] = true;
@@ -2012,7 +2221,10 @@ impl RefStruct {
         if crate::dump::on("fstruct") {
             static CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
             let n = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            crate::dump::emit("fstruct", serde_json::json!({"rowl": (0..m).filter(|&y| !self.rowl[y].is_empty()).map(|y| (y.to_string(), self.rowl[y].clone())).collect::<std::collections::BTreeMap<_, _>>(), "mark": self.mark, "n": n, "m": m, "i3": self.nuc.len(), "i21": self.i21, "kind": self.kind, "nuc": self.nuc, "seqA": self.slot, "fill": self.fill, "diag": self.diag, "uvals": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), (self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.0).collect::<Vec<_>>(), self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.1).collect::<Vec<_>>()))).collect::<std::collections::BTreeMap<_, _>>(), "cols": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), [&self.a[k], &self.b[k]])).collect::<std::collections::BTreeMap<_, _>>()}));
+            crate::dump::emit(
+                "fstruct",
+                serde_json::json!({"rowl": (0..m).filter(|&y| !self.rowl[y].is_empty()).map(|y| (y.to_string(), self.rowl[y].clone())).collect::<std::collections::BTreeMap<_, _>>(), "mark": self.mark, "n": n, "m": m, "i3": self.nuc.len(), "i21": self.i21, "kind": self.kind, "nuc": self.nuc, "seqA": self.slot, "fill": self.fill, "diag": self.diag, "uvals": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), (self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.0).collect::<Vec<_>>(), self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.1).collect::<Vec<_>>()))).collect::<std::collections::BTreeMap<_, _>>(), "cols": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), [&self.a[k], &self.b[k]])).collect::<std::collections::BTreeMap<_, _>>()}),
+            );
         }
         self.before_last = (self.upd, self.sum_alpha);
         self.upd += 1;
@@ -2022,16 +2234,31 @@ impl RefStruct {
         // The eta is stored first, at the current pool fill; its value array sits on a 16-byte boundary when the fill is even.
         let peel = self.fill % 2;
         // The old column's entries leave the row-wise copy after the new column's entries have been added.
-        let old_rows: Vec<usize> = if self.kind[r] == -2 { self.uc[r].iter().map(|e| e.0).collect() } else { Vec::new() };
+        let old_rows: Vec<usize> = if self.kind[r] == -2 {
+            self.uc[r].iter().map(|e| e.0).collect()
+        } else {
+            Vec::new()
+        };
         // The new U column's entries (`0xf15c0`, sites `0xf2521` and `0xf2e3c`).
         let k = self.spike.iter().filter(|e| e.0 != r).count();
         if k > 0 {
-            self.upd_work.push((0xf2521, 3.0 * k as f64, crate::work::CTX));
+            self.upd_work
+                .push((0xf2521, 3.0 * k as f64, crate::work::CTX));
         }
         // A tail column leaves the row-wise copy of U entry by entry.
         if self.kind[r] == -2 && !self.uc[r].is_empty() {
             let len = self.uc[r].len();
-            self.upd_work.push((if k == 0 { 0xf2521 } else if len < k { 0xf2044 } else { 0xf207a }, 5.0 * len as f64, crate::work::CTX));
+            self.upd_work.push((
+                if k == 0 {
+                    0xf2521
+                } else if len < k {
+                    0xf2044
+                } else {
+                    0xf207a
+                },
+                5.0 * len as f64,
+                crate::work::CTX,
+            ));
         }
         self.sum_alpha += self.last_alpha as f64;
         let spike: Vec<usize> = self.spike.iter().map(|e| e.0).collect();
@@ -2040,8 +2267,15 @@ impl RefStruct {
         // The solve runs only when a spike entry lies below `max(slot[r], i21 - 1)` (`0xf1859..0xf191f`).
         let solve_floor = self.slot[r].max(self.i21.saturating_sub(1));
         let cached = self.row_cached.take() == Some(r);
-        if !cached && solve_len > 0 && self.spike.iter().any(|e| e.0 != r && self.slot[e.0] > solve_floor) {
-            self.upd_work.push((0x1322ed, 2.0 * solve_len as f64, crate::work::FAC));
+        if !cached
+            && solve_len > 0
+            && self
+                .spike
+                .iter()
+                .any(|e| e.0 != r && self.slot[e.0] > solve_floor)
+        {
+            self.upd_work
+                .push((0x1322ed, 2.0 * solve_len as f64, crate::work::FAC));
         }
         let mut spk = vec![0.0f64; m];
         for &(p, v) in &self.spike {
@@ -2087,8 +2321,13 @@ impl RefStruct {
         let mut conv: Option<usize> = None;
         // The reference demotes a bare tail column only when the new column depends on the tail; with no tail entries in the spike
         // the tail simply grows by one slot.
-        if old != -2 && self.slot[r] + 1 != self.i21 && sp.iter().any(|&y| y != r && self.kind[y] == -2) {
-            conv = (0..m).filter(|&x| self.kind[x] == -2 && self.a[x].is_empty() && self.b[x].is_empty()).max_by_key(|&x| self.slot[x]);
+        if old != -2
+            && self.slot[r] + 1 != self.i21
+            && sp.iter().any(|&y| y != r && self.kind[y] == -2)
+        {
+            conv = (0..m)
+                .filter(|&x| self.kind[x] == -2 && self.a[x].is_empty() && self.b[x].is_empty())
+                .max_by_key(|&x| self.slot[x]);
             if let Some(x) = conv {
                 convslot = Some(self.slot[x]);
                 // Only a column some tail column refers to joins the nucleus list; the others become singletons.
@@ -2120,7 +2359,14 @@ impl RefStruct {
             let oldslot0 = self.slot[r] as i64;
             let bt = self.i21 as i64 - 1;
             let floor = bt.max(oldslot0);
-            let top = self.spike.iter().filter(|e| e.0 != r).map(|e| self.slot[e.0] as i64).max().unwrap_or(floor).max(floor);
+            let top = self
+                .spike
+                .iter()
+                .filter(|e| e.0 != r)
+                .map(|e| self.slot[e.0] as i64)
+                .max()
+                .unwrap_or(floor)
+                .max(floor);
             xlim = bt;
             if top == floor {
                 if bt >= oldslot0 && k > 0 {
@@ -2134,7 +2380,8 @@ impl RefStruct {
                 let stop = convslot.map_or(floor, |c| c as i64);
                 let passed = (self.mark as i64 - stop).max(0);
                 if passed > 0 {
-                    self.upd_work.push((0xf1d02, 3.0 * passed as f64, crate::work::CTX));
+                    self.upd_work
+                        .push((0xf1d02, 3.0 * passed as f64, crate::work::CTX));
                 }
                 self.mark = stop as usize;
                 if convslot.is_none() {
@@ -2229,9 +2476,14 @@ impl RefStruct {
         // the spike's only tail entry (FIT2P call 2263: column 175, the reference creates the row eta of the leaving column).
         let keep = (old != -2 && av.is_empty() && conv.is_none()) || (old == -2 && !moved);
         // Row r of U: the tail columns that reference r (`0xf2a51`), unless the column stays in its slot.
-        let refs = (0..m).filter(|&x| x != r && self.kind[x] == -2 && (self.a[x].contains(&r) || self.b[x].contains(&r))).count();
+        let refs = (0..m)
+            .filter(|&x| {
+                x != r && self.kind[x] == -2 && (self.a[x].contains(&r) || self.b[x].contains(&r))
+            })
+            .count();
         if refs > 0 && !(keep && !moved) {
-            self.upd_work.push((0xf2a51, 3.0 * refs as f64, crate::work::CTX));
+            self.upd_work
+                .push((0xf2a51, 3.0 * refs as f64, crate::work::CTX));
         }
         let mut elim: Vec<usize> = Vec::new();
         for k in 0..m {
@@ -2246,7 +2498,11 @@ impl RefStruct {
             if in_a || in_b {
                 // The reference scans the lists from their start for `r`; the booking is the number of entries passed.
                 let pa = self.a[k].iter().position(|&y| y == r).unwrap_or(0);
-                let pb = self.b[k].iter().position(|&y| y == r).unwrap_or(0).saturating_sub(usize::from(demoted_front[k]));
+                let pb = self.b[k]
+                    .iter()
+                    .position(|&y| y == r)
+                    .unwrap_or(0)
+                    .saturating_sub(usize::from(demoted_front[k]));
                 let (site, units) = if keep {
                     (0xf4073, if old != -2 && in_b { pb } else { 0 })
                 } else if in_a {
@@ -2299,13 +2555,19 @@ impl RefStruct {
             // The diagonal is summed from the scratch eta, whose alignment is fixed per factor object.
             newdiag = dot(&xs, &val, self.scratch_peel);
             self.sum_eta += ind.len() as f64;
-            self.upd_work.push((0xf1beb, 3.0 * ind.len() as f64, crate::work::CTX));
+            self.upd_work
+                .push((0xf1beb, 3.0 * ind.len() as f64, crate::work::CTX));
             let e = self.etas.len();
             for &j in &ind {
                 self.first_eta[j] = self.first_eta[j].min(e);
             }
             let esz = ind.len();
-            self.etas.push(Eta { idx: r, ind, val, peel });
+            self.etas.push(Eta {
+                idx: r,
+                ind,
+                val,
+                peel,
+            });
             self.fill += esz;
         }
         if k == 0 {
@@ -2313,7 +2575,8 @@ impl RefStruct {
             self.mark = self.mark.max(slot0[r]);
         }
         if k > 0 {
-            self.upd_work.push((0xf2e3c, 5.0 * k as f64, crate::work::CTX));
+            self.upd_work
+                .push((0xf2e3c, 5.0 * k as f64, crate::work::CTX));
         }
         // The new U column goes to the pool unless it fits the old column's slot, and each of its entries to a row of the row-wise copy, which moves to the end of the
         // pool with room to grow when it is full.
@@ -2334,7 +2597,11 @@ impl RefStruct {
             for &row in sp.iter().filter(|&&y| y != r && !old_rows.contains(&y)) {
                 if cnt[row] >= self.row_cap[row] {
                     // The growth is capped by the updates left before the refactorization (`0xf2cd1`: `F+0x188 - F+0x18c`).
-                    let left = (self.upd_limit.unwrap_or(((m as f64).powf(0.7) as usize).max(20)) + 1).saturating_sub(self.upd);
+                    let left = (self
+                        .upd_limit
+                        .unwrap_or(((m as f64).powf(0.7) as usize).max(20))
+                        + 1)
+                    .saturating_sub(self.upd);
                     let extra = (cnt[row] / 2).max(4).min(left);
                     fp_rows.push((row, cnt[row], self.row_cap[row], extra));
                     self.row_par[row] = (self.fill % 2) as u8;
@@ -2346,7 +2613,10 @@ impl RefStruct {
         if crate::dump::on("fillparts") {
             static FP: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
             let n = FP.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            crate::dump::emit("fillparts", serde_json::json!({"n": n, "k": k, "old": old_rows.len(), "col": if k > old_rows.len() { k } else { 0 }, "fill_after_eta": fill_in, "rows": fp_rows}));
+            crate::dump::emit(
+                "fillparts",
+                serde_json::json!({"n": n, "k": k, "old": old_rows.len(), "col": if k > old_rows.len() { k } else { 0 }, "fill_after_eta": fill_in, "rows": fp_rows}),
+            );
         }
         self.diag[r] = newdiag;
         self.uc[r] = self.spike.iter().copied().filter(|e| e.0 != r).collect();
@@ -2376,4 +2646,3 @@ fn remove_last_fill(v: &mut Vec<usize>, r: usize) {
         v.swap_remove(p);
     }
 }
-

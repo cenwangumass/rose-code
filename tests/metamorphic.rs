@@ -15,7 +15,9 @@ thread_local! {
 }
 
 fn load(path: String) -> Option<LpModel> {
-    std::fs::read_to_string(path).ok().map(|t| mps::parse(&t).unwrap())
+    std::fs::read_to_string(path)
+        .ok()
+        .map(|t| mps::parse(&t).unwrap())
 }
 
 fn small() -> Vec<(String, LpModel)> {
@@ -28,7 +30,15 @@ fn small() -> Vec<(String, LpModel)> {
     }
     // `fx_badscale` is left out of the barrier run: the reference's barrier stops at -4.99001868824 (7 iterations, `runs/fx_badscale-barrier-controlled.json`,
     // rose agrees) against the optimum -5, and a transformed path stops elsewhere.
-    for n in ["fx_tied", "fx_neardep", "fx_badscale", "fx_singular", "fx_warm", "fx_infeasible", "fx_unbounded"] {
+    for n in [
+        "fx_tied",
+        "fx_neardep",
+        "fx_badscale",
+        "fx_singular",
+        "fx_warm",
+        "fx_infeasible",
+        "fx_unbounded",
+    ] {
         if BARRIER.get() && n == "fx_badscale" {
             continue;
         }
@@ -49,7 +59,11 @@ fn opts() -> Vec<SolveOptions> {
         o.pdhg.iter_limit = 20000.0;
         vec![o]
     } else {
-        vec![SolveOptions::default(), SolveOptions::dual(), SolveOptions::dual_release()]
+        vec![
+            SolveOptions::default(),
+            SolveOptions::dual(),
+            SolveOptions::dual_release(),
+        ]
     }
 }
 
@@ -58,15 +72,23 @@ fn fin(b: f64) -> bool {
 }
 
 fn sc(b: f64, s: f64) -> f64 {
-    if fin(b) { b * s } else { b }
+    if fin(b) {
+        b * s
+    } else {
+        b
+    }
 }
 
 /// Deterministic pseudo-random permutation of 0..n.
 fn perm(n: usize, seed: u64) -> Vec<usize> {
     let mut p: Vec<usize> = (0..n).collect();
-    let mut s = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    let mut s = seed
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
     for i in (1..n).rev() {
-        s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        s = s
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         p.swap(i, (s >> 33) as usize % (i + 1));
     }
     p
@@ -140,7 +162,11 @@ fn scale_cols(m: &LpModel, s: f64, every: usize) -> LpModel {
 
 fn negate(m: &LpModel) -> LpModel {
     let mut r = m.clone();
-    r.sense = if m.sense == Sense::Minimize { Sense::Maximize } else { Sense::Minimize };
+    r.sense = if m.sense == Sense::Minimize {
+        Sense::Maximize
+    } else {
+        Sense::Minimize
+    };
     r.obj.iter_mut().for_each(|c| *c = -*c);
     r.offset = -m.offset;
     r
@@ -152,12 +178,18 @@ fn run(m: &LpModel, name: &str, what: &str, o: &SolveOptions) -> rose::SolveResu
         // first-order result: every error of the independent report is small relative to the objective's magnitude
         let rep = verify::check_optimal(m, &r);
         let scale = 1.0 + r.objective.abs();
-        assert!(rep.max_error() <= 1e-4 * scale.max(1e3), "{name} [{what}]: {rep:?}");
+        assert!(
+            rep.max_error() <= 1e-4 * scale.max(1e3),
+            "{name} [{what}]: {rep:?}"
+        );
     } else if r.status == Status::Optimal && BARRIER.get() {
         // interior point (no basis): the independent report of the point, relative to the objective's magnitude
         let rep = verify::check_optimal(m, &r);
         let scale = 1.0 + r.objective.abs();
-        assert!(rep.max_error() <= 1e-6 * scale.max(1e3), "{name} [{what}]: {rep:?}");
+        assert!(
+            rep.max_error() <= 1e-6 * scale.max(1e3),
+            "{name} [{what}]: {rep:?}"
+        );
     } else if r.status == Status::Optimal {
         // scaled models have larger magnitudes, so use a mildly loose tolerance on the independent check
         if let Err(e) = verify::check(m, &r, 1e-6) {
@@ -176,14 +208,30 @@ fn case(what: &str, t: impl Fn(&LpModel) -> LpModel, f: impl Fn(f64) -> f64) {
             // The barrier's infeasibility conclusion is code 3 (Infeasible) or 0xd (infeasible or unbounded, reported as NumericalFailure) depending on the path.
             let infeasible = |s: Status| matches!(s, Status::Infeasible | Status::NumericalFailure);
             if BARRIER.get() && infeasible(base.status) {
-                assert!(infeasible(r.status), "{name} [{what}]: status {:?} for {:?}", r.status, base.status);
+                assert!(
+                    infeasible(r.status),
+                    "{name} [{what}]: status {:?} for {:?}",
+                    r.status,
+                    base.status
+                );
             } else {
                 assert_eq!(r.status, base.status, "{name} [{what}]: status");
             }
             if base.status == Status::Optimal {
                 let want = f(base.objective);
                 let err = (r.objective - want).abs() / (1.0 + want.abs());
-                assert!(err <= if PDHG.get() { 1e-4 } else if BARRIER.get() { 1e-6 } else { 1e-8 }, "{name} [{what}]: objective {} vs {} (rel {err:.2e})", r.objective, want);
+                assert!(
+                    err <= if PDHG.get() {
+                        1e-4
+                    } else if BARRIER.get() {
+                        1e-6
+                    } else {
+                        1e-8
+                    },
+                    "{name} [{what}]: objective {} vs {} (rel {err:.2e})",
+                    r.objective,
+                    want
+                );
             }
         }
     }
@@ -191,9 +239,33 @@ fn case(what: &str, t: impl Fn(&LpModel) -> LpModel, f: impl Fn(f64) -> f64) {
 
 #[test]
 fn row_and_column_permutation() {
-    case("perm", |m| permute(m, &perm(m.num_rows(), 1), &perm(m.num_cols(), 2)), |z| z);
-    case("rows reversed", |m| permute(m, &(0..m.num_rows()).rev().collect::<Vec<_>>(), &(0..m.num_cols()).collect::<Vec<_>>()), |z| z);
-    case("cols reversed", |m| permute(m, &(0..m.num_rows()).collect::<Vec<_>>(), &(0..m.num_cols()).rev().collect::<Vec<_>>()), |z| z);
+    case(
+        "perm",
+        |m| permute(m, &perm(m.num_rows(), 1), &perm(m.num_cols(), 2)),
+        |z| z,
+    );
+    case(
+        "rows reversed",
+        |m| {
+            permute(
+                m,
+                &(0..m.num_rows()).rev().collect::<Vec<_>>(),
+                &(0..m.num_cols()).collect::<Vec<_>>(),
+            )
+        },
+        |z| z,
+    );
+    case(
+        "cols reversed",
+        |m| {
+            permute(
+                m,
+                &(0..m.num_rows()).collect::<Vec<_>>(),
+                &(0..m.num_cols()).rev().collect::<Vec<_>>(),
+            )
+        },
+        |z| z,
+    );
 }
 
 #[test]
@@ -219,19 +291,46 @@ fn negated_objective_with_sense_switch() {
 
 #[test]
 fn objective_offset() {
-    case("offset +123.5", |m| LpModel { offset: m.offset + 123.5, ..m.clone() }, |z| z + 123.5);
-    case("offset -7 then negate", |m| negate(&LpModel { offset: m.offset - 7.0, ..m.clone() }), |z| -(z - 7.0));
+    case(
+        "offset +123.5",
+        |m| LpModel {
+            offset: m.offset + 123.5,
+            ..m.clone()
+        },
+        |z| z + 123.5,
+    );
+    case(
+        "offset -7 then negate",
+        |m| {
+            negate(&LpModel {
+                offset: m.offset - 7.0,
+                ..m.clone()
+            })
+        },
+        |z| -(z - 7.0),
+    );
 }
 
 /// The same transformations under the PDHG: other accumulation orders and scalings change the path, so only the optimum (to 1e-4 relative) and the status stay.
 #[test]
 fn pdhg_permutation_scaling_negation_offset() {
     PDHG.set(true);
-    case("perm", |m| permute(m, &perm(m.num_rows(), 1), &perm(m.num_cols(), 2)), |z| z);
+    case(
+        "perm",
+        |m| permute(m, &perm(m.num_rows(), 1), &perm(m.num_cols(), 2)),
+        |z| z,
+    );
     case("rows x7", |m| scale_rows(m, 7.0, 2), |z| z);
     case("cols x3", |m| scale_cols(m, 3.0, 2), |z| z);
     case("negate", negate, |z| -z);
-    case("offset +123.5", |m| LpModel { offset: m.offset + 123.5, ..m.clone() }, |z| z + 123.5);
+    case(
+        "offset +123.5",
+        |m| LpModel {
+            offset: m.offset + 123.5,
+            ..m.clone()
+        },
+        |z| z + 123.5,
+    );
 }
 
 /// The same transformations under the barrier: a permutation changes the ordering and the accumulation order, so only the optimum (to 1e-6 relative, the
@@ -239,9 +338,20 @@ fn pdhg_permutation_scaling_negation_offset() {
 #[test]
 fn barrier_permutation_scaling_negation_offset() {
     BARRIER.set(true);
-    case("perm", |m| permute(m, &perm(m.num_rows(), 1), &perm(m.num_cols(), 2)), |z| z);
+    case(
+        "perm",
+        |m| permute(m, &perm(m.num_rows(), 1), &perm(m.num_cols(), 2)),
+        |z| z,
+    );
     case("rows x7", |m| scale_rows(m, 7.0, 2), |z| z);
     case("cols x3", |m| scale_cols(m, 3.0, 2), |z| z);
     case("negate", negate, |z| -z);
-    case("offset +123.5", |m| LpModel { offset: m.offset + 123.5, ..m.clone() }, |z| z + 123.5);
+    case(
+        "offset +123.5",
+        |m| LpModel {
+            offset: m.offset + 123.5,
+            ..m.clone()
+        },
+        |z| z + 123.5,
+    );
 }

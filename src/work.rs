@@ -35,13 +35,25 @@ pub struct Work {
 
 impl Default for Work {
     fn default() -> Self {
-        Work { mute: false, w: 0.0, w150: 0.0, decided_once: false, w158: 0.0, fac_cost: 0.0, ctx: CTX, log: crate::dump::on("work") || std::env::var_os("ROSE_WORK").is_some() }
+        Work {
+            mute: false,
+            w: 0.0,
+            w150: 0.0,
+            decided_once: false,
+            w158: 0.0,
+            fac_cost: 0.0,
+            ctx: CTX,
+            log: crate::dump::on("work") || std::env::var_os("ROSE_WORK").is_some(),
+        }
     }
 }
 
 impl Work {
     pub fn dual() -> Self {
-        Work { ctx: FAC, ..Work::default() }
+        Work {
+            ctx: FAC,
+            ..Work::default()
+        }
     }
 
     /// `W = est * scale + W`, in the reference's operation order.
@@ -91,7 +103,9 @@ impl Work {
     /// The dual driver's time clause (`0xf8a96`): every tenth update (`F+0x18c % 10 == 9`), when the work since the last decision exceeds
     /// `14 * w158 + 100 * nnz(A)` and a factorization has been costed (`ctx+0x158 > 0`).
     pub fn clause_dual(&self, upd: usize, nnz_a: usize, w: f64) -> bool {
-        let due = upd % 10 == 9 && self.w158 > 0.0 && w - self.w150 > 14.0 * self.w158 + 100.0 * nnz_a as f64;
+        let due = upd % 10 == 9
+            && self.w158 > 0.0
+            && w - self.w150 > 14.0 * self.w158 + 100.0 * nnz_a as f64;
         if self.log && upd % 10 == 9 {
             emit(json!({"k": "clause", "W": w, "w150": self.w150, "w158": self.w158, "U": upd}));
         }
@@ -118,7 +132,10 @@ impl Work {
     pub fn factor_driver(&mut self, sites: &[(u32, f64)], scale: f64) {
         self.fac_cost = 0.0;
         for &(site, est) in sites {
-            if matches!(site, 0xd4ded | 0xd5300 | 0xd85e6 | 0xd8973 | 0xdc7b2 | 0xdcb7b) {
+            if matches!(
+                site,
+                0xd4ded | 0xd5300 | 0xd85e6 | 0xd8973 | 0xdc7b2 | 0xdcb7b
+            ) {
                 self.fac_cost += est * if scale == CTX { self.ctx } else { scale };
             }
         }
@@ -127,7 +144,11 @@ impl Work {
     /// Smooths the cost of the factorization just done into `w158`.
     pub fn factor_done(&mut self) {
         // The first factorization stores its cost as it is; later ones average it with the previous value.
-        self.w158 = if self.w158 == 0.0 { self.fac_cost } else { 0.5 * (self.fac_cost + self.w158) };
+        self.w158 = if self.w158 == 0.0 {
+            self.fac_cost
+        } else {
+            0.5 * (self.fac_cost + self.w158)
+        };
         if self.log {
             emit(json!({"k": "w158", "w158": self.w158, "cost": self.fac_cost, "w150": self.w150}));
         }

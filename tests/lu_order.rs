@@ -5,7 +5,11 @@ use rose::lu_order::pivot_order;
 
 #[test]
 fn pivot_rows_match_the_reference() {
-    let text = std::fs::read_to_string(format!("{}/tests/fixtures/lu-pivot-orders.json", env!("CARGO_MANIFEST_DIR"))).unwrap();
+    let text = std::fs::read_to_string(format!(
+        "{}/tests/fixtures/lu-pivot-orders.json",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap();
     let data: serde_json::Value = serde_json::from_str(&text).unwrap();
     let mut total = 0;
     for (model, cases) in data.as_object().unwrap() {
@@ -19,12 +23,27 @@ fn pivot_rows_match_the_reference() {
                 .map(|c| {
                     let c = c.as_array().unwrap();
                     let v = c[0].as_u64().unwrap() as usize;
-                    let rows = c[1].as_array().unwrap().iter().map(|x| x.as_u64().unwrap() as usize).collect();
-                    let vals = c[2].as_array().unwrap().iter().map(|x| x.as_f64().unwrap()).collect();
+                    let rows = c[1]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|x| x.as_u64().unwrap() as usize)
+                        .collect();
+                    let vals = c[2]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|x| x.as_f64().unwrap())
+                        .collect();
                     (v >= n, rows, vals)
                 })
                 .collect();
-            let want: Vec<usize> = case["p20"].as_array().unwrap().iter().map(|x| x.as_u64().unwrap() as usize).collect();
+            let want: Vec<usize> = case["p20"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|x| x.as_u64().unwrap() as usize)
+                .collect();
             let got: Vec<usize> = pivot_order(m, &cols).into_iter().map(|(r, _)| r).collect();
             assert_eq!(got, want, "{model} factorization {k}");
             total += 1;

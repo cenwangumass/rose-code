@@ -11,7 +11,10 @@ fn check(name: &str) {
 /// The first `limit` decisions (all of them for `usize::MAX`, which also checks the returned solution).
 fn check_rows(name: &str, limit: usize) {
     let root = format!("{}/../reverse-engineer", env!("CARGO_MANIFEST_DIR"));
-    let model = mps::parse(&std::fs::read_to_string(format!("{root}/corpus/netlib/mps/{name}.mps")).unwrap()).unwrap();
+    let model = mps::parse(
+        &std::fs::read_to_string(format!("{root}/corpus/netlib/mps/{name}.mps")).unwrap(),
+    )
+    .unwrap();
     let r = solve(&model, None, &SolveOptions::release()).unwrap();
     if limit == usize::MAX {
         assert_eq!(r.status, Status::Optimal);
@@ -19,12 +22,13 @@ fn check_rows(name: &str, limit: usize) {
 
     // Reference decisions: rows with a pivot (`f2fc` is the entering variable); the leaving variable is the one whose new
     // position is -1 (absent for a bound flip or a slack leaving from its own row).
-    let rows: Vec<serde_json::Value> = std::fs::read_to_string(format!("{root}/traces/{name}-release.jsonl"))
-        .unwrap()
-        .lines()
-        .map(|l| serde_json::from_str(l).unwrap())
-        .filter(|r: &serde_json::Value| r["f2fc"].as_i64().unwrap_or(-1) != -1)
-        .collect();
+    let rows: Vec<serde_json::Value> =
+        std::fs::read_to_string(format!("{root}/traces/{name}-release.jsonl"))
+            .unwrap()
+            .lines()
+            .map(|l| serde_json::from_str(l).unwrap())
+            .filter(|r: &serde_json::Value| r["f2fc"].as_i64().unwrap_or(-1) != -1)
+            .collect();
     if limit == usize::MAX {
         assert_eq!(r.trace.len(), rows.len(), "pivot count");
     }
@@ -32,7 +36,8 @@ fn check_rows(name: &str, limit: usize) {
         let entering = row["f2fc"].as_u64().unwrap() as usize;
         assert_eq!(e.entering, entering, "row {k}: entering");
         let leaving = row["changed"].as_array().unwrap().iter().find_map(|c| {
-            (c[2].as_i64() == Some(-1) && c[0].as_u64() != Some(entering as u64)).then(|| c[0].as_u64().unwrap() as usize)
+            (c[2].as_i64() == Some(-1) && c[0].as_u64() != Some(entering as u64))
+                .then(|| c[0].as_u64().unwrap() as usize)
         });
         if leaving.is_some() {
             assert_eq!(e.leaving, leaving, "row {k}: leaving");
@@ -42,20 +47,49 @@ fn check_rows(name: &str, limit: usize) {
     if limit != usize::MAX {
         return;
     }
-    let run: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(format!("{root}/runs/{name}-release.json")).unwrap()).unwrap();
+    let run: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(format!("{root}/runs/{name}-release.json")).unwrap(),
+    )
+    .unwrap();
     let res = &run["result"];
-    let bits = |v: &serde_json::Value| v.as_array().unwrap().iter().map(|x| x.as_f64().unwrap().to_bits()).collect::<Vec<_>>();
+    let bits = |v: &serde_json::Value| {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_f64().unwrap().to_bits())
+            .collect::<Vec<_>>()
+    };
     let mine = |v: &[f64]| v.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
-    assert_eq!(r.iterations as f64, res["iter_count"].as_f64().unwrap(), "iterations");
-    assert_eq!(r.objective.to_bits(), res["obj"].as_f64().unwrap().to_bits(), "objective");
+    assert_eq!(
+        r.iterations as f64,
+        res["iter_count"].as_f64().unwrap(),
+        "iterations"
+    );
+    assert_eq!(
+        r.objective.to_bits(),
+        res["obj"].as_f64().unwrap().to_bits(),
+        "objective"
+    );
     // The reference's vectors end with one column per ranged row (`MPS_Rg...`): the model's own columns come first.
     let head = |v: Vec<u64>, n: usize| v.into_iter().take(n).collect::<Vec<_>>();
     assert_eq!(mine(&r.x), head(bits(&res["x"]), r.x.len()), "x");
-    assert_eq!(mine(&r.reduced_cost), head(bits(&res["rc"]), r.reduced_cost.len()), "reduced costs");
+    assert_eq!(
+        mine(&r.reduced_cost),
+        head(bits(&res["rc"]), r.reduced_cost.len()),
+        "reduced costs"
+    );
     // PILOT4: the reference returns -0.0 for 29 equality rows with a zero dual (nonbasic, not in the dual BTRAN output); the sign of a
     // zero is not reproduced (open: reverse-engineer/PLAN.md), every other bit is.
-    let unsigned_zero = |v: Vec<u64>| v.into_iter().map(|b| if b == (-0.0f64).to_bits() { 0 } else { b }).collect::<Vec<_>>();
-    assert_eq!(unsigned_zero(mine(&r.dual)), unsigned_zero(bits(&res["pi"])), "duals");
+    let unsigned_zero = |v: Vec<u64>| {
+        v.into_iter()
+            .map(|b| if b == (-0.0f64).to_bits() { 0 } else { b })
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        unsigned_zero(mine(&r.dual)),
+        unsigned_zero(bits(&res["pi"])),
+        "duals"
+    );
 }
 
 #[test]
@@ -146,13 +180,29 @@ fn fit2p_release_matches_the_reference() {
 fn scale_factors_match_the_reference() {
     let root = format!("{}/../reverse-engineer", env!("CARGO_MANIFEST_DIR"));
     let mut checked = 0;
-    for name in ["afiro", "sc50a", "blend", "adlittle", "bore3d", "boeing2", "degen2", "pilot4", "perold", "degen3"] {
-        let Ok(text) = std::fs::read_to_string(format!("{root}/captures/{name}-release/scale_factors.LIM=1.jsonl")) else { continue };
+    for name in [
+        "afiro", "sc50a", "blend", "adlittle", "bore3d", "boeing2", "degen2", "pilot4", "perold",
+        "degen3",
+    ] {
+        let Ok(text) = std::fs::read_to_string(format!(
+            "{root}/captures/{name}-release/scale_factors.LIM=1.jsonl"
+        )) else {
+            continue;
+        };
         let line = text.lines().find(|l| l.starts_with("SCALE ")).unwrap();
         let rec: serde_json::Value = serde_json::from_str(&line[6..]).unwrap();
-        let model = mps::parse(&std::fs::read_to_string(format!("{root}/corpus/netlib/mps/{name}.mps")).unwrap()).unwrap();
+        let model = mps::parse(
+            &std::fs::read_to_string(format!("{root}/corpus/netlib/mps/{name}.mps")).unwrap(),
+        )
+        .unwrap();
         let sc = rose::scale::compute(&model);
-        let f = |v: &serde_json::Value| v.as_array().unwrap().iter().map(|x| x.as_f64().unwrap()).collect::<Vec<_>>();
+        let f = |v: &serde_json::Value| {
+            v.as_array()
+                .unwrap()
+                .iter()
+                .map(|x| x.as_f64().unwrap())
+                .collect::<Vec<_>>()
+        };
         assert_eq!(sc.col, f(&rec["col"]), "{name}: column factors");
         assert_eq!(sc.row, f(&rec["row"]), "{name}: row factors");
         checked += 1;

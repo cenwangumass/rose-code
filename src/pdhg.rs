@@ -42,7 +42,15 @@ pub enum Inject {
 
 impl Default for PdhgOptions {
     fn default() -> Self {
-        PdhgOptions { iter_limit: f64::INFINITY, rel_tol: 1e-6, abs_tol: 1e-6, conv_tol: 1e-6, record_checks: false, seed: 0, inject: None }
+        PdhgOptions {
+            iter_limit: f64::INFINITY,
+            rel_tol: 1e-6,
+            abs_tol: 1e-6,
+            conv_tol: 1e-6,
+            record_checks: false,
+            seed: 0,
+            inject: None,
+        }
     }
 }
 
@@ -176,7 +184,10 @@ struct Rng(u64);
 
 impl Rng {
     fn next(&mut self) -> f64 {
-        self.0 = self.0.wrapping_mul(0x5851f42d4c957f2d).wrapping_add(0x14057b7ef767814f);
+        self.0 = self
+            .0
+            .wrapping_mul(0x5851f42d4c957f2d)
+            .wrapping_add(0x14057b7ef767814f);
         let mut y = (self.0 >> 32) as u32;
         y ^= y >> 11;
         y ^= (y << 7) & 0x9d2c5680;
@@ -241,10 +252,30 @@ fn row_side(v: f64) -> f64 {
 fn row_sides(model: &LpModel, i: usize) -> (f64, f64) {
     let ranged = model.row_range.get(i).is_some_and(|&r| r > 0.0);
     // Gurobi's own infinity: a side beyond 1e100 is stored as +-1e100.
-    let c = |v: f64| if v.is_finite() { v.clamp(-1e100, 1e100) } else { v };
+    let c = |v: f64| {
+        if v.is_finite() {
+            v.clamp(-1e100, 1e100)
+        } else {
+            v
+        }
+    };
     let (lo, up) = match model.row_kind.get(i) {
-        Some(&b'L') => (if ranged { model.row_lo[i] } else { row_side(model.row_lo[i]) }, model.row_up[i]),
-        Some(&b'G') => (model.row_lo[i], if ranged { model.row_up[i] } else { row_side(model.row_up[i]) }),
+        Some(&b'L') => (
+            if ranged {
+                model.row_lo[i]
+            } else {
+                row_side(model.row_lo[i])
+            },
+            model.row_up[i],
+        ),
+        Some(&b'G') => (
+            model.row_lo[i],
+            if ranged {
+                model.row_up[i]
+            } else {
+                row_side(model.row_up[i])
+            },
+        ),
         Some(_) => (model.row_lo[i], model.row_up[i]),
         None => (row_side(model.row_lo[i]), row_side(model.row_up[i])),
     };
@@ -254,7 +285,11 @@ fn row_sides(model: &LpModel, i: usize) -> (f64, f64) {
 fn build(model: &LpModel) -> Internal {
     let n0 = model.num_cols();
     let m0 = model.num_rows();
-    let sense = if model.sense == Sense::Maximize { -1.0 } else { 1.0 };
+    let sense = if model.sense == Sense::Maximize {
+        -1.0
+    } else {
+        1.0
+    };
     let mut row_map = vec![None; m0];
     let mut m = 0;
     let mut eq = Vec::new();
@@ -322,16 +357,43 @@ fn build(model: &LpModel) -> Internal {
         }
         cols.push(Col { ent, c, lb, ub });
     }
-    let order: Vec<usize> = if model.range_order.iter().filter(|&&i| slack[i].is_some()).count() == slack.iter().filter(|s| s.is_some()).count() {
-        model.range_order.iter().copied().filter(|&i| slack[i].is_some()).collect()
+    let order: Vec<usize> = if model
+        .range_order
+        .iter()
+        .filter(|&&i| slack[i].is_some())
+        .count()
+        == slack.iter().filter(|s| s.is_some()).count()
+    {
+        model
+            .range_order
+            .iter()
+            .copied()
+            .filter(|&i| slack[i].is_some())
+            .collect()
     } else {
         (0..m0).filter(|&i| slack[i].is_some()).collect()
     };
     for i in order {
         let (r, sg, w) = slack[i].unwrap();
-        cols.push(Col { ent: vec![(r, sg)], c: 0.0, lb: 0.0, ub: finite_up(w) });
+        cols.push(Col {
+            ent: vec![(r, sg)],
+            c: 0.0,
+            lb: 0.0,
+            ub: finite_up(w),
+        });
     }
-    Internal { m, cols, eq, neg, b, row_map, flip, norig: n0, sense, offset: sense * model.offset }
+    Internal {
+        m,
+        cols,
+        eq,
+        neg,
+        b,
+        row_map,
+        flip,
+        norig: n0,
+        sense,
+        offset: sense * model.offset,
+    }
 }
 
 /// Ruiz x10 (simultaneous) and one Pock-Chambolle pass; returns the row and column scale factors.
@@ -453,12 +515,55 @@ impl Scaled {
                 *v *= f;
             }
         }
-        let b: Vec<f64> = (0..m).map(|i| if p.b[i].abs() >= 1e30 { p.b[i] } else { r[i] * p.b[i] }).collect();
-        let lb = (0..n).map(|j| if p.cols[j].lb > f64::NEG_INFINITY { p.cols[j].lb / c[j] } else { -BIG }).collect();
-        let ub = (0..n).map(|j| if p.cols[j].ub < f64::INFINITY { p.cols[j].ub / c[j] } else { BIG }).collect();
+        let b: Vec<f64> = (0..m)
+            .map(|i| {
+                if p.b[i].abs() >= 1e30 {
+                    p.b[i]
+                } else {
+                    r[i] * p.b[i]
+                }
+            })
+            .collect();
+        let lb = (0..n)
+            .map(|j| {
+                if p.cols[j].lb > f64::NEG_INFINITY {
+                    p.cols[j].lb / c[j]
+                } else {
+                    -BIG
+                }
+            })
+            .collect();
+        let ub = (0..n)
+            .map(|j| {
+                if p.cols[j].ub < f64::INFINITY {
+                    p.cols[j].ub / c[j]
+                } else {
+                    BIG
+                }
+            })
+            .collect();
         let cinv = c.iter().map(|v| 1.0 / v).collect();
         let rinv = r.iter().map(|v| 1.0 / v).collect();
-        Scaled { m, n, rp, rcol, rval, cp, crow, cval, c: cvec, b, lb, ub, eq: p.eq.clone(), cs: c, rs: r, cinv, rinv, objf: f }
+        Scaled {
+            m,
+            n,
+            rp,
+            rcol,
+            rval,
+            cp,
+            crow,
+            cval,
+            c: cvec,
+            b,
+            lb,
+            ub,
+            eq: p.eq.clone(),
+            cs: c,
+            rs: r,
+            cinv,
+            rinv,
+            objf: f,
+        }
     }
 
     /// `out = A x`.
@@ -551,7 +656,9 @@ impl<'a> State<'a> {
         o.p2 = seqsum(v.iter().map(|t| t * t)).sqrt();
         let zz: Vec<f64>;
         if !flag1 {
-            let t: Vec<f64> = (0..n).map(|j| (a.c[j] - self.aty[j] - self.zc[j]) * a.cinv[j]).collect();
+            let t: Vec<f64> = (0..n)
+                .map(|j| (a.c[j] - self.aty[j] - self.zc[j]) * a.cinv[j])
+                .collect();
             o.d_inf = t.iter().map(|v| v.abs()).fold(0.0, f64::max);
             o.d2 = seqsum(t.iter().map(|v| v * v)).sqrt();
             zz = self.zc.clone();
@@ -606,7 +713,11 @@ impl<'a> State<'a> {
                 acc += -sl * self.yh[i];
             }
         }
-        o.compl = if self.ncons > 0 { (acc / self.ncons as f64).max(0.0) } else { acc.max(0.0) };
+        o.compl = if self.ncons > 0 {
+            (acc / self.ncons as f64).max(0.0)
+        } else {
+            acc.max(0.0)
+        };
         o.rel_p = o.p2 / (self.nb + 1.0);
         o.rel_d = o.d2 / (self.nc + 1.0);
         o.gap = (o.pobj - o.dobj).abs() / ((1.0 + o.pobj.abs()) + o.dobj.abs());
@@ -675,7 +786,11 @@ impl<'a> State<'a> {
     fn apply_restart(&mut self) {
         let dxn = sqdist(&self.xh, &self.x0, 0).sqrt();
         let dyn_ = sqdist(&self.yh, &self.y0, 0).sqrt();
-        let ratio = if self.res.rel_p != 0.0 { self.res.rel_d / self.res.rel_p } else { 1e100 };
+        let ratio = if self.res.rel_p != 0.0 {
+            self.res.rel_d / self.res.rel_p
+        } else {
+            1e100
+        };
         if dxn > 1e-16 && dyn_ > 1e-16 && 1e12 > dxn && 1e12 > dyn_ && ratio > 1e-8 && 1e8 > ratio {
             let d = (dyn_.ln() - dxn.ln()) - self.omega.ln();
             let i2 = 0.3 * self.integral + d;
@@ -726,7 +841,11 @@ impl<'a> State<'a> {
             return;
         }
         let sigma = lam.sqrt();
-        self.eta = if err < 0.5 { (1.0 - err - err) / sigma } else { 0.01 / sigma };
+        self.eta = if err < 0.5 {
+            (1.0 - err - err) / sigma
+        } else {
+            0.01 / sigma
+        };
         self.perr = err;
         self.pv = s;
         self.total += done;
@@ -737,7 +856,11 @@ impl<'a> State<'a> {
 /// A model without rows or without nonzeros never reaches the PDHG driver (the reference answers it without iterating): every column goes to
 /// the bound its cost prefers (to the point of smallest magnitude in its bounds when the cost is 0), the duals are 0 and the reduced costs are the costs.
 fn trivial(model: &LpModel) -> PdhgResult {
-    let sense = if model.sense == Sense::Maximize { -1.0 } else { 1.0 };
+    let sense = if model.sense == Sense::Maximize {
+        -1.0
+    } else {
+        1.0
+    };
     let mut status = Status::Optimal;
     let mut x = Vec::with_capacity(model.num_cols());
     for j in 0..model.num_cols() {
@@ -791,11 +914,16 @@ pub fn solve(model: &LpModel, opts: &PdhgOptions) -> PdhgResult {
     let mut rng = Rng(0);
     let x0: Vec<f64> = (0..n)
         .map(|j| {
-            let v = if opts.seed != 0 { rng.next() * 1e-6 } else { 0.0 };
+            let v = if opts.seed != 0 {
+                rng.next() * 1e-6
+            } else {
+                0.0
+            };
             v.max(a.lb[j]).min(a.ub[j])
         })
         .collect();
-    let ncons = (0..n).filter(|&j| a.lb[j] > -BIG || a.ub[j] < BIG).count() + a.eq.iter().filter(|&&e| !e).count();
+    let ncons = (0..n).filter(|&j| a.lb[j] > -BIG || a.ub[j] < BIG).count()
+        + a.eq.iter().filter(|&&e| !e).count();
     let pv: Vec<f64> = (0..m).map(|_| rng.next()).collect();
     let mut st = State {
         a: &a,
@@ -906,7 +1034,11 @@ pub fn solve(model: &LpModel, opts: &PdhgOptions) -> PdhgResult {
                 }
                 st.res = o;
                 if opts.record_checks || dump::on("pdhg") {
-                    let rule = if chk && status == 1 { st.restart_rule() } else { 0 };
+                    let rule = if chk && status == 1 {
+                        st.restart_rule()
+                    } else {
+                        0
+                    };
                     let rec = serde_json::json!({"total": st.total, "n8": st.n8, "k": st.k, "status": status, "rule": rule, "eta": st.eta, "omega": st.omega,
                         "r": st.r, "r_prev": st.r_prev, "r0": st.r0, "pobj": o.pobj, "dobj": o.dobj, "compl": o.compl,
                         "p_inf": o.p_inf, "d_inf": o.d_inf, "rel_p": o.rel_p, "rel_d": o.rel_d, "gap": o.gap});
@@ -940,7 +1072,11 @@ pub fn solve(model: &LpModel, opts: &PdhgOptions) -> PdhgResult {
                         {
                             if st.ptol < st.perr && b > 100 {
                                 let left = opts.iter_limit - st.total as f64;
-                                let b = if b as f64 >= left { left.max(0.0) as u64 } else { b as u64 };
+                                let b = if b as f64 >= left {
+                                    left.max(0.0) as u64
+                                } else {
+                                    b as u64
+                                };
                                 st.power(b, false);
                                 // the termination test after the chunk (`0x36a7d0`) can only stop on the iteration limit here
                                 if st.total as f64 >= opts.iter_limit {
@@ -960,7 +1096,14 @@ pub fn solve(model: &LpModel, opts: &PdhgOptions) -> PdhgResult {
     readout(&p, &a, &st, status, restarts, checks)
 }
 
-fn readout(p: &Internal, a: &Scaled, st: &State, status: u8, restarts: u32, checks: Vec<serde_json::Value>) -> PdhgResult {
+fn readout(
+    p: &Internal,
+    a: &Scaled,
+    st: &State,
+    status: u8,
+    restarts: u32,
+    checks: Vec<serde_json::Value>,
+) -> PdhgResult {
     let sense = p.sense;
     let os = a.objf;
     let (m, n) = (a.m, a.n);

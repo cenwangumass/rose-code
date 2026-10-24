@@ -100,7 +100,11 @@ impl Pass<'_> {
             return;
         }
         let (cs, cf) = (self.rowc[second], self.rowc[first]);
-        let key = if cs < cf || (cs == cf && second < first) { second + self.m * first } else { first + self.m * second };
+        let key = if cs < cf || (cs == cf && second < first) {
+            second + self.m * first
+        } else {
+            first + self.m * second
+        };
         self.register(c, key);
     }
 
@@ -112,7 +116,9 @@ impl Pass<'_> {
 
     /// A row with one active column left: pivot there; the column's other active rows lose one entry.
     fn row_singleton(&mut self, r: usize, rsing: &mut Vec<usize>) {
-        let Some(j) = (0..self.ridx[r].len()).find(|&j| self.colc[self.ridx[r][j]] >= 1) else { return };
+        let Some(j) = (0..self.ridx[r].len()).find(|&j| self.colc[self.ridx[r][j]] >= 1) else {
+            return;
+        };
         let c = self.ridx[r][j];
         self.rowc[r] = 0;
         self.colc[c] = 0;
@@ -131,7 +137,9 @@ impl Pass<'_> {
     }
 
     fn col_singleton(&mut self, c: usize, csing: &mut Vec<usize>) {
-        let Some(&r) = self.cols[c].1.iter().find(|&&r| self.rowc[r] >= 1) else { return };
+        let Some(&r) = self.cols[c].1.iter().find(|&&r| self.rowc[r] >= 1) else {
+            return;
+        };
         self.colc[c] = 0;
         self.rowc[r] = 0;
         self.push_step(r, c);
@@ -153,7 +161,11 @@ impl Pass<'_> {
         let (c0, c1) = (self.ridx[r1][0], self.ridx[r1][1]);
         let (v0, v1) = (self.rval[r1][0], self.rval[r1][1]);
         let (w0, w1) = (self.rval[r2][0], self.rval[r2][1]);
-        let (prow, p, u12, orow, o0, o1) = if v0.abs() < w0.abs() { (r2, w0, w1, r1, v0, v1) } else { (r1, v0, v1, r2, w0, w1) };
+        let (prow, p, u12, orow, o0, o1) = if v0.abs() < w0.abs() {
+            (r2, w0, w1, r1, v0, v1)
+        } else {
+            (r1, v0, v1, r2, w0, w1)
+        };
         let schur = o1 - (o0 * u12) / p;
         if schur.abs() < SING_TOL {
             return;
@@ -234,7 +246,11 @@ impl Pass<'_> {
                 }
             }
         }
-        let (pc, p, nc, u12) = if v[0].abs() < v[1].abs() { (d2, v[1], d1, v[0]) } else { (d1, v[0], d2, v[1]) };
+        let (pc, p, nc, u12) = if v[0].abs() < v[1].abs() {
+            (d2, v[1], d1, v[0])
+        } else {
+            (d1, v[0], d2, v[1])
+        };
         let mut hv = [0.0f64; 2];
         let mut others_hi: Vec<(usize, f64)> = Vec::new();
         for j in 0..self.ridx[hi].len() {
@@ -258,7 +274,14 @@ impl Pass<'_> {
         self.rowc[lo] = 0;
         self.colc[pc] = 0;
         let s1 = self.push_step(lo, pc);
-        self.ov.urow.insert(s1, others_lo.iter().map(|e| e.0).chain(std::iter::once(nc)).collect());
+        self.ov.urow.insert(
+            s1,
+            others_lo
+                .iter()
+                .map(|e| e.0)
+                .chain(std::iter::once(nc))
+                .collect(),
+        );
         for &(c, u) in &others_lo {
             self.temp[c] = ((-x_p) * u) / p;
             self.colc[c] -= 1;
@@ -283,10 +306,21 @@ impl Pass<'_> {
                 let e = vals.entry(c).or_insert(0.0);
                 *e += t;
             }
-            self.ov.unz.insert(s2, vals.values().filter(|v| v.abs() > UNZ_TOL).count());
-            let own: Vec<usize> = others_hi.iter().map(|e| e.0).filter(|c| vals[c].abs() > UNZ_TOL).collect();
-            let fill = others_lo.iter().map(|e| e.0).filter(|c| !others_hi.iter().any(|h| h.0 == *c) && vals[c].abs() > UNZ_TOL);
-            self.ov.urow.insert(s2, own.into_iter().chain(fill).collect());
+            self.ov
+                .unz
+                .insert(s2, vals.values().filter(|v| v.abs() > UNZ_TOL).count());
+            let own: Vec<usize> = others_hi
+                .iter()
+                .map(|e| e.0)
+                .filter(|c| vals[c].abs() > UNZ_TOL)
+                .collect();
+            let fill = others_lo
+                .iter()
+                .map(|e| e.0)
+                .filter(|c| !others_hi.iter().any(|h| h.0 == *c) && vals[c].abs() > UNZ_TOL);
+            self.ov
+                .urow
+                .insert(s2, own.into_iter().chain(fill).collect());
         }
         for &(c, _) in &others_hi {
             self.colc[c] -= 1;

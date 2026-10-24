@@ -7,15 +7,27 @@
 use rose::{mps, solve, Basis, SolveOptions, Status};
 
 fn fixture(path: &str) -> String {
-    std::fs::read_to_string(format!("{}/tests/fixtures/{path}", env!("CARGO_MANIFEST_DIR"))).unwrap()
+    std::fs::read_to_string(format!(
+        "{}/tests/fixtures/{path}",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap()
 }
 
 fn states() -> Vec<serde_json::Value> {
-    fixture("afiro-controlled.states.jsonl").lines().map(|l| serde_json::from_str(l).unwrap()).collect()
+    fixture("afiro-controlled.states.jsonl")
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect()
 }
 
 fn status_of(v: &serde_json::Value) -> Vec<i64> {
-    v["status"].as_array().unwrap().iter().map(|s| s.as_i64().unwrap()).collect()
+    v["status"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s.as_i64().unwrap())
+        .collect()
 }
 
 fn start_basis(status: &[i64], n: usize, m: usize) -> Basis {
@@ -39,7 +51,11 @@ fn afiro_matches_reference_decisions() {
     let basis = start_basis(&status_of(&states[0]), n, m);
     let r = solve(&model, Some(&basis), &SolveOptions::default()).unwrap();
     assert_eq!(r.status, Status::Optimal);
-    assert!((r.objective - (-464.75314285714285)).abs() < 1e-7 + 1e-8 * 464.75, "objective {}", r.objective);
+    assert!(
+        (r.objective - (-464.75314285714285)).abs() < 1e-7 + 1e-8 * 464.75,
+        "objective {}",
+        r.objective
+    );
 
     let expected: Vec<(usize, usize)> = states
         .iter()
@@ -50,6 +66,13 @@ fn afiro_matches_reference_decisions() {
             (enter, leave)
         })
         .collect();
-    let got: Vec<(usize, usize)> = r.trace.iter().map(|e| (e.entering, e.leaving.unwrap())).collect();
-    assert_eq!(got, expected, "entering/leaving variables differ from the reference");
+    let got: Vec<(usize, usize)> = r
+        .trace
+        .iter()
+        .map(|e| (e.entering, e.leaving.unwrap()))
+        .collect();
+    assert_eq!(
+        got, expected,
+        "entering/leaving variables differ from the reference"
+    );
 }

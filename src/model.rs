@@ -59,7 +59,10 @@ impl LpModel {
 
     pub fn col(&self, j: usize) -> impl Iterator<Item = (usize, f64)> + '_ {
         let (s, e) = (self.col_start[j], self.col_start[j + 1]);
-        self.row_idx[s..e].iter().copied().zip(self.val[s..e].iter().copied())
+        self.row_idx[s..e]
+            .iter()
+            .copied()
+            .zip(self.val[s..e].iter().copied())
     }
 
     /// Row activities `A x`.

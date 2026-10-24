@@ -38,14 +38,22 @@ fn pow2_floor(v: f64) -> f64 {
     }
     let bits = v.to_bits();
     let e = ((bits >> 52) & 0x7ff) as i32;
-    let exp = if e == 0 { 63 - (bits & ((1u64 << 52) - 1)).leading_zeros() as i32 - 1074 } else { e - 1023 };
+    let exp = if e == 0 {
+        63 - (bits & ((1u64 << 52) - 1)).leading_zeros() as i32 - 1074
+    } else {
+        e - 1023
+    };
     f64::from_bits(((exp + 1023).max(1) as u64) << 52)
 }
 
 /// The target `1 / m` (1 for `m == 0`), rounded down to a power of two, moved from `old` by at most a factor `thr`.
 /// Returns the new value and whether the move was limited.
 fn damped(target: f64, old: f64, thr: f64) -> (f64, bool) {
-    let p = if target > 0.5 && target < 2.0 { 1.0 } else { pow2_floor(target) };
+    let p = if target > 0.5 && target < 2.0 {
+        1.0
+    } else {
+        pow2_floor(target)
+    };
     if p > thr * old {
         return (thr * old, true);
     }
@@ -56,7 +64,11 @@ fn damped(target: f64, old: f64, thr: f64) -> (f64, bool) {
 /// The reference's scale factors of `model` (ScaleFlag default, no objective scaling).
 pub fn compute(model: &LpModel) -> Scaling {
     let ranges: Vec<(usize, f64)> = (0..model.num_rows())
-        .filter(|&i| !is_inf(model.row_lo[i]) && !is_inf(model.row_up[i]) && model.row_lo[i] != model.row_up[i])
+        .filter(|&i| {
+            !is_inf(model.row_lo[i])
+                && !is_inf(model.row_up[i])
+                && model.row_lo[i] != model.row_up[i]
+        })
         .map(|i| (i, model.row_up[i] - model.row_lo[i]))
         .collect();
     compute_with_ranges(model, &ranges)
@@ -67,7 +79,9 @@ pub fn compute(model: &LpModel) -> Scaling {
 pub fn compute_with_ranges(model: &LpModel, ranges: &[(usize, f64)]) -> Scaling {
     let (nm, m) = (model.num_cols(), model.num_rows());
     // Columns: structurals, then one unit column per range column.
-    let mut cols: Vec<Vec<(usize, f64)>> = (0..nm).map(|j| model.col(j).map(|(i, a)| (i, a.abs())).collect()).collect();
+    let mut cols: Vec<Vec<(usize, f64)>> = (0..nm)
+        .map(|j| model.col(j).map(|(i, a)| (i, a.abs())).collect())
+        .collect();
     let mut lo = model.col_lo.clone();
     let mut up = model.col_up.clone();
     for &(i, ub) in ranges {
@@ -156,7 +170,11 @@ pub fn compute_with_ranges(model: &LpModel, ranges: &[(usize, f64)]) -> Scaling 
     let clamp = |x: f64| if x < LOWEST { LOWEST } else { x.min(HIGHEST) };
     let col: Vec<f64> = col.into_iter().map(clamp).collect();
     let obj = obj_scale(model, &col);
-    Scaling { col, row: row.into_iter().map(clamp).collect(), obj }
+    Scaling {
+        col,
+        row: row.into_iter().map(clamp).collect(),
+        obj,
+    }
 }
 
 /// The objective scale of the setup routine (`0x11c803..0x11cbad`, `ObjScale` 0): from the largest and smallest nonzero
@@ -284,12 +302,20 @@ impl Scaling {
 }
 
 /// Solves the scaled model and returns the solution of `model`.
-pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Result<SolveResult, SolveError> {
+pub fn solve(
+    model: &LpModel,
+    start: Option<&Basis>,
+    opts: &SolveOptions,
+) -> Result<SolveResult, SolveError> {
     let sc = compute(model);
     if crate::dump::on("scale") {
         crate::dump::emit("scale", serde_json::json!({"col": sc.col, "row": sc.row}));
     }
-    let inner = SolveOptions { scaling: false, obj_scale: sc.obj, ..opts.clone() };
+    let inner = SolveOptions {
+        scaling: false,
+        obj_scale: sc.obj,
+        ..opts.clone()
+    };
     match sc.apply(model) {
         Some(scaled) => Ok(sc.unscale(model, crate::simplex::solve(&scaled, start, &inner)?)),
         None => crate::simplex::solve(model, start, &inner),
@@ -302,7 +328,17 @@ mod tests {
 
     #[test]
     fn pow2_floor_matches_ilogb() {
-        for (v, p) in [(0.3, 0.25), (0.5, 0.5), (0.49, 0.25), (2.0, 2.0), (3.9, 2.0), (4.0, 4.0), (1e-3, 2f64.powi(-10)), (1.5, 1.0), (1e5, 65536.0)] {
+        for (v, p) in [
+            (0.3, 0.25),
+            (0.5, 0.5),
+            (0.49, 0.25),
+            (2.0, 2.0),
+            (3.9, 2.0),
+            (4.0, 4.0),
+            (1e-3, 2f64.powi(-10)),
+            (1.5, 1.0),
+            (1e5, 65536.0),
+        ] {
             assert_eq!(pow2_floor(v), p, "{v}");
         }
     }

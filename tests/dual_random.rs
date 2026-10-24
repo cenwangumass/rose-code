@@ -9,7 +9,10 @@ use rose::{solve, SolveOptions, Status};
 struct Rng(u64);
 impl Rng {
     fn next(&mut self) -> u64 {
-        self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         self.0 >> 33
     }
     fn below(&mut self, n: u64) -> u64 {
@@ -53,7 +56,9 @@ fn random_model_with(seed: u64, max_m: u64, max_n: u64, feasible: bool) -> LpMod
         }
         col_start.push(row_idx.len());
     }
-    let obj: Vec<f64> = (0..n).map(|_| if r.below(4) == 0 { 0.0 } else { r.int(-5, 5) }).collect();
+    let obj: Vec<f64> = (0..n)
+        .map(|_| if r.below(4) == 0 { 0.0 } else { r.int(-5, 5) })
+        .collect();
     let (mut col_lo, mut col_up) = (vec![], vec![]);
     for _ in 0..n {
         let (lo, up) = match r.below(8) {
@@ -94,16 +99,33 @@ fn random_model_with(seed: u64, max_m: u64, max_n: u64, feasible: bool) -> LpMod
             0 | 1 => (-INF, b),
             2 | 3 => (b, INF),
             4 => (b, b),
-            5 => (b - r.int(0, 6), b + if feasible { r.int(0, 3) } else { 0.0 }),
+            5 => (
+                b - r.int(0, 6),
+                b + if feasible { r.int(0, 3) } else { 0.0 },
+            ),
             _ => (-INF, INF),
         };
         row_lo.push(lo);
         row_up.push(up);
     }
-    let row_range = row_lo.iter().zip(&row_up).map(|(&l, &u)| if l > -INF && u < INF && l != u { u - l } else { 0.0 }).collect();
+    let row_range = row_lo
+        .iter()
+        .zip(&row_up)
+        .map(|(&l, &u)| {
+            if l > -INF && u < INF && l != u {
+                u - l
+            } else {
+                0.0
+            }
+        })
+        .collect();
     LpModel {
         name: format!("rand{seed}"),
-        sense: if r.below(2) == 0 { Sense::Minimize } else { Sense::Maximize },
+        sense: if r.below(2) == 0 {
+            Sense::Minimize
+        } else {
+            Sense::Maximize
+        },
         offset: r.int(-5, 5),
         obj,
         col_lo,
@@ -165,26 +187,52 @@ fn compare_random_profile(count: u64, max_m: u64, max_n: u64, feasible: bool, du
             Status::NumericalFailure => 4,
         }] += 1;
         if let Err(e) = verify::check(&model, &d, 1e-6) {
-            bad.push(format!("seed {seed}: dual {:?} fails its check: {e}", d.status));
+            bad.push(format!(
+                "seed {seed}: dual {:?} fails its check: {e}",
+                d.status
+            ));
         } else if p.status == Status::NumericalFailure || verify::check(&model, &p, 1e-6).is_err() {
             // The primal simplex gives up on some degenerate corners (a single free row with free columns, unbounded feasible models) or returns a
             // result that fails its check; the dual's verified result stands alone there, nothing to compare.
             skipped += 1;
         } else if d.status != p.status {
             // Both infeasible and unbounded: either answer is a proof of its own; the check above vouches for the dual's.
-            bad.push(format!("seed {seed}: primal {:?}, dual {:?}", p.status, d.status));
-        } else if d.status == Status::Optimal && (d.objective - p.objective).abs() > 1e-7 + 1e-8 * p.objective.abs() {
-            bad.push(format!("seed {seed}: objective {} vs {}", d.objective, p.objective));
+            bad.push(format!(
+                "seed {seed}: primal {:?}, dual {:?}",
+                p.status, d.status
+            ));
+        } else if d.status == Status::Optimal
+            && (d.objective - p.objective).abs() > 1e-7 + 1e-8 * p.objective.abs()
+        {
+            bad.push(format!(
+                "seed {seed}: objective {} vs {}",
+                d.objective, p.objective
+            ));
         }
     }
     let mut kinds = std::collections::BTreeMap::new();
     for b in &bad {
-        let k = b.split(": ").nth(1).unwrap().split(" fails").next().unwrap().split(',').take(2).collect::<Vec<_>>().join(",");
+        let k = b
+            .split(": ")
+            .nth(1)
+            .unwrap()
+            .split(" fails")
+            .next()
+            .unwrap()
+            .split(',')
+            .take(2)
+            .collect::<Vec<_>>()
+            .join(",");
         *kinds.entry(k).or_insert(0) += 1;
     }
     eprintln!("failure kinds: {kinds:?}");
     eprintln!("dual statuses (optimal, infeasible, unbounded, limit, failure): {counts:?}, {skipped} models not compared (the primal simplex fails or fails its own check)");
-    assert!(bad.is_empty(), "{} failures, first: {:#?}", bad.len(), &bad[..bad.len().min(25)]);
+    assert!(
+        bad.is_empty(),
+        "{} failures, first: {:#?}",
+        bad.len(),
+        &bad[..bad.len().min(25)]
+    );
 }
 
 #[test]
@@ -193,9 +241,22 @@ fn show() {
     let seed: u64 = std::env::var("SEED").unwrap().parse().unwrap();
     let model = random_model(seed);
     eprintln!("{model:#?}");
-    for o in [SolveOptions::default(), SolveOptions::dual(), SolveOptions::dual_release()] {
+    for o in [
+        SolveOptions::default(),
+        SolveOptions::dual(),
+        SolveOptions::dual_release(),
+    ] {
         let r = solve(&model, None, &o).unwrap();
-        eprintln!("{:?} obj {} it {} x {:?} farkas {:?} ray {:?} check {:?}", r.status, r.objective, r.iterations, r.x, r.farkas, r.ray, verify::check(&model, &r, 1e-6));
+        eprintln!(
+            "{:?} obj {} it {} x {:?} farkas {:?} ray {:?} check {:?}",
+            r.status,
+            r.objective,
+            r.iterations,
+            r.x,
+            r.farkas,
+            r.ray,
+            verify::check(&model, &r, 1e-6)
+        );
     }
 }
 
@@ -209,7 +270,14 @@ fn primal_failures() {
         let d = solve(&model, None, &SolveOptions::dual()).unwrap();
         if p.status == Status::NumericalFailure && n < 6 {
             n += 1;
-            eprintln!("seed {seed}: primal {:?} dual {:?} dual check {:?} m {} n {}", p.status, d.status, verify::check(&model, &d, 1e-6).is_ok(), model.num_rows(), model.num_cols());
+            eprintln!(
+                "seed {seed}: primal {:?} dual {:?} dual check {:?} m {} n {}",
+                p.status,
+                d.status,
+                verify::check(&model, &d, 1e-6).is_ok(),
+                model.num_rows(),
+                model.num_cols()
+            );
         }
     }
 }

@@ -4,7 +4,11 @@
 use rose::{mps, solve, Basis, SolveOptions, Status};
 
 fn fixture(path: &str) -> String {
-    std::fs::read_to_string(format!("{}/tests/fixtures/{path}", env!("CARGO_MANIFEST_DIR"))).unwrap()
+    std::fs::read_to_string(format!(
+        "{}/tests/fixtures/{path}",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap()
 }
 
 fn check(mps_name: &str, decisions: &str, objective: f64) {
@@ -30,29 +34,62 @@ fn check(mps_name: &str, decisions: &str, objective: f64) {
     };
     let r = solve(&model, Some(&Basis { basic, at_upper }), &opts).unwrap();
     assert_eq!(r.status, Status::Optimal);
-    assert!((r.objective - objective).abs() < 1e-7 + 1e-8 * objective.abs(), "objective {}", r.objective);
-    let expected: Vec<(usize, Option<usize>)> =
-        fx["decisions"].as_array().unwrap().iter().map(|d| (d[0].as_u64().unwrap() as usize, d[1].as_u64().map(|v| v as usize))).collect();
-    let got: Vec<(usize, Option<usize>)> = r.trace.iter().map(|e| (e.entering, e.leaving)).collect();
-    assert_eq!(got, expected, "entering/leaving variables differ from the reference");
+    assert!(
+        (r.objective - objective).abs() < 1e-7 + 1e-8 * objective.abs(),
+        "objective {}",
+        r.objective
+    );
+    let expected: Vec<(usize, Option<usize>)> = fx["decisions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|d| {
+            (
+                d[0].as_u64().unwrap() as usize,
+                d[1].as_u64().map(|v| v as usize),
+            )
+        })
+        .collect();
+    let got: Vec<(usize, Option<usize>)> =
+        r.trace.iter().map(|e| (e.entering, e.leaving)).collect();
+    assert_eq!(
+        got, expected,
+        "entering/leaving variables differ from the reference"
+    );
 }
 
 #[test]
 fn blend_matches_all_reference_decisions() {
-    check("blend.mps", "blend-controlled.decisions.json", -30.812149845828216);
+    check(
+        "blend.mps",
+        "blend-controlled.decisions.json",
+        -30.812149845828216,
+    );
 }
 
 #[test]
 fn bore3d_matches_all_reference_decisions() {
-    check("bore3d.mps", "bore3d-controlled.decisions.json", 1373.0803942085);
+    check(
+        "bore3d.mps",
+        "bore3d-controlled.decisions.json",
+        1373.0803942085,
+    );
 }
 
 #[test]
 fn sc50a_matches_all_reference_decisions() {
-    check("sc50a.mps", "sc50a-controlled.decisions.json", -64.57507705856449);
+    check(
+        "sc50a.mps",
+        "sc50a-controlled.decisions.json",
+        -64.57507705856449,
+    );
 }
 
 #[test]
 fn adlittle_matches_all_reference_decisions_with_the_recovered_refactor_trigger() {
-    check("adlittle.mps", "adlittle-controlled.decisions.json", 225494.96316238036);
+    check(
+        "adlittle.mps",
+        "adlittle-controlled.decisions.json",
+        225494.96316238036,
+    );
 }

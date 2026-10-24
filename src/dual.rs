@@ -9,7 +9,9 @@ use crate::basis::Basis;
 use crate::ftran_order::RefStruct;
 use crate::lu::{Column, Factor};
 use crate::model::{LpModel, Sense, INF};
-use crate::simplex::{build, ref_sort, Internal, SolveError, SolveOptions, SolveResult, Status, TraceEvent};
+use crate::simplex::{
+    build, ref_sort, Internal, SolveError, SolveOptions, SolveResult, Status, TraceEvent,
+};
 
 /// Status of a nonbasic variable: at its lower bound, upper bound, free, fixed (`ctx+0x168`); a basic variable holds its position.
 const LB: i32 = -1;
@@ -28,7 +30,9 @@ const W_EPS: f64 = 1e-8;
 
 /// The reference's integer generator (`0x88a870`): a 64-bit congruential step, the high word tempered, 31 bits.
 fn lcg_int(state: &mut u64) -> u32 {
-    *state = state.wrapping_mul(0x5851f42d4c957f2d).wrapping_add(0x14057b7ef767814f);
+    *state = state
+        .wrapping_mul(0x5851f42d4c957f2d)
+        .wrapping_add(0x14057b7ef767814f);
     let mut e = (*state >> 32) as u32;
     e ^= e >> 11;
     e ^= (e << 7) & 0x9d2c5680;
@@ -42,11 +46,19 @@ fn is_inf(v: f64) -> bool {
 }
 
 fn minsd(a: f64, b: f64) -> f64 {
-    if a < b { a } else { b }
+    if a < b {
+        a
+    } else {
+        b
+    }
 }
 
 fn maxsd(a: f64, b: f64) -> f64 {
-    if a > b { a } else { b }
+    if a > b {
+        a
+    } else {
+        b
+    }
 }
 
 /// Outcome of the ratio test (`0xc74a0`).
@@ -190,12 +202,17 @@ pub(crate) fn dual_crash_basic(p: &Internal) -> Vec<usize> {
     let mut order = eq.clone();
     ref_sort(&mut keys, &mut order);
     if crate::dump::on("dcr") {
-        crate::dump::emit("dcr", serde_json::json!({"order": order, "counts": order.iter().map(|&r| row_cols[r].len()).collect::<Vec<_>>()}));
+        crate::dump::emit(
+            "dcr",
+            serde_json::json!({"order": order, "counts": order.iter().map(|&r| row_cols[r].len()).collect::<Vec<_>>()}),
+        );
     }
     let mut cost: Vec<f64> = p.cost[..n].to_vec();
     let mut marked = vec![false; m];
     // Columns that start at an infinite bound (negative cost and infinite upper bound, or positive cost and infinite lower bound) are flagged from the start.
-    let mut flagged: Vec<bool> = (0..n).map(|j| (p.cost[j] < 0.0 && p.up[j] >= BIG) || (p.cost[j] >= 0.0 && p.lo[j] <= -BIG)).collect();
+    let mut flagged: Vec<bool> = (0..n)
+        .map(|j| (p.cost[j] < 0.0 && p.up[j] >= BIG) || (p.cost[j] >= 0.0 && p.lo[j] <= -BIG))
+        .collect();
     let mut taken = vec![false; n];
     let emit = |j: usize, r: usize| {
         if crate::dump::on("dcr") {
@@ -206,14 +223,15 @@ pub(crate) fn dual_crash_basic(p: &Internal) -> Vec<usize> {
         if marked[r] {
             continue;
         }
-        let (mut best_ratio, mut best_count, mut best): (f64, usize, Option<(usize, f64)>) = (1e100, m, None);
+        let (mut best_ratio, mut best_count, mut best): (f64, usize, Option<(usize, f64)>) =
+            (1e100, m, None);
         for &(j, a) in &row_cols[r] {
             if flagged[j] || a < 0.1 {
                 best = None;
                 break;
             }
             let ratio = cost[j] / a;
-            
+
             let cnt = p.cols[j].len();
             if best_ratio - 1e-10 > ratio || (best_ratio + 1e-10 > ratio && cnt < best_count) {
                 best_ratio = ratio;
@@ -249,7 +267,11 @@ pub(crate) fn dual_crash_basic(p: &Internal) -> Vec<usize> {
         let (mut best_cnt, mut best_abs) = (5i64, 0.0f64);
         for &(j, a) in &row_cols[r] {
             let free_lb = p.lo[j] <= -BIG;
-            if (cost[j].abs() > 1e-10 && !free_lb) || taken[j] || a.abs() < 1e-6 || p.cols[j].len() > 5 {
+            if (cost[j].abs() > 1e-10 && !free_lb)
+                || taken[j]
+                || a.abs() < 1e-6
+                || p.cols[j].len() > 5
+            {
                 continue;
             }
             let cnt = p.cols[j].len() as i64;
@@ -281,11 +303,26 @@ pub(crate) fn dual_crash_basic(p: &Internal) -> Vec<usize> {
 /// (`jmax`), the others for the smallest (`jmin`); the largest wins when it is smaller than the smallest, else (ties included) the smallest, and nothing is taken when
 /// the winner is missing (a smallest without a largest is dropped). The chosen column replaces the slack (`cost = 0`), the costs of the other columns of the row
 /// grow by `a ratio` and their statuses follow the sign of the cost.
-fn crash_pass3(p: &Internal, basic: &mut [usize], cost: &mut [f64], taken: &[bool], is_eq: &[bool], row_cols: &[Vec<(usize, f64)>]) {
+fn crash_pass3(
+    p: &Internal,
+    basic: &mut [usize],
+    cost: &mut [f64],
+    taken: &[bool],
+    is_eq: &[bool],
+    row_cols: &[Vec<(usize, f64)>],
+) {
     let (n, m) = (p.n, p.m);
     // -4 fixed, -1 at lower, -2 at upper, >= 0 basic in that row.
     let mut st: Vec<i64> = (0..n + m)
-        .map(|j| if p.up[j] - p.lo[j] <= 0.0 { -4 } else if p.cost[j] >= 1e-6 { -1 } else { -2 })
+        .map(|j| {
+            if p.up[j] - p.lo[j] <= 0.0 {
+                -4
+            } else if p.cost[j] >= 1e-6 {
+                -1
+            } else {
+                -2
+            }
+        })
         .collect();
     for (r, &j) in basic.iter().enumerate() {
         if j < n {
@@ -347,7 +384,11 @@ fn crash_pass3(p: &Internal, basic: &mut [usize], cost: &mut [f64], taken: &[boo
         if abandoned || sum - sg * p.rhs[r] <= 1e-6 {
             continue;
         }
-        let (chosen, ratio) = if max_r >= min_r { (jmin, min_r) } else { (jmax, max_r) };
+        let (chosen, ratio) = if max_r >= min_r {
+            (jmin, min_r)
+        } else {
+            (jmax, max_r)
+        };
         let Some(c) = chosen else { continue };
         if crate::dump::on("dcr") {
             crate::dump::emit("dcr", serde_json::json!({"col": c, "row": r, "pass": 3}));
@@ -375,11 +416,25 @@ fn crash_pass3(p: &Internal, basic: &mut [usize], cost: &mut [f64], taken: &[boo
 }
 
 /// The reference's pivot order of the basis columns (`lu_order`), as in the primal path.
-fn reference_order(p: &Internal, basic: &[usize], fac_no: usize) -> (Vec<usize>, crate::lu_order::Structure, Vec<(bool, Vec<usize>, Vec<f64>)>) {
+fn reference_order(
+    p: &Internal,
+    basic: &[usize],
+    fac_no: usize,
+) -> (
+    Vec<usize>,
+    crate::lu_order::Structure,
+    Vec<(bool, Vec<usize>, Vec<f64>)>,
+) {
     let n = p.n;
     let cols: Vec<(bool, Vec<usize>, Vec<f64>)> = basic
         .iter()
-        .map(|&v| (v >= n, p.fcols[v].iter().map(|&(r, _)| r).collect(), p.fcols[v].iter().map(|&(_, a)| a).collect()))
+        .map(|&v| {
+            (
+                v >= n,
+                p.fcols[v].iter().map(|&(r, _)| r).collect(),
+                p.fcols[v].iter().map(|&(_, a)| a).collect(),
+            )
+        })
         .collect();
     crate::lu_order::set_factorization_number(fac_no);
     let st = crate::lu_order::factor_structure(p.m, &cols);
@@ -401,7 +456,11 @@ impl<'a> Dual<'a> {
 
     /// Primal feasibility tolerance in force (`0x380`, or `0x370 * (1e-5 * 0x380)` while the level is not zero).
     fn ptol(&self) -> f64 {
-        if self.level != 0 { BIG * (1e-5 * PRIMAL_TOL) } else { PRIMAL_TOL }
+        if self.level != 0 {
+            BIG * (1e-5 * PRIMAL_TOL)
+        } else {
+            PRIMAL_TOL
+        }
     }
 
     fn infeas(&self, r: usize) -> f64 {
@@ -422,9 +481,16 @@ impl<'a> Dual<'a> {
     /// Factorize the basis (`0xd4190`): the positions follow the pivot order of the reference's LU; the weights move with their variables.
     fn refactor(&mut self) -> Result<(), SolveError> {
         let (order, st, rows) = reference_order(self.p, &self.head, self.refactorizations + 1);
-        let discard = if self.pivot_cols.is_some() { self.mirror.discard_work() } else { 0.0 };
+        let discard = if self.pivot_cols.is_some() {
+            self.mirror.discard_work()
+        } else {
+            0.0
+        };
         if crate::dump::on("luin") {
-            crate::dump::emit("luin", serde_json::json!({"n": self.refactorizations, "cols": self.head, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "phase": st.phase}));
+            crate::dump::emit(
+                "luin",
+                serde_json::json!({"n": self.refactorizations, "cols": self.head, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "phase": st.phase}),
+            );
         }
         let mut wv = vec![0.0; self.n + self.m];
         for (pos, &v) in self.head.iter().enumerate() {
@@ -469,13 +535,19 @@ impl<'a> Dual<'a> {
                     best = Some((pos, v));
                 }
             }
-            let Some((r, _)) = best.filter(|_| mx >= PIVOT_FLOOR) else { continue };
+            let Some((r, _)) = best.filter(|_| mx >= PIVOT_FLOOR) else {
+                continue;
+            };
             let mut alpha = vec![0.0; m];
             for &(i, v) in &col_out {
                 alpha[i] = v;
             }
             let leave = self.head[r];
-            self.st[leave] = if self.p.lo[leave] == self.p.up[leave] { FIXED } else { LB };
+            self.st[leave] = if self.p.lo[leave] == self.p.up[leave] {
+                FIXED
+            } else {
+                LB
+            };
             self.st[j] = r as i32;
             self.head[r] = j;
             self.iters += 1;
@@ -493,7 +565,12 @@ impl<'a> Dual<'a> {
 
     /// The work of a factorization and the installation of its factor (`0xd4190` from `0xf34f2`, the update routine `0xf15c0`), after the fresh mirror is built:
     /// the driver's sites, the spike discard and the weight update of the pivot that preceded it, then the factor object's own passes.
-    fn factor_work(&mut self, st: &crate::lu_order::Structure, rows: &[(bool, Vec<usize>, Vec<f64>)], discard: f64) {
+    fn factor_work(
+        &mut self,
+        st: &crate::lu_order::Structure,
+        rows: &[(bool, Vec<usize>, Vec<f64>)],
+        discard: f64,
+    ) {
         use crate::work::{CTX, FAC};
         let lu = st.work(rows, self.mirror.has_levels());
         self.work.factor_driver(&lu, CTX);
@@ -554,10 +631,18 @@ impl<'a> Dual<'a> {
             }
         }
         let est = self.mirror.ftran_dense_work(&r);
-        self.work.add_from(0x1219d6, 0x120673, est, crate::work::FAC);
+        self.work
+            .add_from(0x1219d6, 0x120673, est, crate::work::FAC);
         // `0xc142b`: the solution read-out sums the columns of the nonbasic variables at a nonzero value.
-        let cols: usize = (0..p.n).filter(|&j| self.st[j] < 0 && self.nonbasic_value(j) != 0.0).map(|j| p.cols[j].len()).sum();
-        self.work.add(0xc142b, 4.0 * p.m as f64 + 2.0 * cols as f64, crate::work::CTX);
+        let cols: usize = (0..p.n)
+            .filter(|&j| self.st[j] < 0 && self.nonbasic_value(j) != 0.0)
+            .map(|j| p.cols[j].len())
+            .sum();
+        self.work.add(
+            0xc142b,
+            4.0 * p.m as f64 + 2.0 * cols as f64,
+            crate::work::CTX,
+        );
         let rows: Vec<usize> = (0..p.m).filter(|&i| r[i] != 0.0).collect();
         let vals: Vec<f64> = rows.iter().map(|&i| r[i]).collect();
         let out = self.mirror.ftran_basic(&rows, &vals);
@@ -583,7 +668,8 @@ impl<'a> Dual<'a> {
     /// d recomputed from the costs after a factorization, in the reference frame.
     fn recompute_d(&mut self) {
         let dt = self.true_d();
-        self.work.add_from(0x12de50, 0xe53a7, self.mirror.work, crate::work::FAC);
+        self.work
+            .add_from(0x12de50, 0xe53a7, self.mirror.work, crate::work::FAC);
         for j in 0..self.n + self.m {
             if self.st[j] == FIXED {
                 // A fixed nonbasic variable that has a d (it left the basis, or the start gave it one) gets its true d like one at its lower bound
@@ -603,10 +689,19 @@ impl<'a> Dual<'a> {
     /// ascending row order, as the reference's row-wise product `0x136b00` does (rows with |y| <= 1e-13 are skipped).
     fn true_d(&mut self) -> Vec<f64> {
         let p = self.p;
-        let inp: Vec<(usize, f64)> = self.head.iter().enumerate().map(|(pos, &j)| (pos, self.cost[j])).filter(|e| e.1 != 0.0).collect();
+        let inp: Vec<(usize, f64)> = self
+            .head
+            .iter()
+            .enumerate()
+            .map(|(pos, &j)| (pos, self.cost[j]))
+            .filter(|e| e.1 != 0.0)
+            .collect();
         let out = self.mirror.btran(&inp, false, true);
         if crate::dump::on("dual") {
-            crate::dump::emit("dual", serde_json::json!({"refactor": self.refactorizations, "iter": self.iters, "out": crate::dump::sparse(&out)}));
+            crate::dump::emit(
+                "dual",
+                serde_json::json!({"refactor": self.refactorizations, "iter": self.iters, "out": crate::dump::sparse(&out)}),
+            );
         }
         let mut y = vec![0.0; p.m];
         for &(i, v) in out.iter() {
@@ -649,17 +744,27 @@ impl<'a> Dual<'a> {
         let (n, m) = (self.n, self.m);
         let nnz: usize = self.p.cols[..n].iter().map(|c| c.len()).sum();
         let (nf, mf, z) = (n as f64, m as f64, nnz as f64);
-        self.ptype = if m >= 100 && n >= 100 && (z <= 20.0 * nf || mf * z <= 10.0 * nf * nf) { 1 } else { 0 };
+        self.ptype = if m >= 100 && n >= 100 && (z <= 20.0 * nf || mf * z <= 10.0 * nf * nf) {
+            1
+        } else {
+            0
+        };
         if self.ptype > 0 {
             let avg = z / nf;
-            self.p70 = (0..n + m).map(|j| (if j < n { self.p.cols[j].len() } else { 1 }) as f64 + avg).collect();
+            self.p70 = (0..n + m)
+                .map(|j| (if j < n { self.p.cols[j].len() } else { 1 }) as f64 + avg)
+                .collect();
         }
     }
 
     /// Reset of the row weights at a factorization (`0x132460`, from `0xf48fd`): in pivot order, `w_k = 1` combined with the U entries of column `k`
     /// (rows above, descending) as `w + w_j - w w_j / m`, then backwards with the L entries of column `k`; the total decides between the
     /// capped weights `min(0.1 m + 100, w + 100)` and (total above `m (0.1 m + 100)`, or type 2 already) the constant cap with type 2.
-    fn reset_pricing(&mut self, st: &crate::lu_order::Structure, cols: &[(bool, Vec<usize>, Vec<f64>)]) {
+    fn reset_pricing(
+        &mut self,
+        st: &crate::lu_order::Structure,
+        cols: &[(bool, Vec<usize>, Vec<f64>)],
+    ) {
         if self.ptype == 0 {
             return;
         }
@@ -688,9 +793,17 @@ impl<'a> Dual<'a> {
         let bwd: Vec<Vec<usize>> = (0..m)
             .map(|k| {
                 if st.phase[k] != 0 {
-                    row_pos[st.pivots[k].0].iter().map(|&c| step_of_pos[c]).filter(|&t| t > k).collect()
+                    row_pos[st.pivots[k].0]
+                        .iter()
+                        .map(|&c| step_of_pos[c])
+                        .filter(|&t| t > k)
+                        .collect()
                 } else {
-                    st.u_rows[k].iter().map(|&(c, _)| step_of_pos[c]).filter(|&t| t > k).collect()
+                    st.u_rows[k]
+                        .iter()
+                        .map(|&(c, _)| step_of_pos[c])
+                        .filter(|&t| t > k)
+                        .collect()
                 }
             })
             .collect();
@@ -720,7 +833,10 @@ impl<'a> Dual<'a> {
             }
         }
         if crate::dump::on("p68") {
-            crate::dump::emit("p68", serde_json::json!({"n": self.refactorizations, "it": self.iters, "type": self.ptype, "ucol": fwd, "lcol": bwd, "p68": w}));
+            crate::dump::emit(
+                "p68",
+                serde_json::json!({"n": self.refactorizations, "it": self.iters, "type": self.ptype, "ucol": fwd, "lcol": bwd, "p68": w}),
+            );
         }
         self.p68 = w;
     }
@@ -771,7 +887,11 @@ impl<'a> Dual<'a> {
         };
         let mut keys: Vec<f64> = fresh.iter().map(|&r| key(self, r)).collect();
         ref_sort(&mut keys, &mut fresh);
-        let old: Vec<usize> = self.list[..self.walk_len.min(self.list.len())].iter().copied().filter(|&r| self.flags[r] == 0).collect();
+        let old: Vec<usize> = self.list[..self.walk_len.min(self.list.len())]
+            .iter()
+            .copied()
+            .filter(|&r| self.flags[r] == 0)
+            .collect();
         let mut merged = Vec::with_capacity(old.len() + fresh.len());
         let (mut a, mut b) = (0, 0);
         while a < old.len() && b < fresh.len() {
@@ -791,9 +911,18 @@ impl<'a> Dual<'a> {
         // The loop over the rows (`0xc22f3` / `0xc24b7`) counts every row as feasible when `ctx+0x2c8` is 0 (the largest infeasibility sum at the last recompute is
         // at most 1e20, i.e. the tolerance level is 0), so that the site books `3 m`.
         let n_inf = if self.level != 0 { n1 } else { 0.0 };
-        self.work.add(0xc26ec, 3.0 * (m - n_inf) + (5.0 + if self.ptype == 1 { 1.0 } else { 0.0 }) * n_inf, crate::work::CTX);
-        self.work.add(0xc2761, 2.0 * old.len() as f64 + old_len as f64, crate::work::CTX);
-        self.work.add(0xc2842, 2.0 * fresh.len() as f64, crate::work::CTX);
+        self.work.add(
+            0xc26ec,
+            3.0 * (m - n_inf) + (5.0 + if self.ptype == 1 { 1.0 } else { 0.0 }) * n_inf,
+            crate::work::CTX,
+        );
+        self.work.add(
+            0xc2761,
+            2.0 * old.len() as f64 + old_len as f64,
+            crate::work::CTX,
+        );
+        self.work
+            .add(0xc2842, 2.0 * fresh.len() as f64, crate::work::CTX);
         self.work.add(0xc2ad4, n1, crate::work::CTX);
         for &r in &fresh {
             self.flags[r] = 0;
@@ -826,14 +955,19 @@ impl<'a> Dual<'a> {
         }
         // The mode switch (`0xc0c29`): the value mode starts when 15 times the average of the changed-row counts exceeds m, or when the iteration
         // count does; until then the walk list is rebuilt.
-        if !self.value_mode && !(15.0 * self.avg_touch > self.m as f64 || self.iters as f64 > self.m as f64) {
+        if !self.value_mode
+            && !(15.0 * self.avg_touch > self.m as f64 || self.iters as f64 > self.m as f64)
+        {
             self.build_walk_list();
             return;
         }
         if !self.value_mode {
             // The value mode lowers the factor's update limit to max(20, m^0.65) (`0xc0cad`).
             let lim = ((self.m as f64).powf(0.65) as usize).max(20);
-            let cur = self.mirror.upd_limit.unwrap_or(((self.m as f64).powf(0.7) as usize).max(20));
+            let cur = self
+                .mirror
+                .upd_limit
+                .unwrap_or(((self.m as f64).powf(0.7) as usize).max(20));
             self.upd_limit = Some(lim.min(cur));
             self.mirror.upd_limit = self.upd_limit;
         }
@@ -846,9 +980,17 @@ impl<'a> Dual<'a> {
         // The count compared with the pivot column's entries is the number of infeasible rows (`[P+0x3c]`, `0xc1e8e`).
         let count = inf.iter().filter(|&&f| f).count();
         self.n_infeas = count;
-        let div = if after_pivot && count < self.last_cap || big { 1e5 } else { 1e3 };
+        let div = if after_pivot && count < self.last_cap || big {
+            1e5
+        } else {
+            1e3
+        };
         let new = maxp / div;
-        self.thr = if thr_old != 0.0 && maxp > thr_old { maxsd(new, thr_old) } else { new };
+        self.thr = if thr_old != 0.0 && maxp > thr_old {
+            maxsd(new, thr_old)
+        } else {
+            new
+        };
         self.list.clear();
         for r in 0..self.m {
             if !inf[r] {
@@ -989,7 +1131,12 @@ impl<'a> Dual<'a> {
 
     /// The row product (`0x134d90`): the pivot row `rho^T A_N` over the nonbasic columns (and the leaving slack), in the reference frame.
     /// Returns the entries `(variable, value)` with the structurals first, and their count.
-    fn pivot_row(&self, rho: &[(usize, f64)], leave: usize, above: bool) -> (Vec<(usize, f64)>, usize) {
+    fn pivot_row(
+        &self,
+        rho: &[(usize, f64)],
+        leave: usize,
+        above: bool,
+    ) -> (Vec<(usize, f64)>, usize) {
         let (n, m) = (self.n, self.m);
         let p = self.p;
         // The row product runs over the rows of `rho` unless their entries (`0x134aa0` counts them) outnumber the structurals n by 1.8 (`0xc5355`, `ctx+0x68`);
@@ -1043,7 +1190,12 @@ impl<'a> Dual<'a> {
     /// weights restarted, in the true frame (the leaving variable with 1), combined column by column into a dense vector in the order of the list; the
     /// entries above 1e-13 in magnitude, in the order of their first touch, are the vector. Returns it with the squared norm of the list and the work of
     /// the wrapper without the column copy (`0x120114`: 4 per list entry, 2 per column entry of the structurals, 2 per touched row, 2 per kept row).
-    fn framework_rhs(&self, row: &[(usize, f64)], leave: usize, above: bool) -> (Vec<usize>, Vec<f64>, f64, f64) {
+    fn framework_rhs(
+        &self,
+        row: &[(usize, f64)],
+        leave: usize,
+        above: bool,
+    ) -> (Vec<usize>, Vec<f64>, f64, f64) {
         let p = self.p;
         let sdir = if above { -1.0 } else { 1.0 };
         let mut list: Vec<(usize, f64)> = Vec::new();
@@ -1111,7 +1263,11 @@ impl<'a> Dual<'a> {
         }
         let nr = rho.len() as f64;
         let est = if rho.len() == 1 {
-            if rho[0].1.abs() < 1.0 { 10.5 + 5.0 * p5 as f64 } else { 10.5 + 4.0 * p5 as f64 }
+            if rho[0].1.abs() < 1.0 {
+                10.5 + 5.0 * p5 as f64
+            } else {
+                10.5 + 4.0 * p5 as f64
+            }
         } else if (n as f64) < 1.8 * p5 as f64 {
             // Columnwise in index order (the same test as `pivot_row`).
             8.5 * nr + 2.0 * p5 as f64 + 2.5 * n as f64
@@ -1119,12 +1275,24 @@ impl<'a> Dual<'a> {
             11.5 * nr + 3.5 * p5 as f64 + 3.0 * d as f64
         };
         // Every slack entry of the result (the leaving one and the offered nonbasic ones) adds four.
-        let slack = if self.level != 0 { 4.0 * nslack as f64 } else { 0.0 };
-        self.work.add_from(0x135e92, 0xc5381, est + slack, crate::work::CTX);
+        let slack = if self.level != 0 {
+            4.0 * nslack as f64
+        } else {
+            0.0
+        };
+        self.work
+            .add_from(0x135e92, 0xc5381, est + slack, crate::work::CTX);
     }
 
     /// The bound-flipping Harris ratio test (`0xc74a0`, `ctx+0x468 != 0`), `specs/dual-simplex.md`.
-    fn ratio_test(&mut self, row: &[(usize, f64)], esi: usize, leave: usize, above: bool, xbr: f64) -> Ratio {
+    fn ratio_test(
+        &mut self,
+        row: &[(usize, f64)],
+        esi: usize,
+        leave: usize,
+        above: bool,
+        xbr: f64,
+    ) -> Ratio {
         let p = self.p;
         let delta = DUAL_TOL;
         let (vlb, vub) = (p.lo[leave], p.up[leave]);
@@ -1211,7 +1379,10 @@ impl<'a> Dual<'a> {
         self.work.add(0xc7bcd, 3.0 * cnt as f64, crate::work::CTX);
         if nn == 0 {
             self.work.add(0xc7c4f, 0.0, crate::work::CTX);
-            return Ratio { q: None, flips: Vec::new() };
+            return Ratio {
+                q: None,
+                flips: Vec::new(),
+            };
         }
         // The partition passes of the selection book `3 (hi - lo + 4)` each; the store is separate (`0xcbcae`) when the final sum is below minus the primal tolerance (`xmm9 = -1e19` at a nonzero level, else `-1e-6`, against `xmm10` at `0xcbc8d`).
         let mut sel = 0.0f64;
@@ -1219,7 +1390,10 @@ impl<'a> Dual<'a> {
         if nn == 1 {
             self.work.add(0xc7c4f, 5.0, crate::work::CTX);
             let (q, _) = self.shift_entering(row, &[lst[0]], lst[0], 0.0, 0.0, 0);
-            return Ratio { q: Some(q), flips: Vec::new() };
+            return Ratio {
+                q: Some(q),
+                flips: Vec::new(),
+            };
         }
         let maxa = -minsd(xm13, xm9);
         let mut nflip = 0usize;
@@ -1243,7 +1417,9 @@ impl<'a> Dual<'a> {
                         }
                     }
                     l += 1;
-                    while ratio_arr[l as usize] > pr || (ratio_arr[l as usize] == pr && pc > con[l as usize]) {
+                    while ratio_arr[l as usize] > pr
+                        || (ratio_arr[l as usize] == pr && pc > con[l as usize])
+                    {
                         l += 1;
                     }
                     if l as usize >= h {
@@ -1282,14 +1458,18 @@ impl<'a> Dual<'a> {
             self.work.add(0xcbcae, 3.0 * sel, crate::work::CTX);
             self.work.add(0xc7c4f, w5, crate::work::CTX);
         } else {
-            self.work.add_merged(0xc7c4f, &[3.0 * sel, w5], crate::work::CTX);
+            self.work
+                .add_merged(0xc7c4f, &[3.0 * sel, w5], crate::work::CTX);
         }
         if nflip > 0 && !(self.d[row[lst[nflip]].0] > delta) {
             nflip = 0;
         }
         let pivtol = maxsd(0.0, maxsd(1e-13 * maxa, PIVOT_FLOOR));
         if !(pivtol <= maxa) {
-            return Ratio { q: None, flips: Vec::new() };
+            return Ratio {
+                q: None,
+                flips: Vec::new(),
+            };
         }
         let mut b = nflip;
         let mut kept: Vec<usize> = Vec::new();
@@ -1311,7 +1491,11 @@ impl<'a> Dual<'a> {
                 }
             }
         }
-        self.work.add(0xc82ee, 3.0 * (nn - b) as f64 + kept.len() as f64, crate::work::CTX);
+        self.work.add(
+            0xc82ee,
+            3.0 * (nn - b) as f64 + kept.len() as f64,
+            crate::work::CTX,
+        );
         if kept.is_empty() && b > 0 {
             for t in 0..b {
                 let e = lst[t];
@@ -1332,17 +1516,24 @@ impl<'a> Dual<'a> {
             b = 0;
         }
         if kept.is_empty() {
-            return Ratio { q: None, flips: Vec::new() };
+            return Ratio {
+                q: None,
+                flips: Vec::new(),
+            };
         }
         // The entries of the list that the second loop `0xc8a05` walks: the flips and the kept candidates (`r8d` at `0xc8b2e`).
-        self.work.add(0xc8b67, 4.0 * (b + kept.len()) as f64, crate::work::CTX);
+        self.work
+            .add(0xc8b67, 4.0 * (b + kept.len()) as f64, crate::work::CTX);
         let (chosen, xm5) = self.select_entering(row, &kept, xm3);
         let (mut chosen, xm5) = self.shift_entering(row, &kept, chosen, xm5, xm15, b);
         let mut flips = lst[..b].to_vec();
         if self.flip_select && !flips.is_empty() {
             (chosen, flips) = self.select_among_flips(row, chosen, flips, xm5);
         }
-        Ratio { q: Some(chosen), flips }
+        Ratio {
+            q: Some(chosen),
+            flips,
+        }
     }
 }
 
@@ -1353,7 +1544,11 @@ impl<'a> Dual<'a> {
         let mut xm5 = 0.0f64;
         for &e in kept {
             let (j, av) = row[e];
-            let wgt = if j < self.n { self.p.cols[j].len() as f64 } else { 0.5 };
+            let wgt = if j < self.n {
+                self.p.cols[j].len() as f64
+            } else {
+                0.5
+            };
             if xm3 * av < self.d[j] {
                 continue;
             }
@@ -1375,7 +1570,15 @@ impl<'a> Dual<'a> {
     }
 
     fn raise_pert(&mut self, to: u8) {
-        self.pert = if to == 1 { if self.pert == 0 { 1 } else { self.pert } } else { self.pert.max(2) };
+        self.pert = if to == 1 {
+            if self.pert == 0 {
+                1
+            } else {
+                self.pert
+            }
+        } else {
+            self.pert.max(2)
+        };
     }
 
     /// Cost shift of a nonbasic variable at a bound whose reduced cost has the wrong sign (`d' < -1e-13`; `0xcac52..0xcaeac`, `0xca1a0..0xca4c6`): with
@@ -1417,7 +1620,15 @@ impl<'a> Dual<'a> {
     /// Treatment of the chosen entering variable's reduced cost (`0xcabc2`, `0xc8c12..0xc8e27`). A variable at a bound with `d' < -1e-13` is shifted; the other
     /// candidates of the list with a negative `d'` are then shifted or zeroed, the Harris filter runs again on the new values (continuing from the bound
     /// `xm15` reached, with `xm3 = xm15`) and the entering variable is chosen again. A `d'` in [-1e-13, 0) is zeroed; a free variable's is zeroed.
-    fn shift_entering(&mut self, row: &[(usize, f64)], kept: &[usize], chosen: usize, xm5: f64, mut xm15: f64, nflips: usize) -> (usize, f64) {
+    fn shift_entering(
+        &mut self,
+        row: &[(usize, f64)],
+        kept: &[usize],
+        chosen: usize,
+        xm5: f64,
+        mut xm15: f64,
+        nflips: usize,
+    ) -> (usize, f64) {
         let mut xm3;
         let mut xm5 = xm5;
         let delta = DUAL_TOL;
@@ -1460,7 +1671,11 @@ impl<'a> Dual<'a> {
                         }
                     } else if self.st[jj] == FREE {
                         if self.d[jj].abs() > 1e-13 {
-                            self.raise_pert(if delta * 0.0005 > self.d[jj].abs() { 1 } else { 2 });
+                            self.raise_pert(if delta * 0.0005 > self.d[jj].abs() {
+                                1
+                            } else {
+                                2
+                            });
                         }
                         self.d[jj] = 0.0;
                     }
@@ -1480,7 +1695,11 @@ impl<'a> Dual<'a> {
                 xm5 = 0.0;
             } else {
                 // The selection loop runs again over the compacted list and books its count (`0xc8b67`) like the first one.
-                self.work.add(0xc8b67, 4.0 * (nflips + next.len()) as f64, crate::work::CTX);
+                self.work.add(
+                    0xc8b67,
+                    4.0 * (nflips + next.len()) as f64,
+                    crate::work::CTX,
+                );
                 (chosen, xm5) = self.select_entering(row, &next, xm3);
                 kept = next;
             }
@@ -1492,7 +1711,13 @@ impl<'a> Dual<'a> {
     /// entry with `0 <= d <= theta a - 1000 delta` has the weight `(count + ((theta a - d) / delta)^0.25) (0.3 f + 0.7)` (count 0.5 for a slack, factor `f` 1
     /// for continuous variables; the power term while `ctx+0x178 < 10`) and replaces the chosen one when `xm5 w > a` (`xm5` the best `a / w` so far, that of
     /// the first selection at the start). The new entering variable keeps as flips the old flips (other than itself) with `d <= a theta'`.
-    fn select_among_flips(&mut self, row: &[(usize, f64)], chosen: usize, flips: Vec<usize>, xm5: f64) -> (usize, Vec<usize>) {
+    fn select_among_flips(
+        &mut self,
+        row: &[(usize, f64)],
+        chosen: usize,
+        flips: Vec<usize>,
+        xm5: f64,
+    ) -> (usize, Vec<usize>) {
         let delta = DUAL_TOL;
         let (qj, aq) = row[chosen];
         let theta = self.d[qj] / aq;
@@ -1511,7 +1736,11 @@ impl<'a> Dual<'a> {
                 continue;
             }
             let pw = ((t - dj) / delta).powf(0.25);
-            let w0 = if j < self.n { self.p.cols[j].len() as f64 + pw } else { pw + 0.5 };
+            let w0 = if j < self.n {
+                self.p.cols[j].len() as f64 + pw
+            } else {
+                pw + 0.5
+            };
             let w = w0 * (1.0 * 0.3 + 0.7);
             if xm5 * w > aj {
                 xm5 = aj / w;
@@ -1524,7 +1753,11 @@ impl<'a> Dual<'a> {
         let qe = flips[k];
         let (nj, na) = row[qe];
         let theta2 = self.d[nj] / na;
-        let kept: Vec<usize> = flips.iter().copied().filter(|&e| e != qe && self.d[row[e].0] <= row[e].1 * theta2).collect();
+        let kept: Vec<usize> = flips
+            .iter()
+            .copied()
+            .filter(|&e| e != qe && self.d[row[e].0] <= row[e].1 * theta2)
+            .collect();
         (qe, kept)
     }
 }
@@ -1621,9 +1854,14 @@ impl<'a> Dual<'a> {
         let above = xbr > p.up[leave];
         // Pivot-row BTRAN, drop of the small entries.
         let rho_full = self.mirror.btran(&[(r, 1.0)], true, false);
-        let rho: Vec<(usize, f64)> = rho_full.iter().copied().filter(|e| e.1.abs() > DROP_TOL).collect();
+        let rho: Vec<(usize, f64)> = rho_full
+            .iter()
+            .copied()
+            .filter(|e| e.1.abs() > DROP_TOL)
+            .collect();
         self.p60 = rho.len() as f64;
-        self.work.add_from(0x13174d, 0xc51dd, self.mirror.work, crate::work::FAC);
+        self.work
+            .add_from(0x13174d, 0xc51dd, self.mirror.work, crate::work::FAC);
         let (row, esi) = self.pivot_row(&rho, leave, above);
         self.row_product_work(&rho, row.len() - esi);
         let rt = self.ratio_test(&row, esi, leave, above, xbr);
@@ -1645,13 +1883,16 @@ impl<'a> Dual<'a> {
             }
             // Roundoff in a row with an infinite bound would void the certificate: entries at noise level are dropped.
             let big = y.iter().fold(0.0f64, |a, v| a.max(v.abs()));
-            y.iter_mut().filter(|v| v.abs() <= 1e-11 * big).for_each(|v| *v = 0.0);
+            y.iter_mut()
+                .filter(|v| v.abs() <= 1e-11 * big)
+                .for_each(|v| *v = 0.0);
             return Step::Unbounded(y);
         };
         let (q, aq_row) = row[qe];
         let flips: Vec<usize> = rt.flips.iter().map(|&e| row[e].0).collect();
         if !flips.is_empty() {
-            self.work.add(0xc561a, 7.0 * flips.len() as f64, crate::work::CTX);
+            self.work
+                .add(0xc561a, 7.0 * flips.len() as f64, crate::work::CTX);
         }
         if let Some(s) = rec.as_mut() {
             s["q"] = serde_json::json!(q);
@@ -1664,8 +1905,15 @@ impl<'a> Dual<'a> {
         let col_out = self.mirror.ftran(&rows_q, &vals_q);
         // Mode 3: the second vector is not rho but the combination of the columns of the row's entries that were basic when the weights restarted
         // (`0xc57d8`, `0x11f620`), and its squared norm is the weight of the pivot row.
-        let (rho_rows, rho_vals, w_row, vec_work) = if self.pmode == 3 { self.framework_rhs(&row, leave, above) } else {
-            (rho.iter().map(|e| e.0).collect::<Vec<usize>>(), rho.iter().map(|e| e.1).collect::<Vec<f64>>(), rho_norm(&rho), rho.len() as f64)
+        let (rho_rows, rho_vals, w_row, vec_work) = if self.pmode == 3 {
+            self.framework_rhs(&row, leave, above)
+        } else {
+            (
+                rho.iter().map(|e| e.0).collect::<Vec<usize>>(),
+                rho.iter().map(|e| e.1).collect::<Vec<f64>>(),
+                rho_norm(&rho),
+                rho.len() as f64,
+            )
         };
         let needed: Vec<usize> = col_out.iter().map(|e| e.0).collect();
         let tau_out = self.mirror.ftran_needed(&rho_rows, &rho_vals, &needed);
@@ -1677,10 +1925,12 @@ impl<'a> Dual<'a> {
                 Some(j) => (e1 + self.mirror.tau_l.get()) + j,
                 None => ((e1 + self.mirror.tau_l.get()) + u1) + self.mirror.tau_u.get(),
             };
-            self.work.add_from(0x129671, 0x120200, est, crate::work::FAC);
+            self.work
+                .add_from(0x129671, 0x120200, est, crate::work::FAC);
             // A slack column (`ctx+0x2fc >= n`, `0x11f788`) is not copied from the matrix: its `4 nnz` term is absent.
             let copied = if q < self.n { rows_q.len() } else { 0 };
-            self.work.add(0x120114, 4.0 * copied as f64 + vec_work, crate::work::CTX);
+            self.work
+                .add(0x120114, 4.0 * copied as f64 + vec_work, crate::work::CTX);
         }
         let mut tau_dense = vec![0.0; m];
         for &(i, v) in &tau_out {
@@ -1721,7 +1971,11 @@ impl<'a> Dual<'a> {
             let mut touched: Vec<usize> = Vec::new();
             let mut est = 0usize;
             for &j in &flips {
-                let delta = if self.st[j] == LB { p.up[j] - p.lo[j] } else { p.lo[j] - p.up[j] };
+                let delta = if self.st[j] == LB {
+                    p.up[j] - p.lo[j]
+                } else {
+                    p.lo[j] - p.up[j]
+                };
                 est += p.cols[j].len();
                 for &(i, a) in &p.fcols[j] {
                     if !touched.contains(&i) {
@@ -1734,17 +1988,40 @@ impl<'a> Dual<'a> {
             // rows in order of first touch. Then the plain FTRAN of the factor.
             let dense_in = 2 * est > m;
             // Work of `0xcd720`: the input vector (`4 sum len` for a list, `2 m` for a dense one, doubled) before the FTRAN.
-            self.work.add(0xcdbb5, 2.0 * if dense_in { 2.0 * m as f64 } else { 4.0 * est as f64 }, crate::work::CTX);
-            let rows: Vec<usize> = if dense_in { (0..m).filter(|&i| rhs[i] != 0.0).collect() } else { touched };
+            self.work.add(
+                0xcdbb5,
+                2.0 * if dense_in {
+                    2.0 * m as f64
+                } else {
+                    4.0 * est as f64
+                },
+                crate::work::CTX,
+            );
+            let rows: Vec<usize> = if dense_in {
+                (0..m).filter(|&i| rhs[i] != 0.0).collect()
+            } else {
+                touched
+            };
             let vals: Vec<f64> = rows.iter().map(|&i| rhs[i]).collect();
-            let dense_est = if dense_in { Some(self.mirror.ftran_dense_work(&rhs)) } else { None };
+            let dense_est = if dense_in {
+                Some(self.mirror.ftran_dense_work(&rhs))
+            } else {
+                None
+            };
             let sol = self.mirror.ftran_keep(&rows, &vals, dense_in);
-            self.work.add_from(0x1219d6, 0x120673, dense_est.unwrap_or(self.mirror.keep_work), crate::work::FAC);
+            self.work.add_from(
+                0x1219d6,
+                0x120673,
+                dense_est.unwrap_or(self.mirror.keep_work),
+                crate::work::FAC,
+            );
             if dense_in || self.mirror.keep_dense {
-                self.work.add(0xce316, (m + sol.len()) as f64, crate::work::CTX);
+                self.work
+                    .add(0xce316, (m + sol.len()) as f64, crate::work::CTX);
             }
             // The count of the result vector times 7 on the context's scale (`(7 * scale) * count`).
-            self.work.add(0xce1ef, sol.len() as f64, 7.0 * crate::work::FAC);
+            self.work
+                .add(0xce1ef, sol.len() as f64, 7.0 * crate::work::FAC);
             // The x_B update and the touching follow the result list of the FTRAN in its own order (FIT2P call 44: the rows join the pricing list in that order).
             let mut changed = Vec::new();
             for (i, v) in sol {
@@ -1761,7 +2038,13 @@ impl<'a> Dual<'a> {
         }
         let t0 = self.nonbasic_value(q);
         // Basis change.
-        let new_st_leave = if p.lo[leave] == p.up[leave] { FIXED } else if above { UB } else { LB };
+        let new_st_leave = if p.lo[leave] == p.up[leave] {
+            FIXED
+        } else if above {
+            UB
+        } else {
+            LB
+        };
         self.st[leave] = new_st_leave;
         if leave >= self.n {
             self.slack_nb[leave - self.n] = true;
@@ -1800,8 +2083,23 @@ impl<'a> Dual<'a> {
         self.pending_alpha = Some(alpha_vec);
         // The ratio test leaves the entries of the row list below 1e-10 in magnitude as exact zeros (RIN against ROUT of `0xc74a0`: 41376 entries on PEROLD,
         // largest 9.9997e-11, smallest kept 1.0000751e-10), so that the d update does not see them.
-        let row: Vec<(usize, f64)> = row.into_iter().map(|(j, v)| (j, if v.abs() < ALPHA_TOL { 0.0 } else { v })).collect();
-        Step::Pivot(Box::new(Pivot { r, leave, q, row, flips, col, tau, alpha, w: w_row, t0, above }))
+        let row: Vec<(usize, f64)> = row
+            .into_iter()
+            .map(|(j, v)| (j, if v.abs() < ALPHA_TOL { 0.0 } else { v }))
+            .collect();
+        Step::Pivot(Box::new(Pivot {
+            r,
+            leave,
+            q,
+            row,
+            flips,
+            col,
+            tau,
+            alpha,
+            w: w_row,
+            t0,
+            above,
+        }))
     }
 }
 
@@ -1829,7 +2127,8 @@ impl<'a> Dual<'a> {
         } else {
             let p = self.p;
             for j in 0..self.n + self.m {
-                let bad = (self.st[j] == UB && p.up[j] >= BIG && self.d[j] > DUAL_TOL) || (self.st[j] == LB && p.lo[j] <= -BIG && self.d[j] > DUAL_TOL);
+                let bad = (self.st[j] == UB && p.up[j] >= BIG && self.d[j] > DUAL_TOL)
+                    || (self.st[j] == LB && p.lo[j] <= -BIG && self.d[j] > DUAL_TOL);
                 if bad {
                     self.dual_unbounded();
                     return;
@@ -1895,7 +2194,11 @@ impl<'a> Dual<'a> {
         if level_was_set {
             est += 0.5 * (n + m);
         }
-        est += if (self.request == 4 || self.request == 6) && self.pert == 0 { 2.0 * n + (n + m) } else { 1.5 * n };
+        est += if (self.request == 4 || self.request == 6) && self.pert == 0 {
+            2.0 * n + (n + m)
+        } else {
+            1.5 * n
+        };
         if self.pert != 0 {
             est += 2.0 * m + n;
         }
@@ -1907,11 +2210,20 @@ impl<'a> Dual<'a> {
     fn flags_work(&mut self) {
         let (n, m) = (self.n as f64, self.m as f64);
         let site = if self.value_mode { 0xc1fe3 } else { 0xc4329 };
-        let listed = if self.value_mode { self.n_infeas } else { self.list.len() };
-        self.work.add(site, 5.0 * m + 4.0 * listed as f64, crate::work::CTX);
+        let listed = if self.value_mode {
+            self.n_infeas
+        } else {
+            self.list.len()
+        };
+        self.work
+            .add(site, 5.0 * m + 4.0 * listed as f64, crate::work::CTX);
         // The closing pass (`0xbf5b0`): the variant for a nonzero tolerance level books `bfed2`, the other `bf981`; the perturbation flag adds one unit per variable.
         let pert = if self.pert != 0 { 1.0 } else { 0.0 };
-        self.work.add(if self.level != 0 { 0xbfed2 } else { 0xbf981 }, (2.0 + pert) * (n + m), crate::work::CTX);
+        self.work.add(
+            if self.level != 0 { 0xbfed2 } else { 0xbf981 },
+            (2.0 + pert) * (n + m),
+            crate::work::CTX,
+        );
     }
 
     /// Level of the tolerance (`0xe45c0`, after a refactorization): with request 4 the nonbasic variables are first put on the dual-feasible bound.
@@ -1920,7 +2232,11 @@ impl<'a> Dual<'a> {
         if self.request == 4 {
             for j in 0..self.n + self.m {
                 let (lo_inf, up_inf) = (p.lo[j] <= -BIG, p.up[j] >= BIG);
-                if (self.st[j] == LB || self.st[j] == UB) && lo_inf && up_inf && self.d[j].abs() <= DUAL_TOL {
+                if (self.st[j] == LB || self.st[j] == UB)
+                    && lo_inf
+                    && up_inf
+                    && self.d[j].abs() <= DUAL_TOL
+                {
                     // A free variable no longer tied to an artificial bound by its d goes back to the free status (value 0).
                     self.st[j] = FREE;
                     self.d[j] = 0.0;
@@ -1937,7 +2253,9 @@ impl<'a> Dual<'a> {
                 }
             }
         }
-        self.level = (0..self.n + self.m).filter(|&j| self.at_artificial(j)).count();
+        self.level = (0..self.n + self.m)
+            .filter(|&j| self.at_artificial(j))
+            .count();
         self.stall_check(old_level);
         if !self.flip_select && (self.pert >= 3 || 3.0 * self.iters as f64 > self.m as f64) {
             self.flip_select = true;
@@ -2002,7 +2320,8 @@ impl<'a> Dual<'a> {
         let mut trig = false;
         if self.pstep > 0.0 && old_level <= self.level {
             // More than 90 percent of the iterations since the last check had an entering d of at most delta.
-            trig = (self.stall - self.stall_snap) as f64 > 0.9 * (self.iters as f64 - self.stall_it);
+            trig =
+                (self.stall - self.stall_snap) as f64 > 0.9 * (self.iters as f64 - self.stall_it);
             if !trig && self.prog_on {
                 // No objective progress since the last check.
                 let obj = self.fresh_objective();
@@ -2038,7 +2357,11 @@ impl<'a> Dual<'a> {
                 continue;
             }
             let r = lcg_int(&mut g) as i32;
-            let count = if j < self.n { p.cols[j].len() as f64 } else { 1.0 };
+            let count = if j < self.n {
+                p.cols[j].len() as f64
+            } else {
+                1.0
+            };
             let f = 1.0f64;
             let x = count * (f * 0.3 + 0.7);
             let xi = (((r % 250 + 1) as f64) * sc) * (x + 1.0).log2();
@@ -2069,7 +2392,11 @@ impl<'a> Dual<'a> {
         self.best_obj = -1e100;
         self.pert_left -= 1;
         let x = 3.0 * self.pstep;
-        self.pstep = if self.pert_param == 0.0002 { minsd(0.01, x) } else { minsd(1000.0 * self.pert_param, x) };
+        self.pstep = if self.pert_param == 0.0002 {
+            minsd(0.01, x)
+        } else {
+            minsd(1000.0 * self.pert_param, x)
+        };
     }
 
     /// The post-iteration passes `0xf6c82..0xf6d0a`: factor update or refactorization, the dual update, the primal and weight update.
@@ -2102,7 +2429,8 @@ impl<'a> Dual<'a> {
             // A zero step skips the loop (`0xe4719`): no work.
             if !refactor && theta != 0.0 {
                 let row_cnt = pv.row.len() + usize::from(pv.leave < self.n);
-                self.work.add(0xe7000, 3.0 * row_cnt as f64, crate::work::CTX);
+                self.work
+                    .add(0xe7000, 3.0 * row_cnt as f64, crate::work::CTX);
             }
             let old_leave = self.d[pv.leave];
             for &(j, a) in &pv.row {
@@ -2111,7 +2439,11 @@ impl<'a> Dual<'a> {
             }
             // A leaving variable that becomes fixed keeps the true reduced cost, not the frame value.
             // The leaving variable is in the reference's row with the coefficient 1, so its stored d (0 up to the noise of the last recompute) takes the step too.
-            self.d[pv.leave] = if self.st[pv.leave] == FIXED && pv.above { theta } else { old_leave - theta };
+            self.d[pv.leave] = if self.st[pv.leave] == FIXED && pv.above {
+                theta
+            } else {
+                old_leave - theta
+            };
         } else if refactor {
             self.refactor()?;
         }
@@ -2130,13 +2462,16 @@ impl<'a> Dual<'a> {
             self.recompute_flags(level_before != 0, pv.is_some());
             self.flags_work();
         } else if let Some(pv) = pv {
-            self.work.add(0xc0410, 3.0 * pv.col.len() as f64, crate::work::CTX);
+            self.work
+                .add(0xc0410, 3.0 * pv.col.len() as f64, crate::work::CTX);
             // With `ctx+0x2c8` set (huge infeasibilities: level != 0) the value-mode walk is the 8-per-entry loop `0xc09bd`.
             if self.value_mode && self.level != 0 {
-                self.work.add(0xc09bd, 8.0 * pv.col.len() as f64, crate::work::CTX);
+                self.work
+                    .add(0xc09bd, 8.0 * pv.col.len() as f64, crate::work::CTX);
             } else {
                 let site = if self.value_mode { 0xc0c24 } else { 0xc06c7 };
-                self.work.add(site, 7.0 * pv.col.len() as f64, crate::work::CTX);
+                self.work
+                    .add(site, 7.0 * pv.col.len() as f64, crate::work::CTX);
             }
             self.update_primal_and_weights(pv);
         }
@@ -2147,12 +2482,19 @@ impl<'a> Dual<'a> {
     fn update_weights(&mut self, pv: &Pivot) {
         let (r, alpha, w) = (pv.r, pv.alpha, pv.w);
         if crate::dump::on("dtau") {
-            crate::dump::emit("dtau", serde_json::json!({"r": r, "alpha": alpha, "w": w, "col": crate::dump::sparse(&pv.col), "tau": pv.tau}));
+            crate::dump::emit(
+                "dtau",
+                serde_json::json!({"r": r, "alpha": alpha, "w": w, "col": crate::dump::sparse(&pv.col), "tau": pv.tau}),
+            );
         }
         if w == 0.0 {
             self.w[r] = W_EPS;
         } else {
-            let a2 = if alpha >= 0.0 { maxsd(alpha, W_EPS) } else { minsd(alpha, -W_EPS) };
+            let a2 = if alpha >= 0.0 {
+                maxsd(alpha, W_EPS)
+            } else {
+                minsd(alpha, -W_EPS)
+            };
             self.w[r] = (w / a2) / a2;
             for (j, &(i, cv)) in pv.col.iter().enumerate() {
                 let a = cv / a2;
@@ -2168,7 +2510,11 @@ impl<'a> Dual<'a> {
         let (r, alpha) = (pv.r, pv.alpha);
         let mut changed: Vec<usize> = Vec::new();
         let v = pv.leave;
-        let b = if self.st[v] == LB || self.st[v] == FIXED { self.p.lo[v] } else { self.p.up[v] };
+        let b = if self.st[v] == LB || self.st[v] == FIXED {
+            self.p.lo[v]
+        } else {
+            self.p.up[v]
+        };
         let theta = (self.xb[r] - b) / alpha;
         self.xb[r] = pv.t0 + theta;
         for &(i, cv) in &pv.col {
@@ -2265,7 +2611,11 @@ fn rho_norm(rho: &[(usize, f64)]) -> f64 {
 }
 
 /// Dual simplex from a cold start (the crash basis) or a supplied basis.
-pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Result<SolveResult, SolveError> {
+pub fn solve(
+    model: &LpModel,
+    start: Option<&Basis>,
+    opts: &SolveOptions,
+) -> Result<SolveResult, SolveError> {
     let p = build(model);
     let (n, m) = (p.n, p.m);
     let basis = match start {
@@ -2277,7 +2627,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             crate::simplex::repair_basis(&p, &mut b);
             b
         }
-        None => Basis { basic: dual_crash_basic(&p), at_upper: vec![false; n + m] },
+        None => Basis {
+            basic: dual_crash_basic(&p),
+            at_upper: vec![false; n + m],
+        },
     };
     basis.validate(n, m).map_err(SolveError::InvalidBasis)?;
     crate::lu_order::reset_pair_gate();
@@ -2379,7 +2732,8 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     }
     s.build_rrows();
     let dt = s.true_d();
-    s.work.add_from(0x12de50, 0xe53a7, s.mirror.work, crate::work::FAC);
+    s.work
+        .add_from(0x12de50, 0xe53a7, s.mirror.work, crate::work::FAC);
     s.request = 1;
     s.set_level_work(false);
     s.request = 0;
@@ -2395,7 +2749,11 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
             continue;
         }
         if s.st[j] == FIXED || s.st[j] == FREE {
-            s.d[j] = if s.st[j] == FIXED && j < n { s.cost[j] } else { dt[j] };
+            s.d[j] = if s.st[j] == FIXED && j < n {
+                s.cost[j]
+            } else {
+                dt[j]
+            };
             continue;
         }
         if dt[j] < -DUAL_TOL {
@@ -2417,8 +2775,13 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
     // Initial weights: the squared norms of the rows of B^-1.
     for r in 0..m {
         let out = s.mirror.btran(&[(r, 1.0)], false, false);
-        s.work.add_from(0x12de50, 0xc36f1, s.mirror.work, crate::work::FAC);
-        s.w[r] = if s.mirror.bt_dense { rho_norm_dense(&out, m) } else { rho_norm(&out) };
+        s.work
+            .add_from(0x12de50, 0xc36f1, s.mirror.work, crate::work::FAC);
+        s.w[r] = if s.mirror.bt_dense {
+            rho_norm_dense(&out, m)
+        } else {
+            rho_norm(&out)
+        };
     }
     s.stall_check(0);
     s.recompute_xb();
@@ -2445,7 +2808,13 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         match step {
             Step::Pivot(pv) => {
                 if opts.record_trace {
-                    trace.push(TraceEvent { iteration: s.iters, entering: pv.q, leaving: Some(pv.leave), position: Some(pv.r), step: 0.0 });
+                    trace.push(TraceEvent {
+                        iteration: s.iters,
+                        entering: pv.q,
+                        leaving: Some(pv.leave),
+                        position: Some(pv.r),
+                        step: 0.0,
+                    });
                 }
                 let due = match &schedule {
                     Some(sch) => sch.contains(&s.iters),
@@ -2486,14 +2855,20 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         // The dual is infeasible (a nonbasic variable stayed at an artificial bound, or a free one has a nonzero d). That proves the primal unbounded only
         // if it is feasible, and the point the dual loop holds is a finite point plus 1e30 times the ray, not a feasible point. A zero objective is dual
         // feasible, so the dual simplex on it decides: a feasible point (unbounded) or a Farkas certificate (primal and dual infeasible).
-        let zero = LpModel { obj: vec![0.0; model.num_cols()], offset: 0.0, ..model.clone() };
+        let zero = LpModel {
+            obj: vec![0.0; model.num_cols()],
+            offset: 0.0,
+            ..model.clone()
+        };
         let mut r = solve(&zero, start, opts)?;
         r.iterations += s.iters;
         r.refactorizations += s.refactorizations;
         if r.status == Status::Optimal {
             r.status = Status::Unbounded;
             r.objective = model.objective(&r.x);
-            r.ray = s.ray.take().filter(|ray| crate::verify::ray_improvement(model, ray, 1e-9).is_some_and(|g| g > 0.0));
+            r.ray = s.ray.take().filter(|ray| {
+                crate::verify::ray_improvement(model, ray, 1e-9).is_some_and(|g| g > 0.0)
+            });
             if r.ray.is_none() {
                 // The ray of the artificial-bound point did not verify; the primal simplex may still find one.
                 let mut popts = opts.clone();
@@ -2508,10 +2883,18 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         s.recompute_xb();
     }
     // Read-out.
-    let sgn = if model.sense == Sense::Maximize { -1.0 } else { 1.0 };
+    let sgn = if model.sense == Sense::Maximize {
+        -1.0
+    } else {
+        1.0
+    };
     let mut x = vec![0.0; n + m];
     for j in 0..n + m {
-        x[j] = if s.st[j] >= 0 { s.xb[s.st[j] as usize] } else { s.nonbasic_value(j) };
+        x[j] = if s.st[j] >= 0 {
+            s.xb[s.st[j] as usize]
+        } else {
+            s.nonbasic_value(j)
+        };
     }
     s.cost.clone_from(&p.cost);
     let mut y: Vec<f64> = s.head.iter().map(|&j| p.cost[j]).collect();
@@ -2526,7 +2909,10 @@ pub fn solve(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Res
         x: xs,
         dual: y.iter().map(|v| sgn * v).collect(),
         reduced_cost: dtrue[..nm].iter().map(|v| sgn * v).collect(),
-        basis: Basis { basic: s.head.clone(), at_upper },
+        basis: Basis {
+            basic: s.head.clone(),
+            at_upper,
+        },
         iterations: s.iters,
         refactorizations: s.refactorizations,
         trace,

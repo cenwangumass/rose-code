@@ -8,7 +8,9 @@
 //!
 //! Gaps (never approximated): regularisation and 2x2 pivots of `0x2f1940` (never triggered in the corpus; this port has the normal pivot test
 //! only), dense columns, free variables, the iterative refinement of `0x30fc90`.
-use crate::barrier::{BarrierError, DirKind, Direction, NormalSolver, Rhs, StartKind, State, StdForm};
+use crate::barrier::{
+    BarrierError, DirKind, Direction, NormalSolver, Rhs, StartKind, State, StdForm,
+};
 use crate::dump;
 use crate::order::Symbolic;
 use serde_json::json;
@@ -51,12 +53,25 @@ impl Plan {
                 // Numeric supernodes (SYM width2, `0x302277..0x3023e4`): a symbolic supernode of width W is cut into chunks of at most 192 columns (240 when
                 // the chunk's remaining row count is >= 0x780); a later chunk keeps the tail of the row list. The other cap (`0x302277`, r9d: a function of
                 // the flops and SYM+0x48/0x60, at least 8) is >= 240 on every captured model and not decoded.
-                let (c0, roff, wt) = (sym.count[j] as usize, sym.rowoff[j] as usize, sym.width[j] as usize);
+                let (c0, roff, wt) = (
+                    sym.count[j] as usize,
+                    sym.rowoff[j] as usize,
+                    sym.width[j] as usize,
+                );
                 let mut off = 0;
                 while off < wt {
                     let cap = if c0 - off >= 0x780 { 240 } else { 192 };
                     let w = (wt - off).min(cap);
-                    sns.push(Supernode { col: j + off, w, c: c0 - off, rows: sym.idx[roff + off..roff + c0].iter().map(|&r| r as usize).collect(), upd: Vec::new() });
+                    sns.push(Supernode {
+                        col: j + off,
+                        w,
+                        c: c0 - off,
+                        rows: sym.idx[roff + off..roff + c0]
+                            .iter()
+                            .map(|&r| r as usize)
+                            .collect(),
+                        upd: Vec::new(),
+                    });
                     off += w;
                 }
             }
@@ -130,7 +145,15 @@ fn add_m(mm: &mut [f64], r: &mut [f64], w: usize, a: usize, mq: usize, v: f64) {
 /// `A D A'` plus the slack `D` of the non-'=' rows into `M` (`w x w` row-major, lower part) and `R` (`(c - w) x w` row-major).
 /// Columns of `A` are visited in the order (first row inside the supernode, column index); the entries of a column inside the supernode are taken
 /// three at a time (column a gets `(A_a d) A_q`, b `(A_b d) A_q`, cc `(A_cc d) A_q`), the rest one at a time with `(d A_j) A_q`.
-pub fn assemble(f: &StdForm, rows: &[Vec<(usize, usize)>], d: &[f64], mp: &[usize], col: usize, w: usize, c: usize) -> (Vec<f64>, Vec<f64>) {
+pub fn assemble(
+    f: &StdForm,
+    rows: &[Vec<(usize, usize)>],
+    d: &[f64],
+    mp: &[usize],
+    col: usize,
+    w: usize,
+    c: usize,
+) -> (Vec<f64>, Vec<f64>) {
     let (idx, val, st) = (&f.row_idx, &f.val, &f.col_start);
     let (n1, n2) = (f.m, f.n2);
     let mut mm = vec![0.0; w * w];
@@ -241,7 +264,15 @@ pub fn assemble(f: &StdForm, rows: &[Vec<(usize, usize)>], d: &[f64], mp: &[usiz
 
 /// `0x2f77f0` (used for `w < 3`, `c * w > 30000`): for every supernode column `i` and every column `cj` of row `i` (ascending), `t = D[cj] A[i][cj]`,
 /// then `acc[row_q] = A[q] t + acc[row_q]` over the entries of `cj` from `i`'s position on; column `i` of the front is `acc` (the diagonal gets the slack `D`).
-pub fn assemble_generic(f: &StdForm, rows: &[Vec<(usize, usize)>], d: &[f64], mp: &[usize], col: usize, w: usize, c: usize) -> (Vec<f64>, Vec<f64>) {
+pub fn assemble_generic(
+    f: &StdForm,
+    rows: &[Vec<(usize, usize)>],
+    d: &[f64],
+    mp: &[usize],
+    col: usize,
+    w: usize,
+    c: usize,
+) -> (Vec<f64>, Vec<f64>) {
     let (idx, val, st) = (&f.row_idx, &f.val, &f.col_start);
     let n2 = f.n2;
     let mut mm = vec![0.0; w * w];
@@ -255,7 +286,11 @@ pub fn assemble_generic(f: &StdForm, rows: &[Vec<(usize, usize)>], d: &[f64], mp
             let e = st[cj + 1];
             let sj = f.scale.as_ref().map_or(0.0, |v| v[cj]);
             // Scaled column (`0x2f81fd`): every contribution is the number (s s) D[cj].
-            let t = if sj != 0.0 { (sj * sj) * d[cj] } else { d[cj] * val[pos] };
+            let t = if sj != 0.0 {
+                (sj * sj) * d[cj]
+            } else {
+                d[cj] * val[pos]
+            };
             for q in pos..e {
                 let rr = idx[q];
                 let m = mp[rr];
@@ -264,7 +299,11 @@ pub fn assemble_generic(f: &StdForm, rows: &[Vec<(usize, usize)>], d: &[f64], mp
                         seen[m] = true;
                         touched.push(m);
                     }
-                    acc[m] = if sj != 0.0 { t + acc[m] } else { val[q] * t + acc[m] };
+                    acc[m] = if sj != 0.0 {
+                        t + acc[m]
+                    } else {
+                        val[q] * t + acc[m]
+                    };
                 }
             }
         }
@@ -308,7 +347,11 @@ fn dgemv_t_col(a: &[f64], x: &[f64], variant: u8, alpha: f64, y: f64) -> f64 {
     let mut p = main;
     if tail4 != 0 {
         for k in 0..4 {
-            acc[k] = if variant == 4 { fma(x[p + k], a[p + k], acc[k]) } else { x[p + k] * a[p + k] + acc[k] };
+            acc[k] = if variant == 4 {
+                fma(x[p + k], a[p + k], acc[k])
+            } else {
+                x[p + k] * a[p + k] + acc[k]
+            };
         }
         p += 4;
     }
@@ -320,7 +363,16 @@ fn dgemv_t_col(a: &[f64], x: &[f64], variant: u8, alpha: f64, y: f64) -> f64 {
 }
 
 /// DGEMV('T', L, n, alpha, A, lda, x, 1, beta = 1, y, incy): column `j` of `A` against `x`; four columns at a time, then a pair, then one.
-fn dgemv_t(a: &[f64], lda: usize, l: usize, n: usize, x: &[f64], alpha: f64, y: &mut [f64], incy: usize) {
+fn dgemv_t(
+    a: &[f64],
+    lda: usize,
+    l: usize,
+    n: usize,
+    x: &[f64],
+    alpha: f64,
+    y: &mut [f64],
+    incy: usize,
+) {
     let n4 = n - (n % 4);
     for j in 0..n {
         let var = if j < n4 {
@@ -355,14 +407,26 @@ fn dgemm_tn_elem(kind: Kind, a: &[f64], b: &[f64], c0: f64) -> f64 {
     let (mut e, mut o) = (0.0, 0.0);
     for i in 0..k - (k % 2) {
         if i % 2 == 0 {
-            e = if kind == Kind::A { fma(a[i], b[i], e) } else { e + a[i] * b[i] };
+            e = if kind == Kind::A {
+                fma(a[i], b[i], e)
+            } else {
+                e + a[i] * b[i]
+            };
         } else {
-            o = if kind == Kind::A { fma(a[i], b[i], o) } else { o + a[i] * b[i] };
+            o = if kind == Kind::A {
+                fma(a[i], b[i], o)
+            } else {
+                o + a[i] * b[i]
+            };
         }
     }
     let mut s = e + o;
     if k % 2 == 1 {
-        s = if kind == Kind::A { fma(a[k - 1], b[k - 1], s) } else { s + a[k - 1] * b[k - 1] };
+        s = if kind == Kind::A {
+            fma(a[k - 1], b[k - 1], s)
+        } else {
+            s + a[k - 1] * b[k - 1]
+        };
     }
     c0 + 1.0 * s
 }
@@ -530,7 +594,17 @@ fn nocopy_n_blocks(n: usize) -> Vec<usize> {
 /// DGEMM('T','N', m, n, k, alpha = 1, A, lda, B, ldb, beta = 1, C, ldc): `C(i,j) += sum_k A(k,i) B(k,j)`, Fortran column-major (`A(k,i) = a[i lda + k]`).
 /// `m == 1` is DGEMV('T') of `B` against the row, `n == 1` of `A` against the column; everything else goes to `gemm_path2` (copy-based
 /// 12-row tile kernel or the nocopy TN kernel per column block).
-fn dgemm_t_n(m: usize, n: usize, k: usize, a: &[f64], lda: usize, b: &[f64], ldb: usize, c: &mut [f64], ldc: usize) {
+fn dgemm_t_n(
+    m: usize,
+    n: usize,
+    k: usize,
+    a: &[f64],
+    lda: usize,
+    b: &[f64],
+    ldb: usize,
+    c: &mut [f64],
+    ldc: usize,
+) {
     if m == 1 {
         dgemv_t(b, ldb, k, n, &a[..k], 1.0, c, ldc);
         return;
@@ -556,7 +630,12 @@ fn dgemm_t_n(m: usize, n: usize, k: usize, a: &[f64], lda: usize, b: &[f64], ldb
         for j in 0..nb {
             for i in 0..m {
                 let kind = gemm_kind(m, nb, i, j);
-                c[(j0 + j) * ldc + i] = dgemm_tn_elem(kind, &a[i * lda..i * lda + k], &b[(j0 + j) * ldb..(j0 + j) * ldb + k], c[(j0 + j) * ldc + i]);
+                c[(j0 + j) * ldc + i] = dgemm_tn_elem(
+                    kind,
+                    &a[i * lda..i * lda + k],
+                    &b[(j0 + j) * ldb..(j0 + j) * ldb + k],
+                    c[(j0 + j) * ldc + i],
+                );
             }
         }
         j0 += nb;
@@ -622,7 +701,9 @@ fn dtrsm_llu_col(l: &[f64], w: usize, b: &[f64], col: usize, n: usize) -> Vec<f6
                         }
                     }
                 }
-                let t: Vec<f64> = (0..4).map(|k| (acc[0][k] + acc[1][k]) + (acc[2][k] + acc[3][k])).collect();
+                let t: Vec<f64> = (0..4)
+                    .map(|k| (acc[0][k] + acc[1][k]) + (acc[2][k] + acc[3][k]))
+                    .collect();
                 v = (t[0] + t[2]) + (t[1] + t[3]);
                 j0 = 16 * (i / 16);
             }
@@ -733,7 +814,12 @@ fn pivot(dj: f64, orig: f64, reg: Option<(usize, usize)>) -> (f64, f64) {
 
 /// In-place `LDL'` of the `w x w` row-major block (left looking, column by column; `M[i][j] = (M[i][j] + sum_k L[i][k] temp[k]) / d_j` with
 /// `temp[k] = (-L[j][k]) d[k]`); the diagonal becomes `d`. Returns `(d, reciprocals)`.
-fn dense_ldl(mm: &mut [f64], w: usize, orig: &[f64], reg: Option<(usize, usize)>) -> (Vec<f64>, Vec<f64>) {
+fn dense_ldl(
+    mm: &mut [f64],
+    w: usize,
+    orig: &[f64],
+    reg: Option<(usize, usize)>,
+) -> (Vec<f64>, Vec<f64>) {
     let mut d = vec![0.0; w];
     let mut rcp = vec![0.0; w];
     let mut temp = vec![0.0; w];
@@ -761,7 +847,12 @@ fn dense_ldl(mm: &mut [f64], w: usize, orig: &[f64], reg: Option<(usize, usize)>
 }
 
 /// The block has no nonzero below the diagonal: pivots only, `L = I`.
-fn diag_only(mm: &mut [f64], w: usize, orig: &[f64], reg: Option<(usize, usize)>) -> (Vec<f64>, Vec<f64>) {
+fn diag_only(
+    mm: &mut [f64],
+    w: usize,
+    orig: &[f64],
+    reg: Option<(usize, usize)>,
+) -> (Vec<f64>, Vec<f64>) {
     let mut d = vec![0.0; w];
     let mut rcp = vec![0.0; w];
     for j in 0..w {
@@ -775,9 +866,20 @@ fn diag_only(mm: &mut [f64], w: usize, orig: &[f64], reg: Option<(usize, usize)>
 
 /// After the updates: `LDL'` of `M`, then the rectangle `R` := `(L^-1 R')'` scaled by `1/d` (reciprocal 0 -> 1): DTRSM when `M` has a nonzero below the
 /// diagonal, else only the scaling. Returns `(d, reciprocals)`; `M` (lower triangle, diagonal = d) and `R` are updated in place.
-fn factor_block(mm: &mut [f64], r: &mut [f64], w: usize, c: usize, orig: &[f64], reg: Option<(usize, usize)>) -> (Vec<f64>, Vec<f64>) {
+fn factor_block(
+    mm: &mut [f64],
+    r: &mut [f64],
+    w: usize,
+    c: usize,
+    orig: &[f64],
+    reg: Option<(usize, usize)>,
+) -> (Vec<f64>, Vec<f64>) {
     let dense = (1..w).any(|i| (0..i).any(|j| mm[i * w + j] != 0.0));
-    let (d, rcp) = if dense { dense_ldl(mm, w, orig, reg) } else { diag_only(mm, w, orig, reg) };
+    let (d, rcp) = if dense {
+        dense_ldl(mm, w, orig, reg)
+    } else {
+        diag_only(mm, w, orig, reg)
+    };
     let rows = c - w;
     if rows != 0 {
         if dense {
@@ -816,7 +918,15 @@ struct Child<'a> {
 }
 
 /// Child of width 1 (scalar branch of `0x2fcbd0`): `f_t = (-L_t) d`, every target gets exactly one product `L_u f_t`.
-fn child_update_w1(ch: &Child, wp: usize, mp: &[usize], mpm: &mut [f64], rp: &mut [f64], cnt: usize, e: usize) {
+fn child_update_w1(
+    ch: &Child,
+    wp: usize,
+    mp: &[usize],
+    mpm: &mut [f64],
+    rp: &mut [f64],
+    cnt: usize,
+    e: usize,
+) {
     let (cc, l, dd) = (ch.c, ch.packed, ch.d[0]);
     let mpr: Vec<usize> = ch.rows.iter().map(|&r| mp[r]).collect();
     if wp < 5 {
@@ -854,9 +964,19 @@ fn child_update_w1(ch: &Child, wp: usize, mp: &[usize], mpm: &mut [f64], rp: &mu
 /// the parent's columns) to `e` (end of the parent's columns) are the `m` update rows, the rest the rect rows. `temp[t][k] = (-L[t][k]) d[k]`;
 /// DGEMM('T','N', k = child width) blocks of 24 columns for the diagonal part (contiguous map: directly into `Mp`, else into a zero scratch and
 /// scatter-add), then blocks of rect rows.
-fn child_update(ch: &Child, wp: usize, col: usize, sym80: usize, mp: &[usize], mpm: &mut [f64], rp: &mut [f64]) {
+fn child_update(
+    ch: &Child,
+    wp: usize,
+    col: usize,
+    sym80: usize,
+    mp: &[usize],
+    mpm: &mut [f64],
+    rp: &mut [f64],
+) {
     let (wc, cc, rows_c, lp, d) = (ch.w, ch.c, ch.rows, ch.packed, ch.d);
-    let cnt = (wc..cc).find(|&t| rows_c[t] >= col).expect("child without a row in the parent");
+    let cnt = (wc..cc)
+        .find(|&t| rows_c[t] >= col)
+        .expect("child without a row in the parent");
     let mut e = cnt;
     while e < cc && rows_c[e] < col + wp {
         e += 1;
@@ -912,7 +1032,11 @@ fn child_update(ch: &Child, wp: usize, col: usize, sym80: usize, mp: &[usize], m
         j0 += nb;
     }
     let mut t0 = e;
-    let blk = if m != 0 { (0xc0usize).min(sym80 / m).max(1) } else { 1 };
+    let blk = if m != 0 {
+        (0xc0usize).min(sym80 / m).max(1)
+    } else {
+        1
+    };
     while t0 < cc {
         let mut t1 = (t0 + blk).min(cc);
         let r_first = mp[rows_c[t0]];
@@ -976,7 +1100,14 @@ pub struct Factor {
 
 /// `A D A' = L diag(d) L'` from the model and `D` (`n2 + m` entries: columns, then slacks): per supernode in column order the assembly, the children's
 /// updates (ascending), the block factorization.
-pub fn numeric_factor(f: &StdForm, rows: &[Vec<(usize, usize)>], plan: &Plan, d: &[f64], zx: Option<&[f64]>, mut on_sn: Option<&mut dyn FnMut(usize, &Supernode, &[f64], &[f64])>) -> Factor {
+pub fn numeric_factor(
+    f: &StdForm,
+    rows: &[Vec<(usize, usize)>],
+    plan: &Plan,
+    d: &[f64],
+    zx: Option<&[f64]>,
+    mut on_sn: Option<&mut dyn FnMut(usize, &Supernode, &[f64], &[f64])>,
+) -> Factor {
     let m = f.m;
     // Dense columns: the factor has `nt = m + nd` nodes (the dense nodes last), pivots regularise (`SYM+0x110`, `Q+0x218 > 0`), and every sparse supernode is
     // assembled by the generic routine; the dense supernode starts from the diagonal `-1/D[j]` of its columns, and a row's dense-node entries are the raw
@@ -1033,10 +1164,23 @@ pub fn numeric_factor(f: &StdForm, rows: &[Vec<(usize, usize)>], plan: &Plan, d:
         let orig: Vec<f64> = (0..w).map(|i| mm[i * w + i]).collect();
         for &ci in &s.upd {
             let cs = &plan.sns[ci];
-            let ch = Child { w: cs.w, c: cs.c, rows: &cs.rows, packed: &vals[ci], d: &dvec[ci] };
+            let ch = Child {
+                w: cs.w,
+                c: cs.c,
+                rows: &cs.rows,
+                packed: &vals[ci],
+                d: &dvec[ci],
+            };
             child_update(&ch, w, col, plan.sym80, &mp, &mut mm, &mut r);
         }
-        let (dd, rc) = factor_block(&mut mm, &mut r, w, c, &orig, if reg { Some((col, m)) } else { None });
+        let (dd, rc) = factor_block(
+            &mut mm,
+            &mut r,
+            w,
+            c,
+            &orig,
+            if reg { Some((col, m)) } else { None },
+        );
         let pk = pack(&mm, &r, w);
         for t in 0..w {
             diag[col + t] = dd[t];
@@ -1060,7 +1204,14 @@ pub fn numeric_factor(f: &StdForm, rows: &[Vec<(usize, usize)>], plan: &Plan, d:
         par.push(off & 1);
         off += v.len();
     }
-    Factor { n: nt, vals, diag, rcp, par, minratio }
+    Factor {
+        n: nt,
+        vals,
+        diag,
+        rcp,
+        par,
+        minratio,
+    }
 }
 
 /// Sum of the rounded products `term(i)`, `i < n`, as `0x2ec200` / `0x2ec480` add them, accumulator starting at 0: fewer than 8 terms (or fewer than
@@ -1189,7 +1340,12 @@ fn forward(plan: &Plan, fac: &Factor, x: &mut [f64]) {
         }
         for r in g * 4..rr {
             let row = s.rows[w + r];
-            x[row] = dsub8(x[row], &vals[base + r * w..base + (r + 1) * w], &xs, (par + base + r * w) & 1);
+            x[row] = dsub8(
+                x[row],
+                &vals[base + r * w..base + (r + 1) * w],
+                &xs,
+                (par + base + r * w) & 1,
+            );
         }
     }
 }
@@ -1208,9 +1364,11 @@ fn backward(plan: &Plan, fac: &Factor, x: &mut [f64]) {
         while p - 3 >= 0 {
             let pu = p as usize;
             let xr: [f64; 4] = std::array::from_fn(|q| x[s.rows[w + pu - 3 + q]]);
-            let lr: [&[f64]; 4] = std::array::from_fn(|q| &vals[base + (pu - 3 + q) * w..base + (pu - 2 + q) * w]);
+            let lr: [&[f64]; 4] =
+                std::array::from_fn(|q| &vals[base + (pu - 3 + q) * w..base + (pu - 2 + q) * w]);
             for j in 0..w {
-                let sm = ((lr[0][j] * xr[0] + lr[1][j] * xr[1]) + lr[2][j] * xr[2]) + lr[3][j] * xr[3];
+                let sm =
+                    ((lr[0][j] * xr[0] + lr[1][j] * xr[1]) + lr[2][j] * xr[2]) + lr[3][j] * xr[3];
                 xs[j] = xs[j] - sm;
             }
             p -= 4;
@@ -1258,7 +1416,13 @@ impl Amat {
             }
         }
         rstart.push(ridx.len());
-        Amat { m: f.m, nc: f.n2, rstart, ridx, rval }
+        Amat {
+            m: f.m,
+            nc: f.n2,
+            rstart,
+            ridx,
+            rval,
+        }
     }
 
     /// `0x2ec200`: `out_i` = sum over the row ([`dot8`], peel = start parity) + `w[nc + i]` unless the row is '='.
@@ -1266,7 +1430,11 @@ impl Amat {
         let mut out = Vec::with_capacity(self.m);
         for i in 0..self.m {
             let (s, e) = (self.rstart[i], self.rstart[i + 1]);
-            let mut a = if e > s { dot8(e - s, s & 1, &|q| self.rval[s + q] * w[self.ridx[s + q]]) } else { 0.0 };
+            let mut a = if e > s {
+                dot8(e - s, s & 1, &|q| self.rval[s + q] * w[self.ridx[s + q]])
+            } else {
+                0.0
+            };
             if f.sense[i] != b'=' {
                 a = a + w[self.nc + i];
             }
@@ -1299,14 +1467,24 @@ impl Amat {
 
 /// `0x305f10` for the LP case: `w = rx D`, `t = A w` (`0x2ec200`), `rhs = ry + t`, forward solve, `x *= 1/d`, backward solve, `s = A' dy`
 /// (`0x2ec480`), `dx = (s - rx) D`. Returns `(dx, dy)`.
-fn solve305(a: &Amat, plan: &Plan, fac: &Factor, f: &StdForm, d: &[f64], rx: &[f64], ry: &[f64]) -> (Vec<f64>, Vec<f64>) {
+fn solve305(
+    a: &Amat,
+    plan: &Plan,
+    fac: &Factor,
+    f: &StdForm,
+    d: &[f64],
+    rx: &[f64],
+    ry: &[f64],
+) -> (Vec<f64>, Vec<f64>) {
     let n = f.n();
     // Dense columns (`SYM+0x138 == 0`): `w_j = 0`; the right-hand side of node `m + k` is the raw `rx_j`; the nodes' solution is `dx_j`.
     let mut is_dense = vec![false; n];
     for &j in &f.dense {
         is_dense[j] = true;
     }
-    let w: Vec<f64> = (0..n).map(|j| if is_dense[j] { 0.0 } else { rx[j] * d[j] }).collect();
+    let w: Vec<f64> = (0..n)
+        .map(|j| if is_dense[j] { 0.0 } else { rx[j] * d[j] })
+        .collect();
     let t = a.aw(f, &w);
     let mut x: Vec<f64> = (0..f.m).map(|i| ry[i] + t[i]).collect();
     x.resize(fac.n, 0.0);
@@ -1319,7 +1497,15 @@ fn solve305(a: &Amat, plan: &Plan, fac: &Factor, f: &StdForm, d: &[f64], rx: &[f
     }
     backward(plan, fac, &mut x);
     let s = a.aty(f, &x[..f.m]);
-    let mut dx: Vec<f64> = (0..n).map(|j| if is_dense[j] { s[j] } else { (s[j] - rx[j]) * d[j] }).collect();
+    let mut dx: Vec<f64> = (0..n)
+        .map(|j| {
+            if is_dense[j] {
+                s[j]
+            } else {
+                (s[j] - rx[j]) * d[j]
+            }
+        })
+        .collect();
     for (r, &j) in f.dense.iter().enumerate() {
         dx[j] = x[f.m + f.dense_k[r]];
     }
@@ -1344,7 +1530,10 @@ pub fn ntry_first(f: &StdForm, sym: &Symbolic) -> usize {
 /// `(rho, S)` of [`ntry_first`]; `S = SYM+0x168` also scales the work of a factorization (the dense columns are nodes after the rows: `n = m + dense`).
 pub fn sym_rho_s(f: &StdForm, sym: &Symbolic) -> (f64, f64) {
     let ff = |t: i64| t * (t + 1) * (2 * t + 1) / 6;
-    let a = (0..f.n2).filter(|j| !f.dense.contains(j)).map(|j| ((f.col_start[j + 1] - f.col_start[j]) as i64).pow(2)).sum::<i64>() as f64;
+    let a = (0..f.n2)
+        .filter(|j| !f.dense.contains(j))
+        .map(|j| ((f.col_start[j + 1] - f.col_start[j]) as i64).pow(2))
+        .sum::<i64>() as f64;
     let e = sym
         .width
         .iter()
@@ -1387,21 +1576,52 @@ pub struct CholSolver {
 impl CholSolver {
     /// `sym` is the symbolic factorization of the structure stage ([`crate::order::structure`]) the `StdForm` was permuted with.
     pub fn new(f: &StdForm, sym: &Symbolic) -> CholSolver {
-        CholSolver { plan: Plan::new(sym), rows: model_rows(f), a: Amat::new(f), d: Vec::new(), fac: None, ntry0: ntry_first(f, sym), nfac: 0, zx: Vec::new(), thr: 0.0, fzx: None, norms: (0.0, 0.0), nz_s: (sym.nz as f64, sym_rho_s(f, sym).1), extra: std::cell::Cell::new(0) }
+        CholSolver {
+            plan: Plan::new(sym),
+            rows: model_rows(f),
+            a: Amat::new(f),
+            d: Vec::new(),
+            fac: None,
+            ntry0: ntry_first(f, sym),
+            nfac: 0,
+            zx: Vec::new(),
+            thr: 0.0,
+            fzx: None,
+            norms: (0.0, 0.0),
+            nz_s: (sym.nz as f64, sym_rho_s(f, sym).1),
+            extra: std::cell::Cell::new(0),
+        }
     }
 
     fn solve(&self, f: &StdForm, rx: &[f64], ry: &[f64]) -> (Vec<f64>, Vec<f64>) {
-        solve305(&self.a, &self.plan, self.fac.as_ref().expect("factor before solve"), f, &self.d, rx, ry)
+        solve305(
+            &self.a,
+            &self.plan,
+            self.fac.as_ref().expect("factor before solve"),
+            f,
+            &self.d,
+            rx,
+            ry,
+        )
     }
 
     /// `SYM+0x178 == 1` (`0x2f1720`): free columns remain, or the smallest pivot ratio is below `1e-10` (dense columns and scaling are not modelled).
     fn refining(&self, f: &StdForm) -> bool {
-        (0..f.n2).any(|j| f.flags[j] == 0) || !f.dense.is_empty() || self.fac.as_ref().map_or(false, |x| x.minratio < 1e-10)
+        (0..f.n2).any(|j| f.flags[j] == 0)
+            || !f.dense.is_empty()
+            || self.fac.as_ref().map_or(false, |x| x.minratio < 1e-10)
     }
 
     /// `0x311d70`, the residual of a solve `(dx, dy)` for `(rx, ry)`: `rows = ry - Af dx` and `cols = rx - (Af' dy - zx dx)` in blocks of 8 from index 0,
     /// `(rx - cols) + zx dx` in the scalar tail (`n mod 8` entries).
-    fn residual(&self, f: &StdForm, rx: &[f64], ry: &[f64], dx: &[f64], dy: &[f64]) -> (Vec<f64>, Vec<f64>) {
+    fn residual(
+        &self,
+        f: &StdForm,
+        rx: &[f64],
+        ry: &[f64],
+        dx: &[f64],
+        dy: &[f64],
+    ) -> (Vec<f64>, Vec<f64>) {
         let (m, n2, n) = (f.m, f.n2, f.n());
         let mut rows = vec![0.0; m];
         for j in 0..n2 {
@@ -1410,7 +1630,11 @@ impl CholSolver {
             for k in f.col_start[j]..f.col_start[j + 1] {
                 let i = f.row_idx[k];
                 // scaled variant of `0x2ecab0`: `dx_j s_j` is added to every row of the column
-                rows[i] = if sj != 0.0 { rows[i] + t } else { f.val[k] * dx[j] + rows[i] };
+                rows[i] = if sj != 0.0 {
+                    rows[i] + t
+                } else {
+                    f.val[k] * dx[j] + rows[i]
+                };
             }
         }
         let mut cols = vec![0.0; n];
@@ -1425,13 +1649,28 @@ impl CholSolver {
         }
         let rows: Vec<f64> = (0..m).map(|i| ry[i] - rows[i]).collect();
         let end = if n >= 8 { n - (n & 7) } else { 0 };
-        let cols = (0..n).map(|j| if j < end { rx[j] - (cols[j] - self.zx[j] * dx[j]) } else { (rx[j] - cols[j]) + self.zx[j] * dx[j] }).collect();
+        let cols = (0..n)
+            .map(|j| {
+                if j < end {
+                    rx[j] - (cols[j] - self.zx[j] * dx[j])
+                } else {
+                    (rx[j] - cols[j]) + self.zx[j] * dx[j]
+                }
+            })
+            .collect();
         (rows, cols)
     }
 
     /// The refinement loop of `0x311d70`: while `thr^2 <= |rows|^2 + |cols|^2` and fewer than 5 accepted corrections, solve for the residual and accept
     /// the corrected pair if `0.99 cur > cand`. Returns `(dx, dy, |rows|, |cols|)`.
-    fn refine(&self, f: &StdForm, rx: &[f64], ry: &[f64], mut dx: Vec<f64>, mut dy: Vec<f64>) -> (Vec<f64>, Vec<f64>, f64, f64) {
+    fn refine(
+        &self,
+        f: &StdForm,
+        rx: &[f64],
+        ry: &[f64],
+        mut dx: Vec<f64>,
+        mut dy: Vec<f64>,
+    ) -> (Vec<f64>, Vec<f64>, f64, f64) {
         let norm = |v: &[f64]| crate::barrier::dot_lanes(v, v, 0).sqrt();
         let (mut rows, mut cols) = self.residual(f, rx, ry, &dx, &dy);
         let (mut nr, mut nc) = (norm(&rows), norm(&cols));
@@ -1478,17 +1717,40 @@ impl NormalSolver for CholSolver {
         self.nfac += 1;
         let on = dump::on("barrier_factor");
         let mut cb = |_k: usize, s: &Supernode, pk: &[f64], piv: &[f64]| {
-            dump::emit_tag("barrier_factor", "FSN", json!({"f": fno, "col": s.col, "w": s.w, "c": s.c, "rows": s.rows}));
-            dump::emit_tag("barrier_factor", "FOUT", json!({"f": fno, "col": s.col, "packed": pk, "piv": piv}));
+            dump::emit_tag(
+                "barrier_factor",
+                "FSN",
+                json!({"f": fno, "col": s.col, "w": s.w, "c": s.c, "rows": s.rows}),
+            );
+            dump::emit_tag(
+                "barrier_factor",
+                "FOUT",
+                json!({"f": fno, "col": s.col, "packed": pk, "piv": piv}),
+            );
         };
-        let fac = if on { numeric_factor(f, &self.rows, &self.plan, d, self.fzx.as_deref(), Some(&mut cb)) } else { numeric_factor(f, &self.rows, &self.plan, d, self.fzx.as_deref(), None) };
+        let fac = if on {
+            numeric_factor(
+                f,
+                &self.rows,
+                &self.plan,
+                d,
+                self.fzx.as_deref(),
+                Some(&mut cb),
+            )
+        } else {
+            numeric_factor(f, &self.rows, &self.plan, d, self.fzx.as_deref(), None)
+        };
         self.fac = Some(fac);
         Ok(())
     }
 
     /// Primal (`0x2e8ef0` stage 1): `rx = -ub` on the boxed columns, `ry = b`; returns `(dx, dy)` (the starting `x~`). Dual (stage 2): `rx = c`, `ry = 0`;
     /// returns `(dx, dy)` with `dx = (A'y - c) D` over all variables (the reference's `Q+0x7a8`).
-    fn start(&mut self, f: &StdForm, kind: StartKind) -> Result<(Vec<f64>, Vec<f64>), BarrierError> {
+    fn start(
+        &mut self,
+        f: &StdForm,
+        kind: StartKind,
+    ) -> Result<(Vec<f64>, Vec<f64>), BarrierError> {
         let n = f.n();
         match kind {
             StartKind::Primal { .. } => {
@@ -1510,7 +1772,13 @@ impl NormalSolver for CholSolver {
 
     /// `0x30fc90`: `rx = rd - r3 / x` (flag bit 0), `+ (r7d0 - ru v) / u` (bit 1); the solve; `dz = (r3 - z dx) / x`; `du = (ru - dx) + 0 ub`,
     /// `dv = (r7d0 - v du) / u`. No refinement.
-    fn direction(&mut self, f: &StdForm, s: &State, _kind: DirKind, rhs: &Rhs) -> Result<Direction, BarrierError> {
+    fn direction(
+        &mut self,
+        f: &StdForm,
+        s: &State,
+        _kind: DirKind,
+        rhs: &Rhs,
+    ) -> Result<Direction, BarrierError> {
         let (n, n2) = (f.n(), f.n2);
         let mut rx = rhs.rd.clone();
         for j in 0..n {
@@ -1577,7 +1845,12 @@ impl NormalSolver for CholSolver {
         }
     }
 
-    fn solve_raw(&mut self, f: &StdForm, rx: &[f64], ry: &[f64]) -> Result<(Vec<f64>, Vec<f64>), BarrierError> {
+    fn solve_raw(
+        &mut self,
+        f: &StdForm,
+        rx: &[f64],
+        ry: &[f64],
+    ) -> Result<(Vec<f64>, Vec<f64>), BarrierError> {
         Ok(self.solve(f, rx, ry))
     }
 }
@@ -1588,13 +1861,21 @@ mod tests {
     use serde_json::Value;
 
     fn floats(v: &Value) -> Vec<f64> {
-        v.as_array().unwrap().iter().map(|x| x.as_f64().unwrap()).collect()
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_f64().unwrap())
+            .collect()
     }
 
     fn assert_bits(what: &str, want: &[f64], got: &[f64]) {
         assert_eq!(want.len(), got.len(), "{what}: length");
         for (i, (w, g)) in want.iter().zip(got).enumerate() {
-            assert_eq!(w.to_bits(), g.to_bits(), "{what}[{i}]: model {w:e} rose {g:e}");
+            assert_eq!(
+                w.to_bits(),
+                g.to_bits(),
+                "{what}[{i}]: model {w:e} rose {g:e}"
+            );
         }
     }
 
@@ -1610,7 +1891,17 @@ mod tests {
             let u = |k: &str| g[k].as_u64().unwrap() as usize;
             let (m, n, k) = (u("m"), u("n"), u("k"));
             let mut c = floats(&g["C"]);
-            dgemm_t_n(m, n, k, &floats(&g["A"]), u("lda"), &floats(&g["B"]), u("ldb"), &mut c, u("ldc"));
+            dgemm_t_n(
+                m,
+                n,
+                k,
+                &floats(&g["A"]),
+                u("lda"),
+                &floats(&g["B"]),
+                u("ldb"),
+                &mut c,
+                u("ldc"),
+            );
             assert_bits(&format!("dgemm {m}x{n}x{k}"), &floats(&g["out"]), &c);
         }
     }
@@ -1618,11 +1909,18 @@ mod tests {
     #[test]
     fn dtrsm_kernels_match_the_model() {
         for t in fixture()["trsm"].as_array().unwrap() {
-            let (w, n) = (t["w"].as_u64().unwrap() as usize, t["n"].as_u64().unwrap() as usize);
+            let (w, n) = (
+                t["w"].as_u64().unwrap() as usize,
+                t["n"].as_u64().unwrap() as usize,
+            );
             let l = floats(&t["L"]);
             for c in t["cols"].as_array().unwrap() {
                 let col = c["col"].as_u64().unwrap() as usize;
-                assert_bits(&format!("dtrsm w {w} n {n} col {col}"), &floats(&c["x"]), &dtrsm_llu_col(&l, w, &floats(&c["b"]), col, n));
+                assert_bits(
+                    &format!("dtrsm w {w} n {n} col {col}"),
+                    &floats(&c["x"]),
+                    &dtrsm_llu_col(&l, w, &floats(&c["b"]), col, n),
+                );
             }
         }
     }
@@ -1633,7 +1931,10 @@ mod tests {
             let w = t["w"].as_u64().unwrap() as usize;
             let mut mm = floats(&t["M"]);
             let (d, rcp) = dense_ldl(&mut mm, w, &floats(&t["orig"]), None);
-            let lower: Vec<f64> = (0..w).flat_map(|i| (0..=i).map(move |j| (i, j))).map(|(i, j)| mm[i * w + j]).collect();
+            let lower: Vec<f64> = (0..w)
+                .flat_map(|i| (0..=i).map(move |j| (i, j)))
+                .map(|(i, j)| mm[i * w + j])
+                .collect();
             assert_bits(&format!("ldl w {w}"), &floats(&t["out"]), &lower);
             assert_bits("d", &floats(&t["d"]), &d);
             assert_bits("rcp", &floats(&t["rcp"]), &rcp);
@@ -1648,7 +1949,15 @@ mod tests {
         let s = crate::order::structure(&model, crate::order::DENSE_COL_MIN).unwrap();
         let f = crate::barrier::std_form(&model, &s.sym.perm).unwrap();
         let plan = Plan::new(&s.sym);
-        let d: Vec<f64> = (0..f.n()).map(|j| if f.flags[j] & 1 != 0 { 1.0 + 0.01 * j as f64 } else { 0.0 }).collect();
+        let d: Vec<f64> = (0..f.n())
+            .map(|j| {
+                if f.flags[j] & 1 != 0 {
+                    1.0 + 0.01 * j as f64
+                } else {
+                    0.0
+                }
+            })
+            .collect();
         let fac = numeric_factor(&f, &model_rows(&f), &plan, &d, None, None);
         let m = f.m;
         // Dense A D A'.
@@ -1672,7 +1981,11 @@ mod tests {
             for t in 0..w {
                 l[(s.col + t) * m + s.col + t] = 1.0;
                 for r in t + 1..c {
-                    let v = if r < w { vals[r * (r + 1) / 2 + t] } else { vals[w * (w + 1) / 2 + (r - w) * w + t] };
+                    let v = if r < w {
+                        vals[r * (r + 1) / 2 + t]
+                    } else {
+                        vals[w * (w + 1) / 2 + (r - w) * w + t]
+                    };
                     l[s.rows[r] * m + s.col + t] = v;
                 }
             }

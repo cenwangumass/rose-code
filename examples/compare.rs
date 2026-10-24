@@ -7,16 +7,22 @@ use rose::{mps, solve, Basis, SolveOptions};
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let model = mps::parse(&std::fs::read_to_string(&args[1]).unwrap()).unwrap();
-    let states: Vec<serde_json::Value> =
-        std::fs::read_to_string(&args[2])
-            .unwrap()
-            .lines()
-            .map(|l| serde_json::from_str(&l.replace("NaN", "null").replace("Infinity", "null")).unwrap())
-            .collect();
+    let states: Vec<serde_json::Value> = std::fs::read_to_string(&args[2])
+        .unwrap()
+        .lines()
+        .map(|l| {
+            serde_json::from_str(&l.replace("NaN", "null").replace("Infinity", "null")).unwrap()
+        })
+        .collect();
     let m = model.num_rows();
     let n_all = states[0]["status"].as_array().unwrap().len();
     let n = n_all - m;
-    let status: Vec<i64> = states[0]["status"].as_array().unwrap().iter().map(|s| s.as_i64().unwrap()).collect();
+    let status: Vec<i64> = states[0]["status"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s.as_i64().unwrap())
+        .collect();
     let mut basic = vec![usize::MAX; m];
     let mut at_upper = vec![false; n + m];
     for (j, &s) in status.iter().enumerate() {
@@ -28,7 +34,12 @@ fn main() {
     }
     // Iterations at which the reference refactorized: its basis positions are renumbered by more than the one swapped position.
     let order = |st: &serde_json::Value| -> Vec<usize> {
-        let sv: Vec<i64> = st["status"].as_array().unwrap().iter().map(|s| s.as_i64().unwrap()).collect();
+        let sv: Vec<i64> = st["status"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s.as_i64().unwrap())
+            .collect();
         let mut o = vec![usize::MAX; m];
         for (j, &s) in sv.iter().enumerate() {
             if s >= 0 {
@@ -40,11 +51,20 @@ fn main() {
     let mut schedule = Vec::new();
     for k in 1..states.len() {
         let mut prev = order(&states[k - 1]);
-        let (pos, enter) = (states[k - 1]["after"]["pos"].as_i64().unwrap(), states[k - 1]["after"]["enter"].as_i64().unwrap());
+        let (pos, enter) = (
+            states[k - 1]["after"]["pos"].as_i64().unwrap(),
+            states[k - 1]["after"]["enter"].as_i64().unwrap(),
+        );
         if pos >= 0 && enter >= 0 {
             prev[pos as usize] = enter as usize;
         }
-        if prev.iter().zip(order(&states[k])).filter(|(a, b)| *a != b).count() > 1 {
+        if prev
+            .iter()
+            .zip(order(&states[k]))
+            .filter(|(a, b)| *a != b)
+            .count()
+            > 1
+        {
             schedule.push(k);
         }
     }
@@ -53,7 +73,11 @@ fn main() {
         faithful_weights: true,
         faithful_positions: positions,
         faithful_ftran: positions && std::env::var_os("ROSE_NO_FTRAN").is_none(),
-        refactor_schedule: if positions && std::env::var_os("ROSE_OWN_TRIGGER").is_none() { Some(schedule) } else { None },
+        refactor_schedule: if positions && std::env::var_os("ROSE_OWN_TRIGGER").is_none() {
+            Some(schedule)
+        } else {
+            None
+        },
         ..SolveOptions::default()
     };
     let r = match solve(&model, Some(&Basis { basic, at_upper }), &opts) {
@@ -69,12 +93,22 @@ fn main() {
         .map(|st| {
             let enter = st["after"]["enter"].as_u64().unwrap() as usize;
             let pos = st["after"]["pos"].as_i64().unwrap();
-            let sv: Vec<i64> = st["status"].as_array().unwrap().iter().map(|s| s.as_i64().unwrap()).collect();
+            let sv: Vec<i64> = st["status"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|s| s.as_i64().unwrap())
+                .collect();
             (enter, sv.iter().position(|&s| s == pos && pos >= 0))
         })
         .collect();
-    let got: Vec<(usize, Option<usize>)> = r.trace.iter().map(|e| (e.entering, e.leaving)).collect();
-    let agree = got.iter().zip(&expected).take_while(|(a, b)| a == b).count();
+    let got: Vec<(usize, Option<usize>)> =
+        r.trace.iter().map(|e| (e.entering, e.leaving)).collect();
+    let agree = got
+        .iter()
+        .zip(&expected)
+        .take_while(|(a, b)| a == b)
+        .count();
     println!(
         "{}: status {:?}, objective {:.10}, iterations {} (reference {}), agree on first {} decisions{}",
         args[1], r.status, r.objective, r.iterations, expected.len(), agree,

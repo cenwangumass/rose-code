@@ -26,7 +26,12 @@ pub struct Report {
 
 impl Report {
     pub fn max_error(&self) -> f64 {
-        self.primal_violation.max(self.dual_violation).max(self.complementarity).max(self.objective_error).max(self.duality_gap).max(self.reduced_cost_error)
+        self.primal_violation
+            .max(self.dual_violation)
+            .max(self.complementarity)
+            .max(self.objective_error)
+            .max(self.duality_gap)
+            .max(self.reduced_cost_error)
     }
 }
 
@@ -34,7 +39,11 @@ impl Report {
 /// Duals and reduced costs are in the original sense (for maximization the signs are flipped internally).
 pub fn check_optimal(model: &LpModel, r: &SolveResult) -> Report {
     let (n, m) = (model.num_cols(), model.num_rows());
-    let sgn = if model.sense == Sense::Maximize { -1.0 } else { 1.0 };
+    let sgn = if model.sense == Sense::Maximize {
+        -1.0
+    } else {
+        1.0
+    };
     let act = model.activities(&r.x);
     let mut rep = Report::default();
     for j in 0..n {
@@ -61,9 +70,15 @@ pub fn check_optimal(model: &LpModel, r: &SolveResult) -> Report {
     let mut dual_obj = sgn * model.offset;
     for j in 0..n {
         let aty: f64 = model.col(j).map(|(i, a)| a * y[i]).sum();
-        rep.reduced_cost_error = rep.reduced_cost_error.max((d[j] - (sgn * model.obj[j] - aty)).abs());
+        rep.reduced_cost_error = rep
+            .reduced_cost_error
+            .max((d[j] - (sgn * model.obj[j] - aty)).abs());
         // d > 0: pushes against the lower bound; d < 0: against the upper bound.
-        let (side, slack) = if d[j] > 0.0 { (model.col_lo[j], r.x[j] - model.col_lo[j]) } else { (model.col_up[j], model.col_up[j] - r.x[j]) };
+        let (side, slack) = if d[j] > 0.0 {
+            (model.col_lo[j], r.x[j] - model.col_lo[j])
+        } else {
+            (model.col_up[j], model.col_up[j] - r.x[j])
+        };
         if fin(side) {
             rep.complementarity = rep.complementarity.max(d[j].abs() * slack.abs());
             dual_obj += d[j] * side;
@@ -72,7 +87,11 @@ pub fn check_optimal(model: &LpModel, r: &SolveResult) -> Report {
         }
     }
     for i in 0..m {
-        let (side, slack) = if y[i] > 0.0 { (model.row_lo[i], act[i] - model.row_lo[i]) } else { (model.row_up[i], model.row_up[i] - act[i]) };
+        let (side, slack) = if y[i] > 0.0 {
+            (model.row_lo[i], act[i] - model.row_lo[i])
+        } else {
+            (model.row_up[i], model.row_up[i] - act[i])
+        };
         if fin(side) {
             rep.complementarity = rep.complementarity.max(y[i].abs() * slack.abs());
             dual_obj += y[i] * side;
@@ -100,9 +119,21 @@ pub fn farkas_margin(model: &LpModel, y: &[f64]) -> f64 {
             continue;
         }
         // Bound attaining the minimum / maximum of g*x_j.
-        let (lo, hi) = if g > 0.0 { (model.col_lo[j], model.col_up[j]) } else { (model.col_up[j], model.col_lo[j]) };
-        if fin(lo) { gl += g * lo } else { gl = -INF }
-        if fin(hi) { gu += g * hi } else { gu = INF }
+        let (lo, hi) = if g > 0.0 {
+            (model.col_lo[j], model.col_up[j])
+        } else {
+            (model.col_up[j], model.col_lo[j])
+        };
+        if fin(lo) {
+            gl += g * lo
+        } else {
+            gl = -INF
+        }
+        if fin(hi) {
+            gu += g * hi
+        } else {
+            gu = INF
+        }
     }
     let (mut rl, mut ru) = (0.0f64, 0.0f64);
     for i in 0..model.num_rows() {
@@ -111,8 +142,16 @@ pub fn farkas_margin(model: &LpModel, y: &[f64]) -> f64 {
             continue;
         }
         let (a, b) = if y[i] > 0.0 { (lo, up) } else { (up, lo) };
-        if fin(a) { rl += y[i] * a } else { rl = -INF }
-        if fin(b) { ru += y[i] * b } else { ru = INF }
+        if fin(a) {
+            rl += y[i] * a
+        } else {
+            rl = -INF
+        }
+        if fin(b) {
+            ru += y[i] * b
+        } else {
+            ru = INF
+        }
     }
     (gl - ru).max(rl - gu)
 }
@@ -136,7 +175,11 @@ pub fn ray_improvement(model: &LpModel, ray: &[f64], tol: f64) -> Option<f64> {
             return None;
         }
     }
-    let sgn = if model.sense == Sense::Maximize { -1.0 } else { 1.0 };
+    let sgn = if model.sense == Sense::Maximize {
+        -1.0
+    } else {
+        1.0
+    };
     Some(-sgn * model.obj.iter().zip(&r).map(|(c, v)| c * v).sum::<f64>())
 }
 
@@ -146,7 +189,13 @@ pub fn check(model: &LpModel, r: &SolveResult, tol: f64) -> Result<(), String> {
         Status::Optimal => {
             let rep = check_optimal(model, r);
             let scale = 1.0 + r.objective.abs();
-            if rep.primal_violation > tol || rep.dual_violation > tol || rep.reduced_cost_error > tol || rep.complementarity > tol * scale || rep.duality_gap > tol * scale || rep.objective_error > 1e-9 * scale {
+            if rep.primal_violation > tol
+                || rep.dual_violation > tol
+                || rep.reduced_cost_error > tol
+                || rep.complementarity > tol * scale
+                || rep.duality_gap > tol * scale
+                || rep.objective_error > 1e-9 * scale
+            {
                 return Err(format!("{rep:?}"));
             }
             Ok(())
@@ -158,9 +207,15 @@ pub fn check(model: &LpModel, r: &SolveResult, tol: f64) -> Result<(), String> {
         Status::Unbounded => {
             let rep = check_optimal_primal(model, &r.x);
             if rep > tol {
-                return Err(format!("unbounded result point violates bounds by {rep:.3e}"));
+                return Err(format!(
+                    "unbounded result point violates bounds by {rep:.3e}"
+                ));
             }
-            match r.ray.as_ref().and_then(|ray| ray_improvement(model, ray, tol)) {
+            match r
+                .ray
+                .as_ref()
+                .and_then(|ray| ray_improvement(model, ray, tol))
+            {
                 Some(g) if g > 1e-9 => Ok(()),
                 _ => Err("missing or invalid unbounded ray".into()),
             }

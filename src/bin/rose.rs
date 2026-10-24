@@ -15,8 +15,16 @@ fn basis_to_json(b: &Basis) -> Value {
 }
 
 fn basis_from_json(v: &Value) -> Option<Basis> {
-    let basic = v["basic"].as_array()?.iter().map(|x| x.as_u64().map(|u| u as usize)).collect::<Option<Vec<_>>>()?;
-    let at_upper = v["at_upper"].as_array()?.iter().map(|x| x.as_bool()).collect::<Option<Vec<_>>>()?;
+    let basic = v["basic"]
+        .as_array()?
+        .iter()
+        .map(|x| x.as_u64().map(|u| u as usize))
+        .collect::<Option<Vec<_>>>()?;
+    let at_upper = v["at_upper"]
+        .as_array()?
+        .iter()
+        .map(|x| x.as_bool())
+        .collect::<Option<Vec<_>>>()?;
     Some(Basis { basic, at_upper })
 }
 
@@ -53,12 +61,15 @@ fn main() {
             "--pdhg-inject" => {
                 let (w, at) = val.split_once('@').unwrap_or_else(|| usage());
                 let at = at.parse().unwrap_or_else(|_| usage());
-                popts.inject = Some((at, match w {
-                    "merit" => rose::pdhg::Inject::Merit,
-                    "reld" => rose::pdhg::Inject::RelDual,
-                    "pobj" => rose::pdhg::Inject::Pobj,
-                    _ => usage(),
-                }));
+                popts.inject = Some((
+                    at,
+                    match w {
+                        "merit" => rose::pdhg::Inject::Merit,
+                        "reld" => rose::pdhg::Inject::RelDual,
+                        "pobj" => rose::pdhg::Inject::Pobj,
+                        _ => usage(),
+                    },
+                ));
             }
             "--pdhg-seed" => popts.seed = val.parse().unwrap_or_else(|_| usage()),
             "--pdhg-conv-tol" => popts.conv_tol = val.parse().unwrap_or_else(|_| usage()),
@@ -77,29 +88,53 @@ fn main() {
         (true, false) => SolveOptions::dual(),
         (true, true) => SolveOptions::dual_release(),
     };
-    let mut opts = SolveOptions { record_trace: false, ..base };
+    let mut opts = SolveOptions {
+        record_trace: false,
+        ..base
+    };
     if let Some(n) = max_it {
         opts.max_iterations = n;
     }
-    let text = std::fs::read_to_string(path).unwrap_or_else(|e| fail(&format!("cannot read {path}: {e}")));
+    let text =
+        std::fs::read_to_string(path).unwrap_or_else(|e| fail(&format!("cannot read {path}: {e}")));
     let model = mps::parse(&text).unwrap_or_else(|e| fail(&format!("invalid input: {e}")));
     if method == "pdhg" {
         return run_pdhg(&model, &popts, output);
     } else if method == "barrier" {
         // The barrier's own point (no crossover): the release profile unless --barrier-profile controlled, BarIterLimit 1000 unless --max-iterations is given.
-        let max_iterations = if args.iter().any(|a| a == "--max-iterations") { opts.max_iterations } else { 1000 };
-        let base = if barrier_profile == "controlled" { SolveOptions::barrier() } else { SolveOptions::barrier_release() };
-        opts = SolveOptions { record_trace: false, max_iterations, ..base };
+        let max_iterations = if args.iter().any(|a| a == "--max-iterations") {
+            opts.max_iterations
+        } else {
+            1000
+        };
+        let base = if barrier_profile == "controlled" {
+            SolveOptions::barrier()
+        } else {
+            SolveOptions::barrier_release()
+        };
+        opts = SolveOptions {
+            record_trace: false,
+            max_iterations,
+            ..base
+        };
         if basis_in.is_some() || basis_out.is_some() {
             fail("--method barrier has no basis (Crossover=0): --basis-in and --basis-out are not supported");
         }
         return run_barrier(&model, &opts, output);
     }
     let start = basis_in.map(|p| {
-        let v: Value = serde_json::from_str(&std::fs::read_to_string(&p).unwrap_or_else(|e| fail(&format!("cannot read {p}: {e}")))).unwrap_or_else(|e| fail(&format!("invalid basis file: {e}")));
+        let v: Value = serde_json::from_str(
+            &std::fs::read_to_string(&p).unwrap_or_else(|e| fail(&format!("cannot read {p}: {e}"))),
+        )
+        .unwrap_or_else(|e| fail(&format!("invalid basis file: {e}")));
         basis_from_json(&v).unwrap_or_else(|| fail("invalid basis file"))
     });
-    eprintln!("{}: {} rows, {} columns", model.name, model.num_rows(), model.num_cols());
+    eprintln!(
+        "{}: {} rows, {} columns",
+        model.name,
+        model.num_rows(),
+        model.num_cols()
+    );
     let t = std::time::Instant::now();
     let r = solve(&model, start.as_ref(), &opts).unwrap_or_else(|e| match e {
         rose::simplex::SolveError::Unsupported(_) => fail(&e.to_string()),
@@ -114,7 +149,10 @@ fn main() {
         Status::NumericalFailure => "numerical_failure",
     };
     let check = verify::check(&model, &r, 1e-6);
-    eprintln!("status {status}, objective {:.12e}, {} iterations, {} refactorizations, {secs:.3}s", r.objective, r.iterations, r.refactorizations);
+    eprintln!(
+        "status {status}, objective {:.12e}, {} iterations, {} refactorizations, {secs:.3}s",
+        r.objective, r.iterations, r.refactorizations
+    );
     if let Err(e) = &check {
         eprintln!("independent check failed: {e}");
     }
@@ -131,11 +169,14 @@ fn main() {
         "diagnostics": { "iterations": r.iterations, "refactorizations": r.refactorizations, "seconds": secs, "check": check.err() },
     });
     if let Some(p) = basis_out {
-        std::fs::write(&p, serde_json::to_string(&basis_to_json(&r.basis)).unwrap()).unwrap_or_else(|e| fail(&format!("cannot write {p}: {e}")));
+        std::fs::write(&p, serde_json::to_string(&basis_to_json(&r.basis)).unwrap())
+            .unwrap_or_else(|e| fail(&format!("cannot write {p}: {e}")));
     }
     let text = serde_json::to_string_pretty(&out).unwrap();
     match output {
-        Some(p) => std::fs::write(&p, text).unwrap_or_else(|e| fail(&format!("cannot write {p}: {e}"))),
+        Some(p) => {
+            std::fs::write(&p, text).unwrap_or_else(|e| fail(&format!("cannot write {p}: {e}")))
+        }
         None => println!("{text}"),
     }
     std::process::exit(match r.status {
@@ -152,7 +193,12 @@ fn fail(msg: &str) -> ! {
 
 /// `--method pdhg`: the reflected restarted Halpern PDHG (`rose::pdhg`); no basis.
 fn run_pdhg(model: &rose::LpModel, popts: &rose::pdhg::PdhgOptions, output: Option<String>) {
-    eprintln!("{}: {} rows, {} columns", model.name, model.num_rows(), model.num_cols());
+    eprintln!(
+        "{}: {} rows, {} columns",
+        model.name,
+        model.num_rows(),
+        model.num_cols()
+    );
     let t = std::time::Instant::now();
     let r = rose::pdhg::solve(model, popts);
     let secs = t.elapsed().as_secs_f64();
@@ -163,7 +209,10 @@ fn run_pdhg(model: &rose::LpModel, popts: &rose::pdhg::PdhgOptions, output: Opti
         Status::Unbounded => "unbounded",
         _ => "numerical_failure",
     };
-    eprintln!("status {status}, objective {:.12e}, {} iterations, {} restarts, {secs:.3}s", r.objective, r.iterations, r.restarts);
+    eprintln!(
+        "status {status}, objective {:.12e}, {} iterations, {} restarts, {secs:.3}s",
+        r.objective, r.iterations, r.restarts
+    );
     let out = json!({
         "version": 1,
         "status": status,
@@ -174,7 +223,9 @@ fn run_pdhg(model: &rose::LpModel, popts: &rose::pdhg::PdhgOptions, output: Opti
     });
     let text = serde_json::to_string_pretty(&out).unwrap();
     match output {
-        Some(p) => std::fs::write(&p, text).unwrap_or_else(|e| fail(&format!("cannot write {p}: {e}"))),
+        Some(p) => {
+            std::fs::write(&p, text).unwrap_or_else(|e| fail(&format!("cannot write {p}: {e}")))
+        }
         None => println!("{text}"),
     }
     std::process::exit(if r.status == Status::Optimal { 0 } else { 3 });
@@ -183,7 +234,12 @@ fn run_pdhg(model: &rose::LpModel, popts: &rose::pdhg::PdhgOptions, output: Opti
 /// `--method barrier`: the barrier's own interior point (no crossover, so no basis). Progress goes to stderr; the JSON carries the point, the final
 /// residuals recomputed from the original model (`verify::check_optimal`) and the structure statistics.
 fn run_barrier(model: &rose::LpModel, opts: &SolveOptions, output: Option<String>) {
-    eprintln!("{}: {} rows, {} columns", model.name, model.num_rows(), model.num_cols());
+    eprintln!(
+        "{}: {} rows, {} columns",
+        model.name,
+        model.num_rows(),
+        model.num_cols()
+    );
     let t = std::time::Instant::now();
     let r = solve(model, None, opts).unwrap_or_else(|e| match e {
         rose::simplex::SolveError::Unsupported(_) => fail(&e.to_string()),
@@ -200,7 +256,10 @@ fn run_barrier(model: &rose::LpModel, opts: &SolveOptions, output: Option<String
     let have_point = matches!(r.status, Status::Optimal);
     let rep = have_point.then(|| verify::check_optimal(model, &r));
     let structure = rose::order::structure(model, rose::order::DENSE_COL_MIN).ok();
-    eprintln!("status {status}, objective {:.12e}, {} iterations, {secs:.3}s", r.objective, r.iterations);
+    eprintln!(
+        "status {status}, objective {:.12e}, {} iterations, {secs:.3}s",
+        r.objective, r.iterations
+    );
     let out = json!({
         "version": 1,
         "status": status,
@@ -218,7 +277,9 @@ fn run_barrier(model: &rose::LpModel, opts: &SolveOptions, output: Option<String
     });
     let text = serde_json::to_string_pretty(&out).unwrap();
     match output {
-        Some(p) => std::fs::write(&p, text).unwrap_or_else(|e| fail(&format!("cannot write {p}: {e}"))),
+        Some(p) => {
+            std::fs::write(&p, text).unwrap_or_else(|e| fail(&format!("cannot write {p}: {e}")))
+        }
         None => println!("{text}"),
     }
     std::process::exit(if r.status == Status::Optimal { 0 } else { 3 });

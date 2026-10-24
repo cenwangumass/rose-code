@@ -74,13 +74,19 @@ impl Method {
             let mut big = a / (rows + cols)
                 + 0.3
                 + 1.2 * inp.avg as f64 / rows
-                + 0.6 * (f64::from(self.level as i32 >> 1) + f64::from(self.degenerate - self.snap_degenerate) / (a - b));
+                + 0.6
+                    * (f64::from(self.level as i32 >> 1)
+                        + f64::from(self.degenerate - self.snap_degenerate) / (a - b));
             // Halved in phase 1 while `ctx+0x468 != 0`, that is before any switch.
             if inp.infeasible && self.mode == 0 {
                 big *= 0.5;
             }
             // `P+0x3b0`: rows * (rows^2 / cols)^0.35 / 20.
-            let p3b0 = if inp.cols == 0 { 1.0 } else { rows * (rows * rows / cols).powf(0.35) / 20.0 };
+            let p3b0 = if inp.cols == 0 {
+                1.0
+            } else {
+                rows * (rows * rows / cols).powf(0.35) / 20.0
+            };
             let denom = inp.u_total as f64 - 2.0 * rows + 3.0 * inp.l_total as f64;
             let rhs = p3b0 / (inp.avg as f64 + 1.0) + 1.0 + 9.0 * cols / denom;
             if big + big > rhs {
@@ -94,7 +100,8 @@ impl Method {
         self.perturb_due = false;
         if self.factorizations % 2 == 1 && self.factorizations % (self.level + 2) == 1 {
             // The pricing driver (`0xfb207`) perturbs when the degenerate iterations since the snapshot exceed 0.9 of all of them.
-            if self.pert > 0.0 && f64::from(self.degenerate - self.snap_degenerate) > (a - b) * 0.9 {
+            if self.pert > 0.0 && f64::from(self.degenerate - self.snap_degenerate) > (a - b) * 0.9
+            {
                 self.perturb_due = true;
             }
             self.snap_degenerate = self.degenerate;

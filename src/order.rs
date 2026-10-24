@@ -21,8 +21,13 @@ pub enum StructError {
 impl std::fmt::Display for StructError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            StructError::SortLarge(n) => write!(f, "sorter 0x8c8b70 quicksort partition needed for {n} keys (not decoded)"),
-            StructError::DenseScan => write!(f, "dense-column cost scan 0x31bc1a needed (not decoded)"),
+            StructError::SortLarge(n) => write!(
+                f,
+                "sorter 0x8c8b70 quicksort partition needed for {n} keys (not decoded)"
+            ),
+            StructError::DenseScan => {
+                write!(f, "dense-column cost scan 0x31bc1a needed (not decoded)")
+            }
         }
     }
 }
@@ -67,7 +72,14 @@ pub struct Symbolic {
 
 /// Constraint columns' row lists (explicit zero coefficients dropped), in the model's column order.
 fn columns(m: &LpModel) -> Vec<Vec<usize>> {
-    (0..m.num_cols()).map(|j| m.col(j).filter(|&(_, v)| v != 0.0).map(|(i, _)| i).collect()).collect()
+    (0..m.num_cols())
+        .map(|j| {
+            m.col(j)
+                .filter(|&(_, v)| v != 0.0)
+                .map(|(i, _)| i)
+                .collect()
+        })
+        .collect()
 }
 
 /// The dense columns of the model conversion `0x31af70` (`P+0x218`; port of `dense_columns` of `tools/barrier_order.py`, `specs/barrier.md` "Dense columns").
@@ -103,7 +115,12 @@ pub fn dense_rule(m: &LpModel) -> Result<Vec<usize>, StructError> {
     if cnt.iter().any(|&c| c >= thr2 && c < cut) {
         return Err(StructError::DenseScan);
     }
-    Ok(cnt.iter().enumerate().filter(|&(_, &c)| c >= cut).map(|(j, _)| j).collect())
+    Ok(cnt
+        .iter()
+        .enumerate()
+        .filter(|&(_, &c)| c >= cut)
+        .map(|(j, _)| j)
+        .collect())
 }
 
 /// The columns taken as dense, ascending: the reference's rule ([`dense_rule`]) when `min_nnz` is [`DENSE_AUTO`], else every column with at least
@@ -112,7 +129,12 @@ pub fn dense_columns(m: &LpModel, min_nnz: usize) -> Vec<usize> {
     if min_nnz == DENSE_AUTO {
         return dense_rule(m).unwrap_or_else(|e| panic!("{e}"));
     }
-    columns(m).iter().enumerate().filter(|(_, c)| c.len() >= min_nnz).map(|(j, _)| j).collect()
+    columns(m)
+        .iter()
+        .enumerate()
+        .filter(|(_, c)| c.len() >= min_nnz)
+        .map(|(j, _)| j)
+        .collect()
 }
 
 /// `min_nnz` value that selects the reference's dense-column rule.
@@ -162,7 +184,14 @@ pub fn aat_pattern(m: &LpModel, dense: &[usize]) -> (Pattern, usize) {
         rowind.extend_from_slice(a);
         colptr.push(rowind.len());
     }
-    (Pattern { n: nr + dense.len(), colptr, rowind }, nr)
+    (
+        Pattern {
+            n: nr + dense.len(),
+            colptr,
+            rowind,
+        },
+        nr,
+    )
 }
 
 /// `max(100, int(min(int(50 nnz / n), 10 sqrt(n))))`: the degree above which a node is dense (driver `0x324330` and core `0x320fa0`).
@@ -177,7 +206,9 @@ pub type Bisect<'a> = &'a mut dyn FnMut(usize, &[usize], &[usize]) -> Vec<i64>;
 
 /// The generator `0x88a870` (31 bits): `state = state * 0x5851f42d4c957f2d + 0x14057b7ef767814f`, tempering of the high word.
 fn rand31(rng: &mut u64) -> u32 {
-    *rng = rng.wrapping_mul(0x5851f42d4c957f2d).wrapping_add(0x14057b7ef767814f);
+    *rng = rng
+        .wrapping_mul(0x5851f42d4c957f2d)
+        .wrapping_add(0x14057b7ef767814f);
     let mut e = (*rng >> 32) as u32;
     e ^= e >> 11;
     e ^= (e << 7) & 0x9d2c5680;
@@ -196,7 +227,11 @@ struct Heap {
 
 impl Heap {
     fn new(n: usize) -> Self {
-        Heap { h: Vec::new(), k: Vec::new(), pos: vec![-1; n] }
+        Heap {
+            h: Vec::new(),
+            k: Vec::new(),
+            pos: vec![-1; n],
+        }
     }
     fn clear(&mut self) {
         for &it in &self.h {
@@ -290,7 +325,13 @@ impl Heap {
 /// One matching level of `0x325850`: vertices sorted by degree (counting sort, ascending index), every run of equal degree shuffled (Fisher-Yates from the end, one
 /// draw per element but the first); in that order each unmatched vertex is paired with its unmatched neighbour of smallest degree (first in adjacency order on ties)
 /// or stays alone. Returns `(cptr, members, cxadj, cadj, cvw)`; coarse vertices are numbered in order of creation.
-fn coarsen(n: usize, xadj: &[usize], adj: &[usize], vw: &[i64], rng: &mut u64) -> (Vec<usize>, Vec<usize>, Vec<usize>, Vec<usize>, Vec<i64>) {
+fn coarsen(
+    n: usize,
+    xadj: &[usize],
+    adj: &[usize],
+    vw: &[i64],
+    rng: &mut u64,
+) -> (Vec<usize>, Vec<usize>, Vec<usize>, Vec<usize>, Vec<i64>) {
     let deg: Vec<usize> = (0..n).map(|v| xadj[v + 1] - xadj[v]).collect();
     let mut cnt = vec![0usize; n + 1];
     for &d in &deg {
@@ -382,7 +423,15 @@ fn separator_score(p0: i64, p1: i64, p2: i64) -> f64 {
 /// side with the smaller `p2 / (p0 p1)` after the move, ties to side 1). The best state of the pass (strictly smaller score) is kept and the later moves undone; a
 /// pass stops `min(500, 5 |separator|)` moves after its best, and no pass follows one without improvement. The reference tests `contains` with the moved vertex
 /// instead of the neighbour when it updates the key of a separator neighbour of the moved vertex, so that update never happens (checked against the generator state).
-fn refine(n: usize, xadj: &[usize], adj: &[usize], vw: &[i64], lab: &mut [i64], param: f64, rng: &mut u64) {
+fn refine(
+    n: usize,
+    xadj: &[usize],
+    adj: &[usize],
+    vw: &[i64],
+    lab: &mut [i64],
+    param: f64,
+    rng: &mut u64,
+) {
     let mut pw = [0i64; 3];
     let mut ed = [vec![0i64; n], vec![0i64; n]];
     let mut nsep = 0usize;
@@ -414,7 +463,8 @@ fn refine(n: usize, xadj: &[usize], adj: &[usize], vw: &[i64], lab: &mut [i64], 
         let mut where_ = vec![-1i64; n];
         let mut best_sc = separator_score(pw[0], pw[1], pw[2]);
         let mut best = -1i64;
-        let (mut moves, mut pulled, mut poff): (Vec<usize>, Vec<usize>, Vec<usize>) = (Vec::new(), Vec::new(), Vec::new());
+        let (mut moves, mut pulled, mut poff): (Vec<usize>, Vec<usize>, Vec<usize>) =
+            (Vec::new(), Vec::new(), Vec::new());
         let mut k = 0usize;
         while k < n {
             if k as i64 - best > ntry {
@@ -433,7 +483,11 @@ fn refine(n: usize, xadj: &[usize], adj: &[usize], vw: &[i64], lab: &mut [i64], 
                 let (a, b) = (c0 as usize, c1 as usize);
                 let s0 = separator_score(pw[0] + vw[a], pw[1] - ed[1][a], pw[2] - vw[a] + ed[1][a]);
                 let s1 = separator_score(pw[0] - ed[0][b], pw[1] + vw[b], pw[2] - vw[b] + ed[0][b]);
-                if s0 >= s1 { 1 } else { 0 }
+                if s0 >= s1 {
+                    1
+                } else {
+                    0
+                }
             };
             if [c0, c1][side] < 0 {
                 break;
@@ -521,7 +575,8 @@ fn refine(n: usize, xadj: &[usize], adj: &[usize], vw: &[i64], lab: &mut [i64], 
 /// vertex in the separator and each level is refined ([`refine`]) and projected to the next finer one. Label 2 is the separator. `rng` is the state of the
 /// generator `0x88a870` (0 at the start of a solve), advanced by every draw.
 pub fn partition(size: usize, colptr: &[usize], rowind: &[usize], rng: &mut u64) -> Vec<i64> {
-    let mut levels: Vec<(usize, Vec<usize>, Vec<usize>, Vec<i64>)> = vec![(size, colptr.to_vec(), rowind.to_vec(), vec![1; size])];
+    let mut levels: Vec<(usize, Vec<usize>, Vec<usize>, Vec<i64>)> =
+        vec![(size, colptr.to_vec(), rowind.to_vec(), vec![1; size])];
     let mut maps: Vec<(Vec<usize>, Vec<usize>)> = Vec::new();
     loop {
         let (n, cptr, members, cxadj, cadj, cvw) = {
@@ -564,7 +619,17 @@ pub fn levels(p: &Pattern, n1: usize, bisect: Option<Bisect>) -> Result<Vec<i64>
     let n1 = n1.min(n);
     let thr = dense_threshold(n, p.nnz());
     let mut lv: Vec<i64> = (0..n)
-        .map(|i| if i < n1 { if (p.adj(i).len() as i64) > thr { -2 } else { -1 } } else { -3 })
+        .map(|i| {
+            if i < n1 {
+                if (p.adj(i).len() as i64) > thr {
+                    -2
+                } else {
+                    -1
+                }
+            } else {
+                -3
+            }
+        })
         .collect();
     let mut comp = vec![usize::MAX; n];
     let mut sizes = Vec::new();
@@ -604,7 +669,12 @@ pub fn levels(p: &Pattern, n1: usize, bisect: Option<Bisect>) -> Result<Vec<i64>
             let mut cp = vec![0];
             let mut ri = Vec::new();
             for &v in &nodes {
-                ri.extend(p.adj(v).iter().filter(|&&x| loc[x] != usize::MAX).map(|&x| loc[x]));
+                ri.extend(
+                    p.adj(v)
+                        .iter()
+                        .filter(|&&x| loc[x] != usize::MAX)
+                        .map(|&x| loc[x]),
+                );
                 cp.push(ri.len());
             }
             let lab = b(sz, &cp, &ri);
@@ -653,14 +723,21 @@ fn shellsort(idx: &mut [i64], key: &[f64]) -> Result<(), StructError> {
 pub fn order(p: &Pattern, levels: &[i64]) -> Result<OrderResult, StructError> {
     let n = p.n;
     let ni = n as i64;
-    let mut adj: Vec<Vec<i64>> = (0..n).map(|i| p.adj(i).iter().map(|&x| x as i64).collect()).collect();
+    let mut adj: Vec<Vec<i64>> = (0..n)
+        .map(|i| p.adj(i).iter().map(|&x| x as i64).collect())
+        .collect();
     let mut ln: Vec<i64> = adj.iter().map(|a| a.len() as i64).collect();
     let mut elen = vec![0i64; n];
     let mut deg = ln.clone();
     let mut nv = vec![1i64; n];
     let mut parent: Vec<usize> = (0..n).collect();
     let mut perm: Vec<i64> = levels.to_vec();
-    let maxlev = perm.iter().filter(|&&x| x < 0).map(|&x| -x).max().unwrap_or(0);
+    let maxlev = perm
+        .iter()
+        .filter(|&&x| x < 0)
+        .map(|&x| -x)
+        .max()
+        .unwrap_or(0);
     let mut head = vec![-1i64; n + 1];
     let mut prev = vec![-1i64; n];
     let mut nxt = vec![-1i64; n];
@@ -669,7 +746,11 @@ pub fn order(p: &Pattern, levels: &[i64]) -> Result<OrderResult, StructError> {
     let mut nz: i64 = 0;
     let mut ops = 0f64;
     let mut nelim: i64 = 0;
-    let thr = if n > 0 { dense_threshold(n, p.nnz()) } else { 100 };
+    let thr = if n > 0 {
+        dense_threshold(n, p.nnz())
+    } else {
+        100
+    };
     let mut ndense = 0;
     for i in 0..n {
         if ln[i] > thr {
@@ -682,7 +763,11 @@ pub fn order(p: &Pattern, levels: &[i64]) -> Result<OrderResult, StructError> {
         for i in 0..n {
             let l = ln[i];
             if l > 0 {
-                adj[i] = adj[i][..l as usize].iter().copied().filter(|&j| perm[j as usize] < 0).collect();
+                adj[i] = adj[i][..l as usize]
+                    .iter()
+                    .copied()
+                    .filter(|&j| perm[j as usize] < 0)
+                    .collect();
                 ln[i] = adj[i].len() as i64;
             } else {
                 ln[i] = 0;
@@ -844,7 +929,8 @@ pub fn order(p: &Pattern, levels: &[i64]) -> Result<OrderResult, StructError> {
             nz += k * degme + k * (k - 1) / 2;
             let s = degme + k;
             let kk = (k * (k - 1)) as f64;
-            ops = (2 * k - 1) as f64 * kk / 6.0 + ((k as f64 * s as f64 * s as f64 + ops) - s as f64 * kk);
+            ops = (2 * k - 1) as f64 * kk / 6.0
+                + ((k as f64 * s as f64 * s as f64 + ops) - s as f64 * kk);
             nelim += k;
             nv[v] = degme;
             for &i in &keep {
@@ -929,7 +1015,12 @@ pub fn symbolic(p: &Pattern, perm1: &[i64], n1: usize) -> Symbolic {
     let mut rows: Vec<Vec<usize>> = vec![Vec::new(); n];
     let mut kids: Vec<Vec<usize>> = vec![Vec::new(); n];
     for j in 0..n {
-        let mut s: Vec<usize> = p.adj(inv[j]).iter().map(|&i| perm1[i] as usize).filter(|&x| x > j).collect();
+        let mut s: Vec<usize> = p
+            .adj(inv[j])
+            .iter()
+            .map(|&i| perm1[i] as usize)
+            .filter(|&x| x > j)
+            .collect();
         for &c in &kids[j] {
             s.extend(rows[c][1..].iter().copied().filter(|&x| x > j));
         }
@@ -951,7 +1042,12 @@ pub fn symbolic(p: &Pattern, perm1: &[i64], n1: usize) -> Symbolic {
     let mut j = 0;
     while j < n {
         let mut k = 1;
-        while j + k < n && cnt[j + k] + k == cnt[j] && k < rows[j].len() && rows[j][k] == j + k && (n1 <= j) == (n1 <= j + k) {
+        while j + k < n
+            && cnt[j + k] + k == cnt[j]
+            && k < rows[j].len()
+            && rows[j][k] == j + k
+            && (n1 <= j) == (n1 <= j + k)
+        {
             k += 1;
         }
         for t in 0..k {
@@ -1034,7 +1130,10 @@ pub fn symbolic(p: &Pattern, perm1: &[i64], n1: usize) -> Symbolic {
                     let s2 = lst[j2];
                     if width[s2] == 1 {
                         let b = members[s2][0];
-                        if cnt[b] == cnt[a] && (n1 <= b) == (n1 <= a) && rows[a][1..] == rows[b][1..] {
+                        if cnt[b] == cnt[a]
+                            && (n1 <= b) == (n1 <= a)
+                            && rows[a][1..] == rows[b][1..]
+                        {
                             scnt[c] += 1;
                             width[c] += 1;
                             members[c].push_front(b);
@@ -1064,7 +1163,11 @@ pub fn symbolic(p: &Pattern, perm1: &[i64], n1: usize) -> Symbolic {
         stack.extend(ch[x].iter().copied());
     }
     pre.reverse();
-    let mut post: Vec<usize> = pre.iter().copied().filter(|&x| members[x][0] < n1).collect();
+    let mut post: Vec<usize> = pre
+        .iter()
+        .copied()
+        .filter(|&x| members[x][0] < n1)
+        .collect();
     post.extend(pre.iter().copied().filter(|&x| members[x][0] >= n1));
     let mut order = Vec::new();
     let mut xmap = vec![0usize; n];
@@ -1098,7 +1201,16 @@ pub fn symbolic(p: &Pattern, perm1: &[i64], n1: usize) -> Symbolic {
         }
         pos += w_;
     }
-    Symbolic { exact_nz: exact_nz as i64, perm, nz, ops, width: width_out, count, rowoff, idx }
+    Symbolic {
+        exact_nz: exact_nz as i64,
+        perm,
+        nz,
+        ops,
+        width: width_out,
+        count,
+        rowoff,
+        idx,
+    }
 }
 
 /// The whole structure stage for a model: pattern, levels, ordering, symbolic factorization.
@@ -1113,7 +1225,10 @@ pub struct Structure {
 }
 
 /// Runs the stage with the dense columns chosen by [`dense_columns`]`(m, dense_min)`. Errors name the undecoded routine reached.
-pub fn structure(m: &LpModel, dense_min: usize) -> Result<Structure, (Pattern, usize, Vec<usize>, StructError)> {
+pub fn structure(
+    m: &LpModel,
+    dense_min: usize,
+) -> Result<Structure, (Pattern, usize, Vec<usize>, StructError)> {
     let dense = if dense_min == DENSE_AUTO {
         match dense_rule(m) {
             Ok(d) => d,
@@ -1133,7 +1248,14 @@ pub fn structure(m: &LpModel, dense_min: usize) -> Result<Structure, (Pattern, u
         Ok((lv, o, s))
     };
     match run() {
-        Ok((levels, order, sym)) => Ok(Structure { pattern, n1, dense, levels, order, sym }),
+        Ok((levels, order, sym)) => Ok(Structure {
+            pattern,
+            n1,
+            dense,
+            levels,
+            order,
+            sym,
+        }),
         Err(e) => Err((pattern, n1, dense, e)),
     }
 }

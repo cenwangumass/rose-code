@@ -5,8 +5,13 @@
 use rose::{mps, solve, Basis, LpModel, SolveOptions, Status};
 
 fn fixture(name: &str) -> Option<LpModel> {
-    let p = format!("{}/../reverse-engineer/corpus/fixtures/{name}.mps", env!("CARGO_MANIFEST_DIR"));
-    std::fs::read_to_string(p).ok().map(|t| mps::parse(&t).unwrap())
+    let p = format!(
+        "{}/../reverse-engineer/corpus/fixtures/{name}.mps",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    std::fs::read_to_string(p)
+        .ok()
+        .map(|t| mps::parse(&t).unwrap())
 }
 
 #[test]
@@ -25,7 +30,10 @@ fn infeasible_and_unbounded_statuses_match_reference() {
 
 #[test]
 fn neardep_and_badscale_solutions_match_reference_bits() {
-    for (name, x, z) in [("fx_neardep", vec![0.0, 4.0], -8.0), ("fx_badscale", vec![0.0, 5e-6], -5.0)] {
+    for (name, x, z) in [
+        ("fx_neardep", vec![0.0, 4.0], -8.0),
+        ("fx_badscale", vec![0.0, 5e-6], -5.0),
+    ] {
         if let Some(m) = fixture(name) {
             let r = solve(&m, None, &SolveOptions::default()).unwrap();
             assert_eq!(r.status, Status::Optimal, "{name}");
@@ -39,13 +47,25 @@ fn neardep_and_badscale_solutions_match_reference_bits() {
 fn warm_starts_from_nonoptimal_basis_match_reference() {
     let Some(m) = fixture("fx_warm") else { return };
     // y basic, slack c1 basic, x at lower: reference takes 1 iteration (a bound flip of x to its upper bound 3).
-    let b = Basis { basic: vec![2, 1], at_upper: vec![false; 4] };
+    let b = Basis {
+        basic: vec![2, 1],
+        at_upper: vec![false; 4],
+    };
     let r = solve(&m, Some(&b), &SolveOptions::default()).unwrap();
-    assert_eq!((r.status, r.iterations, r.x.clone()), (Status::Optimal, 1, vec![3.0, 1.0]));
+    assert_eq!(
+        (r.status, r.iterations, r.x.clone()),
+        (Status::Optimal, 1, vec![3.0, 1.0])
+    );
     // same with x already at its upper bound: reference takes 0 iterations.
-    let b = Basis { basic: vec![2, 1], at_upper: vec![true, false, false, false] };
+    let b = Basis {
+        basic: vec![2, 1],
+        at_upper: vec![true, false, false, false],
+    };
     let r = solve(&m, Some(&b), &SolveOptions::default()).unwrap();
-    assert_eq!((r.status, r.iterations, r.x.clone()), (Status::Optimal, 0, vec![3.0, 1.0]));
+    assert_eq!(
+        (r.status, r.iterations, r.x.clone()),
+        (Status::Optimal, 0, vec![3.0, 1.0])
+    );
 }
 
 #[test]
@@ -54,7 +74,10 @@ fn tied_optimal_face_returns_the_reference_vertex() {
     // input order), so y enters and the vertex is (3, 1), as in the reference.
     let Some(m) = fixture("fx_tied") else { return };
     let r = solve(&m, None, &SolveOptions::default()).unwrap();
-    assert_eq!((r.status, r.iterations, r.x.clone()), (Status::Optimal, 1, vec![3.0, 1.0]));
+    assert_eq!(
+        (r.status, r.iterations, r.x.clone()),
+        (Status::Optimal, 1, vec![3.0, 1.0])
+    );
 }
 
 /// Supplied singular bases (`fx_singular`, `fx_sing_*`, made by `corpus/fixtures/singular_cases.py`): the reference drops the
@@ -73,10 +96,30 @@ fn singular_supplied_bases_are_repaired_like_the_reference() {
         ("fx_sing_zero_col2", &[(0, 0), (1, 1)], 2, &[4.0, 3.0]),
         ("fx_sing_slack_dup", &[(0, 1)], 2, &[4.0, 5.0]),
         ("fx_sing_slack_dup2", &[(0, 1), (1, 0)], 0, &[4.0, 0.0]),
-        ("fx_sing_rank3", &[(0, 0), (1, 1), (2, 2)], 0, &[4.0, 5.0, 0.0]),
-        ("fx_sing_all_same3", &[(0, 0), (1, 1), (2, 2)], 1, &[0.0, 0.0, 4.0]),
-        ("fx_sing_nuc_dep2", &[(0, 0), (1, 1), (2, 2)], 1, &[0.0, 3.0, 0.0]),
-        ("fx_sing_two_pairs", &[(0, 0), (1, 1), (2, 2), (3, 3)], 3, &[0.0, 4.0, 6.0, 0.0]),
+        (
+            "fx_sing_rank3",
+            &[(0, 0), (1, 1), (2, 2)],
+            0,
+            &[4.0, 5.0, 0.0],
+        ),
+        (
+            "fx_sing_all_same3",
+            &[(0, 0), (1, 1), (2, 2)],
+            1,
+            &[0.0, 0.0, 4.0],
+        ),
+        (
+            "fx_sing_nuc_dep2",
+            &[(0, 0), (1, 1), (2, 2)],
+            1,
+            &[0.0, 3.0, 0.0],
+        ),
+        (
+            "fx_sing_two_pairs",
+            &[(0, 0), (1, 1), (2, 2), (3, 3)],
+            3,
+            &[0.0, 4.0, 6.0, 0.0],
+        ),
         ("fx_sing_dup_slack3", &[(0, 0), (1, 1)], 2, &[0.0, 4.0, 6.0]),
     ];
     for (name, pairs, iters, x) in cases {
@@ -86,9 +129,16 @@ fn singular_supplied_bases_are_repaired_like_the_reference() {
         for &(j, r) in pairs {
             basic[r] = j;
         }
-        let b = Basis { basic, at_upper: vec![false; n + rows] };
+        let b = Basis {
+            basic,
+            at_upper: vec![false; n + rows],
+        };
         let r = solve(&m, Some(&b), &SolveOptions::default()).unwrap();
-        assert_eq!((r.status, r.iterations, r.x.clone()), (Status::Optimal, iters, x.to_vec()), "{name}");
+        assert_eq!(
+            (r.status, r.iterations, r.x.clone()),
+            (Status::Optimal, iters, x.to_vec()),
+            "{name}"
+        );
     }
 }
 
@@ -108,20 +158,35 @@ fn fixtures_under_the_dual_method_are_correct() {
             assert_eq!(r.status, Status::Unbounded);
             assert!(r.ray.is_some() && rose::verify::check(&m, &r, 1e-6).is_ok());
         }
-        for (name, x, z) in [("fx_neardep", vec![0.0, 4.0], -8.0), ("fx_badscale", vec![0.0, 5e-6], -5.0), ("fx_tied", vec![3.0, 1.0], -4.0)] {
+        for (name, x, z) in [
+            ("fx_neardep", vec![0.0, 4.0], -8.0),
+            ("fx_badscale", vec![0.0, 5e-6], -5.0),
+            ("fx_tied", vec![3.0, 1.0], -4.0),
+        ] {
             if let Some(m) = fixture(name) {
                 let r = solve(&m, None, &o).unwrap();
                 assert_eq!(r.status, Status::Optimal, "{name}");
-                assert!((r.objective - z).abs() <= 1e-9 * z.abs().max(1.0), "{name}: {}", r.objective);
+                assert!(
+                    (r.objective - z).abs() <= 1e-9 * z.abs().max(1.0),
+                    "{name}: {}",
+                    r.objective
+                );
                 assert!(rose::verify::check(&m, &r, 1e-6).is_ok(), "{name}");
                 if name != "fx_tied" {
-                    assert!(r.x.iter().zip(&x).all(|(a, b)| (a - b).abs() <= 1e-9), "{name}: {:?}", r.x);
+                    assert!(
+                        r.x.iter().zip(&x).all(|(a, b)| (a - b).abs() <= 1e-9),
+                        "{name}: {:?}",
+                        r.x
+                    );
                 }
             }
         }
         if let Some(m) = fixture("fx_warm") {
             for up in [false, true] {
-                let b = Basis { basic: vec![2, 1], at_upper: vec![up, false, false, false] };
+                let b = Basis {
+                    basic: vec![2, 1],
+                    at_upper: vec![up, false, false, false],
+                };
                 let r = solve(&m, Some(&b), &o).unwrap();
                 assert_eq!((r.status, r.x.clone()), (Status::Optimal, vec![3.0, 1.0]));
                 assert!(rose::verify::check(&m, &r, 1e-6).is_ok());
@@ -147,13 +212,21 @@ fn fixtures_under_the_dual_method_are_correct() {
             for &(j, r) in &pairs {
                 basic[r] = j;
             }
-            let b = Basis { basic, at_upper: vec![false; n + rows] };
+            let b = Basis {
+                basic,
+                at_upper: vec![false; n + rows],
+            };
             let r = solve(&m, Some(&b), &o).unwrap();
             assert_eq!(r.status, Status::Optimal, "{name}");
             assert!(rose::verify::check(&m, &r, 1e-6).is_ok(), "{name}");
             // The optimum is the same one the primal reaches from the same supplied basis (objective, not vertex: ties are legal).
             let p = solve(&m, Some(&b), &SolveOptions::default()).unwrap();
-            assert!((r.objective - p.objective).abs() <= 1e-9 * p.objective.abs().max(1.0), "{name}: {} vs {}", r.objective, p.objective);
+            assert!(
+                (r.objective - p.objective).abs() <= 1e-9 * p.objective.abs().max(1.0),
+                "{name}: {} vs {}",
+                r.objective,
+                p.objective
+            );
         }
     }
 }

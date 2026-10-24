@@ -49,7 +49,8 @@ impl Factor {
         let mut touched: Vec<usize> = Vec::new();
         // Pivot steps whose pivot row is touched and not yet processed (min-heap): ascending step order as in the dense loop.
         let mut step_mark = vec![false; m];
-        let mut heap: std::collections::BinaryHeap<std::cmp::Reverse<usize>> = std::collections::BinaryHeap::new();
+        let mut heap: std::collections::BinaryHeap<std::cmp::Reverse<usize>> =
+            std::collections::BinaryHeap::new();
         for k in 0..m {
             let p = col_order[k];
             macro_rules! touch {
@@ -122,8 +123,20 @@ impl Factor {
             u.push(ucol);
             diag.push(d);
         }
-        let nnz_lu = l.iter().map(Vec::len).sum::<usize>() + u.iter().map(Vec::len).sum::<usize>() + m;
-        Ok(Factor { m, col_order, pivot_row, step_of_row, l, u, diag, etas: Vec::new(), nnz_lu, nnz_eta: 0 })
+        let nnz_lu =
+            l.iter().map(Vec::len).sum::<usize>() + u.iter().map(Vec::len).sum::<usize>() + m;
+        Ok(Factor {
+            m,
+            col_order,
+            pivot_row,
+            step_of_row,
+            l,
+            u,
+            diag,
+            etas: Vec::new(),
+            nnz_lu,
+            nnz_eta: 0,
+        })
     }
 
     pub fn num_updates(&self) -> usize {
@@ -213,13 +226,23 @@ mod tests {
     fn dense_cols(a: &[&[f64]]) -> Vec<Column> {
         let m = a.len();
         (0..m)
-            .map(|c| (0..m).filter(|&r| a[r][c] != 0.0).map(|r| (r, a[r][c])).collect())
+            .map(|c| {
+                (0..m)
+                    .filter(|&r| a[r][c] != 0.0)
+                    .map(|r| (r, a[r][c]))
+                    .collect()
+            })
             .collect()
     }
 
     #[test]
     fn solves_and_updates_against_dense_residuals() {
-        let a: [&[f64]; 4] = [&[2.0, 0.0, 1.0, 0.0], &[1.0, 3.0, 0.0, 0.5], &[0.0, 1.0, 4.0, 0.0], &[0.0, 0.0, 1.0, 5.0]];
+        let a: [&[f64]; 4] = [
+            &[2.0, 0.0, 1.0, 0.0],
+            &[1.0, 3.0, 0.0, 0.5],
+            &[0.0, 1.0, 4.0, 0.0],
+            &[0.0, 0.0, 1.0, 5.0],
+        ];
         let cols = dense_cols(&a);
         let mut f = Factor::new(4, &cols).unwrap();
         let b = vec![1.0, 2.0, 3.0, 4.0];
