@@ -285,6 +285,16 @@ impl RefStruct {
                     }
                 }
             }
+            // The numeric solve visits the steps in ascending order, not in the Kahn order of the symbolic pass: the sums that
+            // cancel to rounding noise then fall on the reference's side of the tolerance (PILOT.JA factor 45, column 925: the
+            // entries at 870 and 876 are 2.6e-13 and 3.4e-13 in the Kahn order and dropped in the reference).
+            let mut q = q;
+            q.sort_unstable();
+            // The numeric solve visits the steps in ascending order, not in the Kahn order of the symbolic pass: sums that cancel
+            // to rounding noise then fall on the reference's side of the tolerance (PILOT.JA factor 45, column 925: the entries at
+            // 870 and 876 are 2.6e-13 and 3.4e-13 in the Kahn order and absent in the reference).
+            let mut q = q;
+            q.sort_unstable();
             for &v in &q {
                 if v >= t {
                     continue;
@@ -302,11 +312,22 @@ impl RefStruct {
                     // A singleton-phase column subtracts `(x * a) / d` with the raw entry `a`, not `x * (a / d)`; the
                     // multiplier is the only form known for pair overrides and nucleus columns.
                     let a = st.l_raw[v][e];
-                    xv[y] -= if a.is_nan() {
+                    let upd = if a.is_nan() {
                         lvals[v][e] * x
                     } else {
                         (x * a) / st.diag[v]
                     };
+                    // A product at or below the tolerance does not create an entry (as in the Markowitz elimination's fill): PILOT.JA
+                    // factor 48, column 922: 9.06e-14 + 5.95e-14 would make a spurious entry of -1.5e-13 at 901.
+                    if xv[y] == 0.0 && upd.abs() <= TOL {
+                        continue;
+                    }
+                    xv[y] -= upd;
+                    // A sum that cancels to the tolerance leaves the pattern, as an eliminated entry does (PILOT.JA factor 52,
+                    // column 931: -3.2e-14 left by a cancellation plus a later 8.4e-14 must not become an entry of -1.2e-13).
+                    if xv[y].abs() <= TOL {
+                        xv[y] = 0.0;
+                    }
                 }
             }
             let mut ents: Vec<(usize, f64)> = Vec::new();
