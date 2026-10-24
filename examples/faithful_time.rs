@@ -1,5 +1,6 @@
 //! Times a cold-start solve with and without the FTRAN mirror: `faithful_time model.mps`.
 use rose::{crash_basis, mps, solve, SolveOptions};
+
 fn main() {
     let model =
         mps::parse(&std::fs::read_to_string(std::env::args().nth(1).unwrap()).unwrap()).unwrap();

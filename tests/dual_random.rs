@@ -7,6 +7,7 @@ use rose::verify;
 use rose::{solve, SolveOptions, Status};
 
 struct Rng(u64);
+
 impl Rng {
     fn next(&mut self) -> u64 {
         self.0 = self
@@ -15,9 +16,11 @@ impl Rng {
             .wrapping_add(1442695040888963407);
         self.0 >> 33
     }
+
     fn below(&mut self, n: u64) -> u64 {
         self.next() % n
     }
+
     fn int(&mut self, lo: i64, hi: i64) -> f64 {
         (lo + self.below((hi - lo + 1) as u64) as i64) as f64
     }

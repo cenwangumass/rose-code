@@ -20,5 +20,7 @@ pub mod work;
 
 pub use basis::Basis;
 pub use model::{LpModel, Sense};
+
 pub mod verify;
+
 pub use simplex::{crash_basis, solve, Method, SolveOptions, SolveResult, Status, TraceEvent};

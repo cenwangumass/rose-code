@@ -362,6 +362,7 @@ impl Nucleus {
             self.cb[k as usize].insert(0, c);
         }
     }
+
     fn rins(&mut self, r: usize) {
         let k = self.rcnt[r] as isize - 1;
         if k == 0 {
@@ -370,6 +371,7 @@ impl Nucleus {
             self.rb[k as usize].insert(0, r);
         }
     }
+
     fn cdel(&mut self, c: usize) {
         if self.ccnt[c] >= 2 {
             let k = self.ccnt[c] - 1;
@@ -378,6 +380,7 @@ impl Nucleus {
             }
         }
     }
+
     fn rdel(&mut self, r: usize) {
         if self.rcnt[r] >= 2 {
             let k = self.rcnt[r] - 1;
@@ -386,14 +389,17 @@ impl Nucleus {
             }
         }
     }
+
     fn clean_col(&mut self, c: usize) {
         let nodes = &self.nodes;
         self.colchain[c].retain(|&i| nodes[i].alive);
     }
+
     fn clean_row(&mut self, r: usize) {
         let nodes = &self.nodes;
         self.rowchain[r].retain(|&i| nodes[i].alive);
     }
+
     fn add_node(&mut self, r: usize, c: usize, v: f64) {
         let id = self.nodes.len();
         self.nodes.push(Node {
@@ -469,6 +475,7 @@ fn pair_gate_end(steps: usize) {
 }
 
 thread_local! { pub static DENSE_N: std::cell::Cell<usize> = std::cell::Cell::new(0); }
+
 fn nucleus(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> NucleusOut {
     DENSE_N.with(|c| c.set(0));
     let npos = cols.iter().map(|c| c.0 + 1).max().unwrap_or(0);

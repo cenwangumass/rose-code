@@ -60,6 +60,7 @@ fn sc50a() {
         -64.57507705856449,
     );
 }
+
 #[test]
 fn blend() {
     check(
@@ -68,6 +69,7 @@ fn blend() {
         -30.812149845828216,
     );
 }
+
 #[test]
 fn adlittle() {
     check(
@@ -76,6 +78,7 @@ fn adlittle() {
         225494.96316238036,
     );
 }
+
 #[test]
 fn bore3d() {
     check(

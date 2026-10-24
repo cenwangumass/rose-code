@@ -1884,12 +1884,15 @@ pub enum StartKind<'a> {
 /// Factor of `Af D Af'` and the solves with it (`0x2f1720` + `0x30fc90` / `0x305f10`).
 pub trait NormalSolver {
     fn factor(&mut self, f: &StdForm, d: &[f64]) -> Result<(), BarrierError>;
+
     /// The factor of an iteration: `zx` (`Q+0x800`) is also the diagonal `-zx` of the dense-column nodes (the starting point's factors use `-1/D`).
     fn factor_iter(&mut self, f: &StdForm, d: &[f64], _zx: &[f64]) -> Result<(), BarrierError> {
         self.factor(f, d)
     }
+
     fn start(&mut self, f: &StdForm, kind: StartKind)
         -> Result<(Vec<f64>, Vec<f64>), BarrierError>;
+
     fn direction(
         &mut self,
         f: &StdForm,
@@ -1897,29 +1900,36 @@ pub trait NormalSolver {
         kind: DirKind,
         rhs: &Rhs,
     ) -> Result<Direction, BarrierError>;
+
     /// Per iteration, before the directions: `Q+0x800` (`zx`) and the refinement threshold `Q+0x280` for the solvers that refine.
     fn prepare(&mut self, _zx: &[f64], _thr: f64) {}
+
     /// `Q+0x770 / 0x780` of the last direction: the norms of its solve residual (0 where the solver does not refine).
     fn norms(&self) -> (f64, f64) {
         (0.0, 0.0)
     }
+
     /// Number of trial weights of the corrector selection at iteration `it` (`Q+0x29c`). The reference's adaptation rule is not decoded
     /// (5 at iteration 0 and 3 later on AFIRO, SC50A, BLEND, BORE3D, DEGEN2; 3 at iteration 0 on ADLITTLE), so a replaying solver supplies it.
     fn ntry(&mut self, _it: i32, default: usize) -> usize {
         default
     }
+
     /// Inputs of the release profile's work model (`NZ = SYM+0x38`, `S = SYM+0x168`; `None` for solvers without a symbolic factor).
     fn work_info(&self, _f: &StdForm) -> Option<(f64, f64)> {
         None
     }
+
     /// `SYM+0x178 == 1` after the last factorization (the solves refine their result).
     fn refine_mode(&self, _f: &StdForm) -> bool {
         false
     }
+
     /// Number of correction solves of the refinement since the last call.
     fn take_extra_solves(&mut self) -> usize {
         0
     }
+
     /// The plain solve `(dx, dy)` for `rx` over the variables and `ry` over the rows (`0x305f10`; the homogeneous algorithm's solve with `(c, b)`).
     fn solve_raw(
         &mut self,

@@ -1,5 +1,6 @@
 //! `final_dump model.mps [release]`: prints the faithful solve's objective, x, reduced costs, duals and iteration count as JSON (for comparison with `runs/*.json`).
 use rose::{mps, solve, SolveOptions};
+
 fn main() {
     let a: Vec<String> = std::env::args().collect();
     let model = mps::parse(&std::fs::read_to_string(&a[1]).unwrap()).unwrap();

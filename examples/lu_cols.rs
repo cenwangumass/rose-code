@@ -1,5 +1,6 @@
 //! `lu_cols luin.out k`: prints the mirror's pivot (row, position) sequence and phases for factorization k.
 use rose::lu_order::factor_structure;
+
 fn main() {
     let a: Vec<String> = std::env::args().collect();
     let k: u64 = a[2].parse().unwrap();

@@ -3,6 +3,7 @@
 //! kind `status`, stderr) holds the status, iterations and objective.
 //! `dual` runs the dual simplex (`SolveOptions::dual`); `schedule` is a comma list of iteration counts after which the work-based refactorization fires.
 use rose::{mps, solve, Basis, SolveOptions};
+
 fn main() {
     let a: Vec<String> = std::env::args().collect();
     let model = mps::parse(&std::fs::read_to_string(&a[1]).unwrap()).unwrap();

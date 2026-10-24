@@ -1,6 +1,7 @@
 //! `trace_warm model.mps faithful|release|default basis.json`: like trace_dump, from a supplied start basis
 //! ({"basic": [...], "at_upper": [...]}); then one `RESULT {json}` line with status, iterations, objective and x.
 use rose::{mps, solve, Basis, SolveOptions};
+
 fn main() {
     let a: Vec<String> = std::env::args().collect();
     let model = mps::parse(&std::fs::read_to_string(&a[1]).unwrap()).unwrap();

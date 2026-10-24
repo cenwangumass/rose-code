@@ -499,6 +499,7 @@ pub(crate) fn ref_sort<T: Copy>(a: &mut [f64], idx: &mut [T]) {
         }
         shell(a, idx, lo, hi);
     }
+
     fn shell<T: Copy>(a: &mut [f64], idx: &mut [T], lo: usize, hi: usize) {
         let mut gap = (hi - lo) / 2;
         while gap > 0 {

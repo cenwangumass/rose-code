@@ -1,5 +1,6 @@
 //! `crash_dump model.mps`: prints the crash basis as the reference's status array (basis position, -1 lower, -2 upper) on one line.
 use rose::{crash_basis, mps};
+
 fn main() {
     let a: Vec<String> = std::env::args().collect();
     let model = mps::parse(&std::fs::read_to_string(&a[1]).unwrap()).unwrap();

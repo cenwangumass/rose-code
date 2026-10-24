@@ -13,6 +13,7 @@ pub const FAC: f64 = 1.3;
 fn emit(rec: serde_json::Value) {
     crate::dump::emit("work", rec);
 }
+
 use serde_json::json;
 
 pub struct Work {

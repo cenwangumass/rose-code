@@ -45,6 +45,7 @@ impl Pattern {
     pub fn nnz(&self) -> usize {
         self.colptr[self.n]
     }
+
     fn adj(&self, i: usize) -> &[usize] {
         &self.rowind[self.colptr[i]..self.colptr[i + 1]]
     }
@@ -233,6 +234,7 @@ impl Heap {
             pos: vec![-1; n],
         }
     }
+
     fn clear(&mut self) {
         for &it in &self.h {
             self.pos[it] = -1;
@@ -240,18 +242,22 @@ impl Heap {
         self.h.clear();
         self.k.clear();
     }
+
     fn top(&self) -> i64 {
         self.h.first().map_or(-1, |&v| v as i64)
     }
+
     fn contains(&self, it: usize) -> bool {
         self.pos[it] >= 0
     }
+
     fn swap(&mut self, a: usize, b: usize) {
         self.h.swap(a, b);
         self.k.swap(a, b);
         self.pos[self.h[a]] = a as i64;
         self.pos[self.h[b]] = b as i64;
     }
+
     fn up(&mut self, mut p: usize) {
         while p > 0 {
             let q = (p - 1) / 2;
@@ -262,6 +268,7 @@ impl Heap {
             p = q;
         }
     }
+
     fn down(&mut self, mut p: usize) {
         let n = self.h.len();
         while 2 * p + 1 < n {
@@ -276,12 +283,14 @@ impl Heap {
             p = c;
         }
     }
+
     fn insert(&mut self, it: usize, key: i64) {
         self.h.push(it);
         self.k.push(key);
         self.pos[it] = self.h.len() as i64 - 1;
         self.up(self.h.len() - 1);
     }
+
     fn remove(&mut self, it: usize) {
         let p = self.pos[it];
         if p < 0 {
@@ -306,11 +315,13 @@ impl Heap {
             self.down(p);
         }
     }
+
     fn pop(&mut self) -> usize {
         let it = self.h[0];
         self.remove(it);
         it
     }
+
     fn update(&mut self, it: usize, key: i64) {
         let p = self.pos[it] as usize;
         self.k[p] = key;
@@ -795,6 +806,7 @@ pub fn order(p: &Pattern, levels: &[i64]) -> Result<OrderResult, StructError> {
             head[d] = v as i64;
         }};
     }
+
     macro_rules! unlink {
         ($v:expr) => {{
             let v = $v as usize;
