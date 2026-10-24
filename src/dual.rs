@@ -2336,9 +2336,60 @@ impl<'a> Dual<'a> {
         }
         if trig && self.pert >= 2 && !(self.pert == 3 && self.pstep >= 0.01) {
             self.perturb();
+        } else if trig && self.pert < 2 {
+            if self.obj_scale >= 1.0 {
+                self.rescale_objective();
+            }
+            self.perturb();
         }
         self.stall_snap = self.stall;
         self.stall_it = self.iters as f64;
+    }
+
+    /// The objective rescale of the stall trigger with the perturbation flag below 2 and `ctx+0xd8 >= 1` (`0xe6266..0xe6a88`, then the perturbation): the
+    /// factor is a power of two from the largest `|d|` among the free nonbasic variables, `M` (`ctx+0x388`, the tolerance, is the reference value `a`):
+    /// 128 when `a > 128 M`; else the smallest power of two `x < 128` with `a > M x` (or 128), halved when above 2, else 1 (no rescale). With a factor above 1
+    /// the costs, the reduced costs and the objective scale `ctx+0xd8` are multiplied by it.
+    fn rescale_objective(&mut self) {
+        let a = DUAL_TOL;
+        let mut mx = 0.0f64;
+        for j in 0..self.n + self.m {
+            if self.st[j] == FREE {
+                mx = maxsd(self.d[j].abs(), mx);
+            }
+        }
+        let f = if a > 128.0 * mx {
+            128.0
+        } else {
+            let mut x = 1.0f64;
+            loop {
+                if a > mx * x {
+                    break;
+                }
+                x += x;
+                if !(128.0 > x) {
+                    break;
+                }
+            }
+            if 2.0 < x {
+                x * 0.5
+            } else {
+                1.0
+            }
+        };
+        if f <= 1.0 {
+            return;
+        }
+        for v in self.cost.iter_mut() {
+            *v *= f;
+        }
+        for v in self.pcost.iter_mut() {
+            *v *= f;
+        }
+        for v in self.d.iter_mut() {
+            *v *= f;
+        }
+        self.obj_scale *= f;
     }
 
     /// The cost perturbation (`0xe6af8..0xe6cd7`, `0xe74b1..0xe7585`): every nonbasic variable draws an integer `r` (also those that stay unchanged), and
@@ -2861,7 +2912,10 @@ pub fn solve(
             offset: 0.0,
             ..model.clone()
         };
-        let mut r = solve(&zero, start, opts)?;
+        // No cost perturbation here: the stall trigger would perturb the zero costs and the loop could end unbounded again, without end.
+        let mut zopts = opts.clone();
+        zopts.perturb = 0.0;
+        let mut r = solve(&zero, start, &zopts)?;
         r.iterations += s.iters;
         r.refactorizations += s.refactorizations;
         if r.status == Status::Optimal {
