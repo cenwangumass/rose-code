@@ -1,0 +1,1 @@
+{"version":1,"model":"afiro.mps","profile":"dual-release","reference":"Gurobi 13.0.3, Method=1, library defaults, Presolve=0","refactor_schedule":[5],"no_row_calls":3,"objective":-464.75314285714285,"decisions":[[3,15,[]],[5,4,[]],[7,0,[]],[15,28,[]],[9,12,[]],[25,16,[1]],[22,2,[]],[24,17,[]],[16,1,[]],[11,57,[]]]}

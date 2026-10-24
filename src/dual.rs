@@ -2814,6 +2814,7 @@ pub fn solve(
                         leaving: Some(pv.leave),
                         position: Some(pv.r),
                         step: 0.0,
+                        flips: pv.flips.clone(),
                     });
                 }
                 let due = match &schedule {

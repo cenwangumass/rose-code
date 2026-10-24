@@ -176,6 +176,8 @@ pub struct TraceEvent {
     pub leaving: Option<usize>,
     pub position: Option<usize>,
     pub step: f64,
+    /// Variables flipped between their bounds in the same iteration (dual ratio test); empty for the primal.
+    pub flips: Vec<usize>,
 }
 
 #[derive(Clone, Debug)]
@@ -3930,6 +3932,7 @@ pub fn solve(
                     leaving: None,
                     position: None,
                     step,
+                    flips: Vec::new(),
                 });
             }
             continue;
@@ -4021,6 +4024,7 @@ pub fn solve(
                     leaving: Some(leave),
                     position: Some(r),
                     step,
+                    flips: Vec::new(),
                 });
             }
             continue;
@@ -4402,6 +4406,7 @@ pub fn solve(
                 leaving: Some(leave),
                 position: Some(r),
                 step,
+                flips: Vec::new(),
             });
         }
     };
