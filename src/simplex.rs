@@ -3768,10 +3768,27 @@ pub fn solve(
                     s.work.add(site, est, crate::work::CTX);
                 }
             }
-            if pick.entry.is_some() {
+            let mut step_used = pick.step;
+            if let Some(k) = pick.entry {
                 leave_to_upper = Some(pick.to_upper);
+                // To the upper bound the iteration step moves by the distance of the leaving variable's position, rebuilt in the original
+                // frame, to the bound: `((dist + lo) - up) / alpha` (`(up - dist)` for a variable without lower bound), not the ratio
+                // test's `(dist - range) / alpha`, which differs in the last bits when `lo != 0` (PILOT.JA iterations 1096, 1123,
+                // 1219: the reference's next distances equal `dist - step alpha_i` with this step for every entry).
+                let leave = s.basic[entries[k].0];
+                if let Some(c) = info(entries[k].0).filter(|_| pick.to_upper) {
+                    let bound = p.up[leave];
+                    let xr = if is_inf(p.lo[leave]) {
+                        p.up[leave] - c.0
+                    } else {
+                        c.0 + p.lo[leave]
+                    };
+                    if !is_inf(bound) && entries[k].1 != 0.0 {
+                        step_used = (xr - bound) / entries[k].1;
+                    }
+                }
             }
-            (pick.entry, pick.step, pick.pivot)
+            (pick.entry, step_used, pick.pivot)
         } else {
             let (xs, basic, lo, up) = (&s.x, &s.basic, &p.lo, &p.up);
             // After a perturbation the reference's Harris test (`0xef960`) reads the shifted distance array (`dst`), not `x_B`.
