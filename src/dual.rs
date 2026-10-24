@@ -45,6 +45,24 @@ fn is_inf(v: f64) -> bool {
     v.abs() >= INF
 }
 
+/// The pivot threshold asked for by the accuracy of the x_B recompute (`0xc1880`, `0xc3e42..0xc3ed8`, `0xc18a5`): `m0` = max |x_B| / R and `e2` = max |rhs - B x_B| / R,
+/// R = max(1e-9, max |rhs|). The first rung whose `m0` or `e2` bound is exceeded gives the candidate; the driver keeps the larger of it and `ctx+0x390`.
+fn accuracy_threshold(m0: f64, e2: f64) -> f64 {
+    const RUNGS: [(f64, f64, f64); 5] = [
+        (1e10, 1e-8, 0.5),
+        (1e9, 4e-9, 0.25),
+        (1e8, 1e-9, 0.125),
+        (1e7, 4e-10, 0.0625),
+        (1e6, 1e-10, 0.03125),
+    ];
+    for (a, b, t) in RUNGS {
+        if m0 > a || e2 > b {
+            return t;
+        }
+    }
+    1e-4
+}
+
 fn minsd(a: f64, b: f64) -> f64 {
     if a < b {
         a
@@ -87,6 +105,8 @@ struct Dual<'a> {
     /// Row-wise copy of the nonbasic, non-fixed structurals in the reference's storage order.
     rrows: Vec<Vec<usize>>,
     refactorizations: usize,
+    /// The relative pivot threshold of the LU (`ctx+0x390`, 2^-7 at the start): raised after a recompute of x_B by `accuracy_threshold`, never lowered.
+    lu_thr: f64,
     /// The pricing mode `ctx+0x3ec`: 1 for dual steepest edge, 3 after the switch of `0xf770d` (weights restarted at 1).
     pmode: u8,
     /// The number of infeasible rows at the last value-mode recompute (`P+0x3c`).
@@ -483,6 +503,7 @@ impl<'a> Dual<'a> {
 
     /// Factorize the basis (`0xd4190`): the positions follow the pivot order of the reference's LU; the weights move with their variables.
     fn refactor(&mut self) -> Result<(), SolveError> {
+        crate::lu_order::set_threshold(self.lu_thr);
         let (order, st, rows) = reference_order(self.p, &self.head, self.refactorizations + 1);
         let discard = if self.pivot_cols.is_some() {
             self.mirror.discard_work()
@@ -492,7 +513,7 @@ impl<'a> Dual<'a> {
         if crate::dump::on("luin") {
             crate::dump::emit(
                 "luin",
-                serde_json::json!({"n": self.refactorizations, "cols": self.head, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "phase": st.phase}),
+                serde_json::json!({"n": self.refactorizations, "cols": self.head, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "phase": st.phase, "thr": self.lu_thr}),
             );
         }
         let mut wv = vec![0.0; self.n + self.m];
@@ -620,7 +641,10 @@ impl<'a> Dual<'a> {
     // ------------------------------------------------------------------ basic solution
 
     /// x_B from scratch (`0xc0c29` path of `0xc0050`): FTRAN of `b - N x_N`.
-    fn recompute_xb(&mut self) {
+    ///
+    /// `req` is the refactorization request in force (`ctx+0x294`) when the recompute follows a factorization, 0 otherwise. The accuracy of the solve then
+    /// raises the LU pivot threshold for the next factorizations (`0xc1861`, `accuracy_threshold`).
+    fn recompute_xb(&mut self, req: u32) {
         let p = self.p;
         let mut r = p.rhs.clone();
         for j in 0..p.n + p.m {
@@ -658,6 +682,25 @@ impl<'a> Dual<'a> {
             for &(i, a) in &p.cols[j] {
                 res[i] -= a * xb[pos];
             }
+        }
+        // `0xc10ab..0xc1129`, `0xc1480..0xc1517`: R = max(1e-9, max|rhs|), the largest |x_B| and the residual of B x_B against the rhs, both relative to R;
+        // the residual is read only when the factorization count is 4 mod 5 or the request is 4, 6 or 8 (`0xc1137..0xc11ce`, `0xc165b..0xc1699`).
+        let rmax = r.iter().fold(1e-9f64, |a, v| a.max(v.abs()));
+        let xmax = xb.iter().fold(0.0f64, |a, v| a.max(v.abs()));
+        let e2 = if self.refactorizations % 5 == 4 || matches!(req, 4 | 6 | 8) {
+            res.iter().fold(0.0f64, |a, v| a.max(v.abs())) / rmax
+        } else {
+            0.0
+        };
+        let t = accuracy_threshold(xmax / rmax, e2);
+        if crate::dump::on("dualacc") {
+            crate::dump::emit(
+                "dualacc",
+                serde_json::json!({"n": self.refactorizations, "req": req, "R": rmax, "xmax": xmax, "e2": e2, "cand": t, "thr": self.lu_thr}),
+            );
+        }
+        if t > self.lu_thr {
+            self.lu_thr = t;
         }
         let scale = 1.0 + r.iter().fold(0.0f64, |a, v| a.max(v.abs()));
         if res.iter().all(|v| v.abs() <= 1e-7 * scale) {
@@ -2513,8 +2556,9 @@ impl<'a> Dual<'a> {
             let level_before = self.level;
             self.set_level_work(level_before != 0);
             self.set_level(level_before);
+            let req = self.request;
             self.request = 0;
-            self.recompute_xb();
+            self.recompute_xb(req);
             self.prog_on = self.level == 0;
             self.recompute_flags(level_before != 0, pv.is_some());
             self.flags_work();
@@ -2717,6 +2761,7 @@ pub fn solve(
         factor,
         rrows: vec![Vec::new(); m],
         refactorizations: 1,
+        lu_thr: crate::lu_order::THRESHOLD,
         pmode: if start.is_some() { 3 } else { 1 },
         n_infeas: 0,
         dflag: Vec::new(),
@@ -2859,7 +2904,7 @@ pub fn solve(
         };
     }
     s.stall_check(0);
-    s.recompute_xb();
+    s.recompute_xb(0);
     s.prog_on = s.level == 0;
     s.work.add(0xc391f, m as f64, crate::work::CTX);
     s.recompute_flags(s.warm && s.level != 0, false);
@@ -2914,7 +2959,7 @@ pub fn solve(
                         s.obj_off = 0.0;
                         s.pert = 0;
                         s.refactor()?;
-                        s.recompute_xb();
+                        s.recompute_xb(0);
                     }
                     break;
                 }
@@ -2972,7 +3017,7 @@ pub fn solve(
     }
     if status == Status::IterationLimit && s.level != 0 {
         s.zero_artificial = true;
-        s.recompute_xb();
+        s.recompute_xb(0);
     }
     // Read-out.
     let sgn = if model.sense == Sense::Maximize {

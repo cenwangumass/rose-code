@@ -3,7 +3,8 @@
 
 use std::collections::HashSet;
 
-const THRESHOLD: f64 = 0.0078125;
+/// The relative pivot threshold at the start of a solve (`ctx+0x390` = 2^-7).
+pub const THRESHOLD: f64 = 0.0078125;
 const ABS_TOL: f64 = 1e-13;
 
 /// `cols[pos] = (is_slack, rows, values)` in incoming basis-position order. Returns `(row, pos)` per pivot step.
@@ -430,6 +431,8 @@ thread_local! {
     /// factorizations including the running one.
     static PAIR_GATE: std::cell::Cell<(i64, i64)> = std::cell::Cell::new((0, 0));
     static FAC_NO: std::cell::Cell<i64> = std::cell::Cell::new(1);
+    /// The relative pivot threshold `ctx+0x390` for the next factorization; the dual raises it (`set_threshold`), every solve starts at `THRESHOLD`.
+    static THR: std::cell::Cell<f64> = std::cell::Cell::new(THRESHOLD);
     /// The model's columns and constraint nonzeros, which size the reference's pool (`pool_cap`).
     static POOL_DIMS: std::cell::Cell<(usize, usize)> = std::cell::Cell::new((0, 0));
 }
@@ -443,6 +446,12 @@ pub fn set_pool_dims(n: usize, nnz_a: usize) {
 pub fn reset_pair_gate() {
     PAIR_GATE.with(|c| c.set((0, 0)));
     FAC_NO.with(|c| c.set(1));
+    THR.with(|c| c.set(THRESHOLD));
+}
+
+/// The relative pivot threshold (`ctx+0x390`) the next factorizations use.
+pub fn set_threshold(t: f64) {
+    THR.with(|c| c.set(t));
 }
 
 /// `ctx+0x2c0` while the next factorization runs.
@@ -868,6 +877,7 @@ fn nucleus(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> Nucle
 /// Markowitz search over the count buckets; returns the node of the chosen pivot (rotating bucket heads as the reference does)
 /// and the search's work factor: the candidates examined times the cost bound of the last bucket.
 fn search(s: &mut Nucleus) -> Option<(usize, f64)> {
+    let thr = THR.with(|c| c.get());
     let first = |b: &Vec<Vec<usize>>| b.iter().position(|v| !v.is_empty());
     let cmin = first(&s.cb);
     let rmin = first(&s.rb);
@@ -934,8 +944,7 @@ fn search(s: &mut Nucleus) -> Option<(usize, f64)> {
                             }) - 1)
                                 * k) as f64;
                             let a = s.nodes[n].v.abs();
-                            if (cost < bcost && a > THRESHOLD * mx)
-                                || (cost == bcost && a > bratio * mx)
+                            if (cost < bcost && a > thr * mx) || (cost == bcost && a > bratio * mx)
                             {
                                 bcost = cost;
                                 bratio = a / mx;

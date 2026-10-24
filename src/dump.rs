@@ -8,6 +8,7 @@ use std::sync::OnceLock;
 /// Dump kinds, their line tags and what they record.
 pub const KINDS: &[(&str, &str, &str)] = &[
     ("status", "STATUS", "once per solve, written by `examples/trace_dump` whatever ROSE_DUMP selects: final status, iterations, objective"),
+    ("dualacc", "DACC", "dual: each x_B recompute (`0xc1861`): factorization count, request, R = max(1e-9, max|rhs|), max|x_B|, residual e2 (0 when not read), the threshold candidate and `ctx+0x390` before it"),
     ("header", "PHDR", "once per solve: n, m and the fixed variables (lo == up)"),
     ("pricing", "PLIST", "each pricing call: call index, candidate list, d, w, basic set and x"),
     ("scale", "SCALE", "once per solve: the scale factors, columns (structurals, then range columns) and rows"),
