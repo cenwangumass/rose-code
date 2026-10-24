@@ -126,6 +126,9 @@ struct Dual<'a> {
     /// Rebuilds of the walk list left (`P+0x38`).
     rebuilds: i64,
     first_recompute: bool,
+    /// A supplied start basis: the reference runs it in the pricing mode 3 (`ctx+0x3ec`, `ctx+0x298` = 2) with unit weights, and the first
+    /// recompute starts the value mode (`ctx+0x3fc` = -1).
+    warm: bool,
     /// Running average of the number of rows touched per iteration.
     avg_touch: f64,
     /// Entry count of the last pivot column (`*(ctx+0x210)`).
@@ -606,7 +609,7 @@ impl<'a> Dual<'a> {
             r.clear();
         }
         for j in 0..self.n {
-            if self.st[j] < 0 && self.p.lo[j] != self.p.up[j] {
+            if self.st[j] < 0 && self.st[j] != FIXED && self.p.lo[j] != self.p.up[j] {
                 for &(i, _) in &self.p.cols[j] {
                     self.rrows[i].push(j);
                 }
@@ -950,12 +953,15 @@ impl<'a> Dual<'a> {
         }
         if self.first_recompute {
             self.first_recompute = false;
-            self.build_walk_list();
-            return;
+            if !self.warm {
+                self.build_walk_list();
+                return;
+            }
         }
         // The mode switch (`0xc0c29`): the value mode starts when 15 times the average of the changed-row counts exceeds m, or when the iteration
         // count does; until then the walk list is rebuilt.
         if !self.value_mode
+            && !self.warm
             && !(15.0 * self.avg_touch > self.m as f64 || self.iters as f64 > self.m as f64)
         {
             self.build_walk_list();
@@ -2669,13 +2675,16 @@ pub fn solve(
 ) -> Result<SolveResult, SolveError> {
     let p = build(model);
     let (n, m) = (p.n, p.m);
+    let mut dropped = None;
+    let mut supplied = None;
     let basis = match start {
         Some(b) => {
             let mut b = b.clone();
             b.validate(n, m).map_err(SolveError::InvalidBasis)?;
             b.basic.sort_unstable();
+            supplied = Some(b.basic.clone());
             // A singular basis loses the columns that get no pivot in the reference's LU order and takes the slacks of the uncovered rows instead.
-            crate::simplex::repair_basis(&p, &mut b);
+            dropped = crate::simplex::repair_basis(&p, &mut b).map(|(j, _)| j);
             b
         }
         None => Basis {
@@ -2708,7 +2717,7 @@ pub fn solve(
         factor,
         rrows: vec![Vec::new(); m],
         refactorizations: 1,
-        pmode: 1,
+        pmode: if start.is_some() { 3 } else { 1 },
         n_infeas: 0,
         dflag: Vec::new(),
         switch_enabled: opts.perturb > 0.0,
@@ -2731,6 +2740,7 @@ pub fn solve(
         cap,
         rebuilds: 40,
         first_recompute: true,
+        warm: start.is_some(),
         avg_touch: 0.0,
         last_cap: 0,
         updates: 0,
@@ -2745,7 +2755,7 @@ pub fn solve(
         rng: 101,
         pert: 0,
         obj_off: 0.0,
-        flip_select: false,
+        flip_select: start.is_some(),
         work: crate::work::Work::dual(),
         pivot_cols: None,
         nnz_a: p.cols[..n].iter().map(Vec::len).sum(),
@@ -2773,6 +2783,11 @@ pub fn solve(
         } else {
             LB
         };
+    }
+    if let Some(j) = dropped {
+        // The variable the singular start basis lost stays out of the dual (status -4 like a fixed one, at its lower bound, d = its cost); the primal
+        // pass after the dual optimum brings it back (`0x155139`).
+        s.st[j] = FIXED;
     }
     s.init_pricing_type();
     s.work.decided(s.work.w);
@@ -2824,8 +2839,16 @@ pub fn solve(
     }
     s.slack_nb = (0..m).map(|i| s.st[n + i] < 0).collect();
     s.level = (0..n + m).filter(|&j| s.at_artificial(j)).count();
-    // Initial weights: the squared norms of the rows of B^-1.
-    for r in 0..m {
+    if let Some(sup) = &supplied {
+        // The flags of the pricing mode 3 follow the supplied basis, before the repair of a singular one (a slack that replaced a dropped column is flagged
+        // nonbasic, the dropped column basic).
+        s.dflag = vec![true; n + m];
+        for &j in sup {
+            s.dflag[j] = false;
+        }
+    }
+    // Initial weights: the squared norms of the rows of B^-1 (a supplied basis starts with unit weights).
+    for r in 0..if s.warm { 0 } else { m } {
         let out = s.mirror.btran(&[(r, 1.0)], false, false);
         s.work
             .add_from(0x12de50, 0xc36f1, s.mirror.work, crate::work::FAC);
@@ -2839,7 +2862,7 @@ pub fn solve(
     s.recompute_xb();
     s.prog_on = s.level == 0;
     s.work.add(0xc391f, m as f64, crate::work::CTX);
-    s.recompute_flags(false, false);
+    s.recompute_flags(s.warm && s.level != 0, false);
     s.flags_work();
     let schedule = opts.refactor_schedule.clone();
     let mut trace = Vec::new();
@@ -2903,6 +2926,19 @@ pub fn solve(
                 break;
             }
         }
+    }
+    if status == Status::Optimal && dropped.is_some() {
+        // The primal pass of the reference after the dual optimum: the dropped variable is priced again (a bound flip or a pivot, each one an iteration).
+        let mut popts = opts.clone();
+        popts.method = crate::simplex::Method::Primal;
+        let b = Basis {
+            basic: s.head.clone(),
+            at_upper: s.st.iter().map(|&t| t == UB).collect(),
+        };
+        let mut r = crate::simplex::solve(model, Some(&b), &popts)?;
+        r.iterations += s.iters;
+        r.refactorizations += s.refactorizations;
+        return Ok(r);
     }
     if status == Status::Unbounded {
         // The dual is infeasible (a nonbasic variable stayed at an artificial bound, or a free one has a nonzero d). That proves the primal unbounded only
