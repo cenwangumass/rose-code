@@ -3798,22 +3798,18 @@ pub fn solve(
                 let j = basic[pos];
                 if is_inf(lo[j]) {
                     INF
-                } else if perturbed {
-                    dst[j]
                 } else {
-                    xs[j] - lo[j]
+                    dst[j]
                 }
             };
             let upd = |pos: usize| {
                 let j = basic[pos];
                 if is_inf(up[j]) {
                     INF
+                } else if !is_inf(lo[j]) {
+                    (up[j] - lo[j]) - dst[j]
                 } else if perturbed {
-                    if is_inf(lo[j]) {
-                        dst[j]
-                    } else {
-                        (up[j] - lo[j]) - dst[j]
-                    }
+                    dst[j]
                 } else {
                     up[j] - xs[j]
                 }
@@ -3822,12 +3818,10 @@ pub fn solve(
                 let dist: Vec<f64> = (0..m)
                     .map(|pos| {
                         let j = basic[pos];
-                        if perturbed {
+                        if perturbed || !is_inf(lo[j]) {
                             dst[j]
-                        } else if is_inf(lo[j]) {
-                            xs[j]
                         } else {
-                            xs[j] - lo[j]
+                            xs[j]
                         }
                     })
                     .collect();
@@ -3885,6 +3879,16 @@ pub fn solve(
                         (0xefb7d, (4 * entries.len() + 3 * stored) as f64)
                     };
                     s.work.add(site, est, crate::work::CTX);
+                }
+            }
+            let mut res = res;
+            if let Some(k) = res.0 {
+                // To the upper bound the step is the distance of the position rebuilt in the original frame, `((dist + lo) - up) / alpha`,
+                // as in phase 1 (PILOT.JA phase 2 ratio call 17).
+                let (pos, a) = entries[k];
+                let j = basic[pos];
+                if a < 0.0 && !is_inf(lo[j]) && !is_inf(up[j]) {
+                    res.1 = ((dst[j] + lo[j]) - up[j]) / a;
                 }
             }
             res
@@ -3953,6 +3957,10 @@ pub fn solve(
         s.x[q] += dir * move_step;
         s.dst[q] = if is_inf(p.lo[q]) {
             dq_base - dir * move_step
+        } else if dir < 0.0 {
+            // An entering variable that leaves its upper bound has its distance rebuilt from the moved value (PILOT.JA
+            // iteration 1187: (3.5 - step) - 2.0, not 1.5 - step).
+            s.dist_of(q, s.x[q])
         } else {
             dq_base + dir * move_step
         };
@@ -4276,7 +4284,9 @@ pub fn solve(
                 let ratio = arj / alpha_rq;
                 let vj = dot_lanes(&p.fcols[j], &u, col_off[j] & 1);
                 s.w[j] = ratio * ((wq * ratio - vj) - vj) + s.w[j];
-                if opts.faithful_weights && s.w[j] < NORM_RESET_TOL {
+                // A fixed structural never resets the framework (PILOT.JA iteration 3856: the fixed EMROP06 went to -3e4); a fixed
+                // slack does (PEROLD iteration 1626, PILOTNOV iteration 1026).
+                if opts.faithful_weights && s.w[j] < NORM_RESET_TOL && !(j < n && s.is_fixed(j)) {
                     norm_reset = true;
                 }
                 let floor = if opts.faithful_weights { W_MIN } else { 1.0 };
