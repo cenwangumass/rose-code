@@ -368,11 +368,15 @@ pub fn crash_basis(model: &LpModel) -> Basis {
             used[r] = true;
             eligible[j] = false;
         };
-    for j in 0..n {
-        if eligible[j] && p.cols[j].len() == 1 && is_inf(p.up[j]) {
-            let r = p.cols[j][0].0;
-            if !used[r] {
-                assign(&mut b, &mut used, &mut eligible, j, r);
+    // Singleton columns take their row in two sweeps over the columns: first those that start at a value inside their bounds
+    // (`rhs / a >= lo`; D2Q06C: of `-x1 = 6` and `x2 = 6` the second takes the row), then the rest (PILOT4 takes `x = -2.171`).
+    for sweep in 0..2 {
+        for j in 0..n {
+            if eligible[j] && p.cols[j].len() == 1 && is_inf(p.up[j]) {
+                let (r, a) = p.cols[j][0];
+                if !used[r] && (sweep == 1 || p.rhs[r] / a >= p.lo[j]) {
+                    assign(&mut b, &mut used, &mut eligible, j, r);
+                }
             }
         }
     }
