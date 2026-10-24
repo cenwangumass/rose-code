@@ -3538,7 +3538,7 @@ pub fn solve_release(model: &LpModel, o: &Options) -> Result<Solution, BarrierEr
 
 /// `Method::Barrier` of [`crate::solve`]: [`solve_exact`] with the options mapped (`barrier_tol`, `max_iterations`), the result in the public types.
 /// Status: optimal, the iteration limit (API 7), unbounded (code 5, API 5) and infeasible (code 3, never observed); infeasible-or-unbounded (code 0xd, API 12)
-/// and the other codes (6, 0xb) are reported as `NumericalFailure` (no certificate is produced).
+/// and the other codes (6, 0xb, 13) are reported as `NumericalFailure` (no certificate is produced); code 13 keeps the saved best iterate, the others have a NaN objective.
 pub fn solve_method(
     model: &LpModel,
     opts: &crate::SolveOptions,
@@ -3565,9 +3565,14 @@ pub fn solve_method(
         BarrierStatus::Other(3) => Status::Infeasible,
         BarrierStatus::Other(_) => Status::NumericalFailure,
     };
+    // Code 13 (stalled, GREENBEA release) returns the saved best iterate like the reference; the other failure codes have no point (NaN objective).
+    let objective = match sol.run.status {
+        BarrierStatus::Other(c) if !matches!(c, 3 | 5 | 13) => f64::NAN,
+        _ => sol.objective,
+    };
     Ok(crate::SolveResult {
         status,
-        objective: sol.objective,
+        objective,
         x: sol.x[..model.num_cols()].to_vec(),
         dual: sol.y,
         reduced_cost: sol.rc[..model.num_cols()].to_vec(),
