@@ -1879,7 +1879,7 @@ impl<'a> Dual<'a> {
             *dump = rec;
             let mut y = vec![0.0; m];
             for &(i, v) in &rho_full {
-                y[i] = v;
+                y[i] = if above { -v } else { v };
             }
             // Roundoff in a row with an infinite bound would void the certificate: entries at noise level are dropped.
             let big = y.iter().fold(0.0f64, |a, v| a.max(v.abs()));
