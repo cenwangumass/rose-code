@@ -4266,6 +4266,11 @@ pub fn solve(
                     if !s.is_fixed(j) {
                         s.d[j] -= theta_d * arj;
                     }
+                    // Mode 2 gives the basic slack's noise product the weight update too, which puts it into the reference framework
+                    // (`w > 0`), GREENBEA iteration 6094: a product below the update tolerance leaves `w = 1`.
+                    if m2 {
+                        s.w[j] = s.w[j].max(((wq / alpha_rq) / alpha_rq) * arj * arj + 1.0);
+                    }
                     // The reference keeps a basic slack's rounding-noise row product in the pivot row like any entry.
                     changed.push(j);
                     rowvals.push((j, arj));
@@ -4459,7 +4464,11 @@ pub fn solve(
             s.sw.ratio_sum = 0.0;
             s.sw.ratio_cnt = 1;
         }
-        if (norm_reset && opts.faithful_weights) || m2_reset {
+        if m2_reset {
+            // Mode 2's restart empties the list (count 0, level kept) and skips the list update (`0x108ade`).
+            s.reset_weights();
+            s.list.clear();
+        } else if norm_reset && opts.faithful_weights {
             // The reset sets the weights; the candidate list keeps its entries and level and takes the normal update.
             s.reset_weights();
             s.update_list(&changed, 1, 0x1442ab);
