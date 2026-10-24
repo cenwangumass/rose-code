@@ -645,11 +645,120 @@ fn dgemm_t_n(
 const TRSM_LL0_MIN: usize = 13; // m >= 13 and m % 12 != 4 use dtrsm_kernel_ll_0
 const TRSM_LL0_BLOCK: usize = 12;
 
+/// DTRSM with a single right-hand-side column (`n == 1`) is routed by `mkl_blas_dtrsm` to `mkl_blas_avx2_dtrsv_utu` (0x1ced5b0, incx = 1):
+/// rows in pairs `(p, p+1)` (a last odd row alone). For a row with `p` solved terms: `p >= 16`: blocks of 16 terms; the single row has four
+/// ymm accumulators (fused, block `s` of four terms into accumulator `s`, lane 0 starts at b), a pair has two for row `p` (fused, blocks 0, 2 and
+/// 1, 3) and one for row `p+1` (rounded products, subtracted in order); then the remaining quads (rounded products, one accumulator, lane 0 starts
+/// at the value), lanes summed `(l0 + l2) + (l1 + l3)`, then the remaining terms one by one with rounded products. Row `p+1` of a pair finally
+/// takes the term of row `p` fused.
+fn dtrsv_utu_block(l: &[f64], w: usize, b: &[f64]) -> Vec<f64> {
+    let mut x = b.to_vec();
+    let lanes_sum = |a: [f64; 4]| (a[0] + a[2]) + (a[1] + a[3]);
+    // value of row `i` over the terms j < p (row `r` of the pair, `r = i` itself), `single`: the 4-accumulator form
+    let reduce = |x: &[f64], i: usize, p: usize, b0: f64, mode: u8| -> f64 {
+        // mode 0: single row, 1: first row of a pair, 2: second row of a pair
+        let mut v = b0;
+        let mut j0 = 0;
+        if p >= 16 {
+            let nb = p / 16;
+            let mut acc = [[0.0f64; 4]; 4];
+            acc[0][0] = b0;
+            if mode == 2 {
+                for c in 0..nb {
+                    for s in 0..4 {
+                        for k in 0..4 {
+                            let j = 16 * c + 4 * s + k;
+                            acc[0][k] = acc[0][k] - l[i * w + j] * x[j];
+                        }
+                    }
+                }
+                v = lanes_sum(acc[0]);
+            } else {
+                for c in 0..nb {
+                    for s in 0..4 {
+                        let a = if mode == 0 { s } else { s % 2 };
+                        for k in 0..4 {
+                            let j = 16 * c + 4 * s + k;
+                            acc[a][k] = fma(-l[i * w + j], x[j], acc[a][k]);
+                        }
+                    }
+                }
+                v = if mode == 0 {
+                    let t: Vec<f64> = (0..4)
+                        .map(|k| (acc[0][k] + acc[1][k]) + (acc[2][k] + acc[3][k]))
+                        .collect();
+                    (t[0] + t[2]) + (t[1] + t[3])
+                } else {
+                    let t: Vec<f64> = (0..4).map(|k| acc[0][k] + acc[1][k]).collect();
+                    (t[0] + t[2]) + (t[1] + t[3])
+                };
+            }
+            j0 = 16 * nb;
+        }
+        let nq = (p - j0) / 4;
+        if nq != 0 {
+            let mut lanes = [v, 0.0, 0.0, 0.0];
+            for c in 0..nq {
+                for k in 0..4 {
+                    let j = j0 + 4 * c + k;
+                    lanes[k] = lanes[k] - l[i * w + j] * x[j];
+                }
+            }
+            v = lanes_sum(lanes);
+            j0 += 4 * nq;
+        }
+        for j in j0..p {
+            v = v - l[i * w + j] * x[j];
+        }
+        v
+    };
+    let mut p = 0;
+    while p + 1 < w {
+        let (v0, v1) = if p > 0 {
+            (reduce(&x, p, p, x[p], 1), reduce(&x, p + 1, p, x[p + 1], 2))
+        } else {
+            (x[p], x[p + 1])
+        };
+        x[p] = v0;
+        x[p + 1] = fma(-v0, l[(p + 1) * w + p], v1);
+        p += 2;
+    }
+    if p < w && p > 0 {
+        x[p] = reduce(&x, p, p, x[p], 0);
+    }
+    x
+}
+
+/// `mkl_blas_avx2_xdtrsv` ('U', 'T', 'U') cuts the rows into blocks of 32: block `k >= 1` first takes `y = y - A[0..32k, block]' x[0..32k]`
+/// (`mkl_blas_dgemv`, `dgemv_t`), then the block's own triangle is solved by `dtrsv_utu_block`.
+fn dtrsv_utu_unit(l: &[f64], w: usize, b: &[f64]) -> Vec<f64> {
+    let mut x = b.to_vec();
+    let mut r0 = 0;
+    while r0 < w {
+        let s = (w - r0).min(32);
+        if r0 > 0 {
+            let (done, rest) = x.split_at_mut(r0);
+            dgemv_t(&l[r0 * w..], w, r0, s, done, -1.0, &mut rest[..s], 1);
+        }
+        let sub: Vec<f64> = (0..s)
+            .flat_map(|i| (0..s).map(move |j| (i, j)))
+            .map(|(i, j)| l[(r0 + i) * w + r0 + j])
+            .collect();
+        let blk = dtrsv_utu_block(&sub, s, &x[r0..r0 + s]);
+        x[r0..r0 + s].copy_from_slice(&blk);
+        r0 += s;
+    }
+    x
+}
+
 /// DTRSM('L','U','T','U') on right-hand-side column `col` of `n` (B has ldb = w), `A = L` the unit lower triangle of the row-major `w x w` block:
 /// the solution column `L^-1 b`. `w >= 13` and `w % 12 != 4`: `dtrsm_kernel_ll_0` (rows 0..11 an fnma chain from b; then tiles of 12, 4, 2, 1 rows
 /// whose update from all solved rows is an fma accumulator from 0 (structure per tile and column kernel), `x_i = b_i + u_i`, then the in-tile chain).
 /// Smaller `w`: `mkl_blas_avx2_dtrsm_left` (`dtrsm_left_ker`, see the three branches).
 fn dtrsm_llu_col(l: &[f64], w: usize, b: &[f64], col: usize, n: usize) -> Vec<f64> {
+    if n == 1 {
+        return dtrsv_utu_unit(l, w, b);
+    }
     let mut x = b.to_vec();
     if w >= TRSM_LL0_MIN && w % 12 != 4 {
         let ck = col_kernel(n, col);
@@ -1907,12 +2016,39 @@ mod tests {
     }
 
     #[test]
+    fn dtrsm_single_column_matches_the_reference_dtrsv() {
+        // Reference outputs of DTRSM with n = 1 (probe in the live library): blocks of 32 rows, pairs of rows, 16-term fused blocks.
+        let v: Value =
+            serde_json::from_str(include_str!("../tests/fixtures/dtrsv-probe.json")).unwrap();
+        for c in v["cases"].as_array().unwrap() {
+            let w = c["w"].as_u64().unwrap() as usize;
+            assert_bits(
+                &format!("dtrsv w {w}"),
+                &floats(&c["x"]),
+                &dtrsm_llu_col(&floats(&c["L"]), w, &floats(&c["b"]), 0, 1),
+            );
+        }
+        // E226 factor 2, supernode 181 (m 2, n 1): the last row term is fused.
+        let f = f64::from_bits;
+        let l = [1.0, 0.0, f(0xbfe92d2a474b121c), 1.0];
+        let b = [f(0xbfdb6170a82dfb5e), f(0x3fdb6170a82dfb5e)];
+        assert_bits(
+            "dtrsv e226",
+            &[f(0xbfdb6170a82dfb5e), f(0x3fb75aadc5e50f0b)],
+            &dtrsm_llu_col(&l, 2, &b, 0, 1),
+        );
+    }
+
+    #[test]
     fn dtrsm_kernels_match_the_model() {
         for t in fixture()["trsm"].as_array().unwrap() {
             let (w, n) = (
                 t["w"].as_u64().unwrap() as usize,
                 t["n"].as_u64().unwrap() as usize,
             );
+            if n == 1 && w > 1 {
+                continue; // the fixture's model has no dtrsv path; see dtrsm_single_column_matches_the_reference_dtrsv
+            }
             let l = floats(&t["L"]);
             for c in t["cols"].as_array().unwrap() {
                 let col = c["col"].as_u64().unwrap() as usize;
