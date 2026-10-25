@@ -236,6 +236,7 @@ impl RefStruct {
         let mut xv = vec![0.0f64; m];
         let mut cnt = vec![0i32; m];
         let mut epos = vec![usize::MAX; m];
+        let mut changed = vec![false; m];
         for t in i21..m {
             let c = st.pivots[t].1;
             let (_, idx, val) = &cols[c];
@@ -324,6 +325,7 @@ impl RefStruct {
                         continue;
                     }
                     xv[y] -= upd;
+                    changed[y] = true;
                     // A sum that cancels to the tolerance leaves the pattern, as an eliminated entry does (PILOT.JA factor 52,
                     // column 931: -3.2e-14 left by a cancellation plus a later 8.4e-14 must not become an entry of -1.2e-13).
                     if xv[y].abs() <= TOL {
@@ -336,7 +338,7 @@ impl RefStruct {
             touched.sort_unstable();
             touched.dedup();
             for &v in &touched {
-                if v < t && xv[v].abs() > TOL {
+                if v < t && (xv[v].abs() > TOL || (!changed[v] && xv[v] != 0.0 && kind[v] >= 0)) {
                     ents.push((v, xv[v]));
                 }
             }
@@ -356,11 +358,15 @@ impl RefStruct {
             for e in &ents {
                 epos[e.0] = usize::MAX;
             }
-            // The reference's tail columns hold no residues below the tolerance.
-            ents.retain(|e| e.1.abs() > TOL);
+            // The reference's tail columns hold no residues below the tolerance. An entry copied from the matrix and never updated by the L solve is kept
+            // at any size when its row is a nucleus position (fx_e2_r25: a scaled 2^-44 in row 0 enters the x_B row dot); in a tail row it is dropped.
+            ents.retain(|e| e.1.abs() > TOL || (!changed[e.0] && kind[e.0] >= 0));
             for &v in &lst {
                 xv[v] = 0.0;
                 cnt[v] = 0;
+            }
+            for &v in &touched {
+                changed[v] = false;
             }
             for &v in &touched {
                 xv[v] = 0.0;
@@ -882,8 +888,9 @@ impl RefStruct {
         });
         // The U stage `0x123690` solves the tail in one of three loops: the heap walk and the sparse-row loop zero a quotient of at most the tolerance, the dense
         // slot loop (`0x12403b`: `m <= h33^2 c` or `5 h33^2 t > m - i21`, see `tau_u_work`) stores the quotient and only skips its scatter (FIT2P call 14
-        // keeps a tail value of 4e-16 that enters the row dots of the nucleus positions). A dense input (`tau_dense`) zeroes it (FIT2P call 49).
-        let keep_tiny = !tau_dense && self.tau_u_dense(&spike);
+        // keeps a tail value of 4e-16 that enters the row dots of the nucleus positions). A dense input (`tau_dense`) zeroes it (FIT2P call 49), and so does the
+        // joint dense loop (`joint_dense`, fx_e2_r25 call 6: a tail quotient of -1.8e-14 is 0 in the reference).
+        let keep_tiny = !tau_dense && !joint_dense && self.tau_u_dense(&spike);
         for &c in &tail {
             tau_raw[c] = x[c].abs() > TOL;
             let xc = x[c] / self.diag[c];
