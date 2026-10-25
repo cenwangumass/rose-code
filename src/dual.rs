@@ -3797,6 +3797,8 @@ fn solve_pass(
             at_upper: (0..n + m).map(|j| s.st[j] == UB && p.up[j] < BIG).collect(),
         };
         let prres = crate::simplex::solve(model, Some(&from_dual), &popts).ok();
+        // The primal's unit step of the entering variable belongs to its own ray only, not to the dual's artificial-bound point.
+        let prres_enter = crate::simplex::RAY_ENTER.with(|c| c.take());
         if s.art_exit
             && !prres
                 .as_ref()
@@ -3883,6 +3885,7 @@ fn solve_pass(
             if r.ray.is_none() {
                 // The ray of the artificial-bound point did not verify; the primal run from the dual's basis may have found one.
                 r.ray = prres.as_ref().and_then(|pr| pr.ray.clone());
+                crate::simplex::RAY_ENTER.with(|c| c.set(prres_enter.filter(|_| r.ray.is_some())));
             }
             if r.ray.is_none() {
                 // The primal simplex from the slack basis may still find one.
