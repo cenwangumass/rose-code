@@ -204,6 +204,11 @@ struct Dual<'a> {
     /// `ctx+0x3fc` (-1 once set): the second selection among the bound flips of the ratio test. Set at a refactorization (`0xe6dcc`) when the
     /// perturbation flag is 3 or more or 3 iterations exceed the row count (`ctx+0x178`, which also sets it, is 0 in every capture).
     flip_select: bool,
+    /// The dual ended infeasible because of a free nonbasic variable with a nonzero d (not an artificial bound).
+    unb_free: bool,
+    setup_unbounded: bool,
+    /// A confirming refactorization (request 4) was made by the no-row handler: the reference hands an infeasible dual that was confirmed to the primal.
+    confirmed: bool,
     /// The reference's work counter (`ctx+0x118`); in the dual path every estimate is on the scale 1.3.
     work: crate::work::Work,
     /// Entry count of the pivot column when the pending factorization follows a pivot (its weight update and spike discard are booked then).
@@ -235,7 +240,7 @@ struct Dual<'a> {
 /// 2. (`0xeb5c0`) among the columns of the row that are not basic, have no cost left, at most five entries and a coefficient of at least 1e-6, the one with
 ///    the fewest entries (ties: the larger coefficient, then the first); every row of the chosen column is marked.
 /// Position `r` of `basic` holds the column of row `r` (the slack otherwise).
-pub(crate) fn dual_crash_basic(p: &Internal) -> Vec<usize> {
+pub(crate) fn dual_crash_basic(p: &Internal) -> (Vec<usize>, Vec<bool>) {
     let (n, m) = (p.n, p.m);
     let mut basic: Vec<usize> = (n..n + m).collect();
     let is_eq: Vec<bool> = (0..m).map(|i| p.up[n + i] - p.lo[n + i] <= 0.0).collect();
@@ -339,8 +344,8 @@ pub(crate) fn dual_crash_basic(p: &Internal) -> Vec<usize> {
             }
         }
     }
-    crash_pass3(p, &mut basic, &mut cost, &taken, &is_eq, &row_cols);
-    basic
+    let upper = crash_pass3(p, &mut basic, &mut cost, &taken, &is_eq, &row_cols);
+    (basic, upper)
 }
 
 /// Pass 3 of the start basis (`0xeb7ee..0xeba97`, assignment `0xeb9db`; `replay/gdb_dual_crash3.py`): every row that is not an equality and still has its slack
@@ -358,17 +363,17 @@ fn crash_pass3(
     taken: &[bool],
     is_eq: &[bool],
     row_cols: &[Vec<(usize, f64)>],
-) {
+) -> Vec<bool> {
     let (n, m) = (p.n, p.m);
     // -4 fixed, -1 at lower, -2 at upper, >= 0 basic in that row.
     let mut st: Vec<i64> = (0..n + m)
         .map(|j| {
             if p.up[j] - p.lo[j] <= 0.0 {
                 -4
-            } else if p.cost[j] >= 1e-6 {
-                -1
-            } else {
+            } else if p.cost[j] < 0.0 {
                 -2
+            } else {
+                -1
             }
         })
         .collect();
@@ -461,6 +466,10 @@ fn crash_pass3(
         st[basic[r]] = -1;
         basic[r] = c;
     }
+    if crate::dump::on("dcr") {
+        crate::dump::emit("dcr", serde_json::json!({"crash_st": st}));
+    }
+    st.iter().map(|&v| v == -2).collect()
 }
 
 /// The reference's pivot order of the basis columns (`lu_order`), as in the primal path.
@@ -676,48 +685,102 @@ impl<'a> Dual<'a> {
     /// ascending index, is pivoted into the basis. Its column is transformed; among the rows whose basic variable has a finite lower bound the entry of
     /// largest magnitude wins (first in the result's order on ties; below `PIVOT_FLOOR` the variable is deferred, unexercised). The leaving variable
     /// goes to its lower bound (fixed when the range is zero). The factor is updated, or refactorized when the work-based trigger is due.
-    fn free_pivots(&mut self) -> Result<(), SolveError> {
-        let (n, m) = (self.n, self.m);
+    fn free_pivots(&mut self) -> Result<bool, SolveError> {
+        let n = self.n;
         let free: Vec<usize> = (0..n).filter(|&j| self.st[j] == FREE).collect();
+        let mut deferred = Vec::new();
+        let skip = NO_DEFERRED.with(|c| c.get());
         for j in free {
-            let rows_q: Vec<usize> = self.p.fcols[j].iter().map(|&(i, _)| i).collect();
-            let vals_q: Vec<f64> = self.p.fcols[j].iter().map(|&(_, a)| a).collect();
-            let mut col_out = self.mirror.ftran(&rows_q, &vals_q);
-            if self.mirror.last_dense() {
-                col_out.sort_by_key(|e| e.0);
+            match self.free_candidate(j, PIVOT_FLOOR) {
+                Some((r, alpha)) => self.pivot_free(j, r, alpha)?,
+                None => deferred.push(j),
             }
-            let mut best: Option<(usize, f64)> = None;
-            let mut mx = 0.0f64;
-            for &(pos, v) in &col_out {
-                if self.p.lo[self.head[pos]] > -BIG && v.abs() > mx {
-                    mx = v.abs();
-                    best = Some((pos, v));
+        }
+        if deferred.is_empty() || skip {
+            return Ok(false);
+        }
+        // Second pass (`0xe8fc6..0xe98e1`): request 10, a refactorization; then for each deferred variable in turn the reduced cost `d = c - y a` with
+        // `y = B^-T c_B` (recomputed after every pivot of this pass). Within `DUAL_TOL` the variable stays free and nonbasic; beyond it the column is
+        // transformed again and pivoted in on the largest entry among the rows whose basic variable has a finite lower bound (floor `0.01 PIVOT_FLOOR`);
+        // without such an entry the dual is infeasible at once (`0xea0b7`: status 5, `ctx+0x2fc` the variable), before any iteration. `s70`, `s143`.
+        self.request = 10;
+        self.refactor()?;
+        self.request = 0;
+        let mut k = 0;
+        while k < deferred.len() {
+            let mut y: Vec<f64> = self.head.iter().map(|&v| self.cost[v]).collect();
+            self.factor.btran(&mut y);
+            while k < deferred.len() {
+                let j = deferred[k];
+                k += 1;
+                let mut d = self.cost[j];
+                for &(i, a) in &self.p.fcols[j] {
+                    d -= y[i] * a;
                 }
+                if d.abs() <= DUAL_TOL {
+                    continue;
+                }
+                match self.free_candidate(j, 0.01 * PIVOT_FLOOR) {
+                    Some((r, alpha)) => self.pivot_free(j, r, alpha)?,
+                    None => return Ok(true),
+                }
+                break;
             }
-            let Some((r, _)) = best.filter(|_| mx >= PIVOT_FLOOR) else {
-                continue;
-            };
-            let mut alpha = vec![0.0; m];
-            for &(i, v) in &col_out {
-                alpha[i] = v;
+        }
+        Ok(false)
+    }
+
+    /// The pivot row of a free column: the column is transformed and the entry of largest magnitude among the rows whose basic variable has a finite lower
+    /// bound wins (first in the result's order on ties); `None` below `floor` (or without such a row).
+    fn free_candidate(&mut self, j: usize, floor: f64) -> Option<(usize, Vec<f64>)> {
+        let m = self.m;
+        let rows_q: Vec<usize> = self.p.fcols[j].iter().map(|&(i, _)| i).collect();
+        let vals_q: Vec<f64> = self.p.fcols[j].iter().map(|&(_, a)| a).collect();
+        let mut col_out = self.mirror.ftran(&rows_q, &vals_q);
+        if self.mirror.last_dense() {
+            col_out.sort_by_key(|e| e.0);
+        }
+        let mut best: Option<(usize, f64)> = None;
+        let mut mx = 0.0f64;
+        for &(pos, v) in &col_out {
+            if self.p.lo[self.head[pos]] > -BIG && v.abs() > mx {
+                mx = v.abs();
+                best = Some((pos, v));
             }
-            let leave = self.head[r];
-            self.st[leave] = if self.p.lo[leave] == self.p.up[leave] {
-                FIXED
-            } else {
-                LB
-            };
-            self.st[j] = r as i32;
-            self.head[r] = j;
-            self.iters += 1;
-            if self.mirror.refactor_due() {
-                self.refactor()?;
-            } else {
-                self.factor.update(r, alpha);
-                self.mirror.update(r);
-                self.mirror.upd_work.clear();
-                self.updates += 1;
-            }
+        }
+        let (r, _) = best.filter(|_| mx >= floor)?;
+        let mut alpha = vec![0.0; m];
+        for &(i, v) in &col_out {
+            alpha[i] = v;
+        }
+        Some((r, alpha))
+    }
+
+    /// One pivot of the setup: the free variable `j` replaces the basic variable of position `r`, which goes to its lower bound (fixed when the range is
+    /// zero); the factor is updated, or refactorized when the work-based trigger is due.
+    fn pivot_free(&mut self, j: usize, r: usize, alpha: Vec<f64>) -> Result<(), SolveError> {
+        if crate::dump::on("dcr") {
+            crate::dump::emit(
+                "dcr",
+                serde_json::json!({"free": j, "row": r, "val": alpha[r], "it": self.iters}),
+            );
+        }
+        let leave = self.head[r];
+        self.st[leave] = if self.p.lo[leave] == self.p.up[leave] {
+            FIXED
+        } else {
+            LB
+        };
+        self.st[j] = r as i32;
+        self.head[r] = j;
+        self.iters += 1;
+        if self.mirror.refactor_due() {
+            self.refactor()?;
+        } else {
+            self.factor.update(r, alpha);
+            self.mirror.update(r);
+            self.mirror.upd_work.clear();
+            self.updates += 1;
         }
         Ok(())
     }
@@ -2471,6 +2534,7 @@ impl<'a> Dual<'a> {
             // `ctx+0x3f8 != 0` in all captures: confirm on a fresh factor (`0x1aa280`). The cost shifts stay in force through the confirming refactorization
             // (`ctx+0x290` is 0, `0xe4891` is not taken) and are removed at the end of the solve.
             self.request = 4;
+            self.confirmed = true;
         } else if !self.bad_rows.is_empty() && self.pert != 0 {
             // Rows were rejected by the ratio test (pivot row too small) and the fresh factor leaves none to price: the dual ends with the cost shifts in
             // force (status -1004 in the reference); the controller hands over to the primal, which removes them, and reruns the dual (rnd1496 pass 1).
@@ -2478,6 +2542,7 @@ impl<'a> Dual<'a> {
             self.rejected_end = true;
         } else if self.free_infeasible() {
             // A free nonbasic variable (never pivoted in: no basic variable with a finite lower bound) with a nonzero d.
+            self.unb_free = true;
             self.dual_unbounded();
         } else if self.level == 0 {
             self.status = Some(Status::Optimal);
@@ -2621,6 +2686,11 @@ impl<'a> Dual<'a> {
                     self.st[j] = UB;
                     self.d[j] = -self.d[j];
                 } else if self.st[j] == UB && up_inf && self.d[j] <= DUAL_TOL {
+                    self.st[j] = LB;
+                    self.d[j] = -self.d[j];
+                } else if self.st[j] == UB && !up_inf && self.d[j] < -DUAL_TOL {
+                    // At a finite upper bound with the wrong-signed d (`0xe7820`, status -2: d' < -tol): the variable goes to its lower bound (fx_badscale
+                    // release, x with a scaled cost of -2e-9 that the pivot turns into +2e-6).
                     self.st[j] = LB;
                     self.d[j] = -self.d[j];
                 } else if self.st[j] == LB && lo_inf && !up_inf && self.d[j] <= DUAL_TOL {
@@ -3089,6 +3159,55 @@ pub fn solve(
     start: Option<&Basis>,
     opts: &SolveOptions,
 ) -> Result<SolveResult, SolveError> {
+    // The reference works on the mirror image of a column with no lower bound and a finite upper bound (`x' = -x`, bounds `[-up, inf)`, `0xeb61b`
+    // sees `lb = -5` for `x in (-inf, 5]`): every rule below (crash tests on the coefficient sign, the status by the cost sign, the d signs) runs on that frame.
+    let flip: Vec<bool> = (0..model.num_cols())
+        .map(|j| model.col_lo[j] <= -crate::model::INF && model.col_up[j] < crate::model::INF)
+        .collect();
+    if !flip.iter().any(|&f| f) {
+        return solve_frame(model, start, opts);
+    }
+    let mut mirrored = model.clone();
+    for j in 0..model.num_cols() {
+        if flip[j] {
+            for k in model.col_start[j]..model.col_start[j + 1] {
+                mirrored.val[k] = -model.val[k];
+            }
+            mirrored.obj[j] = -model.obj[j];
+            mirrored.col_lo[j] = -model.col_up[j];
+            mirrored.col_up[j] = crate::model::INF;
+        }
+    }
+    let start = start.map(|b| {
+        let mut b = b.clone();
+        for j in (0..model.num_cols()).filter(|&j| flip[j]) {
+            // The mirror of a variable at its upper bound (the only finite one) is at its lower bound.
+            b.at_upper[j] = !b.at_upper[j];
+        }
+        b
+    });
+    let mut r = solve_frame(&mirrored, start.as_ref(), opts)?;
+    for j in (0..model.num_cols()).filter(|&j| flip[j]) {
+        r.x[j] = -r.x[j];
+        r.reduced_cost[j] = -r.reduced_cost[j];
+        r.basis.at_upper[j] = !r.basis.at_upper[j];
+        if let Some(ray) = r.ray.as_mut() {
+            ray[j] = -ray[j];
+        }
+    }
+    Ok(r)
+}
+
+thread_local! {
+    /// Set while a rerun skips the second pass of the free-column pivots (the early verdict's ray did not verify).
+    static NO_DEFERRED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+fn solve_frame(
+    model: &LpModel,
+    start: Option<&Basis>,
+    opts: &SolveOptions,
+) -> Result<SolveResult, SolveError> {
     let mut carry = Carry {
         retries: 0,
         thr: crate::lu_order::THRESHOLD,
@@ -3157,6 +3276,7 @@ fn solve_pass(
     let mut dropped = None;
     let mut cleaned = false;
     let mut supplied = None;
+    let mut crash_upper: Option<Vec<bool>> = None;
     let basis = match start {
         Some(b) => {
             let mut b = b.clone();
@@ -3167,10 +3287,14 @@ fn solve_pass(
             dropped = crate::simplex::repair_basis(&p, &mut b).map(|(j, _)| j);
             b
         }
-        None => Basis {
-            basic: dual_crash_basic(&p),
-            at_upper: vec![false; n + m],
-        },
+        None => {
+            let (basic, upper) = dual_crash_basic(&p);
+            crash_upper = Some(upper);
+            Basis {
+                basic,
+                at_upper: vec![false; n + m],
+            }
+        }
     };
     basis.validate(n, m).map_err(SolveError::InvalidBasis)?;
     if carry.retries == 0 {
@@ -3252,6 +3376,9 @@ fn solve_pass(
         pert: 0,
         obj_off: 0.0,
         flip_select: start.is_some(),
+        unb_free: false,
+        setup_unbounded: false,
+        confirmed: false,
         work: crate::work::Work::dual(),
         pivot_cols: None,
         nnz_a: p.cols[..n].iter().map(Vec::len).sum(),
@@ -3289,9 +3416,13 @@ fn solve_pass(
     s.work.decided(s.work.w);
     s.factor_work(&stc, &rows, 0.0);
     let free_phase = (0..n).any(|j| s.st[j] == FREE);
+    let mut setup_unbounded = false;
     if free_phase {
-        s.free_pivots()?;
-        s.refactor()?;
+        setup_unbounded = s.free_pivots()?;
+        s.setup_unbounded = setup_unbounded;
+        if !setup_unbounded {
+            s.refactor()?;
+        }
     }
     s.build_rrows();
     let dt = s.true_d();
@@ -3323,9 +3454,9 @@ fn solve_pass(
             s.st[j] = UB;
         } else if dt[j] > DUAL_TOL {
             s.st[j] = LB;
-        } else if p.lo[j] <= -BIG {
-            // A d within the tolerance does not tie the variable to the artificial bound: the finite upper bound (the mirror of the default LB for a
-            // variable with a finite lower bound; no corpus model has a variable without a lower bound and with an upper one).
+        } else if crash_upper.as_ref().is_some_and(|u| u[j]) {
+            // A d within the tolerance keeps the status the crash gave (`0xead36`: at the upper bound for a negative cost, else at the lower bound, then
+            // the sign of the cost after the crash's third pass; f94 release: x120 with cost -1 and d = 0 starts at the artificial upper bound).
             s.st[j] = UB;
         }
         s.d[j] = if s.st[j] == UB { -dt[j] } else { dt[j] };
@@ -3370,8 +3501,16 @@ fn solve_pass(
     let mut k = 0usize;
     let mut farkas = None;
     let status;
+    // A deferred free column that has a reduced cost and no row to enter on ends the dual before its first iteration (`0xea0b7`, status 5).
+    if setup_unbounded {
+        s.dual_unbounded();
+    }
     loop {
         k += 1;
+        if setup_unbounded {
+            status = Status::Unbounded;
+            break;
+        }
         if s.iters >= opts.max_iterations {
             status = Status::IterationLimit;
             break;
@@ -3596,11 +3735,54 @@ fn solve_pass(
         // No cost perturbation here: the stall trigger would perturb the zero costs and the loop could end unbounded again, without end.
         let mut zopts = opts.clone();
         zopts.perturb = 0.0;
+        if crate::dump::on("dcr") {
+            crate::dump::emit(
+                "dcr",
+                serde_json::json!({"unbounded_pass_iterations": s.iters, "free": s.unb_free, "pert": s.pert}),
+            );
+        }
         let mut r = solve(&zero, start, &zopts)?;
-        r.iterations += s.iters;
+        // The reference goes on with the primal simplex from the dual's basis (nonbasic variables at their finite bound, the artificial ones at the lower
+        // bound) and counts its pivots after the dual's.
+        let mut popts = opts.clone();
+        popts.method = crate::simplex::Method::Primal;
+        let from_dual = Basis {
+            basic: s.head.clone(),
+            at_upper: (0..n + m).map(|j| s.st[j] == UB && p.up[j] < BIG).collect(),
+        };
+        let primal_iters = crate::simplex::solve(model, Some(&from_dual), &popts)
+            .ok()
+            .map(|pr| pr.iterations);
+        if crate::dump::on("dcr") {
+            crate::dump::emit(
+                "dcr",
+                serde_json::json!({"unbounded_primal_iterations": primal_iters}),
+            );
+        }
+        r.iterations = s.iters
+            + if s.confirmed {
+                primal_iters.unwrap_or(r.iterations)
+            } else {
+                0
+            };
         r.refactorizations += s.refactorizations;
         if r.status == Status::Optimal {
             r.status = Status::Unbounded;
+            if s.setup_unbounded && !NO_DEFERRED.with(|c| c.get()) {
+                // The early verdict's ray: the artificial-bound point must verify, else the dual runs on without the second pass.
+                let ok = s.ray.as_ref().is_some_and(|ray| {
+                    crate::verify::ray_improvement(model, ray, 1e-9).is_some_and(|g| g > 0.0)
+                });
+                if !ok {
+                    NO_DEFERRED.with(|c| c.set(true));
+                    let again = solve_frame(model, start, opts);
+                    NO_DEFERRED.with(|c| c.set(false));
+                    let again = again?;
+                    // Only the ray comes from the longer run; the counts stay those of the early verdict.
+                    r.ray = again.ray;
+                    return Ok(r);
+                }
+            }
             r.objective = model.objective(&r.x);
             r.ray = s.ray.take().filter(|ray| {
                 crate::verify::ray_improvement(model, ray, 1e-9).is_some_and(|g| g > 0.0)
