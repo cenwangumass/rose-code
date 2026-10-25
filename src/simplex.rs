@@ -696,6 +696,8 @@ struct Solver<'a> {
     /// Whether basic variables are infeasible (`ctx+0x2d0 != 0`): the list update and the pricing scan then take the dual
     /// tolerance `P[0x3c0] * P[0]` = `1e-7 * 1e6` instead of the plain one.
     p1_tol_on: bool,
+    /// The infeasibility flag of the last pricing pass (`ctx+0x2d0 != 0`), which the method decision reads.
+    inf_seen: bool,
     /// Whether the last pricing call recomputed the duals (the list scan failed).
     recomputed: bool,
     /// The scan that follows a recomputation of the duals: the reference's recomputation already covered it, so a scan that finds nothing is not booked.
@@ -1162,7 +1164,11 @@ impl<'a> Solver<'a> {
             avg,
             l_total: mi.l_nnz() + self.p.m,
             u_total: mi.u_nnz() + self.p.m,
-            infeasible: self.has_infeasible_basic(),
+            infeasible: if self.opts.sw_carry.is_some() {
+                self.inf_seen
+            } else {
+                self.has_infeasible_basic()
+            },
         };
         let before = self.sw.clone();
         let switch = self.sw.decide(&inp);
@@ -3524,6 +3530,7 @@ pub fn solve(
         work: crate::work::Work::default(),
         last_pivot: None,
         p1_tol_on: false,
+        inf_seen: false,
         recomputed: false,
         rescan: false,
         cleanup: false,
@@ -3643,6 +3650,10 @@ pub fn solve(
     s.primal_full_work();
     s.dual_btran_work();
     s.recompute_dual();
+    if s.sw.active && s.sw.perturb_due {
+        // The perturbation of the first factorization's decision (`0x141a60`), like the one after a later factorization.
+        s.perturb();
+    }
     let mut trace = Vec::new();
     let mut iterations = 0usize;
     // Pricing passes of the main loop, the call index of the `pricing` dump.
@@ -3723,6 +3734,7 @@ pub fn solve(
             }
         }
         let infeasible = s.has_infeasible_basic();
+        s.inf_seen = infeasible;
         s.p1_tol_on = infeasible;
         s.fresh_duals = false;
 

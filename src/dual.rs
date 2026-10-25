@@ -3502,6 +3502,10 @@ fn solve_pass(
         };
     }
     s.stall_check(0);
+    // The setup's post-refactor pass (`0xe6dcc`) sees the iterations of the free-column pivots.
+    if !s.flip_select && 3.0 * s.iters as f64 > s.m as f64 {
+        s.flip_select = true;
+    }
     s.recompute_xb(0);
     s.prog_on = s.level == 0;
     s.work.add(0xc391f, m as f64, crate::work::CTX);
@@ -3755,8 +3759,9 @@ fn solve_pass(
                 degenerate: s.stall as i32,
                 snap_degenerate: s.stall_snap as i32,
                 snap_iters: s.stall_it,
-                factorizations: s.refactorizations as u32 + 1,
-                level: s.pert as u32,
+                factorizations: s.refactorizations as u32,
+
+                level: 0,
                 pert: s.pstep * 0.05,
             });
         }
