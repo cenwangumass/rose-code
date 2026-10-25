@@ -3010,6 +3010,18 @@ pub fn solve(
                 s.cost.clone_from(&p.cost);
                 s.obj_off = 0.0;
                 s.pert = 0;
+                // The clean-up factorization is handed the basic columns in ascending variable order (PILOT.JA `lu_in`: the last record is sorted, the dual's own are in
+                // basis order); the final x_B comes from that factor.
+                let mut wv = vec![0.0; s.n + s.m];
+                for (pos, &v) in s.head.iter().enumerate() {
+                    wv[v] = s.w[pos];
+                }
+                s.head.sort_unstable();
+                for pos in 0..s.m {
+                    let v = s.head[pos];
+                    s.st[v] = pos as i32;
+                    s.w[pos] = wv[v];
+                }
                 s.refactor()?;
                 s.recompute_xb(0);
             }
