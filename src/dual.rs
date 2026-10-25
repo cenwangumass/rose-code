@@ -294,6 +294,8 @@ struct Dual<'a, R: Real = f64> {
     stall_snap: i64,
     stall_it: f64,
     prog_on: bool,
+    /// The progress accumulator `ctx+0x100` (objective gain since the last x_B recompute, scaled by `ctx+0xf8`).
+    prog_acc: f64,
     best_obj: f64,
     pert_left: i64,
     pert_param: f64,
@@ -583,15 +585,15 @@ impl<'a, R: Real> Dual<'a, R> {
         }
     }
 
-    /// Primal feasibility tolerance in force (`0x380`, or `0x370 * (1e-5 * 0x380)` while the level is not zero).
     /// The reference's factorization count `ctx+0x2c0`.
     fn nref(&self) -> usize {
         self.refactorizations - self.fac0 - self.nref_skip + self.nref0
     }
 
+    /// Primal feasibility tolerance in force (`0x380`, or `(0x370 * 1e-5) * 0x380` while the level is not zero).
     fn ptol(&self) -> f64 {
         if self.level != 0 {
-            BIG * (1e-5 * PRIMAL_TOL)
+            BIG * 1e-5 * PRIMAL_TOL
         } else {
             PRIMAL_TOL
         }
@@ -1742,7 +1744,8 @@ impl<'a, R: Real> Dual<'a, R> {
                 }
             }
         }
-        let variant = self.level != 0 && self.iters > self.m;
+        let base = if R::QUAD { self.it_base } else { 0 };
+        let variant = self.level != 0 && self.iters + base > self.m;
         for i in 0..esi.min(cnt) {
             let (j, v) = row[i];
             if v < R::c(-ALPHA_TOL) {
@@ -2521,6 +2524,42 @@ impl<'a, R: Real> Dual<'a, R> {
         };
         let (q, aq_row) = row[qe];
         let flips: Vec<usize> = rt.flips.iter().map(|&e| row[e].0).collect();
+        // The objective progress flag `ctx+0x110` (`0x21cf50` at `0x31dc95`, `0xc56f0` in the double code): cleared by a pivot below 1e-6, a leaving
+        // infeasibility above 1e8, or when the gain accumulated since the recompute (times `ctx+0xf8`, 1e-13) exceeds 100 times the dual tolerance.
+        {
+            let infeas = if above {
+                R::c(p.up[leave]) - xbr
+            } else {
+                xbr - R::c(p.lo[leave])
+            };
+            let mut ob = R::ZERO;
+            let mut inf2 = infeas;
+            if !rt.flips.is_empty() {
+                let mut sm = R::ZERO;
+                for &e in &rt.flips {
+                    let (j, a) = row[e];
+                    if j != q {
+                        let g = R::c(p.up[j] - p.lo[j]);
+                        sm = sm - a * g;
+                        ob = self.d[j] * g + ob;
+                    }
+                }
+                inf2 = infeas + sm;
+            }
+            let a308 = aq_row.to_f64();
+            ob = ob + (self.d[q] / R::c(a308)) * inf2;
+            ob = ob / R::c(self.obj_scale);
+            if a308.abs() < 1e-6 || 1e8 < -infeas.to_f64() {
+                self.prog_on = false;
+            } else {
+                let tol = 100.0 * dual_tol();
+                let acc = (R::c(self.obj_scale) * ob * R::c(1e-13) + R::c(self.prog_acc)).to_f64();
+                self.prog_acc = acc;
+                if tol < acc {
+                    self.prog_on = false;
+                }
+            }
+        }
         if !flips.is_empty() {
             self.work
                 .add(0xc561a, 7.0 * flips.len() as f64, crate::work::CTX);
@@ -3338,6 +3377,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 return Ok(());
             }
             self.prog_on = self.level == 0;
+            self.prog_acc = 0.0;
             self.recompute_flags(level_before != 0, pv.is_some());
             self.flags_work();
             // The recompute pass `0xbf5b0` (called from `0xf6d0f`) runs the no-leaving-row handler itself when the pricing is in the list-walk mode
@@ -3676,7 +3716,11 @@ fn solve_frame(
                 }
                 // Every third restart starts the pricing from scratch (list-walk mode, empty running averages): the reference's p40/thr schedule over the
                 // restarts is list-walk, value (thr maxp/1e3), value (thr maxp/1e5), then again (fx_midsing_m5, seeds 1494, 1390, 1496).
-                let fresh = (pass_retries + 1) % 3 == 0;
+                let fresh = if quad {
+                    pass_retries + 1 == 3
+                } else {
+                    (pass_retries + 1) % 3 == 0
+                };
                 let (avg_touch, last_cap, inf_count) = if fresh {
                     (0.0, 0, 0)
                 } else {
@@ -3704,13 +3748,24 @@ fn solve_frame(
     }
 }
 
+/// A restart pass that starts the pricing from scratch: every third one in the double pass, only the third (`ctx+0x184 == 3`, `0xcedb0`) in the quad pass
+/// (the quad captures: the passes at 4, 5 and 6 restarts price in the value mode).
+fn fresh_pass<R: Real>(retries: u32) -> bool {
+    retries > 0
+        && if R::QUAD {
+            retries == 3
+        } else {
+            retries % 3 == 0
+        }
+}
+
 fn solve_pass<R: Real>(
     model: &LpModel,
     start: Option<&Basis>,
     opts: &SolveOptions,
     carry: &Carry,
 ) -> Result<SolveResult, SolveError> {
-    if carry.retries > 0 && carry.retries % 3 == 0 {
+    if fresh_pass::<R>(carry.retries) {
         // The fresh start of every third restart initialises the context again (`0xcf29b`): the tolerance goes back to the parameter, the counter stays.
         set_dual_tol(DUAL_TOL0);
     }
@@ -3774,7 +3829,7 @@ fn solve_pass<R: Real>(
         rrows: vec![Vec::new(); m],
         refactorizations: carry.fac + 1,
         lu_thr: carry.thr,
-        pmode: if start.is_some() || (carry.retries > 0 && carry.retries % 3 != 0) {
+        pmode: if start.is_some() || (carry.retries > 0 && !fresh_pass::<R>(carry.retries)) {
             3
         } else {
             1
@@ -3813,7 +3868,7 @@ fn solve_pass<R: Real>(
         pend: cap,
         cap,
         rebuilds: 40,
-        first_recompute: carry.retries % 3 == 0,
+        first_recompute: carry.retries == 0 || fresh_pass::<R>(carry.retries),
         warm: start.is_some(),
         avg_touch: carry.avg_touch,
         last_cap: carry.last_cap,
@@ -3852,6 +3907,7 @@ fn solve_pass<R: Real>(
         stall_snap: 0,
         stall_it: 0.0,
         prog_on: false,
+        prog_acc: 0.0,
         best_obj: -1e100,
         pert_left: 1_000_000_000,
         pert_param: opts.perturb,
@@ -3940,7 +3996,7 @@ fn solve_pass<R: Real>(
             s.dflag[j] = false;
         }
     }
-    if supplied.is_none() && carry.retries > 0 && carry.retries % 3 != 0 {
+    if supplied.is_none() && carry.retries > 0 && !fresh_pass::<R>(carry.retries) {
         // A pass after a singular factorization runs in the pricing mode 3 from the slack basis (fx_midsing_1106: the second vector of the two-vector FTRAN is
         // dense from the first iteration of the second pass, the weights differ from the first pass in the last bits).
         s.dflag = s.st.iter().map(|&t| t < 0).collect();
@@ -3978,6 +4034,7 @@ fn solve_pass<R: Real>(
     }
     s.recompute_xb(0);
     s.prog_on = s.level == 0;
+    s.prog_acc = 0.0;
     s.work.add(0xc391f, m as f64, crate::work::CTX);
     s.recompute_flags(
         s.warm && s.level != 0,
@@ -4076,7 +4133,11 @@ fn solve_pass<R: Real>(
                         s.iters,
                         s.refactorizations,
                         s.lu_thr,
-                        s.avg_touch,
+                        if R::QUAD && s.iters == 0 {
+                            carry.avg_touch
+                        } else {
+                            s.avg_touch
+                        },
                         s.last_cap,
                         s.inf_count,
                         // The stale leaving row is cleared on this path (`ctx+0x2f8` = -1 in the recompute of the next pass, fx_midsing_1390).
