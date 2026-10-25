@@ -2748,6 +2748,7 @@ pub fn solve(
     let p = build(model);
     let (n, m) = (p.n, p.m);
     let mut dropped = None;
+    let mut cleaned = false;
     let mut supplied = None;
     let basis = match start {
         Some(b) => {
@@ -3024,6 +3025,7 @@ pub fn solve(
                 }
                 s.refactor()?;
                 s.recompute_xb(0);
+                cleaned = true;
             }
             break;
         }
@@ -3084,7 +3086,16 @@ pub fn solve(
     let mut x = vec![0.0; n + m];
     for j in 0..n + m {
         x[j] = if s.st[j] >= 0 {
-            s.xb[s.st[j] as usize]
+            let v = s.xb[s.st[j] as usize];
+            let lo = s.p.lo[j];
+            // After the clean-up factorization the reference shifts the basic solution to zero lower bounds (`x - lo`, loop `0x10731f..0x1073d2`, run on
+            // the FTRAN result) and adds the bound back at the read-out: a rounding round trip for a finite nonzero lower bound (not on the other exits:
+            // 80BAU3B is bit-equal without it).
+            if cleaned && lo > -1e30 && lo.is_finite() {
+                (v - lo) + lo
+            } else {
+                v
+            }
         } else {
             s.nonbasic_value(j)
         };
