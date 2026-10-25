@@ -181,6 +181,9 @@ struct Dual<'a> {
     upd_limit: Option<usize>,
     /// The pivot column of the last iteration by position (for the factor's update).
     pending_alpha: Option<Vec<f64>>,
+    /// The pivot-check pair of the last iteration that reached the check (`ctx+0x300` = the column's pivot, `ctx+0x308` = the row's): the primal started by the
+    /// controller reads it at its first pricing call.
+    pair: (f64, f64),
     /// Final status once the loop ends.
     status: Option<Status>,
     /// Number of structural columns of the model (the length of a returned ray).
@@ -2137,6 +2140,10 @@ impl<'a> Dual<'a> {
             s["rho"] = crate::dump::sparse(&rho);
             s["row"] = crate::dump::sparse(&row);
         }
+        // The row's value of the chosen entering variable is stored (`ctx+0x308`) before the single-candidate check rejects it (fx_midsing_1496 call 5: -4.5e-9).
+        if let Some(qe) = rt.q {
+            self.pair.1 = row[qe].1;
+        }
         // The chosen pivot is checked once more (`0xc94a3..0xc9528`): a value above minus the pivot floor on a non-free variable rejects the row like the
         // test on the whole row (a single candidate bypasses the tolerance of the selection; rnd1496 call 5).
         let rt = match rt.q {
@@ -2242,6 +2249,7 @@ impl<'a> Dual<'a> {
         let sq = if self.st[q] == UB { -1.0 } else { 1.0 };
         let sdir = if above { -1.0 } else { 1.0 };
         let alpha_row_true = aq_row * (sq * sdir);
+        self.pair.0 = alpha;
         let rel = (alpha_row_true - alpha).abs() / (alpha.abs() + 1.0);
         // Mismatch (`0xc5a0b..0xc5a19`): the two values differ in sign (`(min - 1e-13)(max + 1e-13) <= 0`) or by more than the relative tolerance.
         let (amin, amax) = (alpha_row_true.min(alpha), alpha_row_true.max(alpha));
@@ -3233,6 +3241,7 @@ fn solve_pass(
         updates: 0,
         upd_limit: None,
         pending_alpha: None,
+        pair: (0.0, 0.0),
         status: None,
         nm: model.num_cols(),
         ray: None,
@@ -3493,10 +3502,69 @@ fn solve_pass(
             basic: s.head.clone(),
             at_upper: s.st.iter().map(|&t| t == UB).collect(),
         };
-        let mut r = crate::simplex::solve(model, Some(&b), &popts)?;
+        crate::simplex::HANDOFF.with(|c| {
+            c.set(Some(crate::simplex::Handoff {
+                stale: Some(s.pair),
+                thr: s.lu_thr,
+                retries: s.retries as usize,
+                pert: s.pert >= 2,
+            }))
+        });
+        crate::simplex::PRIMAL_SINGULAR.with(|c| c.set(None));
+        crate::simplex::PRIMAL_REPAIRED.with(|c| c.set(false));
+        let mut r = match crate::simplex::solve(model, Some(&b), &popts) {
+            Err(SolveError::SingularBasis) => {
+                // The primal's factorization has a column without a pivot (status -1002): the controller restarts the dual from the slack basis, like the dual's
+                // own failed factorization, with the primal's iterations counted.
+                let Some((pit, pfac, pthr)) = crate::simplex::PRIMAL_SINGULAR.with(|c| c.take())
+                else {
+                    return Err(SolveError::SingularBasis);
+                };
+                SINGULAR.with(|c| {
+                    c.set(Some((
+                        s.iters + pit,
+                        s.refactorizations + pfac,
+                        s.lu_thr.max(pthr),
+                        s.avg_touch,
+                        s.last_cap,
+                        s.inf_count,
+                        false,
+                        s.retries,
+                    )))
+                });
+                return Err(SolveError::SingularBasis);
+            }
+            other => other?,
+        };
+        let repaired =
+            crate::simplex::PRIMAL_REPAIRED.with(|c| c.take()) && r.status == Status::Infeasible;
+        if repaired {
+            // The primal repaired its basis in place and ended infeasible with the dropped variable out (`0x155117`): the controller restores it and the primal
+            // runs again from its basis.
+            crate::simplex::HANDOFF.with(|c| {
+                c.set(Some(crate::simplex::Handoff {
+                    stale: None,
+                    thr: s.lu_thr,
+                    retries: s.retries as usize + 1,
+                    pert: false,
+                }))
+            });
+            let b2 = r.basis.clone();
+            let r2 = crate::simplex::solve(model, Some(&b2), &popts)?;
+            r.iterations += r2.iterations;
+            r.refactorizations += r2.refactorizations;
+            r.status = r2.status;
+            r.farkas = r2.farkas;
+            r.ray = r2.ray;
+            r.objective = r2.objective;
+            r.x = r2.x;
+            r.dual = r2.dual;
+            r.reduced_cost = r2.reduced_cost;
+            r.basis = r2.basis;
+        }
         r.iterations += s.iters;
         r.refactorizations += s.refactorizations;
-        if status == Status::Infeasible && s.pert != 0 {
+        if status == Status::Infeasible && s.pert != 0 && !repaired {
             // The dual ended with cost shifts in force: the primal removes them and ends with status -1004 (its price scan finds nothing), and the
             // controller runs the dual again from the primal's basis (m5: one primal pivot, then the dual proves the infeasibility on the true costs).
             let carry2 = Carry {

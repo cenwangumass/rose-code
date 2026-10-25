@@ -182,7 +182,23 @@ pub struct TraceEvent {
     pub flips: Vec<usize>,
 }
 
+/// What the dual controller hands to the primal it starts (`0x154f43..0x155190`): the pivot-check pair the dual's last iteration left in `ctx+0x300` / `ctx+0x308`
+/// (the primal's first pricing call reads it), the pivot threshold `ctx+0x390`, and the retry counter `ctx+0x184`.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Handoff {
+    pub stale: Option<(f64, f64)>,
+    pub thr: f64,
+    pub retries: usize,
+    /// The dual ended with cost shifts in force: the primal's failed scan ends with status -1004 (the dual runs again), not the cost-free fallback.
+    pub pert: bool,
+}
+
 thread_local! {
+    pub(crate) static HANDOFF: std::cell::Cell<Option<Handoff>> = const { std::cell::Cell::new(None) };
+    /// The primal's factorization found the basis singular (status -1002, `0xf5921`): iterations and refactorizations of the primal, and its pivot threshold.
+    /// The primal repaired its basis in place after a singular factorization (the controller then restores the dropped variable and runs the primal again).
+    pub(crate) static PRIMAL_REPAIRED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    pub(crate) static PRIMAL_SINGULAR: std::cell::Cell<Option<(usize, usize, f64)>> = const { std::cell::Cell::new(None) };
     /// The entering variable and the structural count `n` of the scaled problem where the primal found its ray: the reference's ray moves that
     /// variable by one unit in the user's frame, so the scaling wrapper rescales by the column factor (structural) or the row factor (slack).
     pub(crate) static RAY_ENTER: std::cell::Cell<Option<(usize, usize)>> = const { std::cell::Cell::new(None) };
@@ -680,6 +696,24 @@ struct Solver<'a> {
     want_refactor: bool,
     /// Counters of the method decision (`crate::method`).
     sw: crate::method::Method,
+    /// Started by the dual controller (`Handoff`).
+    handoff: Option<Handoff>,
+    /// `P+0x18 == 0`: the phase 1 duals take the penalties alone, without the true cost (`0x108d70`); set by the first failed scan of the phase 1.
+    costfree: bool,
+    /// The last `y_ref` was built without the true cost.
+    y_costfree: bool,
+    /// `P[0x3c0]`: the phase 1 scan tolerance is this times `PHASE1_M` (1e-7, then 1e-9 after the failed scan).
+    p3c0: f64,
+    /// The stale pivot-check pair (`ctx+0x300`, `ctx+0x308`), read by the first pricing call (`0x144fe1`).
+    stale: Option<(f64, f64)>,
+    /// `ctx+0x178`: pivot mismatches so far.
+    accuracy: usize,
+    /// Iterations made so far (for the controller when a factorization fails).
+    iters_done: usize,
+    /// A refactorization was requested (5, 6): the next pass of the loop makes it, whatever the schedule.
+    forced: bool,
+    /// The basis was repaired in place after a singular factorization.
+    repaired: bool,
 }
 
 /// State of the release profile's initial pricing (`0xfbe60`, list build `0xfecb0`, dual update `0xfb790`).
@@ -863,6 +897,46 @@ impl<'a> Solver<'a> {
         (order, st, cols)
     }
 
+    /// The in-place repair of a singular basis (see `refactor`): `st` is the failed factorization's structure.
+    fn repair_in_place(&mut self, st: &crate::lu_order::Structure) {
+        let (n, m) = (self.p.n, self.p.m);
+        let (mut row_done, mut pos_done) = (vec![false; m], vec![false; m]);
+        for &(r, pos) in &st.pivots {
+            row_done[r] = true;
+            pos_done[pos] = true;
+        }
+        let free_rows: Vec<usize> = (0..m).filter(|&r| !row_done[r]).collect();
+        let gone: Vec<usize> = (0..m).filter(|&pos| !pos_done[pos]).collect();
+        let mut last = None;
+        for (&pos, &r) in gone.iter().zip(&free_rows) {
+            let out = self.basic[pos];
+            self.at_upper[out] = false;
+            self.pos_of[out] = NONE;
+            self.w[out] = 1.0;
+            self.in_r0[out] = true;
+            self.basic[pos] = n + r;
+            self.pos_of[n + r] = pos;
+            self.w[n + r] = 0.0;
+            self.in_r0[n + r] = false;
+            last = Some(out);
+        }
+        self.excluded = last;
+        self.repaired = true;
+        // The repair restarts the pricing framework (call 18 of fx_midsing_1496: every nonbasic weight 1).
+        self.reset_weights();
+        PRIMAL_REPAIRED.with(|c| c.set(true));
+        // The row-wise copy holds the nonbasic, non-fixed structurals except the excluded one.
+        self.rrows = vec![Vec::new(); m];
+        for j in 0..n {
+            if self.pos_of[j] == NONE && !self.is_fixed(j) && self.excluded != Some(j) {
+                for &(i, _) in &self.p.cols[j] {
+                    self.rrows[i].push(j);
+                }
+            }
+        }
+        self.list.clear();
+    }
+
     fn refactor(&mut self) -> Result<(), SolveError> {
         let mut sw_avg = 0usize;
         if self.opts.faithful_positions {
@@ -870,16 +944,38 @@ impl<'a> Solver<'a> {
                 self.basic.sort_unstable();
             }
             // The driver restart after a repaired basis (`0xcda5b`) factors like the starting factorization.
-            let (order, st, rows) = self.reference_order(if self.restart {
+            let fac_no = if self.restart {
                 1
             } else {
                 self.refactorizations + 1
-            });
+            };
+            let (mut order, mut st, mut rows) = self.reference_order(fac_no);
+            if order.len() < self.basic.len()
+                && self.handoff.is_some_and(|h| h.retries >= 5)
+                && !self.repaired
+            {
+                // After five restarts the driver refuses another one and repairs in place (`0xf5978..0xf5b9a`, as in the dual): the columns without a pivot leave the basis
+                // for the slacks of the rows left without one, and the last one dropped stays out of the pricing until the scan finds nothing else.
+                self.repair_in_place(&st);
+                (order, st, rows) = self.reference_order(fac_no);
+            }
             if crate::dump::on("luin") {
                 crate::dump::emit(
                     "luin",
                     serde_json::json!({"n": self.refactorizations, "cols": self.basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "phase": st.phase}),
                 );
+            }
+            if order.len() < self.basic.len() && self.handoff.is_some() {
+                // A column without a pivot (`0xd4190` returns `p13` > 0): the driver restarts the dual (status -1002, `0xf5921`); the controller reads the
+                // state from here.
+                PRIMAL_SINGULAR.with(|c| {
+                    c.set(Some((
+                        self.iters_done,
+                        self.refactorizations + 1,
+                        crate::lu_order::threshold(),
+                    )))
+                });
+                return Err(SolveError::SingularBasis);
             }
             debug_assert_eq!(order.len(), self.basic.len());
             for (pos, &j) in order.iter().enumerate() {
@@ -1278,12 +1374,20 @@ impl<'a> Solver<'a> {
         let p = self.p;
         // The classes come from the distance array (`dst`), as in the reference's pricing0 rebuild (`0xfb790`).
         let sg = self.sig();
+        // `P+0x18 == 0` and basic variables out of bounds: the input is the penalties alone (`0x108d70`, the path without the cost copy).
+        let cf = self.costfree && sg.iter().any(|&c| c != 0);
+        self.y_costfree = cf;
         let mi = self.mirror.as_mut().unwrap();
         let inp: Vec<(usize, f64)> = self
             .basic
             .iter()
             .enumerate()
-            .map(|(pos, &j)| (pos, p.cost[j] + PHASE1_M * f64::from(sg[pos])))
+            .map(|(pos, &j)| {
+                (
+                    pos,
+                    if cf { 0.0 } else { p.cost[j] } + PHASE1_M * f64::from(sg[pos]),
+                )
+            })
             .filter(|e| e.1 != 0.0)
             .collect();
         let out = mi.btran(&inp, false, true);
@@ -1413,28 +1517,33 @@ impl<'a> Solver<'a> {
     /// `d_j = c_j - sum y_i a_ij`, subtracting the terms in the column's stored order (`0x1020a0`).
     fn set_d_from_y(&mut self, y: &[f64]) {
         let p = self.p;
+        let cf = self.y_costfree;
+        let cost = |j: usize| if cf { 0.0 } else { p.cost[j] };
         let offs = &p.offs;
         let col_off = |j: usize| offs[j] & 1;
         for j in 0..p.n + p.m {
             self.d[j] = if self.pos_of[j] == NONE {
-                if self.cleanup && p.lo[j] == p.up[j] {
+                if self.excluded == Some(j) {
+                    // The dropped variable is outside the row copy and the scan: its reduced cost is not computed (fx_midsing_1496 pricing call 18: 0.0).
+                    0.0
+                } else if self.cleanup && p.lo[j] == p.up[j] {
                     // The API read-out (`0x1a7120..0x1a73c0`) recomputes the reduced cost of a fixed variable from the matrix: the cost plus
                     // the negated column products in stored column order, with the eight-lane kernel (peel by the value pointer's alignment).
-                    dot_lanes_from(&p.fcols[j], y, col_off(j), p.cost[j])
+                    dot_lanes_from(&p.fcols[j], y, col_off(j), cost(j))
                 } else if self.cleanup {
                     // Every other nonbasic variable returns the solver's d, here the sum in the order of the rows in the dual BTRAN output list.
                     let mut e: Vec<(usize, f64)> = p.fcols[j].clone();
                     e.sort_by_key(|x| self.y_rank[x.0]);
-                    let mut acc = p.cost[j];
+                    let mut acc = cost(j);
                     for &(i, a) in &e {
                         acc -= y[i] * a;
                     }
                     acc
                 } else if self.p0.is_some() {
                     // `pricing0`: the returned reduced costs are the scan's scores (`0xfecb0`), the eight-lane kernel.
-                    dot_lanes_from(&p.fcols[j], y, col_off(j), p.cost[j])
+                    dot_lanes_from(&p.fcols[j], y, col_off(j), cost(j))
                 } else {
-                    let mut acc = p.cost[j];
+                    let mut acc = cost(j);
                     for &(i, a) in &p.fcols[j] {
                         acc -= y[i] * a;
                     }
@@ -1557,7 +1666,7 @@ impl<'a> Solver<'a> {
         }
         // The reference's candidate scan accepts |d| above 1e-6 (it rejected a d of 1.5e-7 that the default 1e-7 takes).
         let tol = if self.opts.faithful_weights && self.p1_tol_on {
-            1e-7 * PHASE1_M
+            self.p3c0 * PHASE1_M
         } else if self.opts.faithful_weights {
             self.opts.optimality_tol.max(1e-6)
         } else {
@@ -1678,7 +1787,10 @@ impl<'a> Solver<'a> {
                 self.pre_restart = false;
                 r.ok()?;
             }
-            self.excluded = None;
+            // After the in-place repair the reference keeps the dropped variable out until the primal has ended (`cf0 = 3`; the controller restores it).
+            if !self.repaired {
+                self.excluded = None;
+            }
             // Admitting the variable rebuilds the candidate list (`0x138532`: one pass over all variables) and the row-wise copy
             // (`0x132d88`: `2 nnz(A)`), before the driver restarts.
             let nnz_a: usize = (0..self.p.n).map(|j| self.p.cols[j].len()).sum();
@@ -1689,7 +1801,7 @@ impl<'a> Solver<'a> {
             // The rebuilt row-wise copy holds every nonbasic, non-fixed structural (the admitted one included), in index order.
             self.rrows = vec![Vec::new(); self.p.m];
             for j in 0..self.p.n {
-                if self.pos_of[j] == NONE && !self.is_fixed(j) {
+                if self.pos_of[j] == NONE && !self.is_fixed(j) && self.excluded != Some(j) {
                     for &(i, _) in &self.p.cols[j] {
                         self.rrows[i].push(j);
                     }
@@ -2605,6 +2717,7 @@ impl<'a> Solver<'a> {
             }
         }
         let sg = self.sig();
+        let cf = self.costfree && sg.iter().any(|&c| c != 0);
         let mut y: Vec<f64> = self
             .basic
             .iter()
@@ -2613,6 +2726,8 @@ impl<'a> Solver<'a> {
                 let inf = f64::from(sg[i]);
                 if pure {
                     inf
+                } else if cf {
+                    PHASE1_M * inf
                 } else {
                     p.cost[j] + PHASE1_M * inf
                 }
@@ -2621,7 +2736,7 @@ impl<'a> Solver<'a> {
         self.factor.btran(&mut y);
         for j in 0..p.n + p.m {
             self.d[j] = if self.pos_of[j] == NONE {
-                (if pure { 0.0 } else { p.cost[j] }) - dot(&p.cols[j], &y)
+                (if pure || cf { 0.0 } else { p.cost[j] }) - dot(&p.cols[j], &y)
             } else {
                 0.0
             };
@@ -2640,6 +2755,14 @@ struct Phase1Pick {
 
 /// Type byte of a basic variable for the phase-1 ratio test, in a frame where the variable has a finite lower bound
 /// (variables bounded only above are mirrored): returns `(dist, range, type, mirrored)`; `None` for free variables.
+/// The reference's scan after a factorization runs inside `0x145520`, not as a pricing call (`0x105a50`): the pass that found nothing is no pricing call there.
+fn retract_pricing() {
+    if crate::dump::on("pricing") {
+        crate::dump::emit("pricing", serde_json::json!({"retract": true}));
+    }
+    PRC.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+}
+
 fn classify(x: f64, lo: f64, up: f64, tol: f64, kept: f64) -> Option<(f64, f64, u8, bool)> {
     let (lo_inf, up_inf) = (is_inf(lo), is_inf(up));
     if lo_inf && up_inf {
@@ -3309,6 +3432,7 @@ pub fn solve(
     if opts.method == Method::Dual {
         return crate::dual::solve(model, start, opts);
     }
+    let handoff = HANDOFF.with(|c| c.take());
     let p = build(model);
     let (n, m) = (p.n, p.m);
     let mut excluded = None;
@@ -3382,6 +3506,15 @@ pub fn solve(
             factorizations: 1,
             ..Default::default()
         },
+        handoff,
+        costfree: false,
+        y_costfree: false,
+        p3c0: 1e-7,
+        stale: handoff.and_then(|h| h.stale),
+        accuracy: 0,
+        iters_done: 0,
+        forced: false,
+        repaired: false,
     };
     s.rows = vec![Vec::new(); m];
     s.rrows = vec![Vec::new(); m];
@@ -3399,6 +3532,9 @@ pub fn solve(
     if opts.faithful_ftran && opts.faithful_positions {
         // The reference factorizes the starting basis before the first iteration and numbers the positions by pivot step.
         crate::lu_order::reset_pair_gate();
+        if let Some(h) = &handoff {
+            crate::lu_order::set_threshold(h.thr);
+        }
         crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
         let (order, st, rows) = s.reference_order(1);
         for (pos, &j) in order.iter().enumerate() {
@@ -3483,13 +3619,15 @@ pub fn solve(
         if iterations >= opts.max_iterations {
             break Status::IterationLimit;
         }
-        let due = match &opts.refactor_schedule {
-            Some(sched) => sched.contains(&iterations),
-            None if opts.faithful_ftran && s.mirror.is_some() => {
-                std::mem::replace(&mut refactor_next, false)
-            }
-            None => s.factor.num_updates() >= opts.max_updates,
-        };
+        let forced = std::mem::take(&mut s.forced);
+        let due = forced
+            || match &opts.refactor_schedule {
+                Some(sched) => sched.contains(&iterations),
+                None if opts.faithful_ftran && s.mirror.is_some() => {
+                    std::mem::replace(&mut refactor_next, false)
+                }
+                None => s.factor.num_updates() >= opts.max_updates,
+            };
         // The reference's check reads `W` at the end of the iteration (right after `trig()`), before this update's own work.
         let mut pending_upd: Vec<(u32, f64, f64)> = Vec::new();
         let mut chk: Option<(bool, usize, usize)> = None;
@@ -3634,6 +3772,35 @@ pub fn solve(
         let q = if infeasible && !s.p0.is_some() {
             match s.price_admitting() {
                 Some(q) => q,
+                None if s.repaired => {
+                    // `price_admitting` made the reference's last factorization (request 5) and the scan still finds nothing: `cf0 = 3`, the primal ends infeasible with the
+                    // dropped variable out; the controller restores it and runs the primal again.
+                    break Status::Infeasible;
+                }
+                None if s.handoff.is_some_and(|h| !h.pert)
+                    && (!s.costfree || s.factor.num_updates() != 0 || s.p3c0 > 1e-9) =>
+                {
+                    // The failed scan of a primal started by the dual controller (`0x145520`, `0x145aed..0x145bd3`): the factorization is requested again (5), and
+                    //  - with updates since the last factorization (`model+0x18c != 0`): the cost leaves the penalties (`P+0x18 = 0`) and nothing else changes;
+                    //  - on a fresh factor with the cost still in: the cost leaves and the scan tolerance falls to `min(1e-9, ctx+0x398)` (`0x145b69`);
+                    //  - on a fresh factor without the cost: the tolerance falls to 1e-9, and a scan that fails at 1e-9 ends the primal (`cf0 = 3`, the Farkas path below).
+                    // The scan right after a factorization runs inside `0x145520`, not as a pricing call.
+                    let fresh = s.factor.num_updates() == 0;
+                    s.costfree = true;
+                    if fresh {
+                        s.p3c0 = 1e-9;
+                        retract_pricing();
+                    }
+                    s.list.clear();
+                    s.level = 0;
+                    s.work.trig();
+                    s.work.decided(s.work.w);
+                    if let Some(mi) = s.mirror.as_mut() {
+                        mi.count_all_updates();
+                    }
+                    s.forced = true;
+                    continue;
+                }
                 None => {
                     // No improving column for the penalised cost: try the pure sum of infeasibilities, which either
                     // continues the search or proves infeasibility with the multipliers as certificate.
@@ -3713,6 +3880,24 @@ pub fn solve(
                 let nnz_a: usize = p.cols[..p.n].iter().map(Vec::len).sum();
                 check_state = Some(s.work.decision_state());
                 chk = Some((mi.refactor_due(), mi.updates(), nnz_a));
+            }
+        }
+        if let Some((a, b)) = s.stale.take() {
+            // The pivot check of `0x144ff9..0x145064` on the pair the dual's last iteration left in `ctx+0x300` / `ctx+0x308`: a disagreement (the column's
+            // value below 1e-13, or the relative difference above 3e-6) zeroes both, counts an accuracy event (`ctx+0x178`), and requests a refactorization (6).
+            let (a, b) = (a.abs(), b.abs());
+            if a != 0.0 && b != 0.0 && (1e-13 > a || (b - a).abs() / (a + 1.0) > 3e-6) {
+                s.accuracy += 1;
+                s.list.clear();
+                s.level = 0;
+                s.work.trig();
+                s.work.decided(s.work.w);
+                if let Some(mi) = s.mirror.as_mut() {
+                    mi.count_all_updates();
+                }
+                crate::lu_order::raise_threshold(0.5);
+                s.forced = true;
+                continue;
             }
         }
         let mut alpha = vec![0.0; m];
@@ -4030,6 +4215,7 @@ pub fn solve(
         }
         // A phase 1 step may be negative (a basic variable inside its tolerance leaves from the wrong side of its bound).
         iterations += 1;
+        s.iters_done = iterations;
         if s.sw.active {
             let counted = chosen.is_some_and(|k| !s.is_fixed(s.basic[entries[k].0]))
                 && !(is_inf(p.lo[q]) && is_inf(p.up[q]));
@@ -4381,7 +4567,8 @@ pub fn solve(
                 }
                 continue;
             }
-            if s.pos_of[j] != NONE || j == q {
+            if s.pos_of[j] != NONE || j == q || s.excluded == Some(j) {
+                // The dropped variable is outside the reference's row copy: its d and weight are not updated (fx_midsing_1496 pricing call 19).
                 continue;
             }
             let arj = match prods.as_ref() {

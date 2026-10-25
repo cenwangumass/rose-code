@@ -455,6 +455,20 @@ pub fn set_threshold(t: f64) {
     THR.with(|c| c.set(t));
 }
 
+/// Raises the pivot threshold to `t` when it is lower.
+pub fn raise_threshold(t: f64) {
+    THR.with(|c| {
+        if c.get() < t {
+            c.set(t)
+        }
+    });
+}
+
+/// The pivot threshold `ctx+0x390` in force.
+pub fn threshold() -> f64 {
+    THR.with(|c| c.get())
+}
+
 /// `ctx+0x2c0` while the next factorization runs.
 pub fn set_factorization_number(n: usize) {
     FAC_NO.with(|c| c.set(n as i64));
