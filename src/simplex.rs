@@ -65,6 +65,8 @@ pub struct SolveOptions {
     pub perturb: f64,
     /// The objective scale the model's costs carry (set by `crate::scale::solve`); the dual's objective value divides by it.
     pub obj_scale: f64,
+    /// The model was scaled (`ctx+0xe0` non-null in the reference): set by `crate::scale::solve` for the scaled solve.
+    pub scaled: bool,
     /// `BarConvTol` of `Method::Barrier`.
     pub barrier_tol: f64,
     pub leave_plus: bool,
@@ -104,6 +106,7 @@ impl Default for SolveOptions {
             scaling: false,
             perturb: 0.0,
             obj_scale: 1.0,
+            scaled: false,
             barrier_tol: 1e-8,
             leave_plus: false,
             sw_carry: None,

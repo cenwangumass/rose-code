@@ -318,6 +318,10 @@ pub fn solve(
     };
     match sc.apply(model) {
         Some(scaled) => {
+            let inner = SolveOptions {
+                scaled: true,
+                ..inner
+            };
             crate::simplex::RAY_ENTER.with(|c| c.set(None));
             let r = crate::simplex::solve(&scaled, start, &inner)?;
             let mut out = sc.unscale(model, r);

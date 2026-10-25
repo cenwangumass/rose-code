@@ -133,8 +133,6 @@ struct Dual<'a> {
     last_pivoted: bool,
     /// `Carry::it_base`.
     it_base: usize,
-    /// `ctx+0x430`, `ctx+0x438`: the row whose pivot was rejected since the last factorization and 0.001 of its pivot row value.
-    rej_row: Option<(usize, f64)>,
     /// The reference framework of mode 3 (`ctx+0x418`): the variables nonbasic when the weights were restarted.
     dflag: Vec<bool>,
     /// `SimplexPricing` left at its default (-1): the release profile, which may switch the pricing mode.
@@ -230,6 +228,8 @@ struct Dual<'a> {
     pert_left: i64,
     pert_param: f64,
     obj_scale: f64,
+    /// The model was scaled (`ctx+0xe0` non-null): the growth check of the factorization uses 1e12.
+    scaled: bool,
     pcost: Vec<f64>,
 }
 
@@ -589,7 +589,6 @@ impl<'a> Dual<'a> {
         if (5..=7).contains(&self.request) && self.lu_thr < 0.5 {
             self.lu_thr = 0.5;
         }
-        self.rej_row = None;
         let (mut order, mut st, mut rows, mut mi) = self.lu_attempt();
         if order.len() < self.m && self.retries >= 5 {
             // After five restarts the driver refuses another one (`0xf3aba`) and repairs in place: the columns without a pivot leave the basis and the
@@ -646,7 +645,7 @@ impl<'a> Dual<'a> {
                 .fold((0.0f64, f64::INFINITY), |(a, b), v| {
                     (a.max(v.abs()), b.min(v.abs()))
                 });
-            if !(mx / mn > 1e15) {
+            if !(mx / mn > if self.scaled { 1e12 } else { 1e15 }) {
                 break;
             }
             self.factor_work(&st, &rows, discard);
@@ -1794,12 +1793,11 @@ impl<'a> Dual<'a> {
         if kept.is_empty() {
             // Relaxed fallback (`0xc8585..0xc8887`): the whole row is scanned again, without the `bound > ratio` filter. Every entry with `a < -1e-10` (a slack only
             // at a bound) joins the list; `a <= -pivtol` entries with `d >= -delta` are kept when `r = (delta + d)/a` exceeds the running threshold, which starts at
-            // `bound - 100 delta / pivtol` and follows the kept `r`. `ctx+0x338` becomes 2. An entry with `d < -delta` takes the cost-shift path (`0xcb0be`), not
-            // recovered (the result is then left empty as before).
+            // `bound - 100 delta / pivtol` and follows the kept `r`. `ctx+0x338` becomes 2. An entry with `d < -delta` takes the cost-shift path (`0xcb0be`: `shift_cost`; a free
+            // variable's d is zeroed).
             self.pert = 2;
             let mut thr = xm15 - 100.0 * delta / pivtol;
             let mut xm10 = -1e100f64;
-            let mut ok = true;
             lst.clear();
             for (i, &(j, av)) in row.iter().enumerate() {
                 if !(-1e-10 > av) {
@@ -1812,10 +1810,18 @@ impl<'a> Dual<'a> {
                 if av > -pivtol {
                     continue;
                 }
-                let dj = self.d[j];
+                let mut dj = self.d[j];
                 if -delta > dj {
-                    ok = false;
-                    break;
+                    if self.st[j] == LB || self.st[j] == UB {
+                        // The cost shift of `0xcb0be` (the formulas of `shift_cost`): the entry's d becomes positive and joins the list.
+                        self.shift_cost(j);
+                        dj = self.d[j];
+                    } else if self.st[j] == FREE {
+                        // A free variable's d is zeroed with the perturbation flag raised (`0xc8739`).
+                        self.raise_pert(if delta * 0.0005 > dj.abs() { 1 } else { 2 });
+                        self.d[j] = 0.0;
+                        dj = 0.0;
+                    }
                 }
                 let r = (delta + dj) / av;
                 if r > thr {
@@ -1824,7 +1830,7 @@ impl<'a> Dual<'a> {
                     kept.push(i);
                 }
             }
-            if ok && !kept.is_empty() {
+            if !kept.is_empty() {
                 xm3 = xm10;
                 xm15 = thr;
             }
@@ -2330,8 +2336,9 @@ impl<'a> Dual<'a> {
             // The ladder of `0xc5a2f..0xc5c93`: a pivot whose row and column values disagree is rejected (no iteration) while the factorization can still be made more
             // stable: below 0.5 the pivot threshold becomes 0.5 and the basis is refactorized (request 6); after a restart (`ctx+0x184` != 0) below 0.9 it becomes 0.9
             // (and the retry counter grows). Past that, in the value mode: a factor with updates is refactorized, a fresh one ends the pass with status -1002 (restart,
-            // counter + 1) up to five times and later accepts a pivot of agreeing sign or ends with status 12. The list-walk mode keeps the pivot and asks for a
-            // refactorization (not decoded further).
+            // counter + 1) up to five times and later accepts a pivot of agreeing sign or ends with status 12. With `Quad` at its default (-1, the release profile) and `ctx+0x28` = 0 a fresh
+            // factor ends with status -1005 instead (`0xc5f43`, "Switch to quad due to numerics": the controller reruns the dual in quad precision, `0xcec20`), which is not modelled.
+            // The list-walk mode is handled in the branch below.
             if self.lu_thr < 0.5 {
                 self.lu_thr = 0.5;
                 self.request = 6;
@@ -2346,12 +2353,17 @@ impl<'a> Dual<'a> {
                 return Step::Mismatch;
             }
             if self.value_mode {
-                if self.rej_row.is_none() {
-                    // The first rejection since the last factorization (`ctx+0x430` < 0, `0xc6007`): the row is remembered (`ctx+0x430`, with 0.001 of its pivot
-                    // row value in `ctx+0x438`) and the pricing goes on with another row; the second one climbs the ladder (fx_midsing_1390 calls 7 and 8).
-                    self.rej_row = Some((r, alpha_row_true * 0.001));
+                if self.worst_row < 0 {
+                    // The first rejection since the last factorization (`ctx+0x430` < 0, `0xc6007`): the row joins the rejected list with flag 5 and becomes
+                    // the worst one (`ctx+0x430`, with minus the magnitude of 0.001 of its pivot row value in `ctx+0x438` when that is lower), and the pricing
+                    // goes on with another row; the second one climbs the ladder (fx_midsing_1390 calls 7 and 8).
+                    let meas = -(alpha_row_true * 0.001).abs();
                     self.bad_rows.push(r);
                     self.flags[r] = 5;
+                    if self.worst > meas {
+                        self.worst = meas;
+                        self.worst_row = r as i64;
+                    }
                     *dump = rec;
                     return Step::Reject;
                 }
@@ -2370,7 +2382,22 @@ impl<'a> Dual<'a> {
                     return Step::Mismatch;
                 }
             } else {
-                self.request = 6;
+                // The list-walk mode (`0xc5ab2` with `P+0x40` = 0, `0xc5bd0`): the row is rejected without an iteration (`ctx+0x2f8`, `0x2fc` = -1, no flag
+                // set; the cursor has passed it). When the walk has reached the end of its list (`ctx+0x2c4` = `P+0x3c`): more updates than half the
+                // cursor ask for a refactorization (request 6, none for a fresh factor); otherwise the pricing goes to the value mode (`P+0x40` = -1) and
+                // asks for one.
+                if self.cursor == self.walk_len {
+                    if self.updates > self.cursor / 2 {
+                        if self.updates != 0 {
+                            self.request = 6;
+                        }
+                    } else {
+                        self.value_mode = true;
+                        self.request = 6;
+                    }
+                }
+                *dump = rec;
+                return Step::Reject;
             }
         }
         // Column without the pivot entry: the last entry moves into the pivot's slot.
@@ -3353,7 +3380,6 @@ fn solve_pass(
         stale_count: false,
         last_pivoted: false,
         it_base: carry.it_base,
-        rej_row: None,
         dflag: Vec::new(),
         switch_enabled: opts.perturb > 0.0,
         level: 0,
@@ -3407,6 +3433,7 @@ fn solve_pass(
         pert_left: 1_000_000_000,
         pert_param: opts.perturb,
         obj_scale: opts.obj_scale,
+        scaled: opts.scaled,
         pcost: p.cost.clone(),
     };
     // Initial statuses of the nonbasic variables: the dual-feasible bound (an infinite bound is the artificial one, value +-1e30).
