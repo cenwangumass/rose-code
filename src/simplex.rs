@@ -2439,9 +2439,18 @@ impl<'a> Solver<'a> {
     /// after the two iterations; `inf_itest2` release: calls 2 and 3, the first of them already run by the loop). One-ulp noise in the
     /// vector came from the BTRAN through the updated factor.
     fn refactor_for_farkas(&mut self) -> Result<(), SolveError> {
+        // The LU driver (`0xf32a4..0xf32ec`) raises `ctx+0x390` to 0.5 for a factorization requested as 5, 6 or 7: both factorizations here
+        // in the controlled profile (`inf_klein1`: lu_in calls 12 and 13 have threshold 0.5, the earlier ones 2^-7); the release profile keeps 2^-7.
+        crate::lu_order::set_threshold(if self.opts.pricing0 { 0.0078125 } else { 0.5 });
         if self.factor.num_updates() > 0 {
+            self.cleanup = self.mirror.is_some() && !self.rhs_shift.is_empty();
             self.work.trig();
             self.refactor()?;
+            // Release with the scaling mirror: the clean-up factorization (columns sorted) is the one the BTRAN reads (`inf_klein1` release:
+            // 13 lu_in calls, the last sorted; the other release models have no `rhs_shift`).
+            if std::mem::take(&mut self.cleanup) && self.opts.pricing0 {
+                return Ok(());
+            }
         }
         self.work.trig();
         self.refactor()?;
