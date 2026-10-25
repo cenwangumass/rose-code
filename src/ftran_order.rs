@@ -214,18 +214,24 @@ fn dot_q8<R: Real>(x: &[R], c: &[R]) -> R {
     tot
 }
 
-/// The extended-precision dot of the update's new diagonal: two accumulators by position parity, added at the end (seed 2077: 6 terms match only this
-/// order; the odd-length remainder is not verified).
+/// The extended-precision dot of the update's new diagonal: two accumulators by position parity over the even part, added, then the odd last term (seed 2077: 6 terms match only this
+/// order; seed 2147: 5 terms match only with the last term added after the accumulators).
 fn dot_diag<R: Real>(x: &[R], c: &[R], peel: usize) -> R {
     if R::LANES {
         return dot(x, c, peel);
     }
     let n = c.len();
+    let even = n & !1;
     let mut l = [R::ZERO; 2];
-    for i in 0..n {
+    for i in 0..even {
         l[i & 1] += x[i] * c[i];
     }
-    l[0] + l[1]
+    let mut tot = l[0] + l[1];
+    if even < n {
+        // The odd last term is added after the two accumulators (seed 2147: 5 terms).
+        tot += x[even] * c[even];
+    }
+    tot
 }
 
 /// Eta dot product as the reference evaluates it: the vectorised loop peels the elements before the first 16-byte boundary of

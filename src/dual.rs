@@ -2551,6 +2551,10 @@ impl<'a, R: Real> Dual<'a, R> {
             s["tau"] = crate::dump::sparse_r(&tau_out);
         }
         if mismatch {
+            if let Some(s) = rec.as_mut() {
+                // The ladder ends the call without an entering variable (`ctx+0x2fc` = -1, `0xc5abd`).
+                s["mismatch"] = serde_json::json!(true);
+            }
             // The ladder of `0xc5a2f..0xc5c93`: a pivot whose row and column values disagree is rejected (no iteration) while the factorization can still be made more
             // stable: below 0.5 the pivot threshold becomes 0.5 and the basis is refactorized (request 6); after a restart (`ctx+0x184` != 0) below 0.9 it becomes 0.9
             // (and the retry counter grows). Past that, in the value mode: a factor with updates is refactorized, a fresh one ends the pass with status -1002 (restart,
@@ -2581,6 +2585,9 @@ impl<'a, R: Real> Dual<'a, R> {
                     if self.worst > meas {
                         self.worst = meas;
                         self.worst_row = r as i64;
+                    }
+                    if let Some(s) = rec.as_mut() {
+                        s["reject"] = serde_json::json!(true);
                     }
                     *dump = rec;
                     return Step::Reject;
@@ -3689,7 +3696,13 @@ fn solve_pass<R: Real>(
     let (order, stc, rows) = reference_order::<R>(&p, &basis.basic, carry.fac + 1);
     let mirror = RefStruct::fresh(m, n, &stc, &rows);
     let cols: Vec<&Column> = order.iter().map(|&j| &p.cols[j]).collect();
-    let factor = Factor::new(m, &cols).map_err(|_| SolveError::SingularBasis)?;
+    let factor = if R::QUAD {
+        // The quad pass starts from an ill-conditioned basis the double factor may find singular; the quad LU decides (the double factor is only for read-out).
+        Factor::with_floor(m, &cols, 0.0)
+    } else {
+        Factor::new(m, &cols)
+    }
+    .map_err(|_| SolveError::SingularBasis)?;
     let mut st = vec![LB; n + m];
     for (pos, &j) in order.iter().enumerate() {
         st[j] = pos as i32;
