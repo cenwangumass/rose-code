@@ -1965,8 +1965,9 @@ impl<'a, R: Real> Dual<'a, R> {
             }
         }
         if kept.is_empty() {
-            // Candidates exist (the list is not empty) but the fallback keeps none: the row is rejected like a row below the pivot tolerance, with the same
-            // measure (fx_midsing_1127 call 18: `0.01 maxa`, flag 5, `ctx+0x338` = 2), instead of ending in the no-entering-variable verdict.
+            // Nothing is kept after the relaxed fallback: with the rejected count `ctx+0x420` not negative (`0xcb094`: jump to the rejection `0xc7cfd`) the row is
+            // rejected like a row with a small pivot row (flag 5, measure of the same formula) and the pricing goes on; the dual is unbounded only in the retry of the
+            // worst rejected row (`ctx+0x420` < 0), which is not modelled.
             let m = if R::c(0.01) <= -xmm10 {
                 maxa * R::c(0.01)
             } else {
