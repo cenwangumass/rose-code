@@ -27,6 +27,16 @@ pub struct Factor {
 impl Factor {
     /// Factor the matrix whose column at position `p` is `cols[p]`. Returns the singular position on failure.
     pub fn new<C: std::borrow::Borrow<Column>>(m: usize, cols: &[C]) -> Result<Factor, usize> {
+        Self::with_floor(m, cols, 1e-11)
+    }
+
+    /// As `new`, with the absolute floor below which a column without an acceptable pivot is singular (the dual decides singularity with the reference's
+    /// structure mirror and factors an ill-conditioned basis anyway: `fx_midsing_1390` has a diagonal entry of 5e-13).
+    pub fn with_floor<C: std::borrow::Borrow<Column>>(
+        m: usize,
+        cols: &[C],
+        floor: f64,
+    ) -> Result<Factor, usize> {
         let cols: Vec<&Column> = cols.iter().map(|c| c.borrow()).collect();
         // Eliminate sparser columns first (slack singletons first).
         let mut col_order: Vec<usize> = (0..m).collect();
@@ -91,7 +101,7 @@ impl Factor {
                     maxabs = maxabs.max(w[r].abs());
                 }
             }
-            if maxabs < 1e-11 {
+            if maxabs < floor || maxabs == 0.0 {
                 return Err(p);
             }
             let mut best = NONE;
