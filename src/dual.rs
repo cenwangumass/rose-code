@@ -175,6 +175,8 @@ struct Dual<'a, R: Real = f64> {
     art_exit: bool,
     worst: f64,
     worst_row: i64,
+    /// The retry of the worst rejected row (`ctx+0x420` negated, `0x21cf50` / `0xc4fe0`): the ratio test rejects nothing.
+    retry: bool,
     /// The infeasible-row count of the last flag recompute, whatever the mode (`[P+0x3c]`); a restart after a singular factorization compares the new count with it.
     inf_count: usize,
     /// Restarts so far (the reference's `ctx+0x184`).
@@ -1779,10 +1781,11 @@ impl<'a, R: Real> Dual<'a, R> {
         // A row whose largest entry is below the pivot tolerance (`max(|worst|, 1e-13 maxa, 3e-8)`, `0xc7cd9`) is rejected: no entering variable is chosen, the
         // row gets flag 5 and the pricing goes on with the next one (fx_midsing_m6 calls 10 and 13). The measure kept for the worst rejected row is
         // `0.01 maxa` when the infeasibility is at least 0.01, else `infeasibility * maxa`, negated.
-        if maxr(
-            R::c(self.worst.abs()),
-            maxr(R::c(1e-13) * maxa, R::c(PIVOT_FLOOR)),
-        ) > maxa
+        if !self.retry
+            && maxr(
+                R::c(self.worst.abs()),
+                maxr(R::c(1e-13) * maxa, R::c(PIVOT_FLOOR)),
+            ) > maxa
         {
             let m = if R::c(0.01) <= -xmm10 {
                 maxa * R::c(0.01)
@@ -1963,6 +1966,18 @@ impl<'a, R: Real> Dual<'a, R> {
                 xm3 = xm10;
                 xm15 = thr;
             }
+        }
+        if kept.is_empty() && self.retry && !lst.is_empty() {
+            // The retry of the worst rejected row (`ctx+0x420` < 0, `0x320cb6`) chooses among the whole list of the fallback instead of rejecting: the
+            // entries whose ratio is not below the largest `(delta + d)/a` are admissible (seed 2238: the entry of 1e-10 wins over the one of 1e-3).
+            let mut mx = R::c(-1e100);
+            for &i in &lst {
+                let (j, av) = row[i];
+                mx = maxr(mx, (delta + self.d[j]) / av);
+            }
+            xm3 = mx;
+            xm15 = mx;
+            kept = lst.clone();
         }
         if kept.is_empty() {
             // Nothing is kept after the relaxed fallback: with the rejected count `ctx+0x420` not negative (`0xcb094`: jump to the rejection `0xc7cfd`) the row is
@@ -2288,6 +2303,9 @@ enum Step<R> {
     Mismatch,
     /// The pivot check on a fresh factor ended the pass with status -1002: the controller restarts the dual (`0xc5b9a`).
     Restart,
+    /// The pivot check on a fresh factor ended the pass with status -1005 (`0xc5f43`, "Switch to quad due to numerics"): the controller reruns the dual in
+    /// quad precision from the current basis (`0xcec20`).
+    SwitchQuad,
     /// The ratio test found no entering variable: the dual is unbounded (the primal infeasible). Carries the BTRAN row `e_r' B^-1` (dense, by
     /// row), which is the Farkas certificate.
     Unbounded(Vec<f64>),
@@ -2323,7 +2341,23 @@ impl<'a, R: Real> Dual<'a, R> {
             None
         };
         self.work.trig();
-        let row_sel = self.price();
+        let mut row_sel = self.price();
+        if row_sel.is_none()
+            && self.request == 0
+            && !self.bad_rows.is_empty()
+            && self.value_mode
+            && self.old_rej == 0
+            && self.updates == 0
+            && self.worst_row >= 0
+        {
+            // No row to price while rows were rejected, on a fresh factor and without rows released: the worst rejected row is tried again with the
+            // rejected count negated (`0xc50fb`, `0x21d0xx`), its measure cleared; the ratio test then rejects nothing.
+            let r = self.worst_row as usize;
+            self.retry = true;
+            self.worst = 0.0;
+            self.flags[r] = 1;
+            row_sel = Some(r);
+        }
         let Some(r) = row_sel else {
             if let Some(mut s) = snap {
                 s["r"] = serde_json::json!(-1);
@@ -2365,6 +2399,19 @@ impl<'a, R: Real> Dual<'a, R> {
         let (row, esi) = self.pivot_row(&rho, leave, above);
         self.row_product_work(&rho, row.len() - esi);
         let rt = self.ratio_test(&row, esi, leave, above, xbr);
+        let was_retry = self.retry;
+        if self.retry {
+            self.retry = false;
+            if rt.q.is_none() {
+                // The retried row has no usable entering variable: the end of the rejected rows (status -1004 on the fresh factor).
+                if let Some(mut s) = snap {
+                    s["r"] = serde_json::json!(r);
+                    s["q"] = serde_json::json!(-1);
+                    *dump = Some(s);
+                }
+                return Step::NoRow;
+            }
+        }
         let mut rec = snap;
         if let Some(s) = rec.as_mut() {
             s["r"] = serde_json::json!(r);
@@ -2383,11 +2430,15 @@ impl<'a, R: Real> Dual<'a, R> {
         // The chosen pivot is checked once more (`0xc94a3..0xc9528`): a value above minus the pivot floor on a non-free variable rejects the row like the
         // test on the whole row (a single candidate bypasses the tolerance of the selection; rnd1496 call 5).
         let rt = match rt.q {
-            Some(qe) if self.st[row[qe].0] != FREE && row[qe].1 > R::c(-PIVOT_FLOOR) => Ratio {
-                q: None,
-                flips: Vec::new(),
-                reject: Some(-row[qe].1.abs().to_f64()),
-            },
+            Some(qe)
+                if !was_retry && self.st[row[qe].0] != FREE && row[qe].1 > R::c(-PIVOT_FLOOR) =>
+            {
+                Ratio {
+                    q: None,
+                    flips: Vec::new(),
+                    reject: Some(-row[qe].1.abs().to_f64()),
+                }
+            }
             _ => rt,
         };
         if let Some(meas) = rt.reject {
@@ -2538,6 +2589,10 @@ impl<'a, R: Real> Dual<'a, R> {
                     self.request = 6;
                     *dump = rec;
                     return Step::Mismatch;
+                }
+                if !R::QUAD && self.switch_enabled {
+                    *dump = rec;
+                    return Step::SwitchQuad;
                 }
                 if self.retries <= 5 {
                     *dump = rec;
@@ -3394,6 +3449,11 @@ struct Carry {
 
 thread_local! {
     /// Set where a mid-run factorization found no pivot for a basic column: `(iterations done, factorizations including the failed one, LU threshold)`.
+    /// The pass ended with the quad switch (`Step::SwitchQuad`): the counters and the basis the quad pass continues from.
+    static SWITCH: std::cell::Cell<Option<(usize, usize, f64, f64, usize, usize, bool, u32)>> = const { std::cell::Cell::new(None) };
+    static SWITCH_BASIS: std::cell::RefCell<Option<Basis>> = const { std::cell::RefCell::new(None) };
+    /// The cost shifts the quad pass inherits from the double pass (the context is the same: `ctx+0x338`, the cost array, the shifted d values).
+    static SWITCH_PERT: std::cell::RefCell<Option<SwitchPert>> = const { std::cell::RefCell::new(None) };
     static SINGULAR: std::cell::Cell<Option<(usize, usize, f64, f64, usize, usize, bool, u32)>> = const { std::cell::Cell::new(None) };
 }
 
@@ -3450,6 +3510,15 @@ thread_local! {
     static NO_DEFERRED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
+struct SwitchPert {
+    pert: u8,
+    cost: Vec<f64>,
+    cshift: Vec<f64>,
+    pcost: Vec<f64>,
+    obj_off: f64,
+    d: Vec<(usize, f64)>,
+}
+
 fn solve_frame(
     model: &LpModel,
     start: Option<&Basis>,
@@ -3474,12 +3543,16 @@ fn solve_frame(
     PASS_NO.with(|c| c.set(0));
     // The quad mode (`ctx+0x28`): once the controller switched, every later pass runs the extended-precision twin of the dual.
     let mut quad = false;
+    let mut switch_start: Option<Basis> = None;
     loop {
         // The controller loop reads the tolerance at its top (`0x154ccc`) and sets it again for the primal it starts (`0x15647a`).
         LOOP_TOL.with(|c| c.set(dual_tol()));
         SINGULAR.with(|c| c.set(None));
+        SWITCH.with(|c| c.set(None));
         let snap_start;
+        let sw = switch_start.take();
         let start_now = match (start, SNAP.with(|c| c.borrow().clone())) {
+            _ if sw.is_some() => sw.as_ref(),
             // A restart takes the basis of the last snapshot (`0xcedb0`, `0xd40b0`): the log timer of the wrapper (`0xf9306`) saves the basis at the first
             // fresh factorization after every 100 iterations (the slack basis at the start, which a restart from scratch reproduces).
             (None, Some((basic, at_upper))) if carry.iters > 0 => {
@@ -3494,6 +3567,30 @@ fn solve_frame(
             solve_pass::<f64>(model, start_now, opts, &carry)
         };
         match res {
+            Err(SolveError::SingularBasis) if SWITCH.with(|c| c.get()).is_some() => {
+                let (iters, fac, thr, avg_touch, last_cap, inf_count, after_pivot, pass_retries) =
+                    SWITCH.with(|c| c.take()).unwrap();
+                let b = SWITCH_BASIS.with(|c| c.borrow_mut().take()).unwrap();
+                if crate::dump::on("dcr") {
+                    crate::dump::emit(
+                        "dcr",
+                        serde_json::json!({"switch": true, "iters": carry.iters + iters}),
+                    );
+                }
+                quad = true;
+                carry = Carry {
+                    retries: pass_retries,
+                    thr,
+                    fac,
+                    iters: carry.iters + iters,
+                    avg_touch,
+                    last_cap,
+                    inf_count,
+                    after_pivot,
+                    it_base: 0,
+                };
+                switch_start = Some(b);
+            }
             Err(SolveError::SingularBasis) if carry.retries < 100 => {
                 let Some((
                     iters,
@@ -3627,6 +3724,7 @@ fn solve_pass<R: Real>(
         art_exit: false,
         worst: 0.0,
         worst_row: -1,
+        retry: false,
         stale_count: false,
         last_pivoted: false,
         it_base: carry.it_base,
@@ -3796,6 +3894,20 @@ fn solve_pass<R: Real>(
     if !s.flip_select && 3.0 * s.iters as f64 > s.m as f64 {
         s.flip_select = true;
     }
+    if R::QUAD {
+        if let Some(sp) = SWITCH_PERT.with(|c| c.borrow_mut().take()) {
+            s.pert = sp.pert;
+            s.cost = sp.cost;
+            s.cshift = sp.cshift;
+            s.pcost = sp.pcost;
+            s.obj_off = sp.obj_off;
+            for (j, dv) in sp.d {
+                if s.st[j] < 0 {
+                    s.d[j] = R::c(dv);
+                }
+            }
+        }
+    }
     s.recompute_xb(0);
     s.prog_on = s.level == 0;
     s.work.add(0xc391f, m as f64, crate::work::CTX);
@@ -3903,6 +4015,40 @@ fn solve_pass<R: Real>(
                         false,
                         s.retries,
                     )))
+                });
+                return Err(SolveError::SingularBasis);
+            }
+            Step::SwitchQuad => {
+                SWITCH.with(|c| {
+                    c.set(Some((
+                        s.iters,
+                        s.refactorizations,
+                        s.lu_thr,
+                        s.avg_touch,
+                        s.last_cap,
+                        s.inf_count,
+                        false,
+                        s.retries,
+                    )))
+                });
+                SWITCH_PERT.with(|c| {
+                    *c.borrow_mut() = Some(SwitchPert {
+                        pert: s.pert,
+                        cost: s.cost.clone(),
+                        cshift: s.cshift.clone(),
+                        pcost: s.pcost.clone(),
+                        obj_off: s.obj_off,
+                        d: (0..n + m)
+                            .filter(|&j| s.cshift[j] != 0.0 && s.st[j] < 0)
+                            .map(|j| (j, s.d[j].to_f64()))
+                            .collect(),
+                    })
+                });
+                SWITCH_BASIS.with(|c| {
+                    *c.borrow_mut() = Some(Basis {
+                        basic: s.head.clone(),
+                        at_upper: (0..n + m).map(|j| s.st[j] == UB && p.up[j] < BIG).collect(),
+                    })
                 });
                 return Err(SolveError::SingularBasis);
             }
@@ -4066,7 +4212,8 @@ fn solve_pass<R: Real>(
                 it_base: r.iterations,
             };
             let snap_basis = snap.map(|(basic, at_upper)| Basis { basic, at_upper });
-            let mut r2 = solve_pass::<R>(model, snap_basis.as_ref().or(Some(&r.basis)), opts, &carry2)?;
+            let mut r2 =
+                solve_pass::<R>(model, snap_basis.as_ref().or(Some(&r.basis)), opts, &carry2)?;
             r2.iterations += carry2.iters;
             return Ok(r2);
         }

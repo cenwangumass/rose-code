@@ -71,6 +71,9 @@ fn main() {
             e.step
         );
     }
+    if std::env::var("ROSE_XOUT").is_ok() {
+        eprintln!("X {}", serde_json::json!(r.x));
+    }
     rose::dump::emit(
         "status",
         serde_json::json!({"status": format!("{:?}", r.status), "iterations": r.iterations, "objective": r.objective}),
