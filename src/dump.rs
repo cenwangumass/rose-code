@@ -30,6 +30,7 @@ pub const KINDS: &[(&str, &str, &str)] = &[
     ("switch", "SWITCH", "method decision after each refactorization (`0x142500`): the counters it reads and whether it switched to Devex pricing"),
     ("dcr", "DCR", "the dual start basis: the (column, row) assignments of the crash in order"),
     ("dsx", "DSX", "each call of the dual iteration function: state at entry (head, x_B, d in the reference frame, W, status, flags, priorities, candidate list, threshold, mode, cursor) and the decision (row, leaving variable, entering variable, flips, pivot row, rho)"),
+    ("dsxl", "DSX", "lean variant of dsx for whole solves: per call only k, the leaving row r and variable, the entering variable q and the bound flips (`compare.py trace --lean`)"),
     ("dtau", "DTAU", "each dual pivot at the weight update: leaving position, alpha, w (rho norm), the pivot column without the pivot entry (position, value) and tau at the same positions"),
     ("p68", "P68", "each reset of the pricing weights (`0x132460`): the type, the U and L column structure (steps) and the weights P+0x68 by position"),
     ("work", "WORK", "the work counter W (`crate::work`): each increment (k inc: d, site, caller), each refactorization check (trig: W), the time clause (clause), and the smoothed factorization cost (w158); `ROSE_WORK=1` also selects it"),

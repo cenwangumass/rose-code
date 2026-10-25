@@ -1888,7 +1888,13 @@ impl<'a> Dual<'a> {
     fn iteration(&mut self, k: usize, dump: &mut Option<serde_json::Value>) -> Step {
         let p = self.p;
         let (n, m) = (self.n, self.m);
-        let snap = crate::dump::on_from("dsx", k).then(|| self.snapshot(k));
+        let snap = if crate::dump::on_from("dsx", k) {
+            Some(self.snapshot(k))
+        } else if crate::dump::on("dsxl") {
+            Some(serde_json::json!({"k": k}))
+        } else {
+            None
+        };
         self.work.trig();
         let row_sel = self.price();
         let Some(r) = row_sel else {
@@ -1965,7 +1971,12 @@ impl<'a> Dual<'a> {
             )
         };
         let needed: Vec<usize> = col_out.iter().map(|e| e.0).collect();
-        let tau_out = self.mirror.ftran_needed(&rho_rows, &rho_vals, &needed);
+        // Mode 3: the framework vector is a dense vector (count -1) once it has more than m/8 entries (SC50A calls 11, 14..; AFIRO call 12: 4 of m = 27;
+        // 6 of 50 stay sparse); its L stage then runs dense.
+        let dense_in = self.pmode == 3 && rho_rows.len() * 8 > m;
+        let tau_out = self
+            .mirror
+            .ftran_needed(&rho_rows, &rho_vals, &needed, dense_in);
         {
             // The two-vector FTRAN books the L stages of both vectors and then the U stage of the column at the factor's scale
             // (`0x129671`, call `0x120200`); the wrapper `0x11f620` books `4 nnz(column) + nnz(rho)` (`0x120114`).
@@ -2533,6 +2544,14 @@ impl<'a> Dual<'a> {
                     .add(0xe7000, 3.0 * row_cnt as f64, crate::work::CTX);
             }
             let old_leave = self.d[pv.leave];
+            // The reference's row holds a slack leaving variable with its computed coefficient (about 1, 0.9999999999999997 in PILOT.JA call 30657), the step on it uses that.
+            let lcoef = pv.row.iter().find(|e| e.0 == pv.leave).map_or(1.0, |e| {
+                if pv.above {
+                    -e.1
+                } else {
+                    e.1
+                }
+            });
             for &(j, a) in &pv.row {
                 let a = if pv.flips.contains(&j) { -a } else { a };
                 self.d[j] = self.d[j] - theta * a;
@@ -2540,13 +2559,13 @@ impl<'a> Dual<'a> {
             // A leaving variable that becomes fixed keeps the true reduced cost, not the frame value.
             // The leaving variable is in the reference's row with the coefficient 1, so its stored d (0 up to the noise of the last recompute) takes the step too.
             // `0xe45c0` (`0xe47c7..0xe47ff`): the leaving variable is the row entry with coefficient +1 (leaving below) or -1 (above, the row is negated);
-            // a status -2 (at the upper bound) variable then has its d negated, so for it d = -(old - theta') with theta' = -theta (GROW7 release call 311).
+            // a status -2 (at the upper bound) variable then has its d negated, so for it d = -(old + theta * coef) (GROW7 release call 311; PILOT.JA calls 30572, 30580 with a noise `old` of 7e-18).
             self.d[pv.leave] = if self.st[pv.leave] == FIXED && pv.above {
                 theta
-            } else if self.st[pv.leave] == UB {
-                -(old_leave + -1.0 * -theta)
+            } else if pv.above {
+                -(old_leave + theta * lcoef)
             } else {
-                old_leave - theta
+                old_leave - theta * lcoef
             };
         } else if refactor {
             self.refactor()?;
@@ -2931,8 +2950,22 @@ pub fn solve(
         }
         let mut dump = None;
         let step = s.iteration(k, &mut dump);
-        if let Some(rec) = dump {
-            crate::dump::emit("dsx", rec);
+        if let Some(mut rec) = dump {
+            if crate::dump::on("dsxl") {
+                let lean = ["k", "r", "var", "q", "flips"]
+                    .iter()
+                    .filter_map(|f| rec.get(*f).map(|v| (f.to_string(), v.clone())))
+                    .collect::<serde_json::Map<_, _>>();
+                rec = serde_json::Value::Object(lean);
+            }
+            crate::dump::emit(
+                if crate::dump::on("dsxl") {
+                    "dsxl"
+                } else {
+                    "dsx"
+                },
+                rec,
+            );
         }
         match step {
             Step::Pivot(pv) => {

@@ -827,6 +827,7 @@ impl RefStruct {
         self.ftran_with(rows, vals, false)
     }
 
+    /// `dense_in`: the second vector is handed over as a dense vector (count -1), so its L stage runs dense (`0x12bd30`) whatever its length.
     /// The second vector of the reference's two-vector FTRAN (`0x125f50`, its U stage `0x123690`): `B^-1 a` at the positions of
     /// the first vector's result only (`needed`), in that order. The L stage and the tail columns are solved as in `ftran`, the
     /// tail columns scattering into tail rows only. A needed singleton position is `x / diag`, a needed tail position its solved
@@ -837,11 +838,13 @@ impl RefStruct {
         rows: &[usize],
         vals: &[f64],
         needed: &[usize],
+        dense_in: bool,
     ) -> Vec<(usize, f64)> {
         let m = self.m;
-        let (spike, count_l, e_l) = self.lstage_num(rows, vals, false);
+        let (spike, count_l, e_l) = self.lstage_num(rows, vals, dense_in);
         self.tau_l.set(e_l);
         let tau_dense = rows.len() * self.dthr > self.m
+            || dense_in
             || self.lev_dense_ft
             || (!self.etas.is_empty() && count_l * self.dthr > self.m);
         let tau_n = if tau_dense { None } else { Some(spike.len()) };
@@ -870,7 +873,11 @@ impl RefStruct {
         let mut tau_raw = vec![false; m];
         // The inline dense joint loop of two dense vectors (`0x128c56..0x129152`) tests the raw value before the quotient: a tail column whose
         // raw value is at most the tolerance is zeroed even when the quotient exceeds it.
-        let joint_dense = tau_dense && self.f2.borrow().col_n.is_none();
+        // The same holds for the joint routine `0x12c300` (column sparse, tau dense; PILOT.JA call 249): whenever tau does not take the single-vector U stage
+        // (`ok(n2)` of `joint_u` fails), the tail columns test the raw value as well.
+        let joint_dense = !tau_n.is_some_and(|n| {
+            self.nuc.len() + n < self.i21 || self.dens * (n as f64) < 2.0 * m as f64
+        });
         // The U stage `0x123690` solves the tail in one of three loops: the heap walk and the sparse-row loop zero a quotient of at most the tolerance, the dense
         // slot loop (`0x12403b`: `m <= h33^2 c` or `5 h33^2 t > m - i21`, see `tau_u_work`) stores the quotient and only skips its scatter (FIT2P call 14
         // keeps a tail value of 4e-16 that enters the row dots of the nucleus positions). A dense input (`tau_dense`) zeroes it (FIT2P call 49).
