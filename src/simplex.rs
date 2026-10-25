@@ -4382,6 +4382,17 @@ pub fn solve(
             if infeasible {
                 // Rebuild the factorization once and price again.
                 if s.factor.num_updates() > 0 {
+                    // The ratio test's no-row exit refactors without a following update: every update counts in the window statistics.
+                    if let Some(mi) = s.mirror.as_mut() {
+                        mi.count_all_updates();
+                    }
+                    // The candidate without a leaving row is a failed scan like the one above, and the cost
+                    // leaves the penalties with the refactorization (reference f5276, trace call 1: phase 3 to 2, `d` without the true cost).
+                    s.costfree = true;
+                    // The factorization is requested as 5: the LU driver raises the pivot threshold `ctx+0x390` to 0.5 (`0xf32a4..0xf32ec`; f5803 lu_in 4; the release profile keeps 2^-7).
+                    if !opts.pricing0 {
+                        crate::lu_order::raise_threshold(0.5);
+                    }
                     s.refactor()?;
                     continue;
                 }
