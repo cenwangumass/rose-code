@@ -250,6 +250,10 @@ pub fn parse(text: &str) -> Result<LpModel, MpsError> {
     for c in &cols {
         let c = c.clone();
         for (i, v) in c {
+            // The reference's reader drops constraint coefficients below 1e-13 in magnitude (`NumNZs`: 9.99e-14 and 0.0 are dropped, 1e-13 kept).
+            if v.abs() < 1e-13 {
+                continue;
+            }
             row_idx.push(i);
             val.push(v);
         }
