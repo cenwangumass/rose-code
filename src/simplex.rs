@@ -280,7 +280,7 @@ pub(crate) struct Internal {
     /// Row-wise copy of `cols` (all columns, slacks included): row `i` holds `(j, a)` in ascending `j`, a column's entries in its order.
     rwise: Vec<Vec<(usize, f64)>>,
     /// Offset of each column in the concatenated value array (prefix sums of the column lengths).
-    offs: Vec<usize>,
+    pub(crate) offs: Vec<usize>,
 }
 
 impl Internal {
@@ -834,7 +834,7 @@ fn rank_dot(col: &Column, v: &[f64], rank: &[usize]) -> f64 {
 
 /// `init - sum a_i y_i` accumulated as the reference's read-out kernel does: sequentially below `peel + 8` entries, else the peeled head
 /// and the eight-lane body, the lanes folded pairwise, then the tail (as `dot_lanes`, with the start value in lane 0).
-fn dot_lanes_from(col: &Column, y: &[f64], peel: usize, init: f64) -> f64 {
+pub(crate) fn dot_lanes_from(col: &Column, y: &[f64], peel: usize, init: f64) -> f64 {
     let n = col.len();
     let t = |i: usize| -(col[i].1 * y[col[i].0]);
     if n < peel + 8 {

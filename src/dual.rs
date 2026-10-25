@@ -237,6 +237,10 @@ struct Dual<'a, R: Real = f64> {
     last_y: Vec<f64>,
     /// The factorization count the pass started from (`ctx+0x2c0` counts from there).
     fac0: usize,
+    /// `ctx+0x2c0` at the start of the pass (`Carry::nref0`), and the factorizations that `refactorizations` counts but `ctx+0x2c0` does not (the failed one of the in-place repair:
+    /// fx_midsing_1031 and 1390, `dual_acc` captures).
+    nref0: usize,
+    nref_skip: usize,
     /// The iterations of the earlier passes (`ctx+0x20`).
     it0: usize,
     /// Updates of the factor since the last refactorization.
@@ -580,6 +584,11 @@ impl<'a, R: Real> Dual<'a, R> {
     }
 
     /// Primal feasibility tolerance in force (`0x380`, or `0x370 * (1e-5 * 0x380)` while the level is not zero).
+    /// The reference's factorization count `ctx+0x2c0`.
+    fn nref(&self) -> usize {
+        self.refactorizations - self.fac0 - self.nref_skip + self.nref0
+    }
+
     fn ptol(&self) -> f64 {
         if self.level != 0 {
             BIG * (1e-5 * PRIMAL_TOL)
@@ -686,6 +695,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 self.repaired = Some(j);
             }
             self.refactorizations += 1;
+            self.nref_skip += 1;
             // The failure counts as one more retry (`ctx+0x184` 5 -> 6 at `0xf5921`, fx_midsing_1390): later pivot mismatches on a fresh factor end the run.
             self.retries += 1;
             (order, st, rows, mi) = self.lu_attempt();
@@ -959,7 +969,7 @@ impl<'a, R: Real> Dual<'a, R> {
         // the residual is read only when the factorization count is 4 mod 5 or the request is 4, 6 or 8 (`0xc1137..0xc11ce`, `0xc165b..0xc1699`).
         let rmax = r.iter().fold(R::c(1e-9), |a, v| a.max(v.abs()));
         let xmax = xb.iter().fold(R::ZERO, |a, v| a.max(v.abs()));
-        let e2 = if self.refactorizations % 5 == 4 || matches!(req, 4 | 6 | 8) {
+        let e2 = if self.nref() % 5 == 4 || matches!(req, 4 | 6 | 8) {
             res.iter().fold(R::ZERO, |a, v| a.max(v.abs())) / rmax
         } else {
             R::ZERO
@@ -1026,22 +1036,26 @@ impl<'a, R: Real> Dual<'a, R> {
     /// or the request is 4 or 6. A residual above the tolerance counts a failure; at the sixth the tolerance grows tenfold (up to 1e-3) and the counter restarts.
     fn dual_residual_check(&mut self) {
         let req = self.request;
-        if !((self.refactorizations - self.fac0) % 5 == 4 || req == 4 || req == 6) {
+        if !(self.nref() % 5 == 4 || req == 4 || req == 6) {
             return;
         }
         let mut meas = 0.0f64;
         for &j in &self.head {
-            let mut acc = self.cost[j];
-            for &(i, a) in &self.p.fcols[j] {
-                acc -= self.last_y[i] * a;
-            }
+            // The kernel of `0xe59a1..0xe5bd9`: the cost (with the shift), minus the column products, sequentially below 8 entries past the alignment peel, else the eight-lane
+            // body of the read-out kernel (fx_midsing_1127: 165.177734375 against 142.407).
+            let acc = crate::simplex::dot_lanes_from(
+                &self.p.fcols[j],
+                &self.last_y,
+                self.p.offs[j] & 1,
+                self.cost[j],
+            );
             meas = meas.max(acc.abs());
         }
         let tol = dual_tol();
         if crate::dump::on("dualtol") {
             crate::dump::emit(
                 "dualtol",
-                serde_json::json!({"meas": meas, "tol": tol, "cnt": RESID_FAILS.with(|c| c.get()), "req": req, "n": self.refactorizations - self.fac0}),
+                serde_json::json!({"meas": meas, "tol": tol, "cnt": RESID_FAILS.with(|c| c.get()), "req": req, "n": self.nref()}),
             );
         }
         let mut cnt = RESID_FAILS.with(|c| c.get());
@@ -1761,6 +1775,18 @@ impl<'a, R: Real> Dual<'a, R> {
         }
         let nn = lst.len();
         self.work.add(0xc7bcd, 3.0 * cnt as f64, crate::work::CTX);
+        if self.retry
+            && R::c(PIVOT_FLOOR / 10.0) <= -minr(xm13, xm9)
+            && R::c(PIVOT_FLOOR * 10.0) > -minr(xm13, xm9)
+        {
+            // The retry of the worst rejected row (`ctx+0x420` < 0, `0xc7bcd` -> `0xcc39e`, `0xcc59d`): a row whose largest candidate is below ten pivot floors ends the
+            // pass with status -1004 and no row or entering variable, before the selection (fx_midsing_1031 and 1496: the dual hands over to the primal).
+            return Ratio {
+                q: None,
+                flips: Vec::new(),
+                reject: None,
+            };
+        }
         if nn == 0 {
             self.work.add(0xc7c4f, 0.0, crate::work::CTX);
             return Ratio {
@@ -1972,7 +1998,7 @@ impl<'a, R: Real> Dual<'a, R> {
             }
         }
         if kept.is_empty() && self.retry && !lst.is_empty() {
-            // The retry of the worst rejected row (`ctx+0x420` < 0, `0x320cb6`) chooses among the whole list of the fallback instead of rejecting: the
+            // The retry of the worst rejected row (`ctx+0x420` < 0, `0x320cb6`; the quad copy of the ratio test only, the double copy rejects: fx_midsing_1031 call 26) chooses among the whole list of the fallback instead of rejecting: the
             // entries whose ratio is not below the largest `(delta + d)/a` are admissible (seed 2238: the entry of 1e-10 wins over the one of 1e-3).
             let mut mx = R::c(-1e100);
             for &i in &lst {
@@ -3470,6 +3496,9 @@ struct Carry {
     after_pivot: bool,
     /// The iteration counter `ctx+0x20` at the start of the pass: 0 after a restart, the iterations so far when the dual runs again after the primal.
     it_base: usize,
+    /// The factorization count `ctx+0x2c0` at the start of the pass: 0 after a restart (a fresh context), the count so far plus the primal's factorizations when the dual runs again
+    /// after the primal.
+    nref0: usize,
 }
 
 thread_local! {
@@ -3559,6 +3588,7 @@ fn solve_frame(
         inf_count: 0,
         after_pivot: false,
         it_base: 0,
+        nref0: 0,
     };
     set_dual_tol(DUAL_TOL0);
     RESID_FAILS.with(|c| c.set(0));
@@ -3615,6 +3645,7 @@ fn solve_frame(
                     inf_count,
                     after_pivot,
                     it_base: 0,
+                    nref0: 0,
                 };
                 switch_start = Some(b);
             }
@@ -3661,6 +3692,7 @@ fn solve_frame(
                     inf_count,
                     after_pivot,
                     it_base: 0,
+                    nref0: 0,
                 };
             }
             Ok(mut r) => {
@@ -3787,6 +3819,8 @@ fn solve_pass<R: Real>(
         last_cap: carry.last_cap,
         last_y: Vec::new(),
         fac0: carry.fac,
+        nref0: carry.nref0,
+        nref_skip: 0,
         it0: carry.iters,
         updates: 0,
         upd_limit: None,
@@ -4251,6 +4285,13 @@ fn solve_pass<R: Real>(
                 inf_count: 0,
                 after_pivot: !from_snap,
                 it_base: r.iterations,
+                nref0: if from_snap {
+                    0
+                } else {
+                    // `ctx+0x2c0` after the primal: its start factorization counts one (the primal's own refactorizations at its end, two in rose, do not appear in the
+                    // reference's `lu_in`: fx_midsing_m5, 1494, 1390, `dual_acc` captures).
+                    s.nref() + (r.refactorizations - s.refactorizations).saturating_sub(2)
+                },
             };
             let snap_basis = snap.map(|(basic, at_upper)| Basis { basic, at_upper });
             let mut r2 =
