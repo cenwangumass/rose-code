@@ -27,6 +27,8 @@ const DUAL_TOL0: f64 = 1e-6;
 thread_local! {
     /// The dual feasibility tolerance (`ctx+0x388`) and the counter of failed dual residual checks (`ctx+0x174`); both outlive the restarts of one solve.
     static DUAL_TOL_CELL: std::cell::Cell<f64> = const { std::cell::Cell::new(DUAL_TOL0) };
+    static RNG_CELL: std::cell::Cell<u64> = const { std::cell::Cell::new(101) };
+    static PERT_RERUNS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
     static RESID_FAILS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
 }
 
@@ -257,6 +259,8 @@ struct Dual<'a, R: Real = f64> {
     cost: Vec<f64>,
     /// The accumulated cost shifts per variable: the reference keeps them apart and forms `cost = base + shift` (the sum of the shifts is rounded once).
     cshift: Vec<f64>,
+    /// The part of a shifted cost the double does not hold (the quad pass keeps the cost shifted in long double).
+    cost_lo: Vec<f64>,
     /// State of the reference's random generator (`0x88a870`, `0x88a8d0`), seeded 101.
     rng: u64,
     /// Perturbation flag `ctx+0x338`: 1 after a small cost shift, 2 after a large one or one against an infinite bound.
@@ -1059,7 +1063,7 @@ impl<'a, R: Real> Dual<'a, R> {
             .head
             .iter()
             .enumerate()
-            .map(|(pos, &j)| (pos, R::c(self.cost[j])))
+            .map(|(pos, &j)| (pos, R::c(self.cost[j]) + R::c(self.cost_lo[j])))
             .filter(|e| e.1 != R::ZERO)
             .collect();
         let out = self.mirror.btran(&inp, false, true);
@@ -1080,7 +1084,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 // The reference accumulates row-wise (`0x136b00`): rows in ascending order, skipping |y_i| <= 1e-13 (`ctx+0x3a8`).
                 let mut e: Vec<(usize, f64)> = p.fcols[j].clone();
                 e.sort_by_key(|x| x.0);
-                let mut acc = R::c(self.cost[j]);
+                let mut acc = R::c(self.cost[j]) + R::c(self.cost_lo[j]);
                 for &(i, a) in &e {
                     if y[i].abs() > R::c(DROP_TOL) {
                         acc -= y[i] * R::c(a);
@@ -2036,7 +2040,9 @@ impl<'a, R: Real> Dual<'a, R> {
 
     /// The next value of the reference's random generator (`0x88a870`: 31 bits; `0x88a8d0`: that times 2^-31).
     fn rng_int(&mut self) -> u32 {
-        lcg_int(&mut self.rng)
+        let v = lcg_int(&mut self.rng);
+        RNG_CELL.with(|c| c.set(self.rng));
+        v
     }
 
     fn rng_double(&mut self) -> f64 {
@@ -2068,17 +2074,24 @@ impl<'a, R: Real> Dual<'a, R> {
         let s = if small {
             self.raise_pert(1);
             let u = self.rng_double();
-            m * (R::c(u) + R::ONE)
+            m * R::c(u + 1.0)
         } else {
             self.raise_pert(2);
             let r = self.rng_int() as i32;
-            m * (R::c((((r % 500) + 111) as f64) / 1000.0) + R::ONE)
+            m * R::c((((r % 500) + 111) as f64) / 1000.0 + 1.0)
         };
         self.d[j] += s;
+        let sr = s;
+        let old_cost = R::c(self.cost[j]) + R::c(self.cost_lo[j]);
         let s = s.to_f64();
         if self.st[j] == LB {
             self.cshift[j] += s;
             self.cost[j] = self.pcost[j] + self.cshift[j];
+            if R::QUAD {
+                let new = old_cost + sr;
+                self.cost[j] = new.to_f64();
+                self.cost_lo[j] = (new - R::c(self.cost[j])).to_f64();
+            }
             self.obj_off -= lo * s;
             if -BIG >= lo {
                 self.raise_pert(2);
@@ -2086,6 +2099,11 @@ impl<'a, R: Real> Dual<'a, R> {
         } else {
             self.cshift[j] -= s;
             self.cost[j] = self.pcost[j] + self.cshift[j];
+            if R::QUAD {
+                let new = old_cost - sr;
+                self.cost[j] = new.to_f64();
+                self.cost_lo[j] = (new - R::c(self.cost[j])).to_f64();
+            }
             self.obj_off += up * s;
             if up >= BIG {
                 self.raise_pert(2);
@@ -3544,6 +3562,8 @@ fn solve_frame(
     };
     set_dual_tol(DUAL_TOL0);
     RESID_FAILS.with(|c| c.set(0));
+    PERT_RERUNS.with(|c| c.set(0));
+    RNG_CELL.with(|c| c.set(101));
     SNAP.with(|c| *c.borrow_mut() = None);
     SNAP_C40.with(|c| c.set(-100.0));
     PAIR_TOL.with(|c| c.set(3e-6));
@@ -3778,7 +3798,8 @@ fn solve_pass<R: Real>(
         zero_artificial: false,
         cost: p.cost.clone(),
         cshift: vec![0.0; p.cost.len()],
-        rng: 101,
+        cost_lo: vec![0.0; p.cost.len()],
+        rng: RNG_CELL.with(|c| c.get()),
         pert: 0,
         obj_off: 0.0,
         flip_select: start.is_some(),
@@ -4207,7 +4228,14 @@ fn solve_pass<R: Real>(
             // restart the dual.
             return Ok(r);
         }
-        if status == Status::Infeasible && s.pert != 0 && !repaired {
+        if status == Status::Infeasible
+            && s.pert != 0
+            && !repaired
+            && PERT_RERUNS.with(|c| {
+                c.set(c.get() + 1);
+                c.get() <= 8
+            })
+        {
             // The dual ended with cost shifts in force: the primal removes them and ends with status -1004 (its price scan finds nothing), and the
             // controller runs the dual again from the primal's basis (m5: one primal pivot, then the dual proves the infeasibility on the true costs).
             // With a basis snapshot (`0xd40b0`, taken after 100 iterations) the controller restarts from it instead (`0xcedb0`; fx_midsing_1106 call 113).
