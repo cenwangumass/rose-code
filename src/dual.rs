@@ -573,6 +573,30 @@ fn reference_order<R: Real>(
     (order, st, cols)
 }
 
+thread_local! {
+    static QUAD_RESULT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// The objective read-out accumulates in the working precision of the final pass (`long double` in the quad pass: seed 2150, the double sum is one
+/// bit off), the offset added last.
+fn objective_in<R: Real>(model: &crate::model::LpModel, x: &[f64]) -> f64 {
+    QUAD_RESULT.with(|c| c.set(R::QUAD));
+    let mut acc = R::ZERO;
+    for (c, v) in model.obj.iter().zip(x) {
+        acc = acc + R::c(*c) * R::c(*v);
+    }
+    (acc + R::c(model.offset)).to_f64()
+}
+
+/// The objective of the unscaled solution of the dual's last result: `long double` accumulation when its final pass was the quad pass. Clears the mark.
+pub fn unscaled_objective(model: &crate::model::LpModel, x: &[f64]) -> f64 {
+    if QUAD_RESULT.with(|c| c.replace(false)) {
+        objective_in::<crate::f80::F80>(model, x)
+    } else {
+        model.objective(x)
+    }
+}
+
 impl<'a, R: Real> Dual<'a, R> {
     fn nonbasic_value(&self, j: usize) -> f64 {
         if self.zero_artificial && self.at_artificial(j) {
@@ -2389,6 +2413,17 @@ impl<'a, R: Real> Dual<'a, R> {
         };
         self.work.trig();
         let mut row_sel = self.price();
+        // No row while rows were rejected before this driver call: they are released and the pricing runs again inside the same call (the loop of
+        // `0xc4fe0`/`0x21cf50` around `0x2896a3` and `0xcd250`, quad seed 2081 call 19).
+        while row_sel.is_none()
+            && self.request == 0
+            && !self.bad_rows.is_empty()
+            && self.value_mode
+            && self.old_rej > 0
+        {
+            self.release_rejected();
+            row_sel = self.price();
+        }
         if row_sel.is_none()
             && self.request == 0
             && !self.bad_rows.is_empty()
@@ -4470,7 +4505,7 @@ fn solve_pass<R: Real>(
                     return Ok(r);
                 }
             }
-            r.objective = model.objective(&r.x);
+            r.objective = objective_in::<R>(model, &r.x);
             r.ray = s.ray.take().filter(|ray| {
                 crate::verify::ray_improvement(model, ray, 1e-9).is_some_and(|g| g > 0.0)
             });
@@ -4528,7 +4563,7 @@ fn solve_pass<R: Real>(
     let at_upper: Vec<bool> = s.st.iter().map(|&t| t == UB).collect();
     Ok(SolveResult {
         status,
-        objective: model.objective(&xs),
+        objective: objective_in::<R>(model, &xs),
         x: xs,
         dual: y.iter().map(|v| sgn * v).collect(),
         reduced_cost: dtrue[..nm].iter().map(|v| sgn * v).collect(),
