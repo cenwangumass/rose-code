@@ -768,13 +768,8 @@ impl<'a> Dual<'a> {
         if t > self.lu_thr {
             self.lu_thr = t;
         }
-        let scale = 1.0 + r.iter().fold(0.0f64, |a, v| a.max(v.abs()));
-        if res.iter().all(|v| v.abs() <= 1e-7 * scale) {
-            self.xb = xb;
-        } else {
-            self.factor.ftran(&mut r);
-            self.xb = r;
-        }
+        // The reference keeps the solve's result whatever the residual (no refinement call in `0xc0050`; fx_e2_r0625 call 36, residual 7e-3 relative to R = 100).
+        self.xb = xb;
     }
 
     /// d recomputed from the costs after a factorization, in the reference frame.
@@ -1291,7 +1286,10 @@ impl<'a> Dual<'a> {
             }
         }
         // Entries that cancelled to (nearly) nothing are dropped (the smallest captured entry is 1.04e-13).
-        order.retain(|&j| acc[j].abs() > DROP_TOL);
+        // A single entry in rho takes the scaled-copy path of `0x134d90` (`0x1360ac`), which has no tolerance test (fx_e2_r25 call 1: entries of 6e-14 stay).
+        if rho.len() != 1 {
+            order.retain(|&j| acc[j].abs() > DROP_TOL);
+        }
         let nst = order.len();
         for &(i, rv) in rho {
             let j = n + i;
@@ -1659,6 +1657,44 @@ impl<'a> Dual<'a> {
             b = 0;
         }
         if kept.is_empty() {
+            // Relaxed fallback (`0xc8585..0xc8887`): the whole row is scanned again, without the `bound > ratio` filter. Every entry with `a < -1e-10` (a slack only
+            // at a bound) joins the list; `a <= -pivtol` entries with `d >= -delta` are kept when `r = (delta + d)/a` exceeds the running threshold, which starts at
+            // `bound - 100 delta / pivtol` and follows the kept `r`. `ctx+0x338` becomes 2. An entry with `d < -delta` takes the cost-shift path (`0xcb0be`), not
+            // recovered (the result is then left empty as before).
+            self.pert = 2;
+            let mut thr = xm15 - 100.0 * delta / pivtol;
+            let mut xm10 = -1e100f64;
+            let mut ok = true;
+            lst.clear();
+            for (i, &(j, av)) in row.iter().enumerate() {
+                if !(-1e-10 > av) {
+                    continue;
+                }
+                if i >= esi && self.st[j] != LB && self.st[j] != UB {
+                    continue;
+                }
+                lst.push(i);
+                if av > -pivtol {
+                    continue;
+                }
+                let dj = self.d[j];
+                if -delta > dj {
+                    ok = false;
+                    break;
+                }
+                let r = (delta + dj) / av;
+                if r > thr {
+                    xm10 = maxsd(xm10, r);
+                    thr = r;
+                    kept.push(i);
+                }
+            }
+            if ok && !kept.is_empty() {
+                xm3 = xm10;
+                xm15 = thr;
+            }
+        }
+        if kept.is_empty() {
             return Ratio {
                 q: None,
                 flips: Vec::new(),
@@ -1962,6 +1998,8 @@ enum Step {
     Pivot(Box<Pivot>),
     /// No leaving row.
     NoRow,
+    /// The pivot was abandoned after the FTRAN (pivot mismatch with a low LU threshold): a refactorization (request 6) and the same pricing again.
+    Mismatch,
     /// The row was rejected by the ratio test (pivot row too small); the pricing goes on with another row, no iteration is done.
     Reject,
     /// The ratio test found no entering variable: the dual is unbounded (the primal infeasible). Carries the BTRAN row `e_r' B^-1` (dense, by
@@ -2136,7 +2174,28 @@ impl<'a> Dual<'a> {
         let sdir = if above { -1.0 } else { 1.0 };
         let alpha_row_true = aq_row * (sq * sdir);
         let rel = (alpha_row_true - alpha).abs() / (alpha.abs() + 1.0);
-        if rel > REL_PIVOT_TOL {
+        // Pivot mismatch (`0xc5a0b..0xc5a19`): the two alphas differ in sign (`(min - 1e-13)(max + 1e-13) <= 0`) or by more than `ctx+0x3a0` relative. With the LU
+        // threshold below 0.5 the pivot is abandoned (q = -1), a refactorization is requested (6) with the threshold at 0.5 (`0xc5a1f..0xc5aad`, `0xc5c45`); at 0.5
+        // up to 0.9 after a restart it goes to 0.9 (`0xc5a4d..0xc5aad`). Otherwise the pivot goes on (the further branches `0xc5ab2..` are not recovered).
+        let (amin, amax) = (alpha_row_true.min(alpha), alpha_row_true.max(alpha));
+        let mismatch = (amin - DROP_TOL) * (amax + DROP_TOL) <= 0.0 || rel > REL_PIVOT_TOL;
+        if mismatch {
+            if self.lu_thr < 0.5 {
+                self.request = 6;
+                self.lu_thr = 0.5;
+                if let Some(s) = rec.as_mut() {
+                    s["alpha_col"] = serde_json::json!(alpha);
+                }
+                *dump = rec;
+                return Step::Mismatch;
+            }
+            if self.lu_thr < 0.9 && self.retries != 0 {
+                self.retries += 1;
+                self.request = 6;
+                self.lu_thr = 0.9;
+                *dump = rec;
+                return Step::Mismatch;
+            }
             self.request = 6;
         }
         if let Some(s) = rec.as_mut() {
@@ -3230,6 +3289,12 @@ fn solve_pass(
                 s.post(Some(&pv), due)?;
             }
             Step::Reject => {}
+            Step::Mismatch => {
+                s.post(None, false)?;
+                if s.status.is_none() {
+                    continue;
+                }
+            }
             Step::NoRow => {
                 if s.request != 3 {
                     s.no_row();
@@ -3363,7 +3428,8 @@ fn solve_pass(
             // After the clean-up factorization the reference shifts the basic solution to zero lower bounds (`x - lo`, loop `0x10731f..0x1073d2`, run on
             // the FTRAN result; the threshold `[rsp+0x78]` is `ctx+0x370` = 1e30) and adds the bound back at the read-out: a rounding round trip for a
             // finite lower bound (not on the other exits: 80BAU3B is bit-equal without it). A variable with only an upper bound is mirrored in the
-            // reference (`x' = -x`, lower bound `-up`), so its round trip uses the upper bound: `(-x + up) - up` negated is `(x - up) + up`.
+            // reference (`x' = -x`, lower bound `-up`), so its round trip uses the upper bound: `(-x + up) - up` negated is `(x - up) + up`. A free basic
+            // variable stays as it is (bit-equal on fx_cleanrt_free_105, _1331, _2122: 19 to 36 nonzero free basic values each).
             if cleaned && lo > -1e30 && lo.is_finite() {
                 (v - lo) + lo
             } else if cleaned && up < 1e30 && up.is_finite() {

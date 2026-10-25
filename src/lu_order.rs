@@ -55,7 +55,8 @@ pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Stru
             .iter()
             .copied()
             .zip(val.iter().copied())
-            .filter(|(i, _)| !done_r.contains(i))
+            // The reference's matrix leaves out entries below the absolute tolerance (fx_e2_r25: a scaled entry 2^-44 in a row of the nucleus changed its count).
+            .filter(|(i, v)| !done_r.contains(i) && v.abs() >= ABS_TOL)
             .collect();
         d.reverse();
         nuc.push((pos, d));
