@@ -212,6 +212,8 @@ pub(crate) struct Handoff {
     pub retries: usize,
     /// The dual ended with cost shifts in force: the primal's failed scan ends with status -1004 (the dual runs again), not the cost-free fallback.
     pub pert: bool,
+    /// The relative tolerance of the pivot-pair check (`ctx+0x3a0`): the parameter default 3e-6, 1e-7 once the controller has restored a dropped variable.
+    pub pair_tol: f64,
 }
 
 thread_local! {
@@ -648,6 +650,10 @@ struct Solver<'a> {
     /// Free nonbasic variables the pricing skips: status -6 in the reference (an entering free variable without a leaving row and with a reduced cost within the
     /// tolerance, `0x144d2d..0x144d58`), cleared when the phase changes.
     excl6: Vec<bool>,
+    /// The entering variables rejected for a tiny pivot since the last iteration (status -6 until an iteration is made or the pricing finds nothing else).
+    rej6: Vec<usize>,
+    /// The failed scan has already been repeated on recomputed duals since the last iteration.
+    rescan2: bool,
     restart: bool,
     pre_restart: bool,
     /// The duals were recomputed at the start of this iteration (the end of phase 1), so the scan that finds nothing does not recompute them again.
@@ -1062,7 +1068,22 @@ impl<'a> Solver<'a> {
             }
         }
         let cols: Vec<&Column> = self.basic.iter().map(|&j| &self.p.cols[j]).collect();
-        self.factor = Factor::new(self.p.m, &cols).map_err(|_| SolveError::SingularBasis)?;
+        // Once the driver has used its five restarts it refuses another one (`0xf3aba`): the primal then goes on with the basis that the reference's factorization accepts
+        // (fx_midsing_1106: pivots of 3.6e-12 pass, the floor of the starting factorization is 1e-11).
+        let floor = if self.handoff.is_some() { 1e-13 } else { 1e-11 };
+        self.factor = Factor::with_floor(self.p.m, &cols, floor).map_err(|_| {
+            if self.handoff.is_some() {
+                // The numerical factor finds no acceptable pivot for a column that the structural order placed (the reference's `p13` > 0): same restart as above.
+                PRIMAL_SINGULAR.with(|c| {
+                    c.set(Some((
+                        self.iters_done,
+                        self.refactorizations + 1,
+                        crate::lu_order::threshold(),
+                    )))
+                });
+            }
+            SolveError::SingularBasis
+        })?;
         self.refactorizations += 1;
         self.list.clear();
         if self.cleanup {
@@ -1531,7 +1552,7 @@ impl<'a> Solver<'a> {
                 }
             }
             let scale = 1.0 + r.iter().fold(0.0f64, |a, v| a.max(v.abs()));
-            if res.iter().all(|v| v.abs() <= 1e-7 * scale) {
+            if self.handoff.is_some() || res.iter().all(|v| v.abs() <= 1e-7 * scale) {
                 for (pos, &j) in self.basic.iter().enumerate() {
                     self.x[j] = xb[pos];
                 }
@@ -1589,17 +1610,51 @@ impl<'a> Solver<'a> {
         let p = self.p;
         if let Some(y) = self.y_ref.take() {
             self.set_d_from_y(&y);
+            self.handoff_residual(&y);
             self.y_ref = Some(y);
             return;
         }
         let mut y: Vec<f64> = self.basic.iter().map(|&j| p.cost[j]).collect();
         self.factor.btran(&mut y);
+        self.handoff_residual(&y);
         for j in 0..p.n + p.m {
             self.d[j] = if self.pos_of[j] == NONE {
                 p.cost[j] - dot(&p.cols[j], &y)
             } else {
                 0.0
             };
+        }
+    }
+
+    /// The primal's call of the duals and residual check (`0x145520`) in a run started by the dual controller: it shares the dual tolerance and the failure
+    /// counter of the dual (`ctx+0x388`, `ctx+0x174`). At the start of a call (`0x1455d3`), more than two failures raise the tolerance tenfold (up to 1e-3) and reset
+    /// the counter; the residual `max |c_j - a_j y|` over the basic structurals is then compared with the tolerance (`0x145a36..0x145a56`) when the factorization
+    /// count is 4 modulo 5, the request is 4, 5 or 7, or the counter is not zero.
+    fn handoff_residual(&mut self, y: &[f64]) {
+        if self.handoff.is_none() {
+            return;
+        }
+        let tol = crate::dual::dual_tol();
+        let cnt = crate::dual::resid_fails();
+        if cnt > 2 {
+            if tol < 1e-3 {
+                crate::dual::set_dual_tol(10.0 * tol);
+                crate::dual::set_resid_fails(0);
+            }
+        }
+        let nref = self.refactorizations;
+        if !(nref % 5 == 4 || crate::dual::resid_fails() != 0) {
+            return;
+        }
+        let p = self.p;
+        let mut meas = 0.0f64;
+        for &j in &self.basic {
+            if j < p.n {
+                meas = meas.max((p.cost[j] - dot(&p.cols[j], y)).abs());
+            }
+        }
+        if meas > crate::dual::dual_tol() {
+            crate::dual::set_resid_fails(crate::dual::resid_fails() + 1);
         }
     }
 
@@ -2583,6 +2638,11 @@ impl<'a> Solver<'a> {
     /// after the two iterations; `inf_itest2` release: calls 2 and 3, the first of them already run by the loop). One-ulp noise in the
     /// vector came from the BTRAN through the updated factor.
     fn refactor_for_farkas(&mut self) -> Result<(), SolveError> {
+        // In a primal started by the dual controller the failed scans already made the factorizations (the last scan ends on a fresh factor, `cf0 = 3`): the BTRAN reads
+        // that factor (fx_midsing_1106: the reference's last two factorizations come from the scan's exits, none from the certificate).
+        if self.handoff.is_some() && self.factor.num_updates() == 0 {
+            return Ok(());
+        }
         // The LU driver (`0xf32a4..0xf32ec`) raises `ctx+0x390` to 0.5 for a factorization requested as 5, 6 or 7: both factorizations here
         // in the controlled profile (`inf_klein1`: lu_in calls 12 and 13 have threshold 0.5, the earlier ones 2^-7); the release profile keeps 2^-7.
         crate::lu_order::set_threshold(if self.opts.pricing0 { 0.0078125 } else { 0.5 });
@@ -3495,6 +3555,8 @@ pub fn solve(
         opts,
         excluded,
         excl6: vec![false; n + m],
+        rej6: Vec::new(),
+        rescan2: false,
         restart: false,
         pre_restart: false,
         fresh_duals: false,
@@ -3847,6 +3909,7 @@ pub fn solve(
                     //  - on a fresh factor without the cost: the tolerance falls to 1e-9, and a scan that fails at 1e-9 ends the primal (`cf0 = 3`, the Farkas path below).
                     // The scan right after a factorization runs inside `0x145520`, not as a pricing call.
                     let fresh = s.factor.num_updates() == 0;
+                    let first = !s.rescan2;
                     s.costfree = true;
                     if fresh {
                         s.p3c0 = 1e-9;
@@ -3854,6 +3917,13 @@ pub fn solve(
                     }
                     s.list.clear();
                     s.level = 0;
+                    if !fresh && first {
+                        // With updates the scan simply runs again with the cost out of the penalties: no factorization (fx_midsing_1106: no LU between the two pricing calls).
+                        s.rescan2 = true;
+                        s.dual_btran_work();
+                        s.recompute_dual();
+                        continue;
+                    }
                     s.work.trig();
                     s.work.decided(s.work.w);
                     if let Some(mi) = s.mirror.as_mut() {
@@ -3892,6 +3962,37 @@ pub fn solve(
                         mi.count_all_updates();
                     }
                     refactor_next = true;
+                    continue;
+                }
+                None if !s.rej6.is_empty() => {
+                    // Nothing left to price but rejected columns: they are released and the scan starts again (`0xc684a`-like, `ctx+0x420` negated).
+                    for j in std::mem::take(&mut s.rej6) {
+                        s.excl6[j] = false;
+                    }
+                    s.list.clear();
+                    s.level = 0;
+                    continue;
+                }
+                None if s.stale.is_some_and(|(a, b)| {
+                    let (a, b) = (a.abs(), b.abs());
+                    a != 0.0
+                        && b != 0.0
+                        && (1e-13 > a
+                            || (b - a).abs() / (a + 1.0) > s.handoff.map_or(3e-6, |h| h.pair_tol))
+                }) =>
+                {
+                    // The pivot check also runs when the pricing found no column (`0x144ff9`, fx_midsing_1106 after the pivot of 1.154 / 1.097): the factorization is redone.
+                    s.stale = None;
+                    s.accuracy += 1;
+                    s.list.clear();
+                    s.level = 0;
+                    s.work.trig();
+                    s.work.decided(s.work.w);
+                    if let Some(mi) = s.mirror.as_mut() {
+                        mi.count_all_updates();
+                    }
+                    crate::lu_order::raise_threshold(0.5);
+                    s.forced = true;
                     continue;
                 }
                 None => {
@@ -3947,7 +4048,10 @@ pub fn solve(
             // The pivot check of `0x144ff9..0x145064` on the pair the dual's last iteration left in `ctx+0x300` / `ctx+0x308`: a disagreement (the column's
             // value below 1e-13, or the relative difference above 3e-6) zeroes both, counts an accuracy event (`ctx+0x178`), and requests a refactorization (6).
             let (a, b) = (a.abs(), b.abs());
-            if a != 0.0 && b != 0.0 && (1e-13 > a || (b - a).abs() / (a + 1.0) > 3e-6) {
+            if a != 0.0
+                && b != 0.0
+                && (1e-13 > a || (b - a).abs() / (a + 1.0) > s.handoff.map_or(3e-6, |h| h.pair_tol))
+            {
                 s.accuracy += 1;
                 s.list.clear();
                 s.level = 0;
@@ -4223,6 +4327,13 @@ pub fn solve(
             }
             res
         };
+        if crate::dump::on("ent") {
+            crate::dump::emit_tag(
+                "ent",
+                "ENTOUT",
+                serde_json::json!({"iter": iterations, "q": q, "k": chosen, "row": chosen.map(|k| entries[k].0), "alpha": chosen.map(|k| entries[k].1), "step": step}),
+            );
+        }
         if chosen.is_none() && step >= INF && infeasible && own < INF {
             // No admissible pivot and no improving slope in phase 1: the entering variable goes to its opposite bound.
             step = own;
@@ -4286,6 +4397,25 @@ pub fn solve(
             ray = Some(dir_x);
             break Status::Unbounded;
         }
+        if let (Some(k), true) = (chosen, s.handoff.is_some()) {
+            // A pivot at or below the scan tolerance `ctx+0x398` (3e-8) after the ratio test (`0x1436dd..0x1437e8`): below a factorization threshold of 0.125 the threshold
+            // rises to it and the factorization is redone (request 6); otherwise the entering variable gets status -6 and the pricing goes on without an iteration
+            // (fx_midsing_1106: pivots of 1.93e-8 rejected, 3.86e-8 taken).
+            if entries[k].1.abs() <= 3e-8 {
+                if crate::lu_order::threshold() < 0.125 {
+                    crate::lu_order::raise_threshold(0.125);
+                    s.forced = true;
+                } else {
+                    s.excl6[q] = true;
+                    s.rej6.push(q);
+                }
+                continue;
+            }
+        }
+        for j in std::mem::take(&mut s.rej6) {
+            s.excl6[j] = false;
+        }
+        s.rescan2 = false;
         // A phase 1 step may be negative (a basic variable inside its tolerance leaves from the wrong side of its bound).
         iterations += 1;
         s.iters_done = iterations;
@@ -4616,6 +4746,11 @@ pub fn solve(
             Some(pr) => pr[q],
             None => dot(&p.cols[q], &rho),
         };
+        if s.handoff.is_some() {
+            // The pair of the pivot check at the next pricing (`ctx+0x300`, `ctx+0x308`): the pivot from the column and from the row.
+            // A structural entering variable's row value is the pivot element itself (as in the update of its `d`); a slack's is the row product.
+            s.stale = Some((alpha_rq, if q < n { alpha_rq } else { arq_x }));
+        }
         let mut norm_reset = false;
         let mut changed: Vec<usize> = Vec::new();
         let mut rowvals: Vec<(usize, f64)> = Vec::new();

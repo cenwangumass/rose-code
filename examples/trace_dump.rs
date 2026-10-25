@@ -19,7 +19,13 @@ fn main() {
             o.refactor_schedule = Some(
                 sch.split(',')
                     .filter(|x| !x.is_empty())
-                    .map(|x| x.parse().unwrap())
+                    .map(|x| {
+                        if x == "|" {
+                            usize::MAX
+                        } else {
+                            x.parse().unwrap()
+                        }
+                    })
                     .collect(),
             );
         }

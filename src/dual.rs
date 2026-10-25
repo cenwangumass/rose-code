@@ -21,7 +21,41 @@ const FIXED: i32 = -4;
 /// Tolerances (`ctx+0x370..0x3b0`).
 const BIG: f64 = 1e30;
 const PRIMAL_TOL: f64 = 1e-6;
-const DUAL_TOL: f64 = 1e-6;
+const DUAL_TOL0: f64 = 1e-6;
+
+thread_local! {
+    /// The dual feasibility tolerance (`ctx+0x388`) and the counter of failed dual residual checks (`ctx+0x174`); both outlive the restarts of one solve.
+    static DUAL_TOL_CELL: std::cell::Cell<f64> = const { std::cell::Cell::new(DUAL_TOL0) };
+    static RESID_FAILS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+}
+
+thread_local! {
+    /// The number of passes started in this solve (selects the entry of a per-pass refactorization schedule).
+    static LOOP_TOL: std::cell::Cell<f64> = const { std::cell::Cell::new(1e-6) };
+    static PASS_NO: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// The basis snapshot of the reference's log timer (`ctx+0x190`) and the iteration count of the last one (`ctx+0x40`).
+    static SNAP: std::cell::RefCell<Option<(Vec<usize>, Vec<bool>)>> = const { std::cell::RefCell::new(None) };
+    /// The relative tolerance of the primal's pivot-pair check (`ctx+0x3a0`): 3e-6 from the parameters, 1e-7 from the first restore of a dropped variable on (`0x1551d4`).
+    static PAIR_TOL: std::cell::Cell<f64> = const { std::cell::Cell::new(3e-6) };
+    static SNAP_C40: std::cell::Cell<f64> = const { std::cell::Cell::new(-100.0) };
+}
+
+pub(crate) fn resid_fails() -> u32 {
+    RESID_FAILS.with(|c| c.get())
+}
+
+pub(crate) fn set_resid_fails(v: u32) {
+    RESID_FAILS.with(|c| c.set(v));
+}
+
+pub(crate) fn dual_tol() -> f64 {
+    DUAL_TOL_CELL.with(|c| c.get())
+}
+
+pub(crate) fn set_dual_tol(v: f64) {
+    DUAL_TOL_CELL.with(|c| c.set(v));
+}
+
 const PIVOT_FLOOR: f64 = 3e-8;
 const DROP_TOL: f64 = 1e-13;
 const ALPHA_TOL: f64 = 1e-10;
@@ -115,6 +149,9 @@ struct Dual<'a> {
     n_infeas: usize,
     /// Rows rejected by the ratio test since the last factorization (`ctx+0x420` count), the worst measure (`ctx+0x438`) and its row (`ctx+0x430`).
     bad_rows: Vec<usize>,
+    /// Rejected rows at the entry of the current driver call (`0xf66fb`: `ctx+0x420` copied into the local that `0xc50e4` reads): the pricing that finds no row
+    /// releases that many of the oldest ones (`0xcd250`) before it gives up.
+    old_rej: usize,
     /// The pass ended because every infeasible row was rejected (hand over to the primal like the repair case).
     rejected_end: bool,
     /// The pass ended at the request-4 refactorization with variables at an artificial bound (status -1004): the primal decides the outcome.
@@ -175,6 +212,12 @@ struct Dual<'a> {
     avg_touch: f64,
     /// Entry count of the last pivot column (`*(ctx+0x210)`).
     last_cap: usize,
+    /// The duals `y = B^-T c_B` of the last recompute.
+    last_y: Vec<f64>,
+    /// The factorization count the pass started from (`ctx+0x2c0` counts from there).
+    fac0: usize,
+    /// The iterations of the earlier passes (`ctx+0x20`).
+    it0: usize,
     /// Updates of the factor since the last refactorization.
     updates: usize,
     /// The update limit of the factor object once the value mode has started (`F+0x188`).
@@ -676,6 +719,7 @@ impl<'a> Dual<'a> {
         self.refactorizations += 1;
         self.updates = 0;
         self.bad_rows.clear();
+        self.old_rej = 0;
         self.worst = 0.0;
         self.worst_row = -2;
         self.slack_nb = (0..self.m).map(|i| self.st[self.n + i] < 0).collect();
@@ -701,7 +745,7 @@ impl<'a> Dual<'a> {
             return Ok(false);
         }
         // Second pass (`0xe8fc6..0xe98e1`): request 10, a refactorization; then for each deferred variable in turn the reduced cost `d = c - y a` with
-        // `y = B^-T c_B` (recomputed after every pivot of this pass). Within `DUAL_TOL` the variable stays free and nonbasic; beyond it the column is
+        // `y = B^-T c_B` (recomputed after every pivot of this pass). Within `dual_tol()` the variable stays free and nonbasic; beyond it the column is
         // transformed again and pivoted in on the largest entry among the rows whose basic variable has a finite lower bound (floor `0.01 PIVOT_FLOOR`);
         // without such an entry the dual is infeasible at once (`0xea0b7`: status 5, `ctx+0x2fc` the variable), before any iteration. `s70`, `s143`.
         self.request = 10;
@@ -718,7 +762,7 @@ impl<'a> Dual<'a> {
                 for &(i, a) in &self.p.fcols[j] {
                     d -= y[i] * a;
                 }
-                if d.abs() <= DUAL_TOL {
+                if d.abs() <= dual_tol() {
                     continue;
                 }
                 match self.free_candidate(j, 0.01 * PIVOT_FLOOR) {
@@ -909,6 +953,7 @@ impl<'a> Dual<'a> {
     /// d recomputed from the costs after a factorization, in the reference frame.
     fn recompute_d(&mut self) {
         let dt = self.true_d();
+        self.dual_residual_check();
         self.work
             .add_from(0x12de50, 0xe53a7, self.mirror.work, crate::work::FAC);
         for j in 0..self.n + self.m {
@@ -926,6 +971,58 @@ impl<'a> Dual<'a> {
                 self.d[j] = 0.0;
             }
         }
+    }
+
+    /// The log timer of the wrapper (`0xf9306..0xf6e13`): on a fresh factor with no request pending, the first time the total iteration count is 100 past the last
+    /// snapshot, the basis is saved (`0xd40b0`, only while the restart counter is below 5). The first one (at the start) is the basis a restart from scratch builds.
+    fn log_snapshot(&mut self) {
+        if self.updates != 0 || self.request != 0 || self.retries >= 5 || self.status.is_some() {
+            return;
+        }
+        let total = (self.it0 + self.iters) as f64;
+        let c40 = SNAP_C40.with(|c| c.get());
+        if total - c40 < 100.0 {
+            return;
+        }
+        SNAP_C40.with(|c| c.set(total));
+        if c40 > -100.0 {
+            let basic = self.head.clone();
+            let at_upper = self.st.iter().map(|&t| t == UB).collect();
+            SNAP.with(|c| *c.borrow_mut() = Some((basic, at_upper)));
+        }
+    }
+
+    /// The dual residual check of the post-refactor pass (`0xe5965..0xe5d4c`): `max |c_j - y a_j|` over the basic variables, read when the factorization count is 4 mod 5
+    /// or the request is 4 or 6. A residual above the tolerance counts a failure; at the sixth the tolerance grows tenfold (up to 1e-3) and the counter restarts.
+    fn dual_residual_check(&mut self) {
+        let req = self.request;
+        if !((self.refactorizations - self.fac0) % 5 == 4 || req == 4 || req == 6) {
+            return;
+        }
+        let mut meas = 0.0f64;
+        for &j in &self.head {
+            let mut acc = self.cost[j];
+            for &(i, a) in &self.p.fcols[j] {
+                acc -= self.last_y[i] * a;
+            }
+            meas = meas.max(acc.abs());
+        }
+        let tol = dual_tol();
+        if crate::dump::on("dualtol") {
+            crate::dump::emit(
+                "dualtol",
+                serde_json::json!({"meas": meas, "tol": tol, "cnt": RESID_FAILS.with(|c| c.get()), "req": req, "n": self.refactorizations - self.fac0}),
+            );
+        }
+        let mut cnt = RESID_FAILS.with(|c| c.get());
+        if meas > tol {
+            cnt += 1;
+        }
+        if cnt > 5 && tol < 1e-3 {
+            set_dual_tol(tol * 10.0);
+            cnt = 0;
+        }
+        RESID_FAILS.with(|c| c.set(cnt));
     }
 
     /// d from the costs (`d_j = c_j - y a_j`, in the true frame) with y = B^-T c_B from the reference BTRAN; the terms are subtracted row by row in
@@ -950,6 +1047,7 @@ impl<'a> Dual<'a> {
         for &(i, v) in out.iter() {
             y[i] = v;
         }
+        self.last_y = y.clone();
         let mut d = vec![0.0; p.n + p.m];
         for j in 0..p.n + p.m {
             if self.st[j] < 0 {
@@ -1551,7 +1649,7 @@ impl<'a> Dual<'a> {
         xbr: f64,
     ) -> Ratio {
         let p = self.p;
-        let delta = DUAL_TOL;
+        let delta = dual_tol();
         let (vlb, vub) = (p.lo[leave], p.up[leave]);
         let xmm10 = if above { vub - xbr } else { xbr - vlb };
         let ptol = self.ptol();
@@ -1836,10 +1934,17 @@ impl<'a> Dual<'a> {
             }
         }
         if kept.is_empty() {
+            // Candidates exist (the list is not empty) but the fallback keeps none: the row is rejected like a row below the pivot tolerance, with the same
+            // measure (fx_midsing_1127 call 18: `0.01 maxa`, flag 5, `ctx+0x338` = 2), instead of ending in the no-entering-variable verdict.
+            let m = if 0.01 <= -xmm10 {
+                maxa * 0.01
+            } else {
+                xmm10 * maxa
+            };
             return Ratio {
                 q: None,
                 flips: Vec::new(),
-                reject: None,
+                reject: Some(-m.abs()),
             };
         }
         // The entries of the list that the second loop `0xc8a05` walks: the flips and the kept candidates (`r8d` at `0xc8b2e`).
@@ -1908,7 +2013,7 @@ impl<'a> Dual<'a> {
     /// range times `m`), else by `m ((r mod 500 + 111) / 1000 + 1)` with `r` an integer draw, so that `d'` becomes positive (0.1 to 0.6 of `m`). The cost
     /// takes the shift (plus at the lower bound, minus at the upper), the objective offset the shift times the bound.
     fn shift_cost(&mut self, j: usize) {
-        let delta = DUAL_TOL;
+        let delta = dual_tol();
         let m = -self.d[j];
         let (lo, up) = (self.p.lo[j], self.p.up[j]);
         let small = delta * 0.0005 > m || (delta * 0.05 > m && delta * 0.1 > (up - lo) * m);
@@ -1953,7 +2058,7 @@ impl<'a> Dual<'a> {
     ) -> (usize, f64) {
         let mut xm3;
         let mut xm5 = xm5;
-        let delta = DUAL_TOL;
+        let delta = dual_tol();
         let mut chosen = chosen;
         let mut kept: Vec<usize> = kept.to_vec();
         for _ in 0..8 {
@@ -2040,7 +2145,7 @@ impl<'a> Dual<'a> {
         flips: Vec<usize>,
         xm5: f64,
     ) -> (usize, Vec<usize>) {
-        let delta = DUAL_TOL;
+        let delta = dual_tol();
         let (qj, aq) = row[chosen];
         let theta = self.d[qj] / aq;
         let tol = 1000.0 * delta;
@@ -2186,6 +2291,24 @@ impl<'a> Dual<'a> {
                 s["r"] = serde_json::json!(-1);
                 *dump = Some(s);
             }
+            // No row and rows were rejected (`0xc50d4..0xc5105`, `0xc67f6..0xc683b`): the rows rejected before this driver call are released (`0xcd250`: flag 0 and
+            // a new priority if still infeasible, else flag 2) and the pricing runs again; with none of them left, a factor with updates is refactorized with
+            // a higher pivot threshold (request 6), a fresh one is the end handled in `no_row` (fx_midsing_1106 call 21).
+            if self.request == 0 && !self.bad_rows.is_empty() && self.value_mode {
+                if self.old_rej > 0 {
+                    self.release_rejected();
+                    return Step::Reject;
+                }
+                if self.updates != 0 {
+                    self.lu_thr = if 0.125 > self.lu_thr {
+                        0.125
+                    } else {
+                        self.lu_thr.max(0.5)
+                    };
+                    self.request = 6;
+                    return Step::Mismatch;
+                }
+            }
             return Step::NoRow;
         };
         let leave = self.head[r];
@@ -2214,6 +2337,10 @@ impl<'a> Dual<'a> {
         // The row's value of the chosen entering variable is stored (`ctx+0x308`) before the single-candidate check rejects it (fx_midsing_1496 call 5: -4.5e-9).
         if let Some(qe) = rt.q {
             self.pair.1 = row[qe].1;
+        }
+        // A row rejected for its small entries stores the measure of the rejection there too (`ctx+0x308` = `ctx+0x438`: fx_midsing_1106 pairs of -6.2287e-11).
+        if let (Some(rj), true) = (rt.reject, true) {
+            self.pair.1 = rj;
         }
         // The chosen pivot is checked once more (`0xc94a3..0xc9528`): a value above minus the pivot floor on a non-free variable rejects the row like the
         // test on the whole row (a single candidate bypasses the tolerance of the selection; rnd1496 call 5).
@@ -2516,7 +2643,7 @@ impl<'a> Dual<'a> {
                 }
             }
         }
-        if self.d[q] <= DUAL_TOL {
+        if self.d[q] <= dual_tol() {
             self.stall += 1;
         }
         self.iters += 1;
@@ -2557,6 +2684,39 @@ impl<'a> Dual<'a> {
         })
     }
 
+    /// The driver around the pricing returns (`0xf6745..0xf6768`, `0xf8b51..0xf8b77`): the worst rejected row is cleared and the rejected rows so far are the
+    /// ones a later call may release.
+    fn driver_return(&mut self) {
+        self.worst = 0.0;
+        self.worst_row = -1;
+        self.old_rej = self.bad_rows.len();
+    }
+
+    /// `0xcd250` on the rows rejected before the current driver call: a row still infeasible gets flag 0 and its priority, any other flag 2; the rest of the
+    /// list moves up.
+    fn release_rejected(&mut self) {
+        let tol = self.ptol();
+        let first: Vec<usize> = self
+            .bad_rows
+            .drain(..self.old_rej.min(self.bad_rows.len()))
+            .collect();
+        self.old_rej = 0;
+        for r in first {
+            if self.flags[r] < 5 {
+                continue;
+            }
+            let v = self.head[r];
+            let (x, lo, up) = (self.xb[r], self.p.lo[v], self.p.up[v]);
+            if (lo > -BIG && lo - tol > x) || (up < BIG && x > tol + up) {
+                let f = self.infeas(r);
+                self.prio[r] = self.pri(r, f);
+                self.flags[r] = 0;
+            } else {
+                self.flags[r] = 2;
+            }
+        }
+    }
+
     /// The no-leaving-row handler (`0x1aa280`): a refactorization request, optimality or infeasibility.
     fn no_row(&mut self) {
         if self.updates != 0 {
@@ -2564,7 +2724,7 @@ impl<'a> Dual<'a> {
             // (`ctx+0x290` is 0, `0xe4891` is not taken) and are removed at the end of the solve.
             self.request = 4;
             self.confirmed = true;
-        } else if !self.bad_rows.is_empty() && self.pert != 0 {
+        } else if !self.bad_rows.is_empty() {
             // Rows were rejected by the ratio test (pivot row too small) and the fresh factor leaves none to price: the dual ends with the cost shifts in
             // force (status -1004 in the reference); the controller hands over to the primal, which removes them, and reruns the dual (rnd1496 pass 1).
             self.status = Some(Status::Infeasible);
@@ -2578,8 +2738,8 @@ impl<'a> Dual<'a> {
         } else {
             let p = self.p;
             for j in 0..self.n + self.m {
-                let bad = (self.st[j] == UB && p.up[j] >= BIG && self.d[j] > DUAL_TOL)
-                    || (self.st[j] == LB && p.lo[j] <= -BIG && self.d[j] > DUAL_TOL);
+                let bad = (self.st[j] == UB && p.up[j] >= BIG && self.d[j] > dual_tol())
+                    || (self.st[j] == LB && p.lo[j] <= -BIG && self.d[j] > dual_tol());
                 if bad {
                     self.dual_unbounded();
                     return;
@@ -2600,7 +2760,7 @@ impl<'a> Dual<'a> {
 
     /// A free nonbasic variable has a reduced cost beyond the dual tolerance.
     fn free_infeasible(&self) -> bool {
-        (0..self.n + self.m).any(|j| self.st[j] == FREE && self.d[j].abs() > DUAL_TOL)
+        (0..self.n + self.m).any(|j| self.st[j] == FREE && self.d[j].abs() > dual_tol())
     }
 
     /// The dual is infeasible (unbounded dual ray in the primal's terms): a nonbasic variable sits at an artificial bound with the wrong-signed d, or is free
@@ -2680,11 +2840,11 @@ impl<'a> Dual<'a> {
         for j in 0..self.n + self.m {
             let d = self.d[j];
             let shift = if self.st[j] == LB {
-                (d < -DUAL_TOL).then_some(-d)
+                (d < -dual_tol()).then_some(-d)
             } else if self.st[j] == UB {
-                (d < -DUAL_TOL).then_some(d)
+                (d < -dual_tol()).then_some(d)
             } else if self.st[j] == FREE {
-                (d.abs() > DUAL_TOL).then_some(-d)
+                (d.abs() > dual_tol()).then_some(-d)
             } else {
                 None
             };
@@ -2706,23 +2866,23 @@ impl<'a> Dual<'a> {
                 if (self.st[j] == LB || self.st[j] == UB)
                     && lo_inf
                     && up_inf
-                    && self.d[j].abs() <= DUAL_TOL
+                    && self.d[j].abs() <= dual_tol()
                 {
                     // A free variable no longer tied to an artificial bound by its d goes back to the free status (value 0).
                     self.st[j] = FREE;
                     self.d[j] = 0.0;
-                } else if self.st[j] == LB && self.d[j] < -DUAL_TOL {
+                } else if self.st[j] == LB && self.d[j] < -dual_tol() {
                     self.st[j] = UB;
                     self.d[j] = -self.d[j];
-                } else if self.st[j] == UB && up_inf && self.d[j] <= DUAL_TOL {
+                } else if self.st[j] == UB && up_inf && self.d[j] <= dual_tol() {
                     self.st[j] = LB;
                     self.d[j] = -self.d[j];
-                } else if self.st[j] == UB && !up_inf && self.d[j] < -DUAL_TOL {
+                } else if self.st[j] == UB && !up_inf && self.d[j] < -dual_tol() {
                     // At a finite upper bound with the wrong-signed d (`0xe7820`, status -2: d' < -tol): the variable goes to its lower bound (fx_badscale
                     // release, x with a scaled cost of -2e-9 that the pivot turns into +2e-6).
                     self.st[j] = LB;
                     self.d[j] = -self.d[j];
-                } else if self.st[j] == LB && lo_inf && !up_inf && self.d[j] <= DUAL_TOL {
+                } else if self.st[j] == LB && lo_inf && !up_inf && self.d[j] <= dual_tol() {
                     // The mirror of the previous rule for a variable without a lower bound.
                     self.st[j] = UB;
                     self.d[j] = -self.d[j];
@@ -2827,7 +2987,7 @@ impl<'a> Dual<'a> {
     /// 128 when `a > 128 M`; else the smallest power of two `x < 128` with `a > M x` (or 128), halved when above 2, else 1 (no rescale). With a factor above 1
     /// the costs, the reduced costs and the objective scale `ctx+0xd8` are multiplied by it.
     fn rescale_objective(&mut self) {
-        let a = DUAL_TOL;
+        let a = dual_tol();
         let mut mx = 0.0f64;
         for j in 0..self.n + self.m {
             if self.st[j] == FREE {
@@ -2903,7 +3063,7 @@ impl<'a> Dual<'a> {
                     self.cost[j] -= xi;
                     self.d[j] += xi;
                     acc += p.up[j] * xi;
-                } else if self.d[j] <= DUAL_TOL {
+                } else if self.d[j] <= dual_tol() {
                     self.d[j] = -self.d[j];
                     self.pcost[j] += xi;
                     self.cost[j] += xi;
@@ -2928,6 +3088,12 @@ impl<'a> Dual<'a> {
 
     /// The post-iteration passes `0xf6c82..0xf6d0a`: factor update or refactorization, the dual update, the primal and weight update.
     fn post(&mut self, pv: Option<&Pivot>, schedule_due: bool) -> Result<(), SolveError> {
+        self.post_inner(pv, schedule_due)?;
+        self.log_snapshot();
+        Ok(())
+    }
+
+    fn post_inner(&mut self, pv: Option<&Pivot>, schedule_due: bool) -> Result<(), SolveError> {
         let refactor = self.request != 0 || schedule_due;
         if refactor {
             self.work.decided(self.work.w);
@@ -3261,9 +3427,27 @@ fn solve_frame(
         after_pivot: false,
         it_base: 0,
     };
+    set_dual_tol(DUAL_TOL0);
+    RESID_FAILS.with(|c| c.set(0));
+    SNAP.with(|c| *c.borrow_mut() = None);
+    SNAP_C40.with(|c| c.set(-100.0));
+    PAIR_TOL.with(|c| c.set(3e-6));
+    PASS_NO.with(|c| c.set(0));
     loop {
+        // The controller loop reads the tolerance at its top (`0x154ccc`) and sets it again for the primal it starts (`0x15647a`).
+        LOOP_TOL.with(|c| c.set(dual_tol()));
         SINGULAR.with(|c| c.set(None));
-        match solve_pass(model, start, opts, &carry) {
+        let snap_start;
+        let start_now = match (start, SNAP.with(|c| c.borrow().clone())) {
+            // A restart takes the basis of the last snapshot (`0xcedb0`, `0xd40b0`): the log timer of the wrapper (`0xf9306`) saves the basis at the first
+            // fresh factorization after every 100 iterations (the slack basis at the start, which a restart from scratch reproduces).
+            (None, Some((basic, at_upper))) if carry.iters > 0 => {
+                snap_start = Basis { basic, at_upper };
+                Some(&snap_start)
+            }
+            _ => start,
+        };
+        match solve_pass(model, start_now, opts, &carry) {
             Err(SolveError::SingularBasis) if carry.retries < 100 => {
                 let Some((
                     iters,
@@ -3313,6 +3497,10 @@ fn solve_pass(
     opts: &SolveOptions,
     carry: &Carry,
 ) -> Result<SolveResult, SolveError> {
+    if carry.retries > 0 && carry.retries % 3 == 0 {
+        // The fresh start of every third restart initialises the context again (`0xcf29b`): the tolerance goes back to the parameter, the counter stays.
+        set_dual_tol(DUAL_TOL0);
+    }
     let p = build(model);
     let (n, m) = (p.n, p.m);
     let mut dropped = None;
@@ -3367,12 +3555,17 @@ fn solve_pass(
         rrows: vec![Vec::new(); m],
         refactorizations: carry.fac + 1,
         lu_thr: carry.thr,
-        pmode: if start.is_some() { 3 } else { 1 },
+        pmode: if start.is_some() || (carry.retries > 0 && carry.retries % 3 != 0) {
+            3
+        } else {
+            1
+        },
         n_infeas: 0,
         inf_count: carry.inf_count,
         retries: carry.retries,
         repaired: None,
         bad_rows: Vec::new(),
+        old_rej: 0,
         rejected_end: false,
         art_exit: false,
         worst: 0.0,
@@ -3404,6 +3597,9 @@ fn solve_pass(
         warm: start.is_some(),
         avg_touch: carry.avg_touch,
         last_cap: carry.last_cap,
+        last_y: Vec::new(),
+        fac0: carry.fac,
+        it0: carry.iters,
         updates: 0,
         upd_limit: None,
         pending_alpha: None,
@@ -3478,7 +3674,7 @@ fn solve_pass(
         if s.st[j] >= 0 {
             continue;
         }
-        if s.st[j] == FREE && dt[j].abs() > DUAL_TOL {
+        if s.st[j] == FREE && dt[j].abs() > dual_tol() {
             // A free variable the setup pivots could not bring into the basis (no basic variable with a finite lower bound in its column) and that is dual
             // infeasible: it takes the artificial bound its d asks for, like any other variable without the bound it would need.
             s.st[j] = if dt[j] > 0.0 { LB } else { UB };
@@ -3493,9 +3689,9 @@ fn solve_pass(
             };
             continue;
         }
-        if dt[j] < -DUAL_TOL {
+        if dt[j] < -dual_tol() {
             s.st[j] = UB;
-        } else if dt[j] > DUAL_TOL {
+        } else if dt[j] > dual_tol() {
             s.st[j] = LB;
         } else if crash_upper.as_ref().is_some_and(|u| u[j]) {
             // A d within the tolerance keeps the status the crash gave (`0xead36`: at the upper bound for a negative cost, else at the lower bound, then
@@ -3516,6 +3712,11 @@ fn solve_pass(
         for &j in sup {
             s.dflag[j] = false;
         }
+    }
+    if supplied.is_none() && carry.retries > 0 && carry.retries % 3 != 0 {
+        // A pass after a singular factorization runs in the pricing mode 3 from the slack basis (fx_midsing_1106: the second vector of the two-vector FTRAN is
+        // dense from the first iteration of the second pass, the weights differ from the first pass in the last bits).
+        s.dflag = s.st.iter().map(|&t| t < 0).collect();
     }
     // Initial weights: the squared norms of the rows of B^-1 (a supplied basis starts with unit weights).
     for r in 0..if s.warm { 0 } else { m } {
@@ -3543,7 +3744,22 @@ fn solve_pass(
     // The carried average decides the pricing mode of the first recompute; the running average of the pass (`P+0x48`) starts at 0 (m6, m5 captures).
     s.avg_touch = 0.0;
     s.flags_work();
-    let schedule = opts.refactor_schedule.clone();
+    s.log_snapshot();
+    // A schedule with `usize::MAX` separators is one list of per-pass iteration counts for each pass of a run with restarts (the counter restarts at 0).
+    let pass_no = PASS_NO.with(|c| {
+        let k = c.get();
+        c.set(k + 1);
+        k
+    });
+    let schedule = opts.refactor_schedule.as_ref().map(|sch| {
+        if sch.contains(&usize::MAX) {
+            sch.split(|&x| x == usize::MAX)
+                .nth(pass_no)
+                .map_or_else(Vec::new, |v| v.to_vec())
+        } else {
+            sch.clone()
+        }
+    });
     let mut trace = Vec::new();
     let mut k = 0usize;
     let mut farkas = None;
@@ -3601,12 +3817,16 @@ fn solve_pass(
                     }
                 };
                 s.post(Some(&pv), due)?;
+                // The driver around the pricing (`0xf6745..0xf6768`, `0xf8b51..0xf8b77`) clears the worst rejected row (`ctx+0x430` = -1, `ctx+0x438` = 0)
+                // each time it returns, so the "first rejection" is per iteration; the rejected count `ctx+0x420` stays (fx_midsing_1106 call 20).
+                s.driver_return();
             }
             Step::Reject => {}
             Step::Mismatch => {
                 if s.status.is_none() {
                     s.post(None, false)?;
                 }
+                s.driver_return();
             }
             Step::Restart => {
                 SINGULAR.with(|c| {
@@ -3631,6 +3851,7 @@ fn solve_pass(
                 if s.status.is_none() {
                     s.post(None, false)?;
                 }
+                s.driver_return();
             }
             Step::Unbounded(y) => {
                 if s.updates != 0 {
@@ -3679,11 +3900,16 @@ fn solve_pass(
     if (restored.is_some() && matches!(status, Status::Optimal | Status::Infeasible))
         || (status == Status::Infeasible && s.rejected_end)
     {
+        if restored.is_some() {
+            PAIR_TOL.with(|c| c.set(1e-7));
+        }
         // The controller (`0x154f43..0x155190`) after a dual that left a variable out (a singular supplied basis, or the repair after the retry limit):
         // the variable goes back to a bound (status -4 + 3) and the primal runs from the dual's basis; the dropped variable is priced again (a bound flip
         // or a pivot, each one an iteration).
         let mut popts = opts.clone();
         popts.method = crate::simplex::Method::Primal;
+        // The dual's teacher-forced factorization schedule does not apply to the primal, which decides its own (work based).
+        popts.refactor_schedule = None;
         let b = Basis {
             basic: s.head.clone(),
             at_upper: s.st.iter().map(|&t| t == UB).collect(),
@@ -3693,9 +3919,11 @@ fn solve_pass(
                 stale: Some(s.pair),
                 thr: s.lu_thr,
                 retries: s.retries as usize,
-                pert: s.pert >= 2,
+                pert: s.pert >= 2 && !s.rejected_end,
+                pair_tol: PAIR_TOL.with(|c| c.get()),
             }))
         });
+        set_dual_tol(LOOP_TOL.with(|c| c.get()));
         crate::simplex::PRIMAL_SINGULAR.with(|c| c.set(None));
         crate::simplex::PRIMAL_REPAIRED.with(|c| c.set(false));
         let mut r = match crate::simplex::solve(model, Some(&b), &popts) {
@@ -3706,6 +3934,8 @@ fn solve_pass(
                 else {
                     return Err(SolveError::SingularBasis);
                 };
+                // The reference's iteration counter (`ctx+0x2a8`, the log timer's clock) runs five above the primal's pivots here (fx_midsing_1106: 9 per run).
+
                 SINGULAR.with(|c| {
                     c.set(Some((
                         s.iters + pit,
@@ -3733,6 +3963,7 @@ fn solve_pass(
                     thr: s.lu_thr,
                     retries: s.retries as usize + 1,
                     pert: false,
+                    pair_tol: PAIR_TOL.with(|c| c.get()),
                 }))
             });
             let b2 = r.basis.clone();
@@ -3750,21 +3981,30 @@ fn solve_pass(
         }
         r.iterations += s.iters;
         r.refactorizations += s.refactorizations;
+        if r.status == Status::NumericalFailure {
+            // The primal's phase 1 ratio test finds no row on a fresh factor: the reference ends the solve with status 12 (fx_midsing_1031), the controller does not
+            // restart the dual.
+            return Ok(r);
+        }
         if status == Status::Infeasible && s.pert != 0 && !repaired {
             // The dual ended with cost shifts in force: the primal removes them and ends with status -1004 (its price scan finds nothing), and the
             // controller runs the dual again from the primal's basis (m5: one primal pivot, then the dual proves the infeasibility on the true costs).
+            // With a basis snapshot (`0xd40b0`, taken after 100 iterations) the controller restarts from it instead (`0xcedb0`; fx_midsing_1106 call 113).
+            let snap = SNAP.with(|c| c.borrow().clone());
+            let from_snap = snap.is_some();
             let carry2 = Carry {
-                retries: s.retries,
+                retries: s.retries + from_snap as u32,
                 thr: s.lu_thr,
                 fac: r.refactorizations,
                 iters: r.iterations,
                 avg_touch: 0.0,
                 last_cap: 0,
                 inf_count: 0,
-                after_pivot: true,
+                after_pivot: !from_snap,
                 it_base: r.iterations,
             };
-            let mut r2 = solve_pass(model, Some(&r.basis), opts, &carry2)?;
+            let snap_basis = snap.map(|(basic, at_upper)| Basis { basic, at_upper });
+            let mut r2 = solve_pass(model, snap_basis.as_ref().or(Some(&r.basis)), opts, &carry2)?;
             r2.iterations += carry2.iters;
             return Ok(r2);
         }
