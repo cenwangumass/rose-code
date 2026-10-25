@@ -164,6 +164,8 @@ pub enum Status {
     Unbounded,
     IterationLimit,
     NumericalFailure,
+    /// The solve stopped short of the tolerances and returns its best iterate (the barrier's API status 13, `SUBOPTIMAL`).
+    Suboptimal,
 }
 
 /// One simplex iteration as seen by the diagnostic stream.

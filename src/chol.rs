@@ -1706,7 +1706,7 @@ impl CholSolver {
     }
 
     fn solve(&self, f: &StdForm, rx: &[f64], ry: &[f64]) -> (Vec<f64>, Vec<f64>) {
-        solve305(
+        let out = solve305(
             &self.a,
             &self.plan,
             self.fac.as_ref().expect("factor before solve"),
@@ -1714,7 +1714,22 @@ impl CholSolver {
             &self.d,
             rx,
             ry,
-        )
+        );
+        if crate::dump::on("barrier_solve") {
+            static CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+            let s = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let bits = |v: &[f64]| {
+                v.iter()
+                    .map(|x| format!("{:016x}", x.to_bits()))
+                    .collect::<Vec<_>>()
+            };
+            crate::dump::emit_tag(
+                "barrier_solve",
+                "RSOLVE",
+                serde_json::json!({"s": s, "rx": bits(rx), "ry": bits(ry), "D": bits(&self.d), "dx": bits(&out.0), "dy": bits(&out.1)}),
+            );
+        }
+        out
     }
 
     /// `SYM+0x178 == 1` (`0x2f1720`): free columns remain, or the smallest pivot ratio is below `1e-10` (dense columns and scaling are not modelled).

@@ -2303,6 +2303,31 @@ fn vec_json(v: &[f64]) -> Value {
     json!(v)
 }
 
+/// `ROSE_DUMP=barrier_best`: one BEST record per call of the best-iterate tracker (`flag` 0 after the per-iteration update, 1 after the save at the end).
+fn emit_best(h: &Hist, it: i32, flag: i32, st: &State) {
+    if !dump::on("barrier_best") {
+        return;
+    }
+    let at = |v: &Vec<f64>| {
+        let a = v.get(it as usize).copied();
+        let b = if h.q88 >= 0 {
+            v.get(h.q88 as usize).copied()
+        } else {
+            None
+        };
+        json!([a, b])
+    };
+    dump::emit_tag(
+        "barrier_best",
+        "BEST",
+        json!({"it": it, "flag": flag, "q88": h.q88, "qa8": h.qa8, "mins": h.mins,
+            "q220": h.nrm.x2, "q230": h.nrm.z2,
+            "xx": dot_lanes(&st.x, &st.x, 0), "zz": dot_lanes(&st.z, &st.z, 0), "yy": dot_lanes(&st.y, &st.y, 0), "nx": st.x.len(),
+            "h": {"h48": at(&h.h48), "h50": at(&h.h50), "h58": at(&h.h58), "h60": at(&h.h60),
+                  "h68": at(&h.h68), "h70": at(&h.h70), "h78": at(&h.h78), "h80": at(&h.h80)}}),
+    );
+}
+
 fn emit_record(r: &IterRecord) {
     let k = "barrier";
     if !dump::on(k) {
@@ -2497,6 +2522,15 @@ fn save_iterate(st: &State, tau: f64, it: i32) -> Saved {
     }
 }
 
+/// Plain sequential `sum a_i^2`.
+fn dot_seq(a: &[f64]) -> f64 {
+    let mut s = 0.0;
+    for &v in a {
+        s += v * v;
+    }
+    s
+}
+
 /// `maxsd dst, src`: `dst` if `dst > src`, else `src`.
 fn maxsd(a: f64, b: f64) -> f64 {
     if a > b {
@@ -2544,7 +2578,7 @@ fn better(
 }
 
 /// The second solve of the homogeneous algorithm (`0x3117e0`: `(c, b)`, with `c_j - v_j ub_j / u_j` on the upper-bounded columns) and
-/// `den = (kappa / tau + b'dy_s) - c'dx_s`, plus `((v ub) (ub - dx_s)) / u` per upper-bounded column.
+/// `den = (kappa / tau + b'dy_s) - c'dx_s` (`c'dx_s` over the `n2` columns only: 10 columns are a block of 8 and a scalar tail), plus `((v ub) (ub - dx_s)) / u` per upper-bounded column.
 struct Hsd {
     /// `Q+0x790 / 0x798`.
     norms: (f64, f64),
@@ -2573,8 +2607,8 @@ impl Hsd {
             }
         }
         let (dxs, dys) = solver.solve_raw(f, &rxs, &f.b)?;
-        let mut den =
-            ((kappa / tau) + dot_lanes(&f.b[..m], &dys[..m], 0)) - dot_lanes(&cx, &dxs, 0);
+        let mut den = ((kappa / tau) + dot_lanes(&f.b[..m], &dys[..m], 0))
+            - dot_lanes(&cx[..f.n2], &dxs[..f.n2], 0);
         // `0x3107ea`: the upper-bounded columns add `((v ub) (ub - dx_s)) / u`.
         for j in f.ub_lo..f.ub_hi {
             if f.flags[j] & 2 != 0 {
@@ -2605,8 +2639,9 @@ impl Hsd {
         kappa: f64,
     ) -> (f64, f64) {
         let (m, n) = (f.m, f.n());
-        let mut num =
-            ((g - dot_lanes(&f.b[..m], &d.dy[..m], 0)) + dot_lanes(&self.cx, &d.dx, 0)) + rk / tau;
+        let mut num = ((g - dot_lanes(&f.b[..m], &d.dy[..m], 0))
+            + dot_lanes(&self.cx[..f.n2], &d.dx[..f.n2], 0))
+            + rk / tau;
         for j in f.ub_lo..f.ub_hi {
             if f.flags[j] & 2 != 0 {
                 let du1 = rhs.ru[j] - d.dx[j];
@@ -2984,6 +3019,7 @@ pub fn run<S: NormalSolver>(
                 h.qa8 = it;
             }
         }
+        emit_best(&h, it, 0, &st);
         if res.q148 > best_dual && it > 0 {
             best_dual = res.q148;
         }
@@ -3028,6 +3064,7 @@ pub fn run<S: NormalSolver>(
                 h.saved = Some(save_iterate(&st, tau, it));
                 h.q88 = it;
             }
+            emit_best(&h, it, 1, &st);
             let mut code = code;
             if code == 0xd {
                 let a = ti_res.q1d8 / (h.nrm.xinf + 1.0);
@@ -3039,6 +3076,21 @@ pub fn run<S: NormalSolver>(
                 let h2 = g / maxsd(1.0, f64::min(ti_res.q130.abs(), ti_res.q140.abs()));
                 if o.tol > a && o.tol > b && 10.0 * o.tol > h2 {
                     code = 2;
+                }
+            }
+            // `0x2e2e64`: with a saved iterate (`Q+0x88 >= 0`) and the end code 0xd: saved relative gap >= 0.1 -> 0xc; else optimal when tol > Q1f8 of the
+            // saved iterate and 10 Q260 > Q198, 10 Q268 > Q1a8 (saved) or 10 Q270 > Q1d8, 10 Q278 > Q1e0 (current).
+            if code == 0xd && h.q88 >= 0 {
+                let i = h.q88 as usize;
+                let (p, d) = (h.h48[i], h.h60[i]);
+                if (p - d).abs() / (p.abs() + 1.0) >= 0.1 {
+                    code = 0xc;
+                } else if o.tol > h.h78[i] {
+                    if (10.0 * sc.q260 > h.h50[i] && 10.0 * sc.q268 > h.h68[i])
+                        || (10.0 * sc.q270 > ti_res.q1d8 && 10.0 * sc.q270 > ti_res.q1e0)
+                    {
+                        code = 2;
+                    }
                 }
             }
             let status = match code {
@@ -3308,9 +3360,9 @@ pub fn run<S: NormalSolver>(
         let (mut next, (g, _sp, _sd), hout) = update(f, &st, &comb, cp, cd, ncomp, hk);
         // `Q+0x220..0x240` (`0x30ebbf`): norms of the updated iterate, before the dual iterate is rescaled.
         h.nrm = Norms {
-            x2: dot_lanes(&next.x, &next.x, 0),
-            y2: dot_lanes(&next.y, &next.y, 0),
-            z2: dot_lanes(&next.z, &next.z, 0),
+            x2: dot_seq(&next.x),
+            y2: dot_seq(&next.y),
+            z2: dot_seq(&next.z),
             xinf: max_abs(&next.x),
             zinf: max_abs(&next.z),
         };
@@ -3537,8 +3589,8 @@ pub fn solve_release(model: &LpModel, o: &Options) -> Result<Solution, BarrierEr
 }
 
 /// `Method::Barrier` of [`crate::solve`]: [`solve_exact`] with the options mapped (`barrier_tol`, `max_iterations`), the result in the public types.
-/// Status: optimal, the iteration limit (API 7), unbounded (code 5, API 5) and infeasible (code 3, never observed); infeasible-or-unbounded (code 0xd, API 12)
-/// and the other codes (6, 0xb, 13) are reported as `NumericalFailure` (no certificate is produced); code 13 keeps the saved best iterate, the others have a NaN objective.
+/// Status: optimal, the iteration limit (API 7), unbounded (code 5, API 5) and infeasible (code 3, never observed); infeasible-or-unbounded (code 0xc, API 12)
+/// and the other codes (6, 0xb) are reported as `NumericalFailure` (no certificate is produced, NaN objective); code 0xd (API 13, stalled) is `Suboptimal` and keeps the saved best iterate.
 pub fn solve_method(
     model: &LpModel,
     opts: &crate::SolveOptions,
@@ -3560,9 +3612,11 @@ pub fn solve_method(
     let status = match sol.run.status {
         BarrierStatus::Optimal => Status::Optimal,
         BarrierStatus::IterationLimit => Status::IterationLimit,
-        // 5: unbounded (API 5, fx_unbounded); 3: infeasible (never observed); 0xd: infeasible or unbounded (API 12, fx_infeasible), reported like PDHG's 12.
+        // 5: unbounded (API 5, fx_unbounded); 3: infeasible (never observed); 0xc: infeasible or unbounded (API 12, fx_infeasible), reported like PDHG's 12.
         BarrierStatus::Other(5) => Status::Unbounded,
         BarrierStatus::Other(3) => Status::Infeasible,
+        // 0xd after the best-iterate checks of the end (`0x2e2e64`): API 13, the best iterate is returned (stalled, GREENBEA release).
+        BarrierStatus::Other(13) => Status::Suboptimal,
         BarrierStatus::Other(_) => Status::NumericalFailure,
     };
     // Code 13 (stalled, GREENBEA release) returns the saved best iterate like the reference; the other failure codes have no point (NaN objective).

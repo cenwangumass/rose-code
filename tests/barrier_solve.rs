@@ -181,13 +181,33 @@ fn maximization_doubled_ranges_and_homogeneous_statuses_match_reference_bitwise(
         &fx,
         "fx_infeasible",
         include_str!("fixtures/fx_infeasible.mps"),
-        BarrierStatus::Other(0xd),
+        BarrierStatus::Other(0xc),
     );
+    // The stalled end (`0x2e2e64`: saved iterate, gap below 0.1, residuals too large for optimal): code 0xd, API 13, the best iterate is returned.
+    for (name, text, iters) in [
+        (
+            "fx_bar_stall52",
+            include_str!("fixtures/fx_bar_stall52.mps"),
+            56,
+        ),
+        (
+            "fx_bar_stall109",
+            include_str!("fixtures/fx_bar_stall109.mps"),
+            93,
+        ),
+    ] {
+        check_solve(&fx, name, text, BarrierStatus::Other(0xd));
+        assert_eq!(fx[name]["run"]["iters"].as_i64().unwrap(), iters);
+    }
     for (text, status) in [
         (include_str!("fixtures/fx_unbounded.mps"), Status::Unbounded),
         (
             include_str!("fixtures/fx_infeasible.mps"),
             Status::NumericalFailure,
+        ),
+        (
+            include_str!("fixtures/fx_bar_stall52.mps"),
+            Status::Suboptimal,
         ),
     ] {
         let r = solve(&mps::parse(text).unwrap(), None, &SolveOptions::barrier()).unwrap();
@@ -315,5 +335,35 @@ fn release_profile_scales_range_columns_in_ranges_order() {
         same(name, "pi (read-out)", 0, &floats(&run["pi"]), &sol.y);
         same(name, "rc (read-out)", 0, &floats(&run["rc"]), &sol.rc);
         scalar(name, "objective", 0, &run["obj"], sol.objective);
+    }
+}
+
+/// The stalled end in the release profile (API 13, no solution in the reference; the iteration count and the status bit for bit); `fx_bar_stall113` ends
+/// infeasible (code 3) after 17 iterations.
+#[test]
+fn release_profile_ends_without_a_solution_like_the_reference() {
+    let fx: Value =
+        serde_json::from_str(include_str!("fixtures/barrier-solve-release.json")).unwrap();
+    for (name, text) in [
+        (
+            "fx_bar_stall57",
+            include_str!("fixtures/fx_bar_stall57.mps"),
+        ),
+        (
+            "fx_bar_stall133",
+            include_str!("fixtures/fx_bar_stall133.mps"),
+        ),
+    ] {
+        let model = mps::parse(text).unwrap();
+        let sol = barrier::solve_release(&model, &Options::default())
+            .unwrap_or_else(|e| panic!("{name}: {e}"));
+        let run = &fx[name]["run"];
+        let want = run["status"].as_i64().unwrap() as i32;
+        assert_eq!(sol.run.status, BarrierStatus::Other(want), "{name}");
+        assert_eq!(
+            run["iters"].as_i64().unwrap() as i32,
+            sol.run.iterations,
+            "{name} iterations"
+        );
     }
 }
