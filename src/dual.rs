@@ -3359,12 +3359,15 @@ fn solve_pass(
     for j in 0..n + m {
         x[j] = if s.st[j] >= 0 {
             let v = s.xb[s.st[j] as usize];
-            let lo = s.p.lo[j];
+            let (lo, up) = (s.p.lo[j], s.p.up[j]);
             // After the clean-up factorization the reference shifts the basic solution to zero lower bounds (`x - lo`, loop `0x10731f..0x1073d2`, run on
-            // the FTRAN result) and adds the bound back at the read-out: a rounding round trip for a finite nonzero lower bound (not on the other exits:
-            // 80BAU3B is bit-equal without it).
+            // the FTRAN result; the threshold `[rsp+0x78]` is `ctx+0x370` = 1e30) and adds the bound back at the read-out: a rounding round trip for a
+            // finite lower bound (not on the other exits: 80BAU3B is bit-equal without it). A variable with only an upper bound is mirrored in the
+            // reference (`x' = -x`, lower bound `-up`), so its round trip uses the upper bound: `(-x + up) - up` negated is `(x - up) + up`.
             if cleaned && lo > -1e30 && lo.is_finite() {
                 (v - lo) + lo
+            } else if cleaned && up < 1e30 && up.is_finite() {
+                (v - up) + up
             } else {
                 v
             }

@@ -2434,6 +2434,20 @@ impl<'a> Solver<'a> {
             .collect()
     }
 
+    /// The reference's two factorizations before the FarkasDual BTRAN: the clean one that the end of a solve takes when the factor has
+    /// updates (also before declaring optimality), then one more, whose factor the BTRAN reads (`inf_itest6` controlled: lu_in calls 1 and 2
+    /// after the two iterations; `inf_itest2` release: calls 2 and 3, the first of them already run by the loop). One-ulp noise in the
+    /// vector came from the BTRAN through the updated factor.
+    fn refactor_for_farkas(&mut self) -> Result<(), SolveError> {
+        if self.factor.num_updates() > 0 {
+            self.work.trig();
+            self.refactor()?;
+        }
+        self.work.trig();
+        self.refactor()?;
+        Ok(())
+    }
+
     /// The reference's `FarkasDual` (the BTRAN of the `+-1` cost vector built from the basic type bytes at `0x1b44a0`, entered in the
     /// user's row orientation): `y' B = c` with `c = +1` for a basic variable below its lower bound and `-1` above its upper bound, the
     /// cost of a slack taken in the orientation of the row side it belongs to (so `y_i = +1` for a violated slack whatever the row's sense).
@@ -3618,6 +3632,7 @@ pub fn solve(
                     match s.price_admitting() {
                         Some(q) => q,
                         None => {
+                            s.refactor_for_farkas()?;
                             farkas = Some(s.farkas_dual());
                             break Status::Infeasible;
                         }
@@ -3670,6 +3685,7 @@ pub fn solve(
                         match s.price_admitting() {
                             Some(q) => q,
                             None => {
+                                s.refactor_for_farkas()?;
                                 farkas = Some(s.farkas_dual());
                                 break Status::Infeasible;
                             }
