@@ -199,6 +199,31 @@ fn maximization_doubled_ranges_and_homogeneous_statuses_match_reference_bitwise(
         check_solve(&fx, name, text, BarrierStatus::Other(0xd));
         assert_eq!(fx[name]["run"]["iters"].as_i64().unwrap(), iters);
     }
+    // Refinement inside the homogeneous algorithm (restart A at iteration 10, both solves refined: the smallest pivot ratio below 1e-10, or free columns),
+    // the z reduction of the homogeneous start at iteration 11 (API 12 numerical, 5 unbounded, 3 infeasible).
+    for (name, text, status, iters) in [
+        (
+            "fx_bar_refine",
+            include_str!("fixtures/fx_bar_refine.mps"),
+            BarrierStatus::Other(0xc),
+            34,
+        ),
+        (
+            "fx_bar_refine_free",
+            include_str!("fixtures/fx_bar_refine_free.mps"),
+            BarrierStatus::Other(5),
+            27,
+        ),
+        (
+            "fx_bar_refine_inf",
+            include_str!("fixtures/fx_bar_refine_inf.mps"),
+            BarrierStatus::Other(3),
+            45,
+        ),
+    ] {
+        check_solve(&fx, name, text, status);
+        assert_eq!(fx[name]["run"]["iters"].as_i64().unwrap(), iters);
+    }
     for (text, status) in [
         (include_str!("fixtures/fx_unbounded.mps"), Status::Unbounded),
         (
@@ -339,7 +364,7 @@ fn release_profile_scales_range_columns_in_ranges_order() {
 }
 
 /// The stalled end in the release profile (API 13, no solution in the reference; the iteration count and the status bit for bit); `fx_bar_stall113` ends
-/// infeasible (code 3) after 17 iterations.
+/// infeasible (code 3) after 17 iterations; the `fx_bar_refine*` models run the refined homogeneous algorithm (status 3, 5, 3).
 #[test]
 fn release_profile_ends_without_a_solution_like_the_reference() {
     let fx: Value =
@@ -352,6 +377,15 @@ fn release_profile_ends_without_a_solution_like_the_reference() {
         (
             "fx_bar_stall133",
             include_str!("fixtures/fx_bar_stall133.mps"),
+        ),
+        ("fx_bar_refine", include_str!("fixtures/fx_bar_refine.mps")),
+        (
+            "fx_bar_refine_free",
+            include_str!("fixtures/fx_bar_refine_free.mps"),
+        ),
+        (
+            "fx_bar_refine_inf",
+            include_str!("fixtures/fx_bar_refine_inf.mps"),
         ),
     ] {
         let model = mps::parse(text).unwrap();

@@ -3115,6 +3115,7 @@ pub fn run<S: NormalSolver>(
         let (n, n2, m) = (f.n(), f.n2, f.m);
         // The reference's iteration record (`BIT`) is taken before the homogeneous start recomputes the scalars.
         let res_bit = res.clone();
+        let st_bit = (q2c && kappa == 0.0).then(|| st.clone());
         if q2c && kappa == 0.0 {
             // `0x2ebf20` (homogeneous start after restart A): tau = 1, kappa = max(c'x - b'y + v.ub, 1) and sqrt(kappa mu) when mu > 0, one more
             // complementarity term (`Q+0x210`), `0x2ecde0` again.
@@ -3130,6 +3131,10 @@ pub fn run<S: NormalSolver>(
             }
             ncomp += 1;
             res = residuals(f, &st, tau, kappa, ncomp, scale);
+            if it > 10 && h.h78[it as usize - 1] > 0.99 * h.h78[it as usize - 2] {
+                // The same `0x2ecde0` call as the iteration's first one: the z reduction at `0x2eed95` runs again after the scalars with tau and kappa.
+                z_reduce(f, &mut st, &mut res.rd, res.q1f0);
+            }
             let i = it as usize;
             h.h50[i] = res.q198;
             h.h68[i] = res.q1a8;
@@ -3392,7 +3397,7 @@ pub fn run<S: NormalSolver>(
         let (q1d8, q1e0, q138, q1f0) = (res.q1d8, res.q1e0, res.q138, res.q1f0);
         let rec = IterRecord {
             it,
-            state: st.clone(),
+            state: st_bit.unwrap_or_else(|| st.clone()),
             res: res_bit,
             status: code,
             dec: Some(dec),
