@@ -24,6 +24,7 @@ pub struct RefStruct {
     lcols: Vec<Vec<usize>>,
     perm: Vec<usize>,
     dens: f64,
+    dense_est: std::cell::Cell<f64>,
     /// Density threshold fixed at factorization time (`f104` in the notes): 2, or `5 (nnzL/m + 1)^2` capped at `m`.
     dthr: usize,
     slot: Vec<usize>,
@@ -549,6 +550,7 @@ impl RefStruct {
             lcols,
             perm,
             dens: (h33 + h34) * (h33 + h34),
+            dense_est: std::cell::Cell::new(0.0),
             dthr,
             slot: (0..m).collect(),
             at: (0..m).collect(),
@@ -2223,12 +2225,21 @@ impl RefStruct {
         // Only positions in the tail (slot >= i21) are visited in the heap phase of the solve that books; the earlier ones are
         // handled in the list phase.
         let mut visited = if self.slot[r] >= self.i21 { rlen(r) } else { 0 };
+        // Dense branch (`F+0x108 > 5`): `3` for the one input entry, `2 len` for `r` (a tail column is handled by the slot walk
+        // like the rest), `2 (m - minslot)` for the slot walk over every position from the lowest slot reached, and `2 len` for
+        // every accepted position of the walk.
+        let mut dense = 3.0 + 2.0 * rlen(r) as f64;
+        let mut minslot = if self.kind[r] == -2 { self.slot[r] } else { m };
+        for &(k, _) in rows(r) {
+            minslot = minslot.min(self.slot[k]);
+        }
         while let Some(std::cmp::Reverse((_, k))) = heap.pop() {
             let c = -w[k] / self.diag[k];
             if c.abs() <= TOL {
                 continue;
             }
             eta.push((k, c));
+            dense += 2.0 * rlen(k) as f64;
             if self.slot[k] >= self.i21 {
                 visited += rlen(k);
             }
@@ -2240,6 +2251,10 @@ impl RefStruct {
                 }
             }
         }
+        dense += 2.0 * (m - minslot) as f64;
+        // The solve returns at once, booking nothing, when row `r` of the row-wise copy is empty.
+        self.dense_est
+            .set(if rows(r).is_empty() { 0.0 } else { dense });
         (eta, visited)
     }
 
@@ -2296,14 +2311,18 @@ impl RefStruct {
         let solve_floor = self.slot[r].max(self.i21.saturating_sub(1));
         let cached = self.row_cached.take() == Some(r);
         if !cached
-            && solve_len > 0
+            && (solve_len > 0 || (self.h33 > 5.0 && self.dense_est.get() > 0.0))
             && self
                 .spike
                 .iter()
                 .any(|e| e.0 != r && self.slot[e.0] > solve_floor)
         {
-            self.upd_work
-                .push((0x1322ed, 2.0 * solve_len as f64, crate::work::FAC));
+            let est = if self.h33 > 5.0 {
+                self.dense_est.get()
+            } else {
+                2.0 * solve_len as f64
+            };
+            self.upd_work.push((0x1322ed, est, crate::work::FAC));
         }
         let mut spk = vec![0.0f64; m];
         for &(p, v) in &self.spike {
