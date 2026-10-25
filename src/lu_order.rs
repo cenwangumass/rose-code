@@ -1,6 +1,7 @@
 //! Pivot order of the reference LU factorization, recovered from the Gurobi 13.0.3 primal simplex (`reverse-engineer/specs/lu-factor.md`):
 //! four singleton phases followed by a bucketed Markowitz search on the remaining nucleus. Only the order is reproduced here.
 
+use crate::real::Real;
 use std::collections::HashSet;
 
 /// The relative pivot threshold at the start of a solve (`ctx+0x390` = 2^-7).
@@ -14,18 +15,18 @@ pub fn pivot_order(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Vec<(usiz
 
 /// The pivot sequence together with what the sparse FTRAN model needs (`crate::ftran_order`): the singleton phase of each step
 /// (1..=4, 0 for the Markowitz nucleus) and the L column of each step as row indices in chain order.
-pub struct Structure {
+pub struct Structure<R = f64> {
     pub pivots: Vec<(usize, usize)>,
     pub phase: Vec<u8>,
     pub l_rows: Vec<Vec<usize>>,
     /// L multipliers matching `l_rows` and the pivot value of each step.
-    pub l_vals: Vec<Vec<f64>>,
+    pub l_vals: Vec<Vec<R>>,
     /// The column entries before the division by the pivot, for the singleton-phase steps; NaN where not known (pair
     /// overrides, nucleus steps).
-    pub l_raw: Vec<Vec<f64>>,
-    pub diag: Vec<f64>,
+    pub l_raw: Vec<Vec<R>>,
+    pub diag: Vec<R>,
     /// Pivot-row entries `(basis position, value)` of the Markowitz steps (empty for singleton steps).
-    pub u_rows: Vec<Vec<(usize, f64)>>,
+    pub u_rows: Vec<Vec<(usize, R)>>,
     /// Entries of the nucleus (the columns left after the singleton phases, in the rows left) and the Markowitz search's
     /// work estimate.
     pub nuc_nnz: usize,
@@ -42,21 +43,30 @@ pub struct Structure {
 }
 
 pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Structure {
+    factor_structure_r::<f64>(m, cols)
+}
+
+/// `factor_structure` with the numbers of the factor in the number type `R` (the quad mode runs the same LU in extended precision).
+pub fn factor_structure_r<R: Real>(
+    m: usize,
+    cols: &[(bool, Vec<usize>, Vec<f64>)],
+) -> Structure<R> {
     let (mut seq, mut phase, ov, loff) = phases(m, cols);
     let nsing = seq.len();
     let done_r: HashSet<usize> = seq.iter().map(|&(r, _)| r).collect();
     let done_c: HashSet<usize> = seq.iter().map(|&(_, c)| c).collect();
-    let mut nuc: Vec<(usize, Vec<(usize, f64)>)> = Vec::new();
+    let mut nuc: Vec<(usize, Vec<(usize, R)>)> = Vec::new();
     for (pos, (_, idx, val)) in cols.iter().enumerate() {
         if done_c.contains(&pos) {
             continue;
         }
-        let mut d: Vec<(usize, f64)> = idx
+        let mut d: Vec<(usize, R)> = idx
             .iter()
             .copied()
             .zip(val.iter().copied())
             // The reference's matrix leaves out entries below the absolute tolerance (fx_e2_r25: a scaled entry 2^-44 in a row of the nucleus changed its count).
             .filter(|(i, v)| !done_r.contains(i) && v.abs() >= ABS_TOL)
+            .map(|(i, v)| (i, R::c(v)))
             .collect();
         d.reverse();
         nuc.push((pos, d));
@@ -70,26 +80,26 @@ pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Stru
         step[r] = s;
     }
     let mut l_rows: Vec<Vec<usize>> = Vec::with_capacity(seq.len());
-    let mut l_vals: Vec<Vec<f64>> = Vec::with_capacity(seq.len());
-    let mut l_raw: Vec<Vec<f64>> = Vec::with_capacity(seq.len());
-    let mut diag: Vec<f64> = Vec::with_capacity(seq.len());
-    let mut u_rows: Vec<Vec<(usize, f64)>> = Vec::with_capacity(seq.len());
+    let mut l_vals: Vec<Vec<R>> = Vec::with_capacity(seq.len());
+    let mut l_raw: Vec<Vec<R>> = Vec::with_capacity(seq.len());
+    let mut diag: Vec<R> = Vec::with_capacity(seq.len());
+    let mut u_rows: Vec<Vec<(usize, R)>> = Vec::with_capacity(seq.len());
     for (s, &(prow, c)) in seq.iter().enumerate().take(nsing) {
         let (_, idx, val) = &cols[c];
-        let pv = val[idx.iter().position(|&i| i == prow).unwrap()];
+        let pv = R::c(val[idx.iter().position(|&i| i == prow).unwrap()]);
         l_rows.push(idx.iter().copied().filter(|&i| step[i] > s).collect());
         l_vals.push(
             idx.iter()
                 .zip(val)
                 .filter(|(&i, _)| step[i] > s)
-                .map(|(_, &x)| x / pv)
+                .map(|(_, &x)| R::c(x) / pv)
                 .collect(),
         );
         l_raw.push(
             idx.iter()
                 .zip(val)
                 .filter(|(&i, _)| step[i] > s)
-                .map(|(_, &x)| x)
+                .map(|(_, &x)| R::c(x))
                 .collect(),
         );
         diag.push(pv);
@@ -102,11 +112,11 @@ pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Stru
     }
     for (s, (r, v)) in ov.l {
         l_rows[s] = r;
-        l_raw[s] = vec![f64::NAN; v.len()];
+        l_raw[s] = vec![R::c(f64::NAN); v.len()];
         l_vals[s] = v;
     }
     l_rows.extend(nl);
-    l_raw.extend(nv.iter().map(|v| vec![f64::NAN; v.len()]));
+    l_raw.extend(nv.iter().map(|v| vec![R::c(f64::NAN); v.len()]));
     l_vals.extend(nv);
     diag.extend(npiv);
     u_rows.extend(nu);
@@ -128,7 +138,7 @@ pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Stru
     }
 }
 
-impl Structure {
+impl<R: Real> Structure<R> {
     /// The factorization's increments of the reference's work counter (`0xd4190`, `crate::work`) as `(site, estimate)`, given
     /// the factored columns and whether the L solve levels are built (`crate::ftran_order`).
     pub fn work(&self, cols: &[(bool, Vec<usize>, Vec<f64>)], levels: bool) -> Vec<(u32, f64)> {
@@ -186,7 +196,7 @@ impl Structure {
             .u_rows
             .iter()
             .flatten()
-            .filter(|e| e.1.abs() > 1e-13)
+            .filter(|e| e.1.abs() > R::c(1e-13))
             .count();
         let nnz_lu = (nnz_l + u_sing + u_rows_nnz) as f64;
         // A size factor that ramps from 1 to 10 between 2e6 and 4e6 for 24 bytes per entry.
@@ -206,13 +216,13 @@ impl Structure {
     }
 }
 
-fn phases(
+fn phases<R: Real>(
     m: usize,
     cols: &[(bool, Vec<usize>, Vec<f64>)],
 ) -> (
     Vec<(usize, usize)>,
     Vec<u8>,
-    crate::lu_pairs::Overrides,
+    crate::lu_pairs::Overrides<R>,
     usize,
 ) {
     let n = cols.len();
@@ -323,7 +333,7 @@ fn phases(
             }
         }
     }
-    let mut ov = crate::lu_pairs::Overrides::default();
+    let mut ov = crate::lu_pairs::Overrides::<R>::default();
     let loff = seq.len();
     if pair_gate(m - seq.len()) && std::env::var_os("ROSE_NO_PAIRS").is_none() {
         let before = seq.len();
@@ -335,15 +345,15 @@ fn phases(
     (seq, phase, ov, loff)
 }
 
-struct Node {
+struct Node<R> {
     r: usize,
     c: usize,
-    v: f64,
+    v: R,
     alive: bool,
 }
 
-struct Nucleus {
-    nodes: Vec<Node>,
+struct Nucleus<R> {
+    nodes: Vec<Node<R>>,
     colchain: Vec<Vec<usize>>,
     rowchain: Vec<Vec<usize>>,
     ccnt: Vec<usize>,
@@ -355,7 +365,7 @@ struct Nucleus {
     building: bool,
 }
 
-impl Nucleus {
+impl<R: Real> Nucleus<R> {
     fn cins(&mut self, c: usize) {
         let k = self.ccnt[c] as isize - 1;
         if k == 0 {
@@ -402,7 +412,7 @@ impl Nucleus {
         self.rowchain[r].retain(|&i| nodes[i].alive);
     }
 
-    fn add_node(&mut self, r: usize, c: usize, v: f64) {
+    fn add_node(&mut self, r: usize, c: usize, v: R) {
         let id = self.nodes.len();
         self.nodes.push(Node {
             r,
@@ -418,12 +428,12 @@ impl Nucleus {
 }
 
 /// `cols`: (position, entries (row, value) in column-chain order). Rows and positions are the global indices of the basis.
-type NucleusOut = (
+type NucleusOut<R> = (
     Vec<(usize, usize)>,
     Vec<Vec<usize>>,
-    Vec<Vec<f64>>,
-    Vec<f64>,
-    Vec<Vec<(usize, f64)>>,
+    Vec<Vec<R>>,
+    Vec<R>,
+    Vec<Vec<(usize, R)>>,
     f64,
 );
 
@@ -507,7 +517,7 @@ fn pair_gate_end(steps: usize) {
 
 thread_local! { pub static DENSE_N: std::cell::Cell<usize> = std::cell::Cell::new(0); }
 
-fn nucleus(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> NucleusOut {
+fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -> NucleusOut<R> {
     DENSE_N.with(|c| c.set(0));
     let npos = cols.iter().map(|c| c.0 + 1).max().unwrap_or(0);
     let mut s = Nucleus {
@@ -557,9 +567,9 @@ fn nucleus(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> Nucle
     }
     let mut out = Vec::new();
     let mut lout: Vec<Vec<usize>> = Vec::new();
-    let mut lvout: Vec<Vec<f64>> = Vec::new();
-    let mut pout: Vec<f64> = Vec::new();
-    let mut uout: Vec<Vec<(usize, f64)>> = Vec::new();
+    let mut lvout: Vec<Vec<R>> = Vec::new();
+    let mut pout: Vec<R> = Vec::new();
+    let mut uout: Vec<Vec<(usize, R)>> = Vec::new();
     let mut prows: HashSet<usize> = HashSet::new();
     let mut pcols: HashSet<usize> = HashSet::new();
     let mut remaining = ckeys.len();
@@ -660,7 +670,7 @@ fn nucleus(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> Nucle
                     rows.sort_unstable();
                     let nn = remaining;
                     if rows.len() == nn && cols_a.len() == nn {
-                        let mut a = vec![vec![0.0f64; nn]; nn];
+                        let mut a = vec![vec![R::ZERO; nn]; nn];
                         let rpos: std::collections::HashMap<usize, usize> =
                             rows.iter().enumerate().map(|(i, &r)| (r, i)).collect();
                         for (cj, &c) in cols_a.iter().enumerate() {
@@ -681,7 +691,7 @@ fn nucleus(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> Nucle
                         if std::env::var_os("ROSE_DENSE_DUMP").is_some() {
                             let flat: Vec<f64> = (0..nn)
                                 .flat_map(|c| (0..nn).map(move |r| (r, c)))
-                                .map(|(r, c)| a[r][c])
+                                .map(|(r, c)| a[r][c].to_f64())
                                 .collect();
                             println!(
                                 "DENSE {}",
@@ -695,7 +705,7 @@ fn nucleus(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> Nucle
                             let mut lr = Vec::new();
                             let mut lv = Vec::new();
                             for i in k + 1..nn {
-                                if a[i][k].abs() > ABS_TOL {
+                                if a[i][k].abs() > R::c(ABS_TOL) {
                                     lr.push(rows[perm[i]]);
                                     lv.push(a[i][k]);
                                 }
@@ -705,7 +715,7 @@ fn nucleus(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> Nucle
                             pout.push(piv);
                             uout.push(
                                 (k + 1..nn)
-                                    .filter(|&j| a[k][j] != 0.0)
+                                    .filter(|&j| a[k][j] != R::ZERO)
                                     .map(|j| (cols_a[j], a[k][j]))
                                     .collect(),
                             );
@@ -763,8 +773,8 @@ fn nucleus(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> Nucle
             .copied()
             .filter(|&i| s.nodes[i].r != pr)
             .collect();
-        let u: Vec<(usize, f64)> = prow.iter().map(|&i| (s.nodes[i].c, s.nodes[i].v)).collect();
-        let l: Vec<(usize, f64)> = pcol
+        let u: Vec<(usize, R)> = prow.iter().map(|&i| (s.nodes[i].c, s.nodes[i].v)).collect();
+        let l: Vec<(usize, R)> = pcol
             .iter()
             .map(|&i| (s.nodes[i].r, s.nodes[i].v / pv))
             .collect();
@@ -813,7 +823,7 @@ fn nucleus(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> Nucle
                     if let Some(&(_, uc)) = u.iter().find(|x| x.0 == c) {
                         seen.insert(c);
                         s.nodes[mid].v -= lr * uc;
-                        if s.nodes[mid].v.abs() < ABS_TOL {
+                        if s.nodes[mid].v.abs() < R::c(ABS_TOL) {
                             s.nodes[mid].alive = false;
                             s.rcnt[r2] -= 1;
                             s.ccnt[c] -= 1;
@@ -825,7 +835,7 @@ fn nucleus(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> Nucle
                         continue;
                     }
                     let val = -lr * uv;
-                    if val.abs() >= ABS_TOL {
+                    if val.abs() >= R::c(ABS_TOL) {
                         s.add_node(r2, c, val);
                     }
                 }
@@ -863,7 +873,7 @@ fn nucleus(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> Nucle
                     if let Some(&(_, lv)) = l.iter().find(|x| x.0 == r) {
                         seen.insert(r);
                         s.nodes[mid].v -= lv * uc;
-                        if s.nodes[mid].v.abs() < ABS_TOL {
+                        if s.nodes[mid].v.abs() < R::c(ABS_TOL) {
                             s.nodes[mid].alive = false;
                             s.rcnt[r] -= 1;
                             s.ccnt[c2] -= 1;
@@ -875,7 +885,7 @@ fn nucleus(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> Nucle
                         continue;
                     }
                     let val = -lv * uc;
-                    if val.abs() >= ABS_TOL {
+                    if val.abs() >= R::c(ABS_TOL) {
                         s.add_node(r, c2, val);
                     }
                 }
@@ -891,7 +901,7 @@ fn nucleus(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, f64)>)]) -> Nucle
 
 /// Markowitz search over the count buckets; returns the node of the chosen pivot (rotating bucket heads as the reference does)
 /// and the search's work factor: the candidates examined times the cost bound of the last bucket.
-fn search(s: &mut Nucleus) -> Option<(usize, f64)> {
+fn search<R: Real>(s: &mut Nucleus<R>) -> Option<(usize, f64)> {
     let thr = THR.with(|c| c.get());
     let first = |b: &Vec<Vec<usize>>| b.iter().position(|v| !v.is_empty());
     let cmin = first(&s.cb);
@@ -912,7 +922,7 @@ fn search(s: &mut Nucleus) -> Option<(usize, f64)> {
             .unwrap();
     let mut best: Option<usize> = None;
     let mut bcost = f64::INFINITY;
-    let mut bratio = 0.0f64;
+    let mut bratio = R::ZERO;
     let mut count = 0usize;
     let mut done = false;
     let mut last_bound = 0.0;
@@ -946,11 +956,8 @@ fn search(s: &mut Nucleus) -> Option<(usize, f64)> {
                     } else {
                         s.rowchain[x].clone()
                     };
-                    let mx = ch
-                        .iter()
-                        .map(|&n| s.nodes[n].v.abs())
-                        .fold(0.0f64, f64::max);
-                    if mx >= ABS_TOL {
+                    let mx = ch.iter().map(|&n| s.nodes[n].v.abs()).fold(R::ZERO, R::max);
+                    if mx >= R::c(ABS_TOL) {
                         for &n in &ch {
                             let cost = (((if col {
                                 s.rcnt[s.nodes[n].r]
@@ -959,7 +966,8 @@ fn search(s: &mut Nucleus) -> Option<(usize, f64)> {
                             }) - 1)
                                 * k) as f64;
                             let a = s.nodes[n].v.abs();
-                            if (cost < bcost && a > thr * mx) || (cost == bcost && a > bratio * mx)
+                            if (cost < bcost && a > R::c(thr) * mx)
+                                || (cost == bcost && a > bratio * mx)
                             {
                                 bcost = cost;
                                 bratio = a / mx;
@@ -1050,9 +1058,9 @@ fn pool_fill(m: usize, nnz_b: usize) -> usize {
     from_cap.max(2.0 * ((m / 2 + 2) as f64).min(g) * m as f64) as usize
 }
 
-fn dot_lanes<const W: usize>(mut acc: f64, a: &[f64], b: &[f64], peel: usize) -> f64 {
+fn dot_lanes<R: Real, const W: usize>(mut acc: R, a: &[R], b: &[R], peel: usize) -> R {
     let len = a.len();
-    if len < peel + W || len < 2 {
+    if !R::LANES || len < peel + W || len < 2 {
         for t in 0..len {
             acc -= a[t] * b[t];
         }
@@ -1062,7 +1070,7 @@ fn dot_lanes<const W: usize>(mut acc: f64, a: &[f64], b: &[f64], peel: usize) ->
     for t in 0..peel {
         acc -= a[t] * b[t];
     }
-    let mut ln = [0.0f64; W];
+    let mut ln = [R::ZERO; W];
     ln[0] = acc;
     let mut t = peel;
     while t < end {
@@ -1088,12 +1096,12 @@ fn dot_lanes<const W: usize>(mut acc: f64, a: &[f64], b: &[f64], peel: usize) ->
 
 /// The reference's dense LU on `a[row][col]` (`0xdd1b2`): column blocks of four with partial pivoting over the rows, the dot
 /// products of the block updates split in two lanes and those of the leftover columns in eight. Returns the row permutation.
-fn dense_lu(a: &mut [Vec<f64>], base: usize) -> Vec<usize> {
+fn dense_lu<R: Real>(a: &mut [Vec<R>], base: usize) -> Vec<usize> {
     let n = a.len();
     let mut perm: Vec<usize> = (0..n).collect();
     let nb = n / 4 * 4;
     let peel = |i: usize| (base + i * n) & 1;
-    let pick = |a: &[Vec<f64>], k: usize| {
+    let pick = |a: &[Vec<R>], k: usize| {
         let mut p = k;
         for i in k + 1..n {
             if a[i][k].abs() > a[p][k].abs() {
@@ -1105,14 +1113,14 @@ fn dense_lu(a: &mut [Vec<f64>], base: usize) -> Vec<usize> {
     for j0 in (0..nb).step_by(4) {
         for i in 1..j0 {
             for c in j0..j0 + 4 {
-                let col: Vec<f64> = (0..i).map(|t| a[t][c]).collect();
-                a[i][c] = dot_lanes::<2>(a[i][c], &a[i][..i], &col, peel(i));
+                let col: Vec<R> = (0..i).map(|t| a[t][c]).collect();
+                a[i][c] = dot_lanes::<R, 2>(a[i][c], &a[i][..i], &col, peel(i));
             }
         }
         for i in j0..n {
             for c in j0..j0 + 4 {
-                let col: Vec<f64> = (0..j0).map(|t| a[t][c]).collect();
-                a[i][c] = dot_lanes::<2>(a[i][c], &a[i][..j0], &col, peel(i));
+                let col: Vec<R> = (0..j0).map(|t| a[t][c]).collect();
+                a[i][c] = dot_lanes::<R, 2>(a[i][c], &a[i][..j0], &col, peel(i));
             }
         }
         for k in j0..j0 + 4 {
@@ -1134,12 +1142,12 @@ fn dense_lu(a: &mut [Vec<f64>], base: usize) -> Vec<usize> {
     }
     for k in nb..n {
         for i in 1..k {
-            let col: Vec<f64> = (0..i).map(|t| a[t][k]).collect();
-            a[i][k] = dot_lanes::<8>(a[i][k], &a[i][..i], &col, 0);
+            let col: Vec<R> = (0..i).map(|t| a[t][k]).collect();
+            a[i][k] = dot_lanes::<R, 8>(a[i][k], &a[i][..i], &col, 0);
         }
         for i in k..n {
-            let col: Vec<f64> = (0..k).map(|t| a[t][k]).collect();
-            a[i][k] = dot_lanes::<8>(a[i][k], &a[i][..k], &col, 0);
+            let col: Vec<R> = (0..k).map(|t| a[t][k]).collect();
+            a[i][k] = dot_lanes::<R, 8>(a[i][k], &a[i][..k], &col, 0);
         }
         let p = pick(a, k);
         if p != k {

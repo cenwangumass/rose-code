@@ -2,6 +2,7 @@
 //! with the same two active columns are eliminated as 2x2 blocks, then pairs of columns with the same two active rows, with
 //! the singletons that each elimination creates drained right away (`reverse-engineer/specs/lu-factor.md`).
 
+use crate::real::Real;
 use std::collections::HashMap;
 
 const SING_TOL: f64 = 1e-10;
@@ -11,9 +12,9 @@ const UNZ_TOL: f64 = 1e-13;
 /// What the pass computes that the generic singleton formulas (`factor_structure`) do not: the Schur pivot of each pair, and
 /// for a row pair the second column's L multipliers.
 #[derive(Default)]
-pub struct Overrides {
-    pub diag: HashMap<usize, f64>,
-    pub l: HashMap<usize, (Vec<usize>, Vec<f64>)>,
+pub struct Overrides<R = f64> {
+    pub diag: HashMap<usize, R>,
+    pub l: HashMap<usize, (Vec<usize>, Vec<R>)>,
     /// Number of nonzero entries in the U row of a column pair's second pivot (the pivot row `hi` after the elimination,
     /// fill from the first pivot's row included).
     pub unz: HashMap<usize, usize>,
@@ -23,7 +24,7 @@ pub struct Overrides {
     pub urow: HashMap<usize, Vec<usize>>,
 }
 
-struct Pass<'a> {
+struct Pass<'a, R: Real> {
     m: usize,
     cols: &'a [(bool, Vec<usize>, Vec<f64>)],
     /// Active counts (> 0 while active, -1 or 0 once assigned).
@@ -31,8 +32,8 @@ struct Pass<'a> {
     colc: Vec<i64>,
     /// Row-wise copies (column positions and values) of the rows left after phase 3, in the reference's array order.
     ridx: Vec<Vec<usize>>,
-    rval: Vec<Vec<f64>>,
-    temp: Vec<f64>,
+    rval: Vec<Vec<R>>,
+    temp: Vec<R>,
     /// Hash entries: owner id and key; the key's pending entry waits for a partner.
     ids: Vec<usize>,
     keys: Vec<usize>,
@@ -40,10 +41,10 @@ struct Pass<'a> {
     pairs: Vec<(usize, usize)>,
     seq: Vec<(usize, usize)>,
     phase: Vec<u8>,
-    ov: Overrides,
+    ov: Overrides<R>,
 }
 
-impl Pass<'_> {
+impl<R: Real> Pass<'_, R> {
     fn register(&mut self, id: usize, key: usize) {
         let e = self.ids.len();
         self.ids.push(id);
@@ -167,7 +168,7 @@ impl Pass<'_> {
             (r1, v0, v1, r2, w0, w1)
         };
         let schur = o1 - (o0 * u12) / p;
-        if schur.abs() < SING_TOL {
+        if schur.abs() < R::c(SING_TOL) {
             return;
         }
         let mut rsing: Vec<usize> = Vec::new();
@@ -178,7 +179,7 @@ impl Pass<'_> {
         let col0 = self.cols[c0].clone();
         for (&r, &v) in col0.1.iter().zip(&col0.2) {
             if self.rowc[r] > 0 {
-                self.temp[r] = ((-v) * u12) / p;
+                self.temp[r] = ((-R::c(v)) * u12) / p;
                 l1.push(r);
                 self.rowc[r] -= 1;
                 if self.rowc[r] == 1 {
@@ -191,15 +192,15 @@ impl Pass<'_> {
         self.rowc[orow] = 0;
         self.colc[c1] = 0;
         let s2 = self.push_step(orow, c1);
-        self.temp[orow] = 0.0;
+        self.temp[orow] = R::ZERO;
         let mut lr: Vec<usize> = Vec::new();
-        let mut lv: Vec<f64> = Vec::new();
+        let mut lv: Vec<R> = Vec::new();
         let col1 = self.cols[c1].clone();
         for (&r, &v) in col1.1.iter().zip(&col1.2) {
             if self.rowc[r] > 0 {
-                let x = (v + self.temp[r]) / schur;
-                self.temp[r] = 0.0;
-                if x.abs() > DROP_TOL {
+                let x = (R::c(v) + self.temp[r]) / schur;
+                self.temp[r] = R::ZERO;
+                if x.abs() > R::c(DROP_TOL) {
                     lr.push(r);
                     lv.push(x);
                 }
@@ -213,11 +214,11 @@ impl Pass<'_> {
         }
         for &r in &l1 {
             let x = self.temp[r] / schur;
-            if x.abs() > DROP_TOL {
+            if x.abs() > R::c(DROP_TOL) {
                 lr.push(r);
                 lv.push(self.temp[r] / schur);
             }
-            self.temp[r] = 0.0;
+            self.temp[r] = R::ZERO;
         }
         self.ov.diag.insert(s2, schur);
         self.ov.l.insert(s2, (lr, lv));
@@ -232,8 +233,8 @@ impl Pass<'_> {
     /// the Schur element.
     fn col_pair(&mut self, d1: usize, d2: usize, key: usize) {
         let (lo, hi) = (key % self.m, key / self.m);
-        let mut v = [0.0f64; 2];
-        let mut others_lo: Vec<(usize, f64)> = Vec::new();
+        let mut v = [R::ZERO; 2];
+        let mut others_lo: Vec<(usize, R)> = Vec::new();
         for j in 0..self.ridx[lo].len() {
             let c = self.ridx[lo][j];
             if self.colc[c] > 0 {
@@ -251,8 +252,8 @@ impl Pass<'_> {
         } else {
             (d1, v[0], d2, v[1])
         };
-        let mut hv = [0.0f64; 2];
-        let mut others_hi: Vec<(usize, f64)> = Vec::new();
+        let mut hv = [R::ZERO; 2];
+        let mut others_hi: Vec<(usize, R)> = Vec::new();
         for j in 0..self.ridx[hi].len() {
             let c = self.ridx[hi][j];
             if self.colc[c] > 0 {
@@ -267,7 +268,7 @@ impl Pass<'_> {
         }
         let (x_p, x_n) = (hv[0], hv[1]);
         let schur = x_n - (u12 * x_p) / p;
-        if schur.abs() < SING_TOL {
+        if schur.abs() < R::c(SING_TOL) {
             return;
         }
         let mut csing: Vec<usize> = Vec::new();
@@ -297,27 +298,28 @@ impl Pass<'_> {
         self.ov.diag.insert(s2, schur);
         self.ov.l.insert(s2, (Vec::new(), Vec::new()));
         {
-            let mut vals: HashMap<usize, f64> = HashMap::new();
+            let mut vals: HashMap<usize, R> = HashMap::new();
             for &(c, v) in &others_hi {
                 vals.insert(c, v);
             }
             for &(c, _) in &others_lo {
                 let t = self.temp[c];
-                let e = vals.entry(c).or_insert(0.0);
+                let e = vals.entry(c).or_insert(R::ZERO);
                 *e += t;
             }
-            self.ov
-                .unz
-                .insert(s2, vals.values().filter(|v| v.abs() > UNZ_TOL).count());
+            self.ov.unz.insert(
+                s2,
+                vals.values().filter(|v| v.abs() > R::c(UNZ_TOL)).count(),
+            );
             let own: Vec<usize> = others_hi
                 .iter()
                 .map(|e| e.0)
-                .filter(|c| vals[c].abs() > UNZ_TOL)
+                .filter(|c| vals[c].abs() > R::c(UNZ_TOL))
                 .collect();
             let fill = others_lo
                 .iter()
                 .map(|e| e.0)
-                .filter(|c| !others_hi.iter().any(|h| h.0 == *c) && vals[c].abs() > UNZ_TOL);
+                .filter(|c| !others_hi.iter().any(|h| h.0 == *c) && vals[c].abs() > R::c(UNZ_TOL));
             self.ov
                 .urow
                 .insert(s2, own.into_iter().chain(fill).collect());
@@ -329,10 +331,10 @@ impl Pass<'_> {
             } else if self.colc[c] == 2 {
                 self.register_col(c);
             }
-            self.temp[c] = 0.0;
+            self.temp[c] = R::ZERO;
         }
         for &(c, _) in &others_lo {
-            self.temp[c] = 0.0;
+            self.temp[c] = R::ZERO;
         }
         while let Some(c) = csing.pop() {
             if self.colc[c] > 0 {
@@ -344,7 +346,7 @@ impl Pass<'_> {
 
 /// Runs the pass after phase 4. `done3` are the rows and columns assigned by phases 1-3 (the row lists are built from what was
 /// left then), `row_done`/`col_done` the state after phase 4. Appends the pass's pivots to `seq` and `phase`.
-pub fn run(
+pub fn run<R: Real>(
     m: usize,
     cols: &[(bool, Vec<usize>, Vec<f64>)],
     seq: &mut Vec<(usize, usize)>,
@@ -353,10 +355,10 @@ pub fn run(
     col_done3: &[bool],
     row_done: &[bool],
     col_done: &[bool],
-) -> Overrides {
+) -> Overrides<R> {
     let n = cols.len();
     let mut ridx: Vec<Vec<usize>> = vec![Vec::new(); m];
-    let mut rval: Vec<Vec<f64>> = vec![Vec::new(); m];
+    let mut rval: Vec<Vec<R>> = vec![Vec::new(); m];
     for pos in 0..n {
         if col_done3[pos] {
             continue;
@@ -364,7 +366,7 @@ pub fn run(
         for (&r, &v) in cols[pos].1.iter().zip(&cols[pos].2) {
             if !row_done3[r] {
                 ridx[r].push(pos);
-                rval[r].push(v);
+                rval[r].push(R::c(v));
             }
         }
     }
@@ -390,14 +392,14 @@ pub fn run(
         colc,
         ridx,
         rval,
-        temp: vec![0.0; m.max(n)],
+        temp: vec![R::ZERO; m.max(n)],
         ids: Vec::new(),
         keys: Vec::new(),
         pending: HashMap::new(),
         pairs: Vec::new(),
         seq: std::mem::take(seq),
         phase: std::mem::take(phase),
-        ov: Overrides::default(),
+        ov: Overrides::<R>::default(),
     };
     // Row pairs.
     for r in 0..m {
