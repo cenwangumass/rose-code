@@ -28,6 +28,9 @@ pub struct Method {
     /// were initialised, and the count (starting at 1). The weights restart when the average exceeds 3 (`0x10882c`).
     pub ratio_sum: f64,
     pub ratio_cnt: u32,
+    /// `ctx+0x468` is still set although the mode is not 0 (the primal that continues a dual run starts in mode 2 without the clearing): the phase 1 ratio test
+    /// stays `0xf0120` until the decision switches the method.
+    pub keep468: bool,
 }
 
 /// What the decision reads from the factor and the model.
@@ -82,7 +85,7 @@ impl Method {
                     * (f64::from(self.level as i32 >> 1)
                         + f64::from(self.degenerate - self.snap_degenerate) / (a - b));
             // Halved in phase 1 while `ctx+0x468 != 0`, that is before any switch.
-            if inp.infeasible && self.mode == 0 {
+            if inp.infeasible && (self.mode == 0 || self.keep468) {
                 big *= 0.5;
             }
             // `P+0x3b0`: rows * (rows^2 / cols)^0.35 / 20.
@@ -95,9 +98,11 @@ impl Method {
             let rhs = p3b0 / (inp.avg as f64 + 1.0) + 1.0 + 9.0 * cols / denom;
             if big + big > rhs {
                 self.mode = 1;
+                self.keep468 = false;
                 switch = true;
             } else if self.mode == 0 && 1.2 * big > 1.0 + 6.0 * cols / denom {
                 self.mode = 2;
+                self.keep468 = false;
                 switch = true;
             }
         }

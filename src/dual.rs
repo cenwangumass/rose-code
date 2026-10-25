@@ -117,6 +117,8 @@ struct Dual<'a> {
     bad_rows: Vec<usize>,
     /// The pass ended because every infeasible row was rejected (hand over to the primal like the repair case).
     rejected_end: bool,
+    /// The pass ended at the request-4 refactorization with variables at an artificial bound (status -1004): the primal decides the outcome.
+    art_exit: bool,
     worst: f64,
     worst_row: i64,
     /// The infeasible-row count of the last flag recompute, whatever the mode (`[P+0x3c]`); a restart after a singular factorization compares the new count with it.
@@ -2971,6 +2973,18 @@ impl<'a> Dual<'a> {
             let req = self.request;
             self.request = 0;
             self.recompute_xb(req);
+            if req == 4
+                && self.level != 0
+                && self.status.is_none()
+                && !NO_ART_EXIT.with(|c| c.get())
+            {
+                // The confirming refactorization leaves variables at an artificial bound: the post-refactor pass (`0xe45c0`, `0xe5e33..0xe5e63`) counts
+                // them and, with `ctx+0x35c` != 0 (1 from the start), ends the dual at once with status -1004 (s16, s198 `dual_exit`: the exit comes
+                // with `ctx+0x294` = 4 pending, before any further pricing call). The controller continues with the primal from this basis.
+                self.art_exit = true;
+                self.dual_unbounded();
+                return Ok(());
+            }
             self.prog_on = self.level == 0;
             self.recompute_flags(level_before != 0, pv.is_some());
             self.flags_work();
@@ -3200,6 +3214,7 @@ pub fn solve(
 
 thread_local! {
     /// Set while a rerun skips the second pass of the free-column pivots (the early verdict's ray did not verify).
+    static NO_ART_EXIT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static NO_DEFERRED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
@@ -3332,6 +3347,7 @@ fn solve_pass(
         repaired: None,
         bad_rows: Vec::new(),
         rejected_end: false,
+        art_exit: false,
         worst: 0.0,
         worst_row: -1,
         stale_count: false,
@@ -3727,6 +3743,48 @@ fn solve_pass(
         // The dual is infeasible (a nonbasic variable stayed at an artificial bound, or a free one has a nonzero d). That proves the primal unbounded only
         // if it is feasible, and the point the dual loop holds is a finite point plus 1e30 times the ray, not a feasible point. A zero objective is dual
         // feasible, so the dual simplex on it decides: a feasible point (unbounded) or a Farkas certificate (primal and dual infeasible).
+        // The reference goes on with the primal simplex from the dual's basis (nonbasic variables at their finite bound, the artificial ones at the lower
+        // bound) and counts its pivots after the dual's.
+        let mut popts = opts.clone();
+        popts.method = crate::simplex::Method::Primal;
+        if opts.perturb != 0.0 {
+            // The release profile: the primal goes on in method 2 with the dual's counters (`compare.py switch` call 0 of `dual-release`: iterations, the stall
+            // counters, `ctx+0x2c0` one above the dual's factorizations, `ctx+0x340` = 1e-5 for the default `PerturbValue`).
+            popts.sw_carry = Some(crate::simplex::SwCarry {
+                iters: s.iters as f64,
+                degenerate: s.stall as i32,
+                snap_degenerate: s.stall_snap as i32,
+                snap_iters: s.stall_it,
+                factorizations: s.refactorizations as u32 + 1,
+                level: s.pert as u32,
+                pert: s.pstep * 0.05,
+            });
+        }
+        let from_dual = Basis {
+            basic: s.head.clone(),
+            at_upper: (0..n + m).map(|j| s.st[j] == UB && p.up[j] < BIG).collect(),
+        };
+        let prres = crate::simplex::solve(model, Some(&from_dual), &popts).ok();
+        if s.art_exit
+            && !prres
+                .as_ref()
+                .is_some_and(|pr| matches!(pr.status, Status::Optimal | Status::Unbounded))
+        {
+            // The primal gives up from the dual's basis: the dual runs on past the request-4 refactorization instead.
+            NO_ART_EXIT.with(|c| c.set(true));
+            let again = solve_frame(model, start, opts);
+            NO_ART_EXIT.with(|c| c.set(false));
+            return again;
+        }
+        if s.art_exit {
+            if let Some(pr) = prres.as_ref().filter(|pr| pr.status == Status::Optimal) {
+                // The variables left at an artificial bound were not a proof: the primal from the dual's basis found the optimum.
+                let mut r = pr.clone();
+                r.iterations += s.iters;
+                r.refactorizations += s.refactorizations;
+                return Ok(r);
+            }
+        }
         let zero = LpModel {
             obj: vec![0.0; model.num_cols()],
             offset: 0.0,
@@ -3742,17 +3800,20 @@ fn solve_pass(
             );
         }
         let mut r = solve(&zero, start, &zopts)?;
-        // The reference goes on with the primal simplex from the dual's basis (nonbasic variables at their finite bound, the artificial ones at the lower
-        // bound) and counts its pivots after the dual's.
-        let mut popts = opts.clone();
-        popts.method = crate::simplex::Method::Primal;
-        let from_dual = Basis {
-            basic: s.head.clone(),
-            at_upper: (0..n + m).map(|j| s.st[j] == UB && p.up[j] < BIG).collect(),
-        };
-        let primal_iters = crate::simplex::solve(model, Some(&from_dual), &popts)
-            .ok()
-            .map(|pr| pr.iterations);
+        if crate::dump::on("dcr") {
+            if let Some(pr) = &prres {
+                let tr: Vec<_> = pr
+                    .trace
+                    .iter()
+                    .map(|e| (e.entering, e.leaving, e.position))
+                    .collect();
+                crate::dump::emit(
+                    "dcr",
+                    serde_json::json!({"primal_status": format!("{:?}", pr.status), "primal_trace": tr}),
+                );
+            }
+        }
+        let primal_iters = prres.as_ref().map(|pr| pr.iterations);
         if crate::dump::on("dcr") {
             crate::dump::emit(
                 "dcr",
@@ -3788,7 +3849,11 @@ fn solve_pass(
                 crate::verify::ray_improvement(model, ray, 1e-9).is_some_and(|g| g > 0.0)
             });
             if r.ray.is_none() {
-                // The ray of the artificial-bound point did not verify; the primal simplex may still find one.
+                // The ray of the artificial-bound point did not verify; the primal run from the dual's basis may have found one.
+                r.ray = prres.as_ref().and_then(|pr| pr.ray.clone());
+            }
+            if r.ray.is_none() {
+                // The primal simplex from the slack basis may still find one.
                 let mut popts = opts.clone();
                 popts.method = crate::simplex::Method::Primal;
                 r.ray = crate::simplex::solve(model, None, &popts)?.ray;

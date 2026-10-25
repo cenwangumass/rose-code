@@ -67,6 +67,22 @@ pub struct SolveOptions {
     pub obj_scale: f64,
     /// `BarConvTol` of `Method::Barrier`.
     pub barrier_tol: f64,
+    pub leave_plus: bool,
+    /// The primal that continues a dual run in the release profile starts in method 2 with the dual's counters (`ctx+0x3ec` = 2 at its first step).
+    pub sw_carry: Option<SwCarry>,
+}
+
+/// The counters the dual leaves in the context for the primal that continues it (`ctx+0x2a0`, `0x330`, `0x334`, `0x2b0`, `0x2c0`, `0x338`, `0x340`).
+#[derive(Clone, Debug)]
+pub struct SwCarry {
+    pub iters: f64,
+    pub degenerate: i32,
+    pub snap_degenerate: i32,
+    pub snap_iters: f64,
+    /// Factorizations of the dual run (`ctx+0x2c0` before the primal's first one is counted by the method decision).
+    pub factorizations: u32,
+    pub level: u32,
+    pub pert: f64,
 }
 
 impl Default for SolveOptions {
@@ -89,6 +105,8 @@ impl Default for SolveOptions {
             perturb: 0.0,
             obj_scale: 1.0,
             barrier_tol: 1e-8,
+            leave_plus: false,
+            sw_carry: None,
         }
     }
 }
@@ -624,6 +642,9 @@ struct Solver<'a> {
     opts: &'a SolveOptions,
     /// Variable dropped last from a singular supplied basis: not priced until the basis is primal feasible.
     excluded: Option<usize>,
+    /// Free nonbasic variables the pricing skips: status -6 in the reference (an entering free variable without a leaving row and with a reduced cost within the
+    /// tolerance, `0x144d2d..0x144d58`), cleared when the phase changes.
+    excl6: Vec<bool>,
     restart: bool,
     pre_restart: bool,
     /// The duals were recomputed at the start of this iteration (the end of phase 1), so the scan that finds nothing does not recompute them again.
@@ -1661,7 +1682,7 @@ impl<'a> Solver<'a> {
 
     /// Eligibility and score `d^2 / w` of a nonbasic variable, or `None` if it cannot enter.
     fn score(&self, j: usize) -> Option<f64> {
-        if self.pos_of[j] != NONE || self.is_fixed(j) || self.excluded == Some(j) {
+        if self.pos_of[j] != NONE || self.is_fixed(j) || self.excluded == Some(j) || self.excl6[j] {
             return None;
         }
         // The reference's candidate scan accepts |d| above 1e-6 (it rejected a d of 1.5e-7 that the default 1e-7 takes).
@@ -3464,16 +3485,25 @@ pub fn solve(
         p: &p,
         opts,
         excluded,
+        excl6: vec![false; n + m],
         restart: false,
         pre_restart: false,
         fresh_duals: false,
         restarted: false,
         basic: basis.basic.clone(),
-        pos_of,
+        pos_of: pos_of.clone(),
         at_upper: basis.at_upper.clone(),
         x: vec![0.0; n + m],
         d: vec![0.0; n + m],
-        w: vec![1.0; n + m],
+        w: (0..n + m)
+            .map(|j| {
+                if opts.sw_carry.is_some() && pos_of[j] != NONE {
+                    0.0
+                } else {
+                    1.0
+                }
+            })
+            .collect(),
         in_r0,
         factor,
         refactorizations: 1,
@@ -3503,6 +3533,9 @@ pub fn solve(
         upd_work: Vec::new(),
         p0: None,
         sw: crate::method::Method {
+            mode: if opts.sw_carry.is_some() { 2 } else { 0 },
+            ratio_cnt: u32::from(opts.sw_carry.is_some()),
+            keep468: opts.sw_carry.is_some(),
             factorizations: 1,
             ..Default::default()
         },
@@ -3594,6 +3627,18 @@ pub fn solve(
         });
     }
     s.work.factor_done();
+    if let Some(c) = &opts.sw_carry {
+        // The dual's counters carry over; the method decision of the primal's first factorization runs (`0x142500`, call 0 of `compare.py switch`).
+        s.sw.active = true;
+        s.sw.iters = c.iters;
+        s.sw.degenerate = c.degenerate;
+        s.sw.snap_degenerate = c.snap_degenerate;
+        s.sw.snap_iters = c.snap_iters;
+        s.sw.factorizations = c.factorizations;
+        s.sw.level = c.level;
+        s.sw.pert = c.pert;
+        s.method_decision(0);
+    }
     s.recompute_primal();
     s.primal_full_work();
     s.dual_btran_work();
@@ -3722,6 +3767,7 @@ pub fn solve(
         } else if phase1 {
             // Back in a feasible region: continue with the true costs (weights and framework are kept).
             phase1 = false;
+            s.excl6.iter_mut().for_each(|e| *e = false);
             if s.p0.is_some() && !due {
                 // The end of phase 1 recomputes the duals from the true costs (one dense BTRAN) and keeps the list.
                 s.dual_btran_work();
@@ -3994,7 +4040,7 @@ pub fn solve(
                 );
             }
             let mut passes = Vec::new();
-            let eefa = s.sw.mode != 0;
+            let eefa = s.sw.mode != 0 && !s.sw.keep468;
             let mut passes2: Vec<(usize, usize)> = Vec::new();
             let pick = if eefa {
                 phase1_eefa0(tol, opts.pivot_tol, own, &entries, &info, &mut passes2)
@@ -4193,6 +4239,18 @@ pub fn solve(
                     leave_to_upper = Some(true);
                 }
             }
+        }
+        if chosen.is_none()
+            && step >= INF
+            && own >= INF
+            && is_inf(p.lo[q])
+            && is_inf(p.up[q])
+            && s.d[q].abs() <= opts.optimality_tol.max(1e-6)
+        {
+            // A free entering variable without a leaving row and with a reduced cost within the tolerance gets status -6 and the step returns without an
+            // iteration (`0x1449c7..0x144d58`, s198: phase 1 call 0 and phase 2 call 2); the pricing skips it until the phase changes.
+            s.excl6[q] = true;
+            continue;
         }
         if chosen.is_none() && step >= INF {
             if infeasible {
@@ -4648,6 +4706,9 @@ pub fn solve(
                 s.w[leave] = wl.max(((wq / alpha_rq) / alpha_rq) * leave_arj * leave_arj + 1.0);
             }
             s.w[q] = 1.0;
+        } else if opts.leave_plus {
+            let wl = s.w[leave].max(1.0);
+            s.w[leave] = wl.max(((wq / alpha_rq) / alpha_rq) * leave_arj * leave_arj + 1.0);
         } else {
             if opts.faithful_weights && s.w[leave] <= NORM_RESET_TOL {
                 norm_reset = true;
