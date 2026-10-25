@@ -2428,6 +2428,48 @@ impl<'a> Solver<'a> {
             .collect()
     }
 
+    /// The reference's `FarkasDual` (the BTRAN of the `+-1` cost vector built from the basic type bytes at `0x1b44a0`, entered in the
+    /// user's row orientation): `y' B = c` with `c = +1` for a basic variable below its lower bound and `-1` above its upper bound, the
+    /// cost of a slack taken in the orientation of the row side it belongs to (so `y_i = +1` for a violated slack whatever the row's sense).
+    fn farkas_dual(&mut self) -> Vec<f64> {
+        let p = self.p;
+        let sg = self.sig();
+        let pure = self.opts.pricing0;
+        let mut y: Vec<f64> = self
+            .basic
+            .iter()
+            .enumerate()
+            .map(|(i, &j)| {
+                let c = -f64::from(sg[i]);
+                // The release profile (`pricing0`) keeps the pure sum-of-infeasibilities duals with the sign of its own convention.
+                if pure {
+                    return c;
+                }
+                if j >= p.n {
+                    c * p.cols[j][0].1
+                } else {
+                    c
+                }
+            })
+            .collect();
+        // The reference's dense BTRAN (with its drops and rounding) when the mirror of its factor is kept.
+        if let Some(mi) = self.mirror.as_mut() {
+            let inp: Vec<(usize, f64)> = y
+                .iter()
+                .enumerate()
+                .filter(|e| *e.1 != 0.0)
+                .map(|(i, &v)| (i, v))
+                .collect();
+            let mut out = vec![0.0; y.len()];
+            for (i, v) in mi.btran(&inp, false, true) {
+                out[i] = v;
+            }
+            return out;
+        }
+        self.factor.btran(&mut y);
+        y
+    }
+
     /// The reference's dual clean-up pass after a shifted primal optimum (`0xf6a00`): the unshifted basic solution may leave a bound by
     /// more than the tolerance (FIT2P: one variable, 4.15e-4), and the reference then pivots with the dual simplex instead of re-entering
     /// the primal phase 1 (2 pivots, counted in its iteration count; rose's phase 1 took 6 to reach the same basis). Textbook dual
@@ -3564,13 +3606,13 @@ pub fn solve(
                 None => {
                     // No improving column for the penalised cost: try the pure sum of infeasibilities, which either
                     // continues the search or proves infeasibility with the multipliers as certificate.
-                    let y = s.composite_dual(true);
+                    s.composite_dual(true);
                     s.list.clear();
                     s.level = 0;
                     match s.price_admitting() {
                         Some(q) => q,
                         None => {
-                            farkas = Some(y.iter().map(|v| -v).collect());
+                            farkas = Some(s.farkas_dual());
                             break Status::Infeasible;
                         }
                     }
@@ -3616,13 +3658,13 @@ pub fn solve(
                     if infeasible && s.has_infeasible_basic() {
                         // The scan found no improving column in phase 1 on a basis that is still infeasible: the pure sum of infeasibilities
                         // either continues the search or proves infeasibility with the multipliers as certificate (as without the scan).
-                        let y = s.composite_dual(true);
+                        s.composite_dual(true);
                         s.list.clear();
                         s.level = 0;
                         match s.price_admitting() {
                             Some(q) => q,
                             None => {
-                                farkas = Some(y.iter().map(|v| -v).collect());
+                                farkas = Some(s.farkas_dual());
                                 break Status::Infeasible;
                             }
                         }
@@ -4524,23 +4566,6 @@ pub fn solve(
     }
     let nm = model.num_cols();
     let x: Vec<f64> = s.x[..nm].to_vec();
-    // The reference's primal (controlled profile) returns a certificate that uses an inequality row in its own convention (`verify::farkas_margins`:
-    // `y >= 0` on rows with only a lower side, `<= 0` on rows with only an upper side); with equality rows only, as in the release profile and
-    // the dual method, the opposite signs.
-    let farkas = farkas.map(|y| {
-        let one_sided = (0..model.num_rows())
-            .any(|i| y[i] != 0.0 && (is_inf(model.row_lo[i]) || is_inf(model.row_up[i])));
-        let neg: Vec<f64> = y.iter().map(|v| -v).collect();
-        let (a, a_neg) = (
-            crate::verify::farkas_margins(model, &y).0,
-            crate::verify::farkas_margins(model, &neg).0,
-        );
-        if !opts.pricing0 && one_sided && a_neg > 0.0 && a_neg > a {
-            neg
-        } else {
-            y
-        }
-    });
     Ok(SolveResult {
         status,
         objective: model.objective(&x),

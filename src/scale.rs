@@ -317,7 +317,27 @@ pub fn solve(
         ..opts.clone()
     };
     match sc.apply(model) {
-        Some(scaled) => Ok(sc.unscale(model, crate::simplex::solve(&scaled, start, &inner)?)),
+        Some(scaled) => {
+            let r = crate::simplex::solve(&scaled, start, &inner)?;
+            let mut out = sc.unscale(model, r);
+            // The dual's FarkasDual: the reference enters the unit vector of the leaving position in the user's frame, so the wrapper `0x1b32e0`
+            // divides it by the row factor of a leaving slack (multiplies it by the column factor of a leaving structural) before the BTRAN;
+            // the result is `R e_r' B'^-1` times that factor.
+            if opts.method == crate::simplex::Method::Dual {
+                if let (Some(f), Some((leave, n))) = (
+                    out.farkas.as_mut(),
+                    crate::dual::FARKAS_LEAVE.with(|c| c.take()),
+                ) {
+                    let g = if leave >= n {
+                        1.0 / sc.row[leave - n]
+                    } else {
+                        sc.col[leave]
+                    };
+                    f.iter_mut().for_each(|y| *y *= g);
+                }
+            }
+            Ok(out)
+        }
         None => crate::simplex::solve(model, start, &inner),
     }
 }

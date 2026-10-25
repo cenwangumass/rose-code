@@ -1855,6 +1855,11 @@ fn PIVOT_DELTA(delta: f64, v: f64, ratio: f64) -> f64 {
     delta / v + ratio
 }
 
+thread_local! {
+    /// The leaving variable of the last ratio test without an entering variable and the number of non-slack columns (read by `scale::solve`).
+    pub(crate) static FARKAS_LEAVE: std::cell::Cell<Option<(usize, usize)>> = const { std::cell::Cell::new(None) };
+}
+
 /// Result of one call of the iteration function.
 enum Step {
     /// A basis change: leaving row, leaving and entering variable, the pivot row (reference frame) and the data of the post-iteration passes.
@@ -1941,6 +1946,7 @@ impl<'a> Dual<'a> {
             y.iter_mut()
                 .filter(|v| v.abs() <= 1e-11 * big)
                 .for_each(|v| *v = 0.0);
+            FARKAS_LEAVE.with(|c| c.set(Some((leave, self.n))));
             return Step::Unbounded(y);
         };
         let (q, aq_row) = row[qe];
@@ -2998,9 +3004,19 @@ pub fn solve(
                 }
             }
             Step::Unbounded(y) => {
-                status = Status::Infeasible;
-                farkas = Some(y);
-                break;
+                if s.updates != 0 {
+                    // No entering variable on a factor with updates (ctx+0x294 = 5, RECIPE-like bgdbg1 calls 29 and 31): refactorize and price again; the
+                    // certificate is the row of the first such failure on a fresh factor.
+                    s.request = 5;
+                    s.post(None, false)?;
+                    if s.status.is_none() {
+                        continue;
+                    }
+                } else {
+                    status = Status::Infeasible;
+                    farkas = Some(y);
+                    break;
+                }
             }
         }
         if let Some(stt) = s.status {
