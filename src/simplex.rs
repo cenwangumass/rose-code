@@ -180,6 +180,12 @@ pub struct TraceEvent {
     pub flips: Vec<usize>,
 }
 
+thread_local! {
+    /// The entering variable and the structural count `n` of the scaled problem where the primal found its ray: the reference's ray moves that
+    /// variable by one unit in the user's frame, so the scaling wrapper rescales by the column factor (structural) or the row factor (slack).
+    pub(crate) static RAY_ENTER: std::cell::Cell<Option<(usize, usize)>> = const { std::cell::Cell::new(None) };
+}
+
 #[derive(Clone, Debug)]
 pub struct SolveResult {
     pub status: Status,
@@ -3740,7 +3746,7 @@ pub fn solve(
             INF
         };
         let mut leave_to_upper: Option<bool> = None;
-        let (chosen, mut step, _pivot) = if infeasible {
+        let (mut chosen, mut step, _pivot) = if infeasible {
             let (xs, basic, lo, up) = (&s.x, &s.basic, &p.lo, &p.up);
             let tol = opts.feasibility_tol;
             let info = |pos: usize| {
@@ -3948,6 +3954,34 @@ pub fn solve(
             // No admissible pivot and no improving slope in phase 1: the entering variable goes to its opposite bound.
             step = own;
         }
+        if chosen.is_none() && step >= INF && !infeasible && is_inf(p.lo[q]) && is_inf(p.up[q]) {
+            // A free entering variable with no blocking row is not declared unbounded at once (`0x144635`, `0x144d9b`): the reference
+            // pivots it in on the entry of largest |alpha| (first on ties, strictly greater) among the basic variables that are not free
+            // and above the pivot tolerance, the leaving variable going to its bound (fx_unb_free: the slack of c2 leaves, the ray is then
+            // found for that slack entering).
+            let mut best = opts.pivot_tol;
+            for (k, &(i, a)) in entries.iter().enumerate() {
+                let j = s.basic[i];
+                if a.abs() > opts.pivot_tol
+                    && a.abs() > best
+                    && !(is_inf(p.lo[j]) && is_inf(p.up[j]))
+                {
+                    best = a.abs();
+                    chosen = Some(k);
+                }
+            }
+            if let Some(k) = chosen {
+                let (i, a) = entries[k];
+                let j = s.basic[i];
+                if !is_inf(p.lo[j]) {
+                    step = s.dst[j] / a;
+                    leave_to_upper = Some(false);
+                } else {
+                    step = -(p.up[j] - s.x[j]) / a;
+                    leave_to_upper = Some(true);
+                }
+            }
+        }
         if chosen.is_none() && step >= INF {
             if infeasible {
                 // Rebuild the factorization once and price again.
@@ -3962,6 +3996,7 @@ pub fn solve(
             for &(i, a) in &entries {
                 dir_x[s.basic[i]] -= a;
             }
+            RAY_ENTER.with(|c| c.set(Some((q, n))));
             dir_x.truncate(model.num_cols());
             ray = Some(dir_x);
             break Status::Unbounded;

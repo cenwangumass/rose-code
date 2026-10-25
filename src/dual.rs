@@ -111,6 +111,12 @@ struct Dual<'a> {
     pmode: u8,
     /// The number of infeasible rows at the last value-mode recompute (`P+0x3c`).
     n_infeas: usize,
+    /// The infeasible-row count of the last flag recompute, whatever the mode (`[P+0x3c]`); a restart after a singular factorization compares the new count with it.
+    inf_count: usize,
+    /// Restarts so far (the reference's `ctx+0x184`).
+    retries: u32,
+    /// Set at a restart: the next flag recompute compares the stale `inf_count`.
+    stale_count: bool,
     /// The reference framework of mode 3 (`ctx+0x418`): the variables nonbasic when the weights were restarted.
     dflag: Vec<bool>,
     /// `SimplexPricing` left at its default (-1): the release profile, which may switch the pricing mode.
@@ -508,7 +514,49 @@ impl<'a> Dual<'a> {
             self.lu_thr = 0.5;
         }
         crate::lu_order::set_threshold(self.lu_thr);
-        let (order, st, rows) = reference_order(self.p, &self.head, self.refactorizations + 1);
+        let (mut order, mut st, mut rows) =
+            reference_order(self.p, &self.head, self.refactorizations + 1);
+        if order.len() < self.m && self.retries >= 5 {
+            // After five restarts the driver refuses another one (`0xf3aba`) and repairs in place: the columns without a pivot leave the basis and the
+            // slacks of the rows left without a pivot replace them (the supplied-basis repair); the last variable dropped stays out of pricing (status -4).
+            // The failed factorization counts as one (`ctx+0x2c0`).
+            let n = self.n;
+            let (mut row_done, mut pos_done) = (vec![false; self.m], vec![false; self.m]);
+            for &(r, pos) in &st.pivots {
+                row_done[r] = true;
+                pos_done[pos] = true;
+            }
+            let free_rows = (0..self.m).filter(|&r| !row_done[r]);
+            let gone = (0..self.m).filter(|&pos| !pos_done[pos]);
+            let mut last = None;
+            for (pos, r) in gone.zip(free_rows) {
+                let out = self.head[pos];
+                self.st[out] = LB;
+                self.head[pos] = n + r;
+                last = Some(out);
+            }
+            if let Some(j) = last {
+                self.st[j] = FIXED;
+                self.d[j] = if j < n { self.cost[j] } else { 0.0 };
+            }
+            self.refactorizations += 1;
+            (order, st, rows) = reference_order(self.p, &self.head, self.refactorizations + 1);
+        }
+        if order.len() < self.m {
+            // A basis column without a pivot: the reference restarts the dual from the slack basis (spec, "Singular factorization in the middle of a dual run").
+            SINGULAR.with(|c| {
+                c.set(Some((
+                    self.iters,
+                    self.refactorizations + 1,
+                    self.lu_thr,
+                    self.avg_touch,
+                    // The pivot-column length carries over only from a pass in value mode (m5: the second pass compares with 0, the third with 3).
+                    if self.value_mode { self.last_cap } else { 0 },
+                    self.inf_count,
+                )))
+            });
+            return Err(SolveError::SingularBasis);
+        }
         let discard = if self.pivot_cols.is_some() {
             self.mirror.discard_work()
         } else {
@@ -998,6 +1046,14 @@ impl<'a> Dual<'a> {
                 maxp = maxsd(maxp, self.prio[r]);
             }
         }
+        let count_now = inf.iter().filter(|&&f| f).count();
+        let count_cmp = if self.stale_count {
+            self.inf_count
+        } else {
+            count_now
+        };
+        self.stale_count = false;
+        self.inf_count = count_now;
         if self.first_recompute {
             self.first_recompute = false;
             if !self.warm {
@@ -1031,8 +1087,8 @@ impl<'a> Dual<'a> {
         // priority is only ever raised.
         let thr_old = self.thr;
         // The count compared with the pivot column's entries is the number of infeasible rows (`[P+0x3c]`, `0xc1e8e`).
-        let count = inf.iter().filter(|&&f| f).count();
-        self.n_infeas = count;
+        let count = count_cmp;
+        self.n_infeas = count_now;
         let div = if after_pivot && count < self.last_cap || big {
             1e5
         } else {
@@ -2227,27 +2283,19 @@ impl<'a> Dual<'a> {
     /// a recession direction. That direction moves every nonbasic variable at an artificial bound away from its finite bound, every free one with a nonzero d
     /// against its d, and the basic variables with them (the factor is fresh here). Whether the primal is feasible is for the caller to settle.
     fn dual_unbounded(&mut self) {
-        let p = self.p;
-        let mut rhs = vec![0.0; self.m];
+        // The reference reads the ray from the point the loop holds (`0x1b4870`, branch without an entering variable): the primal solution of the
+        // artificial-bound problem (nonbasic variables at `+-1e30`, basics from the FTRAN) divided by `1e30` (`ctx+0x370`), entries of 1e-13 or less dropped.
         let mut ray = vec![0.0; self.n + self.m];
-        for k in 0..self.n + self.m {
-            let dir = if self.st[k] == UB && p.up[k] >= BIG {
-                1.0
-            } else if self.st[k] == LB && p.lo[k] <= -BIG {
-                -1.0
-            } else if self.st[k] == FREE && self.d[k].abs() > DUAL_TOL {
-                -self.d[k].signum()
+        for j in 0..self.n + self.m {
+            let v = if self.st[j] >= 0 {
+                self.xb[self.st[j] as usize]
             } else {
-                continue;
+                self.nonbasic_value(j)
             };
-            ray[k] = dir;
-            for &(i, a) in &p.cols[k] {
-                rhs[i] -= a * dir;
+            let r = v / BIG;
+            if r.abs() > 1e-13 {
+                ray[j] = r;
             }
-        }
-        self.factor.ftran(&mut rhs);
-        for (pos, &b) in self.head.iter().enumerate() {
-            ray[b] = rhs[pos];
         }
         ray.truncate(self.nm);
         self.ray = Some(ray);
@@ -2749,11 +2797,82 @@ fn rho_norm(rho: &[(usize, f64)]) -> f64 {
     t
 }
 
-/// Dual simplex from a cold start (the crash basis) or a supplied basis.
+/// State the reference's driver keeps across a singular factorization (`0xf398e..0xf3b84`): the retry counter `ctx+0x184`, the LU pivot threshold `ctx+0x390`,
+/// the factorization count `ctx+0x2c0` (the failed one included) and the iterations done.
+#[derive(Clone, Copy)]
+struct Carry {
+    retries: u32,
+    thr: f64,
+    fac: usize,
+    iters: usize,
+    avg_touch: f64,
+    last_cap: usize,
+    inf_count: usize,
+}
+
+thread_local! {
+    /// Set where a mid-run factorization found no pivot for a basic column: `(iterations done, factorizations including the failed one, LU threshold)`.
+    static SINGULAR: std::cell::Cell<Option<(usize, usize, f64, f64, usize, usize)>> = const { std::cell::Cell::new(None) };
+}
+
+/// Dual simplex from a cold start (the crash basis) or a supplied basis. A singular factorization in the middle of the run restarts the dual from
+/// the slack basis (the reference's driver, `0xf398e`): the retry counter picks the pivot threshold of the next factorizations, 0.5 for the first
+/// retry and 0.9 for the later ones, and the iteration count goes on.
 pub fn solve(
     model: &LpModel,
     start: Option<&Basis>,
     opts: &SolveOptions,
+) -> Result<SolveResult, SolveError> {
+    let mut carry = Carry {
+        retries: 0,
+        thr: crate::lu_order::THRESHOLD,
+        fac: 0,
+        iters: 0,
+        avg_touch: 0.0,
+        last_cap: 0,
+        inf_count: 0,
+    };
+    loop {
+        SINGULAR.with(|c| c.set(None));
+        match solve_pass(model, start, opts, &carry) {
+            Err(SolveError::SingularBasis) if carry.retries < 100 => {
+                let Some((iters, fac, thr, avg_touch, last_cap, inf_count)) =
+                    SINGULAR.with(|c| c.take())
+                else {
+                    return Err(SolveError::SingularBasis);
+                };
+                // Every third restart starts the pricing from scratch (list-walk mode, empty running averages): the reference's p40/thr schedule over the
+                // restarts is list-walk, value (thr maxp/1e3), value (thr maxp/1e5), then again (fx_midsing_m5, seeds 1494, 1390, 1496).
+                let fresh = (carry.retries + 1) % 3 == 0;
+                let (avg_touch, last_cap, inf_count) = if fresh {
+                    (0.0, 0, 0)
+                } else {
+                    (avg_touch, last_cap, inf_count)
+                };
+                carry = Carry {
+                    retries: carry.retries + 1,
+                    thr: thr.max(if carry.retries == 0 { 0.5 } else { 0.9 }),
+                    fac,
+                    iters: carry.iters + iters,
+                    avg_touch,
+                    last_cap,
+                    inf_count,
+                };
+            }
+            Ok(mut r) => {
+                r.iterations += carry.iters;
+                return Ok(r);
+            }
+            e => return e,
+        }
+    }
+}
+
+fn solve_pass(
+    model: &LpModel,
+    start: Option<&Basis>,
+    opts: &SolveOptions,
+    carry: &Carry,
 ) -> Result<SolveResult, SolveError> {
     let p = build(model);
     let (n, m) = (p.n, p.m);
@@ -2776,9 +2895,12 @@ pub fn solve(
         },
     };
     basis.validate(n, m).map_err(SolveError::InvalidBasis)?;
-    crate::lu_order::reset_pair_gate();
+    if carry.retries == 0 {
+        crate::lu_order::reset_pair_gate();
+    }
+    crate::lu_order::set_threshold(carry.thr);
     crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
-    let (order, stc, rows) = reference_order(&p, &basis.basic, 1);
+    let (order, stc, rows) = reference_order(&p, &basis.basic, carry.fac + 1);
     let mirror = RefStruct::fresh(m, n, &stc, &rows);
     let cols: Vec<&Column> = order.iter().map(|&j| &p.cols[j]).collect();
     let factor = Factor::new(m, &cols).map_err(|_| SolveError::SingularBasis)?;
@@ -2799,10 +2921,13 @@ pub fn solve(
         mirror,
         factor,
         rrows: vec![Vec::new(); m],
-        refactorizations: 1,
-        lu_thr: crate::lu_order::THRESHOLD,
+        refactorizations: carry.fac + 1,
+        lu_thr: carry.thr,
         pmode: if start.is_some() { 3 } else { 1 },
         n_infeas: 0,
+        inf_count: carry.inf_count,
+        retries: carry.retries,
+        stale_count: false,
         dflag: Vec::new(),
         switch_enabled: opts.perturb > 0.0,
         level: 0,
@@ -2823,10 +2948,10 @@ pub fn solve(
         pend: cap,
         cap,
         rebuilds: 40,
-        first_recompute: true,
+        first_recompute: carry.retries % 3 == 0,
         warm: start.is_some(),
-        avg_touch: 0.0,
-        last_cap: 0,
+        avg_touch: carry.avg_touch,
+        last_cap: carry.last_cap,
         updates: 0,
         upd_limit: None,
         pending_alpha: None,
@@ -2946,7 +3071,7 @@ pub fn solve(
     s.recompute_xb(0);
     s.prog_on = s.level == 0;
     s.work.add(0xc391f, m as f64, crate::work::CTX);
-    s.recompute_flags(s.warm && s.level != 0, false);
+    s.recompute_flags(s.warm && s.level != 0, carry.retries > 0);
     s.flags_work();
     let schedule = opts.refactor_schedule.clone();
     let mut trace = Vec::new();

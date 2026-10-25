@@ -318,8 +318,21 @@ pub fn solve(
     };
     match sc.apply(model) {
         Some(scaled) => {
+            crate::simplex::RAY_ENTER.with(|c| c.set(None));
             let r = crate::simplex::solve(&scaled, start, &inner)?;
             let mut out = sc.unscale(model, r);
+            if let (Some(ray), Some((q, n))) = (
+                out.ray.as_mut(),
+                crate::simplex::RAY_ENTER.with(|c| c.take()),
+            ) {
+                // Unit step of the entering variable in the user's frame: a slack's scaled value is `R s`, a structural's is `x / C`.
+                let g = if q >= n {
+                    sc.row[q - n]
+                } else {
+                    1.0 / sc.col[q]
+                };
+                ray.iter_mut().for_each(|v| *v *= g);
+            }
             // The dual's FarkasDual: the reference enters the unit vector of the leaving position in the user's frame, so the wrapper `0x1b32e0`
             // divides it by the row factor of a leaving slack (multiplies it by the column factor of a leaving structural) before the BTRAN;
             // the result is `R e_r' B'^-1` times that factor.
