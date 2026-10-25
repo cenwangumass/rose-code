@@ -3580,6 +3580,7 @@ thread_local! {
     /// Set where a mid-run factorization found no pivot for a basic column: `(iterations done, factorizations including the failed one, LU threshold)`.
     /// The pass ended with the quad switch (`Step::SwitchQuad`): the counters and the basis the quad pass continues from.
     static SWITCH: std::cell::Cell<Option<(usize, usize, f64, f64, usize, usize, bool, u32)>> = const { std::cell::Cell::new(None) };
+    static FROM_SWITCH: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static SWITCH_BASIS: std::cell::RefCell<Option<Basis>> = const { std::cell::RefCell::new(None) };
     /// The cost shifts the quad pass inherits from the double pass (the context is the same: `ctx+0x338`, the cost array, the shifted d values).
     static SWITCH_PERT: std::cell::RefCell<Option<SwitchPert>> = const { std::cell::RefCell::new(None) };
@@ -3693,6 +3694,7 @@ fn solve_frame(
             }
             _ => start,
         };
+        FROM_SWITCH.with(|c| c.set(sw.is_some()));
         let res = if quad {
             solve_pass::<crate::f80::F80>(model, start_now, opts, &carry)
         } else {
@@ -3817,6 +3819,27 @@ fn solve_pass<R: Real>(
             b.basic.sort_unstable();
             supplied = Some(b.basic.clone());
             // A singular basis loses the columns that get no pivot in the reference's LU order and takes the slacks of the uncovered rows instead.
+            let mut probe = b.clone();
+            if FROM_SWITCH.with(|c| c.get())
+                && crate::simplex::repair_basis(&p, &mut probe).is_some()
+            {
+                // The basis the quad switch carries over is not a supplied one: when its quad factorization is singular (the double structure finds the same columns
+                // dependent), the pass ends before its first iteration and the restart takes the snapshot basis (seed 2706: first quad factorization has `p13` = 1,
+                // the next one is the slack basis, `ctx+0x184` = 1).
+                SINGULAR.with(|c| {
+                    c.set(Some((
+                        0,
+                        carry.fac + 1,
+                        carry.thr,
+                        carry.avg_touch,
+                        carry.last_cap,
+                        carry.inf_count,
+                        carry.after_pivot,
+                        carry.retries,
+                    )))
+                });
+                return Err(SolveError::SingularBasis);
+            }
             dropped = crate::simplex::repair_basis(&p, &mut b).map(|(j, _)| j);
             b
         }
