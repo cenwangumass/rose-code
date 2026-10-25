@@ -57,6 +57,14 @@ impl Work {
         }
     }
 
+    /// The quad pass: `0xcec20` sets the context's scale (`ctx+0x148`) to 1.95.
+    pub fn dual_quad() -> Self {
+        Work {
+            ctx: 1.95,
+            ..Work::default()
+        }
+    }
+
     /// `W = est * scale + W`, in the reference's operation order.
     pub fn add(&mut self, site: u32, est: f64, scale: f64) {
         if self.mute {

@@ -29,6 +29,8 @@ pub trait Real:
     const ONE: Self;
     /// The SSE2 kernels of the double code add in vector lanes; the x87 code of the quad mode adds one term after the other.
     const LANES: bool;
+    /// The extended-precision instantiation (the reference's quad mode).
+    const QUAD: bool;
 
     /// Exact conversion of a double.
     fn c(x: f64) -> Self;
@@ -44,6 +46,9 @@ pub trait Real:
 
     fn is_nan(self) -> bool;
 
+    /// A dump value: the number for `f64`, `[mantissa hex, sign/exponent hex]` for an extended value (as the reference captures print long doubles).
+    fn json(self) -> serde_json::Value;
+
     fn from_usize(n: usize) -> Self {
         Self::c(n as f64)
     }
@@ -53,6 +58,7 @@ impl Real for f64 {
     const ZERO: f64 = 0.0;
     const ONE: f64 = 1.0;
     const LANES: bool = true;
+    const QUAD: bool = false;
 
     #[inline(always)]
     fn c(x: f64) -> f64 {
@@ -83,12 +89,17 @@ impl Real for f64 {
     fn is_nan(self) -> bool {
         f64::is_nan(self)
     }
+
+    fn json(self) -> serde_json::Value {
+        serde_json::json!(self)
+    }
 }
 
 impl Real for F80 {
     const ZERO: F80 = F80::ZERO;
     const ONE: F80 = F80::ONE;
     const LANES: bool = false;
+    const QUAD: bool = true;
 
     fn c(x: f64) -> F80 {
         F80::from_f64(x)
@@ -124,5 +135,10 @@ impl Real for F80 {
 
     fn is_nan(self) -> bool {
         F80::is_nan(self)
+    }
+
+    fn json(self) -> serde_json::Value {
+        let (m, se) = self.repr();
+        serde_json::json!([format!("{m:#x}"), format!("{se:#x}")])
     }
 }

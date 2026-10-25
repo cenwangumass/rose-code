@@ -7,9 +7,9 @@
 
 use crate::basis::Basis;
 use crate::ftran_order::RefStruct;
-use crate::real::Real;
 use crate::lu::{Column, Factor};
 use crate::model::{LpModel, Sense, INF};
+use crate::real::Real;
 use crate::simplex::{
     build, ref_sort, Internal, SolveError, SolveOptions, SolveResult, Status, TraceEvent,
 };
@@ -608,8 +608,7 @@ impl<'a, R: Real> Dual<'a, R> {
         Option<RefStruct<R>>,
     ) {
         crate::lu_order::set_threshold(self.lu_thr);
-        let (order, st, rows) =
-            reference_order::<R>(self.p, &self.head, self.refactorizations + 1);
+        let (order, st, rows) = reference_order::<R>(self.p, &self.head, self.refactorizations + 1);
         let mi = (order.len() == self.m).then(|| RefStruct::fresh(self.m, self.n, &st, &rows));
         if crate::dump::on("luin") {
             crate::dump::emit(
@@ -1508,12 +1507,7 @@ impl<'a, R: Real> Dual<'a, R> {
 
     /// The row product (`0x134d90`): the pivot row `rho^T A_N` over the nonbasic columns (and the leaving slack), in the reference frame.
     /// Returns the entries `(variable, value)` with the structurals first, and their count.
-    fn pivot_row(
-        &self,
-        rho: &[(usize, R)],
-        leave: usize,
-        above: bool,
-    ) -> (Vec<(usize, R)>, usize) {
+    fn pivot_row(&self, rho: &[(usize, R)], leave: usize, above: bool) -> (Vec<(usize, R)>, usize) {
         let (n, m) = (self.n, self.m);
         let p = self.p;
         // The row product runs over the rows of `rho` unless their entries (`0x134aa0` counts them) outnumber the structurals n by 1.8 (`0xc5355`, `ctx+0x68`);
@@ -1583,7 +1577,11 @@ impl<'a, R: Real> Dual<'a, R> {
             if self.dflag[j] {
                 continue;
             }
-            let a = if a.abs() < R::c(ALPHA_TOL) { R::ZERO } else { a };
+            let a = if a.abs() < R::c(ALPHA_TOL) {
+                R::ZERO
+            } else {
+                a
+            };
             let s = if self.st[j] == UB { -1.0 } else { 1.0 };
             list.push((j, a * R::c(s * sdir)));
         }
@@ -1781,7 +1779,11 @@ impl<'a, R: Real> Dual<'a, R> {
         // A row whose largest entry is below the pivot tolerance (`max(|worst|, 1e-13 maxa, 3e-8)`, `0xc7cd9`) is rejected: no entering variable is chosen, the
         // row gets flag 5 and the pricing goes on with the next one (fx_midsing_m6 calls 10 and 13). The measure kept for the worst rejected row is
         // `0.01 maxa` when the infeasibility is at least 0.01, else `infeasibility * maxa`, negated.
-        if maxr(R::c(self.worst.abs()), maxr(R::c(1e-13) * maxa, R::c(PIVOT_FLOOR))) > maxa {
+        if maxr(
+            R::c(self.worst.abs()),
+            maxr(R::c(1e-13) * maxa, R::c(PIVOT_FLOOR)),
+        ) > maxa
+        {
             let m = if R::c(0.01) <= -xmm10 {
                 maxa * R::c(0.01)
             } else {
@@ -1941,7 +1943,11 @@ impl<'a, R: Real> Dual<'a, R> {
                         dj = self.d[j];
                     } else if self.st[j] == FREE {
                         // A free variable's d is zeroed with the perturbation flag raised (`0xc8739`).
-                        self.raise_pert(if delta * R::c(0.0005) > dj.abs() { 1 } else { 2 });
+                        self.raise_pert(if delta * R::c(0.0005) > dj.abs() {
+                            1
+                        } else {
+                            2
+                        });
                         self.d[j] = R::ZERO;
                         dj = R::ZERO;
                     }
@@ -2105,7 +2111,11 @@ impl<'a, R: Real> Dual<'a, R> {
                 }
             } else if self.st[j] == FREE {
                 if dj.abs() > R::c(1e-13) {
-                    self.raise_pert(if delta * R::c(0.0005) > dj.abs() { 1 } else { 2 });
+                    self.raise_pert(if delta * R::c(0.0005) > dj.abs() {
+                        1
+                    } else {
+                        2
+                    });
                 }
                 self.d[j] = R::ZERO;
                 break;
@@ -2685,7 +2695,16 @@ impl<'a, R: Real> Dual<'a, R> {
         // largest 9.9997e-11, smallest kept 1.0000751e-10), so that the d update does not see them.
         let row: Vec<(usize, R)> = row
             .into_iter()
-            .map(|(j, v)| (j, if v.abs() < R::c(ALPHA_TOL) { R::ZERO } else { v }))
+            .map(|(j, v)| {
+                (
+                    j,
+                    if v.abs() < R::c(ALPHA_TOL) {
+                        R::ZERO
+                    } else {
+                        v
+                    },
+                )
+            })
             .collect();
         Step::Pivot(Box::new(Pivot {
             r,
@@ -2706,8 +2725,8 @@ impl<'a, R: Real> Dual<'a, R> {
 impl<'a, R: Real> Dual<'a, R> {
     fn snapshot(&self, k: usize) -> serde_json::Value {
         serde_json::json!({
-            "k": k, "lvl": self.level, "req": self.request, "it": self.iters as f64, "head": self.head, "xB": self.xb.iter().map(|v| v.to_f64()).collect::<Vec<_>>(), "d": self.d.iter().map(|v| v.to_f64()).collect::<Vec<_>>(), "W": self.w,
-            "st": self.st, "flags": self.flags, "prio": self.prio,
+            "k": k, "lvl": self.level, "req": self.request, "it": self.iters as f64, "head": self.head, "xB": self.xb.iter().map(|v| v.json()).collect::<Vec<_>>(), "d": self.d.iter().map(|v| v.json()).collect::<Vec<_>>(), "W": self.w,
+            "st": self.st, "flags": self.flags, "prio": self.prio, "diag": self.mirror.numerics().0.iter().map(|v| v.json()).collect::<Vec<_>>(),
             "list": if self.value_mode { self.list.clone() } else { self.list[..self.walk_len.min(self.list.len())].to_vec() },
             "thr": self.thr, "p40": self.value_mode as u8, "cur": self.cursor,
         })
@@ -3151,7 +3170,8 @@ impl<'a, R: Real> Dual<'a, R> {
             // d update (`0xe45c0`).
             // The reference's row list also holds the leaving variable (rose's only when it is a slack).
             let aq = pv.row.iter().find(|e| e.0 == pv.q).unwrap().1;
-            let theta = self.d[pv.q] / aq;
+            // The step divides by the pivot as the double `ctx+0x308` (the row's pivot, stored as a double); the same for the primal step and `ctx+0x300`.
+            let theta = self.d[pv.q] / R::c(aq.to_f64());
             // A zero step skips the loop (`0xe4719`): no work.
             if !refactor && theta != R::ZERO {
                 let row_cnt = pv.row.len() + usize::from(pv.leave < self.n);
@@ -3272,7 +3292,7 @@ impl<'a, R: Real> Dual<'a, R> {
         } else {
             self.p.up[v]
         };
-        let theta = (self.xb[r] - R::c(b)) / alpha;
+        let theta = (self.xb[r] - R::c(b)) / R::c(alpha.to_f64());
         self.xb[r] = pv.t0 + theta;
         for &(i, cv) in &pv.col {
             self.xb[i] = self.xb[i] - cv * theta;
@@ -3451,6 +3471,8 @@ fn solve_frame(
     SNAP_C40.with(|c| c.set(-100.0));
     PAIR_TOL.with(|c| c.set(3e-6));
     PASS_NO.with(|c| c.set(0));
+    // The quad mode (`ctx+0x28`): once the controller switched, every later pass runs the extended-precision twin of the dual.
+    let mut quad = false;
     loop {
         // The controller loop reads the tolerance at its top (`0x154ccc`) and sets it again for the primal it starts (`0x15647a`).
         LOOP_TOL.with(|c| c.set(dual_tol()));
@@ -3465,7 +3487,12 @@ fn solve_frame(
             }
             _ => start,
         };
-        match solve_pass(model, start_now, opts, &carry) {
+        let res = if quad {
+            solve_pass::<crate::f80::F80>(model, start_now, opts, &carry)
+        } else {
+            solve_pass::<f64>(model, start_now, opts, &carry)
+        };
+        match res {
             Err(SolveError::SingularBasis) if carry.retries < 100 => {
                 let Some((
                     iters,
@@ -3480,6 +3507,17 @@ fn solve_frame(
                 else {
                     return Err(SolveError::SingularBasis);
                 };
+                // The restart handler (`0xcedb0`) switches to quad when iterations were made (`ctx+0x20 + ctx+0x2a0`), with `Quad` at its default (-1, the release
+                // profile) and `ctx+0x28` still 0 (the checks of `0x2c8d0` and `ctx+0x188` hold in a pure dual run).
+                if crate::dump::on("dcr") {
+                    crate::dump::emit(
+                        "dcr",
+                        serde_json::json!({"restart": true, "quad": quad, "perturb": opts.perturb, "iters": carry.iters + iters}),
+                    );
+                }
+                if !quad && opts.perturb > 0.0 && carry.iters + iters > 0 {
+                    quad = true;
+                }
                 // Every third restart starts the pricing from scratch (list-walk mode, empty running averages): the reference's p40/thr schedule over the
                 // restarts is list-walk, value (thr maxp/1e3), value (thr maxp/1e5), then again (fx_midsing_m5, seeds 1494, 1390, 1496).
                 let fresh = (pass_retries + 1) % 3 == 0;
@@ -3509,7 +3547,7 @@ fn solve_frame(
     }
 }
 
-fn solve_pass(
+fn solve_pass<R: Real>(
     model: &LpModel,
     start: Option<&Basis>,
     opts: &SolveOptions,
@@ -3550,7 +3588,7 @@ fn solve_pass(
     }
     crate::lu_order::set_threshold(carry.thr);
     crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
-    let (order, stc, rows) = reference_order(&p, &basis.basic, carry.fac + 1);
+    let (order, stc, rows) = reference_order::<R>(&p, &basis.basic, carry.fac + 1);
     let mirror = RefStruct::fresh(m, n, &stc, &rows);
     let cols: Vec<&Column> = order.iter().map(|&j| &p.cols[j]).collect();
     let factor = Factor::new(m, &cols).map_err(|_| SolveError::SingularBasis)?;
@@ -3559,14 +3597,14 @@ fn solve_pass(
         st[j] = pos as i32;
     }
     let cap = ((m as f64).powf(0.7).floor() as i64).max(20);
-    let mut s = Dual {
+    let mut s: Dual<R> = Dual {
         p: &p,
         n,
         m,
         head: order,
         st,
-        xb: vec![0.0; m],
-        d: vec![0.0; n + m],
+        xb: vec![R::ZERO; m],
+        d: vec![R::ZERO; n + m],
         w: vec![1.0; m],
         mirror,
         factor,
@@ -3635,7 +3673,11 @@ fn solve_pass(
         unb_free: false,
         setup_unbounded: false,
         confirmed: false,
-        work: crate::work::Work::dual(),
+        work: if R::QUAD {
+            crate::work::Work::dual_quad()
+        } else {
+            crate::work::Work::dual()
+        },
         pivot_cols: None,
         nnz_a: p.cols[..n].iter().map(Vec::len).sum(),
         pstep: opts.perturb,
@@ -3692,24 +3734,24 @@ fn solve_pass(
         if s.st[j] >= 0 {
             continue;
         }
-        if s.st[j] == FREE && dt[j].abs() > dual_tol() {
+        if s.st[j] == FREE && dt[j].abs() > R::c(dual_tol()) {
             // A free variable the setup pivots could not bring into the basis (no basic variable with a finite lower bound in its column) and that is dual
             // infeasible: it takes the artificial bound its d asks for, like any other variable without the bound it would need.
-            s.st[j] = if dt[j] > 0.0 { LB } else { UB };
+            s.st[j] = if dt[j] > R::ZERO { LB } else { UB };
             s.d[j] = dt[j].abs();
             continue;
         }
         if s.st[j] == FIXED || s.st[j] == FREE {
             s.d[j] = if s.st[j] == FIXED && j < n {
-                s.cost[j]
+                R::c(s.cost[j])
             } else {
                 dt[j]
             };
             continue;
         }
-        if dt[j] < -dual_tol() {
+        if dt[j] < R::c(-dual_tol()) {
             s.st[j] = UB;
-        } else if dt[j] > dual_tol() {
+        } else if dt[j] > R::c(dual_tol()) {
             s.st[j] = LB;
         } else if crash_upper.as_ref().is_some_and(|u| u[j]) {
             // A d within the tolerance keeps the status the crash gave (`0xead36`: at the upper bound for a negative cost, else at the lower bound, then
@@ -3738,14 +3780,15 @@ fn solve_pass(
     }
     // Initial weights: the squared norms of the rows of B^-1 (a supplied basis starts with unit weights).
     for r in 0..if s.warm { 0 } else { m } {
-        let out = s.mirror.btran(&[(r, 1.0)], false, false);
+        let out = s.mirror.btran(&[(r, R::ONE)], false, false);
         s.work
             .add_from(0x12de50, 0xc36f1, s.mirror.work, crate::work::FAC);
         s.w[r] = if s.mirror.bt_dense {
             rho_norm_dense(&out, m)
         } else {
             rho_norm(&out)
-        };
+        }
+        .to_f64();
     }
     s.stall_check(0);
     // The setup's post-refactor pass (`0xe6dcc`) sees the iterations of the free-column pivots.
@@ -4022,7 +4065,7 @@ fn solve_pass(
                 it_base: r.iterations,
             };
             let snap_basis = snap.map(|(basic, at_upper)| Basis { basic, at_upper });
-            let mut r2 = solve_pass(model, snap_basis.as_ref().or(Some(&r.basis)), opts, &carry2)?;
+            let mut r2 = solve_pass::<R>(model, snap_basis.as_ref().or(Some(&r.basis)), opts, &carry2)?;
             r2.iterations += carry2.iters;
             return Ok(r2);
         }
@@ -4175,11 +4218,11 @@ fn solve_pass(
             // reference (`x' = -x`, lower bound `-up`), so its round trip uses the upper bound: `(-x + up) - up` negated is `(x - up) + up`. A free basic
             // variable stays as it is (bit-equal on fx_cleanrt_free_105, _1331, _2122: 19 to 36 nonzero free basic values each).
             if cleaned && lo > -1e30 && lo.is_finite() {
-                (v - lo) + lo
+                ((v - R::c(lo)) + R::c(lo)).to_f64()
             } else if cleaned && up < 1e30 && up.is_finite() {
-                (v - up) + up
+                ((v - R::c(up)) + R::c(up)).to_f64()
             } else {
-                v
+                v.to_f64()
             }
         } else {
             s.nonbasic_value(j)
@@ -4188,7 +4231,7 @@ fn solve_pass(
     s.cost.clone_from(&p.cost);
     let mut y: Vec<f64> = s.head.iter().map(|&j| p.cost[j]).collect();
     s.factor.btran(&mut y);
-    let dtrue = s.true_d();
+    let dtrue: Vec<f64> = s.true_d().iter().map(|v| v.to_f64()).collect();
     let nm = model.num_cols();
     let xs: Vec<f64> = x[..nm].to_vec();
     let at_upper: Vec<bool> = s.st.iter().map(|&t| t == UB).collect();

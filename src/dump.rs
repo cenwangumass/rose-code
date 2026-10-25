@@ -82,8 +82,11 @@ pub fn emit(kind: &str, rec: serde_json::Value) {
 }
 
 pub fn sparse_r<R: crate::real::Real>(v: &[(usize, R)]) -> serde_json::Value {
-    let f: Vec<(usize, f64)> = v.iter().map(|e| (e.0, e.1.to_f64())).collect();
-    sparse(&f)
+    serde_json::Value::Array(
+        v.iter()
+            .map(|e| serde_json::json!([e.0, e.1.json()]))
+            .collect(),
+    )
 }
 
 /// A sparse vector as `[[index, value], ...]`.

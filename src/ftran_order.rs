@@ -195,13 +195,49 @@ fn row_dot<R: Real>(s: R, t: &[(R, R)], peel: usize) -> R {
     r
 }
 
+/// The extended-precision eta dot product (`0x25e0e0`): blocks of eight terms go to eight accumulators (position mod 8), which are added
+/// in order `((((((a0 + a1) + a2) + a3) + a4) + a5) + a6) + a7` (the decompiled order is misleading; see the stack code at `0x265587`); the remaining terms are then added one by one from the last to the first.
+fn dot_q8<R: Real>(x: &[R], c: &[R]) -> R {
+    let n = c.len();
+    let nb = n / 8 * 8;
+    let mut tot = R::ZERO;
+    if nb > 0 {
+        let mut a = [R::ZERO; 8];
+        for i in 0..nb {
+            a[i & 7] += x[i] * c[i];
+        }
+        tot = a[0] + a[1] + a[2] + a[3] + a[4] + a[5] + a[6] + a[7];
+    }
+    for i in (nb..n).rev() {
+        tot += x[i] * c[i];
+    }
+    tot
+}
+
+/// The extended-precision dot of the update's new diagonal: two accumulators by position parity, added at the end (seed 2077: 6 terms match only this
+/// order; the odd-length remainder is not verified).
+fn dot_diag<R: Real>(x: &[R], c: &[R], peel: usize) -> R {
+    if R::LANES {
+        return dot(x, c, peel);
+    }
+    let n = c.len();
+    let mut l = [R::ZERO; 2];
+    for i in 0..n {
+        l[i & 1] += x[i] * c[i];
+    }
+    l[0] + l[1]
+}
+
 /// Eta dot product as the reference evaluates it: the vectorised loop peels the elements before the first 16-byte boundary of
 /// the value array (`peel` is 0 or 1) and keeps eight lane-wise partial sums; below `peel + 8` terms it is sequential. The extended-precision
-/// code (`R::LANES` false) is always sequential.
+/// code (`R::LANES` false) uses `dot_q8`.
 fn dot<R: Real>(x: &[R], c: &[R], peel: usize) -> R {
     let n = c.len();
     let t = |i: usize| x[i] * c[i];
-    if !R::LANES || n < peel + 8 {
+    if !R::LANES {
+        return dot_q8(x, c);
+    }
+    if n < peel + 8 {
         let mut acc = R::ZERO;
         for i in 0..n {
             acc += t(i);
@@ -1258,7 +1294,8 @@ impl<R: Real> RefStruct<R> {
         }
         tail.sort_unstable_by_key(|&p| std::cmp::Reverse(self.slot[p]));
         // The dense U routine (`0x121ef0`) tests the raw value first; the sparse one (`0x1223e0`, at `0x12297b`) only the quotient.
-        let u_dense = rows.len() * self.dthr > m
+        let u_dense = !R::LANES
+            || rows.len() * self.dthr > m
             || (!self.etas.is_empty() && count_l * self.dthr > m)
             || !(self.nuc.len() + spike.len() < self.i21
                 || self.dens * (spike.len() as f64) < 2.0 * m as f64)
@@ -2647,7 +2684,7 @@ impl<R: Real> RefStruct<R> {
             }
             let xs: Vec<R> = ind.iter().map(|&j| spk[j]).collect();
             // The diagonal is summed from the scratch eta, whose alignment is fixed per factor object.
-            newdiag = dot(&xs, &val, self.scratch_peel);
+            newdiag = dot_diag(&xs, &val, self.scratch_peel);
             self.sum_eta += ind.len() as f64;
             self.upd_work
                 .push((0xf1beb, 3.0 * ind.len() as f64, crate::work::CTX));
