@@ -503,6 +503,10 @@ impl<'a> Dual<'a> {
 
     /// Factorize the basis (`0xd4190`): the positions follow the pivot order of the reference's LU; the weights move with their variables.
     fn refactor(&mut self) -> Result<(), SolveError> {
+        // LU driver (`0xf32a4..0xf32ec`): a factorization requested as 5, 6 or 7 (no entering variable, pivot mismatch) first raises `ctx+0x390` to 0.5.
+        if (5..=7).contains(&self.request) && self.lu_thr < 0.5 {
+            self.lu_thr = 0.5;
+        }
         crate::lu_order::set_threshold(self.lu_thr);
         let (order, st, rows) = reference_order(self.p, &self.head, self.refactorizations + 1);
         let discard = if self.pivot_cols.is_some() {
