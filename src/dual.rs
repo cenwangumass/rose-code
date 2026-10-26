@@ -181,6 +181,11 @@ struct Dual<'a, R: Real = f64> {
     worst_row: i64,
     /// The retry of the worst rejected row (`ctx+0x420` negated, `0x21cf50` / `0xc4fe0`): the ratio test rejects nothing.
     retry: bool,
+    /// The end of a retried row whose largest candidate is below a tenth of the pivot floor (`0xcc3bc`, quad `0x223f49`): 0 none, 1 the dual ends infeasible (status 3),
+    /// 2 a refactorization is requested (5).
+    retry_end: u8,
+    /// `ctx+0x4d4`: the retried rows of that kind so far (at most 10 before the dual ends infeasible).
+    retry_tiny: u32,
     /// The infeasible-row count of the last flag recompute, whatever the mode (`[P+0x3c]`); a restart after a singular factorization compares the new count with it.
     inf_count: usize,
     /// Restarts so far (the reference's `ctx+0x184`).
@@ -267,6 +272,9 @@ struct Dual<'a, R: Real = f64> {
     cshift: Vec<f64>,
     /// The part of a shifted cost the double does not hold (the quad pass keeps the cost shifted in long double).
     cost_lo: Vec<f64>,
+    /// The quad instance's shift array (`0xc0(rsp)` of `0x237750`): the accumulated shifts and perturbations per variable in long double; the cost used is
+    /// the double base cost plus this, rounded once to long double.
+    shift_r: Vec<R>,
     /// State of the reference's random generator (`0x88a870`, `0x88a8d0`), seeded 101.
     rng: u64,
     /// Perturbation flag `ctx+0x338`: 1 after a small cost shift, 2 after a large one or one against an infinite bound.
@@ -1811,6 +1819,49 @@ impl<'a, R: Real> Dual<'a, R> {
         }
         let nn = lst.len();
         self.work.add(0xc7bcd, 3.0 * cnt as f64, crate::work::CTX);
+        self.retry_end = 0;
+        if self.retry && self.level == 0 && R::c(PIVOT_FLOOR / 10.0) > -minr(xm13, xm9) {
+            // The retried row whose largest candidate is below a tenth of the pivot floor (`0xcc3bc..0xcc583`, quad `0x223f49..0x224183`; the factor is fresh and
+            // `ctx+0x3f8` is 0 here): the dual ends infeasible (status 3) when the infeasibility exceeds 100 primal tolerances, after ten such rows, or when the finite
+            // ranges of the candidates cannot absorb it (a tiny infeasibility under ten tolerances first raises the LU threshold to 0.5 and refactorizes);
+            // otherwise a refactorization (5) is requested after the bound flips the loop compacted.
+            let pt = self.ptol();
+            let end = if R::c(pt * -100.0) > xmm10 || self.retry_tiny >= 10 {
+                1
+            } else {
+                self.retry_tiny += 1;
+                let mut acc = xmm10;
+                let mut done = 0usize;
+                for &i in &lst {
+                    let (j, av) = row[i];
+                    if 1e30 > p.up[j] {
+                        acc = acc + (R::c(p.up[j] - p.lo[j]) * av).abs();
+                        if acc >= R::c(-pt) {
+                            break;
+                        }
+                    }
+                    done += 1;
+                }
+                if done == lst.len() {
+                    if R::c(10.0 * pt) <= -xmm10 {
+                        1
+                    } else if 0.3 > self.lu_thr {
+                        self.lu_thr = 0.5;
+                        2
+                    } else {
+                        1
+                    }
+                } else {
+                    2
+                }
+            };
+            self.retry_end = end;
+            return Ratio {
+                q: None,
+                flips: Vec::new(),
+                reject: None,
+            };
+        }
         if self.retry
             && R::c(PIVOT_FLOOR / 10.0) <= -minr(xm13, xm9)
             && R::c(PIVOT_FLOOR * 10.0) > -minr(xm13, xm9)
@@ -2111,6 +2162,15 @@ impl<'a, R: Real> Dual<'a, R> {
         self.rng_int() as f64 * 4.656612873077393e-10
     }
 
+    /// The quad instance adds a shift to its long double shift array; the cost in force is the double base plus that array, rounded once to long double.
+    fn add_shift_q(&mut self, j: usize, delta: R) {
+        self.shift_r[j] = self.shift_r[j] + delta;
+        let total = R::c(self.pcost[j]) + self.shift_r[j];
+        self.cost[j] = total.to_f64();
+        self.cost_lo[j] = (total - R::c(self.cost[j])).to_f64();
+        self.cshift[j] = self.shift_r[j].to_f64();
+    }
+
     fn raise_pert(&mut self, to: u8) {
         self.pert = if to == 1 {
             if self.pert == 0 {
@@ -2144,27 +2204,24 @@ impl<'a, R: Real> Dual<'a, R> {
         };
         self.d[j] += s;
         let sr = s;
-        let old_cost = R::c(self.cost[j]) + R::c(self.cost_lo[j]);
         let s = s.to_f64();
         if self.st[j] == LB {
-            self.cshift[j] += s;
-            self.cost[j] = self.pcost[j] + self.cshift[j];
             if R::QUAD {
-                let new = old_cost + sr;
-                self.cost[j] = new.to_f64();
-                self.cost_lo[j] = (new - R::c(self.cost[j])).to_f64();
+                self.add_shift_q(j, sr);
+            } else {
+                self.cshift[j] += s;
+                self.cost[j] = self.pcost[j] + self.cshift[j];
             }
             self.obj_off -= lo * s;
             if -BIG >= lo {
                 self.raise_pert(2);
             }
         } else {
-            self.cshift[j] -= s;
-            self.cost[j] = self.pcost[j] + self.cshift[j];
             if R::QUAD {
-                let new = old_cost - sr;
-                self.cost[j] = new.to_f64();
-                self.cost_lo[j] = (new - R::c(self.cost[j])).to_f64();
+                self.add_shift_q(j, -sr);
+            } else {
+                self.cshift[j] -= s;
+                self.cost[j] = self.pcost[j] + self.cshift[j];
             }
             self.obj_off += up * s;
             if up >= BIG {
@@ -2500,7 +2557,19 @@ impl<'a, R: Real> Dual<'a, R> {
         let was_retry = self.retry;
         if self.retry {
             self.retry = false;
-            if rt.q.is_none() {
+            if rt.q.is_none() && self.retry_end == 2 {
+                self.retry_end = 0;
+                self.request = 5;
+                return Step::Mismatch;
+            }
+            if rt.q.is_some() && R::QUAD {
+                // The wrapper releases after the call returns; the worst row of the call (the mismatch ladder reads it) stays.
+                let (w, wr) = (self.worst, self.worst_row);
+                self.release_all();
+                self.worst = w;
+                self.worst_row = wr;
+            }
+            if rt.q.is_none() && self.retry_end == 0 {
                 // The retried row has no usable entering variable: the end of the rejected rows (status -1004 on the fresh factor).
                 if let Some(mut s) = snap {
                     s["r"] = serde_json::json!(r);
@@ -2970,6 +3039,35 @@ impl<'a, R: Real> Dual<'a, R> {
         }
     }
 
+    /// `0x2252b0` with a count of 0 (quad; the wrapper `0x24bdc2` calls it after a retried worst row, `0x24c2fb`): the list of rejected rows is emptied, the worst row cleared, and every row
+    /// with flag 5 or more is released: still infeasible it gets flag 0 and its priority, and joins the pricing list (flag 1) when the priority reaches the threshold; any other row
+    /// gets flag 2.
+    fn release_all(&mut self) {
+        let tol = self.ptol();
+        self.bad_rows.clear();
+        self.old_rej = 0;
+        self.worst = 0.0;
+        self.worst_row = -2;
+        for r in 0..self.m {
+            if self.flags[r] < 5 {
+                continue;
+            }
+            let v = self.head[r];
+            let (x, lo, up) = (self.xb[r].to_f64(), self.p.lo[v], self.p.up[v]);
+            if (lo > -BIG && lo - tol > x) || (up < BIG && x > tol + up) {
+                let f = self.infeas(r);
+                self.prio[r] = self.pri(r, f);
+                self.flags[r] = 0;
+                if self.value_mode && self.prio[r] >= self.thr {
+                    self.list.push(r);
+                    self.flags[r] = 1;
+                }
+            } else {
+                self.flags[r] = 2;
+            }
+        }
+    }
+
     /// The no-leaving-row handler (`0x1aa280`): a refactorization request, optimality or infeasibility.
     fn no_row(&mut self) {
         if self.updates != 0 {
@@ -3102,14 +3200,13 @@ impl<'a, R: Real> Dual<'a, R> {
             } else {
                 None
             };
-            if let Some(sr) = shift {
-                let s = sr.to_f64();
-                self.cshift[j] += s;
+            if let Some(s) = shift {
                 if R::QUAD {
-                    let new = R::c(self.cost[j]) + R::c(self.cost_lo[j]) + sr;
-                    self.cost[j] = new.to_f64();
-                    self.cost_lo[j] = (new - R::c(self.cost[j])).to_f64();
+                    // `0x239ff7..0x23a02e`: the shift array takes `-d` (lower bound, free) or `+d` (upper bound) in long double.
+                    self.add_shift_q(j, s);
                 } else {
+                    let s = s.to_f64();
+                    self.cshift[j] += s;
                     self.cost[j] += s;
                 }
                 self.d[j] = R::ZERO;
@@ -3211,7 +3308,7 @@ impl<'a, R: Real> Dual<'a, R> {
         }
         // The test runs at every second refactorization (every fifth once the perturbation flag has reached 3).
         let period = if self.pert > 2 { 5 } else { 2 };
-        if self.refactorizations % period != 1 {
+        if self.nref() % period != 1 {
             return;
         }
         let mut trig = false;
@@ -3302,7 +3399,7 @@ impl<'a, R: Real> Dual<'a, R> {
         // The perturbation has its own generator, seeded with the iteration count (`0x115220`, state = it + the `Seed` parameter); the generator of the
         // cost shifts is not touched.
         let mut g = self.iters as u64;
-        let mut acc = 0.0f64;
+        let mut acc = R::ZERO;
         for j in 0..self.n + self.m {
             if self.st[j] >= 0 {
                 continue;
@@ -3315,29 +3412,36 @@ impl<'a, R: Real> Dual<'a, R> {
             };
             let f = 1.0f64;
             let x = count * (f * 0.3 + 0.7);
-            let xi = (((r % 250 + 1) as f64) * sc) * (x + 1.0).log2();
+            // The quad instance keeps xi in long double (`0x23a293`: `(r mod 250 + 1) * sc` in x87, times the double log2, not rounded to a double).
+            let xi = R::c((r % 250 + 1) as f64) * R::c(sc) * R::c((x + 1.0).log2());
+            let xd = xi.to_f64();
+            let bump = |s: &mut Self, up: bool| {
+                if R::QUAD {
+                    s.add_shift_q(j, if up { xi } else { -xi });
+                } else {
+                    s.pcost[j] += if up { xd } else { -xd };
+                    s.cost[j] += if up { xd } else { -xd };
+                }
+            };
             if self.st[j] == LB {
-                self.pcost[j] += xi;
-                self.cost[j] += xi;
-                self.d[j] += R::c(xi);
-                acc -= p.lo[j] * xi;
+                bump(self, true);
+                self.d[j] += xi;
+                acc -= R::c(p.lo[j]) * xi;
             } else if self.st[j] == UB {
                 if p.up[j] < BIG {
-                    self.pcost[j] -= xi;
-                    self.cost[j] -= xi;
-                    self.d[j] += R::c(xi);
-                    acc += p.up[j] * xi;
+                    bump(self, false);
+                    self.d[j] += xi;
+                    acc += R::c(p.up[j]) * xi;
                 } else if self.d[j] <= R::c(dual_tol()) {
                     self.d[j] = -self.d[j];
-                    self.pcost[j] += xi;
-                    self.cost[j] += xi;
-                    acc -= p.lo[j] * xi;
-                    self.d[j] += R::c(xi);
+                    bump(self, true);
+                    acc -= R::c(p.lo[j]) * xi;
+                    self.d[j] += xi;
                     self.st[j] = LB;
                 }
             }
         }
-        self.obj_off = acc + self.obj_off;
+        self.obj_off = acc.to_f64() + self.obj_off;
         self.prog_on = false;
         self.pert = 3;
         self.best_obj = -1e100;
@@ -3958,6 +4062,8 @@ fn solve_pass<R: Real>(
         worst: 0.0,
         worst_row: -1,
         retry: false,
+        retry_end: 0,
+        retry_tiny: 0,
         stale_count: false,
         last_pivoted: false,
         it_base: carry.it_base,
@@ -4001,6 +4107,7 @@ fn solve_pass<R: Real>(
         cost: p.cost.clone(),
         cshift: vec![0.0; p.cost.len()],
         cost_lo: vec![0.0; p.cost.len()],
+        shift_r: vec![R::ZERO; p.cost.len()],
         rng: RNG_CELL.with(|c| c.get()),
         pert: 0,
         obj_off: 0.0,
