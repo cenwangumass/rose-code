@@ -4458,6 +4458,17 @@ fn solve_pass<R: Real>(
         popts.method = crate::simplex::Method::Primal;
         // The dual's teacher-forced factorization schedule does not apply to the primal, which decides its own (work based).
         popts.refactor_schedule = None;
+        if opts.perturb != 0.0 {
+            popts.sw_carry = Some(crate::simplex::SwCarry {
+                iters: s.iters as f64,
+                degenerate: s.stall as i32,
+                snap_degenerate: s.stall_snap as i32,
+                snap_iters: s.stall_it,
+                factorizations: s.refactorizations as u32,
+                level: 0,
+                pert: s.pstep * 0.05,
+            });
+        }
         let b = Basis {
             basic: s.head.clone(),
             at_upper: s.st.iter().map(|&t| t == UB).collect(),

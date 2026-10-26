@@ -3987,7 +3987,24 @@ fn solve_primal(
                     }
                 }
             } else {
-                s.composite_dual(false);
+                if !was && s.handoff.is_some() && s.mirror.is_some() && !due {
+                    // Phase 1 entered from phase 2 on a factor with updates: the reference adds the penalties of the infeasible basics to the phase 2 duals
+                    // in place (a BTRAN of the cost changes, like the cost-change pass inside phase 1), `P+0x18` unchanged (seed 2717).
+                    let cls = s.sig();
+                    let dc2: Vec<(usize, f64)> = cls
+                        .iter()
+                        .enumerate()
+                        .filter(|e| *e.1 != 0)
+                        .map(|(i, &c)| (i, PHASE1_M * f64::from(c)))
+                        .collect();
+                    if let (Some(lp), false) = (&last, dc2.is_empty()) {
+                        s.cost_change_work(&dc2, lp.q, lp.leave, lp.alpha_rq, false);
+                    } else {
+                        s.composite_dual(false);
+                    }
+                } else {
+                    s.composite_dual(false);
+                }
                 s.list.clear();
                 s.level = 0;
             }
