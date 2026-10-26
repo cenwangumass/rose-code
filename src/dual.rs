@@ -217,6 +217,8 @@ struct Dual<'a, R: Real = f64> {
     p70: Vec<f64>,
     /// Touch increment `P+0x60`: the number of entries of the pivot row's BTRAN result.
     p60: f64,
+    /// `P+0x58`: the entries the row products have visited since the pass (or the last weight reset) started (the row lengths of the nonzero rho entries).
+    p58: f64,
     flags: Vec<u8>,
     list: Vec<usize>,
     thr: f64,
@@ -2553,6 +2555,7 @@ impl<'a, R: Real> Dual<'a, R> {
             .add_from(0x13174d, 0xc51dd, self.mirror.work, crate::work::FAC);
         let (row, esi) = self.pivot_row(&rho, leave, above);
         self.row_product_work(&rho, row.len() - esi);
+        self.p58 += rho.iter().map(|e| self.rrows[e.0].len()).sum::<usize>() as f64;
         let rt = self.ratio_test(&row, esi, leave, above, xbr);
         let was_retry = self.retry;
         if self.retry {
@@ -3301,6 +3304,29 @@ impl<'a, R: Real> Dual<'a, R> {
         }
     }
 
+    /// The weight-overflow reset of the quad driver (`0x24ac2c..0x24b51a`, after each iteration call): with a pending request other than 1, the factorization count
+    /// a multiple of 3 and the pricing mode 1 or 3, when fewer than `10 + m/10` entries were visited since the pass began or the iterations exceed 3 m or n exceeds 3 m,
+    /// any weight above 1e20 (1e30 outside the mode 3) or not a number restarts the weights at 1 in mode 3.
+    fn weight_overflow_gate(&mut self, req: u32) {
+        if !R::QUAD || req == 1 || self.nref() % 3 != 0 || !matches!(self.pmode, 1 | 3) {
+            return;
+        }
+        let m = self.m as f64;
+        let few = self.p58 < (10 + self.m / 10) as f64;
+        if !(few || 3.0 * m < (self.iters + self.it_base) as f64 || 3.0 * m < self.n as f64) {
+            return;
+        }
+        let thr = R::c(if self.pmode == 3 { 1e20 } else { 1e30 });
+        if self.w.iter().any(|&w| w > thr || w != w) {
+            self.pmode = 3;
+            self.p58 = 0.0;
+            self.dflag = self.st.iter().map(|&t| t < 0).collect();
+            for w in self.w.iter_mut() {
+                *w = R::ONE;
+            }
+        }
+    }
+
     /// The stall test of the refactorization post pass (`0xe60cc..0xe6237`) and the cost perturbation it triggers (`0xe6af8..0xe6cd7`, `0xe74b1`).
     fn stall_check(&mut self, old_level: usize) {
         if self.pstep <= 0.0 && self.pert_param <= 0.0 {
@@ -3549,6 +3575,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 self.dual_unbounded();
                 return Ok(());
             }
+            self.weight_overflow_gate(req);
             self.prog_on = self.level == 0;
             self.prog_acc = 0.0;
             self.recompute_flags(level_before != 0, pv.is_some());
@@ -3730,6 +3757,8 @@ struct Carry {
     /// The factorization count `ctx+0x2c0` at the start of the pass: 0 after a restart (a fresh context), the count so far plus the primal's factorizations when the dual runs again
     /// after the primal.
     nref0: usize,
+    /// The perturbation scale `ctx+0x348` the pass starts with: the default, or after the primal's clean-up max(1e-7, 0.05 times the previous pass's scale) (reference quad runs, seeds 2950, 2840).
+    pstep: Option<f64>,
 }
 
 thread_local! {
@@ -3812,6 +3841,7 @@ fn solve_frame(
         after_pivot: false,
         it_base: 0,
         nref0: 0,
+        pstep: None,
     };
     set_dual_tol(DUAL_TOL0);
     RESID_FAILS.with(|c| c.set(0));
@@ -3871,6 +3901,7 @@ fn solve_frame(
                     after_pivot,
                     it_base: 0,
                     nref0: 0,
+                    pstep: None,
                 };
                 switch_start = Some(b);
             }
@@ -3922,6 +3953,7 @@ fn solve_frame(
                     after_pivot,
                     it_base: 0,
                     nref0: 0,
+                    pstep: None,
                 };
             }
             Ok(mut r) => {
@@ -4090,6 +4122,7 @@ fn solve_pass<R: Real>(
         p68: Vec::new(),
         p70: Vec::new(),
         p60: 0.0,
+        p58: 0.0,
         flags: vec![2; m],
         list: Vec::new(),
         thr: 0.0,
@@ -4135,12 +4168,7 @@ fn solve_pass<R: Real>(
         },
         pivot_cols: None,
         nnz_a: p.cols[..n].iter().map(Vec::len).sum(),
-        // The quad instance starts its perturbation scale at 1e-5 (a fit: seed 2840, xi = 18 * 2e-8 for a slack at iteration 22), a twentieth of the double's.
-        pstep: if R::QUAD {
-            opts.perturb * 0.05
-        } else {
-            opts.perturb
-        },
+        pstep: carry.pstep.unwrap_or(opts.perturb),
         stall: 0,
         stall_snap: 0,
         stall_it: 0.0,
@@ -4579,13 +4607,25 @@ fn solve_pass<R: Real>(
                 last_cap: 0,
                 inf_count: 0,
                 after_pivot: !from_snap,
-                it_base: r.iterations,
+                it_base: if from_snap {
+                    r.iterations
+                } else {
+                    s.it_base + r.iterations
+                },
                 nref0: if from_snap {
                     0
                 } else {
                     // `ctx+0x2c0` after the primal: its start factorization counts one (the primal's own refactorizations at its end, two in rose, do not appear in the
                     // reference's `lu_in`: fx_midsing_m5, 1494, 1390, `dual_acc` captures).
-                    s.nref() + (r.refactorizations - s.refactorizations).saturating_sub(2)
+                    s.nref()
+                        + (r.refactorizations - s.refactorizations)
+                            .saturating_sub(2)
+                            .max(usize::from(R::QUAD))
+                },
+                pstep: if R::QUAD && !from_snap && s.pstep > 0.0 {
+                    Some(maxsd(1e-7, s.pstep * 0.05))
+                } else {
+                    None
                 },
             };
             let snap_basis = snap.map(|(basic, at_upper)| Basis { basic, at_upper });
