@@ -3374,6 +3374,38 @@ fn lane_sum(s: f64, part: &[(f64, usize, bool)], sign: f64, weight: &dyn Fn(usiz
     r
 }
 
+/// The x87 test's version of `lane_sum` (`0x243d3c`..`0x244187`): fewer than 8 terms are added one after the other from the last
+/// to the first; otherwise eight one-lane accumulators over blocks of 8 (`s` in lane 0), combined in lane order, then the
+/// remaining terms from the last to the first.
+fn lane_sum_q(
+    s: crate::f80::F80,
+    part: &[(f64, usize, bool)],
+    sub: bool,
+    weight: &dyn Fn(usize) -> crate::f80::F80,
+) -> crate::f80::F80 {
+    use crate::f80::F80;
+    let step = |acc: F80, w: F80| if sub { acc - w } else { acc + w };
+    let nv = part.len() & !7;
+    let mut r = s;
+    if nv > 0 {
+        let mut lane = [F80::ZERO; 8];
+        lane[0] = s;
+        for blk in part[..nv].chunks(8) {
+            for (l, b) in blk.iter().enumerate() {
+                lane[l] = step(lane[l], weight(b.1));
+            }
+        }
+        r = lane[0];
+        for l in &lane[1..] {
+            r = r + *l;
+        }
+    }
+    for b in part[nv..].iter().rev() {
+        r = step(r, weight(b.1));
+    }
+    r
+}
+
 /// Mid-point search of the breakpoint where the cumulative slope reaches zero: a Hoare partition around the first element
 /// that adds the lower part / subtracts the upper part of the weights `|a|` (transcribed from the reference). With `quad` the slope is kept in extended precision
 /// (the x87 test `0x243150` adds the weights one after the other in long double; seed 2133: the cancelling slopes of two infeasible entries are exactly zero there).
@@ -3383,6 +3415,7 @@ fn find_theta_q(
     bp: &mut [(f64, usize, bool)],
     weight: &dyn Fn(usize) -> f64,
     quad: bool,
+    weight_q: &dyn Fn(usize) -> crate::f80::F80,
 ) -> f64 {
     use crate::f80::F80;
     let n = bp.len();
@@ -3411,13 +3444,9 @@ fn find_theta_q(
             if quad {
                 let zero = F80::from_f64(0.0);
                 if sq >= zero {
-                    for b in &bp[j + 1..=hi] {
-                        sq = sq - F80::from_f64(weight(b.1));
-                    }
+                    sq = lane_sum_q(sq, &bp[j + 1..=hi], true, weight_q);
                 } else if lo <= j {
-                    for b in &bp[lo..=j] {
-                        sq = sq + F80::from_f64(weight(b.1));
-                    }
+                    sq = lane_sum_q(sq, &bp[lo..=j], false, weight_q);
                 }
                 s = if sq < zero { -1.0 } else { 0.0 };
             } else if s >= 0.0 {
@@ -3451,10 +3480,22 @@ fn phase1_ratio(
     passes: &mut Vec<Option<(usize, usize)>>,
     dense: bool,
     quad: bool,
+    entq: Option<&[crate::f80::F80]>,
 ) -> Phase1Pick {
     use crate::f80::F80;
     let inf = INF;
     let frames: Vec<Option<(f64, f64, u8, bool)>> = ent.iter().map(|&(pos, _)| info(pos)).collect();
+    // The entry values as the x87 test reads them (long doubles, signed like `val`).
+    let valq = |k: usize| -> F80 {
+        let a = match entq {
+            Some(e) => e[k],
+            None => F80::from_f64(ent[k].1),
+        };
+        match frames[k] {
+            Some((_, _, _, true)) => -a,
+            _ => a,
+        }
+    };
     let val = |k: usize| -> f64 {
         let a = ent[k].1;
         match frames[k] {
@@ -3480,8 +3521,8 @@ fn phase1_ratio(
                 match c {
                     b'A' => {
                         slope_a -= a;
-                        qa = qa - F80::from_f64(a);
-                        qa = qa - F80::from_f64(a);
+                        qa = qa - valq(k);
+                        qa = qa - valq(k);
                     }
                     b'B' => {
                         if d / a < own {
@@ -3491,7 +3532,7 @@ fn phase1_ratio(
                             bp.push(((d - r) / a, k, true));
                         }
                         slope_a += a;
-                        qa = qa + F80::from_f64(a);
+                        qa = qa + valq(k);
                     }
                     b'L' | b'N' => {
                         if r < inf && (d - r) / a < own {
@@ -3500,7 +3541,7 @@ fn phase1_ratio(
                     }
                     b'U' | b'X' => {
                         slope_b -= a;
-                        qb = qb - F80::from_f64(a);
+                        qb = qb - valq(k);
                     }
                     _ => {}
                 }
@@ -3514,15 +3555,15 @@ fn phase1_ratio(
                             bp.push((d / a, k, false));
                         }
                         slope_a -= a;
-                        qa = qa - F80::from_f64(a);
+                        qa = qa - valq(k);
                     }
                     b'B' => {
                         slope_a += a;
-                        qa = qa + F80::from_f64(a);
+                        qa = qa + valq(k);
                     }
                     b'L' | b'X' => {
                         slope_b += a;
-                        qb = qb + F80::from_f64(a);
+                        qb = qb + valq(k);
                     }
                     // The reference's dense-result variant records only the breakpoints below the entering variable's range.
                     b'N' | b'U' => {
@@ -3554,7 +3595,9 @@ fn phase1_ratio(
         let mut theta = 0.0;
         if s0 < 0.0 {
             let mut work = bp.clone();
-            theta = find_theta_q(s0, qb + qa, &mut work, &|k| val(k).abs(), quad);
+            theta = find_theta_q(s0, qb + qa, &mut work, &|k| val(k).abs(), quad, &|k| {
+                valq(k).abs()
+            });
             if own < inf && own <= theta {
                 return Phase1Pick {
                     entry: None,
@@ -4799,6 +4842,12 @@ fn solve_primal(
                 .map(|i| (i, dir * alpha[i]))
                 .collect()
         };
+        let entq: Option<Vec<crate::f80::F80>> = aq.as_ref().map(|v| {
+            entries
+                .iter()
+                .map(|&(i, _)| if dir < 0.0 { -v[i] } else { v[i] })
+                .collect()
+        });
         let own = if !is_inf(p.lo[q]) && !is_inf(p.up[q]) {
             p.up[q] - p.lo[q]
         } else {
@@ -4856,6 +4905,7 @@ fn solve_primal(
                     &mut passes,
                     ft_dense,
                     s.handoff.is_some_and(|h| h.quad),
+                    entq.as_deref(),
                 )
             };
             if let Some(mi) = s.mirror.as_ref() {
