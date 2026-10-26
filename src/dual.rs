@@ -36,6 +36,8 @@ thread_local! {
     /// The number of passes started in this solve (selects the entry of a per-pass refactorization schedule).
     static LOOP_TOL: std::cell::Cell<f64> = const { std::cell::Cell::new(1e-6) };
     static PASS_NO: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// The stability counter `ctx+0x178`: one per pivot-check mismatch (`0xc5a35`, quad `0x21da43`) and per singular quad restart (`0x248f99`); never reset in a solve.
+    static C178: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
     /// The basis snapshot of the reference's log timer (`ctx+0x190`) and the iteration count of the last one (`ctx+0x40`).
     static SNAP: std::cell::RefCell<Option<(Vec<usize>, Vec<bool>)>> = const { std::cell::RefCell::new(None) };
     /// The relative tolerance of the primal's pivot-pair check (`ctx+0x3a0`): 3e-6 from the parameters, 1e-7 from the first restore of a dropped variable on (`0x1551d4`).
@@ -674,6 +676,9 @@ impl<'a, R: Real> Dual<'a, R> {
 
     /// The payload of a pass that ends in a restart (`SINGULAR`): the state the next pass inherits.
     fn singular_payload(&self) {
+        if R::QUAD {
+            C178.with(|c| c.set(c.get() + 1));
+        }
         SINGULAR.with(|c| {
             c.set(Some((
                 self.iters,
@@ -2288,7 +2293,12 @@ impl<'a, R: Real> Dual<'a, R> {
             if dj > t - tol {
                 continue;
             }
-            let pw = R::c(((t - dj) / delta).to_f64().powf(0.25));
+            // The power term only while `ctx+0x178` < 10 (quad copy `0x22159e`: past it the weight is the column count alone).
+            let pw = if C178.with(|c| c.get()) >= 10 {
+                R::ZERO
+            } else {
+                R::c(((t - dj) / delta).to_f64().powf(0.25))
+            };
             let w0 = if j < self.n {
                 R::from_usize(self.p.cols[j].len()) + pw
             } else {
@@ -2671,6 +2681,7 @@ impl<'a, R: Real> Dual<'a, R> {
             s["tau"] = crate::dump::sparse_r(&tau_out);
         }
         if mismatch {
+            C178.with(|c| c.set(c.get() + 1));
             if let Some(s) = rec.as_mut() {
                 // The ladder ends the call without an entering variable (`ctx+0x2fc` = -1, `0xc5abd`).
                 s["mismatch"] = serde_json::json!(true);
@@ -3682,6 +3693,7 @@ fn solve_frame(
     SNAP_C40.with(|c| c.set(-100.0));
     PAIR_TOL.with(|c| c.set(3e-6));
     PASS_NO.with(|c| c.set(0));
+    C178.with(|c| c.set(0));
     // The quad mode (`ctx+0x28`): once the controller switched, every later pass runs the extended-precision twin of the dual.
     let mut quad = false;
     let mut switch_start: Option<Basis> = None;
@@ -3866,8 +3878,32 @@ fn solve_pass<R: Real>(
     }
     crate::lu_order::set_threshold(carry.thr);
     crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
-    let (order, stc, rows) = reference_order::<R>(&p, &basis.basic, carry.fac + 1);
-    let mirror = RefStruct::fresh(m, n, &stc, &rows);
+    let (mut order, mut stc, mut rows) = reference_order::<R>(&p, &basis.basic, carry.fac + 1);
+    let mut mirror = RefStruct::fresh(m, n, &stc, &rows);
+    let mut carry_thr = carry.thr;
+    // Growth check of the setup factorization (quad setup `0x246d39..0x246df1`, double driver `0xf351d..0xf3629`): max|diag| / min|diag| above 1e15 (1e12 scaled)
+    // raises the threshold to 0.5, then 0.9, and the same columns are factorized again.
+    if order.len() == m {
+        while carry_thr < 0.9 {
+            let (mx, mn) = mirror
+                .numerics()
+                .0
+                .iter()
+                .fold((0.0f64, f64::INFINITY), |(a, b), v| {
+                    (a.max(v.abs().to_f64()), b.min(v.abs().to_f64()))
+                });
+            if !(mx / mn > if opts.scaled { 1e12 } else { 1e15 }) {
+                break;
+            }
+            carry_thr = if carry_thr < 0.5 { 0.5 } else { 0.9 };
+            crate::lu_order::set_threshold(carry_thr);
+            (order, stc, rows) = reference_order::<R>(&p, &basis.basic, carry.fac + 1);
+            if order.len() != m {
+                break;
+            }
+            mirror = RefStruct::fresh(m, n, &stc, &rows);
+        }
+    }
     let cols: Vec<&Column> = order.iter().map(|&j| &p.cols[j]).collect();
     let factor = if R::QUAD {
         // The quad pass starts from an ill-conditioned basis the double factor may find singular; the quad LU decides (the double factor is only for read-out).
@@ -3894,7 +3930,7 @@ fn solve_pass<R: Real>(
         factor,
         rrows: vec![Vec::new(); m],
         refactorizations: carry.fac + 1,
-        lu_thr: carry.thr,
+        lu_thr: carry_thr,
         pmode: if start.is_some() || (carry.retries > 0 && !fresh_pass::<R>(carry.retries)) {
             3
         } else {
@@ -4128,7 +4164,7 @@ fn solve_pass<R: Real>(
     let mut trace = Vec::new();
     let mut k = 0usize;
     let mut farkas = None;
-    let status;
+    let mut status;
     // A deferred free column that has a reduced cost and no row to enter on ends the dual before its first iteration (`0xea0b7`, status 5).
     if setup_unbounded {
         s.dual_unbounded();
@@ -4300,6 +4336,11 @@ fn solve_pass<R: Real>(
         }
     }
     let restored = dropped.or(s.repaired);
+    // The eleventh restore (`0x15553e`, `PERT_RERUNS` past 10) ends the solve with status 12 before the primal runs: the reference's iteration count has no primal pivot
+    // in that last cycle, and its x is that of the dual's last basis (seed 2147: 189 iterations).
+    if status == Status::Infeasible && s.pert != 0 && PERT_RERUNS.with(|c| c.get()) >= 10 {
+        status = Status::NumericalFailure;
+    }
     if (restored.is_some() && matches!(status, Status::Optimal | Status::Infeasible))
         || (status == Status::Infeasible && s.rejected_end)
     {
