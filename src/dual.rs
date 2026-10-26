@@ -720,6 +720,8 @@ impl<'a, R: Real> Dual<'a, R> {
                 self.d[j] = R::c(if j < n { self.cost[j] } else { 0.0 });
                 self.repaired = Some(j);
             }
+            // The post pass after the repair runs as at a normal start (shifts, no flip to the artificial bound): the request is not 4.
+            self.request = 10;
             self.refactorizations += 1;
             self.nref_skip += 1;
             // The failure counts as one more retry (`ctx+0x184` 5 -> 6 at `0xf5921`, fx_midsing_1390): later pivot mismatches on a fresh factor end the run.
@@ -3078,10 +3080,16 @@ impl<'a, R: Real> Dual<'a, R> {
             } else {
                 None
             };
-            if let Some(s) = shift {
-                let s = s.to_f64();
+            if let Some(sr) = shift {
+                let s = sr.to_f64();
                 self.cshift[j] += s;
-                self.cost[j] += s;
+                if R::QUAD {
+                    let new = R::c(self.cost[j]) + R::c(self.cost_lo[j]) + sr;
+                    self.cost[j] = new.to_f64();
+                    self.cost_lo[j] = (new - R::c(self.cost[j])).to_f64();
+                } else {
+                    self.cost[j] += s;
+                }
                 self.d[j] = R::ZERO;
                 self.raise_pert(2);
             }
@@ -4384,9 +4392,18 @@ fn solve_pass<R: Real>(
         if status == Status::Infeasible
             && s.pert != 0
             && !repaired
+            && PERT_RERUNS.with(|c| c.get()) >= 10
+        {
+            // The controller's restore counter (`ebx` of `0x1551ac`) passes 10 at the eleventh restore: status 12 (`0x15553e`).
+            r.status = Status::NumericalFailure;
+            return Ok(r);
+        }
+        if status == Status::Infeasible
+            && s.pert != 0
+            && !repaired
             && PERT_RERUNS.with(|c| {
                 c.set(c.get() + 1);
-                c.get() <= 8
+                c.get() <= 10
             })
         {
             // The dual ended with cost shifts in force: the primal removes them and ends with status -1004 (its price scan finds nothing), and the
