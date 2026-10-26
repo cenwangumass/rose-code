@@ -2992,10 +2992,19 @@ fn lane_sum(s: f64, part: &[(f64, usize, bool)], sign: f64, weight: &dyn Fn(usiz
 }
 
 /// Mid-point search of the breakpoint where the cumulative slope reaches zero: a Hoare partition around the first element
-/// that adds the lower part / subtracts the upper part of the weights `|a|` (transcribed from the reference).
-fn find_theta(s0: f64, bp: &mut [(f64, usize, bool)], weight: &dyn Fn(usize) -> f64) -> f64 {
+/// that adds the lower part / subtracts the upper part of the weights `|a|` (transcribed from the reference). With `quad` the slope is kept in extended precision
+/// (the x87 test `0x243150` adds the weights one after the other in long double; seed 2133: the cancelling slopes of two infeasible entries are exactly zero there).
+fn find_theta_q(
+    s0: f64,
+    s0q: crate::f80::F80,
+    bp: &mut [(f64, usize, bool)],
+    weight: &dyn Fn(usize) -> f64,
+    quad: bool,
+) -> f64 {
+    use crate::f80::F80;
     let n = bp.len();
     let (mut s, mut lo, mut hi) = (s0, 0usize, n - 1);
+    let mut sq = s0q;
     if hi > 0 {
         loop {
             let piv = bp[lo].0;
@@ -3016,7 +3025,19 @@ fn find_theta(s0: f64, bp: &mut [(f64, usize, bool)], weight: &dyn Fn(usize) -> 
                 bp.swap(i as usize, j as usize);
             }
             let j = j as usize;
-            if s >= 0.0 {
+            if quad {
+                let zero = F80::from_f64(0.0);
+                if sq >= zero {
+                    for b in &bp[j + 1..=hi] {
+                        sq = sq - F80::from_f64(weight(b.1));
+                    }
+                } else if lo <= j {
+                    for b in &bp[lo..=j] {
+                        sq = sq + F80::from_f64(weight(b.1));
+                    }
+                }
+                s = if sq < zero { -1.0 } else { 0.0 };
+            } else if s >= 0.0 {
                 s = lane_sum(s, &bp[j + 1..=hi], -1.0, weight);
             } else if lo <= j {
                 s = lane_sum(s, &bp[lo..=j], 1.0, weight);
@@ -3046,7 +3067,9 @@ fn phase1_ratio(
     info: &dyn Fn(usize) -> Option<(f64, f64, u8, bool)>,
     passes: &mut Vec<Option<(usize, usize)>>,
     dense: bool,
+    quad: bool,
 ) -> Phase1Pick {
+    use crate::f80::F80;
     let inf = INF;
     let frames: Vec<Option<(f64, f64, u8, bool)>> = ent.iter().map(|&(pos, _)| info(pos)).collect();
     let val = |k: usize| -> f64 {
@@ -3060,6 +3083,7 @@ fn phase1_ratio(
     let mut first = true;
     loop {
         let (mut slope_a, mut slope_b) = (0.0f64, 0.0f64);
+        let (mut qa, mut qb) = (F80::from_f64(0.0), F80::from_f64(0.0));
         let mut bp: Vec<(f64, usize, bool)> = Vec::new();
         for k in 0..ent.len() {
             let Some((d, r, c, _)) = frames[k] else {
@@ -3071,7 +3095,11 @@ fn phase1_ratio(
                     continue;
                 }
                 match c {
-                    b'A' => slope_a -= a,
+                    b'A' => {
+                        slope_a -= a;
+                        qa = qa - F80::from_f64(a);
+                        qa = qa - F80::from_f64(a);
+                    }
                     b'B' => {
                         if d / a < own {
                             bp.push((d / a, k, false));
@@ -3080,13 +3108,17 @@ fn phase1_ratio(
                             bp.push(((d - r) / a, k, true));
                         }
                         slope_a += a;
+                        qa = qa + F80::from_f64(a);
                     }
                     b'L' | b'N' => {
                         if r < inf && (d - r) / a < own {
                             bp.push(((d - r) / a, k, true));
                         }
                     }
-                    b'U' | b'X' => slope_b -= a,
+                    b'U' | b'X' => {
+                        slope_b -= a;
+                        qb = qb - F80::from_f64(a);
+                    }
                     _ => {}
                 }
             } else {
@@ -3099,9 +3131,16 @@ fn phase1_ratio(
                             bp.push((d / a, k, false));
                         }
                         slope_a -= a;
+                        qa = qa - F80::from_f64(a);
                     }
-                    b'B' => slope_a += a,
-                    b'L' | b'X' => slope_b += a,
+                    b'B' => {
+                        slope_a += a;
+                        qa = qa + F80::from_f64(a);
+                    }
+                    b'L' | b'X' => {
+                        slope_b += a;
+                        qb = qb + F80::from_f64(a);
+                    }
                     // The reference's dense-result variant records only the breakpoints below the entering variable's range.
                     b'N' | b'U' => {
                         if !dense || d / a < own {
@@ -3116,7 +3155,11 @@ fn phase1_ratio(
             (0..ent.len()).filter(|&k| ent[k].1.abs() > tol_p).count(),
             bp.len(),
         )));
-        let s0 = slope_b + slope_a;
+        let s0 = if quad {
+            (qb + qa).to_f64()
+        } else {
+            slope_b + slope_a
+        };
         if s0 < 0.0 && bp.is_empty() {
             return Phase1Pick {
                 entry: None,
@@ -3128,7 +3171,7 @@ fn phase1_ratio(
         let mut theta = 0.0;
         if s0 < 0.0 {
             let mut work = bp.clone();
-            theta = find_theta(s0, &mut work, &|k| val(k).abs());
+            theta = find_theta_q(s0, qb + qa, &mut work, &|k| val(k).abs(), quad);
             if own < inf && own <= theta {
                 return Phase1Pick {
                     entry: None,
@@ -4349,6 +4392,7 @@ fn solve_primal(
                     &info,
                     &mut passes,
                     ft_dense,
+                    s.handoff.is_some_and(|h| h.quad),
                 )
             };
             if let Some(mi) = s.mirror.as_ref() {
