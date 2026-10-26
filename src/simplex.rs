@@ -205,6 +205,257 @@ pub struct TraceEvent {
 
 /// What the dual controller hands to the primal it starts (`0x154f43..0x155190`): the pivot-check pair the dual's last iteration left in `ctx+0x300` / `ctx+0x308`
 /// (the primal's first pricing call reads it), the pivot threshold `ctx+0x390`, and the retry counter `ctx+0x184`.
+/// The primal's FTRAN/BTRAN mirror: the double one, or, after a quad dual, the x87 long double one (values rounded to a double where the primal stores them).
+pub(crate) enum Mir {
+    D(crate::ftran_order::RefStruct<f64>),
+    Q(crate::ftran_order::RefStruct<crate::f80::F80>),
+}
+
+macro_rules! mir {
+    ($s:expr, $m:ident => $e:expr) => {
+        match $s {
+            Mir::D($m) => $e,
+            Mir::Q($m) => $e,
+        }
+    };
+}
+
+impl Mir {
+    fn work(&self) -> f64 {
+        mir!(self, m => m.work)
+    }
+
+    fn bt_dense(&self) -> bool {
+        mir!(self, m => m.bt_dense)
+    }
+
+    fn take_upd_work(&mut self) -> Vec<(u32, f64, f64)> {
+        mir!(self, m => std::mem::take(&mut m.upd_work))
+    }
+
+    fn window_stats(&self) -> (usize, f64) {
+        mir!(self, m => m.window_stats())
+    }
+
+    fn discard_work(&self) -> f64 {
+        mir!(self, m => m.discard_work())
+    }
+
+    fn discard_work_unused(&self) -> f64 {
+        mir!(self, m => m.discard_work_unused())
+    }
+
+    fn fresh_work(&self) -> Vec<(u32, f64)> {
+        mir!(self, m => m.fresh_work())
+    }
+
+    fn u_nnz(&self) -> usize {
+        mir!(self, m => m.u_nnz())
+    }
+
+    fn has_levels(&self) -> bool {
+        mir!(self, m => m.has_levels())
+    }
+
+    fn updates(&self) -> usize {
+        mir!(self, m => m.updates())
+    }
+
+    fn count_all_updates(&mut self) {
+        mir!(self, m => m.count_all_updates())
+    }
+
+    fn refactor_due(&self) -> bool {
+        mir!(self, m => m.refactor_due())
+    }
+
+    fn max_updates(&self) -> usize {
+        mir!(self, m => m.max_updates())
+    }
+
+    fn dims(&self) -> (usize, usize, f64) {
+        mir!(self, m => m.dims())
+    }
+
+    fn kinds(&self) -> &[i64] {
+        mir!(self, m => m.kinds())
+    }
+
+    fn blists(&self) -> &[Vec<usize>] {
+        mir!(self, m => m.blists())
+    }
+
+    fn dthr(&self) -> usize {
+        mir!(self, m => m.dthr())
+    }
+
+    fn l_nnz(&self) -> usize {
+        mir!(self, m => m.l_nnz())
+    }
+
+    fn last_dense(&self) -> bool {
+        mir!(self, m => m.last_dense())
+    }
+
+    fn last_ordered(&self) -> bool {
+        mir!(self, m => m.last_ordered())
+    }
+
+    fn update(&mut self, r: usize) {
+        mir!(self, m => m.update(r))
+    }
+
+    fn numerics(&self) -> (Vec<f64>, Vec<Vec<(usize, f64)>>) {
+        match self {
+            Mir::D(m) => {
+                let (d, l) = m.numerics();
+                (d.to_vec(), l)
+            }
+            Mir::Q(m) => {
+                let (d, l) = m.numerics();
+                (
+                    d.iter().map(|&v| crate::real::Real::to_f64(v)).collect(),
+                    l.into_iter()
+                        .map(|c| {
+                            c.into_iter()
+                                .map(|(i, v)| (i, crate::real::Real::to_f64(v)))
+                                .collect()
+                        })
+                        .collect(),
+                )
+            }
+        }
+    }
+
+    fn lstage_snap(&self) -> (Vec<f64>, Vec<f64>) {
+        match self {
+            Mir::D(m) => m.lstage_snap(),
+            Mir::Q(m) => {
+                let (a, b) = m.lstage_snap();
+                (
+                    a.iter().map(|&v| crate::real::Real::to_f64(v)).collect(),
+                    b.iter().map(|&v| crate::real::Real::to_f64(v)).collect(),
+                )
+            }
+        }
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn ustage_state(
+        &self,
+    ) -> (
+        Vec<(usize, f64)>,
+        Vec<f64>,
+        Vec<Vec<(usize, f64)>>,
+        Vec<usize>,
+        Vec<i64>,
+        usize,
+    ) {
+        match self {
+            Mir::D(m) => {
+                let (a, b, c, d, e, f) = m.ustage_state();
+                (
+                    a.to_vec(),
+                    b.to_vec(),
+                    c.to_vec(),
+                    d.to_vec(),
+                    e.to_vec(),
+                    f,
+                )
+            }
+            Mir::Q(_) => (
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                0,
+            ),
+        }
+    }
+
+    fn ftran_dense_work(&self, b: &[f64]) -> f64 {
+        match self {
+            Mir::D(m) => m.ftran_dense_work(b),
+            Mir::Q(m) => {
+                let bq: Vec<crate::f80::F80> = b.iter().map(|&v| crate::real::Real::c(v)).collect();
+                m.ftran_dense_work(&bq)
+            }
+        }
+    }
+
+    fn btran_ld(
+        &mut self,
+        inp: &[(usize, crate::f80::F80)],
+        direct: bool,
+        dense_in: bool,
+    ) -> Option<Vec<(usize, crate::f80::F80)>> {
+        match self {
+            Mir::D(_) => None,
+            Mir::Q(m) => Some(m.btran(inp, direct, dense_in)),
+        }
+    }
+
+    fn ftran_ld(&mut self, rows: &[usize], vals: &[f64]) -> Option<Vec<(usize, crate::f80::F80)>> {
+        match self {
+            Mir::D(_) => None,
+            Mir::Q(m) => {
+                let q: Vec<crate::f80::F80> =
+                    vals.iter().map(|&v| crate::real::Real::c(v)).collect();
+                Some(m.ftran(rows, &q))
+            }
+        }
+    }
+
+    fn is_q(&self) -> bool {
+        matches!(self, Mir::Q(_))
+    }
+
+    fn btran(&mut self, inp: &[(usize, f64)], direct: bool, dense_in: bool) -> Vec<(usize, f64)> {
+        match self {
+            Mir::D(m) => m.btran(inp, direct, dense_in),
+            Mir::Q(m) => {
+                let q: Vec<(usize, crate::f80::F80)> = inp
+                    .iter()
+                    .map(|&(i, v)| (i, crate::real::Real::c(v)))
+                    .collect();
+                m.btran(&q, direct, dense_in)
+                    .into_iter()
+                    .map(|(i, v)| (i, crate::real::Real::to_f64(v)))
+                    .collect()
+            }
+        }
+    }
+
+    fn ftran(&mut self, rows: &[usize], vals: &[f64]) -> Vec<(usize, f64)> {
+        match self {
+            Mir::D(m) => m.ftran(rows, vals),
+            Mir::Q(m) => {
+                let q: Vec<crate::f80::F80> =
+                    vals.iter().map(|&v| crate::real::Real::c(v)).collect();
+                m.ftran(rows, &q)
+                    .into_iter()
+                    .map(|(i, v)| (i, crate::real::Real::to_f64(v)))
+                    .collect()
+            }
+        }
+    }
+
+    fn ftran_basic(&mut self, rows: &[usize], vals: &[f64]) -> Vec<(usize, f64)> {
+        match self {
+            Mir::D(m) => m.ftran_basic(rows, vals),
+            Mir::Q(m) => {
+                let q: Vec<crate::f80::F80> =
+                    vals.iter().map(|&v| crate::real::Real::c(v)).collect();
+                m.ftran_basic(rows, &q)
+                    .into_iter()
+                    .map(|(i, v)| (i, crate::real::Real::to_f64(v)))
+                    .collect()
+            }
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Handoff {
     pub stale: Option<(f64, f64)>,
@@ -297,6 +548,23 @@ pub(crate) struct Internal {
 impl Internal {
     /// `rank_dot(&cols[j], v, rank)` for every column at once, iterating only the rows with a rank (in rank order), so each
     /// column's sum is accumulated in the same order from 0.0 as `rank_dot` does.
+    fn rank_products_q(&self, v: &[crate::f80::F80], rank: &[usize]) -> Vec<crate::f80::F80> {
+        use crate::real::Real;
+        let mut order: Vec<(usize, usize)> = (0..self.m)
+            .filter(|&i| rank[i] != usize::MAX)
+            .map(|i| (rank[i], i))
+            .collect();
+        order.sort_unstable();
+        let mut acc = vec![crate::f80::F80::ZERO; self.n + self.m];
+        for &(_, i) in &order {
+            let vi = v[i];
+            for &(j, a) in &self.rwise[i] {
+                acc[j] = acc[j] + crate::f80::F80::c(a) * vi;
+            }
+        }
+        acc
+    }
+
     fn rank_products(&self, v: &[f64], rank: &[usize]) -> Vec<f64> {
         let mut order: Vec<(usize, usize)> = (0..self.m)
             .filter(|&i| rank[i] != usize::MAX)
@@ -717,7 +985,7 @@ struct Solver<'a> {
     /// variable re-enters).
     rhs_shift: Vec<f64>,
     /// Mirror of the reference's FTRAN structure (`faithful_ftran`).
-    mirror: Option<crate::ftran_order::RefStruct>,
+    mirror: Option<Mir>,
     /// The same factor in extended precision, kept after a quad pass (`Handoff::quad`): the basic solution is read from it.
     mirror_q: Option<crate::ftran_order::RefStruct<crate::f80::F80>>,
     /// The reference's work counter (`crate::work`).
@@ -756,6 +1024,10 @@ struct Solver<'a> {
     costfree: bool,
     /// The last `y_ref` was built without the true cost.
     y_costfree: bool,
+    /// The duals of the last `dual_btran_work` in extended precision (after a quad dual), unrounded.
+    y_q: Option<Vec<crate::f80::F80>>,
+    /// The Devex weights in extended precision (after a quad dual): valid for `j` while it rounds to `w[j]`.
+    wf: Vec<crate::f80::F80>,
     /// `P[0x3c0]`: the phase 1 scan tolerance is this times `PHASE1_M` (1e-7, then 1e-9 after the failed scan).
     p3c0: f64,
     /// The stale pivot-check pair (`ctx+0x300`, `ctx+0x308`), read by the first pricing call (`0x144fe1`).
@@ -1087,10 +1359,14 @@ impl<'a> Solver<'a> {
                         self.work.add(0xf461f, est, crate::work::CTX);
                     }
                 }
-                let mi = crate::ftran_order::RefStruct::fresh(self.p.m, self.p.n, &st, &rows);
-                if self.handoff.is_some_and(|h| h.quad) {
+                let mi = if self.handoff.is_some_and(|h| h.quad) {
                     self.mirror_q = Some(self.quad_mirror(gate0, fac_no, &rows));
-                }
+                    Mir::Q(self.quad_mirror(gate0, fac_no, &rows))
+                } else {
+                    Mir::D(crate::ftran_order::RefStruct::fresh(
+                        self.p.m, self.p.n, &st, &rows,
+                    ))
+                };
                 if crate::dump::on("luout") {
                     let (diag, l) = mi.numerics();
                     crate::dump::emit(
@@ -1439,10 +1715,10 @@ impl<'a> Solver<'a> {
         let dc_sorted = dc.to_vec();
         let out = mi.btran(&dc_sorted, false, false);
         self.work
-            .add_from(0x12de50, 0x10804b, mi.work, crate::work::FAC);
+            .add_from(0x12de50, 0x10804b, mi.work(), crate::work::FAC);
         // The mirror's values, which carry the reference's cancellation noise; a dense result is compacted with the row
         // product's drop tolerance.
-        let bt_dense = mi.bt_dense;
+        let bt_dense = mi.bt_dense();
         let mut rho = vec![0.0; m];
         for &(i, v) in &out {
             if !bt_dense || v.abs() > ROW_DROP_TOL {
@@ -1530,7 +1806,36 @@ impl<'a> Solver<'a> {
             })
             .filter(|e| e.1 != 0.0)
             .collect();
-        let out = mi.btran(&inp, false, true);
+        let mut yq: Option<Vec<crate::f80::F80>> = None;
+        let out = if mi.is_q() {
+            use crate::real::Real;
+            let inq: Vec<(usize, crate::f80::F80)> = self
+                .basic
+                .iter()
+                .enumerate()
+                .map(|(pos, &j)| {
+                    (
+                        pos,
+                        (if cf {
+                            crate::f80::F80::ZERO
+                        } else {
+                            crate::f80::F80::c(p.cost[j])
+                        }) + crate::f80::F80::c(PHASE1_M) * crate::f80::F80::c(f64::from(sg[pos])),
+                    )
+                })
+                .filter(|e| !e.1.is_zero())
+                .collect();
+            let oq = mi.btran_ld(&inq, false, true).unwrap();
+            let mut v = vec![crate::f80::F80::ZERO; p.m];
+            for &(i, x) in &oq {
+                v[i] = x;
+            }
+            yq = Some(v);
+            oq.into_iter().map(|(i, x)| (i, x.to_f64())).collect()
+        } else {
+            mi.btran(&inp, false, true)
+        };
+        self.y_q = yq;
         if crate::dump::on("dual") {
             crate::dump::emit(
                 "dual",
@@ -1539,7 +1844,7 @@ impl<'a> Solver<'a> {
         }
         let caller = if self.cleanup { 0xe53a7 } else { 0x109289 };
         self.work
-            .add_from(0x12de50, caller, mi.work, crate::work::FAC);
+            .add_from(0x12de50, caller, mi.work(), crate::work::FAC);
         let mut y = vec![0.0; p.m];
         for &(i, v) in &out {
             y[i] = if self.cleanup && v.abs() < 1e-13 {
@@ -1732,6 +2037,13 @@ impl<'a> Solver<'a> {
                 } else if self.p0.is_some() {
                     // `pricing0`: the returned reduced costs are the scan's scores (`0xfecb0`), the eight-lane kernel.
                     dot_lanes_from(&p.fcols[j], y, col_off(j), cost(j))
+                } else if let Some(yq) = self.y_q.as_ref() {
+                    use crate::real::Real;
+                    let mut acc = crate::f80::F80::c(cost(j));
+                    for &(i, a) in &p.fcols[j] {
+                        acc -= yq[i] * crate::f80::F80::c(a);
+                    }
+                    acc.to_f64()
                 } else {
                     let mut acc = cost(j);
                     for &(i, a) in &p.fcols[j] {
@@ -1991,7 +2303,9 @@ impl<'a> Solver<'a> {
     fn price_admitting(&mut self) -> Option<usize> {
         let w0 = self.work.w;
         let q = self.price_faithful();
-        if q.is_none() && self.excluded.is_some() {
+        // The x87 primal with cost shifts in force does not admit the dropped variable: its first failed scan ends the primal with status -1004.
+        if q.is_none() && self.excluded.is_some() && !self.handoff.is_some_and(|h| h.quad && h.pert)
+        {
             // Without updates the scan books nothing (the driver's own list build, `0x138532` below, takes its place).
             if self.factor.num_updates() == 0 {
                 self.work.rollback(w0);
@@ -2359,7 +2673,7 @@ impl<'a> Solver<'a> {
         };
         let mi = self.mirror.as_mut().unwrap();
         let out = mi.btran(&inp, false, false);
-        let dense = mi.bt_dense;
+        let dense = mi.bt_dense();
         if crate::dump::on("dual") {
             crate::dump::emit(
                 "dual",
@@ -2367,7 +2681,7 @@ impl<'a> Solver<'a> {
             );
         }
         self.work
-            .add_from(0x12de50, 0xfb7ee, mi.work, crate::work::FAC);
+            .add_from(0x12de50, 0xfb7ee, mi.work(), crate::work::FAC);
         let y = &mut self.p0.as_mut().unwrap().y;
         for &(i, v) in &out {
             if !dense || v < -ROW_DROP_TOL || ROW_DROP_TOL < v {
@@ -3881,7 +4195,16 @@ fn solve_primal(
         upd_work: Vec::new(),
         p0: None,
         sw: crate::method::Method {
-            mode: if opts.sw_carry.is_some() { 2 } else { 0 },
+            // After a quad dual the x87 primal's method `ctx+0x3ec` is 1 from the third quad primal on (with `ctx+0x468` still set): Devex pricing at once.
+            mode: if opts.sw_carry.is_some() {
+                if handoff.is_some_and(|h| h.quad) && QUAD_PRIMALS.with(|c| c.get()) >= 3 {
+                    1
+                } else {
+                    2
+                }
+            } else {
+                0
+            },
             ratio_cnt: u32::from(opts.sw_carry.is_some()),
             keep468: opts.sw_carry.is_some(),
             factorizations: 1,
@@ -3890,6 +4213,8 @@ fn solve_primal(
         handoff,
         costfree: false,
         y_costfree: false,
+        y_q: None,
+        wf: Vec::new(),
         p3c0: 1e-7,
         stale: handoff.and_then(|h| h.stale),
         accuracy: 0,
@@ -3926,9 +4251,13 @@ fn solve_primal(
             s.pos_of[j] = pos;
         }
         s.basic = order;
-        s.mirror = Some(crate::ftran_order::RefStruct::fresh(m, n, &st, &rows));
         if handoff.is_some_and(|h| h.quad) {
             s.mirror_q = Some(s.quad_mirror(gate0, 1, &rows));
+            s.mirror = Some(Mir::Q(s.quad_mirror(gate0, 1, &rows)));
+        } else {
+            s.mirror = Some(Mir::D(crate::ftran_order::RefStruct::fresh(
+                m, n, &st, &rows,
+            )));
         }
         let mi = s.mirror.as_ref().unwrap();
         lu_work = st.work(&rows, mi.has_levels());
@@ -4203,6 +4532,10 @@ fn solve_primal(
             match s.price_admitting() {
                 Some(q) => q,
                 None if s.repaired => {
+                    if s.handoff.is_some_and(|h| h.quad && h.pert) {
+                        // The x87 primal with cost shifts in force ends with status -1004 at the failed scan: the controller reruns the dual, it does not restore the dropped variable.
+                        PRIMAL_REPAIRED.with(|c| c.set(false));
+                    }
                     // `price_admitting` made the reference's last factorization (request 5) and the scan still finds nothing: `cf0 = 3`, the primal ends infeasible with the
                     // dropped variable out; the controller restores it and runs the primal again.
                     break Status::Infeasible;
@@ -4238,6 +4571,11 @@ fn solve_primal(
                     }
                     s.forced = true;
                     continue;
+                }
+                None if s.handoff.is_some_and(|h| h.quad && h.pert) => {
+                    // The x87 primal started with cost shifts in force (`ctx+0x338` != 0) ends at its first failed scan with status -1004 (`ctx+0x294` = 9, no
+                    // factorization): the controller removes the shifts and reruns the dual from this basis (seed 2950: the exit follows the pivot of x6).
+                    break Status::Infeasible;
                 }
                 None => {
                     // No improving column for the penalised cost: try the pure sum of infeasibilities, which either
@@ -4310,6 +4648,10 @@ fn solve_primal(
                     crate::lu_order::raise_threshold(0.5);
                     s.forced = true;
                     continue;
+                }
+                None if s.handoff.is_some_and(|h| h.quad && h.pert) => {
+                    // As above, in phase 2: the x87 primal with cost shifts in force ends with status -1004 at its first failed scan.
+                    break Status::Infeasible;
                 }
                 None => {
                     // The reference recomputes the duals once more when the scan finds nothing (`0x145520`, with the residual check).
@@ -4394,11 +4736,24 @@ fn solve_primal(
         let dir = if s.d[q] < 0.0 { 1.0 } else { -1.0 };
         let mut ftran_out: Vec<(usize, f64)> = Vec::new();
         let mut ft_dense = false;
+        let mut aq: Option<Vec<crate::f80::F80>> = None;
         let entries: Vec<(usize, f64)> = if let Some(mi) = s.mirror.as_mut() {
             // The reference's FTRAN, value for value and in its output order.
             let rows_q: Vec<usize> = p.fcols[q].iter().map(|&(i, _)| i).collect();
             let vals_q: Vec<f64> = p.fcols[q].iter().map(|&(_, a)| a).collect();
-            let out = mi.ftran(&rows_q, &vals_q);
+            let out = if mi.is_q() {
+                let oq = mi.ftran_ld(&rows_q, &vals_q).unwrap();
+                let mut v = vec![crate::f80::F80::ZERO; m];
+                for &(i, x) in &oq {
+                    v[i] = x;
+                }
+                aq = Some(v);
+                oq.into_iter()
+                    .map(|(i, x)| (i, crate::real::Real::to_f64(x)))
+                    .collect()
+            } else {
+                mi.ftran(&rows_q, &vals_q)
+            };
             if crate::dump::on("ftran") {
                 crate::dump::emit(
                     "ftran",
@@ -4420,11 +4775,11 @@ fn solve_primal(
                     .collect();
                 crate::dump::emit(
                     "ustage",
-                    serde_json::json!({"iter": iterations, "q": q, "i21": i21, "spike": crate::dump::sparse(spike), "diag": diag, "tail": tail}),
+                    serde_json::json!({"iter": iterations, "q": q, "i21": i21, "spike": crate::dump::sparse(&spike), "diag": diag, "tail": tail}),
                 );
             }
             s.work
-                .add_from(0x1219d6, 0x120673, mi.work, crate::work::FAC);
+                .add_from(0x1219d6, 0x120673, mi.work(), crate::work::FAC);
             for &(i, a) in &out {
                 alpha[i] = a;
             }
@@ -4887,7 +5242,7 @@ fn solve_primal(
             s.factor.update(r, alpha);
             if let Some(mi) = s.mirror.as_mut() {
                 mi.update(r);
-                s.upd_work = std::mem::take(&mut mi.upd_work);
+                s.upd_work = mi.take_upd_work();
             }
             s.leave_prev = Some(leave);
             s.last_pivot = Some(LastPivot {
@@ -4933,6 +5288,8 @@ fn solve_primal(
 
         // Pivot row alpha_r = e_r' B^-1 [A I] and the Devex cross-term vector tau = B^-T u.
         let mut rho_ref: Option<Vec<(usize, f64)>> = None;
+        let mut rho_q: Option<Vec<crate::f80::F80>> = None;
+        let mut tau_q: Option<Vec<crate::f80::F80>> = None;
         // The pivot-row update's own estimate (`0x102d20`, site `0x1040c7`) apart from its pivot-row term.
         let mut devex_est = 0.0f64;
         // Method 2 (`0x104a03`) has no cross-term BTRAN and a simpler work estimate.
@@ -4941,7 +5298,21 @@ fn solve_primal(
         let mut alpha_ordered = false;
         let mut tau_ref: Option<Vec<(usize, f64)>> = None;
         if let Some(mi) = s.mirror.as_mut() {
-            rho_ref = Some(mi.btran(&[(r, 1.0)], true, false));
+            rho_ref = Some(if mi.is_q() {
+                let oq = mi
+                    .btran_ld(&[(r, crate::real::Real::c(1.0))], true, false)
+                    .unwrap();
+                let mut v = vec![crate::f80::F80::ZERO; m];
+                for &(i, x) in &oq {
+                    v[i] = x;
+                }
+                rho_q = Some(v);
+                oq.into_iter()
+                    .map(|(i, x)| (i, crate::real::Real::to_f64(x)))
+                    .collect()
+            } else {
+                mi.btran(&[(r, 1.0)], true, false)
+            });
             if crate::dump::on("rho") {
                 crate::dump::emit(
                     "rho",
@@ -4949,7 +5320,7 @@ fn solve_primal(
                 );
             }
             s.work
-                .add_from(0x13174d, 0x102e5b, mi.work, crate::work::FAC);
+                .add_from(0x13174d, 0x102e5b, mi.work(), crate::work::FAC);
             // The reference's input list for the cross-term BTRAN (`0x102d20`): the pivot entry first (when its variable is in `R0`),
             // then the pivot column's list with the pivot entry dropped by moving the last entry into its slot (when the column
             // came out as a list rather than ascending).
@@ -4987,7 +5358,21 @@ fn solve_primal(
             let mut tau_len = Some(0usize);
             tau_ref = Some(Vec::new());
             if !m2 && (dense_in || !inp.is_empty()) {
-                let tau = mi.btran(&inp, false, dense_in);
+                let tau = if let Some(aqv) = aq.as_ref() {
+                    let inq: Vec<(usize, crate::f80::F80)> =
+                        inp.iter().map(|&(i, _)| (i, aqv[i])).collect();
+                    let oq = mi.btran_ld(&inq, false, dense_in).unwrap();
+                    let mut v = vec![crate::f80::F80::ZERO; m];
+                    for &(i, x) in &oq {
+                        v[i] = x;
+                    }
+                    tau_q = Some(v);
+                    oq.into_iter()
+                        .map(|(i, x)| (i, crate::real::Real::to_f64(x)))
+                        .collect()
+                } else {
+                    mi.btran(&inp, false, dense_in)
+                };
                 if crate::dump::on("tau") {
                     crate::dump::emit(
                         "tau",
@@ -4996,8 +5381,8 @@ fn solve_primal(
                 }
                 tau_ref = Some(tau.clone());
                 s.work
-                    .add_from(0x12de50, 0x103ac7, mi.work, crate::work::FAC);
-                tau_len = if mi.bt_dense { None } else { Some(tau.len()) };
+                    .add_from(0x12de50, 0x103ac7, mi.work(), crate::work::FAC);
+                tau_len = if mi.bt_dense() { None } else { Some(tau.len()) };
             }
             if let (Some(t), false) = (tau_len, m2) {
                 devex_est = devex_est + m as f64 + t as f64 * 2.0;
@@ -5058,6 +5443,36 @@ fn solve_primal(
             }
             t
         };
+        // Extended precision twins of the pivot column and the Devex quantities (after a quad dual).
+        let qw: Option<(crate::f80::F80, crate::f80::F80)> = aq.as_ref().map(|aqv| {
+            use crate::real::Real;
+            let a_rq = aqv[r];
+            let wq_q = if ftran_out.is_empty() {
+                crate::f80::F80::c(s.w[q])
+            } else {
+                let inr = |j: usize| s.in_r0[j];
+                let mut t = if s.in_r0[q] {
+                    crate::f80::F80::ONE
+                } else {
+                    crate::f80::F80::ZERO
+                };
+                if inr(s.basic[r]) {
+                    t += a_rq * a_rq;
+                }
+                let mut order: Vec<(usize, crate::f80::F80)> =
+                    ftran_out.iter().map(|&(i, _)| (i, aqv[i])).collect();
+                if let (false, Some(k)) = (alpha_ordered, order.iter().position(|e| e.0 == r)) {
+                    order.swap_remove(k);
+                }
+                for &(i, v) in &order {
+                    if i != r && inr(s.basic[i]) {
+                        t += v * v;
+                    }
+                }
+                t
+            };
+            (a_rq, wq_q)
+        });
         let col_off = &p.offs;
         let rho_rank: Option<Vec<usize>> = rho_ref.as_ref().map(|rr| {
             let mut rank = vec![usize::MAX; m];
@@ -5070,7 +5485,14 @@ fn solve_primal(
             rank
         });
         // The leaving variable takes part in the row update like any nonbasic: its row product is 1 up to rounding.
-        let prods: Option<Vec<f64>> = rho_rank.as_ref().map(|rank| p.rank_products(&rho, rank));
+        let prods_q: Option<Vec<crate::f80::F80>> = match (rho_rank.as_ref(), rho_q.as_ref()) {
+            (Some(rank), Some(rq)) => Some(p.rank_products_q(rq, rank)),
+            _ => None,
+        };
+        let prods: Option<Vec<f64>> = match prods_q.as_ref() {
+            Some(pq) => Some(pq.iter().map(|&x| crate::real::Real::to_f64(x)).collect()),
+            None => rho_rank.as_ref().map(|rank| p.rank_products(&rho, rank)),
+        };
         let leave_arj = match prods.as_ref() {
             Some(pr) => pr[leave],
             None => 1.0,
@@ -5133,9 +5555,31 @@ fn solve_primal(
                     s.w[j] = s.w[j].max(((wq / alpha_rq) / alpha_rq) * arj * arj + 1.0);
                 }
             } else if arj.abs() > WEIGHT_DROP_TOL {
-                let ratio = arj / alpha_rq;
-                let vj = dot_lanes(&p.fcols[j], &u, col_off[j] & 1);
-                s.w[j] = ratio * ((wq * ratio - vj) - vj) + s.w[j];
+                if let (Some((a_rq, wq_q)), Some(tq), Some(pq)) =
+                    (qw, tau_q.as_ref(), prods_q.as_ref())
+                {
+                    use crate::real::Real;
+                    let ratio = pq[j] / a_rq;
+                    let mut vj = crate::f80::F80::ZERO;
+                    for &(i, a) in &p.fcols[j] {
+                        vj += crate::f80::F80::c(a) * tq[i];
+                    }
+                    if s.wf.len() != s.w.len() {
+                        s.wf = vec![crate::f80::F80::ZERO; s.w.len()];
+                    }
+                    let old = if s.wf[j].to_f64() == s.w[j] {
+                        s.wf[j]
+                    } else {
+                        crate::f80::F80::c(s.w[j])
+                    };
+                    let nw = ratio * ((wq_q * ratio - vj) - vj) + old;
+                    s.wf[j] = nw;
+                    s.w[j] = nw.to_f64();
+                } else {
+                    let ratio = arj / alpha_rq;
+                    let vj = dot_lanes(&p.fcols[j], &u, col_off[j] & 1);
+                    s.w[j] = ratio * ((wq * ratio - vj) - vj) + s.w[j];
+                }
                 // A fixed structural never resets the framework (PILOT.JA iteration 3856: the fixed EMROP06 went to -3e4); a fixed
                 // slack does (PEROLD iteration 1626, PILOTNOV iteration 1026).
                 if opts.faithful_weights && s.w[j] < NORM_RESET_TOL && !(j < n && s.is_fixed(j)) {
@@ -5180,7 +5624,16 @@ fn solve_primal(
                 0.0
             };
         }
-        s.w[leave] = (wq / alpha_rq) / alpha_rq;
+        s.w[leave] = if let Some((a_rq, wq_q)) = qw {
+            let v = (wq_q / a_rq) / a_rq;
+            if s.wf.len() != s.w.len() {
+                s.wf = vec![crate::f80::F80::ZERO; s.w.len()];
+            }
+            s.wf[leave] = v;
+            crate::real::Real::to_f64(v)
+        } else {
+            (wq / alpha_rq) / alpha_rq
+        };
         if m2 {
             // `0x104b4d`: the error of the stored weight of the entering variable against the recomputed one, larger over smaller.
             let ws = s.w[q];
@@ -5226,7 +5679,7 @@ fn solve_primal(
         s.factor.update(r, alpha);
         if let Some(mi) = s.mirror.as_mut() {
             mi.update(r);
-            s.upd_work = std::mem::take(&mut mi.upd_work);
+            s.upd_work = mi.take_upd_work();
         }
         changed.push(leave);
         s.leave_prev = Some(leave);

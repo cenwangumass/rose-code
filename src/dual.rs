@@ -1456,6 +1456,26 @@ impl<'a, R: Real> Dual<'a, R> {
         }
     }
 
+    /// The acceptance test of the recompute (`0x21a383..0x21a4b6`): with `v` the infeasibility of a row beyond the tolerance, `rel` the largest `v / (|x| + 1)`, `a` the largest `v`
+    /// and `xm` the largest `|x| + 1`, the solution counts as feasible when `rel < c390 2^-21` or `0.1 xm c390 2^-21 > a` (`c390` is the relative pivot tolerance).
+    fn tiny_infeasibility(&self) -> bool {
+        let tol = self.ptol();
+        let (mut rel, mut a, mut xm) = (0.0f64, 0.0f64, 0.0f64);
+        let mut any = false;
+        for r in 0..self.m {
+            let x = self.xb[r].to_f64();
+            xm = xm.max(x.abs() + 1.0);
+            let f = self.infeas(r);
+            if f > tol {
+                any = true;
+                a = a.max(f);
+                rel = rel.max(f / (x.abs() + 1.0));
+            }
+        }
+        let s3 = self.lu_thr * (-21.0f64).exp2();
+        any && (rel < s3 || 0.1 * xm * s3 > a)
+    }
+
     /// The leaving row (`0xccbc0`), `None` when no row is infeasible.
     fn price(&mut self) -> Option<usize> {
         if !self.value_mode {
@@ -3609,6 +3629,19 @@ impl<'a, R: Real> Dual<'a, R> {
             self.prog_acc = 0.0;
             self.recompute_flags(level_before != 0, pv.is_some());
             self.flags_work();
+            if R::QUAD
+                && self.status.is_none()
+                && self.level == 0
+                && self.lu_thr >= 0.5
+                && crate::simplex::QUAD_PRIMALS.with(|c| c.get()) >= 10
+                && self.tiny_infeasibility()
+            {
+                // The recompute after a factorization of a pass that follows the tenth quad primal (`ctx+0x35c` above 10, `0x21a315..0x21a4b6`) takes the basic solution as
+                // feasible when the infeasibilities are small against the size of x_B: the flags are all 2 and the dual ends optimal (seed 2950, 3e11 against 7e-3).
+                self.flags.iter_mut().for_each(|f| *f = 2);
+                self.list.clear();
+                self.status = Some(Status::Optimal);
+            }
             // The recompute pass `0xbf5b0` (called from `0xf6d0f`) runs the no-leaving-row handler itself when the pricing is in the list-walk mode
             // (`P+0x40 == 0`) and the list is empty (`P+0x3c == 0`, `0xbffbe`): no pricing call follows (RECIPE call 46).
             if !self.value_mode && self.list.is_empty() && self.status.is_none() {
@@ -4561,7 +4594,18 @@ fn solve_pass<R: Real>(
                 c178: C178.with(|c| c.get()),
             }))
         });
-        set_dual_tol(LOOP_TOL.with(|c| c.get()));
+        // The controller scales the tolerance by a factor of `ctx+0x35c`, the count of primals started in quad mode, plus one (`0x154cff..0x154d13`, store
+        // `0x15647a`): 1 up to 5, 0.5 for 6 and 7, 0.2 above (seed 2950: `ctx+0x388` 1e-6, 5e-7, 2e-7).
+        let tol_factor = if R::QUAD {
+            match crate::simplex::QUAD_PRIMALS.with(|c| c.get()) + 1 {
+                0..=5 => 1.0,
+                6 | 7 => 0.5,
+                _ => 0.2,
+            }
+        } else {
+            1.0
+        };
+        set_dual_tol(LOOP_TOL.with(|c| c.get()) * tol_factor);
         crate::simplex::PRIMAL_SINGULAR.with(|c| c.set(None));
         crate::simplex::PRIMAL_REPAIRED.with(|c| c.set(false));
         let mut r = match crate::simplex::solve(model, Some(&b), &popts) {
@@ -4672,11 +4716,15 @@ fn solve_pass<R: Real>(
                     0
                 } else {
                     // `ctx+0x2c0` after the primal: its start factorization counts one (the primal's own refactorizations at its end, two in rose, do not appear in the
-                    // reference's `lu_in`: fx_midsing_m5, 1494, 1390, `dual_acc` captures).
+                    // reference's `lu_in`: fx_midsing_m5, 1494, 1390, `dual_acc` captures). The x87 primal with shifts in force ends at its first failed scan with
+                    // status -1004 and makes no such factorizations: every one counts (seed 2950: four in the reference, `ctx+0x2c0` 24 -> 28).
+                    let l = r.refactorizations - s.refactorizations;
                     s.nref()
-                        + (r.refactorizations - s.refactorizations)
-                            .saturating_sub(2)
-                            .max(usize::from(R::QUAD))
+                        + if R::QUAD {
+                            l.max(1)
+                        } else {
+                            l.saturating_sub(2)
+                        }
                 },
                 pstep: if R::QUAD && !from_snap && s.pstep > 0.0 {
                     Some(maxsd(1e-7, s.pstep * 0.05))
