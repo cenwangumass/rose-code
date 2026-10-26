@@ -4612,6 +4612,7 @@ fn solve_pass<R: Real>(
         if status == Status::Infeasible
             && s.pert != 0
             && !repaired
+            && !(R::QUAD && s.rejected_end)
             && PERT_RERUNS.with(|c| {
                 c.set(c.get() + 1);
                 c.get() <= 10
