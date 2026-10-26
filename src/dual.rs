@@ -4566,6 +4566,11 @@ fn solve_pass<R: Real>(
         popts.method = crate::simplex::Method::Primal;
         // The dual's teacher-forced factorization schedule does not apply to the primal, which decides its own (work based).
         popts.refactor_schedule = None;
+        if R::QUAD && crate::simplex::QUAD_PRIMALS.with(|c| c.get()) == 0 {
+            // The first x87 primal after a quad dual runs the `SimplexPricing=0` scan (`ctx+0x3ec` = 0 at its start, seed 2772: enters 24, 27, 1, 6, 12, 2 by the largest score bucket);
+            // the later ones are in method 2 / 1.
+            popts.pricing0 = true;
+        }
         if opts.perturb != 0.0 {
             popts.sw_carry = Some(crate::simplex::SwCarry {
                 iters: s.iters as f64,

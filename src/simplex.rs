@@ -4196,7 +4196,9 @@ fn solve_primal(
         p0: None,
         sw: crate::method::Method {
             // After a quad dual the x87 primal's method `ctx+0x3ec` is 1 from the third quad primal on (with `ctx+0x468` still set): Devex pricing at once.
-            mode: if opts.sw_carry.is_some() {
+            mode: if opts.pricing0 {
+                0
+            } else if opts.sw_carry.is_some() {
                 if handoff.is_some_and(|h| h.quad) && QUAD_PRIMALS.with(|c| c.get()) >= 3 {
                     1
                 } else {
