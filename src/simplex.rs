@@ -471,6 +471,8 @@ pub(crate) struct Handoff {
     pub iters: f64,
     pub snap: f64,
     pub c178: u32,
+    /// The variable the dual's in-place repair dropped, still out of the primal's scan (status -4) when the quad dual ended without cost shifts (seed 2594: the second quad primal prices without it until its scan finds nothing, then the controller restores it).
+    pub excl: Option<usize>,
 }
 
 thread_local! {
@@ -4163,6 +4165,17 @@ fn solve_primal(
         }
     };
     basis.validate(n, m).map_err(SolveError::InvalidBasis)?;
+    let mut kept_out = false;
+    if excluded.is_none() {
+        if let Some(e) = handoff
+            .and_then(|h| h.excl)
+            .filter(|e| !basis.basic.contains(e))
+        {
+            excluded = Some(e);
+            kept_out = true;
+            PRIMAL_REPAIRED.with(|c| c.set(true));
+        }
+    }
     let mut pos_of = vec![NONE; n + m];
     for (pos, &j) in basis.basic.iter().enumerate() {
         pos_of[j] = pos;
@@ -4265,7 +4278,7 @@ fn solve_primal(
         accuracy: 0,
         iters_done: 0,
         forced: false,
-        repaired: false,
+        repaired: kept_out,
         restarts: rs.map_or(0, |r| r.count),
     };
     s.rows = vec![Vec::new(); m];

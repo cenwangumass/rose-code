@@ -4597,6 +4597,11 @@ fn solve_pass<R: Real>(
                 iters: (s.it_base + s.iters) as f64,
                 snap: (s.it_base + s.stall_it as usize) as f64,
                 c178: C178.with(|c| c.get()),
+                excl: if R::QUAD && s.pert == 0 {
+                    s.repaired
+                } else {
+                    None
+                },
             }))
         });
         // The controller scales the tolerance by a factor of `ctx+0x35c`, the count of primals started in quad mode, plus one (`0x154cff..0x154d13`, store
@@ -4658,6 +4663,7 @@ fn solve_pass<R: Real>(
                     iters: (s.it_base + s.iters) as f64,
                     snap: (s.it_base + s.stall_it as usize) as f64,
                     c178: C178.with(|c| c.get()),
+                    excl: None,
                 }))
             });
             let b2 = r.basis.clone();
