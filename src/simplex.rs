@@ -481,6 +481,13 @@ thread_local! {
     pub(crate) static QUAD_EEFA: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     pub(crate) static HANDOFF: std::cell::Cell<Option<Handoff>> = const { std::cell::Cell::new(None) };
     /// The primal ended with status -1002 from its drift test (not from a singular factorization): the controller restarts from the primal's start basis.
+    /// The reference's iteration counter `ctx+0x2a8` (all dual and primal iterations of the solve), the infeasibility sum `ctx+0x120` at the last progress check (it outlives
+    /// the primal restarts), and the stall exit of the x87 primal (`0x27e100`, status -1004 at `0x27e6e4`).
+    pub(crate) static TOTAL_ITERS: std::cell::Cell<f64> = const { std::cell::Cell::new(0.0) };
+    /// Iterations of the earlier x87 run (see `TOTAL_ITERS`) that the controller adds to the primal's count.
+    pub(crate) static EARLIER_ITERS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static STALL_PREV: std::cell::Cell<f64> = const { std::cell::Cell::new(f64::INFINITY) };
+    pub(crate) static PRIMAL_STALL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     pub(crate) static PRIMAL_DRIFT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The primal's factorization found the basis singular (status -1002, `0xf5921`): iterations and refactorizations of the primal, and its pivot threshold.
     /// The primal repaired its basis in place after a singular factorization (the controller then restores the dropped variable and runs the primal again).
@@ -940,6 +947,10 @@ struct Solver<'a> {
     /// The drift test of the primal update (`ctx+0x380`, `ctx+0x170`): tolerance and count of excesses.
     drift_tol: f64,
     drift_cnt: u32,
+    /// The progress check's counters `ctx+0x378` (checks) and `ctx+0x37c` (checks without a fall of the infeasibility sum), reset at the primal's start.
+    stall_calls: u32,
+    stall_cnt: u32,
+    stalled: bool,
     want_drift: bool,
     drift_err: Option<f64>,
     restart: bool,
@@ -1497,7 +1508,48 @@ impl<'a> Solver<'a> {
                 self.perturb();
             }
         }
+        if !self.cleanup && self.p0.is_none() {
+            self.progress_check();
+        }
         Ok(())
+    }
+
+    /// The progress check of the primal (`0x27e100` in the x87 primal; its double twin keeps the same timer): at a factorization, once the iteration counter `ctx+0x2a8` is 100 past
+    /// `ctx+0x40` it sets `ctx+0x40` to it; the x87 primal then sums the bound violations of the basic variables (`ctx+0x120`, tolerance `ctx+0x380`) and counts the check
+    /// (`ctx+0x378`) and, unless the sum fell by more than 1e-13, a check without progress (`ctx+0x37c`). More than 50 of these and 20 times their count above the checks end
+    /// the primal with status -1004 (seed 2717: 7714 and 15415 iterations).
+    fn progress_check(&mut self) {
+        let Some(h) = self.handoff else { return };
+        if !crate::dual::timer_check(TOTAL_ITERS.with(|c| c.get())) || !h.quad {
+            return;
+        }
+        let p = self.p;
+        let tol = crate::dual::primal_tol();
+        let mut sum = 0.0f64;
+        for &j in &self.basic {
+            if is_inf(p.lo[j]) && is_inf(p.up[j]) {
+                continue;
+            }
+            let x = self.dst[j];
+            let range = if is_inf(p.lo[j]) || is_inf(p.up[j]) {
+                f64::INFINITY
+            } else {
+                p.up[j] - p.lo[j]
+            };
+            if x < -tol {
+                sum -= x;
+            } else if range < 1e30 && x > range + tol {
+                sum += x - range;
+            }
+        }
+        let prev = STALL_PREV.with(|c| c.replace(sum));
+        self.stall_calls += 1;
+        if sum > 1e-7 && !(sum - prev < -1e-13) {
+            self.stall_cnt += 1;
+        }
+        if self.stall_cnt > 50 && f64::from(self.stall_cnt) * 20.0 > f64::from(self.stall_calls) {
+            self.stalled = true;
+        }
     }
 
     /// The bound perturbation (`0x141a60`, called from the pricing driver after a factorization): every basic variable at a bound (type
@@ -4075,6 +4127,16 @@ pub fn solve(
         return crate::dual::solve(model, start, opts);
     }
     let handoff = HANDOFF.with(|c| c.take());
+    if let Some(h) = handoff {
+        // `ctx+0x2a8` at the double primal's start: the dual's iterations. The x87 primal after a quad dual that made no iterations continues a context in which
+        // an earlier x87 run of two iterations (a cycle back to the start basis) has been made (seed 2717).
+        if !h.quad {
+            TOTAL_ITERS.with(|c| c.set(h.iters));
+        } else if h.iters == 0.0 && QUAD_PRIMALS.with(|c| c.get()) == 0 {
+            TOTAL_ITERS.with(|c| c.set(c.get() + 2.0));
+            EARLIER_ITERS.with(|c| c.set(2));
+        }
+    }
     if let Some(h) = handoff.filter(|h| h.quad) {
         // The decision of the primal's start factorization (`0x27ebb0..0x27ecc9`): a method other than 1, iterations `ctx+0x2a0` neither 0 nor the snapshot
         // `ctx+0x2b0`, and the stability counter `ctx+0x178` positive switch to method 1 and clear `ctx+0x468`. `ctx+0x3ec` at the start of the first two quad primals
@@ -4199,6 +4261,9 @@ fn solve_primal(
             opts.feasibility_tol
         },
         drift_cnt: 0,
+        stall_calls: 0,
+        stall_cnt: 0,
+        stalled: false,
         want_drift: false,
         drift_err: None,
         restart: false,
@@ -4255,7 +4320,9 @@ fn solve_primal(
             mode: if opts.pricing0 {
                 0
             } else if opts.sw_carry.is_some() {
-                if handoff.is_some_and(|h| h.quad) && QUAD_PRIMALS.with(|c| c.get()) >= 3 {
+                if handoff.is_some_and(|h| {
+                    h.quad && (h.iters == 0.0 || QUAD_PRIMALS.with(|c| c.get()) >= 3)
+                }) {
                     1
                 } else {
                     2
@@ -4425,6 +4492,10 @@ fn solve_primal(
         let mut chk: Option<(bool, usize, usize)> = None;
         if due {
             s.refactor()?;
+            if s.stalled {
+                PRIMAL_STALL.with(|c| c.set(true));
+                break Status::Infeasible;
+            }
         }
         // The reference makes this check after the ratio test, and not at all for a bound flip: `check_state` takes it back.
         let mut check_state = None;
@@ -5178,6 +5249,7 @@ fn solve_primal(
         // A phase 1 step may be negative (a basic variable inside its tolerance leaves from the wrong side of its bound).
         iterations += 1;
         s.iters_done = iterations;
+        TOTAL_ITERS.with(|c| c.set(c.get() + 1.0));
         if s.sw.active {
             let counted = chosen.is_some_and(|k| !s.is_fixed(s.basic[entries[k].0]))
                 && !(is_inf(p.lo[q]) && is_inf(p.up[q]));

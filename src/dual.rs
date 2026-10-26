@@ -49,6 +49,16 @@ thread_local! {
     static SNAP_C40: std::cell::Cell<f64> = const { std::cell::Cell::new(-100.0) };
 }
 
+/// The log timer of the primal (`ctx+0x40`): true once `total` is 100 past the last check, which it then sets (`(total / 100) * 100`, `0x27e1a1..0x27e1a9`).
+pub(crate) fn timer_check(total: f64) -> bool {
+    let c40 = SNAP_C40.with(|c| c.get());
+    if total - c40 < 100.0 {
+        return false;
+    }
+    SNAP_C40.with(|c| c.set((total / 100.0) * 100.0));
+    true
+}
+
 pub(crate) fn resid_fails() -> u32 {
     RESID_FAILS.with(|c| c.get())
 }
@@ -3633,7 +3643,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 && self.status.is_none()
                 && self.level == 0
                 && self.lu_thr >= 0.5
-                && crate::simplex::QUAD_PRIMALS.with(|c| c.get()) >= 10
+                && (req == 4 || crate::simplex::QUAD_PRIMALS.with(|c| c.get()) >= 10)
                 && self.tiny_infeasibility()
             {
                 // The recompute after a factorization of a pass that follows the tenth quad primal (`ctx+0x35c` above 10, `0x21a315..0x21a4b6`) takes the basic solution as
@@ -4679,8 +4689,32 @@ fn solve_pass<R: Real>(
             r.reduced_cost = r2.reduced_cost;
             r.basis = r2.basis;
         }
-        r.iterations += s.iters;
+        r.iterations += s.iters + crate::simplex::EARLIER_ITERS.with(|c| c.take());
         r.refactorizations += s.refactorizations;
+        if R::QUAD && crate::simplex::PRIMAL_STALL.with(|c| c.take()) {
+            // The x87 primal ended on its progress check (status -1004): the controller runs the quad dual again from the primal's basis, and the primal after it.
+            let l = r.refactorizations - s.refactorizations;
+            let carry2 = Carry {
+                retries: s.retries,
+                thr: s.lu_thr,
+                fac: r.refactorizations,
+                iters: r.iterations,
+                avg_touch: 0.0,
+                last_cap: 0,
+                inf_count: 0,
+                after_pivot: true,
+                it_base: s.it_base + r.iterations,
+                nref0: s.nref() + l.max(1),
+                pstep: if s.pstep > 0.0 {
+                    Some(maxsd(1e-7, s.pstep * 0.05))
+                } else {
+                    None
+                },
+            };
+            let mut r2 = solve_pass::<R>(model, Some(&r.basis), opts, &carry2)?;
+            r2.iterations += carry2.iters;
+            return Ok(r2);
+        }
         if r.status == Status::NumericalFailure {
             // The primal's phase 1 ratio test finds no row on a fresh factor: the reference ends the solve with status 12 (fx_midsing_1031), the controller does not
             // restart the dual.
