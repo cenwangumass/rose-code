@@ -1634,7 +1634,7 @@ impl<'a, R: Real> Dual<'a, R> {
         row: &[(usize, R)],
         leave: usize,
         above: bool,
-    ) -> (Vec<usize>, Vec<R>, R, f64) {
+    ) -> (Vec<usize>, Vec<R>, R, f64, bool) {
         let p = self.p;
         let sdir = if above { -1.0 } else { 1.0 };
         let mut list: Vec<(usize, R)> = Vec::new();
@@ -1677,17 +1677,22 @@ impl<'a, R: Real> Dual<'a, R> {
                 }
             }
         }
+        // The quad update (`0x25d220`, `0x25d510`) builds the vector as a sparse list (entries above 1e-13 in magnitude) only when
+        // `n m > 3 count nnz(A)` (`count` the list length, `n` = `ctx+0x68`, one above rose's structural count: 28 for the 27 columns of seed 2772); otherwise it
+        // is a dense vector (count -1) whose entries are all kept, however small (`0x25d7ac`; seed 2772 call 93: a row of 1.9e-14).
+        let dense_route = R::QUAD
+            && ((self.n + 1) * self.m) as f64 <= list.len() as f64 * 3.0 * self.nnz_a as f64;
         let mut rows = Vec::new();
         let mut vals = Vec::new();
         let order_len = order.len();
         for i in order {
-            if dense[i].abs() > R::c(1e-13) {
+            if dense[i].abs() > R::c(1e-13) || (dense_route && dense[i] != R::ZERO) {
                 rows.push(i);
                 vals.push(dense[i]);
             }
         }
         work += 2.0 * order_len as f64 + 2.0 * rows.len() as f64;
-        (rows, vals, w, work)
+        (rows, vals, w, work, dense_route)
     }
 
     /// Work of the row product (`0x134d90`, site `0x135e92`, same estimate as the primal path's `row_product_work`).
@@ -2701,7 +2706,7 @@ impl<'a, R: Real> Dual<'a, R> {
         let col_out = self.mirror.ftran(&rows_q, &vals_q);
         // Mode 3: the second vector is not rho but the combination of the columns of the row's entries that were basic when the weights restarted
         // (`0xc57d8`, `0x11f620`), and its squared norm is the weight of the pivot row.
-        let (rho_rows, rho_vals, w_row, vec_work) = if self.pmode == 3 {
+        let (rho_rows, rho_vals, w_row, vec_work, dense_route) = if self.pmode == 3 {
             self.framework_rhs(&row, leave, above)
         } else {
             (
@@ -2709,15 +2714,28 @@ impl<'a, R: Real> Dual<'a, R> {
                 rho.iter().map(|e| e.1).collect::<Vec<R>>(),
                 rho_norm(&rho),
                 rho.len() as f64,
+                false,
             )
         };
         let needed: Vec<usize> = col_out.iter().map(|e| e.0).collect();
         // Mode 3: the framework vector is a dense vector (count -1) once it has more than m/8 entries (SC50A calls 11, 14..; AFIRO call 12: 4 of m = 27;
         // 6 of 50 stay sparse); its L stage then runs dense.
-        let dense_in = self.pmode == 3 && rho_rows.len() * 8 > m;
+        let dense_in = self.pmode == 3 && (dense_route || rho_rows.len() * 8 > m);
         let tau_out = self
             .mirror
             .ftran_needed(&rho_rows, &rho_vals, &needed, dense_in);
+        if R::QUAD && crate::dump::on("qtau") {
+            let v: Vec<(usize, R)> = rho_rows
+                .iter()
+                .copied()
+                .zip(rho_vals.iter().copied())
+                .collect();
+            crate::dump::emit_tag(
+                "qtau",
+                "QTAU",
+                serde_json::json!({"r": r, "pmode": self.pmode, "dense_in": dense_in, "in": crate::dump::sparse_r(&v), "col": crate::dump::sparse_r(&col_out), "tau": crate::dump::sparse_r(&tau_out)}),
+            );
+        }
         {
             // The two-vector FTRAN books the L stages of both vectors and then the U stage of the column at the factor's scale
             // (`0x129671`, call `0x120200`); the wrapper `0x11f620` books `4 nnz(column) + nnz(rho)` (`0x120114`).

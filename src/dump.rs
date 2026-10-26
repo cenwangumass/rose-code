@@ -43,6 +43,7 @@ pub const KINDS: &[(&str, &str, &str)] = &[
     ("barrier_best", "BEST", "barrier best-iterate tracker, one record per call (flag 0 per iteration, 1 at the end): it, q88 (saved iterate), qa8, the running minima, Q+0x220 / 0x230 (norms of the updated iterate), the history arrays h48..h80 at it and at q88; `compare.py barrier_best`"),
     ("barrier_solve", "RSOLVE", "barrier solve of the normal equations (`0x305f10`), per call s (counted from 0, the starting point first): rx, ry, D and the results dx, dy as hex bit patterns, shaped like the SOLVE / SOLVEOUT records of `replay/gdb_barrier_solve.py` (rose orders the solves of an iteration differently, so match them by input)"),
     ("fillparts", "FILLP", "per factor update: pool fill on entry, eta size, new column entries added, and the row growths (row, cnt, cap, extra)"),
+    ("qtau", "QTAU", "quad dual, per two-vector FTRAN: r, pricing mode, dense_in, the second vector (in), the pivot column result (col) and tau at its positions (tau), as long-double values"),
 ];
 
 fn kinds() -> &'static [String] {

@@ -195,6 +195,28 @@ fn row_dot<R: Real>(s: R, t: &[(R, R)], peel: usize) -> R {
     r
 }
 
+/// The row dot of the extended-precision two-vector FTRAN output stage (`0x2642b0`, loop `0x2678c4`): for `n >= 8` terms, eight accumulators by term
+/// position mod 8 (the first starting with `s`, the others at zero, each subtracting its terms), added in order `((((((a0 + a1) + a2) + ...) + a7`; the
+/// remaining `n % 8` terms (all of them for `n < 8`) are then subtracted from the last to the first (the Duff cascade at `0x267b0d..0x267bbd`).
+fn row_dot_q<R: Real>(s: R, t: &[(R, R)]) -> R {
+    let n = t.len();
+    let nb = n / 8 * 8;
+    let prod = |i: usize| t[i].0 * t[i].1;
+    let mut r = s;
+    if nb > 0 {
+        let mut a = [R::ZERO; 8];
+        a[0] = s;
+        for i in 0..nb {
+            a[i & 7] -= prod(i);
+        }
+        r = a[0] + a[1] + a[2] + a[3] + a[4] + a[5] + a[6] + a[7];
+    }
+    for i in (nb..n).rev() {
+        r -= prod(i);
+    }
+    r
+}
+
 /// The extended-precision eta dot product (`0x25e0e0`): blocks of eight terms go to eight accumulators (position mod 8), which are added
 /// in order `((((((a0 + a1) + a2) + a3) + a4) + a5) + a6) + a7` (the decompiled order is misleading; see the stack code at `0x265587`); the remaining terms are then added one by one from the last to the first.
 fn dot_q8<R: Real>(x: &[R], c: &[R]) -> R {
@@ -1014,7 +1036,12 @@ impl<R: Real> RefStruct<R> {
                                 self.uc[c].iter().find(|e| e.0 == p).map(|e| (e.1, x[c]))
                             })
                             .collect();
-                        row_dot(x[p], &terms, self.row_par[p] as usize) / self.diag[p]
+                        let dot = if R::QUAD {
+                            row_dot_q(x[p], &terms)
+                        } else {
+                            row_dot(x[p], &terms, self.row_par[p] as usize)
+                        };
+                        dot / self.diag[p]
                     }
                 };
                 (p, v)
