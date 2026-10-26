@@ -216,9 +216,16 @@ pub(crate) struct Handoff {
     pub pair_tol: f64,
     /// The dual ran in extended precision (the quad pass): the reference's primal keeps using the x87 factor, FTRAN and BTRAN kernels (`ctx+0x28` stays 1).
     pub quad: bool,
+    /// `ctx+0x2a0` and `ctx+0x2b0` (iterations so far and the last snapshot) and the stability counter `ctx+0x178` at the handoff.
+    pub iters: f64,
+    pub snap: f64,
+    pub c178: u32,
 }
 
 thread_local! {
+    /// Quad primals run so far in this solve, and whether the running quad primal's phase 1 uses the Harris test `0x241da0` (`ctx+0x468` cleared by the decision `0x27ecad..0x27ecc9`; every quad pass setup `0x23abb1` sets it again: `0x243150`).
+    pub(crate) static QUAD_PRIMALS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+    pub(crate) static QUAD_EEFA: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     pub(crate) static HANDOFF: std::cell::Cell<Option<Handoff>> = const { std::cell::Cell::new(None) };
     /// The primal's factorization found the basis singular (status -1002, `0xf5921`): iterations and refactorizations of the primal, and its pivot threshold.
     /// The primal repaired its basis in place after a singular factorization (the controller then restores the dropped variable and runs the primal again).
@@ -3647,6 +3654,17 @@ pub fn solve(
         return crate::dual::solve(model, start, opts);
     }
     let handoff = HANDOFF.with(|c| c.take());
+    if let Some(h) = handoff.filter(|h| h.quad) {
+        // The decision of the primal's start factorization (`0x27ebb0..0x27ecc9`): a method other than 1, iterations `ctx+0x2a0` neither 0 nor the snapshot
+        // `ctx+0x2b0`, and the stability counter `ctx+0x178` positive switch to method 1 and clear `ctx+0x468`. `ctx+0x3ec` at the start of the first two quad primals
+        // is 0 and 2, from the third on 1 (origin of the 2 not modelled).
+        let k = QUAD_PRIMALS.with(|c| {
+            c.set(c.get() + 1);
+            c.get()
+        });
+        let switch = k <= 2 && h.iters != 0.0 && h.iters != h.snap && h.c178 > 0;
+        QUAD_EEFA.with(|c| c.set(switch));
+    }
     if handoff.is_some() || !opts.faithful_positions {
         return solve_primal(model, start, opts, handoff, None);
     }
@@ -4379,7 +4397,8 @@ fn solve_primal(
                 );
             }
             let mut passes = Vec::new();
-            let eefa = s.sw.mode != 0 && !s.sw.keep468;
+            let eefa = (s.sw.mode != 0 && !s.sw.keep468)
+                || (s.handoff.is_some_and(|h| h.quad) && QUAD_EEFA.with(|c| c.get()));
             let mut passes2: Vec<(usize, usize)> = Vec::new();
             let pick = if eefa {
                 phase1_eefa0(tol, opts.pivot_tol, own, &entries, &info, &mut passes2)

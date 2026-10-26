@@ -64,7 +64,6 @@ pub(crate) fn set_dual_tol(v: f64) {
 const PIVOT_FLOOR: f64 = 3e-8;
 const DROP_TOL: f64 = 1e-13;
 const ALPHA_TOL: f64 = 1e-10;
-const REL_PIVOT_TOL: f64 = 3e-6;
 const W_EPS: f64 = 1e-8;
 
 /// The reference's integer generator (`0x88a870`): a 64-bit congruential step, the high word tempered, 31 bits.
@@ -2766,10 +2765,10 @@ impl<'a, R: Real> Dual<'a, R> {
         let alpha_row_true = aq_row * R::c(sq * sdir);
         self.pair.0 = alpha.to_f64();
         let rel = (alpha_row_true - alpha).abs() / (alpha.abs() + R::ONE);
-        // Mismatch (`0xc5a0b..0xc5a19`): the two values differ in sign (`(min - 1e-13)(max + 1e-13) <= 0`) or by more than the relative tolerance.
+        // Mismatch (`0xc5a0b..0xc5a19`, quad `0x21da1f..0x21da2d`): the two values differ in sign (`(min - 1e-13)(max + 1e-13) <= 0`) or by more than `ctx+0x3a0` (3e-6, 1e-7 from the first restore of a dropped variable on: it persists into later dual passes, seed 2948).
         let (amin, amax) = (alpha_row_true.min(alpha), alpha_row_true.max(alpha));
         let mismatch = (amin - R::c(DROP_TOL)) * (amax + R::c(DROP_TOL)) <= R::ZERO
-            || rel > R::c(REL_PIVOT_TOL);
+            || rel > R::c(PAIR_TOL.with(|c| c.get()));
         if let Some(s) = rec.as_mut() {
             s["alpha_col"] = serde_json::json!(alpha.to_f64());
             s["tau_r"] = serde_json::json!(tau_dense[r].to_f64());
@@ -3870,6 +3869,7 @@ fn solve_frame(
     PAIR_TOL.with(|c| c.set(3e-6));
     PASS_NO.with(|c| c.set(0));
     C178.with(|c| c.set(0));
+    crate::simplex::QUAD_PRIMALS.with(|c| c.set(0));
     // The quad mode (`ctx+0x28`): once the controller switched, every later pass runs the extended-precision twin of the dual.
     let mut quad = false;
     let mut switch_start: Option<Basis> = None;
@@ -4528,6 +4528,9 @@ fn solve_pass<R: Real>(
                 pert: s.pert >= 2 && !s.rejected_end,
                 pair_tol: PAIR_TOL.with(|c| c.get()),
                 quad: R::QUAD,
+                iters: (s.it_base + s.iters) as f64,
+                snap: (s.it_base + s.stall_it as usize) as f64,
+                c178: C178.with(|c| c.get()),
             }))
         });
         set_dual_tol(LOOP_TOL.with(|c| c.get()));
@@ -4572,6 +4575,9 @@ fn solve_pass<R: Real>(
                     pert: false,
                     pair_tol: PAIR_TOL.with(|c| c.get()),
                     quad: R::QUAD,
+                    iters: (s.it_base + s.iters) as f64,
+                    snap: (s.it_base + s.stall_it as usize) as f64,
+                    c178: C178.with(|c| c.get()),
                 }))
             });
             let b2 = r.basis.clone();
