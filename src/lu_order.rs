@@ -474,6 +474,15 @@ pub fn raise_threshold(t: f64) {
     });
 }
 
+/// The doubleton gate state, saved and restored around a second structure build of the same factorization (the quad twin of the primal's mirror).
+pub fn gate_get() -> (i64, i64) {
+    PAIR_GATE.with(|c| c.get())
+}
+
+pub fn gate_set(g: (i64, i64)) {
+    PAIR_GATE.with(|c| c.set(g));
+}
+
 /// The pivot threshold `ctx+0x390` in force.
 pub fn threshold() -> f64 {
     THR.with(|c| c.get())
@@ -729,7 +738,7 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
         let mut search_cost = 0.0;
         let best = match sing {
             Some(id) => id,
-            None => match search(&mut s) {
+            None => match search(&mut s, remaining) {
                 Some((id, c)) => {
                     search_cost = c;
                     id
@@ -901,7 +910,7 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
 
 /// Markowitz search over the count buckets; returns the node of the chosen pivot (rotating bucket heads as the reference does)
 /// and the search's work factor: the candidates examined times the cost bound of the last bucket.
-fn search<R: Real>(s: &mut Nucleus<R>) -> Option<(usize, f64)> {
+fn search<R: Real>(s: &mut Nucleus<R>, remaining: usize) -> Option<(usize, f64)> {
     let thr = THR.with(|c| c.get());
     let first = |b: &Vec<Vec<usize>>| b.iter().position(|v| !v.is_empty());
     let cmin = first(&s.cb);
@@ -912,8 +921,11 @@ fn search<R: Real>(s: &mut Nucleus<R>) -> Option<(usize, f64)> {
     let big = usize::MAX / 4;
     let (u74, u69) = (cmin.unwrap_or(big), rmin.unwrap_or(big));
     let mut k = u74.min(u69);
-    // The quad LU stops after three examined lists (seed 2448 quad call 22; two breaks seed 2324); the double LU after four.
-    let limit = ((k as f64 * 0.5) as usize).max(if R::QUAD { 3 } else { 4 });
+    // The quad LU's loop bound (`0x229a3c..0x229a6d`): max(4, k / 2) examined lists, at most the number of columns left (seeds 2448, 2324: three left).
+    let limit =
+        ((k as f64 * 0.5) as usize)
+            .max(4)
+            .min(if R::QUAD { remaining } else { usize::MAX });
     let maxk =
         s.cb.iter()
             .rposition(|v| !v.is_empty())

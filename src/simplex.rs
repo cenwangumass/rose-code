@@ -214,6 +214,8 @@ pub(crate) struct Handoff {
     pub pert: bool,
     /// The relative tolerance of the pivot-pair check (`ctx+0x3a0`): the parameter default 3e-6, 1e-7 once the controller has restored a dropped variable.
     pub pair_tol: f64,
+    /// The dual ran in extended precision (the quad pass): the reference's primal keeps using the x87 factor, FTRAN and BTRAN kernels (`ctx+0x28` stays 1).
+    pub quad: bool,
 }
 
 thread_local! {
@@ -698,6 +700,8 @@ struct Solver<'a> {
     rhs_shift: Vec<f64>,
     /// Mirror of the reference's FTRAN structure (`faithful_ftran`).
     mirror: Option<crate::ftran_order::RefStruct>,
+    /// The same factor in extended precision, kept after a quad pass (`Handoff::quad`): the basic solution is read from it.
+    mirror_q: Option<crate::ftran_order::RefStruct<crate::f80::F80>>,
     /// The reference's work counter (`crate::work`).
     work: crate::work::Work,
     /// The last pivot, whose primal update the reference runs at the start of the next iteration (`0x105f20`).
@@ -939,6 +943,21 @@ impl<'a> Solver<'a> {
         (order, st, cols)
     }
 
+    /// The factor of the current basis in extended precision (same column order as the double one), built with the gate state of the double build.
+    fn quad_mirror(
+        &self,
+        gate0: (i64, i64),
+        fac_no: usize,
+        rows: &[(bool, Vec<usize>, Vec<f64>)],
+    ) -> crate::ftran_order::RefStruct<crate::f80::F80> {
+        let g1 = crate::lu_order::gate_get();
+        crate::lu_order::gate_set(gate0);
+        crate::lu_order::set_factorization_number(fac_no);
+        let stq = crate::lu_order::factor_structure_r::<crate::f80::F80>(self.p.m, rows);
+        crate::lu_order::gate_set(g1);
+        crate::ftran_order::RefStruct::fresh(self.p.m, self.p.n, &stq, rows)
+    }
+
     /// The in-place repair of a singular basis (see `refactor`): `st` is the failed factorization's structure.
     fn repair_in_place(&mut self, st: &crate::lu_order::Structure) {
         let (n, m) = (self.p.n, self.p.m);
@@ -991,6 +1010,7 @@ impl<'a> Solver<'a> {
             } else {
                 self.refactorizations + 1
             };
+            let mut gate0 = crate::lu_order::gate_get();
             let (mut order, mut st, mut rows) = self.reference_order(fac_no);
             if order.len() < self.basic.len()
                 && self.handoff.map_or(self.restarts, |h| h.retries) >= 5
@@ -999,6 +1019,7 @@ impl<'a> Solver<'a> {
                 // After five restarts the driver refuses another one and repairs in place (`0xf5978..0xf5b9a`, as in the dual): the columns without a pivot leave the basis
                 // for the slacks of the rows left without one, and the last one dropped stays out of the pricing until the scan finds nothing else.
                 self.repair_in_place(&st);
+                gate0 = crate::lu_order::gate_get();
                 (order, st, rows) = self.reference_order(fac_no);
             }
             if crate::dump::on("luin") {
@@ -1049,6 +1070,9 @@ impl<'a> Solver<'a> {
                     }
                 }
                 let mi = crate::ftran_order::RefStruct::fresh(self.p.m, self.p.n, &st, &rows);
+                if self.handoff.is_some_and(|h| h.quad) {
+                    self.mirror_q = Some(self.quad_mirror(gate0, fac_no, &rows));
+                }
                 if crate::dump::on("luout") {
                     let (diag, l) = mi.numerics();
                     crate::dump::emit(
@@ -1540,6 +1564,42 @@ impl<'a> Solver<'a> {
             let est = mi.ftran_dense_work(&r0);
             self.work
                 .add_from(0x1219d6, 0x120673, est, crate::work::FAC);
+        }
+        if self.mirror_q.is_some() && self.mirror.as_ref().is_some_and(|mi| mi.updates() == 0) {
+            // After a quad pass the reference's primal solves with the x87 kernels (`ctx+0x28` stays 1): the right-hand side and x_B are long doubles, x is read as a double.
+            use crate::f80::F80;
+            use crate::real::Real;
+            let mut r: Vec<F80> = p.rhs.iter().map(|&v| F80::c(v)).collect();
+            for (ri, sh) in r.iter_mut().zip(&self.rhs_shift) {
+                *ri += F80::c(*sh);
+            }
+            for j in 0..p.n + p.m {
+                if self.pos_of[j] == NONE {
+                    let v = self.nonbasic_value(j);
+                    if v != 0.0 {
+                        for &(i, a) in &p.cols[j] {
+                            r[i] -= F80::c(a) * F80::c(v);
+                        }
+                    }
+                }
+            }
+            let mut r0 = r.clone();
+            if self.cleanup {
+                for (ri, sh) in r0.iter_mut().zip(&self.rhs_shift) {
+                    *ri -= F80::c(*sh);
+                }
+            }
+            let rows: Vec<usize> = (0..p.m).filter(|&i| r0[i] != F80::ZERO).collect();
+            let vals: Vec<F80> = rows.iter().map(|&i| r0[i]).collect();
+            let out = self.mirror_q.as_mut().unwrap().ftran_basic(&rows, &vals);
+            let mut xb = vec![F80::ZERO; p.m];
+            for (i, v) in out {
+                xb[i] = v;
+            }
+            for (pos, &j) in self.basic.iter().enumerate() {
+                self.x[j] = xb[pos].to_f64();
+            }
+            return;
         }
         if let Some(mi) = self.mirror.as_mut() {
             // The reference's FTRAN of the basic solution, value for value. The mirror's numeric factor is exact only where the
@@ -3674,6 +3734,7 @@ fn solve_primal(
         dst: vec![0.0; p.n + p.m],
         rhs_shift: Vec::new(),
         mirror: None,
+        mirror_q: None,
         work: crate::work::Work::default(),
         last_pivot: None,
         p1_tol_on: false,
@@ -3726,12 +3787,16 @@ fn solve_primal(
             crate::lu_order::set_threshold(r.thr);
         }
         crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
+        let gate0 = crate::lu_order::gate_get();
         let (order, st, rows) = s.reference_order(1);
         for (pos, &j) in order.iter().enumerate() {
             s.pos_of[j] = pos;
         }
         s.basic = order;
         s.mirror = Some(crate::ftran_order::RefStruct::fresh(m, n, &st, &rows));
+        if handoff.is_some_and(|h| h.quad) {
+            s.mirror_q = Some(s.quad_mirror(gate0, 1, &rows));
+        }
         let mi = s.mirror.as_ref().unwrap();
         lu_work = st.work(&rows, mi.has_levels());
         lu_work.extend(mi.fresh_work());

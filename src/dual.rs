@@ -4469,6 +4469,7 @@ fn solve_pass<R: Real>(
                 retries: s.retries as usize,
                 pert: s.pert >= 2 && !s.rejected_end,
                 pair_tol: PAIR_TOL.with(|c| c.get()),
+                quad: R::QUAD,
             }))
         });
         set_dual_tol(LOOP_TOL.with(|c| c.get()));
@@ -4512,6 +4513,7 @@ fn solve_pass<R: Real>(
                     retries: s.retries as usize + 1,
                     pert: false,
                     pair_tol: PAIR_TOL.with(|c| c.get()),
+                    quad: R::QUAD,
                 }))
             });
             let b2 = r.basis.clone();
