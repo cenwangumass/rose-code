@@ -3602,7 +3602,12 @@ impl<'a, R: Real> Dual<'a, R> {
             for (j, &(i, cv)) in pv.col.iter().enumerate() {
                 let a = cv / a2;
                 let t = pv.tau[j];
-                let x = ((w * a) * a - (R::c(2.0) * a) * t) + self.w[i];
+                // Quad kernel `0x2165c0..0x21668d`: a * ((w a) - 2 tau) + W (the double one is (w a) a - (2 a) tau + W).
+                let x = if R::QUAD {
+                    (a * ((w * a) - t * R::c(2.0))) + self.w[i]
+                } else {
+                    ((w * a) * a - (R::c(2.0) * a) * t) + self.w[i]
+                };
                 self.w[i] = maxr(R::c(W_EPS), x);
             }
         }
@@ -3672,6 +3677,13 @@ fn rho_norm_dense<R: Real>(rho: &[(usize, R)], m: usize) -> R {
 }
 
 fn rho_norm<R: Real>(rho: &[(usize, R)]) -> R {
+    if R::QUAD {
+        // The quad kernel (`0x25d3ff..0x25d49a`) squares in extended precision and keeps the running sum in a double: each step is
+        // rounded to extended by the add and then to double by the store.
+        return rho
+            .iter()
+            .fold(R::ZERO, |a, e| R::c((a + e.1 * e.1).to_f64()));
+    }
     let sq: Vec<R> = rho.iter().map(|e| e.1 * e.1).collect();
     sum_squares(&sq)
 }
@@ -4458,17 +4470,6 @@ fn solve_pass<R: Real>(
         popts.method = crate::simplex::Method::Primal;
         // The dual's teacher-forced factorization schedule does not apply to the primal, which decides its own (work based).
         popts.refactor_schedule = None;
-        if opts.perturb != 0.0 {
-            popts.sw_carry = Some(crate::simplex::SwCarry {
-                iters: s.iters as f64,
-                degenerate: s.stall as i32,
-                snap_degenerate: s.stall_snap as i32,
-                snap_iters: s.stall_it,
-                factorizations: s.refactorizations as u32,
-                level: 0,
-                pert: s.pstep * 0.05,
-            });
-        }
         let b = Basis {
             basic: s.head.clone(),
             at_upper: s.st.iter().map(|&t| t == UB).collect(),
