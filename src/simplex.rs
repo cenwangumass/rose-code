@@ -746,6 +746,16 @@ struct Solver<'a> {
     forced: bool,
     /// The basis was repaired in place after a singular factorization.
     repaired: bool,
+    /// Restarts of a primal not started by the dual controller after singular factorizations (`ctx+0x184`, see `PlainRestart`).
+    restarts: usize,
+}
+
+/// A primal run by itself whose factorization found the basis singular (status -1002 at `0xf5921`): the controller (`0x154e5d`) restarts it
+/// from the start basis, with the pivot threshold raised (`0xf595d`: 0.5 at the first event, 0.9 after), five times; the sixth event repairs in place.
+#[derive(Clone, Copy, Debug)]
+struct PlainRestart {
+    count: usize,
+    thr: f64,
 }
 
 /// State of the release profile's initial pricing (`0xfbe60`, list build `0xfecb0`, dual update `0xfb790`).
@@ -983,7 +993,7 @@ impl<'a> Solver<'a> {
             };
             let (mut order, mut st, mut rows) = self.reference_order(fac_no);
             if order.len() < self.basic.len()
-                && self.handoff.is_some_and(|h| h.retries >= 5)
+                && self.handoff.map_or(self.restarts, |h| h.retries) >= 5
                 && !self.repaired
             {
                 // After five restarts the driver refuses another one and repairs in place (`0xf5978..0xf5b9a`, as in the dual): the columns without a pivot leave the basis
@@ -997,9 +1007,9 @@ impl<'a> Solver<'a> {
                     serde_json::json!({"n": self.refactorizations, "cols": self.basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "phase": st.phase}),
                 );
             }
-            if order.len() < self.basic.len() && self.handoff.is_some() {
-                // A column without a pivot (`0xd4190` returns `p13` > 0): the driver restarts the dual (status -1002, `0xf5921`); the controller reads the
-                // state from here.
+            if order.len() < self.basic.len() {
+                // A column without a pivot (`0xd4190` returns `p13` > 0): the driver restarts the dual, or the primal run by itself (status -1002, `0xf5921`);
+                // the controller reads the state from here.
                 PRIMAL_SINGULAR.with(|c| {
                     c.set(Some((
                         self.iters_done,
@@ -2645,11 +2655,22 @@ impl<'a> Solver<'a> {
         }
         // The LU driver (`0xf32a4..0xf32ec`) raises `ctx+0x390` to 0.5 for a factorization requested as 5, 6 or 7: both factorizations here
         // in the controlled profile (`inf_klein1`: lu_in calls 12 and 13 have threshold 0.5, the earlier ones 2^-7); the release profile keeps 2^-7.
-        crate::lu_order::set_threshold(if self.opts.pricing0 { 0.0078125 } else { 0.5 });
+        // A threshold raised by a restart stays (fx_midsing_m5 controlled: the last two factorizations at 0.9).
+        crate::lu_order::set_threshold(if self.opts.pricing0 {
+            0.0078125
+        } else {
+            crate::lu_order::threshold().max(0.5)
+        });
         if self.factor.num_updates() > 0 {
             self.cleanup = self.mirror.is_some() && !self.rhs_shift.is_empty();
             self.work.trig();
+            let was = self.repaired;
             self.refactor()?;
+            if self.repaired && !was {
+                // The factorization repaired the basis in place: the iterations go on from it, with no second factorization.
+                self.cleanup = false;
+                return Ok(());
+            }
             // Release with the scaling mirror: the clean-up factorization (columns sorted) is the one the BTRAN reads (`inf_klein1` release:
             // 13 lu_in calls, the last sorted; the other release models have no `rhs_shift`).
             if std::mem::take(&mut self.cleanup) && self.opts.pricing0 {
@@ -3523,6 +3544,58 @@ pub fn solve(
         return crate::dual::solve(model, start, opts);
     }
     let handoff = HANDOFF.with(|c| c.take());
+    if handoff.is_some() || !opts.faithful_positions {
+        return solve_primal(model, start, opts, handoff, None);
+    }
+    // fx_midsing_m5 controlled: six singular Farkas factorizations (each run replays iteration 0), the repair, then the run after the restored variable.
+    let (mut iters, mut facs) = (0, 0);
+    let mut rs: Option<PlainRestart> = None;
+    loop {
+        PRIMAL_SINGULAR.with(|c| c.set(None));
+        PRIMAL_REPAIRED.with(|c| c.set(false));
+        match solve_primal(model, start, opts, None, rs) {
+            Err(SolveError::SingularBasis) => {
+                let Some((pit, pfac, pthr)) = PRIMAL_SINGULAR.with(|c| c.take()) else {
+                    return Err(SolveError::SingularBasis);
+                };
+                iters += pit;
+                facs += pfac;
+                let count = rs.map_or(0, |r| r.count);
+                rs = Some(PlainRestart {
+                    count: count + 1,
+                    thr: pthr.max(if count == 0 { 0.5 } else { 0.9 }),
+                });
+            }
+            Ok(mut r) => {
+                if PRIMAL_REPAIRED.with(|c| c.take()) && r.status == Status::Infeasible {
+                    // The scan finds nothing with the dropped variable out (`0x155139`): the controller restores it (status -4 + 3) and the primal runs
+                    // again from its basis, factored in ascending order (request 1).
+                    let rs2 = rs.map(|r| PlainRestart {
+                        count: r.count + 1,
+                        ..r
+                    });
+                    let r2 = solve_primal(model, Some(&r.basis), opts, None, rs2)?;
+                    let (it, fa) = (r.iterations, r.refactorizations);
+                    r = r2;
+                    r.iterations += it;
+                    r.refactorizations += fa;
+                }
+                r.iterations += iters;
+                r.refactorizations += facs;
+                return Ok(r);
+            }
+            Err(e) => return Err(e),
+        }
+    }
+}
+
+fn solve_primal(
+    model: &LpModel,
+    start: Option<&Basis>,
+    opts: &SolveOptions,
+    handoff: Option<Handoff>,
+    rs: Option<PlainRestart>,
+) -> Result<SolveResult, SolveError> {
     let p = build(model);
     let (n, m) = (p.n, p.m);
     let mut excluded = None;
@@ -3540,7 +3613,14 @@ pub fn solve(
             b
         }
         // Cold start: the reference's crash basis (`crash_basis`).
-        None => crash_basis(model),
+        None => {
+            let mut b = crash_basis(model);
+            // A restart factors the start basis in ascending order, except every third one, which is a fresh start in the crash order (fx_midsing_m5: lu_in k = 6).
+            if rs.is_some_and(|r| r.count % 3 != 0) {
+                b.basic.sort_unstable();
+            }
+            b
+        }
     };
     basis.validate(n, m).map_err(SolveError::InvalidBasis)?;
     let mut pos_of = vec![NONE; n + m];
@@ -3620,6 +3700,7 @@ pub fn solve(
         iters_done: 0,
         forced: false,
         repaired: false,
+        restarts: rs.map_or(0, |r| r.count),
     };
     s.rows = vec![Vec::new(); m];
     s.rrows = vec![Vec::new(); m];
@@ -3639,6 +3720,8 @@ pub fn solve(
         crate::lu_order::reset_pair_gate();
         if let Some(h) = &handoff {
             crate::lu_order::set_threshold(h.thr);
+        } else if let Some(r) = rs {
+            crate::lu_order::set_threshold(r.thr);
         }
         crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
         let (order, st, rows) = s.reference_order(1);
@@ -3941,7 +4024,16 @@ pub fn solve(
                     match s.price_admitting() {
                         Some(q) => q,
                         None => {
+                            let was = s.repaired;
                             s.refactor_for_farkas()?;
+                            if s.repaired && !was {
+                                // The Farkas factorization repaired the basis in place (sixth singular event): the iterations go on from the repaired basis
+                                // with the cost out of the penalties (fx_midsing_m5 controlled: x11 enters).
+                                s.costfree = true;
+                                s.y_ref = None;
+                                s.composite_dual(false);
+                                continue;
+                            }
                             farkas = Some(s.farkas_dual());
                             break Status::Infeasible;
                         }
