@@ -156,7 +156,7 @@ struct Dual<'a, R: Real = f64> {
     /// Reduced costs in the reference's frame.
     d: Vec<R>,
     /// Dual steepest-edge weights by position.
-    w: Vec<f64>,
+    w: Vec<R>,
     mirror: RefStruct<R>,
     factor: Factor,
     /// Row-wise copy of the nonbasic, non-fixed structurals in the reference's storage order.
@@ -731,6 +731,8 @@ impl<'a, R: Real> Dual<'a, R> {
             self.nref_skip += 1;
             // The failure counts as one more retry (`ctx+0x184` 5 -> 6 at `0xf5921`, fx_midsing_1390): later pivot mismatches on a fresh factor end the run.
             self.retries += 1;
+            // The in-place repair also counts for the stability counter (`ctx+0x178`; quad seeds 2081, 2448).
+            C178.with(|c| c.set(c.get() + 1));
             (order, st, rows, mi) = self.lu_attempt();
         }
         if order.len() < self.m {
@@ -771,7 +773,7 @@ impl<'a, R: Real> Dual<'a, R> {
             }
         }
         let mi = mi.unwrap();
-        let mut wv = vec![0.0; self.n + self.m];
+        let mut wv = vec![R::ZERO; self.n + self.m];
         for (pos, &v) in self.head.iter().enumerate() {
             wv[v] = self.w[pos];
         }
@@ -1148,7 +1150,7 @@ impl<'a, R: Real> Dual<'a, R> {
     /// Priority of row `r` with primal infeasibility `f` (`0xc0861`, `0xc23fe`, `0xcdc9`): `f^2 / W[r]`, scaled by the pricing type
     /// (the factor 1 of the reference's variable-class multiplier holds for continuous variables).
     fn pri(&self, r: usize, f: f64) -> f64 {
-        let base = f * f / self.w[r];
+        let base = f * f / self.w[r].to_f64();
         match self.ptype {
             1 => base * (self.p70[self.head[r]] / self.p68[r]),
             2 => base / self.p68[r],
@@ -2765,6 +2767,10 @@ impl<'a, R: Real> Dual<'a, R> {
                 return Step::Reject;
             }
         }
+        if let Some(o) = rec.as_mut().and_then(|s| s.as_object_mut()) {
+            // A mismatch the ladder accepted (agreeing signs past the sixth retry) is an iteration: no mismatch mark in the record.
+            o.remove("mismatch");
+        }
         // Column without the pivot entry: the last entry moves into the pivot's slot.
         // A dense FTRAN result (count -1) is compacted by an ascending scan that skips the pivot and the entries up to the drop tolerance (`0x12013c`).
         let mut col: Vec<(usize, R)> = col_out.clone();
@@ -2924,7 +2930,7 @@ impl<'a, R: Real> Dual<'a, R> {
 impl<'a, R: Real> Dual<'a, R> {
     fn snapshot(&self, k: usize) -> serde_json::Value {
         serde_json::json!({
-            "k": k, "lvl": self.level, "req": self.request, "it": self.iters as f64, "head": self.head, "xB": self.xb.iter().map(|v| v.json()).collect::<Vec<_>>(), "d": self.d.iter().map(|v| v.json()).collect::<Vec<_>>(), "W": self.w,
+            "k": k, "lvl": self.level, "req": self.request, "it": self.iters as f64, "head": self.head, "xB": self.xb.iter().map(|v| v.json()).collect::<Vec<_>>(), "d": self.d.iter().map(|v| v.json()).collect::<Vec<_>>(), "W": self.w.iter().map(|v| v.json()).collect::<Vec<_>>(),
             "st": self.st, "flags": self.flags, "prio": self.prio, "diag": self.mirror.numerics().0.iter().map(|v| v.json()).collect::<Vec<_>>(),
             "list": if self.value_mode { self.list.clone() } else { self.list[..self.walk_len.min(self.list.len())].to_vec() },
             "thr": self.thr, "p40": self.value_mode as u8, "cur": self.cursor,
@@ -3193,7 +3199,7 @@ impl<'a, R: Real> Dual<'a, R> {
             self.pmode = 3;
             self.dflag = self.st.iter().map(|&t| t < 0).collect();
             for w in self.w.iter_mut() {
-                *w = 1.0;
+                *w = R::ONE;
             }
         }
     }
@@ -3272,6 +3278,9 @@ impl<'a, R: Real> Dual<'a, R> {
             return;
         }
         for v in self.cost.iter_mut() {
+            *v *= f;
+        }
+        for v in self.cost_lo.iter_mut() {
             *v *= f;
         }
         for v in self.pcost.iter_mut() {
@@ -3464,6 +3473,12 @@ impl<'a, R: Real> Dual<'a, R> {
     /// x_B and DSE weight update (`0xc0050`, fast path), bit for bit as in the spec.
     fn update_weights(&mut self, pv: &Pivot<R>) {
         let (r, alpha, w) = (pv.r, pv.alpha, pv.w);
+        // The quad weight update works on the double-rounded rho norm and pivot (verified against the reference W bits, `0x225820` callers).
+        let (alpha, w) = if R::QUAD {
+            (R::c(alpha.to_f64()), R::c(w.to_f64()))
+        } else {
+            (alpha, w)
+        };
         if crate::dump::on("dtau") {
             crate::dump::emit(
                 "dtau",
@@ -3471,19 +3486,19 @@ impl<'a, R: Real> Dual<'a, R> {
             );
         }
         if w == R::ZERO {
-            self.w[r] = W_EPS;
+            self.w[r] = R::c(W_EPS);
         } else {
             let a2 = if alpha >= R::ZERO {
                 maxr(alpha, R::c(W_EPS))
             } else {
                 minr(alpha, R::c(-W_EPS))
             };
-            self.w[r] = ((w / a2) / a2).to_f64();
+            self.w[r] = (w / a2) / a2;
             for (j, &(i, cv)) in pv.col.iter().enumerate() {
                 let a = cv / a2;
                 let t = pv.tau[j];
-                let x = ((w * a) * a - (R::c(2.0) * a) * t) + R::c(self.w[i]);
-                self.w[i] = maxr(R::c(W_EPS), x).to_f64();
+                let x = ((w * a) * a - (R::c(2.0) * a) * t) + self.w[i];
+                self.w[i] = maxr(R::c(W_EPS), x);
             }
         }
     }
@@ -3921,7 +3936,7 @@ fn solve_pass<R: Real>(
         st,
         xb: vec![R::ZERO; m],
         d: vec![R::ZERO; n + m],
-        w: vec![1.0; m],
+        w: vec![R::ONE; m],
         mirror,
         factor,
         rrows: vec![Vec::new(); m],
@@ -4108,8 +4123,7 @@ fn solve_pass<R: Real>(
             rho_norm_dense(&out, m)
         } else {
             rho_norm(&out)
-        }
-        .to_f64();
+        };
     }
     s.stall_check(0);
     // The setup's post-refactor pass (`0xe6dcc`) sees the iterations of the free-column pivots.
@@ -4295,7 +4309,7 @@ fn solve_pass<R: Real>(
                 s.pert = 0;
                 // The clean-up factorization is handed the basic columns in ascending variable order (PILOT.JA `lu_in`: the last record is sorted, the dual's own are in
                 // basis order); the final x_B comes from that factor.
-                let mut wv = vec![0.0; s.n + s.m];
+                let mut wv = vec![R::ZERO; s.n + s.m];
                 for (pos, &v) in s.head.iter().enumerate() {
                     wv[v] = s.w[pos];
                 }

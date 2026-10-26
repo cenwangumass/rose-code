@@ -912,7 +912,8 @@ fn search<R: Real>(s: &mut Nucleus<R>) -> Option<(usize, f64)> {
     let big = usize::MAX / 4;
     let (u74, u69) = (cmin.unwrap_or(big), rmin.unwrap_or(big));
     let mut k = u74.min(u69);
-    let limit = ((k as f64 * 0.5) as usize).max(4);
+    // The quad LU stops after three examined lists (seed 2448 quad call 22; two breaks seed 2324); the double LU after four.
+    let limit = ((k as f64 * 0.5) as usize).max(if R::QUAD { 3 } else { 4 });
     let maxk =
         s.cb.iter()
             .rposition(|v| !v.is_empty())
