@@ -2575,7 +2575,7 @@ impl<'a, R: Real> Dual<'a, R> {
             if rt.q.is_none() && self.retry_end == 0 {
                 // The retried row has no usable entering variable: the end of the rejected rows (status -1004 on the fresh factor).
                 if let Some(mut s) = snap {
-                    s["r"] = serde_json::json!(r);
+                    s["r"] = serde_json::json!(-1);
                     s["q"] = serde_json::json!(-1);
                     *dump = Some(s);
                 }
