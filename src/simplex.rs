@@ -3629,7 +3629,9 @@ fn solve_primal(
     }
     let in_r0: Vec<bool> = (0..n + m).map(|j| pos_of[j] == NONE).collect();
     let cols: Vec<Column> = basis.basic.iter().map(|&j| p.cols[j].clone()).collect();
-    let factor = Factor::new(m, &cols).map_err(|_| SolveError::SingularBasis)?;
+    // A handoff from the dual factors with the primal's numeric floor 1e-13 (`ctx+0x3a8`), as the start factorization below does.
+    let factor = Factor::with_floor(m, &cols, if handoff.is_some() { 1e-13 } else { 1e-11 })
+        .map_err(|_| SolveError::SingularBasis)?;
     let mut s = Solver {
         p: &p,
         opts,
@@ -3735,7 +3737,8 @@ fn solve_primal(
         lu_work.extend(mi.fresh_work());
 
         let cols: Vec<&Column> = s.basic.iter().map(|&j| &s.p.cols[j]).collect();
-        s.factor = Factor::new(m, &cols).map_err(|_| SolveError::SingularBasis)?;
+        s.factor = Factor::with_floor(m, &cols, if handoff.is_some() { 1e-13 } else { 1e-11 })
+            .map_err(|_| SolveError::SingularBasis)?;
     }
     s.work.trig();
     s.work.decided(s.work.w);

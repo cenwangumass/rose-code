@@ -3398,7 +3398,8 @@ impl<'a, R: Real> Dual<'a, R> {
         let sc = self.pstep / 500.0;
         // The perturbation has its own generator, seeded with the iteration count (`0x115220`, state = it + the `Seed` parameter); the generator of the
         // cost shifts is not touched.
-        let mut g = self.iters as u64;
+        // The seed is the pass's iteration counter including the iterations before the quad switch (`ctx+0x2a8`), as the stall and the ratio test variant count.
+        let mut g = (self.iters + if R::QUAD { self.it_base } else { 0 }) as u64;
         let mut acc = R::ZERO;
         for j in 0..self.n + self.m {
             if self.st[j] >= 0 {
@@ -4122,7 +4123,12 @@ fn solve_pass<R: Real>(
         },
         pivot_cols: None,
         nnz_a: p.cols[..n].iter().map(Vec::len).sum(),
-        pstep: opts.perturb,
+        // The quad instance starts its perturbation scale at 1e-5 (a fit: seed 2840, xi = 18 * 2e-8 for a slack at iteration 22), a twentieth of the double's.
+        pstep: if R::QUAD {
+            opts.perturb * 0.05
+        } else {
+            opts.perturb
+        },
         stall: 0,
         stall_snap: 0,
         stall_it: 0.0,
