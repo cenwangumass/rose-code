@@ -27,6 +27,8 @@ const DUAL_TOL0: f64 = 1e-6;
 thread_local! {
     /// The dual feasibility tolerance (`ctx+0x388`) and the counter of failed dual residual checks (`ctx+0x174`); both outlive the restarts of one solve.
     static DUAL_TOL_CELL: std::cell::Cell<f64> = const { std::cell::Cell::new(DUAL_TOL0) };
+    /// The primal feasibility tolerance in force (`ctx+0x380`); the primal's drift test raises it (up to 1e-3), the dual passes after it read the raised value.
+    static PRIMAL_TOL_CELL: std::cell::Cell<f64> = const { std::cell::Cell::new(PRIMAL_TOL) };
     static RNG_CELL: std::cell::Cell<u64> = const { std::cell::Cell::new(101) };
     static PERT_RERUNS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
     static RESID_FAILS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
@@ -42,6 +44,8 @@ thread_local! {
     static SNAP: std::cell::RefCell<Option<(Vec<usize>, Vec<bool>)>> = const { std::cell::RefCell::new(None) };
     /// The relative tolerance of the primal's pivot-pair check (`ctx+0x3a0`): 3e-6 from the parameters, 1e-7 from the first restore of a dropped variable on (`0x1551d4`).
     static PAIR_TOL: std::cell::Cell<f64> = const { std::cell::Cell::new(3e-6) };
+    /// The primal's start basis when its drift test ended it (status -1002): the restart takes it (`0xcedb0`, seed 2717).
+    static DRIFT_START: std::cell::RefCell<Option<Basis>> = const { std::cell::RefCell::new(None) };
     static SNAP_C40: std::cell::Cell<f64> = const { std::cell::Cell::new(-100.0) };
 }
 
@@ -51,6 +55,14 @@ pub(crate) fn resid_fails() -> u32 {
 
 pub(crate) fn set_resid_fails(v: u32) {
     RESID_FAILS.with(|c| c.set(v));
+}
+
+pub(crate) fn primal_tol() -> f64 {
+    PRIMAL_TOL_CELL.with(|c| c.get())
+}
+
+pub(crate) fn set_primal_tol(v: f64) {
+    PRIMAL_TOL_CELL.with(|c| c.set(v));
 }
 
 pub(crate) fn dual_tol() -> f64 {
@@ -628,9 +640,9 @@ impl<'a, R: Real> Dual<'a, R> {
     /// Primal feasibility tolerance in force (`0x380`, or `(0x370 * 1e-5) * 0x380` while the level is not zero).
     fn ptol(&self) -> f64 {
         if self.level != 0 {
-            BIG * 1e-5 * PRIMAL_TOL
+            BIG * 1e-5 * primal_tol()
         } else {
-            PRIMAL_TOL
+            primal_tol()
         }
     }
 
@@ -3861,10 +3873,12 @@ fn solve_frame(
         pstep: None,
     };
     set_dual_tol(DUAL_TOL0);
+    set_primal_tol(PRIMAL_TOL);
     RESID_FAILS.with(|c| c.set(0));
     PERT_RERUNS.with(|c| c.set(0));
     RNG_CELL.with(|c| c.set(101));
     SNAP.with(|c| *c.borrow_mut() = None);
+    DRIFT_START.with(|c| *c.borrow_mut() = None);
     SNAP_C40.with(|c| c.set(-100.0));
     PAIR_TOL.with(|c| c.set(3e-6));
     PASS_NO.with(|c| c.set(0));
@@ -3880,8 +3894,10 @@ fn solve_frame(
         SWITCH.with(|c| c.set(None));
         let snap_start;
         let sw = switch_start.take();
+        let drift_start = DRIFT_START.with(|c| c.borrow_mut().take());
         let start_now = match (start, SNAP.with(|c| c.borrow().clone())) {
             _ if sw.is_some() => sw.as_ref(),
+            _ if drift_start.is_some() => drift_start.as_ref(),
             // A restart takes the basis of the last snapshot (`0xcedb0`, `0xd40b0`): the log timer of the wrapper (`0xf9306`) saves the basis at the first
             // fresh factorization after every 100 iterations (the slack basis at the start, which a restart from scratch reproduces).
             (None, Some((basic, at_upper))) if carry.iters > 0 => {
@@ -4003,6 +4019,7 @@ fn solve_pass<R: Real>(
     if fresh_pass::<R>(carry.retries) {
         // The fresh start of every third restart initialises the context again (`0xcf29b`): the tolerance goes back to the parameter, the counter stays.
         set_dual_tol(DUAL_TOL0);
+        set_primal_tol(PRIMAL_TOL);
     }
     let p = build(model);
     let (n, m) = (p.n, p.m);
@@ -4516,6 +4533,17 @@ fn solve_pass<R: Real>(
         popts.method = crate::simplex::Method::Primal;
         // The dual's teacher-forced factorization schedule does not apply to the primal, which decides its own (work based).
         popts.refactor_schedule = None;
+        if opts.perturb != 0.0 {
+            popts.sw_carry = Some(crate::simplex::SwCarry {
+                iters: s.iters as f64,
+                degenerate: s.stall as i32,
+                snap_degenerate: s.stall_snap as i32,
+                snap_iters: s.stall_it,
+                factorizations: s.refactorizations as u32,
+                level: 0,
+                pert: s.pstep * 0.05,
+            });
+        }
         let b = Basis {
             basic: s.head.clone(),
             at_upper: s.st.iter().map(|&t| t == UB).collect(),
@@ -4544,6 +4572,9 @@ fn solve_pass<R: Real>(
                 else {
                     return Err(SolveError::SingularBasis);
                 };
+                if crate::simplex::PRIMAL_DRIFT.with(|c| c.take()) {
+                    DRIFT_START.with(|c| *c.borrow_mut() = Some(b.clone()));
+                }
                 // The reference's iteration counter (`ctx+0x2a8`, the log timer's clock) runs five above the primal's pivots here (fx_midsing_1106: 9 per run).
 
                 SINGULAR.with(|c| {

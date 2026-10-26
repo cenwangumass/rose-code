@@ -227,6 +227,8 @@ thread_local! {
     pub(crate) static QUAD_PRIMALS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
     pub(crate) static QUAD_EEFA: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     pub(crate) static HANDOFF: std::cell::Cell<Option<Handoff>> = const { std::cell::Cell::new(None) };
+    /// The primal ended with status -1002 from its drift test (not from a singular factorization): the controller restarts from the primal's start basis.
+    pub(crate) static PRIMAL_DRIFT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The primal's factorization found the basis singular (status -1002, `0xf5921`): iterations and refactorizations of the primal, and its pivot threshold.
     /// The primal repaired its basis in place after a singular factorization (the controller then restores the dropped variable and runs the primal again).
     pub(crate) static PRIMAL_REPAIRED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
@@ -663,10 +665,19 @@ struct Solver<'a> {
     rej6: Vec<usize>,
     /// The failed scan has already been repeated on recomputed duals since the last iteration.
     rescan2: bool,
+    /// The scan that found nothing has been repeated on freshly recomputed duals (`0x145520` then the pricing again, seed 2717).
+    rescan3: bool,
+    /// The drift test of the primal update (`ctx+0x380`, `ctx+0x170`): tolerance and count of excesses.
+    drift_tol: f64,
+    drift_cnt: u32,
+    want_drift: bool,
+    drift_err: Option<f64>,
     restart: bool,
     pre_restart: bool,
     /// The duals were recomputed at the start of this iteration (the end of phase 1), so the scan that finds nothing does not recompute them again.
     fresh_duals: bool,
+    /// Phase 1 has ended once in this run (`P+0xc` of the reference went from 1 to 2, `0xe4379`): that first end forces a recomputation of the duals.
+    feas_seen: bool,
     /// The driver restarted inside the last pricing call: the refactorization check read before it is stale.
     restarted: bool,
     basic: Vec<usize>,
@@ -1139,8 +1150,45 @@ impl<'a> Solver<'a> {
                     .as_ref()
                     .is_some_and(|bk| self.refactorizations % bk.r8 != 1)
             });
+        // The primal's drift test (`0x105f20`, `0x1071a3`): at the factorizations with `ctx+0x2c0 % 5 == 4` the recomputed x_B is multiplied back and the largest
+        // residual against the right-hand side is compared with `ctx+0x380` (1e-6 at the start). A sixth excess raises the tolerance tenfold and clears the count, or
+        // ends the primal with status -1002 once the tolerance has reached 1e-3 (seed 2717: a cycle of 600 iterations on values of 1e17).
+        let c2c0 = if self.sw.active {
+            self.sw.factorizations as usize + 1
+        } else {
+            self.refactorizations
+        };
+        self.want_drift =
+            !keep_x && !self.cleanup && self.mirror.is_some() && self.p0.is_none() && c2c0 % 5 == 4;
+        self.drift_err = None;
         if !keep_x {
             self.recompute_primal();
+        }
+        self.want_drift = false;
+        if let Some(err) = self.drift_err.take() {
+            if err > self.drift_tol {
+                self.drift_cnt += 1;
+            }
+            if self.drift_cnt > 5 {
+                if self.drift_tol >= 1e-3 {
+                    if self.handoff.is_some() {
+                        PRIMAL_DRIFT.with(|c| c.set(true));
+                        PRIMAL_SINGULAR.with(|c| {
+                            c.set(Some((
+                                self.iters_done,
+                                self.refactorizations,
+                                crate::lu_order::threshold(),
+                            )))
+                        });
+                    }
+                    return Err(SolveError::SingularBasis);
+                }
+                self.drift_tol *= 10.0;
+                self.drift_cnt = 0;
+                if self.handoff.is_some() {
+                    crate::dual::set_primal_tol(self.drift_tol);
+                }
+            }
         }
         if self.cleanup {
             self.cleanup_work();
@@ -1627,6 +1675,20 @@ impl<'a> Solver<'a> {
                 for &(i, a) in &p.cols[j] {
                     res[i] -= a * xb[pos];
                 }
+            }
+            if self.want_drift {
+                // `0x115d60`: the product of the basis with the solution, accumulated column by column in position order from zero.
+                let mut out = vec![0.0f64; p.m];
+                for (pos, &j) in self.basic.iter().enumerate() {
+                    for &(i, a) in &p.cols[j] {
+                        out[i] += a * xb[pos];
+                    }
+                }
+                self.drift_err = Some(
+                    r.iter()
+                        .zip(&out)
+                        .fold(0.0f64, |e, (a, b)| e.max((a - b).abs())),
+                );
             }
             let scale = 1.0 + r.iter().fold(0.0f64, |a, v| a.max(v.abs()));
             if self.handoff.is_some() || res.iter().all(|v| v.abs() <= 1e-7 * scale) {
@@ -3760,9 +3822,19 @@ fn solve_primal(
         excl6: vec![false; n + m],
         rej6: Vec::new(),
         rescan2: false,
+        rescan3: false,
+        drift_tol: if handoff.is_some() {
+            crate::dual::primal_tol()
+        } else {
+            opts.feasibility_tol
+        },
+        drift_cnt: 0,
+        want_drift: false,
+        drift_err: None,
         restart: false,
         pre_restart: false,
         fresh_duals: false,
+        feas_seen: false,
         restarted: false,
         basic: basis.basic.clone(),
         pos_of: pos_of.clone(),
@@ -4092,8 +4164,14 @@ fn solve_primal(
             }
             s.list.clear();
             s.level = 0;
-            // After a refactorization the duals were just recomputed with the same (now feasible) basic values.
-            if !due && !s.p0.is_some() {
+            // After a refactorization the duals were just recomputed with the same (now feasible) basic values. The first end of phase 1 of a run
+            // sets `P+0xc` from 1 to 2 and clears `P+0x10` (`0xe4379`), which makes the next pricing recompute the duals. At a later end the
+            // iteration that brings the infeasibility count to 0 clears `P+0x10` (`0x106523`) and only the cost-change pass (`0x108280`, run when the
+            // update has cost changes) sets it again: the duals are recomputed after an ending iteration without cost changes, and the pass
+            // keeps the updated duals otherwise (seed 2717, `compare.py` pricing calls 6 and 10).
+            let first_end = !std::mem::replace(&mut s.feas_seen, true);
+            let cc_pass = s.mirror.is_some() && last.is_some() && !dc.is_empty() && !first_end;
+            if !due && !s.p0.is_some() && !cc_pass {
                 s.dual_btran_work();
                 s.recompute_dual();
                 s.fresh_duals = true;
@@ -4235,8 +4313,17 @@ fn solve_primal(
                 }
                 None => {
                     // The reference recomputes the duals once more when the scan finds nothing (`0x145520`, with the residual check).
-                    if s.mirror.is_some() && !s.recomputed && !s.fresh_duals {
+                    if s.mirror.is_some() && !s.recomputed && !s.fresh_duals && !s.rescan3 {
                         s.dual_btran_work();
+                        if s.handoff.is_some() && !infeasible && s.p0.is_none() {
+                            // The duals were only updated since the end of phase 1: the recomputation is followed by a new pricing call, which may find a
+                            // column (seed 2717, ref call 25: the scan on the updated duals is empty, on the recomputed ones x6 enters).
+                            s.recompute_dual();
+                            s.rescan3 = true;
+                            s.list.clear();
+                            s.level = 0;
+                            continue;
+                        }
                     }
                     // Before declaring optimality, rebuild the basic solution from a fresh factorization: drift in the updated
                     // values can hide a bound violation just above the tolerance.
@@ -4667,6 +4754,7 @@ fn solve_primal(
             s.excl6[j] = false;
         }
         s.rescan2 = false;
+        s.rescan3 = false;
         // A phase 1 step may be negative (a basic variable inside its tolerance leaves from the wrong side of its bound).
         iterations += 1;
         s.iters_done = iterations;
