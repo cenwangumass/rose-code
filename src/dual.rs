@@ -1542,7 +1542,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 self.prio[r] = self.pri(r, f);
                 match self.flags[r] {
                     3 => self.flags[r] = 1,
-                    1 | 5 => {}
+                    1 | 5 | 7 => {}
                     _ => {
                         if self.prio[r] >= self.thr {
                             self.list.push(r);
@@ -2427,7 +2427,8 @@ impl<'a, R: Real> Dual<'a, R> {
         let mut row_sel = self.price();
         // No row while rows were rejected before this driver call: they are released and the pricing runs again inside the same call (the loop of
         // `0xc4fe0`/`0x21cf50` around `0x2896a3` and `0xcd250`, quad seed 2081 call 19).
-        while row_sel.is_none()
+        while R::QUAD
+            && row_sel.is_none()
             && self.request == 0
             && !self.bad_rows.is_empty()
             && self.value_mode
@@ -2450,6 +2451,7 @@ impl<'a, R: Real> Dual<'a, R> {
             self.retry = true;
             self.worst = 0.0;
             self.flags[r] = 1;
+            self.list.push(r);
             row_sel = Some(r);
         }
         let Some(r) = row_sel else {
@@ -2505,6 +2507,9 @@ impl<'a, R: Real> Dual<'a, R> {
                 }
                 return Step::NoRow;
             }
+            // The retried row is taken: the rejected count (`ctx+0x420`, negated for the retry) is back to 0 at the next call (seed 2717 call 18).
+            self.bad_rows.clear();
+            self.old_rej = 0;
         }
         let mut rec = snap;
         if let Some(s) = rec.as_mut() {
@@ -3601,8 +3606,8 @@ thread_local! {
     static SWITCH: std::cell::Cell<Option<(usize, usize, f64, f64, usize, usize, bool, u32)>> = const { std::cell::Cell::new(None) };
     static FROM_SWITCH: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static SWITCH_BASIS: std::cell::RefCell<Option<Basis>> = const { std::cell::RefCell::new(None) };
-    /// The cost shifts the quad pass inherits from the double pass (the context is the same: `ctx+0x338`, the cost array, the shifted d values).
-    static SWITCH_PERT: std::cell::RefCell<Option<SwitchPert>> = const { std::cell::RefCell::new(None) };
+    /// The perturbation flag the quad pass inherits from the double pass (`ctx+0x338`).
+    static SWITCH_PERT: std::cell::Cell<Option<u8>> = const { std::cell::Cell::new(None) };
     static SINGULAR: std::cell::Cell<Option<(usize, usize, f64, f64, usize, usize, bool, u32)>> = const { std::cell::Cell::new(None) };
 }
 
@@ -3657,15 +3662,6 @@ thread_local! {
     /// Set while a rerun skips the second pass of the free-column pivots (the early verdict's ray did not verify).
     static NO_ART_EXIT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static NO_DEFERRED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
-}
-
-struct SwitchPert {
-    pert: u8,
-    cost: Vec<f64>,
-    cshift: Vec<f64>,
-    pcost: Vec<f64>,
-    obj_off: f64,
-    d: Vec<(usize, f64)>,
 }
 
 fn solve_frame(
@@ -4121,17 +4117,10 @@ fn solve_pass<R: Real>(
         s.flip_select = true;
     }
     if R::QUAD {
-        if let Some(sp) = SWITCH_PERT.with(|c| c.borrow_mut().take()) {
-            s.pert = sp.pert;
-            s.cost = sp.cost;
-            s.cshift = sp.cshift;
-            s.pcost = sp.pcost;
-            s.obj_off = sp.obj_off;
-            for (j, dv) in sp.d {
-                if s.st[j] < 0 {
-                    s.d[j] = R::c(dv);
-                }
-            }
+        // The quad pass keeps the perturbation flag of the double pass but not its cost shifts: d is recomputed from the true costs (seed 2240: the shifted
+        // d of the double pass are 10^3..10^4 times the reference's at the first quad call, and so are the d of every quad refactorization).
+        if let Some(pert) = SWITCH_PERT.with(|c| c.take()) {
+            s.pert = pert;
         }
     }
     s.recompute_xb(0);
@@ -4262,19 +4251,7 @@ fn solve_pass<R: Real>(
                         s.retries,
                     )))
                 });
-                SWITCH_PERT.with(|c| {
-                    *c.borrow_mut() = Some(SwitchPert {
-                        pert: s.pert,
-                        cost: s.cost.clone(),
-                        cshift: s.cshift.clone(),
-                        pcost: s.pcost.clone(),
-                        obj_off: s.obj_off,
-                        d: (0..n + m)
-                            .filter(|&j| s.cshift[j] != 0.0 && s.st[j] < 0)
-                            .map(|j| (j, s.d[j].to_f64()))
-                            .collect(),
-                    })
-                });
+                SWITCH_PERT.with(|c| c.set(Some(s.pert)));
                 SWITCH_BASIS.with(|c| {
                     *c.borrow_mut() = Some(Basis {
                         basic: s.head.clone(),
