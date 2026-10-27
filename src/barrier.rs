@@ -1919,6 +1919,9 @@ pub trait NormalSolver {
     /// Per iteration, before the directions: `Q+0x800` (`zx`) and the refinement threshold `Q+0x280` for the solvers that refine.
     fn prepare(&mut self, _zx: &[f64], _thr: f64) {}
 
+    /// `0x2e2650`, after the step caps of an iteration: `early` is `Q+0x28c != 0`, `q1f8` the complementarity measure, `capped` the flag of the caps (`r10b`).
+    fn after_caps(&mut self, _early: bool, _q1f8: f64, _capped: bool) {}
+
     /// `Q+0x770 / 0x780` of the last direction: the norms of its solve residual (0 where the solver does not refine).
     fn norms(&self) -> (f64, f64) {
         (0.0, 0.0)
@@ -3370,16 +3373,21 @@ pub fn run<S: NormalSolver>(
         }
         // `0x2e24f0..0x2e2647`: with a small complementarity measure the steps are capped by the solve residuals against the iterate's.
         let (mut cp, mut cd) = (tp, td);
+        let mut capped = false;
         if res.q1f8 < 1e-4 {
             let t1 = (res.q198 * 1.2).max(sc.q260);
             if q770 > t1 {
                 cp = cp.min(t1 / q770);
+                capped = true;
             }
             let t2 = (res.q1a8 * 1.2).max(sc.q268);
             if q780 > t2 {
                 cd = cd.min(t2 / q780);
+                capped = true;
             }
         }
+        // `0x2e2650`: the single-precision factor is dropped for the next iterations.
+        solver.after_caps(early, res.q1f8, capped);
         w5 = [cp * cd, w5[0], w5[1]];
         // Combination words `Q+0x720..0x750` (`0x30fb8d`): dtau and dkappa of the primal (wp) and dual (wd) candidates.
         let hk = if hsd {

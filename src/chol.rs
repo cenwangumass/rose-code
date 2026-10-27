@@ -651,7 +651,7 @@ fn sgemm_t_n(
 /// DGEMM('T','N', m, n, k, alpha = 1, A, lda, B, ldb, beta = 1, C, ldc): `C(i,j) += sum_k A(k,i) B(k,j)`, Fortran column-major (`A(k,i) = a[i lda + k]`).
 /// `m == 1` is DGEMV('T') of `B` against the row, `n == 1` of `A` against the column; everything else goes to `gemm_path2` (copy-based
 /// 12-row tile kernel or the nocopy TN kernel per column block).
-fn dgemm_t_n(
+pub fn dgemm_t_n(
     m: usize,
     n: usize,
     k: usize,
@@ -686,20 +686,28 @@ fn dgemm_t_n(
         }
         return;
     }
-    let mut j0 = 0;
-    for nb in nocopy_n_blocks(n) {
-        for j in 0..nb {
-            for i in 0..m {
-                let kind = gemm_kind(m, nb, i, j);
-                c[(j0 + j) * ldc + i] = dgemm_tn_elem(
-                    kind,
-                    &a[i * lda..i * lda + k],
-                    &b[(j0 + j) * ldb..(j0 + j) * ldb + k],
-                    c[(j0 + j) * ldc + i],
-                );
+    // The nocopy driver (`0xa7be50`) cuts `k > 192` into two calls of the kernel, `ceil(k / 2)` then the rest, each a `beta = 1` update of `C`
+    // (the dispatch above sees the whole `k`; the copy-based kernel takes `k` up to 240 in one call).
+    let kb = if k > 192 { (k + 1) / 2 } else { k };
+    let mut k0 = 0;
+    while k0 < k {
+        let kk = (k - k0).min(kb);
+        let mut j0 = 0;
+        for nb in nocopy_n_blocks(n) {
+            for j in 0..nb {
+                for i in 0..m {
+                    let kind = gemm_kind(m, nb, i, j);
+                    c[(j0 + j) * ldc + i] = dgemm_tn_elem(
+                        kind,
+                        &a[i * lda + k0..i * lda + k0 + kk],
+                        &b[(j0 + j) * ldb + k0..(j0 + j) * ldb + k0 + kk],
+                        c[(j0 + j) * ldc + i],
+                    );
+                }
             }
+            j0 += nb;
         }
-        j0 += nb;
+        k0 += kk;
     }
 }
 
@@ -816,7 +824,7 @@ fn dtrsv_utu_unit(l: &[f64], w: usize, b: &[f64]) -> Vec<f64> {
 /// the solution column `L^-1 b`. `w >= 13` unless `w % 4 == 0 && w <= 88`: `dtrsm_kernel_ll_0` (rows 0..11 an fnma chain from b; then tiles of 12, 4, 2, 1 rows
 /// whose update from all solved rows is an fma accumulator from 0 (structure per tile and column kernel), `x_i = b_i + u_i`, then the in-tile chain).
 /// Smaller `w`: `mkl_blas_avx2_dtrsm_left` (`dtrsm_left_ker`, see the three branches).
-fn dtrsm_llu_col(l: &[f64], w: usize, b: &[f64], col: usize, n: usize) -> Vec<f64> {
+pub fn dtrsm_llu_col(l: &[f64], w: usize, b: &[f64], col: usize, n: usize) -> Vec<f64> {
     if n == 1 {
         return dtrsv_utu_unit(l, w, b);
     }
@@ -1997,6 +2005,7 @@ impl CholSolver {
         (0..f.n2).any(|j| f.flags[j] == 0)
             || !f.dense.is_empty()
             || self.fac.as_ref().map_or(false, |x| x.minratio < 1e-10)
+            || (self.plan.single && self.fac.as_ref().map_or(false, |x| x.minratio < 1e-3))
     }
 
     /// `0x311d70`, the residual of a solve `(dx, dy)` for `(rx, ry)`: `rows = ry - Af dx` and `cols = rx - (Af' dy - zx dx)` in blocks of 8 from index 0,
@@ -2155,8 +2164,23 @@ impl NormalSolver for CholSolver {
         } else {
             numeric_factor(f, &self.rows, &self.plan, d, self.fzx.as_deref(), None)
         };
+        // `0x2f1720`: a single-precision factor with `SYM+0x100 < 1e-8` is dropped and the factor computed in double.
+        if self.plan.single && fac.minratio < 1e-8 {
+            self.plan.single = false;
+            self.fac = None;
+            return self.factor(f, d);
+        }
         self.fac = Some(fac);
         Ok(())
+    }
+
+    fn after_caps(&mut self, early: bool, q1f8: f64, capped: bool) {
+        if self.plan.single && !early {
+            let minratio = self.fac.as_ref().map_or(0.0, |x| x.minratio);
+            if 1e-4 > minratio || 1e-8 > q1f8 || capped {
+                self.plan.single = false;
+            }
+        }
     }
 
     /// Primal (`0x2e8ef0` stage 1): `rx = -ub` on the boxed columns, `ry = b`; returns `(dx, dy)` (the starting `x~`). Dual (stage 2): `rx = c`, `ry = 0`;
