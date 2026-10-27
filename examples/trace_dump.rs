@@ -9,7 +9,7 @@ fn main() {
     let model = mps::parse(&std::fs::read_to_string(&a[1]).unwrap()).unwrap();
     let basis_arg = a.iter().skip(3).find(|x| x.ends_with(".json"));
     let schedule_arg = a.iter().skip(3).find(|x| !x.ends_with(".json"));
-    let opts = if a[2] == "dual" || a[2] == "dual-controlled" || a[2] == "dual-release" {
+    let mut opts = if a[2] == "dual" || a[2] == "dual-controlled" || a[2] == "dual-release" {
         let mut o = if a[2] != "dual-release" {
             SolveOptions::dual()
         } else {
@@ -29,9 +29,6 @@ fn main() {
                     .collect(),
             );
         }
-        if let Ok(v) = std::env::var("ROSE_MAXIT") {
-            o.max_iterations = v.parse().unwrap();
-        }
         o
     } else if a[2] == "release" {
         SolveOptions::release()
@@ -45,6 +42,9 @@ fn main() {
     } else {
         SolveOptions::plain()
     };
+    if let Ok(v) = std::env::var("ROSE_MAXIT") {
+        opts.max_iterations = v.parse().unwrap();
+    }
     let basis = basis_arg.map(|f| {
         let v: serde_json::Value =
             serde_json::from_str(&std::fs::read_to_string(f).unwrap()).unwrap();

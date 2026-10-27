@@ -334,3 +334,32 @@ fn infeasible_dual_cleanup_returns_its_reference_certificate() {
         assert_eq!(r.farkas, Some(expected));
     }
 }
+
+#[test]
+fn phase_one_retries_preserve_pricing_after_bound_flips() {
+    let model = mps::parse(include_str!("fixtures/fx_ladder_386.mps")).unwrap();
+    let opts = SolveOptions {
+        max_iterations: 24,
+        ..SolveOptions::default()
+    };
+    let r = solve(&model, None, &opts).unwrap();
+    let tail: Vec<_> = r
+        .trace
+        .iter()
+        .skip(16)
+        .map(|e| (e.entering, e.leaving))
+        .collect();
+    assert_eq!(
+        tail,
+        [
+            (3, None),
+            (40, None),
+            (40, None),
+            (17, Some(50)),
+            (28, None),
+            (40, None),
+            (40, None),
+            (36, Some(57))
+        ]
+    );
+}

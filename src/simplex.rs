@@ -2556,16 +2556,19 @@ impl<'a> Solver<'a> {
             self.list.clear();
             self.level = 0;
             self.dump_xpricing("rescan");
-            if crate::dump::on("pricing") {
-                crate::dump::emit(
-                    "pricing",
-                    serde_json::json!({"n": PRC.load(std::sync::atomic::Ordering::Relaxed), "iter": 0, "infeasible": true, "list": self.list, "basic": self.basic, "d": self.d, "w": self.w, "x": self.x}),
-                );
-            }
-            PRC.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            // A failed rebuilt scan stays inside the residual check; only a successful scan becomes another pricing call.
             self.rescan = true;
             let q = self.price();
             self.rescan = false;
+            if q.is_some() {
+                if crate::dump::on("pricing") {
+                    crate::dump::emit(
+                        "pricing",
+                        serde_json::json!({"n": PRC.load(std::sync::atomic::Ordering::Relaxed), "iter": 0, "infeasible": true, "list": [], "basic": self.basic, "d": self.d, "w": self.w, "x": self.x}),
+                    );
+                }
+                PRC.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
             return q;
         }
         q
@@ -4876,9 +4879,9 @@ fn solve_primal(
                     }
                 }
             } else {
-                if !was && s.handoff.is_some() && s.mirror.is_some() && !due {
-                    // Phase 1 entered from phase 2 on a factor with updates: the reference adds the penalties of the infeasible basics to the phase 2 duals
-                    // in place (a BTRAN of the cost changes, like the cost-change pass inside phase 1), `P+0x18` unchanged (seed 2717).
+                if !was && s.mirror.is_some() && !due {
+                    // Phase 1 entered from phase 2 without a refactorization: the reference adds the penalties of the infeasible basics to the phase 2 duals
+                    // in place (a BTRAN of the cost changes, like the cost-change pass inside phase 1), `P+0x18` unchanged (seed 2717, fx_ladder_386).
                     let cls = s.sig();
                     let dc2: Vec<(usize, f64)> = cls
                         .iter()
@@ -4984,8 +4987,8 @@ fn solve_primal(
                     }
                     s.list.clear();
                     s.level = 0;
-                    if !fresh && first {
-                        // With updates the scan simply runs again with the cost out of the penalties: no factorization (fx_midsing_1106: no LU between the two pricing calls).
+                    if !fresh && first && s.handoff.is_some() {
+                        // In a handoff with updates the scan runs again with the cost out of the penalties, without a factorization (fx_midsing_1106).
                         s.rescan2 = true;
                         s.dual_btran_work("rescan");
                         s.recompute_dual();
@@ -5091,9 +5094,9 @@ fn solve_primal(
                         && s.factor.num_updates() > 0
                     {
                         s.dual_btran_work("none");
-                        if s.handoff.is_some() && !infeasible && s.p0.is_none() {
+                        if !infeasible && s.p0.is_none() {
                             // The duals were only updated since the end of phase 1: the recomputation is followed by a new pricing call, which may find a
-                            // column (seed 2717, ref call 25: the scan on the updated duals is empty, on the recomputed ones x6 enters).
+                            // column (seed 2717, ref call 25; fx_ladder_386 call 25).
                             if s.handoff.is_some_and(|h| h.quad) && s.admitted {
                                 // After the admission of the variable the quad dual's repair left out, the failed scan is followed by a refactorization before the duals
                                 // are recomputed (seed 3981: the factorization count goes 7 -> 8 between the two scans; 2717's failed scans, no admission, keep it).
