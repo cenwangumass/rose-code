@@ -3751,7 +3751,7 @@ impl<'a, R: Real> Dual<'a, R> {
             // `0xe45c0` (`0xe47c7..0xe47ff`): the leaving variable is the row entry with coefficient +1 (leaving below) or -1 (above, the row is negated);
             // a status -2 (at the upper bound) variable then has its d negated, so for it d = -(old + theta * coef) (GROW7 release call 311; PILOT.JA calls 30572, 30580 with a noise `old` of 7e-18).
             self.d[pv.leave] = if self.st[pv.leave] == FIXED && pv.above {
-                theta
+                theta + R::ZERO
             } else if pv.above {
                 -(old_leave + theta * lcoef)
             } else {
