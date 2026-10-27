@@ -187,7 +187,7 @@ fn compare_random_profile(count: u64, max_m: u64, max_n: u64, feasible: bool, du
             Status::Infeasible => 1,
             Status::Unbounded => 2,
             Status::IterationLimit => 3,
-            Status::NumericalFailure | Status::Suboptimal => 4,
+            Status::NumericalFailure | Status::Suboptimal | Status::Cutoff => 4,
         }] += 1;
         let check = if d.status == Status::Unbounded {
             match d

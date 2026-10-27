@@ -2309,7 +2309,7 @@ impl Default for Options {
 pub enum BarrierStatus {
     Optimal,
     IterationLimit,
-    /// A status code of `0x2e2fe0` that this port does not interpret further (3 / 5 infeasible variants, 6, 0xb, 0xd).
+    /// A status code of `0x2e2fe0` interpreted by the public solver.
     Other(i32),
 }
 
@@ -3025,7 +3025,11 @@ pub fn run<S: NormalSolver>(
     let mut h = Hist::new();
     // `Q+0x220` of the starting point (`0x2eb2ea`); the other norms are 0 until the first update.
     h.nrm.x2 = dot_lanes(&st.x, &st.x, 0);
-    let mut best_dual = -1e100;
+    let mut best_dual = if res.q1e0 < 0.1 * 1e-6 {
+        (-1e100f64).max(res.q140)
+    } else {
+        -1e100
+    };
     // `Q+0x5e0 / 0x5e8 / 0x5f0`: the step products of the last three iterations.
     let mut w5 = [1e100f64; 3];
     // `Q+0xf4`: the iteration after the last update with a step product above 5e-5; `Q+0xf8`: the iteration after the restart.
@@ -3077,8 +3081,10 @@ pub fn run<S: NormalSolver>(
             }
         }
         emit_best(&h, it, 0, &st);
-        if res.q148 > best_dual && it > 0 {
-            best_dual = res.q148;
+        // `0x2eec26..0x2eec46`: only a sufficiently dual-feasible iterate
+        // contributes its unscaled objective (including the objective offset).
+        if res.q1e0 < 0.1 * 1e-6 && res.q140 > best_dual {
+            best_dual = res.q140;
         }
         let ti = term_input(
             f,
@@ -3159,7 +3165,11 @@ pub fn run<S: NormalSolver>(
                 Some(sv) => (sv.state, sv.it),
                 None => (save_iterate(&st, tau, it).state, it),
             };
-            let objective = h.h48.get(sit as usize).copied().unwrap_or(ti_res.q130);
+            let objective = if code == 6 {
+                best_dual
+            } else {
+                h.h48.get(sit as usize).copied().unwrap_or(ti_res.q130)
+            };
             return Ok(BarrierRun {
                 status,
                 iterations: it,
@@ -3549,8 +3559,12 @@ pub fn run<S: NormalSolver>(
                 wk.factor(solver.take_extra_factors());
             }
             qf8 = it + 1;
+            best_dual = -1e100;
             h.nrm.x2 = dot_lanes(&st.x, &st.x, 0);
             let r = residuals(f, &st, tau, kappa, ncomp, scale);
+            if r.q1e0 < 0.1 * 1e-6 && r.q140 > best_dual {
+                best_dual = r.q140;
+            }
             let mut rd = r.rd.clone();
             z_reduce(f, &mut st, &mut rd, r.q1f0);
         }
@@ -3674,7 +3688,7 @@ pub fn solve_release(model: &LpModel, o: &Options) -> Result<Solution, BarrierEr
 
 /// `Method::Barrier` of [`crate::solve`]: [`solve_exact`] with the options mapped (`barrier_tol`, `max_iterations`), the result in the public types.
 /// Status: optimal, the iteration limit (API 7), unbounded (code 5, API 5) and infeasible (code 3, never observed); infeasible-or-unbounded (code 0xc, API 12)
-/// and the other codes (6, 0xb) are reported as `NumericalFailure` (no certificate is produced, NaN objective); code 0xd (API 13, stalled) is `Suboptimal` and keeps the saved best iterate.
+/// code 6 is `Cutoff`, and other codes (including 0xb) are reported as `NumericalFailure` (no certificate is produced, NaN objective); code 0xd (API 13, stalled) is `Suboptimal` and keeps the saved best iterate.
 pub fn solve_method(
     model: &LpModel,
     opts: &crate::SolveOptions,
@@ -3699,13 +3713,14 @@ pub fn solve_method(
         // 5: unbounded (API 5, fx_unbounded); 3: infeasible (never observed); 0xc: infeasible or unbounded (API 12, fx_infeasible), reported like PDHG's 12.
         BarrierStatus::Other(5) => Status::Unbounded,
         BarrierStatus::Other(3) => Status::Infeasible,
+        BarrierStatus::Other(6) => Status::Cutoff,
         // 0xd after the best-iterate checks of the end (`0x2e2e64`): API 13, the best iterate is returned (stalled, GREENBEA release).
         BarrierStatus::Other(13) => Status::Suboptimal,
         BarrierStatus::Other(_) => Status::NumericalFailure,
     };
-    // Code 13 (stalled, GREENBEA release) returns the saved best iterate like the reference; the other failure codes have no point (NaN objective).
+    // Cutoff and code 13 return the saved best iterate; other failure codes have no objective.
     let objective = match sol.run.status {
-        BarrierStatus::Other(c) if !matches!(c, 3 | 5 | 13) => f64::NAN,
+        BarrierStatus::Other(c) if !matches!(c, 3 | 5 | 6 | 13) => f64::NAN,
         _ => sol.objective,
     };
     Ok(crate::SolveResult {

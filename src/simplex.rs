@@ -190,6 +190,8 @@ pub enum Status {
     /// The reference's improving-ray exit. Primal feasibility is not established; a contradictory model can also take this exit.
     Unbounded,
     IterationLimit,
+    /// The objective cutoff was exceeded; the barrier returns its saved iterate.
+    Cutoff,
     NumericalFailure,
     /// The solve stopped short of the tolerances and returns its best iterate (the barrier's API status 13, `SUBOPTIMAL`).
     Suboptimal,

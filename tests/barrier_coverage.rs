@@ -31,6 +31,25 @@ fn barrier(m: &LpModel) -> rose::SolveResult {
     solve(m, None, &SolveOptions::barrier()).unwrap()
 }
 
+#[test]
+fn default_cutoff_returns_saved_iterate() {
+    let Some(m) = fixture("fx_bar_cutoff_default") else {
+        return;
+    };
+    let opts = SolveOptions {
+        scaling: true,
+        ..SolveOptions::barrier()
+    };
+    let r = solve(&m, None, &opts).unwrap();
+    assert_eq!(r.status, Status::Cutoff);
+    assert_eq!(r.iterations, 0);
+    assert_eq!(r.objective, 1.25e100);
+    assert_eq!(r.x, [1e10]);
+    assert_eq!(r.dual, [1.0]);
+    assert_eq!(r.reduced_cost, [0.1]);
+    assert!(verify::check(&m, &r, 1e-6).is_err());
+}
+
 /// Optimal point: the independent report is small relative to the objective, and the objective equals the primal simplex's to the barrier's gap.
 fn optimal_agrees(name: &str, m: &LpModel) -> rose::SolveResult {
     let r = barrier(m);

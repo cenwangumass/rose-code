@@ -146,6 +146,7 @@ fn main() {
         Status::Infeasible => "infeasible",
         Status::Unbounded => "unbounded",
         Status::IterationLimit => "iteration_limit",
+        Status::Cutoff => "cutoff",
         Status::NumericalFailure => "numerical_failure",
         Status::Suboptimal => "suboptimal",
     };
@@ -254,10 +255,11 @@ fn run_barrier(model: &rose::LpModel, opts: &SolveOptions, output: Option<String
         Status::IterationLimit => "iteration_limit",
         Status::NumericalFailure => "numerical_failure",
         Status::Suboptimal => "suboptimal",
+        Status::Cutoff => "cutoff",
     };
     let have_point = matches!(r.status, Status::Optimal);
-    // the stalled status 13 returns the saved best iterate; other failures have a NaN objective
-    let have_vectors = have_point || (r.status == Status::Suboptimal && r.objective.is_finite());
+    // Cutoff and stalled status 13 return the saved best iterate.
+    let have_vectors = have_point || (matches!(r.status, Status::Suboptimal | Status::Cutoff) && r.objective.is_finite());
     let rep = have_point.then(|| verify::check_optimal(model, &r));
     let structure = rose::order::structure(model, rose::order::DENSE_COL_MIN).ok();
     eprintln!(
@@ -268,7 +270,7 @@ fn run_barrier(model: &rose::LpModel, opts: &SolveOptions, output: Option<String
         "version": 1,
         "status": status,
         "objective": if have_vectors { json!(r.objective) } else { Value::Null },
-        // like the reference, no solution vectors unless the status is optimal or the stalled 13; there is no basis, certificate or ray
+        // No basis, certificate or ray is returned.
         "x": if have_vectors { json!(r.x) } else { Value::Null },
         "dual": if have_vectors { json!(r.dual) } else { Value::Null },
         "reduced_cost": if have_vectors { json!(r.reduced_cost) } else { Value::Null },
