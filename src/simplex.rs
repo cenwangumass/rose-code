@@ -2643,7 +2643,7 @@ impl<'a> Solver<'a> {
                 .collect();
             crate::dump::emit(
                 "xpricing",
-                serde_json::json!({"dq": dq, "wq": wq, "tag": tag, "done": self.iters_done, "excl": self.excluded, "d": self.d, "w": self.w, "list": self.list, "basic": self.basic}),
+                serde_json::json!({"dq": dq, "wq": wq, "tag": tag, "done": self.iters_done, "pass": QUAD_PRIMALS.with(|c| c.get()), "c35c": crate::dual::C35C.with(|c| c.get()), "it_base": self.handoff.map(|h| h.iters), "fac": self.refactorizations, "excl": self.excluded, "d": self.d, "w": self.w, "list": self.list, "basic": self.basic}),
             );
         }
     }
