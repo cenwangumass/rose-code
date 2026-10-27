@@ -467,6 +467,8 @@ pub(crate) struct Handoff {
     pub pair_tol: f64,
     /// The dual ran in extended precision (the quad pass): the reference's primal keeps using the x87 factor, FTRAN and BTRAN kernels (`ctx+0x28` stays 1).
     pub quad: bool,
+    /// The dual's tolerance relaxation level (`ctx+0x2cc`) carried into x87.
+    pub dual_level: usize,
     /// `ctx+0x2a0` and `ctx+0x2b0` (iterations so far and the last snapshot) and the stability counter `ctx+0x178` at the handoff.
     pub iters: f64,
     pub snap: f64,
@@ -5210,6 +5212,13 @@ fn solve_primal(
                     s.level = 0;
                     retry_unbounded = true;
                     continue;
+                }
+                None if s.handoff.is_some_and(|h| h.quad && h.pert && h.dual_level == 0) => {
+                    // The x87 post-factor list check clears the cost shifts and
+                    // exits with request 9 before checking the stale pivot pair
+                    // when `ctx+0x2cc` and the candidate count are zero
+                    // (0x281c1c; seed 5653).
+                    break Status::Infeasible;
                 }
                 None if s.stale.is_some_and(|(a, b)| {
                     let (a, b) = (a.abs(), b.abs());
