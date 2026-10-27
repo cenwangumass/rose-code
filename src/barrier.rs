@@ -2983,6 +2983,8 @@ pub fn run<S: NormalSolver>(
     let (mut tau, mut kappa) = (1.0f64, 0.0f64);
     let mut ncomp = f.ncomp();
     let mut q2c = false;
+    // `Q+0x30`: the starting point's floor, set by restart B and kept by a later restart A.
+    let mut q30k = 0.0f64;
     let c_file = f.c.clone();
     let sc = setup_scalars(&f.b_file, &c_file, o.tol);
     // Starting point.
@@ -3525,7 +3527,7 @@ pub fn run<S: NormalSolver>(
             }
             if restart {
                 q2c = true;
-                q30r = 0.0;
+                q30r = q30k;
             }
         }
         if release && !restart && it > qf4 {
@@ -3540,6 +3542,7 @@ pub fn run<S: NormalSolver>(
                 s1 = solver.restart_start(f, StartKind::Primal { w: &w })?;
                 s2 = solver.restart_start(f, StartKind::Dual)?;
             }
+            q30k = q30r;
             (st, _, _, _) = start_point(f, s1.clone(), s2.clone(), &sc, 0, q30r);
             if let Some(wk) = work.as_mut() {
                 wk.factor(solver.take_extra_factors());

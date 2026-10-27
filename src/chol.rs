@@ -2332,7 +2332,7 @@ impl NormalSolver for CholSolver {
     }
 
     fn redo_start(&self, f: &StdForm) -> bool {
-        self.dropped || (self.ever_single && self.refining(f))
+        self.dropped || self.ever_single
     }
 
     fn restart_start(
