@@ -5740,3 +5740,206 @@ mod captured_quad_partition {
         }
     }
 }
+
+#[cfg(test)]
+mod captured_bh305_ratio {
+    use super::*;
+    use serde_json::Value;
+
+    #[test]
+    fn fresh_factor_artificial_bound_retry() {
+        // Captured reference call 1, not a reconstruction of the unknown original model.
+        let case: Value =
+            serde_json::from_str(include_str!("../tests/fixtures/bh305_ratio_capture.json"))
+                .unwrap();
+        let input = &case["input"];
+        let n = input["n"].as_u64().unwrap() as usize;
+        let m = input["m"].as_u64().unwrap() as usize;
+        let counts = input["colcnt"].as_array().unwrap();
+        // Only column lengths are read by ratio_test; the placeholder matrix is used
+        // to construct an otherwise unused factor and mirror.
+        let mut starts = vec![0];
+        let mut rows = Vec::new();
+        for count in counts {
+            for i in 0..count.as_u64().unwrap() as usize {
+                rows.push(i);
+            }
+            starts.push(rows.len());
+        }
+        let model = LpModel {
+            name: "captured-ratio-input".into(),
+            sense: Sense::Minimize,
+            offset: 0.0,
+            obj: vec![0.0; n],
+            col_lo: vec![0.0; n],
+            col_up: vec![INF; n],
+            row_lo: vec![-INF; m],
+            row_up: vec![0.0; m],
+            row_range: vec![],
+            row_kind: vec![],
+            range_order: vec![],
+            range_entries: vec![],
+            range_dup: false,
+            col_start: starts,
+            val: vec![1.0; rows.len()],
+            row_idx: rows,
+            col_names: vec![],
+            row_names: vec![],
+        };
+        let mut p = build(&model);
+        let idx = input["row"]["idx"].as_array().unwrap();
+        let vals = input["row"]["val"].as_array().unwrap();
+        let row: Vec<(usize, f64)> = idx
+            .iter()
+            .zip(vals)
+            .map(|(j, a)| (j.as_u64().unwrap() as usize, a.as_f64().unwrap()))
+            .collect();
+        let mut st = vec![FIXED; n + m];
+        let mut d = vec![0.0; n + m];
+        for (i, &(j, _)) in row.iter().enumerate() {
+            st[j] = input["st"][i].as_i64().unwrap() as i32;
+            d[j] = input["d"][i].as_f64().unwrap();
+            p.lo[j] = input["lb"][i].as_f64().unwrap();
+            p.up[j] = input["ub"][i].as_f64().unwrap();
+        }
+        let basic: Vec<_> = (n..n + m).collect();
+        let (order, structure, cols) = reference_order::<f64>(&p, &basic, 1);
+        let mirror = RefStruct::fresh(m, n, &structure, &cols);
+        let basis_cols: Vec<_> = order.iter().map(|&j| &p.cols[j]).collect();
+        let factor = Factor::new(m, &basis_cols).unwrap();
+        let cap = 20;
+        let mut s: Dual<f64> = Dual {
+            p: &p,
+            n,
+            m,
+            head: order,
+            st,
+            xb: vec![0.0; m],
+            d: vec![0.0; n + m],
+            w: vec![1.0; m],
+            mirror,
+            factor,
+            rrows: vec![Vec::new(); m],
+            absorb_request: false,
+            refactorizations: 1,
+            lu_thr: 0.0078125,
+            big_pricing: false,
+            pmode: 1,
+            n_infeas: 0,
+            inf_count: 0,
+            retries: 0,
+            repaired: None,
+            snapshot_excluded: false,
+            bad_rows: Vec::new(),
+            old_rej: 0,
+            rejected_end: false,
+            art_exit: false,
+            worst: 0.0,
+            worst_row: -1,
+            retry: false,
+            retry_end: 0,
+            retry_tiny: 0,
+            stale_count: false,
+            last_pivoted: false,
+            it_base: 0,
+            dflag: Vec::new(),
+            switch_enabled: false,
+            level: 0,
+            request: 0,
+            iters: 0,
+            prio: vec![0.0; m],
+            ptype: 0,
+            p68: Vec::new(),
+            p70: Vec::new(),
+            p60: 0.0,
+            p58: 0.0,
+            flags: vec![2; m],
+            list: Vec::new(),
+            thr: 0.0,
+            xb_residual: 0.0,
+            value_mode: false,
+            cursor: 0,
+            walk_len: 0,
+            slack_nb: vec![false; m],
+            pend: cap,
+            cap,
+            rebuilds: 40,
+            first_recompute: true,
+            warm: false,
+            avg_touch: 0.0,
+            last_cap: 0,
+            last_y: Vec::new(),
+            fac0: 0,
+            nref0: 0,
+            nref_skip: 0,
+            it0: 0,
+            updates: 0,
+            upd_limit: None,
+            pending_alpha: None,
+            pair: (0.0, 0.0),
+            status: None,
+            nm: n,
+            ray: None,
+            zero_artificial: false,
+            cost: p.cost.clone(),
+            cshift: vec![0.0; p.cost.len()],
+            cost_lo: vec![0.0; p.cost.len()],
+            shift_r: vec![0.0; p.cost.len()],
+            rng: 101,
+            pert: 0,
+            obj_off: 0.0,
+            flip_select: false,
+            work: crate::work::Work::dual(),
+            pivot_cols: None,
+            nnz_a: p.cols[..n].iter().map(Vec::len).sum(),
+            pstep: 0.0,
+            stall: 0,
+            stall_snap: 0,
+            stall_it: 0.0,
+            prog_on: false,
+            prog_acc: 0.0,
+            best_obj: -1e100,
+            pert_left: 1_000_000_000,
+            pert_param: 0.0,
+            obj_scale: 1.0,
+            scaled: false,
+            pcost: p.cost.clone(),
+        };
+        s.d = d;
+        s.level = input["lvl"].as_u64().unwrap() as usize;
+        s.iters = input["it"].as_f64().unwrap() as usize;
+        let rc = &case["candidate_collection"];
+        assert_eq!(rc["n"].as_u64().unwrap(), 7);
+        assert_eq!(rc["pos"], serde_json::json!([0, 2, 3, 4, 5, 6, 9]));
+        assert_eq!(
+            rc["x12"].as_f64().unwrap().to_bits(),
+            (-2.0 * input["xB"].as_f64().unwrap()).to_bits()
+        );
+        for pos in [0, 2, 4, 9] {
+            let j = row[pos].0;
+            assert_eq!(s.st[j], UB);
+            assert!(p.up[j] >= BIG);
+        }
+        // The capture does not record the factor's update count: exercise a
+        // fresh factor explicitly (updates = 0).
+        let leave = input["var"].as_u64().unwrap() as usize;
+        let result = s.ratio_test(
+            &row,
+            input["esi"].as_u64().unwrap() as usize,
+            leave,
+            false,
+            input["xB"].as_f64().unwrap(),
+        );
+        let q = result.q.expect("reference selected a candidate");
+        assert_eq!(row[q].0 as i64, case["expected"]["q"].as_i64().unwrap());
+        assert_eq!(
+            result.flips.len(),
+            case["expected"]["nflip"].as_u64().unwrap() as usize
+        );
+        assert_eq!(
+            row[q].1.to_bits(),
+            case["expected"]["a308"].as_f64().unwrap().to_bits()
+        );
+        assert!(result.reject.is_none());
+    }
+}
