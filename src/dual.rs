@@ -4761,10 +4761,12 @@ fn solve_pass<R: Real>(
                 && stt == Status::Optimal
                 && s.pert != 0
                 && !NO_ART_EXIT.with(|c| c.get())
-                && (s.level != 0 || s.q4_shifted)
+                && (s.level != 0 || s.q4_shifted || s.true_cost_infeasible())
             {
                 // The quad driver's end (`0x24a4f6..0x24a548`): a final status 2 (dual optimal) or 5 with the cost shifts in force (`ctx+0x338` != 0) clears them and returns
                 // status -1004; the controller hands over to the x87 primal (seeds 5247, 6972, 6610, 8179). It replaces the double dual's exit at the request-4 refactor.
+                // The reference exits for every final status 2 with `ctx+0x338` != 0 (`c35c` up to 10); rose keeps the exit to the cases where the true costs make a d wrong-signed or the
+                // pass shifted (the x87 primal makes pivots there), the others end in the clean-up pass whose values equal the x87 primal's without pivots (seeds 4821, 4874, 7358).
                 s.art_exit = true;
                 s.dual_unbounded();
                 status = Status::Unbounded;
