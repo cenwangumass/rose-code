@@ -1422,7 +1422,13 @@ impl<'a> Solver<'a> {
         let cols: Vec<&Column> = self.basic.iter().map(|&j| &self.p.cols[j]).collect();
         // Once the driver has used its five restarts it refuses another one (`0xf3aba`): the primal then goes on with the basis that the reference's factorization accepts
         // (fx_midsing_1106: pivots of 3.6e-12 pass, the floor of the starting factorization is 1e-11).
-        let floor = if self.handoff.is_some() { 1e-13 } else { 1e-11 };
+        let floor = if self.handoff.as_ref().is_some_and(|h| h.quad) {
+            0.0
+        } else if self.handoff.is_some() {
+            1e-13
+        } else {
+            1e-11
+        };
         self.factor = Factor::with_floor(self.p.m, &cols, floor).map_err(|_| {
             if self.handoff.is_some() {
                 // The numerical factor finds no acceptable pivot for a column that the structural order placed (the reference's `p13` > 0): same restart as above.
@@ -2659,7 +2665,7 @@ const P0_DTOL_P1: f64 = 1e-7 * PHASE1_M;
 impl<'a> Solver<'a> {
     /// Nonbasic, not fixed: the variables the `pricing0` list ranks (status -1, -2 or -3 of the reference).
     fn p0_eligible(&self, j: usize) -> bool {
-        self.pos_of[j] == NONE && !self.is_fixed(j) && self.excluded != Some(j)
+        self.pos_of[j] == NONE && !self.is_fixed(j) && self.excluded != Some(j) && !self.excl6[j]
     }
 
     /// The reference's score `s` of a nonbasic variable (`d`, negated at the upper bound) and whether it is free, from the duals `y`.
@@ -4335,8 +4341,18 @@ fn solve_primal(
     let in_r0: Vec<bool> = (0..n + m).map(|j| pos_of[j] == NONE).collect();
     let cols: Vec<Column> = basis.basic.iter().map(|&j| p.cols[j].clone()).collect();
     // A handoff from the dual factors with the primal's numeric floor 1e-13 (`ctx+0x3a8`), as the start factorization below does.
-    let factor = Factor::with_floor(m, &cols, if handoff.is_some() { 1e-13 } else { 1e-11 })
-        .map_err(|_| SolveError::SingularBasis)?;
+    let factor = Factor::with_floor(
+        m,
+        &cols,
+        if handoff.as_ref().is_some_and(|h| h.quad) {
+            0.0
+        } else if handoff.is_some() {
+            1e-13
+        } else {
+            1e-11
+        },
+    )
+    .map_err(|_| SolveError::SingularBasis)?;
     let mut s = Solver {
         p: &p,
         opts,
@@ -4488,8 +4504,18 @@ fn solve_primal(
         lu_work.extend(mi.fresh_work());
 
         let cols: Vec<&Column> = s.basic.iter().map(|&j| &s.p.cols[j]).collect();
-        s.factor = Factor::with_floor(m, &cols, if handoff.is_some() { 1e-13 } else { 1e-11 })
-            .map_err(|_| SolveError::SingularBasis)?;
+        s.factor = Factor::with_floor(
+            m,
+            &cols,
+            if handoff.as_ref().is_some_and(|h| h.quad) {
+                0.0
+            } else if handoff.is_some() {
+                1e-13
+            } else {
+                1e-11
+            },
+        )
+        .map_err(|_| SolveError::SingularBasis)?;
     }
     s.work.trig();
     s.work.decided(s.work.w);

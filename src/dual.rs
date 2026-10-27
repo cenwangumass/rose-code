@@ -4047,6 +4047,8 @@ pub fn solve(
 }
 
 thread_local! {
+    /// Quad resumes after the primal gave up at an artificial-bound exit (one per solve).
+    static QUAD_RESUMES: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
     /// Set while a rerun skips the second pass of the free-column pivots (the early verdict's ray did not verify).
     static NO_ART_EXIT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static NO_DEFERRED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
@@ -4076,6 +4078,7 @@ fn solve_frame(
     set_primal_tol(PRIMAL_TOL);
     RESID_FAILS.with(|c| c.set(0));
     PERT_RERUNS.with(|c| c.set(0));
+    QUAD_RESUMES.with(|c| c.set(0));
     RNG_CELL.with(|c| c.set(101));
     SNAP.with(|c| *c.borrow_mut() = None);
     DRIFT_START.with(|c| *c.borrow_mut() = None);
@@ -4987,6 +4990,27 @@ fn solve_pass<R: Real>(
             basic: s.head.clone(),
             at_upper: (0..n + m).map(|j| s.st[j] == UB && p.up[j] < BIG).collect(),
         };
+        if R::QUAD && s.art_exit {
+            // After a quad pass the reference's primal is the x87 one (`ctx+0x28` stays 1), whatever ended the dual (random LP seed 5247: the request-4
+            // exit of a quad pass; the double primal found the ill-conditioned basis singular and the run ended with an error).
+            if crate::simplex::QUAD_PRIMALS.with(|c| c.get()) == 0 && s.iters > 0 {
+                popts.pricing0 = true;
+            }
+            crate::simplex::HANDOFF.with(|c| {
+                c.set(Some(crate::simplex::Handoff {
+                    stale: Some(s.pair),
+                    thr: s.lu_thr,
+                    retries: s.retries as usize,
+                    pert: s.pert >= 2 && !s.rejected_end,
+                    pair_tol: PAIR_TOL.with(|c| c.get()),
+                    quad: true,
+                    iters: (s.it_base + s.iters) as f64,
+                    snap: (s.it_base + s.stall_it as usize) as f64,
+                    c178: C178.with(|c| c.get()),
+                    excl: if s.pert == 0 { s.repaired } else { None },
+                }))
+            });
+        }
         let prres = crate::simplex::solve(model, Some(&from_dual), &popts).ok();
         // The primal's unit step of the entering variable belongs to its own ray only, not to the dual's artificial-bound point.
         let prres_enter = crate::simplex::RAY_ENTER.with(|c| c.take());
@@ -4998,6 +5022,34 @@ fn solve_pass<R: Real>(
             // The primal gives up from the dual's basis: the dual runs on past the request-4 refactorization instead.
             NO_ART_EXIT.with(|c| c.set(true));
             let resume = prres.as_ref().map(|pr| pr.basis.clone());
+            if R::QUAD
+                && QUAD_RESUMES.with(|c| {
+                    c.set(c.get() + 1);
+                    c.get() <= 1
+                })
+            {
+                // A quad pass resumes as a quad pass from the primal's basis (the x87 primal gave up at its first scan), the counters going on (random LP seed 5247).
+                let pit = prres.as_ref().map_or(0, |pr| pr.iterations);
+                let pfac = prres.as_ref().map_or(0, |pr| pr.refactorizations);
+                let carry3 = Carry {
+                    retries: s.retries,
+                    thr: s.lu_thr,
+                    fac: s.refactorizations + pfac,
+                    iters: s.iters + pit,
+                    avg_touch: 0.0,
+                    last_cap: 0,
+                    inf_count: 0,
+                    after_pivot: false,
+                    it_base: s.it_base + s.iters + pit,
+                    nref0: s.nref() + pfac.max(1),
+                    pstep: None,
+                };
+                let again = solve_pass::<R>(model, resume.as_ref().or(start), opts, &carry3);
+                NO_ART_EXIT.with(|c| c.set(false));
+                let mut again = again?;
+                again.iterations += carry3.iters;
+                return Ok(again);
+            }
             let again = solve_frame(model, resume.as_ref().or(start), opts);
             NO_ART_EXIT.with(|c| c.set(false));
             return again;
