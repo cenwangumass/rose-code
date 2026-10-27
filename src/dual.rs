@@ -2760,6 +2760,9 @@ impl<'a, R: Real> Dual<'a, R> {
                     self.worst = meas;
                     self.worst_row = r as i64;
                 }
+            } else {
+                // The list-walk mode (`0xc94fb` -> `0xc9577`): the row is dropped without a flag; at the end of the walk list the factor is refactorized or the value mode starts.
+                self.walk_end_request();
             }
             return Step::Reject;
         }
@@ -2971,16 +2974,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 // set; the cursor has passed it). When the walk has reached the end of its list (`ctx+0x2c4` = `P+0x3c`): more updates than half the
                 // cursor ask for a refactorization (request 6, none for a fresh factor); otherwise the pricing goes to the value mode (`P+0x40` = -1) and
                 // asks for one.
-                if self.cursor == self.walk_len {
-                    if self.updates > self.cursor / 2 {
-                        if self.updates != 0 {
-                            self.request = 6;
-                        }
-                    } else {
-                        self.value_mode = true;
-                        self.request = 6;
-                    }
-                }
+                self.walk_end_request();
                 *dump = rec;
                 return Step::Reject;
             }
@@ -3213,6 +3207,21 @@ impl<'a, R: Real> Dual<'a, R> {
                 }
             } else {
                 self.flags[r] = 2;
+            }
+        }
+    }
+
+    /// The end of the list walk after a rejected row (`0xc9577..0xc95b3`, `0xc5bd0`): at the end of the list (`ctx+0x2c4` = `P+0x3c`) more updates than half the
+    /// cursor ask for a refactorization (request 6, none for a fresh factor); otherwise the pricing goes to the value mode (`P+0x40` = -1) and asks for one.
+    fn walk_end_request(&mut self) {
+        if self.cursor == self.walk_len {
+            if self.updates > self.cursor / 2 {
+                if self.updates != 0 {
+                    self.request = 6;
+                }
+            } else {
+                self.value_mode = true;
+                self.request = 6;
             }
         }
     }
@@ -4537,7 +4546,13 @@ fn solve_pass<R: Real>(
                 // each time it returns, so the "first rejection" is per iteration; the rejected count `ctx+0x420` stays (fx_midsing_1106 call 20).
                 s.driver_return();
             }
-            Step::Reject => {}
+            Step::Reject => {
+                // A row dropped in the list-walk mode returns from the iteration function with the request it set (`0xc9577`): the post-iteration pass refactorizes.
+                if s.request != 0 && s.status.is_none() {
+                    s.post(None, false)?;
+                    s.driver_return();
+                }
+            }
             Step::Mismatch => {
                 if s.status.is_none() {
                     s.post(None, false)?;
