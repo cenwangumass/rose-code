@@ -1181,6 +1181,45 @@ struct Solver<'a> {
     restarts: usize,
 }
 
+/// Pricing0's x87 pivot writes the column value while preserving the last
+/// row value (0x2806f1); Devex consumes the pair at its next scan (0x281097).
+fn pricing0_quad_pair(pair: Option<(f64, f64)>, column: f64) -> Option<(f64, f64)> {
+    Some((column, pair.map_or(0.0, |(_, row)| row)))
+}
+
+fn take_primal_pair(pair: &mut Option<(f64, f64)>, quad_pricing0: bool) -> Option<(f64, f64)> {
+    if quad_pricing0 {
+        None
+    } else {
+        pair.take()
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn pricing0_quad_pair_survives_until_devex() {
+    // 5959: the inherited row value survives five pricing0 pivots. The
+    // following Devex check rejects the pair and requests factorization 6.
+    let mut pair = Some((0.0, 1.1514178559569295e-6));
+    for column in [
+        -299999999990000.4,
+        0.05960464477538585,
+        0.009999999966999986,
+        0.0,
+        -1.4305114793062157,
+        0.0,
+        -32.0000000016,
+    ] {
+        pair = pricing0_quad_pair(pair, column);
+        assert!(take_primal_pair(&mut pair, true).is_none());
+    }
+    let (a, b) = take_primal_pair(&mut pair, false).unwrap();
+    assert!(pair.is_none());
+    assert_eq!(a.to_bits(), (-32.0000000016_f64).to_bits());
+    assert_eq!(b.to_bits(), (1.1514178559569295e-6_f64).to_bits());
+    assert!((b.abs() - a.abs()).abs() / (a.abs() + 1.0) > 3e-6);
+}
+
 /// A primal run by itself whose factorization found the basis singular (status -1002 at `0xf5921`): the controller (`0x154e5d`) restarts it
 /// from the start basis, with the pivot threshold raised (`0xf595d`: 0.5 at the first event, 0.9 after), five times; the sixth event repairs in place.
 #[derive(Clone, Copy, Debug)]
@@ -5887,11 +5926,11 @@ fn solve_primal(
         }
         // The x87 pricing0 path (0x281126) uses its own residual test and
         // bypasses the Devex pivot-pair check at 0x281097 (seed 7089).
-        if let Some((a, b)) = s
-            .stale
-            .take()
-            .filter(|_| !(s.handoff.is_some_and(|h| h.quad) && s.p0.is_some()))
-        {
+        let pair = take_primal_pair(
+            &mut s.stale,
+            s.handoff.is_some_and(|h| h.quad) && s.p0.is_some(),
+        );
+        if let Some((a, b)) = pair {
             // The pivot check of `0x144ff9..0x145064` on the pair the dual's last iteration left in `ctx+0x300` / `ctx+0x308`: a disagreement (the column's
             // value below 1e-13, or the relative difference above 3e-6) zeroes both, counts an accuracy event (`ctx+0x178`), and requests a refactorization (6).
             let (a, b) = (a.abs(), b.abs());
@@ -6559,6 +6598,9 @@ fn solve_primal(
         }
 
         if s.p0.is_some() {
+            if s.handoff.is_some_and(|h| h.quad) {
+                s.stale = pricing0_quad_pair(s.stale, alpha_rq);
+            }
             // `pricing0`: no pivot row, no Devex weights, no maintained `d`; the next pricing call updates the duals by one BTRAN.
             let dq = s.d[q];
             s.y_ref = None;
