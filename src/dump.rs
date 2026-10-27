@@ -13,6 +13,7 @@ pub const KINDS: &[(&str, &str, &str)] = &[
     ("pricing", "PLIST", "each pricing call: call index, candidate list, d, w, basic set and x"),
     ("scale", "SCALE", "once per solve: the scale factors, columns (structurals, then range columns) and rows"),
     ("pricing0", "P0", "`pricing0` scan: list, position, duals and stored d at entry (tag in), and the chosen variable with its d (tag out)"),
+    ("xpricing", "XPR", "x87 primal (after a quad dual): at each scan (tag scan) and after the recompute of the duals (tag rescan): iterations done, d, w, candidate list, basis"),
     ("ftran", "FTR", "pivot-column FTRAN input rows and result in output order"),
     ("ustage", "USTG", "U-stage state of each pivot-column FTRAN: the L-stage result (spike, ascending), the diagonal, the tail columns' U entries and slots"),
     ("lstage", "LST", "dense x (by position) of each pivot-column FTRAN after the L stage (l) and after the row etas (e)"),

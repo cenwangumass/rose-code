@@ -1077,6 +1077,8 @@ struct Solver<'a> {
     forced: bool,
     /// The basis was repaired in place after a singular factorization.
     repaired: bool,
+    /// The scan right after the admission of the excluded variable (dump tag `admit`).
+    admit_scan: bool,
     /// Restarts of a primal not started by the dual controller after singular factorizations (`ctx+0x184`, see `PlainRestart`).
     restarts: usize,
 }
@@ -2462,9 +2464,20 @@ impl<'a> Solver<'a> {
 
     /// `price`, with the reference's recovery when the list scan finds nothing: the duals are recomputed from scratch
     /// (no pivot) and the list is rebuilt by the next pass.
+    /// `ROSE_DUMP=xpricing`: the duals, weights and candidate list at a scan of the primal started by a quad dual (the x87 primal), with the iterations made in the run.
+    fn dump_xpricing(&self, tag: &str) {
+        if crate::dump::on("xpricing") && self.handoff.is_some_and(|h| h.quad) {
+            crate::dump::emit(
+                "xpricing",
+                serde_json::json!({"tag": tag, "done": self.iters_done, "excl": self.excluded, "d": self.d, "w": self.w, "list": self.list, "basic": self.basic}),
+            );
+        }
+    }
+
     fn price_faithful(&mut self) -> Option<usize> {
         self.list_failed = false;
         self.recomputed = false;
+        self.dump_xpricing(if self.admit_scan { "admit" } else { "scan" });
         let q = self.price();
         if q.is_none() && self.list_failed {
             self.list_failed = false;
@@ -2473,6 +2486,7 @@ impl<'a> Solver<'a> {
             self.recompute_dual();
             self.list.clear();
             self.level = 0;
+            self.dump_xpricing("rescan");
             if crate::dump::on("pricing") {
                 crate::dump::emit(
                     "pricing",
@@ -2562,11 +2576,13 @@ impl<'a> Solver<'a> {
             self.list.clear();
             self.level = 0;
             let w1 = self.work.w;
+            self.admit_scan = true;
             let q = if self.p0.is_some() {
                 self.price0()
             } else {
                 self.price_faithful()
             };
+            self.admit_scan = false;
             if q.is_none() {
                 self.work.rollback(w1);
             }
@@ -4540,6 +4556,7 @@ fn solve_primal(
         iters_done: 0,
         forced: false,
         repaired: kept_out,
+        admit_scan: false,
         restarts: rs.map_or(0, |r| r.count),
     };
     s.rows = vec![Vec::new(); m];
