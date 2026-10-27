@@ -976,6 +976,8 @@ struct Solver<'a> {
     feas_seen: bool,
     /// The driver restarted inside the last pricing call: the refactorization check read before it is stale.
     restarted: bool,
+    /// The excluded variable was admitted in this run (`price_admitting`).
+    admitted: bool,
     basic: Vec<usize>,
     pos_of: Vec<usize>,
     at_upper: Vec<bool>,
@@ -2567,6 +2569,7 @@ impl<'a> Solver<'a> {
             let r = self.refactor();
             self.restart = false;
             self.restarted = true;
+            self.admitted = true;
             if r.is_err() {
                 return None;
             }
@@ -4471,6 +4474,7 @@ fn solve_primal(
         fresh_duals: false,
         feas_seen: false,
         restarted: false,
+        admitted: false,
         basic: basis.basic.clone(),
         pos_of: pos_of.clone(),
         at_upper: basis.at_upper.clone(),
@@ -5019,6 +5023,12 @@ fn solve_primal(
                         if s.handoff.is_some() && !infeasible && s.p0.is_none() {
                             // The duals were only updated since the end of phase 1: the recomputation is followed by a new pricing call, which may find a
                             // column (seed 2717, ref call 25: the scan on the updated duals is empty, on the recomputed ones x6 enters).
+                            if s.handoff.is_some_and(|h| h.quad) && s.admitted {
+                                // After the admission of the variable the quad dual's repair left out, the failed scan is followed by a refactorization before the duals
+                                // are recomputed (seed 3981: the factorization count goes 7 -> 8 between the two scans; 2717's failed scans, no admission, keep it).
+                                s.work.trig();
+                                s.refactor()?;
+                            }
                             s.recompute_dual();
                             s.rescan3 = true;
                             s.list.clear();
