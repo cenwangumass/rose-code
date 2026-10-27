@@ -4771,6 +4771,7 @@ fn solve_pass<R: Real>(
                 && stt == Status::Optimal
                 && s.pert != 0
                 && !NO_ART_EXIT.with(|c| c.get())
+                && CLEANUP_PASS.with(|c| c.get()).is_none()
                 && s.true_cost_infeasible()
             {
                 // The double dual ends optimal for the shifted costs but the true costs make a nonbasic d wrong-signed: the controller's primal runs from this basis (-1004).
@@ -5105,28 +5106,6 @@ fn solve_pass<R: Real>(
             });
         }
         let prres = crate::simplex::solve(model, Some(&from_dual), &popts).ok();
-        if !R::QUAD
-            && s.art_exit
-            && prres
-                .as_ref()
-                .is_some_and(|pr| pr.status == Status::Infeasible)
-        {
-            let pit = prres.as_ref().map_or(0, |pr| pr.iterations);
-            let pfac = prres.as_ref().map_or(0, |pr| pr.refactorizations);
-            SINGULAR.with(|c| {
-                c.set(Some((
-                    s.iters + pit,
-                    s.refactorizations + pfac,
-                    s.lu_thr,
-                    s.avg_touch,
-                    s.last_cap,
-                    s.inf_count,
-                    false,
-                    s.retries,
-                )))
-            });
-            return Err(SolveError::SingularBasis);
-        }
         if R::QUAD && s.art_exit {
             if let Some(pr) = prres
                 .as_ref()
