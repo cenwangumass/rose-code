@@ -6424,14 +6424,20 @@ fn solve_primal(
             let wq_q = if ftran_out.is_empty() {
                 crate::f80::F80::c(s.w[q])
             } else {
-                let inr = |j: usize| s.in_r0[j];
-                let mut t = if s.in_r0[q] {
+                // The x87 mode-2 sum counts positive-weight basics and squares the
+                // double pivot in double precision; the other terms stay extended.
+                let inr = |j: usize| if m2 { s.w[j] > 0.0 } else { s.in_r0[j] };
+                let mut t = if m2 || s.in_r0[q] {
                     crate::f80::F80::ONE
                 } else {
                     crate::f80::F80::ZERO
                 };
                 if inr(s.basic[r]) {
-                    t += a_rq * a_rq;
+                    t += if m2 {
+                        crate::f80::F80::c(alpha_rq * alpha_rq)
+                    } else {
+                        a_rq * a_rq
+                    };
                 }
                 let mut order: Vec<(usize, crate::f80::F80)> =
                     ftran_out.iter().map(|&(i, _)| (i, aqv[i])).collect();
@@ -6554,7 +6560,25 @@ fn solve_primal(
             if m2 {
                 // Mode 2 (`0x104c2d`): `w_j = max(w_j, wq / alpha^2 * arj^2 + 1)`, no cross term.
                 if arj.abs() > WEIGHT_DROP_TOL {
-                    s.w[j] = s.w[j].max(((wq / alpha_rq) / alpha_rq) * arj * arj + 1.0);
+                    if let (Some((a_rq, wq_q)), Some(pq)) = (qw, prods_q.as_ref()) {
+                        // 0x257f98 and 0x25809d keep the divisions and row update in x87 precision.
+                        use crate::real::Real;
+                        let nw = ((wq_q / a_rq) / a_rq) * pq[j] * pq[j] + crate::f80::F80::ONE;
+                        if s.wf.len() != s.w.len() {
+                            s.wf = vec![crate::f80::F80::ZERO; s.w.len()];
+                        }
+                        let old = if s.wf[j].to_f64() == s.w[j] {
+                            s.wf[j]
+                        } else {
+                            crate::f80::F80::c(s.w[j])
+                        };
+                        if nw > old {
+                            s.wf[j] = nw;
+                            s.w[j] = nw.to_f64();
+                        }
+                    } else {
+                        s.w[j] = s.w[j].max(((wq / alpha_rq) / alpha_rq) * arj * arj + 1.0);
+                    }
                 }
             } else if arj.abs() > WEIGHT_DROP_TOL {
                 if let (Some((a_rq, wq_q)), Some(tq), Some(pq)) =
@@ -6666,7 +6690,21 @@ fn solve_primal(
             // Mode 2: the leaving weight is floored at 1 and the pivot-row loop then reaches the leaving variable with its row product.
             let wl = s.w[leave].max(1.0);
             s.w[leave] = wl;
-            if leave_arj.abs() > WEIGHT_DROP_TOL {
+            if let (Some((a_rq, wq_q)), Some(pq)) = (qw, prods_q.as_ref()) {
+                let mut v = (wq_q / a_rq) / a_rq;
+                if v < crate::f80::F80::ONE {
+                    v = crate::f80::F80::ONE;
+                }
+                if leave_arj.abs() > WEIGHT_DROP_TOL {
+                    let nw = ((wq_q / a_rq) / a_rq) * pq[leave] * pq[leave] + crate::f80::F80::ONE;
+                    if nw > v {
+                        v = nw;
+                    }
+                }
+                s.wf[leave] = v;
+                s.w[leave] = v.to_f64();
+                s.wf[q] = crate::f80::F80::ONE;
+            } else if leave_arj.abs() > WEIGHT_DROP_TOL {
                 s.w[leave] = wl.max(((wq / alpha_rq) / alpha_rq) * leave_arj * leave_arj + 1.0);
             }
             s.w[q] = 1.0;
