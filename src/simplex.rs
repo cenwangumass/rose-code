@@ -4625,10 +4625,10 @@ pub fn solve(
     }
     if let Some(h) = handoff.filter(|h| h.quad) {
         // The decision of the primal's start factorization (`0x27ebb0..0x27ecc9`): a method other than 1, iterations `ctx+0x2a0` neither 0 nor the snapshot
-        // `ctx+0x2b0`, and the stability counter `ctx+0x178` positive switch to method 1 and clear `ctx+0x468`. `ctx+0x3ec` at the start of the first two quad primals
-        // is 0 and 2 for `ctx+0x35c` 1 and 2, 1 from 3 on (`replay/gdb_c35c_trace.py`).
+        // `ctx+0x2b0`, and the stability counter `ctx+0x178` positive switch to method 1 and clear `ctx+0x468`. `ctx+0x3ec` at initialization
+        // is 0 at `ctx+0x35c` <= 1, 1 above 2 when `ctx+0x178` is positive, and 2 otherwise (`0x275913..0x275947`).
         QUAD_PRIMALS.with(|c| c.set(c.get() + 1));
-        // `ctx+0x35c` (the count of runs ended with status -1004, plus one) decides: the first two quad primals are in methods 0/2, the later ones in method 1.
+        // `ctx+0x35c` counts runs ended with status -1004, plus one.
         let k = crate::dual::C35C.with(|c| c.get());
         let switch = k <= 2 && h.iters != 0.0 && h.iters != h.snap && h.c178 > 0;
         QUAD_EEFA.with(|c| c.set(switch || (h.preserve_ratio && c.get())));
@@ -4926,7 +4926,7 @@ fn solve_primal(
                 if handoff.is_some_and(|h| {
                     h.quad
                         && (h.iters == 0.0
-                            || crate::dual::C35C.with(|c| c.get()) >= 3
+                            || (crate::dual::C35C.with(|c| c.get()) >= 3 && h.c178 > 0)
                             || (!h.preserve_ratio && QUAD_EEFA.with(|c| c.get())))
                 }) {
                     1
