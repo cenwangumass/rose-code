@@ -1639,7 +1639,7 @@ impl<'a, R: Real> Dual<'a, R> {
         let mut acc = vec![R::ZERO; n + m];
         let mut touched = vec![false; n + m];
         let mut order: Vec<usize> = Vec::new();
-        let sparse = !((n as f64) < 1.8 * est as f64);
+        let sparse = rho.len() == 1 || !((n as f64) < 1.8 * est as f64);
         for &(i, rv) in rho {
             for &j in &self.rrows[i] {
                 let a = p.cols[j].iter().find(|e| e.0 == i).map_or(0.0, |e| e.1);
