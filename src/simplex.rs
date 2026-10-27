@@ -1878,7 +1878,20 @@ impl<'a> Solver<'a> {
         };
         let (n, m) = (self.p.n, self.p.m);
         let dc_sorted = dc.to_vec();
-        let out = mi.btran(&dc_sorted, false, false);
+        let outq = if mi.is_q() {
+            let input = dc_sorted
+                .iter()
+                .map(|&(i, v)| (i, crate::f80::F80::from_f64(v)))
+                .collect::<Vec<_>>();
+            mi.btran_ld(&input, false, false)
+        } else {
+            None
+        };
+        let out = if let Some(ref v) = outq {
+            v.iter().map(|&(i, x)| (i, x.to_f64())).collect()
+        } else {
+            mi.btran(&dc_sorted, false, false)
+        };
         self.work
             .add_from(0x12de50, 0x10804b, mi.work(), crate::work::FAC);
         if crate::dump::on("costchg") {
@@ -1909,6 +1922,24 @@ impl<'a> Solver<'a> {
         // the pivot-row update). Basic slacks outside the cost-change positions lose their raw row entry (rounding noise);
         // basic structurals are not touched.
         let prods = p.rank_products(&rho, &rank);
+        let prodsq = outq.as_ref().map(|out| {
+            let mut rq = vec![crate::f80::F80::ZERO; m];
+            for &(i, v) in out {
+                if rho[i] != 0.0 {
+                    rq[i] = v;
+                }
+            }
+            p.rank_products_q(&rq, &rank)
+        });
+        let subq = |s: &mut Self, j: usize, v: crate::f80::F80| {
+            let old = if s.df[j].to_f64() == s.d[j] {
+                s.df[j]
+            } else {
+                crate::f80::F80::from_f64(s.d[j])
+            };
+            s.df[j] = old - v;
+            s.d[j] = s.df[j].to_f64();
+        };
         if q != NONE && !q_only {
             self.d[q] = if q < n {
                 self.d[q] - alpha_rq
@@ -1936,7 +1967,11 @@ impl<'a> Solver<'a> {
                 0.0
             };
             if self.pos_of[j] == NONE && a.abs() > ROW_DROP_TOL {
-                self.d[j] -= a;
+                if let Some(ref pq) = prodsq {
+                    subq(self, j, pq[j]);
+                } else {
+                    self.d[j] -= a;
+                }
             }
             if ((j >= n && rho[j - n] != 0.0) || (self.pos_of[j] == NONE && a.abs() > ROW_DROP_TOL))
                 && self.excluded != Some(j)
@@ -6121,7 +6156,12 @@ fn solve_primal(
             // The reference keeps the stored value of a basic variable: the leaving one moves by the pivot-row update like any
             // other entry and loses its phase 1 penalty; the entering one is left holding the negated pivot element (zero for a
             // degenerate step; this matches 277 of 330 DEGEN2 pivots).
-            s.d[leave] -= theta_leave;
+            if !prods_q
+                .as_ref()
+                .is_some_and(|pq| dsub(&mut s, leave, pq[leave]))
+            {
+                s.d[leave] -= theta_leave;
+            }
             if let Some(&(j, c)) = s.p1_prev.get(r) {
                 if j == leave && c != 0 {
                     leave_penalty = PHASE1_M * f64::from(c);
@@ -6131,7 +6171,12 @@ fn solve_primal(
         } else {
             // The reference subtracts from the stored value (rounding noise included) in phase 2 as well.
             if s.mirror.is_some() {
-                s.d[leave] -= theta_leave;
+                if !prods_q
+                    .as_ref()
+                    .is_some_and(|pq| dsub(&mut s, leave, pq[leave]))
+                {
+                    s.d[leave] -= theta_leave;
+                }
             } else {
                 s.d[leave] = -theta_leave;
             }
@@ -6291,7 +6336,13 @@ fn solve_primal(
         } else {
             s.update_list(&changed, 1, 0x1442ab);
         }
-        s.d[leave] -= leave_penalty;
+        if qw.is_some() {
+            let v = dval(&s, leave) - crate::f80::F80::from_f64(leave_penalty);
+            s.df[leave] = v;
+            s.d[leave] = v.to_f64();
+        } else {
+            s.d[leave] -= leave_penalty;
+        }
         s.work.trig();
         if let Some((d, u, na)) = chk {
             let w_now = s.work.w;
