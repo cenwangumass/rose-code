@@ -1122,14 +1122,11 @@ impl<'a, R: Real> Dual<'a, R> {
             .add_from(0x12de50, 0xe53a7, self.mirror.work, crate::work::FAC);
         for j in 0..self.n + self.m {
             if self.st[j] == FIXED {
-                // A fixed nonbasic variable that has a d (it left the basis, or the start gave it one) gets its true d like one at its lower bound
-                // (DEGEN2 d[700] after the refactorization at iteration 16); the fixed variables whose d is 0 keep it (PILOT4: 183 of 214).
                 if j < self.n {
                     // The cost in force: the double cost and, in the quad pass, its long-double remainder (seeds 8531, 7084).
                     self.d[j] = R::c(self.cost[j]) + R::c(self.cost_lo[j]);
-                } else if self.d[j] != R::ZERO || R::QUAD {
-                    // The quad pass's d recompute (`0x273cd0`) subtracts y from the slack of every row whatever the status (seed 7084: d = -4.87e-6 on a
-                    // fixed slack that had d = 0).
+                } else {
+                    // The row product subtracts y from every slack irrespective of its status (`0x136b5d..0x136b85`, quad `0x273cd0`).
                     self.d[j] = dt[j];
                 }
             } else if self.st[j] < 0 {
