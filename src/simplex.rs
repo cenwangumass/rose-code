@@ -6093,6 +6093,10 @@ fn solve_primal(
         if empty_retry
             && s.mirror.as_ref().map_or(s.factor.num_updates(), |mi| mi.updates()) > 16
         {
+            // The driver checks and records work before the requested factorization,
+            // even though this ratio call did not complete an iteration.
+            s.work.trig();
+            s.work.decided(s.work.w);
             if crate::dump::on("ent2") {
                 crate::dump::emit_tag(
                     "ent2",
