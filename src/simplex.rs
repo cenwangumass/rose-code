@@ -5184,6 +5184,12 @@ fn solve_primal(
                     // The pivot check also runs when the pricing found no column (`0x144ff9`, fx_midsing_1106 after the pivot of 1.154 / 1.097): the factorization is redone.
                     s.stale = None;
                     s.accuracy += 1;
+                    if s.handoff.is_some() {
+                        // The primal's stale-pair rejection increments the same
+                        // stability counter the following dual pass reads (x87
+                        // `0x281396`; seed 3260).
+                        crate::dual::C178.with(|c| c.set(c.get() + 1));
+                    }
                     s.list.clear();
                     s.level = 0;
                     s.work.trig();
@@ -5348,6 +5354,9 @@ fn solve_primal(
                 && (1e-13 > a || (b - a).abs() / (a + 1.0) > s.handoff.map_or(3e-6, |h| h.pair_tol))
             {
                 s.accuracy += 1;
+                if s.handoff.is_some() {
+                    crate::dual::C178.with(|c| c.set(c.get() + 1));
+                }
                 s.list.clear();
                 s.level = 0;
                 s.work.trig();

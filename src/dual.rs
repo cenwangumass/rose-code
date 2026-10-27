@@ -44,7 +44,7 @@ thread_local! {
     pub(crate) static C35C: std::cell::Cell<u32> = const { std::cell::Cell::new(1) };
     static PASS_NO: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     /// The stability counter `ctx+0x178`: one per pivot-check mismatch (`0xc5a35`, quad `0x21da43`) and per singular quad restart (`0x248f99`); never reset in a solve.
-    static C178: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+    pub(crate) static C178: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
     /// Large basic-value flag (`ctx+0x2c8`), retained across dual passes.
     static LARGE_XB: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The basis snapshot of the reference's log timer (`ctx+0x190`) and the iteration count of the last one (`ctx+0x40`).
