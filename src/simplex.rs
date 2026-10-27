@@ -470,6 +470,8 @@ pub(crate) struct Handoff {
     pub quad: bool,
     /// The dual's tolerance relaxation level (`ctx+0x2cc`) carried into x87.
     pub dual_level: usize,
+    /// A double dual ended with cost shifts in force and hands off to primal.
+    pub shifted_exit: bool,
     /// `ctx+0x2a0` and `ctx+0x2b0` (iterations so far and the last snapshot) and the stability counter `ctx+0x178` at the handoff.
     pub iters: f64,
     pub snap: f64,
@@ -501,6 +503,8 @@ thread_local! {
     /// The primal's factorization found the basis singular (status -1002, `0xf5921`): iterations and refactorizations of the primal, and its pivot threshold.
     /// The primal repaired its basis in place after a singular factorization (the controller then restores the dropped variable and runs the primal again).
     pub(crate) static PRIMAL_REPAIRED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The primal initial factor returned -1002 without a preceding primal -1004.
+    pub(crate) static PRIMAL_START_SINGULAR: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     pub(crate) static PRIMAL_SINGULAR: std::cell::Cell<Option<(usize, usize, f64)>> = const { std::cell::Cell::new(None) };
     /// The entering variable and the structural count `n` of the scaled problem where the primal found its ray: the reference's ray moves that
     /// variable by one unit in the user's frame, so the scaling wrapper rescales by the column factor (structural) or the row factor (slack).
@@ -1271,22 +1275,7 @@ impl<'a> Solver<'a> {
         crate::lu_order::Structure,
         Vec<(bool, Vec<usize>, Vec<f64>)>,
     ) {
-        let n = self.p.n;
-        let cols: Vec<(bool, Vec<usize>, Vec<f64>)> = self
-            .basic
-            .iter()
-            .map(|&v| {
-                (
-                    v >= n,
-                    self.p.fcols[v].iter().map(|&(r, _)| r).collect(),
-                    self.p.fcols[v].iter().map(|&(_, a)| a).collect(),
-                )
-            })
-            .collect();
-        crate::lu_order::set_factorization_number(fac_no);
-        let st = crate::lu_order::factor_structure(self.p.m, &cols);
-        let order = st.pivots.iter().map(|&(_, pos)| self.basic[pos]).collect();
-        (order, st, cols)
+        reference_order_for(self.p, &self.basic, fac_no)
     }
 
     /// The factor of the current basis in extended precision (same column order as the double one), built with the gate state of the double build.
@@ -4413,6 +4402,31 @@ fn ratio_test(
     }
 }
 
+fn reference_order_for(
+    p: &Internal,
+    basic: &[usize],
+    fac_no: usize,
+) -> (
+    Vec<usize>,
+    crate::lu_order::Structure,
+    Vec<(bool, Vec<usize>, Vec<f64>)>,
+) {
+    let cols: Vec<(bool, Vec<usize>, Vec<f64>)> = basic
+        .iter()
+        .map(|&v| {
+            (
+                v >= p.n,
+                p.fcols[v].iter().map(|&(r, _)| r).collect(),
+                p.fcols[v].iter().map(|&(_, a)| a).collect(),
+            )
+        })
+        .collect();
+    crate::lu_order::set_factorization_number(fac_no);
+    let st = crate::lu_order::factor_structure(p.m, &cols);
+    let order = st.pivots.iter().map(|&(_, pos)| basic[pos]).collect();
+    (order, st, cols)
+}
+
 /// The reference's repair of a singular supplied basis ("variables dropped from basis"): the columns that get no pivot in the
 /// reference's LU order leave the basis (nonbasic at their lower bound) and the slacks of the rows left without a pivot replace them.
 /// Returns the last variable dropped (highest basis position), which the reference keeps out of pricing until the basis is
@@ -4593,11 +4607,18 @@ fn solve_primal(
             b.validate(n, m).map_err(SolveError::InvalidBasis)?;
             // The reference gets a basis as variable statuses, so its incoming position order is the variable order.
             b.basic.sort_unstable();
-            if let Some((e, w)) =
-                repair_basis_at(&p, &mut b, handoff.map(|h| h.thr), handoff.is_none())
+            // Before the retry limit a singular handoff returns -1002; after
+            // five retries the factor handler repairs the basis in place.
+            if !handoff.is_some_and(|h| h.shifted_exit && h.retries < 5)
+                || !opts.faithful_ftran
+                || !opts.faithful_positions
             {
-                excluded = Some(e);
-                singular_work = w;
+                if let Some((e, w)) =
+                    repair_basis_at(&p, &mut b, handoff.map(|h| h.thr), handoff.is_none())
+                {
+                    excluded = Some(e);
+                    singular_work = w;
+                }
             }
             b
         }
@@ -4623,6 +4644,40 @@ fn solve_primal(
             PRIMAL_REPAIRED.with(|c| c.set(true));
         }
     }
+    // A shifted dual exit invokes primal setup and factors the supplied basis.
+    // Inspect the reference order before constructing the numeric factor, so
+    // an incomplete factor returns through the ordinary singular handler.
+    let mut start_work = crate::work::Work::default();
+    let initial_order = if handoff.is_some_and(|h| h.shifted_exit)
+        && opts.faithful_ftran
+        && opts.faithful_positions
+    {
+        start_work.add(0x138532, 2.0 * (n + m) as f64, crate::work::CTX);
+        crate::lu_order::reset_pair_gate();
+        crate::lu_order::set_threshold(handoff.unwrap().thr);
+        crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
+        let gate = crate::lu_order::gate_get();
+        let (order, st, rows) = reference_order_for(&p, &basis.basic, 1);
+        if crate::dump::on("lustart") {
+            crate::dump::emit(
+                "lustart",
+                serde_json::json!({"cols": basis.basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "primal": true}),
+            );
+        }
+        if order.len() < m {
+            let lu = st.work(&rows, false);
+            start_work.factor_driver(&lu, crate::work::CTX);
+            for (site, est) in lu {
+                start_work.add(site, est, crate::work::CTX);
+            }
+            PRIMAL_SINGULAR.with(|c| c.set(Some((0, 1, crate::lu_order::threshold()))));
+            PRIMAL_START_SINGULAR.with(|c| c.set(true));
+            return Err(SolveError::SingularBasis);
+        }
+        Some((gate, order, st, rows))
+    } else {
+        None
+    };
     let mut pos_of = vec![NONE; n + m];
     for (pos, &j) in basis.basic.iter().enumerate() {
         pos_of[j] = pos;
@@ -4708,7 +4763,7 @@ fn solve_primal(
         mirror: None,
         mirror_q: None,
         x_q: None,
-        work: crate::work::Work::default(),
+        work: start_work,
         last_pivot: None,
         p1_tol_on: false,
         inf_seen: false,
@@ -4780,27 +4835,33 @@ fn solve_primal(
     // The starting factorization's work, which the reference counts after its first refactorization check.
     let mut lu_work = Vec::new();
     if opts.faithful_ftran && opts.faithful_positions {
-        // The singular supplied-basis factorization is an actual pairing attempt, even though the repaired driver's factor count restarts at one.
-        let repair_gate =
-            (handoff.is_none() && excluded.is_some()).then(crate::lu_order::gate_get);
-        crate::lu_order::reset_pair_gate();
-        if let Some(gate) = repair_gate {
-            crate::lu_order::gate_set(gate);
-        }
-        if let Some(h) = &handoff {
-            crate::lu_order::set_threshold(h.thr);
-        } else if let Some(r) = rs {
-            crate::lu_order::set_threshold(r.thr);
-        }
-        crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
-        let gate0 = crate::lu_order::gate_get();
-        let (order, st, rows) = s.reference_order(1);
-        if crate::dump::on("lustart") {
-            crate::dump::emit(
-                "lustart",
-                serde_json::json!({"cols": s.basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "primal": true}),
-            );
-        }
+        let (gate0, order, st, rows) = if let Some(initial) = initial_order {
+            initial
+        } else {
+            // A singular supplied-basis factorization is a pairing attempt,
+            // even though the repaired driver's factor count restarts at one.
+            let repair_gate =
+                (handoff.is_none() && excluded.is_some()).then(crate::lu_order::gate_get);
+            crate::lu_order::reset_pair_gate();
+            if let Some(gate) = repair_gate {
+                crate::lu_order::gate_set(gate);
+            }
+            if let Some(h) = &handoff {
+                crate::lu_order::set_threshold(h.thr);
+            } else if let Some(r) = rs {
+                crate::lu_order::set_threshold(r.thr);
+            }
+            crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
+            let gate = crate::lu_order::gate_get();
+            let (order, st, rows) = s.reference_order(1);
+            if crate::dump::on("lustart") {
+                crate::dump::emit(
+                    "lustart",
+                    serde_json::json!({"cols": s.basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "primal": true}),
+                );
+            }
+            (gate, order, st, rows)
+        };
         for (pos, &j) in order.iter().enumerate() {
             s.pos_of[j] = pos;
         }
@@ -5238,7 +5299,10 @@ fn solve_primal(
                     retry_unbounded = true;
                     continue;
                 }
-                None if s.handoff.is_some_and(|h| h.quad && h.pert && h.dual_level == 0) => {
+                None if s
+                    .handoff
+                    .is_some_and(|h| h.quad && h.pert && h.dual_level == 0) =>
+                {
                     // The x87 post-factor list check clears the cost shifts and
                     // exits with request 9 before checking the stale pivot pair
                     // when `ctx+0x2cc` and the candidate count are zero

@@ -3480,20 +3480,6 @@ impl<'a, R: Real> Dual<'a, R> {
         }
     }
 
-    /// A nonbasic variable at a bound has a wrong-signed d for the true costs (the cost shifts removed), beyond the dual tolerance.
-    fn true_cost_infeasible(&mut self) -> bool {
-        let saved = std::mem::replace(&mut self.cost, self.p.cost.clone());
-        let saved_lo = std::mem::replace(&mut self.cost_lo, vec![0.0; self.n + self.m]);
-        let y = self.last_y.clone();
-        let dt = self.true_d();
-        self.last_y = y;
-        self.cost = saved;
-        self.cost_lo = saved_lo;
-        let tol = R::c(dual_tol());
-        (0..self.n + self.m)
-            .any(|j| (self.st[j] == LB && dt[j] < -tol) || (self.st[j] == UB && dt[j] > tol))
-    }
-
     /// The status count of the quad post-iteration function (`0x238c38..0x238d1f`) on d recomputed with the current factor: a variable at its lower bound
     /// (status -1) with `d < -tol` and no finite upper bound, or at its upper bound (status -2) with `d > tol` and no finite upper bound, counts.
     fn artificial_count(&mut self) -> usize {
@@ -4987,12 +4973,10 @@ fn solve_pass<R: Real>(
                 && s.pert != 0
                 && !NO_ART_EXIT.with(|c| c.get())
                 && CLEANUP_PASS.with(|c| c.get()).is_none()
-                && s.true_cost_infeasible()
             {
-                // The double dual ends optimal for the shifted costs but the true costs make a nonbasic d wrong-signed: the controller's primal runs from this basis (-1004).
+                // The double dual ends optimal with cost shifts in force: restore the costs and start the primal (-1004).
 
-                // The double dual ended optimal for the shifted costs; the primal runs on the true ones for a few pivots (the reference's primal, seed 3981: enters 19 and 4)
-                // and ends with status -1004, then the dual runs again from the primal's basis, like after a rejected end.
+                // The primal can return optimal, restart the dual, or report a singular starting factor.
                 s.rejected_end = true;
                 status = Status::Infeasible;
                 break;
@@ -5089,6 +5073,7 @@ fn solve_pass<R: Real>(
                 pair_tol: PAIR_TOL.with(|c| c.get()),
                 quad: R::QUAD,
                 dual_level: s.level,
+                shifted_exit: !R::QUAD && s.rejected_end && s.pert != 0,
                 iters: (s.it_base + s.iters) as f64,
                 snap: (s.it_base + s.stall_it as usize) as f64,
                 c178: C178.with(|c| c.get()),
@@ -5126,6 +5111,7 @@ fn solve_pass<R: Real>(
         };
         set_dual_tol(LOOP_TOL.with(|c| c.get()) * tol_factor);
         crate::simplex::PRIMAL_SINGULAR.with(|c| c.set(None));
+        crate::simplex::PRIMAL_START_SINGULAR.with(|c| c.set(false));
         crate::simplex::PRIMAL_FARKAS_SKIPPED.with(|c| c.set(0));
         crate::simplex::PRIMAL_REPAIRED.with(|c| c.set(false));
         crate::simplex::PRIMAL_SHIFT_END.with(|c| c.set(false));
@@ -5146,7 +5132,10 @@ fn solve_pass<R: Real>(
                     // used by the next dual ratio test (0xf58f7 / 0x248f99).
                     C178.with(|c| c.set(c.get() + 1));
                 }
-                if !R::QUAD && s.rejected_end {
+                if !R::QUAD
+                    && s.rejected_end
+                    && !crate::simplex::PRIMAL_START_SINGULAR.with(|c| c.take())
+                {
                     // The double primal after a rejected end made its pivots and ended with status -1004 (`0xe404a`, seed 3981), then the dual restarts in quad.
                     C35C.with(|c| c.set(c.get() + 1));
                 }
@@ -5209,6 +5198,7 @@ fn solve_pass<R: Real>(
                     pair_tol: PAIR_TOL.with(|c| c.get()),
                     quad: R::QUAD,
                     dual_level: s.level,
+                    shifted_exit: false,
                     iters: (s.it_base + s.iters) as f64,
                     snap: (s.it_base + s.stall_it as usize) as f64,
                     c178: C178.with(|c| c.get()),
@@ -5230,6 +5220,10 @@ fn solve_pass<R: Real>(
             repaired = R::QUAD
                 && crate::simplex::PRIMAL_REPAIRED.with(|c| c.take())
                 && r.status == Status::Infeasible;
+        }
+        if opts.record_trace {
+            trace.append(&mut r.trace);
+            r.trace = trace;
         }
         r.iterations += s.iters + crate::simplex::EARLIER_ITERS.with(|c| c.take());
         r.refactorizations += s.refactorizations;
@@ -5389,6 +5383,7 @@ fn solve_pass<R: Real>(
                     pair_tol: PAIR_TOL.with(|c| c.get()),
                     quad: true,
                     dual_level: s.level,
+                    shifted_exit: false,
                     iters: (s.it_base + s.iters) as f64,
                     snap: (s.it_base + s.stall_it as usize) as f64,
                     c178: C178.with(|c| c.get()),
