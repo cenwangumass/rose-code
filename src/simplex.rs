@@ -2520,12 +2520,20 @@ impl<'a> Solver<'a> {
                 r.ok()?;
             }
             // After the in-place repair the reference keeps the dropped variable out until the primal has ended (`cf0 = 3`; the controller restores it).
-            if self.repaired {
+            // An x87 primal that fails its first scan before any pivot admits the variable the quad dual's repair left out and goes on (seeds 3981, 5367: the entry
+            // right after the failed scan is that variable); after pivots the run ends and the controller restores it (seed 2594).
+            if self.repaired
+                && !(self
+                    .handoff
+                    .is_some_and(|h| h.quad && h.excl == self.excluded)
+                    && self.iters_done == 0)
+            {
                 // The in-place repair keeps the dropped variable out: the run ends here and the controller starts the next one (`compare.py lu`,
                 // fx_midsing_1106: one sorted factorization after the pre-restart one, not two).
                 return None;
             }
             self.excluded = None;
+            self.repaired = false;
             // Admitting the variable rebuilds the candidate list (`0x138532`: one pass over all variables) and the row-wise copy
             // (`0x132d88`: `2 nnz(A)`), before the driver restarts.
             let nnz_a: usize = (0..self.p.n).map(|j| self.p.cols[j].len()).sum();
