@@ -503,6 +503,12 @@ fn pair_gate(remaining: usize) -> bool {
         && gate >= 0
         && (gate >= GATE_ALWAYS || remaining >= 50);
     if run {
+        if crate::dump::on("pairgate") {
+            crate::dump::emit(
+                "pairgate",
+                serde_json::json!({"rem": remaining, "att": att, "gate": gate, "c2c0": FAC_NO.with(|c| c.get())}),
+            );
+        }
         PAIR_GATE.with(|c| c.set((att + 1, gate)));
     }
     run

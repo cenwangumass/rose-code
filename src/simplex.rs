@@ -1350,8 +1350,8 @@ impl<'a> Solver<'a> {
             if (self.cleanup && !self.cleanup_keep_head) || self.restart {
                 self.basic.sort_unstable();
             }
-            // The driver restart after a repaired basis (`0xcda5b`) factors like the starting factorization.
-            let fac_no = if self.restart {
+            // A plain restart retains the factorization count for the pairing gate; the basis order is restarted separately above (`0xcda5b`).
+            let fac_no = if self.restart && self.handoff.is_some() {
                 1
             } else {
                 self.refactorizations + 1
@@ -4418,13 +4418,14 @@ fn ratio_test(
 /// Returns the last variable dropped (highest basis position), which the reference keeps out of pricing until the basis is
 /// primal feasible (status -4 until `0x155139` adds 3 back).
 pub(crate) fn repair_basis(p: &Internal, b: &mut Basis) -> Option<(usize, Vec<(u32, f64)>)> {
-    repair_basis_at(p, b, None)
+    repair_basis_at(p, b, None, false)
 }
 
 fn repair_basis_at(
     p: &Internal,
     b: &mut Basis,
     threshold: Option<f64>,
+    emit_singular: bool,
 ) -> Option<(usize, Vec<(u32, f64)>)> {
     let (n, m) = (p.n, p.m);
     let cols: Vec<(bool, Vec<usize>, Vec<f64>)> = b
@@ -4450,6 +4451,12 @@ fn repair_basis_at(
     let piv = st.pivots.clone();
     if piv.len() == m {
         return None;
+    }
+    if emit_singular && crate::dump::on("lustart") {
+        crate::dump::emit(
+            "lustart",
+            serde_json::json!({"cols": b.basic, "out": piv.iter().map(|&(_,pos)| b.basic[pos]).collect::<Vec<_>>(), "prow": piv.iter().map(|&(row,_)| row).collect::<Vec<_>>(), "primal": true, "singular": true}),
+        );
     }
     // The reference's first factorization (of the singular basis) counts its work like any other (`Structure::work` with the full row count).
     let fwork = st.work(&cols, false);
@@ -4586,7 +4593,9 @@ fn solve_primal(
             b.validate(n, m).map_err(SolveError::InvalidBasis)?;
             // The reference gets a basis as variable statuses, so its incoming position order is the variable order.
             b.basic.sort_unstable();
-            if let Some((e, w)) = repair_basis_at(&p, &mut b, handoff.map(|h| h.thr)) {
+            if let Some((e, w)) =
+                repair_basis_at(&p, &mut b, handoff.map(|h| h.thr), handoff.is_none())
+            {
                 excluded = Some(e);
                 singular_work = w;
             }
@@ -4771,8 +4780,13 @@ fn solve_primal(
     // The starting factorization's work, which the reference counts after its first refactorization check.
     let mut lu_work = Vec::new();
     if opts.faithful_ftran && opts.faithful_positions {
-        // The reference factorizes the starting basis before the first iteration and numbers the positions by pivot step.
+        // The singular supplied-basis factorization is an actual pairing attempt, even though the repaired driver's factor count restarts at one.
+        let repair_gate =
+            (handoff.is_none() && excluded.is_some()).then(crate::lu_order::gate_get);
         crate::lu_order::reset_pair_gate();
+        if let Some(gate) = repair_gate {
+            crate::lu_order::gate_set(gate);
+        }
         if let Some(h) = &handoff {
             crate::lu_order::set_threshold(h.thr);
         } else if let Some(r) = rs {

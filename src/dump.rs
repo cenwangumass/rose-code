@@ -26,6 +26,7 @@ pub const KINDS: &[(&str, &str, &str)] = &[
     ("ord", "ORD", "pivot-row input list and changed columns per pivot (CORD for the cost-change pass)"),
     ("xb", "XB", "right-hand side and x_B of the basic-solution recompute"),
     ("fstruct", "FSTRUCT", "U-factor structure (kinds, nucleus list, tail start, slots) before each column replacement"),
+    ("pairgate", "PGATE", "each attempted doubleton pairing pass: remaining rows, prior attempts, gate, factorization number"),
     ("luin", "LUIN", "basis column order handed to each factorization (the reference's lu_in `cols`), and the order it returns"),
     ("lustart", "LUSTART", "the factorization a pass makes at its start (dual or primal, `luin` does not record it): the columns in the order handed to the LU and the order it returns"),
     ("luout", "LUOUT", "numerics of each fresh factor: the diagonal and the L columns (the reference's lu_in `diag`, `Lcp`/`Lidx`/`Lval`)"),
