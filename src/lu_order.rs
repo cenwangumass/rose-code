@@ -362,7 +362,6 @@ struct Nucleus<R> {
     rb: Vec<Vec<usize>>,
     cst: Vec<usize>,
     rst: Vec<usize>,
-    building: bool,
 }
 
 impl<R: Real> Nucleus<R> {
@@ -370,7 +369,7 @@ impl<R: Real> Nucleus<R> {
         let k = self.ccnt[c] as isize - 1;
         if k == 0 {
             self.cst.push(c);
-        } else if k > 0 && !self.building {
+        } else if k > 0 {
             self.cb[k as usize].insert(0, c);
         }
     }
@@ -379,7 +378,7 @@ impl<R: Real> Nucleus<R> {
         let k = self.rcnt[r] as isize - 1;
         if k == 0 {
             self.rst.push(r);
-        } else if k > 0 && !self.building {
+        } else if k > 0 {
             self.rb[k as usize].insert(0, r);
         }
     }
@@ -539,7 +538,6 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
         rb: vec![Vec::new(); m.max(npos) + 2],
         cst: Vec::new(),
         rst: Vec::new(),
-        building: true,
     };
     let ckeys: Vec<usize> = cols.iter().map(|c| c.0).collect();
     for (pos, ents) in cols {
@@ -611,23 +609,9 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
                 }
             }
         }
-        if sing.is_none() && s.building {
-            s.building = false;
-            for &c in &ckeys {
-                if !pcols.contains(&c) && s.ccnt[c] >= 2 {
-                    s.cins(c);
-                }
-            }
-            for &r in &rkeys {
-                if !prows.contains(&r) && s.rcnt[r] >= 2 {
-                    s.rins(r);
-                }
-            }
-            continue;
-        }
-        if sing.is_none() && !s.building {
+        if sing.is_none() {
             let n = remaining as f64;
-            if std::env::var_os("ROSE_GATE_LOG").is_some() && !s.building {
+            if std::env::var_os("ROSE_GATE_LOG").is_some() {
                 eprintln!("RGATE n={} z={}", remaining, z);
             }
             if remaining > 50
@@ -649,7 +633,7 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
                         0.325 * n * n
                     );
                 }
-                if z > 0.325 * (n * n) && !s.building {
+                if z > 0.325 * (n * n) {
                     // Hand the active matrix to the dense LU: rows by index, columns in ascending bucket order. (Rows in bucket order
                     // reproduce the reference's pivots but not the parity of its vectorised dot products.)
                     let mut rows: Vec<usize> = Vec::new();
@@ -747,10 +731,10 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
             },
         };
         let (pr, pc, pv) = (s.nodes[best].r, s.nodes[best].c, s.nodes[best].v);
-        if std::env::var_os("ROSE_GATE_LOG").is_some() && !s.building {
+        if std::env::var_os("ROSE_GATE_LOG").is_some() {
             eprintln!(
-                "RPIV n={} r={} c={} sing={:?}",
-                remaining, s.rcnt[pr], s.ccnt[pc], sing_kind
+                "RPIV n={} r={} c={} sing={:?} row={} col={}",
+                remaining, s.rcnt[pr], s.ccnt[pc], sing_kind, pr, pc
             );
         }
         if sing.is_none() {
@@ -921,11 +905,8 @@ fn search<R: Real>(s: &mut Nucleus<R>, remaining: usize) -> Option<(usize, f64)>
     let big = usize::MAX / 4;
     let (u74, u69) = (cmin.unwrap_or(big), rmin.unwrap_or(big));
     let mut k = u74.min(u69);
-    // The quad LU's loop bound (`0x229a3c..0x229a6d`): max(4, k / 2) examined lists, at most the number of columns left (seeds 2448, 2324: three left).
-    let limit =
-        ((k as f64 * 0.5) as usize)
-            .max(4)
-            .min(if R::QUAD { remaining } else { usize::MAX });
+    // The loop bound (double `0xd6a77`, quad `0x229a3c..0x229a6d`): max(4, k / 2) examined lists, at most the number of columns left (seeds 2448, 2324; bh50093: three left).
+    let limit = ((k as f64 * 0.5) as usize).max(4).min(remaining);
     let maxk =
         s.cb.iter()
             .rposition(|v| !v.is_empty())
