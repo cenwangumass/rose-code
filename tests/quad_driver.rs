@@ -137,3 +137,10 @@ fn shifted_quad_retry_selects_pricing_from_handoff_count() {
     let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
     assert_eq!((result.status, result.iterations), (Status::Infeasible, 142));
 }
+
+#[test]
+fn x87_primal_basic_values_keep_update_precision() {
+    let model = mps::parse(include_str!("fixtures/quad_7986.mps")).unwrap();
+    let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
+    assert_eq!((result.status, result.iterations), (Status::Infeasible, 85));
+}
