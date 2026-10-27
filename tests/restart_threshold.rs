@@ -109,3 +109,13 @@ fn repaired_confirmation_hands_off_without_extra_dual_pricing() {
         .map(|l| serde_json::from_str::<serde_json::Value>(l).unwrap())
         .any(|v| v["primal"] == true));
 }
+
+#[test]
+fn forced_refactor_keeps_pricing_method() {
+    let model = mps::parse(include_str!("fixtures/randlp50289.mps")).unwrap();
+    let mut opts = SolveOptions::dual_release();
+    opts.max_iterations = 20;
+    let result = solve(&model, None, &opts).unwrap();
+    assert_eq!(result.status, rose::Status::Optimal);
+    assert_eq!(result.iterations, 8);
+}

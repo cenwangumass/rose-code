@@ -990,6 +990,8 @@ struct Solver<'a> {
     pre_restart: bool,
     /// Whether the current x87 factorization request permits a method switch.
     quad_switch_allowed: bool,
+    /// Forced factorization requests (3 through 8) skip the method switch.
+    skip_forced_switch: bool,
     /// The duals were recomputed at the start of this iteration (the end of phase 1), so the scan that finds nothing does not recompute them again.
     fresh_duals: bool,
     /// Phase 1 has ended once in this run (`P+0xc` of the reference went from 1 to 2, `0xe4379`): that first end forces a recomputation of the duals.
@@ -1721,7 +1723,7 @@ impl<'a> Solver<'a> {
             can_switch: if self.handoff.is_some_and(|h| h.quad) {
                 self.quad_switch_allowed
             } else {
-                !self.pre_restart
+                !self.pre_restart && !self.skip_forced_switch
             },
         };
         let before = self.sw.clone();
@@ -4773,6 +4775,7 @@ fn solve_primal(
         restart: false,
         pre_restart: false,
         quad_switch_allowed: false,
+        skip_forced_switch: false,
         fresh_duals: false,
         feas_seen: false,
         restarted: false,
@@ -5048,8 +5051,10 @@ fn solve_primal(
             // Requests 3..8 skip the x87 method decision; a scheduled
             // refactorization (request 2 or 10) may switch.
             s.quad_switch_allowed = !forced;
+            s.skip_forced_switch = forced;
             s.refactor()?;
             s.quad_switch_allowed = false;
+            s.skip_forced_switch = false;
             if s.handoff.as_ref().is_some_and(|h| h.quad) {
                 s.cycle_check();
             }
@@ -5440,7 +5445,9 @@ fn solve_primal(
                         if let Some(mi) = s.mirror.as_mut() {
                             mi.count_all_updates();
                         }
+                        s.skip_forced_switch = true;
                         s.refactor()?;
+                        s.skip_forced_switch = false;
                         if s.cleanup && s.has_infeasible_basic() {
                             // The dual clean-up pass; the primal phase 1 only when it finds no entering variable.
                             let b = Basis {
