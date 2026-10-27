@@ -488,6 +488,8 @@ thread_local! {
     pub(crate) static EARLIER_ITERS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     static STALL_PREV: std::cell::Cell<f64> = const { std::cell::Cell::new(f64::INFINITY) };
     pub(crate) static PRIMAL_STALL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// Factorizations the primal of a dual handoff left out at its end (the Farkas pair, see `refactor_for_farkas`): the dual controller books them as made.
+    pub(crate) static PRIMAL_FARKAS_SKIPPED: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     pub(crate) static PRIMAL_DRIFT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The primal's factorization found the basis singular (status -1002, `0xf5921`): iterations and refactorizations of the primal, and its pivot threshold.
     /// The primal repaired its basis in place after a singular factorization (the controller then restores the dropped variable and runs the primal again).
@@ -997,6 +999,8 @@ struct Solver<'a> {
     /// for its column; the recomputation of `x_B` starts from `b + shift` and the shift is never reset (PEROLD: it stays after the
     /// variable re-enters).
     rhs_shift: Vec<f64>,
+    /// A shift of the right-hand side was made during the solve (kept after the clean-up clears `rhs_shift`): the reference frees its pricing object at the shifted optimum.
+    shifted: bool,
     /// Mirror of the reference's FTRAN structure (`faithful_ftran`).
     mirror: Option<Mir>,
     /// The same factor in extended precision, kept after a quad pass (`Handoff::quad`): the basic solution is read from it.
@@ -1587,6 +1591,7 @@ impl<'a> Solver<'a> {
                 continue;
             }
             self.dst[j] = nd;
+            self.shifted = true;
             if self.rhs_shift.is_empty() {
                 self.rhs_shift = vec![0.0; m];
             }
@@ -1660,6 +1665,30 @@ impl<'a> Solver<'a> {
             self.sw.ratio_cnt = 1;
             self.list.clear();
             self.level = 0;
+        }
+    }
+
+    /// The sign of a zero in the returned duals (`Pi` getter `0x1a7430`, range loop `0x1a78ea..0x1a7928`): a row whose slack is basic returns `+0.0`;
+    /// for a nonbasic slack the getter returns `-d` (`d` for a `>` row, times the model sense) with `d` the stored reduced cost of the slack, whose
+    /// zero is `-0.0` when the pricing object is alive at the end (the final copy `0x1a5170` stores the negated multipliers of the pricing object,
+    /// whose zeros are `+0.0`) and `+0.0` when the object was freed at a shifted optimum (the clean-up recompute zeroes the array: `0xe550a`).
+    /// `dual` holds the values in the returned sign convention.
+    fn sign_zero_duals(&self, model: &LpModel, sgn: f64, dual: &mut [f64]) {
+        let p = self.p;
+        let in_basis: std::collections::HashSet<usize> = self.basic.iter().copied().collect();
+        for (i, v) in dual.iter_mut().enumerate() {
+            if *v != 0.0 {
+                continue;
+            }
+            let neg = if in_basis.contains(&(p.n + i)) {
+                false
+            } else {
+                let g = model.row_kind.get(i) == Some(&b'G') || p.cols[p.n + i][0].1 < 0.0;
+                // d = -0.0 (alive) or +0.0 (freed); the getter returns d for a `>` row, else -d.
+                let d_neg = !self.shifted;
+                if g { d_neg } else { !d_neg }
+            };
+            *v = if neg ^ (sgn < 0.0) { -0.0 } else { 0.0 };
         }
     }
 
@@ -4314,6 +4343,7 @@ fn solve_primal(
         want_refactor: false,
         dst: vec![0.0; p.n + p.m],
         rhs_shift: Vec::new(),
+        shifted: false,
         mirror: None,
         mirror_q: None,
         work: crate::work::Work::default(),
@@ -4385,6 +4415,12 @@ fn solve_primal(
         crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
         let gate0 = crate::lu_order::gate_get();
         let (order, st, rows) = s.reference_order(1);
+        if crate::dump::on("lustart") {
+            crate::dump::emit(
+                "lustart",
+                serde_json::json!({"cols": s.basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "primal": true}),
+            );
+        }
         for (pos, &j) in order.iter().enumerate() {
             s.pos_of[j] = pos;
         }
@@ -4728,6 +4764,12 @@ fn solve_primal(
                     match s.price_admitting() {
                         Some(q) => q,
                         None => {
+                            if s.handoff.is_some_and(|h| h.pert && !h.quad) && !s.repaired {
+                                // The dual reruns after this primal (cost shifts removed, `pert`) and the certificate is dropped: the reference makes no factorization here
+                                // (its `lu_in` has the primal's start and the dual's restart only; fx_midsing_m5, 1390, 1494).
+                                PRIMAL_FARKAS_SKIPPED.with(|c| c.set(2));
+                                break Status::Infeasible;
+                            }
                             let was = s.repaired;
                             s.refactor_for_farkas()?;
                             if s.repaired && !was {
@@ -5366,6 +5408,7 @@ fn solve_primal(
                 s.sw.level = 1;
             }
             let delta = bound - x_before[0];
+            s.shifted = true;
             if s.rhs_shift.is_empty() {
                 s.rhs_shift = vec![0.0; p.m];
             }
@@ -5968,11 +6011,15 @@ fn solve_primal(
     }
     let nm = model.num_cols();
     let x: Vec<f64> = s.x[..nm].to_vec();
+    let mut dual: Vec<f64> = y.iter().map(|v| sgn * v).collect();
+    if status == Status::Optimal {
+        s.sign_zero_duals(model, sgn, &mut dual);
+    }
     Ok(SolveResult {
         status,
         objective: model.objective(&x),
         x,
-        dual: y.iter().map(|v| sgn * v).collect(),
+        dual,
         reduced_cost: s.d[..nm].iter().map(|v| sgn * v).collect(),
         basis: Basis {
             basic: s.basic.clone(),

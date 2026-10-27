@@ -78,18 +78,8 @@ fn check_rows(name: &str, limit: usize) {
         head(bits(&res["rc"]), r.reduced_cost.len()),
         "reduced costs"
     );
-    // PILOT4: the reference returns -0.0 for 29 equality rows with a zero dual (nonbasic, not in the dual BTRAN output); the sign of a
-    // zero is not reproduced (open: reverse-engineer/PLAN.md), every other bit is.
-    let unsigned_zero = |v: Vec<u64>| {
-        v.into_iter()
-            .map(|b| if b == (-0.0f64).to_bits() { 0 } else { b })
-            .collect::<Vec<_>>()
-    };
-    assert_eq!(
-        unsigned_zero(mine(&r.dual)),
-        unsigned_zero(bits(&res["pi"])),
-        "duals"
-    );
+    // Including the sign of every zero (rule: `Solver::sign_zero_duals`).
+    assert_eq!(mine(&r.dual), bits(&res["pi"]), "duals");
 }
 
 #[test]
