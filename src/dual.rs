@@ -4997,7 +4997,16 @@ fn solve_pass<R: Real>(
                     s.st[v] = pos as i32;
                     s.w[pos] = wv[v];
                 }
-                s.refactor()?;
+                if let Err(e) = s.refactor() {
+                    // The double driver's shifted optimum returns -1004 and
+                    // increments ctx+0x35c before the primal cleanup. If our
+                    // substitute cleanup factor is singular, preserve that
+                    // increment across its restart (seed 2594).
+                    if !R::QUAD {
+                        C35C.with(|c| c.set(c.get() + 1));
+                    }
+                    return Err(e);
+                }
                 s.recompute_xb(0);
                 cleaned = true;
                 CLEANUP_OUT.with(|c| c.set((true, s.lu_thr)));
