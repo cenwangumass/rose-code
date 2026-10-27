@@ -448,10 +448,11 @@ pub fn std_form_scaled(
             }
             continue;
         }
-        if is_inf(lo) && is_inf(up) {
+        if model.row_kind.get(i) == Some(&b'E') && lo == up && lo.is_finite() {
+            b_file[i] = lo;
+        } else if is_inf(lo) && is_inf(up) {
             return unsupported("free row");
-        }
-        if !is_inf(lo) && !is_inf(up) {
+        } else if !is_inf(lo) && !is_inf(up) {
             if lo != up {
                 return unsupported("ranged row without a RANGES entry");
             }

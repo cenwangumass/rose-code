@@ -252,6 +252,10 @@ impl Scaling {
     pub fn apply_loose(&self, model: &LpModel) -> LpModel {
         let (nm, m) = (model.num_cols(), model.num_rows());
         let mut s = model.clone();
+        let mut ranged = vec![false; m];
+        for &(i, _) in &model.range_entries {
+            ranged[i] = true;
+        }
         for j in 0..nm {
             let c = self.col[j];
             s.obj[j] *= c;
@@ -263,8 +267,21 @@ impl Scaling {
             }
         }
         for i in 0..m {
-            s.row_lo[i] = scale_bound(model.row_lo[i], self.row[i]);
-            s.row_up[i] = scale_bound(model.row_up[i], self.row[i]);
+            // A file equality's RHS remains finite beyond the variable-bound infinity sentinel.
+            let equality = model.row_kind.get(i) == Some(&b'E')
+                && !ranged[i]
+                && model.row_lo[i] == model.row_up[i]
+                && model.row_lo[i].is_finite();
+            s.row_lo[i] = if equality {
+                model.row_lo[i] * self.row[i]
+            } else {
+                scale_bound(model.row_lo[i], self.row[i])
+            };
+            s.row_up[i] = if equality {
+                model.row_up[i] * self.row[i]
+            } else {
+                scale_bound(model.row_up[i], self.row[i])
+            };
             if let Some(r) = s.row_range.get_mut(i) {
                 *r *= self.row[i];
             }

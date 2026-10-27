@@ -3,6 +3,22 @@
 //! agree bit for bit (AFIRO and SC50A whole solves; the first iterations of BLEND, ADLITTLE and BORE3D, whose upper-bound pairs, lower-bound
 //! shifts and fixed column it exercises). The plain f64 `DenseSolver` is checked at tolerance only (it is not bit-exact).
 use rose::barrier::{self, BarrierStatus, Options, ReplaySolver, StdForm};
+
+#[test]
+fn large_file_equality_rhs_is_finite_in_barrier_form() {
+    let model = rose::mps::parse("NAME TEST\nROWS\n N COST\n E R1\nCOLUMNS\n X COST 1 R1 1\nRHS\n RHS1 R1 5e99 COST -7.5e99\nENDATA\n").unwrap();
+    let scaling = rose::scale::Scaling {
+        col: vec![1.0],
+        row: vec![2.0],
+        obj: 1.0,
+    };
+    let form = barrier::std_form_scaled(&model, &[0], Some(&scaling)).unwrap();
+    assert_eq!(form.b_file, vec![1e100]);
+    assert_eq!(form.sense, vec![b'=']);
+    assert_eq!(form.offset, 7.5e99);
+    let unscaled = barrier::std_form(&model, &[0]).unwrap();
+    assert_eq!(unscaled.b_file, vec![5e99]);
+}
 use rose::{mps, order};
 use serde_json::Value;
 
