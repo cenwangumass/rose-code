@@ -2519,9 +2519,21 @@ impl<'a, R: Real> Dual<'a, R> {
                 }
             }
             if next.is_empty() {
+                // The empty-list branch combines the re-pass and selection work in one store (`0xc8b62`).
+                self.work.add(
+                    0xc8b67,
+                    (3 * kept.len() + 4 * nflips) as f64,
+                    crate::work::CTX,
+                );
                 chosen = kept[0];
                 xm5 = R::ZERO;
             } else {
+                // The re-pass scan and compaction book separately before the next selection (`0xc8e73`).
+                self.work.add(
+                    0xc8e78,
+                    (3 * kept.len() + next.len()) as f64,
+                    crate::work::CTX,
+                );
                 // The selection loop runs again over the compacted list and books its count (`0xc8b67`) like the first one.
                 self.work.add(
                     0xc8b67,
