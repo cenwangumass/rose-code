@@ -5776,7 +5776,14 @@ fn solve_primal(
                 } else {
                     s.excl6[q] = true;
                     s.rej6.push(q);
-                    if !(0..s.p.n + s.p.m).any(|j| s.score(j).is_some()) {
+                    let no_candidate = if s.p0.is_none() {
+                        // Only the active pricing bucket is walked before retrying
+                        // rejected columns (3196: lower-bucket candidates stay out).
+                        s.best_in_list().is_none()
+                    } else {
+                        !(0..s.p.n + s.p.m).any(|j| s.score(j).is_some())
+                    };
+                    if no_candidate {
                         for j in std::mem::take(&mut s.rej6) {
                             s.excl6[j] = false;
                         }
