@@ -506,12 +506,12 @@ thread_local! {
     /// Row-wise matrix retained by the controller across a dual/primal handoff.
     pub(crate) static HANDOFF_ROWS: std::cell::RefCell<Option<Vec<Vec<usize>>>> = const { std::cell::RefCell::new(None) };
     /// The primal ended with status -1002 from its drift test (not from a singular factorization): the controller restarts from the primal's start basis.
-    /// The reference's iteration counter `ctx+0x2a8` (all dual and primal iterations of the solve), the infeasibility sum `ctx+0x120` at the last progress check (it outlives
-    /// the primal restarts), and the stall exit of the x87 primal (`0x27e100`, status -1004 at `0x27e6e4`).
+    /// The reference's iteration counter `ctx+0x2a8` (all dual and primal iterations of the solve).
     pub(crate) static TOTAL_ITERS: std::cell::Cell<f64> = const { std::cell::Cell::new(0.0) };
     /// Iterations of the earlier x87 run (see `TOTAL_ITERS`) that the controller adds to the primal's count.
     pub(crate) static EARLIER_ITERS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
-    static STALL_PREV: std::cell::Cell<f64> = const { std::cell::Cell::new(f64::INFINITY) };
+    /// Shared `ctx+0x120`: last primal-progress or dual basic-infeasibility sum.
+    pub(crate) static STALL_PREV: std::cell::Cell<f64> = const { std::cell::Cell::new(0.0) };
     pub(crate) static PRIMAL_STALL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The x87 failed scan ended after perturbation (status -1004).
     pub(crate) static PRIMAL_SHIFT_END: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
@@ -547,6 +547,30 @@ fn record_quad_progress(record: QuadProgressRecord) {
     });
 }
 
+/// The x87 progress predicate reads the saved sum before recomputing it.
+fn primal_progress_stalled(prev: f64, sum: f64, old_obj: Option<f64>, new_obj: Option<f64>) -> bool {
+    if prev > 1e-7 {
+        use crate::f80::F80;
+        !(F80::from_f64(sum) - F80::from_f64(prev) < F80::from_f64(-1e-13))
+    } else if let (Some(old), Some(new)) = (old_obj, new_obj) {
+        use crate::f80::F80;
+        !(F80::from_f64(new) - F80::from_f64(old) < F80::from_f64(-1e-13))
+    } else {
+        false
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn progress_uses_previous_infeasibility() {
+    // Native standalone 5959: the first x87 check sees this double-progress
+    // sum and replaces it with zero; the counter stays at zero.
+    assert!(!primal_progress_stalled(2.034581090761116e16, 0.0, Some(0.0), Some(1.0)));
+    // Native 5371: the last dual recompute leaves zero, so this check uses
+    // the objective. A positive fresh sum exercises the branch boundary.
+    assert!(primal_progress_stalled(0.0, 1.0, Some(221699549.95117602), Some(268371380.61310527)));
+}
+
 #[cfg(test)]
 #[test]
 fn standalone_primal_initial_progress_snapshot() {
@@ -562,6 +586,7 @@ fn standalone_primal_initial_progress_snapshot() {
     assert_eq!(records[0].0, [2, 1, 3, 17, 19, 20, 21, 22, 25]);
     assert!(records[0].1.iter().all(|&upper| !upper));
     assert_eq!(records[0].2, 1);
+    assert_eq!(STALL_PREV.with(|c| c.get()), 2.034581090761116e16);
 }
 
 #[cfg(test)]
@@ -571,10 +596,15 @@ fn quad_progress_carried_objective_and_stall_exit() {
     let mut opts = SolveOptions::dual_release();
     opts.max_iterations = 5210;
     QUAD_PROGRESS_TEST.with(|c| *c.borrow_mut() = Some(Vec::new()));
+    crate::dual::PRIMAL_SUM_TEST.with(|c| *c.borrow_mut() = Some(Vec::new()));
     crate::dual::PRIMAL_SNAPSHOT_TEST.with(|c| *c.borrow_mut() = Some(Vec::new()));
     // This checks the first stall exit; later controller passes are a separate comparison.
     let _result = crate::solve(&model, None, &opts);
     let records = QUAD_PROGRESS_TEST.with(|c| c.borrow_mut().take().unwrap());
+    let sums = crate::dual::PRIMAL_SUM_TEST.with(|c| c.borrow_mut().take().unwrap());
+    let quad: Vec<_> = sums.iter().filter(|&&(q, _, total, _)| q && total == 92).copied().collect();
+    assert_eq!(quad, vec![(true, 0, 92, 64.00961303710938), (true, 3, 92, 10.569838163778261), (true, 8, 92, 22.89347143524323), (true, 13, 92, 3175.143282988146), (true, 15, 92, 0.0)]);
+    assert!(sums.contains(&(false, 0, 0, 64.00961303710938)));
     let snapshots = crate::dual::PRIMAL_SNAPSHOT_TEST.with(|c| c.borrow_mut().take().unwrap());
     // The first x87 progress check replaces the prior dual snapshot (native
     // mode-0 save at total iteration 109); all 51 checks save this basis.
@@ -1775,8 +1805,8 @@ impl<'a> Solver<'a> {
             self.handoff.map_or(self.restarts, |h| h.retries),
             self.excluded.is_some() || self.repaired,
         );
-        let Some(h) = self.handoff.filter(|h| h.quad) else { return };
         let prev = STALL_PREV.with(|c| c.replace(sum));
+        let Some(h) = self.handoff.filter(|h| h.quad) else { return };
         // The progress routine writes a fresh objective even on an infeasible
         // check. Its structural loop uses x87 basic values and double-rounded
         // products for nonbasic bounds (0x27e1d0..0x27e235, 0x27e79e).
@@ -1803,14 +1833,7 @@ impl<'a> Solver<'a> {
         let old_obj = self.working_obj;
         self.working_obj = objective;
         self.stall_calls += 1;
-        let stalled = if sum > 1e-7 {
-            !(sum - prev < -1e-13)
-        } else if let (Some(old), Some(new)) = (old_obj, objective) {
-            use crate::f80::F80;
-            !(F80::from_f64(new) - F80::from_f64(old) < F80::from_f64(-1e-13))
-        } else {
-            false
-        };
+        let stalled = primal_progress_stalled(prev, sum, old_obj, objective);
         if stalled {
             self.stall_cnt += 1;
         }
@@ -4843,6 +4866,7 @@ pub fn solve(
         crate::dual::set_dual_tol(1e-6);
         crate::dual::set_resid_fails(0);
         crate::dual::reset_primal_snapshot();
+        STALL_PREV.with(|c| c.set(0.0));
     }
     if let Some(h) = handoff {
         // An earlier x87 run of two iterations is included in the public count (seed 2717).

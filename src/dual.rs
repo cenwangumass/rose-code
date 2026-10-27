@@ -121,6 +121,7 @@ pub(crate) fn primal_snapshot(
 
 #[cfg(test)]
 thread_local! {
+    pub(crate) static PRIMAL_SUM_TEST: std::cell::RefCell<Option<Vec<(bool, usize, usize, f64)>>> = const { std::cell::RefCell::new(None) };
     pub(crate) static PRIMAL_SNAPSHOT_TEST: std::cell::RefCell<Option<Vec<(Vec<usize>, Vec<bool>, u32)>>> = const { std::cell::RefCell::new(None) };
 }
 
@@ -1282,12 +1283,33 @@ impl<'a, R: Real> Dual<'a, R> {
         }
     }
 
-    /// Full dual recompute of `ctx+0x2d8` (`0xbf5b0`, quad `0x217600`).
-    /// Its terms are positive reduced costs at artificial upper bounds.
+    /// Full dual recompute (`0xbf5b0`, quad `0x217600`). The basic primal
+    /// infeasibility sum updates `ctx+0x120`; `ctx+0x2d8` separately sums
+    /// positive reduced costs at artificial upper bounds.
     fn snapshot_recomputed(&self) {
         if R::QUAD && !self.value_mode {
             return;
         }
+        let mut primal_sum = 0.0;
+        let ptol = R::c(primal_tol());
+        for j in 0..self.n + self.m {
+            if self.st[j] < 0 { continue; }
+            let x = self.xb[self.st[j] as usize];
+            let lo = R::c(self.p.lo[j]);
+            let up = R::c(self.p.up[j]);
+            if lo - x > ptol {
+                primal_sum = if R::QUAD { (R::c(primal_sum) + lo - x).to_f64() } else { (R::c(primal_sum) + (lo - x)).to_f64() };
+            } else if self.p.up[j] < BIG && x - up > ptol {
+                primal_sum = if R::QUAD { (R::c(primal_sum) - up + x).to_f64() } else { (R::c(primal_sum) + (x - up)).to_f64() };
+            }
+        }
+        crate::simplex::STALL_PREV.with(|c| c.set(primal_sum));
+        #[cfg(test)]
+        PRIMAL_SUM_TEST.with(|c| {
+            if let Some(records) = c.borrow_mut().as_mut() {
+                records.push((R::QUAD, self.iters, self.it0, primal_sum));
+            }
+        });
         let tol = R::c(dual_tol());
         let mut sum = R::ZERO;
         if self.level != 0 {
@@ -4454,6 +4476,7 @@ fn solve_frame(
         pstep: None,
     };
     if CLEANUP_PASS.with(|c| c.get()).is_none() {
+        crate::simplex::STALL_PREV.with(|c| c.set(0.0));
         crate::simplex::TOTAL_ITERS.with(|c| c.set(0.0));
         crate::simplex::EARLIER_ITERS.with(|c| c.set(0));
     }
