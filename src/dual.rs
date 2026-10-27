@@ -840,8 +840,8 @@ impl<'a, R: Real> Dual<'a, R> {
                 self.d[j] = R::c(if j < n { self.cost[j] } else { 0.0 });
                 self.repaired = Some(j);
             }
-            // The post pass after the repair runs as at a normal start (shifts, no flip to the artificial bound): the request is not 4.
-            self.request = 10;
+            // The repair retains the pending request: in particular, a request-4
+            // confirmation still runs its residual-scale feasibility test.
             self.refactorizations += 1;
             self.nref_skip += 1;
             // The failure counts as one more retry (`ctx+0x184` 5 -> 6 at `0xf5921`, fx_midsing_1390): later pivot mismatches on a fresh factor end the run.
