@@ -3067,7 +3067,7 @@ impl<'a> Solver<'a> {
         }
     }
 
-    /// Applies the pending dual update: the BTRAN of the entering `d` at the leaving position, in the updated basis (`0xfb790`, mode 2).
+    /// Applies the pending dual update: the BTRAN of the entering `d` at the leaving position, in the updated basis (`0xfebe8`, mode 2).
     fn p0_update_duals(&mut self) {
         let Some(inp) = self.p0.as_mut().unwrap().pending.take() else {
             return;
@@ -3082,7 +3082,7 @@ impl<'a> Solver<'a> {
             );
         }
         self.work
-            .add_from(0x12de50, 0xfb7ee, mi.work(), crate::work::FAC);
+            .add_from(0x12de50, 0xfebed, mi.work(), crate::work::FAC);
         let y = &mut self.p0.as_mut().unwrap().y;
         for &(i, v) in &out {
             if !dense || v < -ROW_DROP_TOL || ROW_DROP_TOL < v {
