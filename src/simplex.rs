@@ -4674,12 +4674,16 @@ fn solve_primal(
         upd_work: Vec::new(),
         p0: None,
         sw: crate::method::Method {
-            // After a quad dual the x87 primal's method `ctx+0x3ec` is 1 from the third quad primal on (with `ctx+0x468` still set): Devex pricing at once.
+            // The x87 start decision (`0x27e9b0`) also selects method 1 when
+            // it clears `ctx+0x468`; keep the weights and ratio test in that mode.
             mode: if opts.pricing0 {
                 0
             } else if opts.sw_carry.is_some() {
                 if handoff.is_some_and(|h| {
-                    h.quad && (h.iters == 0.0 || crate::dual::C35C.with(|c| c.get()) >= 3)
+                    h.quad
+                        && (h.iters == 0.0
+                            || crate::dual::C35C.with(|c| c.get()) >= 3
+                            || QUAD_EEFA.with(|c| c.get()))
                 }) {
                     1
                 } else {
