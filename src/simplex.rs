@@ -1408,7 +1408,7 @@ impl<'a> Solver<'a> {
             debug_assert_eq!(order.len(), self.basic.len());
             // Use the reference-accepted pivots for the auxiliary factor too:
             // its own ordering can reject a basis that this factorization accepted.
-            if self.handoff.is_some_and(|h| !h.quad) {
+            if !self.handoff.is_some_and(|h| h.quad) {
                 accepted_rows = Some(st.pivots.iter().map(|p| p.0).collect::<Vec<_>>());
             }
             for (pos, &j) in order.iter().enumerate() {
