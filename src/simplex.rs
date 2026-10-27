@@ -4443,6 +4443,7 @@ fn ratio_test(
     passes: &mut Vec<(usize, usize)>,
 ) -> (Option<usize>, f64, f64) {
     let mut first = true;
+    let mut prior = (None, INF, 0.0);
     loop {
         let mut theta = own;
         let mut cands: Vec<(usize, f64)> = Vec::new();
@@ -4479,7 +4480,7 @@ fn ratio_test(
             return (None, own, 0.0);
         }
         if theta >= INF || cands.is_empty() {
-            return (None, INF, 0.0);
+            return prior;
         }
         let (mut best_w, mut chosen, mut step) = (0.0, NONE, 0.0);
         for &(k, r) in &cands {
@@ -4521,6 +4522,9 @@ fn ratio_test(
         if tol_p * mx * mult <= pa {
             return (Some(chosen), step, pa);
         }
+        // The retry keeps the first scan's selection if its stricter pivot
+        // tolerance removes every candidate (0xefb95..0xeff38).
+        prior = (Some(chosen), step, pa);
         tol_p *= mx * mult;
         first = false;
     }
@@ -7155,6 +7159,18 @@ fn solve_primal(
 mod tests {
     use super::*;
     use crate::mps;
+
+    #[test]
+    fn ratio_retry_retains_first_candidate_when_stricter_scan_is_empty() {
+        let text = "NAME T\nROWS\n N OBJ\n L R1\n L R2\nCOLUMNS\n X OBJ -1 R1 -1e14\n X R2 0.01\nRHS\n RHS1 R1 1 R2 1\nENDATA\n";
+        let model = mps::parse(text).unwrap();
+        let result = solve(&model, None, &SolveOptions::default()).unwrap();
+        assert_eq!(
+            (result.status, result.iterations, result.objective),
+            (Status::Optimal, 1, -100.0)
+        );
+        assert_eq!(result.x, vec![100.0]);
+    }
 
     #[test]
     fn x87_primal_move_uses_double_pivot_and_carries_basic_value() {
