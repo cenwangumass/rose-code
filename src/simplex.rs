@@ -5127,9 +5127,11 @@ fn solve_primal(
                                     s.cleanup_keep_head = false;
                                     res?;
                                     if r2.status == Status::Infeasible {
-                                        // The dual proves the infeasibility: the certificate is the primal's, read from this basis.
+                                        // The dual proves infeasibility; keep its certificate from the failed ratio test.
                                         s.refactor_for_farkas()?;
-                                        farkas = Some(s.farkas_dual());
+                                        farkas = Some(
+                                            r2.farkas.clone().unwrap_or_else(|| s.farkas_dual()),
+                                        );
                                         break Status::Infeasible;
                                     }
                                     s.recompute_dual();

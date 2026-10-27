@@ -315,3 +315,22 @@ fn dual_cleanup_pass_matches_the_reference() {
         }
     }
 }
+
+#[test]
+fn infeasible_dual_cleanup_returns_its_reference_certificate() {
+    let m = mps::parse(include_str!("fixtures/fx_cleanup_infeasible.mps")).unwrap();
+    for (opts, want) in [
+        (
+            SolveOptions::default(),
+            [0.0003322259136212624, 1.661129568106312],
+        ),
+        (SolveOptions::release(), [3.125e-06, 0.015625]),
+    ] {
+        let r = solve(&m, None, &opts).unwrap();
+        assert_eq!(r.status, Status::Infeasible);
+        let mut expected = vec![0.0; 12];
+        expected[5] = want[0];
+        expected[10] = want[1];
+        assert_eq!(r.farkas, Some(expected));
+    }
+}
