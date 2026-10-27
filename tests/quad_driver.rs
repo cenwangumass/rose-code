@@ -1,6 +1,16 @@
 use rose::{mps, solve, verify, SolveOptions, Status};
 
 #[test]
+fn singular_quad_primal_handoff_restarts_from_snapshot() {
+    let model = mps::parse(include_str!("fixtures/quad_8825.mps")).unwrap();
+    let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
+    assert_eq!(
+        (result.status, result.iterations),
+        (Status::NumericalFailure, 106)
+    );
+}
+
+#[test]
 fn quad_primal_repeated_repairs_resume_dual() {
     let model = mps::parse(include_str!("fixtures/quad_4737.mps")).unwrap();
     let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();

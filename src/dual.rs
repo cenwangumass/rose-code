@@ -83,6 +83,10 @@ pub(crate) fn dual_infeas_sum() -> f64 {
     DUAL_INFEAS_SUM.with(|c| c.get())
 }
 
+pub(crate) fn has_restart_snapshot() -> bool {
+    SNAP_QUALITY.with(|c| c.get() > 0)
+}
+
 pub(crate) fn set_dual_infeas_sum(v: f64) {
     DUAL_INFEAS_SUM.with(|c| c.set(v));
 }
@@ -5478,7 +5482,37 @@ fn solve_pass<R: Real>(
                 }))
             });
         }
-        let prres = crate::simplex::solve(model, Some(&from_dual), &popts).ok();
+        crate::simplex::PRIMAL_SINGULAR.with(|c| c.set(None));
+        crate::simplex::PRIMAL_START_SINGULAR.with(|c| c.set(false));
+        let prres = match crate::simplex::solve(model, Some(&from_dual), &popts) {
+            Err(SolveError::SingularBasis) if R::QUAD && s.art_exit => {
+                // A failed x87 handoff factorization returns -1002 to the
+                // controller, which restores the saved snapshot (seed 8825).
+                let Some((pit, pfac, pthr)) = crate::simplex::PRIMAL_SINGULAR.with(|c| c.take())
+                else {
+                    return Err(SolveError::SingularBasis);
+                };
+                if s.retries < 5 {
+                    C178.with(|c| c.set(c.get() + 1));
+                }
+                SINGULAR_BASIS.with(|c| *c.borrow_mut() = Some(from_dual.clone()));
+                SINGULAR.with(|c| {
+                    c.set(Some((
+                        s.iters + pit,
+                        s.refactorizations + pfac,
+                        s.lu_thr.max(pthr),
+                        s.avg_touch,
+                        s.last_cap,
+                        s.inf_count,
+                        false,
+                        s.retries,
+                        s.it_base + s.iters + pit,
+                    )))
+                });
+                return Err(SolveError::SingularBasis);
+            }
+            other => other.ok(),
+        };
         if R::QUAD && s.art_exit {
             if let Some(pr) = prres
                 .as_ref()

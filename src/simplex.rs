@@ -4668,6 +4668,36 @@ fn solve_primal(
             b.validate(n, m).map_err(SolveError::InvalidBasis)?;
             // The reference gets a basis as variable statuses, so its incoming position order is the variable order.
             b.basic.sort_unstable();
+            if let Some(h) =
+                handoff.filter(|h| h.quad && h.retries < 5 && crate::dual::has_restart_snapshot())
+            {
+                // Before the retry limit the x87 factor driver reports a
+                // singular handoff to the controller rather than repairing
+                // it in place (seed 8825, quad LU k13).
+                crate::lu_order::reset_pair_gate();
+                crate::lu_order::set_threshold(h.thr);
+                crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
+                let gate = crate::lu_order::gate_get();
+                let rows: Vec<_> = b
+                    .basic
+                    .iter()
+                    .map(|&v| {
+                        (
+                            v >= n,
+                            p.fcols[v].iter().map(|&(r, _)| r).collect(),
+                            p.fcols[v].iter().map(|&(_, a)| a).collect(),
+                        )
+                    })
+                    .collect();
+                crate::lu_order::set_factorization_number(1);
+                let st = crate::lu_order::factor_structure_r::<crate::f80::F80>(m, &rows);
+                crate::lu_order::gate_set(gate);
+                if st.pivots.len() < m {
+                    PRIMAL_SINGULAR.with(|c| c.set(Some((0, 1, h.thr))));
+                    PRIMAL_START_SINGULAR.with(|c| c.set(true));
+                    return Err(SolveError::SingularBasis);
+                }
+            }
             // Before the retry limit a singular handoff returns -1002; after
             // five retries the factor handler repairs the basis in place.
             if !handoff.is_some_and(|h| h.shifted_exit && h.retries < 5)
