@@ -5298,8 +5298,8 @@ fn solve_primal(
                     if s.repaired && !was {
                         // A singular factor repair changes the basis; resume
                         // phase-one pricing before deciding infeasibility.
-                        s.y_ref = None;
-                        s.composite_dual(false);
+                        // The repair's refactorization already rebuilt the phase-one
+                        // reduced costs on the repaired basis, in working precision.
                         continue;
                     }
                     farkas = Some(s.farkas_dual());
