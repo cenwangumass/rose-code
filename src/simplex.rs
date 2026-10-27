@@ -950,7 +950,7 @@ struct Solver<'a> {
     excl6: Vec<bool>,
     /// The entering variables rejected for a tiny pivot since the last iteration (status -6 until an iteration is made or the pricing finds nothing else).
     rej6: Vec<usize>,
-    /// The failed scan has already been repeated on recomputed duals since the last iteration.
+    /// The x87 handoff's failed scan has been repeated without a factorization.
     rescan2: bool,
     /// The scan that found nothing has been repeated on freshly recomputed duals (`0x145520` then the pricing again, seed 2717).
     rescan3: bool,
@@ -5083,7 +5083,7 @@ fn solve_primal(
                     && (!s.costfree || s.factor.num_updates() != 0 || s.p3c0 > 1e-9) =>
                 {
                     // The failed scan of a primal started by the dual controller (`0x145520`, `0x145aed..0x145bd3`): the factorization is requested again (5), and
-                    //  - with updates since the last factorization (`model+0x18c != 0`): the cost leaves the penalties (`P+0x18 = 0`) and nothing else changes;
+                    //  - with updates since the last factorization (`model+0x18c != 0`): the cost leaves the penalties (`P+0x18 = 0`) and request 5 refactors before another pricing call (fx_midsing_1031, 1496);
                     //  - on a fresh factor with the cost still in: the cost leaves and the scan tolerance falls to `min(1e-9, ctx+0x398)` (`0x145b69`);
                     //  - on a fresh factor without the cost: the tolerance falls to 1e-9, and a scan that fails at 1e-9 ends the primal (`cf0 = 3`, the Farkas path below).
                     // The scan right after a factorization runs inside `0x145520`, not as a pricing call.
@@ -5096,8 +5096,8 @@ fn solve_primal(
                     }
                     s.list.clear();
                     s.level = 0;
-                    if !fresh && first && s.handoff.is_some() {
-                        // In a handoff with updates the scan runs again with the cost out of the penalties, without a factorization (fx_midsing_1106).
+                    if !fresh && first && s.handoff.is_some_and(|h| h.quad) {
+                        // Preserve the x87 handoff's rescan until its reference path is separately recovered.
                         s.rescan2 = true;
                         s.dual_btran_work("rescan");
                         s.recompute_dual();
