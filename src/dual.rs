@@ -39,6 +39,9 @@ thread_local! {
     static LOOP_TOL: std::cell::Cell<f64> = const { std::cell::Cell::new(1e-6) };
     /// Dual passes ended with a primal handoff in this solve (`ctx+0x35c` - 1 outside the quad passes).
     static DUAL_HANDOFFS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+    /// `ctx+0x35c`: 1 at the start, plus one for every run that ends with status -1004 (writers `0xf8691` double dual, `0xe404a` double primal, `0x24b98b` quad dual,
+    /// `0x2371bd` x87 primal; `replay/gdb_c35c_trace.py`). The quad primals' method (`ctx+0x3ec`) and the switch of the first ones read it.
+    pub(crate) static C35C: std::cell::Cell<u32> = const { std::cell::Cell::new(1) };
     static PASS_NO: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     /// The stability counter `ctx+0x178`: one per pivot-check mismatch (`0xc5a35`, quad `0x21da43`) and per singular quad restart (`0x248f99`); never reset in a solve.
     static C178: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
@@ -4145,6 +4148,7 @@ fn solve_frame(
     PAIR_TOL.with(|c| c.set(3e-6));
     PASS_NO.with(|c| c.set(0));
     DUAL_HANDOFFS.with(|c| c.set(0));
+    C35C.with(|c| c.set(1));
     C178.with(|c| c.set(0));
     crate::simplex::QUAD_PRIMALS.with(|c| c.set(0));
     crate::simplex::QUAD_STALLS.with(|c| c.set(0));
@@ -4781,10 +4785,6 @@ fn solve_pass<R: Real>(
                 s.rejected_end = true;
                 status = Status::Infeasible;
                 break;
-                s.art_exit = true;
-                s.dual_unbounded();
-                status = Status::Unbounded;
-                break;
             }
             if stt == Status::Optimal && s.pert != 0 {
                 // The end of the dual with the cost shifts in force (`ctx+0x338` != 0, `0xf7033`): the shifts are removed (status -1004) and the primal
@@ -4884,8 +4884,11 @@ fn solve_pass<R: Real>(
             c.set(c.get() + 1);
             c.get()
         });
+        if !(R::QUAD && s.pert != 0 && !s.rejected_end) {
+            C35C.with(|c| c.set(c.get() + 1));
+        }
         let c35c = if R::QUAD {
-            crate::simplex::QUAD_PRIMALS.with(|c| c.get()) + 1
+            C35C.with(|c| c.get())
         } else {
             handoffs + 1
         };
@@ -4910,6 +4913,10 @@ fn solve_pass<R: Real>(
                 else {
                     return Err(SolveError::SingularBasis);
                 };
+                if !R::QUAD && s.rejected_end {
+                    // The double primal after a rejected end made its pivots and ended with status -1004 (`0xe404a`, seed 3981), then the dual restarts in quad.
+                    C35C.with(|c| c.set(c.get() + 1));
+                }
                 if crate::simplex::PRIMAL_DRIFT.with(|c| c.take()) {
                     DRIFT_START.with(|c| *c.borrow_mut() = Some(b.clone()));
                 }
@@ -4966,6 +4973,7 @@ fn solve_pass<R: Real>(
         r.iterations += s.iters + crate::simplex::EARLIER_ITERS.with(|c| c.take());
         r.refactorizations += s.refactorizations;
         if R::QUAD && crate::simplex::PRIMAL_STALL.with(|c| c.take()) {
+            C35C.with(|c| c.set(c.get() + 1));
             // The x87 primal ended on its progress check (status -1004): the controller runs the quad dual again from the primal's basis, and the primal after it.
             let l = r.refactorizations - s.refactorizations;
             let carry2 = Carry {
@@ -5012,6 +5020,7 @@ fn solve_pass<R: Real>(
                 c.get() <= 10
             })
         {
+            C35C.with(|c| c.set(c.get() + 1));
             // The dual ended with cost shifts in force: the primal removes them and ends with status -1004 (its price scan finds nothing), and the
             // controller runs the dual again from the primal's basis (m5: one primal pivot, then the dual proves the infeasibility on the true costs).
             // With a basis snapshot (`0xd40b0`, taken after 100 iterations) the controller restarts from it instead (`0xcedb0`; fx_midsing_1106 call 113).
@@ -5062,6 +5071,9 @@ fn solve_pass<R: Real>(
         return Ok(r);
     }
     if status == Status::Unbounded {
+        if R::QUAD && s.art_exit {
+            C35C.with(|c| c.set(c.get() + 1));
+        }
         // The dual is infeasible (a nonbasic variable stayed at an artificial bound, or a free one has a nonzero d). That proves the primal unbounded only
         // if it is feasible, and the point the dual loop holds is a finite point plus 1e30 times the ray, not a feasible point. A zero objective is dual
         // feasible, so the dual simplex on it decides: a feasible point (unbounded) or a Farkas certificate (primal and dual infeasible).
