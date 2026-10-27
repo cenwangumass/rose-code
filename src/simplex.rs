@@ -4353,6 +4353,14 @@ fn ratio_test(
 /// Returns the last variable dropped (highest basis position), which the reference keeps out of pricing until the basis is
 /// primal feasible (status -4 until `0x155139` adds 3 back).
 pub(crate) fn repair_basis(p: &Internal, b: &mut Basis) -> Option<(usize, Vec<(u32, f64)>)> {
+    repair_basis_at(p, b, None)
+}
+
+fn repair_basis_at(
+    p: &Internal,
+    b: &mut Basis,
+    threshold: Option<f64>,
+) -> Option<(usize, Vec<(u32, f64)>)> {
     let (n, m) = (p.n, p.m);
     let cols: Vec<(bool, Vec<usize>, Vec<f64>)> = b
         .basic
@@ -4366,6 +4374,11 @@ pub(crate) fn repair_basis(p: &Internal, b: &mut Basis) -> Option<(usize, Vec<(u
         })
         .collect();
     crate::lu_order::reset_pair_gate();
+    if let Some(threshold) = threshold {
+        // The handoff keeps the dual's pivot threshold during the initial repair
+        // (quad seed 2594: 0.9); reset_pair_gate also resets the threshold.
+        crate::lu_order::set_threshold(threshold);
+    }
     crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
     crate::lu_order::set_factorization_number(1);
     let st = crate::lu_order::factor_structure(m, &cols);
@@ -4508,7 +4521,7 @@ fn solve_primal(
             b.validate(n, m).map_err(SolveError::InvalidBasis)?;
             // The reference gets a basis as variable statuses, so its incoming position order is the variable order.
             b.basic.sort_unstable();
-            if let Some((e, w)) = repair_basis(&p, &mut b) {
+            if let Some((e, w)) = repair_basis_at(&p, &mut b, handoff.map(|h| h.thr)) {
                 excluded = Some(e);
                 singular_work = w;
             }
