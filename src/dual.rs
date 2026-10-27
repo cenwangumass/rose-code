@@ -4745,7 +4745,10 @@ fn solve_pass<R: Real>(
             // The first x87 primal after a quad dual runs the `SimplexPricing=0` scan (`ctx+0x3ec` = 0 at its start, seed 2772: enters 24, 27, 1, 6, 12, 2 by the largest score bucket);
             // the later ones are in method 2 / 1. After a dual that applied its cost shifts (`pert` 3) the first x87 primal is already in method 1, Devex (`ctx+0x3ec` = 1 at its
             // first entry: seeds 7877, 8531, 7084; seed 8547 has the same dual state and `ctx+0x3ec` = 0: the rule behind the method is not read, `ctx+0x3e8` = -1 in all).
-            popts.pricing0 = s.pert != 3;
+            // The method decision after the primal's start factorization (`0x27e9b0`, `ctx+0x178` > 0): the first x87 primal goes to method 1 when the dual made iterations since its
+            // last snapshot of the stall counters (`ctx+0x2a0` != `ctx+0x2b0`, written with `ctx+0x334` at `0x239a6e`, rose's `stall_it`; seed 7877: 25 vs 21 fires, 8547: 22 vs 22 stays in mode 0).
+            let fires = C178.with(|c| c.get()) > 0 && s.stall_it != s.iters as f64;
+            popts.pricing0 = !fires;
         }
         if opts.perturb != 0.0 {
             popts.sw_carry = Some(crate::simplex::SwCarry {
