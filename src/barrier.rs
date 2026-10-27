@@ -1922,6 +1922,26 @@ pub trait NormalSolver {
     /// `0x2e2650`, after the step caps of an iteration: `early` is `Q+0x28c != 0`, `q1f8` the complementarity measure, `capped` the flag of the caps (`r10b`).
     fn after_caps(&mut self, _early: bool, _q1f8: f64, _capped: bool) {}
 
+    /// Factorizations the last [`NormalSolver::factor_iter`] / `factor` ran beyond the first (the single-precision factor redone in double).
+    fn take_extra_factors(&mut self) -> usize {
+        0
+    }
+
+    /// Whether a restart of the starting point must solve again (the factor of the starting point is no longer the one that produced `s1`, `s2`:
+    /// the single-precision factor was dropped for double in between).
+    fn redo_start(&self, _f: &StdForm) -> bool {
+        false
+    }
+
+    /// The starting-point solve of a restart (`0x2e9596` / `0x2e9f81` after iterations): like [`NormalSolver::start`], refined when the solver refines.
+    fn restart_start(
+        &mut self,
+        f: &StdForm,
+        kind: StartKind,
+    ) -> Result<(Vec<f64>, Vec<f64>), BarrierError> {
+        self.start(f, kind)
+    }
+
     /// `Q+0x770 / 0x780` of the last direction: the norms of its solve residual (0 where the solver does not refine).
     fn norms(&self) -> (f64, f64) {
         (0.0, 0.0)
@@ -2872,9 +2892,10 @@ impl Work {
         self.t[k] = self.t[k] + w;
     }
 
-    fn factor(&mut self) {
+    /// The factor window: `S` per factorization (`extra` more when the single-precision factor was dropped and redone in double: one window, two charges).
+    fn factor(&mut self, extra: usize) {
         let s = self.s * WORK_SCALE;
-        self.add(0, &[s]);
+        self.add(0, &vec![s; 1 + extra]);
     }
 
     fn predictor(&mut self, extra: usize) {
@@ -2968,7 +2989,7 @@ pub fn run<S: NormalSolver>(
     solver.early_decision(f, -1, 1e100);
     solver.factor(f, &start_diag(f))?;
     if let Some(wk) = work.as_mut() {
-        wk.factor();
+        wk.factor(solver.take_extra_factors());
     }
     let w: Vec<f64> = (0..f.n())
         .map(|j| {
@@ -2979,8 +3000,8 @@ pub fn run<S: NormalSolver>(
             }
         })
         .collect();
-    let s1 = solver.start(f, StartKind::Primal { w: &w })?;
-    let s2 = solver.start(f, StartKind::Dual)?;
+    let mut s1 = solver.start(f, StartKind::Primal { w: &w })?;
+    let mut s2 = solver.start(f, StartKind::Dual)?;
     let (mut st, p3_0, p4_0, _stage) = start_point(f, s1.clone(), s2.clone(), &sc, 0, 0.0);
     // `Q+0x38` of the starting point: the floor of a type B restart is `max(1000, 10 Q+0x38)` (`0x2e2983`).
     let q38 = p3_0.min(p4_0);
@@ -3180,7 +3201,7 @@ pub fn run<S: NormalSolver>(
         let early = solver.early_decision(f, it, res.q190);
         solver.factor_iter(f, &dd, &zx)?;
         if let Some(wk) = work.as_mut() {
-            wk.factor();
+            wk.factor(solver.take_extra_factors());
             wk.mode1 = solver.refine_mode(f);
         }
         solver.prepare(
@@ -3513,9 +3534,15 @@ pub fn run<S: NormalSolver>(
             ntry_next = 10;
         }
         if restart {
+            if solver.redo_start(f) {
+                // `0x2e9596` / `0x2e9f81`: the restart factors the starting diagonal and solves both starting-point systems again.
+                solver.factor(f, &start_diag(f))?;
+                s1 = solver.restart_start(f, StartKind::Primal { w: &w })?;
+                s2 = solver.restart_start(f, StartKind::Dual)?;
+            }
             (st, _, _, _) = start_point(f, s1.clone(), s2.clone(), &sc, 0, q30r);
             if let Some(wk) = work.as_mut() {
-                wk.factor();
+                wk.factor(solver.take_extra_factors());
             }
             qf8 = it + 1;
             h.nrm.x2 = dot_lanes(&st.x, &st.x, 0);

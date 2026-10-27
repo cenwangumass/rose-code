@@ -326,7 +326,12 @@ pub fn strsm_left_ker(l: &[f32], w: usize, x: &mut [f32]) {
             for c in 0..nch {
                 for k in 0..8 {
                     let j = 8 * c + k;
-                    lane[k] = rd(lane[k] - rd(l[i * w + j] * x[j]));
+                    // The first block of lanes is fused (`b - l x` in one rounding, visible when `l_i0 x_0` cancels `b_i`), the later blocks unfused.
+                    lane[k] = if c == 0 {
+                        (-l[i * w + j]).mul_add(x[j], lane[k])
+                    } else {
+                        rd(lane[k] - rd(l[i * w + j] * x[j]))
+                    };
                 }
             }
             v = rd(rd(rd(lane[0] + lane[4]) + rd(lane[2] + lane[6]))

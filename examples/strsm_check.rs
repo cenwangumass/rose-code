@@ -36,6 +36,13 @@ fn main() {
             for i in 0..m {
                 if x[i].to_bits() != r[c * m + i].to_bits() {
                     bad += 1;
+                    if std::env::var("VERB").is_ok() {
+                        eprintln!(
+                            "diff row {i} col {c}: ref {:e} rose {:e}",
+                            r[c * m + i],
+                            x[i]
+                        );
+                    }
                     if first.is_none() {
                         first = Some((i, c));
                     }

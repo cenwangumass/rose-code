@@ -343,9 +343,19 @@ pub fn assemble_generic(
                 }
             }
         }
+        // The slack of an inequality row is added to the double sum before the one rounding to float.
+        let slack = f.sense[i] != b'=';
+        if slack && !seen[a] {
+            seen[a] = true;
+            touched.push(a);
+        }
         for &m in &touched {
             if m < w {
-                mm[m * w + a] = rf(acc[m]);
+                mm[m * w + a] = rf(if slack && m == a {
+                    acc[m] + d[n2 + i]
+                } else {
+                    acc[m]
+                });
             } else {
                 r[(m - w) * w + a] = rf(acc[m]);
             }
@@ -353,9 +363,6 @@ pub fn assemble_generic(
             seen[m] = false;
         }
         touched.clear();
-        if f.sense[i] != b'=' {
-            mm[a * w + a] = rf(mm[a * w + a] + d[n2 + i]);
-        }
     }
     (mm, r)
 }
@@ -1933,6 +1940,12 @@ pub struct CholSolver {
     it: i32,
     q190: f64,
     sym_work: f64,
+    /// Factorizations beyond the first of the last factor call (single precision dropped for double).
+    extra_fac: usize,
+    /// The single-precision factor was dropped for double.
+    dropped: bool,
+    /// The factor was single precision at some point (a restart then solves the starting point again, refined).
+    ever_single: bool,
 }
 
 impl CholSolver {
@@ -1940,6 +1953,7 @@ impl CholSolver {
     /// Sets `GURO_PAR_BARQUICKSTART` (the hidden parameter at `P+0x2be0`; 1 forces the single-precision factor, 0 forbids it).
     pub fn set_quick_start(&mut self, f: &StdForm, sym: &Symbolic, quick: i32) {
         self.plan.single = replaced_pivots(f, sym, quick);
+        self.ever_single = self.plan.single;
     }
 
     pub fn new(f: &StdForm, sym: &Symbolic) -> CholSolver {
@@ -1954,6 +1968,9 @@ impl CholSolver {
             d: Vec::new(),
             fac: None,
             ntry0: ntry_first(f, sym),
+            extra_fac: 0,
+            dropped: false,
+            ever_single: replaced_pivots(f, sym, -1),
             nfac: 0,
             zx: Vec::new(),
             thr: 0.0,
@@ -2189,6 +2206,8 @@ impl NormalSolver for CholSolver {
         if self.plan.single && fac.minratio < 1e-8 {
             self.plan.single = false;
             self.fac = None;
+            self.extra_fac += 1;
+            self.dropped = true;
             return self.factor(f, d);
         }
         self.fac = Some(fac);
@@ -2295,6 +2314,39 @@ impl NormalSolver for CholSolver {
 
     fn take_extra_solves(&mut self) -> usize {
         self.extra.replace(0)
+    }
+
+    fn redo_start(&self, f: &StdForm) -> bool {
+        self.dropped || (self.ever_single && self.refining(f))
+    }
+
+    fn restart_start(
+        &mut self,
+        f: &StdForm,
+        kind: StartKind,
+    ) -> Result<(Vec<f64>, Vec<f64>), BarrierError> {
+        let n = f.n();
+        let (rx, ry) = match kind {
+            StartKind::Primal { .. } => {
+                let mut rx = vec![0.0; n];
+                for j in 0..f.n2 {
+                    if f.flags[j] & 2 != 0 {
+                        rx[j] = -f.ub[j];
+                    }
+                }
+                (rx, f.b.clone())
+            }
+            StartKind::Dual => {
+                let mut rx = f.c.clone();
+                rx.resize(n, 0.0);
+                (rx, vec![0.0; f.m])
+            }
+        };
+        self.solve_raw(f, &rx, &ry)
+    }
+
+    fn take_extra_factors(&mut self) -> usize {
+        std::mem::take(&mut self.extra_fac)
     }
 
     fn ntry(&mut self, it: i32, default: usize) -> usize {
