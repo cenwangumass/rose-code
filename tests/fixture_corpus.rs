@@ -282,12 +282,21 @@ fn infeasible_models_end_infeasible_in_every_simplex_profile() {
     assert!(y[4] > 0.0 && y[6] > 0.0 && y[7] > 0.0, "{y:?}");
 }
 
-/// The dual clean-up pass after a shifted optimum (random LP `gen3` seed 243, controlled profile; reference run through `tools/ref_run.py`):
-/// it needs one clean-up pivot and then a primal pivot, because the dual pivot leaves a negative reduced cost (16 iterations; without the second
-/// pricing rose stopped at 15 and 9.999967768276168).
+/// The dual clean-up pass after a shifted optimum (random LPs of `corpus/randlp/gen3.py`, controlled profile; reference run through `tools/ref_run.py`).
+/// The pass is the dual simplex run from the primal basis (`crate::dual`) with the LU threshold of the primal's accuracy ladder; the primal then prices
+/// again (`fx_cleanup_one`: one dual pivot, then a primal pivot, 16 iterations). x, reduced costs and duals of the returned solution are compared
+/// bit for bit with the reference by `tools/compare.py`-style runs (`gen3` seeds 243, 247, 566, 680, 1296); here the iteration count and the objective.
+/// `fx_cleanup_infeasible` (`gen` seed 2020): the dual proves the infeasibility after four pivots (22 iterations).
 #[test]
-fn dual_cleanup_pivots_are_followed_by_a_pricing_scan() {
-    for (name, iters, obj) in [("fx_cleanup_one", 16, 9.999962571150556)] {
+fn dual_cleanup_pass_matches_the_reference() {
+    for (name, iters, obj) in [
+        ("fx_cleanup_one", 16, Some(9.999962571150556)),
+        ("fx_cleanup_two", 11, Some(56.38623931869912)),
+        ("fx_cleanup_four", 9, Some(0.0004169818070081059)),
+        ("fx_cleanup_five", 25, Some(0.0005515042229220582)),
+        ("fx_cleanup_six", 34, Some(1.2259691964239767)),
+        ("fx_cleanup_infeasible", 22, None),
+    ] {
         let Some(m) = fixture(name) else { continue };
         let opts = SolveOptions {
             faithful_weights: true,
@@ -296,8 +305,13 @@ fn dual_cleanup_pivots_are_followed_by_a_pricing_scan() {
             ..SolveOptions::default()
         };
         let r = solve(&m, None, &opts).unwrap();
-        assert_eq!(r.status, Status::Optimal, "{name}");
         assert_eq!(r.iterations, iters, "{name}");
-        assert_eq!(r.objective.to_bits(), f64::to_bits(obj), "{name}");
+        match obj {
+            Some(o) => {
+                assert_eq!(r.status, Status::Optimal, "{name}");
+                assert_eq!(r.objective.to_bits(), f64::to_bits(o), "{name}");
+            }
+            None => assert_eq!(r.status, Status::Infeasible, "{name}"),
+        }
     }
 }

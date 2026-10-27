@@ -1024,6 +1024,8 @@ struct Solver<'a> {
     /// The final factorization of a solve that ended with right-hand-side shifts: the reference removes the shifts in a dual clean-up pass
     /// that factorizes the basis in ascending index order (`0xf6a00`), instead of refactorizing in pivot order.
     cleanup: bool,
+    /// The pivot threshold `ctx+0x390` as the accuracy ladder of the x_B recomputes leaves it (`crate::dual::accuracy_threshold`); the primal's own factorizations keep 2^-7, the clean-up pass uses it.
+    acc_thr: f64,
     /// The final clean-up factorization after dual pivots takes the basis head as the pivots left it (the reference updates the factor between the pivots).
     cleanup_keep_head: bool,
     /// The pivot row and `extra` of the last list update from the pivot step (`0x1442ab`), which `0x107e14` repeats.
@@ -2086,6 +2088,18 @@ impl<'a> Solver<'a> {
                         .zip(&out)
                         .fold(0.0f64, |e, (a, b)| e.max((a - b).abs())),
                 );
+            }
+            {
+                let rmax = r.iter().fold(1e-9f64, |a, v| a.max(v.abs()));
+                let xmax = xb.iter().fold(0.0f64, |a, v| a.max(v.abs()));
+                let e2 = if self.want_drift {
+                    res.iter().fold(0.0f64, |a, v| a.max(v.abs())) / rmax
+                } else {
+                    0.0
+                };
+                self.acc_thr = self
+                    .acc_thr
+                    .max(crate::dual::accuracy_threshold(xmax / rmax, e2));
             }
             let scale = 1.0 + r.iter().fold(0.0f64, |a, v| a.max(v.abs()));
             if self.handoff.is_some() || res.iter().all(|v| v.abs() <= 1e-7 * scale) {
@@ -3292,7 +3306,6 @@ impl<'a> Solver<'a> {
         let tol = self.opts.feasibility_tol;
         let mut pivots = 0;
         let mut head = self.basic.clone();
-        if std::env::var("CLBASIS").is_ok() { eprintln!("CLB {}", serde_json::json!({"basic": self.basic, "at_upper": self.at_upper})); }
         let count = self.refactorizations;
         while pivots < 10 * p.m {
             let sg = self.sig();
@@ -4388,6 +4401,7 @@ fn solve_primal(
         recomputed: false,
         rescan: false,
         cleanup: false,
+        acc_thr: crate::lu_order::THRESHOLD,
         cleanup_keep_head: false,
         last_upd: None,
         last_row: Vec::new(),
@@ -4891,7 +4905,64 @@ fn solve_primal(
                         s.refactor()?;
                         if s.cleanup && s.has_infeasible_basic() {
                             // The dual clean-up pass; the primal phase 1 only when it finds no entering variable.
-                            if let Some(k) = s.dual_cleanup()? {
+                            let b = Basis {
+                                basic: s.basic.clone(),
+                                at_upper: s.at_upper.clone(),
+                            };
+                            let dopts = SolveOptions {
+                                method: Method::Dual,
+                                scaled: opts.scaled,
+                                obj_scale: opts.obj_scale,
+                                record_trace: true,
+                                ..SolveOptions::default()
+                            };
+                            crate::dual::CLEANUP_PASS.with(|c| c.set(Some(s.acc_thr)));
+                            let via = crate::dual::solve(model, Some(&b), &dopts);
+                            crate::dual::CLEANUP_PASS.with(|c| c.set(None));
+                            let via = via.ok().filter(|r| {
+                                matches!(r.status, Status::Optimal | Status::Infeasible)
+                            });
+                            if let Some(r2) = via {
+                                let k = r2.iterations;
+                                let mut head = s.basic.clone();
+                                for ev in &r2.trace {
+                                    if let Some(l) = ev.leaving {
+                                        if let Some(h) = head.iter().position(|&v| v == l) {
+                                            head[h] = ev.entering;
+                                        }
+                                    }
+                                }
+                                iterations += k;
+                                if k > 0 || r2.status == Status::Infeasible {
+                                    s.basic = head;
+                                    s.pos_of.iter_mut().for_each(|v| *v = NONE);
+                                    for (pos, &j) in s.basic.iter().enumerate() {
+                                        s.pos_of[j] = pos;
+                                    }
+                                    for j in 0..p.n + p.m {
+                                        if s.pos_of[j] == NONE {
+                                            s.at_upper[j] = r2.basis.at_upper[j];
+                                        }
+                                    }
+                                    // The dual ended with cost shifts: its last factorization was the sorted clean-up one, not the head left by the pivots.
+                                    let (sorted, thr) = crate::dual::CLEANUP_OUT.with(|c| c.get());
+                                    crate::lu_order::set_threshold(thr.max(s.acc_thr));
+                                    s.cleanup_keep_head = !sorted;
+                                    let res = s.refactor();
+                                    s.cleanup_keep_head = false;
+                                    res?;
+                                    if r2.status == Status::Infeasible {
+                                        // The dual proves the infeasibility: the certificate is the primal's, read from this basis.
+                                        s.refactor_for_farkas()?;
+                                        farkas = Some(s.farkas_dual());
+                                        break Status::Infeasible;
+                                    }
+                                    s.recompute_dual();
+                                    s.list.clear();
+                                    s.level = 0;
+                                    continue;
+                                }
+                            } else if let Some(k) = s.dual_cleanup()? {
                                 iterations += k;
                                 if k > 0 {
                                     // The pivots can leave a negative reduced cost (the ratio test's tolerance): the primal prices again.

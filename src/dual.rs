@@ -109,7 +109,7 @@ fn is_inf(v: f64) -> bool {
 
 /// The pivot threshold asked for by the accuracy of the x_B recompute (`0xc1880`, `0xc3e42..0xc3ed8`, `0xc18a5`): `m0` = max |x_B| / R and `e2` = max |rhs - B x_B| / R,
 /// R = max(1e-9, max |rhs|). The first rung whose `m0` or `e2` bound is exceeded gives the candidate; the driver keeps the larger of it and `ctx+0x390`.
-fn accuracy_threshold(m0: f64, e2: f64) -> f64 {
+pub(crate) fn accuracy_threshold(m0: f64, e2: f64) -> f64 {
     const RUNGS: [(f64, f64, f64); 5] = [
         (1e10, 1e-8, 0.5),
         (1e9, 4e-9, 0.25),
@@ -3972,7 +3972,11 @@ thread_local! {
     static SWITCH: std::cell::Cell<Option<(usize, usize, f64, f64, usize, usize, bool, u32)>> = const { std::cell::Cell::new(None) };
     static FROM_SWITCH: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static SWITCH_BASIS: std::cell::RefCell<Option<Basis>> = const { std::cell::RefCell::new(None) };
+    /// Set by the primal's clean-up pass: the dual runs inside the primal's context, with the LU threshold the primal's accuracy ladder left in `ctx+0x390` (gen3 seeds 247, 680: raised to 0.5 at the first x_B recompute; with 2^-7 the pivot order of the final factorization differs).
+    pub static CLEANUP_PASS: std::cell::Cell<Option<f64>> = const { std::cell::Cell::new(None) };
     /// The perturbation flag the quad pass inherits from the double pass (`ctx+0x338`).
+    /// Out of a clean-up pass dual: (the dual ended with cost shifts, so its last factorization was the sorted primal clean-up one, the LU threshold at the end).
+    pub static CLEANUP_OUT: std::cell::Cell<(bool, f64)> = const { std::cell::Cell::new((false, 0.0)) };
     static SWITCH_PERT: std::cell::Cell<Option<u8>> = const { std::cell::Cell::new(None) };
     static SINGULAR: std::cell::Cell<Option<(usize, usize, f64, f64, usize, usize, bool, u32)>> = const { std::cell::Cell::new(None) };
 }
@@ -4037,7 +4041,9 @@ fn solve_frame(
 ) -> Result<SolveResult, SolveError> {
     let mut carry = Carry {
         retries: 0,
-        thr: crate::lu_order::THRESHOLD,
+        thr: CLEANUP_PASS
+            .with(|c| c.get())
+            .unwrap_or(crate::lu_order::THRESHOLD),
         fac: 0,
         iters: 0,
         avg_touch: 0.0,
@@ -4687,9 +4693,13 @@ fn solve_pass<R: Real>(
                 s.refactor()?;
                 s.recompute_xb(0);
                 cleaned = true;
+                CLEANUP_OUT.with(|c| c.set((true, s.lu_thr)));
             }
             break;
         }
+    }
+    if !cleaned {
+        CLEANUP_OUT.with(|c| c.set((false, s.lu_thr)));
     }
     let restored = dropped.or(s.repaired);
     // The eleventh restore (`0x15553e`, `PERT_RERUNS` past 10) ends the solve with status 12 before the primal runs: the reference's iteration count has no primal pivot
