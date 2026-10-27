@@ -268,6 +268,8 @@ struct Dual<'a, R: Real = f64> {
     flags: Vec<u8>,
     list: Vec<usize>,
     thr: R,
+    /// Relative residual of the last full basic-solution recomputation.
+    xb_residual: R,
     value_mode: bool,
     cursor: usize,
     walk_len: usize,
@@ -1133,6 +1135,7 @@ impl<'a, R: Real> Dual<'a, R> {
         } else {
             R::ZERO
         };
+        self.xb_residual = e2;
         let (rmax, xmax, e2) = (rmax.to_f64(), xmax.to_f64(), e2.to_f64());
         if !R::QUAD {
             let large = rmax + xmax > 1e20;
@@ -1596,23 +1599,23 @@ impl<'a, R: Real> Dual<'a, R> {
     }
 
     /// The acceptance test of the recompute (`0x21a383..0x21a4b6`): with `v` the infeasibility of a row beyond the tolerance, `rel` the largest `v / (|x| + 1)`, `a` the largest `v`
-    /// and `xm` the largest `|x| + 1`, the solution counts as feasible when `rel < c390 2^-21` or `0.1 xm c390 2^-21 > a` (`c390` is the relative pivot tolerance).
+    /// and `xm` the largest `|x|`, the comparison threshold is the greater of the recompute's relative residual and `1e-4` times the primal tolerance.
     fn tiny_infeasibility(&self) -> bool {
         let tol = self.ptol();
-        let (mut rel, mut a, mut xm) = (0.0f64, 0.0f64, 0.0f64);
+        let (mut rel, mut a, mut xm) = (R::ZERO, R::ZERO, R::ZERO);
         let mut any = false;
         for r in 0..self.m {
-            let x = self.xb[r].to_f64();
-            xm = xm.max(x.abs() + 1.0);
-            let f = self.infeas(r);
-            if f > tol {
+            let x = self.xb[r];
+            xm = xm.max(x.abs());
+            let f = self.infeas_real(r);
+            if f > R::c(tol) {
                 any = true;
                 a = a.max(f);
-                rel = rel.max(f / (x.abs() + 1.0));
+                rel = rel.max(f / (x.abs() + R::ONE));
             }
         }
-        let s3 = self.lu_thr * (-21.0f64).exp2();
-        any && (rel < s3 || 0.1 * xm * s3 > a)
+        let s3 = self.xb_residual.max(R::c(tol * 1e-4));
+        any && (rel < s3 || (R::ONE / R::c(10.0)) * xm * s3 > a)
     }
 
     /// The leaving row (`0xccbc0`), `None` when no row is infeasible.
@@ -4605,6 +4608,7 @@ fn solve_pass<R: Real>(
         flags: vec![2; m],
         list: Vec::new(),
         thr: R::ZERO,
+        xb_residual: R::ZERO,
         value_mode: false,
         cursor: 0,
         walk_len: 0,
