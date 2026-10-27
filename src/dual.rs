@@ -5316,7 +5316,10 @@ fn solve_pass<R: Real>(
             && s.pert != 0
             && !had_repair
             && (R::QUAD || r.status != Status::Optimal)
-            && (!(R::QUAD && s.rejected_end) || shift_end)
+            // A rejected-row dual handoff can end with an ordinary primal
+            // infeasibility result. The controller exits on status 3 when no
+            // dropped variable remains; only a shifted primal exit reruns it.
+            && (!s.rejected_end || shift_end)
             && PERT_RERUNS.with(|c| {
                 // A rejected-end handoff is not a restore; the controller's
                 // restore counter increments on the later status-3 exits.
