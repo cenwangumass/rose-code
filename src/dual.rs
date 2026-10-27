@@ -3333,6 +3333,20 @@ impl<'a, R: Real> Dual<'a, R> {
         }
     }
 
+    /// A nonbasic variable at a bound has a wrong-signed d for the true costs (the cost shifts removed), beyond the dual tolerance.
+    fn true_cost_infeasible(&mut self) -> bool {
+        let saved = std::mem::replace(&mut self.cost, self.p.cost.clone());
+        let saved_lo = std::mem::replace(&mut self.cost_lo, vec![0.0; self.n + self.m]);
+        let y = self.last_y.clone();
+        let dt = self.true_d();
+        self.last_y = y;
+        self.cost = saved;
+        self.cost_lo = saved_lo;
+        let tol = R::c(dual_tol());
+        (0..self.n + self.m)
+            .any(|j| (self.st[j] == LB && dt[j] < -tol) || (self.st[j] == UB && dt[j] > tol))
+    }
+
     /// The status count of the quad post-iteration function (`0x238c38..0x238d1f`) on d recomputed with the current factor: a variable at its lower bound
     /// (status -1) with `d < -tol` and no finite upper bound, or at its upper bound (status -2) with `d > tol` and no finite upper bound, counts.
     fn artificial_count(&mut self) -> usize {
@@ -3438,7 +3452,9 @@ impl<'a, R: Real> Dual<'a, R> {
     /// `ctx+0x338` becomes at least 2. A free nonbasic variable (status -3) with `|d| > tol` is shifted like the lower-bound case. Fixed ones (status -4) stay.
     /// In a quad pass the request-4 refactorization shifts too (the reference keeps st and sets d = 0 where the double dual moves the variable to its other bound; seed 5247).
     fn shift_wrong_d(&mut self) {
-        if self.request == 1 || (self.request == 4 && !R::QUAD) {
+        // The double dual's confirming refactorization (request 4) shifts only with the cost shifts already in force (`ctx+0x338` != 0; seed 3981: d = -29 and -58 at
+        // a lower bound with an infinite range have d = 0 at the next call, not a level of artificial bounds).
+        if self.request == 1 || (self.request == 4 && !R::QUAD && self.pert == 0) {
             return;
         }
         for j in 0..self.n + self.m {
@@ -4739,13 +4755,26 @@ fn solve_pass<R: Real>(
         if let Some(stt) = s.status {
             status = stt;
             if R::QUAD
-                && (s.level != 0 || s.q4_shifted)
                 && stt == Status::Optimal
                 && s.pert != 0
                 && !NO_ART_EXIT.with(|c| c.get())
+                && (s.level != 0 || s.q4_shifted)
             {
                 // The quad driver's end (`0x24a4f6..0x24a548`): a final status 2 (dual optimal) or 5 with the cost shifts in force (`ctx+0x338` != 0) clears them and returns
                 // status -1004; the controller hands over to the x87 primal (seeds 5247, 6972, 6610, 8179). It replaces the double dual's exit at the request-4 refactor.
+                s.art_exit = true;
+                s.dual_unbounded();
+                status = Status::Unbounded;
+                break;
+            }
+            if !R::QUAD
+                && stt == Status::Optimal
+                && s.pert != 0
+                && !NO_ART_EXIT.with(|c| c.get())
+                && s.true_cost_infeasible()
+            {
+                // The double dual ends optimal for the shifted costs but the true costs make a nonbasic d wrong-signed: the controller's primal runs from this basis (-1004).
+
                 s.art_exit = true;
                 s.dual_unbounded();
                 status = Status::Unbounded;
@@ -5076,6 +5105,28 @@ fn solve_pass<R: Real>(
             });
         }
         let prres = crate::simplex::solve(model, Some(&from_dual), &popts).ok();
+        if !R::QUAD
+            && s.art_exit
+            && prres
+                .as_ref()
+                .is_some_and(|pr| pr.status == Status::Infeasible)
+        {
+            let pit = prres.as_ref().map_or(0, |pr| pr.iterations);
+            let pfac = prres.as_ref().map_or(0, |pr| pr.refactorizations);
+            SINGULAR.with(|c| {
+                c.set(Some((
+                    s.iters + pit,
+                    s.refactorizations + pfac,
+                    s.lu_thr,
+                    s.avg_touch,
+                    s.last_cap,
+                    s.inf_count,
+                    false,
+                    s.retries,
+                )))
+            });
+            return Err(SolveError::SingularBasis);
+        }
         if R::QUAD && s.art_exit {
             if let Some(pr) = prres
                 .as_ref()
