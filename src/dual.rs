@@ -5225,6 +5225,10 @@ fn solve_pass<R: Real>(
         crate::simplex::HANDOFF.with(|c| {
             c.set(Some(crate::simplex::Handoff {
                 stale: Some(s.pair),
+                // Shift and offset accounting in the primal progress writer is not yet recovered.
+                working_obj: (R::QUAD && s.pert == 0 && s.obj_off == 0.0 && model.offset == 0.0)
+                    .then_some(s.working_obj)
+                    .flatten(),
                 nref0: s.nref(),
                 thr: s.lu_thr,
                 retries: s.retries as usize,
@@ -5358,6 +5362,7 @@ fn solve_pass<R: Real>(
             crate::simplex::HANDOFF.with(|c| {
                 c.set(Some(crate::simplex::Handoff {
                     stale: None,
+                    working_obj: None,
                     nref0: s.nref() + r.refactorizations,
                     thr: s.lu_thr,
                     retries: s.retries as usize + repair_count,
@@ -5550,6 +5555,9 @@ fn solve_pass<R: Real>(
             crate::simplex::HANDOFF.with(|c| {
                 c.set(Some(crate::simplex::Handoff {
                     stale: Some(s.pair),
+                    working_obj: (s.obj_off == 0.0 && model.offset == 0.0)
+                        .then_some(s.working_obj)
+                        .flatten(),
                     nref0: s.nref(),
                     thr: s.lu_thr,
                     retries: s.retries as usize,
@@ -5609,6 +5617,8 @@ fn solve_pass<R: Real>(
                 crate::simplex::HANDOFF.with(|c| {
                     c.set(Some(crate::simplex::Handoff {
                         stale: None,
+                        // Restored-variable objective carry is not yet recovered.
+                        working_obj: None,
                         nref0: s.nref() + pr.refactorizations,
                         thr: s.lu_thr,
                         retries: s.retries as usize + 1,

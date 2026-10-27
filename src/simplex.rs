@@ -469,6 +469,8 @@ impl Mir {
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Handoff {
     pub stale: Option<(f64, f64)>,
+    /// Objective stored in the shared quad context at the handoff.
+    pub working_obj: Option<f64>,
     /// Factorization count (`ctx+0x2c0`) inherited from the dual.
     pub nref0: usize,
     pub thr: f64,
@@ -526,6 +528,42 @@ thread_local! {
     /// The entering variable and the structural count `n` of the scaled problem where the primal found its ray: the reference's ray moves that
     /// variable by one unit in the user's frame, so the scaling wrapper rescales by the column factor (structural) or the row factor (slack).
     pub(crate) static RAY_ENTER: std::cell::Cell<Option<(usize, usize)>> = const { std::cell::Cell::new(None) };
+}
+
+#[cfg(test)]
+type QuadProgressRecord = (usize, f64, Option<f64>, Option<f64>, u32, u32, bool);
+
+#[cfg(test)]
+thread_local! {
+    static QUAD_PROGRESS_TEST: std::cell::RefCell<Option<Vec<QuadProgressRecord>>> = const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(test)]
+fn record_quad_progress(record: QuadProgressRecord) {
+    QUAD_PROGRESS_TEST.with(|c| {
+        if let Some(records) = c.borrow_mut().as_mut() {
+            records.push(record);
+        }
+    });
+}
+
+#[cfg(test)]
+#[test]
+fn quad_progress_carried_objective_and_stall_exit() {
+    let model = crate::mps::parse(include_str!("../tests/fixtures/fx_quad_obj_5371.mps")).unwrap();
+    let mut opts = SolveOptions::dual_release();
+    opts.max_iterations = 5210;
+    QUAD_PROGRESS_TEST.with(|c| *c.borrow_mut() = Some(Vec::new()));
+    crate::solve(&model, None, &opts).unwrap();
+    let records = QUAD_PROGRESS_TEST.with(|c| c.borrow_mut().take().unwrap());
+    assert_eq!(records.len(), 51);
+    for (i, &(it, base, old, new, calls, stalls, stalled)) in records.iter().enumerate() {
+        assert_eq!(it as f64 + base, 109.0 + 102.0 * i as f64);
+        let expected_old = if i == 0 { 221699549.95117602_f64 } else { 268371380.61310527_f64 };
+        assert_eq!(old.unwrap().to_bits(), expected_old.to_bits());
+        assert_eq!(new.unwrap().to_bits(), 268371380.61310527_f64.to_bits());
+        assert_eq!((calls, stalls, stalled), ((i + 1) as u32, (i + 1) as u32, i == 50));
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -990,6 +1028,7 @@ struct Solver<'a> {
     /// The progress check's counters `ctx+0x378` (checks) and `ctx+0x37c` (checks without a fall of the infeasibility sum), reset at the primal's start.
     stall_calls: u32,
     stall_cnt: u32,
+    working_obj: Option<f64>,
     /// The cycle detector of the x87 primal (`ctx+0x4c8`, `0x4c0`, `0x4cc`, `0x4d0`; `0x27fc20..0x27fc59`): the entering variable it follows (-1 none, -2 take the next),
     /// the iteration it was first seen at, the distance of its first return, and the returns at a multiple of that distance.
     cyc_var: i64,
@@ -1666,12 +1705,52 @@ impl<'a> Solver<'a> {
             }
         }
         let prev = STALL_PREV.with(|c| c.replace(sum));
+        // The progress routine writes a fresh objective even on an infeasible
+        // check. Its structural loop uses x87 basic values and double-rounded
+        // products for nonbasic bounds (0x27e1d0..0x27e235, 0x27e79e).
+        let objective = self.working_obj.filter(|_| !h.pert).and_then(|_| {
+            let xq = self.x_q.as_ref()?;
+            let dq = self.dst_q.as_ref()?;
+            use crate::f80::F80;
+            use crate::real::Real;
+            let mut acc = F80::ZERO;
+            for j in 0..p.n {
+                if self.pos_of[j] != NONE {
+                    let x = if is_inf(p.lo[j]) {
+                        xq[j]
+                    } else {
+                        dq[j] + F80::c(p.lo[j])
+                    };
+                    acc += x * F80::c(p.cost[j]);
+                } else {
+                    acc += F80::c(self.nonbasic_value(j) * p.cost[j]);
+                }
+            }
+            Some((acc / F80::c(self.opts.obj_scale)).to_f64())
+        });
+        let old_obj = self.working_obj;
+        self.working_obj = objective;
         self.stall_calls += 1;
-        if sum > 1e-7 && !(sum - prev < -1e-13) {
+        let stalled = if sum > 1e-7 {
+            !(sum - prev < -1e-13)
+        } else if let (Some(old), Some(new)) = (old_obj, objective) {
+            use crate::f80::F80;
+            !(F80::from_f64(new) - F80::from_f64(old) < F80::from_f64(-1e-13))
+        } else {
+            false
+        };
+        if stalled {
             self.stall_cnt += 1;
         }
         if self.stall_cnt > 50 && f64::from(self.stall_cnt) * 20.0 > f64::from(self.stall_calls) {
             self.stalled = true;
+        }
+        #[cfg(test)]
+        record_quad_progress((
+            self.iters_done, h.iters, old_obj, objective, self.stall_calls, self.stall_cnt, self.stalled,
+        ));
+        if crate::dump::on("qprogress") {
+            crate::dump::emit("qprogress", serde_json::json!({"it": self.iters_done, "it_base": h.iters, "total": TOTAL_ITERS.with(|c| c.get()), "old": old_obj, "new": objective, "sum": sum, "calls": self.stall_calls, "cnt": self.stall_cnt, "stalled":self.stalled}));
         }
     }
 
@@ -1685,6 +1764,7 @@ impl<'a> Solver<'a> {
         if let Some(h) = self.handoff.as_mut().filter(|h| h.quad) {
             h.pert = true;
         }
+        self.working_obj = None;
         // The x87 perturbation has a separate distance-update kernel.
         self.x_q = None;
         self.dst_q = None;
@@ -4962,6 +5042,7 @@ fn solve_primal(
         drift_cnt: 0,
         stall_calls: 0,
         stall_cnt: 0,
+        working_obj: handoff.and_then(|h| h.working_obj),
         cyc_var: -2,
         cyc_start: 0.0,
         cyc_period: 0,
