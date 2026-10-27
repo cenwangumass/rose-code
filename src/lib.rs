@@ -16,6 +16,7 @@ pub mod model;
 pub mod mps;
 pub mod order;
 pub mod pdhg;
+mod primal_rhs_perturb;
 pub mod real;
 pub mod scale;
 pub mod sgemm32;
