@@ -1230,7 +1230,7 @@ impl<R: Real> RefStruct<R> {
 
     /// Work of the tau solve's U stage (`0x123690`, which adds to `F+0x200`): `10 + 2 n + 6 c` for `n` needed positions and a spike of
     /// `c` entries; a dense spike (`m <= h33^2 c`) or one with many tail entries (`5 h33^2 t > m - i21`) books `3 (m - i21)` and `2 len` (its tail-row entries) per
-    /// nonzero tail column (plus `2 t` in the second case) and `4 (m - i21)` at the end; otherwise the heap walk books `4 h33` per nonzero
+    /// tail column with quotient above the tolerance (plus `2 t` in the second case) and `4 (m - i21)` at the end; otherwise the heap walk books `4 h33` per nonzero
     /// tail column and `4` per such column at the end. `(2 n) h34` is added last. `x` holds the solved tail values.
     fn tau_u_work(&self, spike: &[(usize, R)], x: &[R], n: usize) -> f64 {
         let m = self.m as f64;
@@ -1252,7 +1252,7 @@ impl<R: Real> RefStruct<R> {
             e = 3.0 * tail_rows + e;
             for t in (self.i21..self.m).rev() {
                 let c = self.at[t];
-                if x[c] != R::ZERO {
+                if x[c].abs() > R::c(TOL) {
                     e += self.a[c].len() as f64 * 2.0;
                 }
             }
