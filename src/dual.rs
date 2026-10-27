@@ -4095,13 +4095,9 @@ fn solve_frame(
                 if !quad && opts.perturb > 0.0 && carry.iters + iters > 0 {
                     quad = true;
                 }
-                // Every third restart starts the pricing from scratch (list-walk mode, empty running averages): the reference's p40/thr schedule over the
-                // restarts is list-walk, value (thr maxp/1e3), value (thr maxp/1e5), then again (fx_midsing_m5, seeds 1494, 1390, 1496).
-                let fresh = if quad {
-                    pass_retries + 1 == 3
-                } else {
-                    (pass_retries + 1) % 3 == 0
-                };
+                // The third restart starts the pricing from scratch (list-walk mode, empty running averages): the reference's p40/thr schedule over the
+                // restarts is value (thr maxp/1e3), value (thr maxp/1e5), list-walk, then value again (fx_midsing_m5, seeds 1494, 1390, 1496, 50010).
+                let fresh = pass_retries + 1 == 3;
                 let (avg_touch, last_cap, inf_count) = if fresh {
                     (0.0, 0, 0)
                 } else {
@@ -4130,15 +4126,10 @@ fn solve_frame(
     }
 }
 
-/// A restart pass that starts the pricing from scratch: every third one in the double pass, only the third (`ctx+0x184 == 3`, `0xcedb0`) in the quad pass
-/// (the quad captures: the passes at 4, 5 and 6 restarts price in the value mode).
+/// A restart pass that starts the pricing from scratch: only the third (`ctx+0x184 == 3`, `0xcedb0`), in the double and in the quad pass (the passes at 4, 5
+/// and 6 restarts price in the value mode: random LP seed 50010, restarts at calls 9 .. 54).
 fn fresh_pass<R: Real>(retries: u32) -> bool {
-    retries > 0
-        && if R::QUAD {
-            retries == 3
-        } else {
-            retries % 3 == 0
-        }
+    retries > 0 && retries == 3
 }
 
 fn solve_pass<R: Real>(
@@ -4148,7 +4139,7 @@ fn solve_pass<R: Real>(
     carry: &Carry,
 ) -> Result<SolveResult, SolveError> {
     if fresh_pass::<R>(carry.retries) {
-        // The fresh start of every third restart initialises the context again (`0xcf29b`): the tolerance goes back to the parameter, the counter stays.
+        // The fresh start of the third restart initialises the context again (`0xcf29b`): the tolerance goes back to the parameter, the counter stays.
         set_dual_tol(DUAL_TOL0);
         set_primal_tol(PRIMAL_TOL);
     }
