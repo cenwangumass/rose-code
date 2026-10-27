@@ -5174,6 +5174,10 @@ fn solve_pass<R: Real>(
             basic: s.head.clone(),
             at_upper: s.st.iter().map(|&t| t == UB).collect(),
         };
+        if R::QUAD {
+            // The shared clock includes the quad dual's iterations before its primal starts.
+            crate::simplex::TOTAL_ITERS.with(|c| c.set(c.get() + s.iters as f64));
+        }
         crate::simplex::HANDOFF.with(|c| {
             c.set(Some(crate::simplex::Handoff {
                 stale: Some(s.pair),
@@ -5498,6 +5502,7 @@ fn solve_pass<R: Real>(
             if crate::simplex::QUAD_PRIMALS.with(|c| c.get()) == 0 && s.iters > 0 {
                 popts.pricing0 = C35C.with(|c| c.get()) == 1;
             }
+            crate::simplex::TOTAL_ITERS.with(|c| c.set(c.get() + s.iters as f64));
             crate::simplex::HANDOFF.with(|c| {
                 c.set(Some(crate::simplex::Handoff {
                     stale: Some(s.pair),
