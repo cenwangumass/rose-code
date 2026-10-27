@@ -492,6 +492,8 @@ thread_local! {
     pub(crate) static EARLIER_ITERS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     static STALL_PREV: std::cell::Cell<f64> = const { std::cell::Cell::new(f64::INFINITY) };
     pub(crate) static PRIMAL_STALL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The x87 failed scan ended after perturbation (status -1004).
+    pub(crate) static PRIMAL_SHIFT_END: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// Factorizations the primal of a dual handoff left out at its end (the Farkas pair, see `refactor_for_farkas`): the dual controller books them as made.
     pub(crate) static PRIMAL_FARKAS_SKIPPED: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     pub(crate) static PRIMAL_DRIFT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
@@ -1648,6 +1650,11 @@ impl<'a> Solver<'a> {
     /// position order. The reference changes its distance array and the persistent right-hand side shift (the basic values follow at the
     /// next recomputation), not `x_B`.
     fn perturb(&mut self) {
+        // The x87 perturbation driver marks the shared shift flag even when
+        // no bound moves (`0x27dd9c`); its failed scan then restarts dual.
+        if let Some(h) = self.handoff.as_mut().filter(|h| h.quad) {
+            h.pert = true;
+        }
         let (p, m) = (self.p, self.p.m);
         let tol = self.opts.feasibility_tol;
         let size = self.sw.pert;
@@ -5152,8 +5159,9 @@ fn solve_primal(
                     continue;
                 }
                 None if s.handoff.is_some_and(|h| h.quad && h.pert) => {
-                    // The x87 primal started with cost shifts in force (`ctx+0x338` != 0) ends at its first failed scan with status -1004 (`ctx+0x294` = 9, no
+                    // The x87 primal with shifts in force (`ctx+0x338` != 0) ends at its first failed scan with status -1004 (`ctx+0x294` = 9, no
                     // factorization): the controller removes the shifts and reruns the dual from this basis (seed 2950: the exit follows the pivot of x6).
+                    PRIMAL_SHIFT_END.with(|c| c.set(true));
                     break Status::Infeasible;
                 }
                 None => {

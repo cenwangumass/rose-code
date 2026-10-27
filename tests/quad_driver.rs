@@ -1,6 +1,16 @@
 use rose::{mps, solve, verify, SolveOptions, Status};
 
 #[test]
+fn shifted_quad_handoff_retries_until_restore_limit() {
+    let model = mps::parse(include_str!("fixtures/quad_3076.mps")).unwrap();
+    let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
+    assert_eq!(
+        (result.status, result.iterations),
+        (Status::NumericalFailure, 189)
+    );
+}
+
+#[test]
 fn primal_stale_pivot_rejection_carries_stability_to_quad_dual() {
     let model = mps::parse(include_str!("fixtures/quad_3260.mps")).unwrap();
     let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();

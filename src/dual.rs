@@ -5118,6 +5118,7 @@ fn solve_pass<R: Real>(
         crate::simplex::PRIMAL_SINGULAR.with(|c| c.set(None));
         crate::simplex::PRIMAL_FARKAS_SKIPPED.with(|c| c.set(0));
         crate::simplex::PRIMAL_REPAIRED.with(|c| c.set(false));
+        crate::simplex::PRIMAL_SHIFT_END.with(|c| c.set(false));
         let primal_result = crate::simplex::solve(model, Some(&b), &popts);
         // The controller saves the tolerance left by the primal, undoing the
         // handoff scale (`0x1564a4`), for the next handoff.
@@ -5164,6 +5165,7 @@ fn solve_pass<R: Real>(
         };
         let repaired =
             crate::simplex::PRIMAL_REPAIRED.with(|c| c.take()) && r.status == Status::Infeasible;
+        let shift_end = crate::simplex::PRIMAL_SHIFT_END.with(|c| c.take());
         if repaired {
             // The primal repaired its basis in place and ended infeasible with the dropped variable out (`0x155117`): the controller restores it and the primal
             // runs again from its basis.
@@ -5242,9 +5244,13 @@ fn solve_pass<R: Real>(
             && s.pert != 0
             && !repaired
             && (R::QUAD || r.status != Status::Optimal)
-            && !(R::QUAD && s.rejected_end)
+            && (!(R::QUAD && s.rejected_end) || shift_end)
             && PERT_RERUNS.with(|c| {
-                c.set(c.get() + 1);
+                // A rejected-end handoff is not a restore; the controller's
+                // restore counter increments on the later status-3 exits.
+                if !(R::QUAD && s.rejected_end) {
+                    c.set(c.get() + 1);
+                }
                 c.get() <= 10
             })
         {
