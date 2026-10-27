@@ -2316,13 +2316,13 @@ impl<'a> Solver<'a> {
         let p = self.p;
         if let Some(y) = self.y_ref.take() {
             self.set_d_from_y(&y);
+            self.update_dual_infeas_sum();
             self.handoff_residual(&y);
             self.y_ref = Some(y);
             return;
         }
         let mut y: Vec<f64> = self.basic.iter().map(|&j| p.cost[j]).collect();
         self.factor.btran(&mut y);
-        self.handoff_residual(&y);
         for j in 0..p.n + p.m {
             self.d[j] = if self.pos_of[j] == NONE {
                 p.cost[j] - dot(&p.cols[j], &y)
@@ -2330,6 +2330,31 @@ impl<'a> Solver<'a> {
                 0.0
             };
         }
+        self.update_dual_infeas_sum();
+        self.handoff_residual(&y);
+    }
+
+    /// The full primal dual recompute replaces ctx+0x2d8 with the sum of
+    /// wrong-signed nonbasic reduced costs (`0x1020d8..0x102376`).
+    fn update_dual_infeas_sum(&self) {
+        let p = self.p;
+        let tol = crate::dual::dual_tol();
+        let sum: f64 = (0..p.n + p.m)
+            .filter(|&j| self.pos_of[j] == NONE && !self.is_fixed(j))
+            .map(|j| {
+                let d = self.d[j];
+                if is_inf(p.lo[j]) && is_inf(p.up[j]) {
+                    d.abs()
+                } else if self.at_upper[j] && d > tol {
+                    d
+                } else if !self.at_upper[j] && d < -tol {
+                    -d
+                } else {
+                    0.0
+                }
+            })
+            .sum();
+        crate::dual::set_dual_infeas_sum(sum);
     }
 
     /// The primal's call of the duals and residual check (`0x145520`) in a run started by the dual controller: it shares the dual tolerance and the failure
@@ -2378,7 +2403,10 @@ impl<'a> Solver<'a> {
                 serde_json::json!({"src": "primal-cmp", "meas": meas, "tol": crate::dual::dual_tol(), "cnt": crate::dual::resid_fails(), "n": nref}),
             );
         }
-        if meas > crate::dual::dual_tol() {
+        // The reference also compares against 1e-4 times the sum of dual
+        // infeasibilities (`ctx+0x2d8`, 0x145a46 / 0x281bdf).
+        let tol = crate::dual::dual_tol();
+        if meas > tol && meas > 1e-4 * crate::dual::dual_infeas_sum() {
             crate::dual::set_resid_fails(crate::dual::resid_fails() + 1);
         }
     }

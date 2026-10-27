@@ -32,6 +32,8 @@ thread_local! {
     static RNG_CELL: std::cell::Cell<u64> = const { std::cell::Cell::new(101) };
     static PERT_RERUNS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
     static RESID_FAILS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+    /// Sum of dual infeasibilities from the last full recomputation (`ctx+0x2d8`).
+    static DUAL_INFEAS_SUM: std::cell::Cell<f64> = const { std::cell::Cell::new(0.0) };
 }
 
 thread_local! {
@@ -72,6 +74,14 @@ pub(crate) fn resid_fails() -> u32 {
 
 pub(crate) fn set_resid_fails(v: u32) {
     RESID_FAILS.with(|c| c.set(v));
+}
+
+pub(crate) fn dual_infeas_sum() -> f64 {
+    DUAL_INFEAS_SUM.with(|c| c.get())
+}
+
+pub(crate) fn set_dual_infeas_sum(v: f64) {
+    DUAL_INFEAS_SUM.with(|c| c.set(v));
 }
 
 pub(crate) fn primal_tol() -> f64 {
@@ -4225,6 +4235,7 @@ fn solve_frame(
         pstep: None,
     };
     set_dual_tol(DUAL_TOL0);
+    set_dual_infeas_sum(0.0);
     set_primal_tol(PRIMAL_TOL);
     RESID_FAILS.with(|c| c.set(0));
     PERT_RERUNS.with(|c| c.set(0));
