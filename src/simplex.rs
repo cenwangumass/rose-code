@@ -1510,7 +1510,7 @@ impl<'a> Solver<'a> {
             self.cleanup_work();
         } else {
             self.primal_full_work();
-            self.dual_btran_work();
+            self.dual_btran_work("full");
         }
         self.recompute_dual();
         if let Some(p0) = self.p0.as_mut() {
@@ -1763,7 +1763,7 @@ impl<'a> Solver<'a> {
     /// the pricing setup (`0xe7000`, `3 m + 3.5 n`) and the final solution handling (`0xc362f`, `0xc1fe3`, `0xbf981`, `0xcd191`).
     fn cleanup_work(&mut self) {
         let (m, n) = (self.p.m as f64, self.p.n as f64);
-        self.dual_btran_work();
+        self.dual_btran_work("cleanup");
         self.work.add(0xe7000, 3.0 * m + 3.5 * n, crate::work::CTX);
         // `0xc142b`: the nonbasic structurals at a nonzero value, whose columns the solution read-out sums (`0xc0ef0`).
         let r: usize = (0..self.p.n)
@@ -1866,6 +1866,12 @@ impl<'a> Solver<'a> {
         let out = mi.btran(&dc_sorted, false, false);
         self.work
             .add_from(0x12de50, 0x10804b, mi.work(), crate::work::FAC);
+        if crate::dump::on("costchg") {
+            crate::dump::emit(
+                "costchg",
+                serde_json::json!({"in": crate::dump::sparse(&dc_sorted), "out": crate::dump::sparse(&out)}),
+            );
+        }
         // The mirror's values, which carry the reference's cancellation noise; a dense result is compacted with the row
         // product's drop tolerance.
         let bt_dense = mi.bt_dense();
@@ -1933,7 +1939,7 @@ impl<'a> Solver<'a> {
 
     /// Work of the reference's dual recomputation after a factorization (`0x108d70`): a BTRAN of the dense vector of basic costs,
     /// with the phase 1 penalty on the infeasible ones.
-    fn dual_btran_work(&mut self) {
+    fn dual_btran_work(&mut self, site: &str) {
         if self.mirror.is_none() {
             return;
         }
@@ -1989,7 +1995,7 @@ impl<'a> Solver<'a> {
         if crate::dump::on("dual") {
             crate::dump::emit(
                 "dual",
-                serde_json::json!({"refactor": self.refactorizations, "out": crate::dump::sparse(&out)}),
+                serde_json::json!({"refactor": self.refactorizations, "site": site, "out": crate::dump::sparse(&out)}),
             );
         }
         let caller = if self.cleanup { 0xe53a7 } else { 0x109289 };
@@ -2454,7 +2460,7 @@ impl<'a> Solver<'a> {
         if q.is_none() && self.list_failed {
             self.list_failed = false;
             self.recomputed = true;
-            self.dual_btran_work();
+            self.dual_btran_work("listfail");
             self.recompute_dual();
             self.list.clear();
             self.level = 0;
@@ -2495,7 +2501,7 @@ impl<'a> Solver<'a> {
             if self.factor.num_updates() > 0 {
                 // As at the optimality exit: the duals are recomputed once more when the scan finds nothing (`0x145520`).
                 if self.mirror.is_some() && !self.recomputed && !self.fresh_duals {
-                    self.dual_btran_work();
+                    self.dual_btran_work("scan_none_upd");
                 }
                 self.work.trig();
                 self.work.decided(self.work.w);
@@ -2739,7 +2745,7 @@ impl<'a> Solver<'a> {
     /// Recomputes the duals (a dense BTRAN of the basic costs), then scores every variable and sorts the list (`0xfb790`, `0xfecb0`).
     fn p0_rebuild(&mut self) {
         if self.y_ref.is_none() {
-            self.dual_btran_work();
+            self.dual_btran_work("p0_rebuild");
             // `0x145520` runs its residual check after the duals (the refactorization's own run is booked in `refactor`).
             self.residual_check_work();
         }
@@ -3157,7 +3163,7 @@ impl<'a> Solver<'a> {
             {
                 // Bucket chains keep their state across a refactorization: only the duals are recomputed (`P+0x10 = 0`, `0xfb790` in the scan).
                 if self.y_ref.is_none() {
-                    self.dual_btran_work();
+                    self.dual_btran_work("bucket");
                 }
                 let y = self.y_ref.clone().unwrap();
                 let p0 = self.p0.as_mut().unwrap();
@@ -4632,7 +4638,7 @@ fn solve_primal(
     }
     s.recompute_primal();
     s.primal_full_work();
-    s.dual_btran_work();
+    s.dual_btran_work("start");
     s.recompute_dual();
     if s.sw.active && s.sw.perturb_due {
         // The perturbation of the first factorization's decision (`0x141a60`), like the one after a later factorization.
@@ -4790,7 +4796,7 @@ fn solve_primal(
             s.excl6.iter_mut().for_each(|e| *e = false);
             if s.p0.is_some() && !due {
                 // The end of phase 1 recomputes the duals from the true costs (one dense BTRAN) and keeps the list.
-                s.dual_btran_work();
+                s.dual_btran_work("phase1_end");
                 let p0 = s.p0.as_mut().unwrap();
                 if !p0.rebuild {
                     p0.y = s.y_ref.clone().unwrap();
@@ -4814,7 +4820,7 @@ fn solve_primal(
             let first_end = !std::mem::replace(&mut s.feas_seen, true);
             let cc_pass = s.mirror.is_some() && last.is_some() && !dc.is_empty() && !first_end;
             if !due && !s.p0.is_some() && !cc_pass {
-                s.dual_btran_work();
+                s.dual_btran_work("ending");
                 s.recompute_dual();
                 s.fresh_duals = true;
             }
@@ -4873,7 +4879,7 @@ fn solve_primal(
                     if !fresh && first {
                         // With updates the scan simply runs again with the cost out of the penalties: no factorization (fx_midsing_1106: no LU between the two pricing calls).
                         s.rescan2 = true;
-                        s.dual_btran_work();
+                        s.dual_btran_work("rescan");
                         s.recompute_dual();
                         continue;
                     }
@@ -4970,8 +4976,13 @@ fn solve_primal(
                 }
                 None => {
                     // The reference recomputes the duals once more when the scan finds nothing (`0x145520`, with the residual check).
-                    if s.mirror.is_some() && !s.recomputed && !s.fresh_duals && !s.rescan3 {
-                        s.dual_btran_work();
+                    if s.mirror.is_some()
+                        && !s.recomputed
+                        && !s.fresh_duals
+                        && !s.rescan3
+                        && s.factor.num_updates() > 0
+                    {
+                        s.dual_btran_work("none");
                         if s.handoff.is_some() && !infeasible && s.p0.is_none() {
                             // The duals were only updated since the end of phase 1: the recomputation is followed by a new pricing call, which may find a
                             // column (seed 2717, ref call 25: the scan on the updated duals is empty, on the recomputed ones x6 enters).
@@ -6081,10 +6092,15 @@ fn solve_primal(
         s.leave_prev = Some(leave);
         s.last_pivot = Some(LastPivot {
             rows: {
-                // The reference removes the pivot entry from the list by moving the last entry into its place.
+                // The reference removes the pivot entry from a sparse list by moving the last entry into its place; a dense result keeps its
+                // order (degen2 cost-change BTRAN inputs, `compare.py vec --kind costchg`).
                 let mut rows: Vec<usize> = ftran_out.iter().map(|e| e.0).collect();
                 if let Some(k) = rows.iter().position(|&i| i == r) {
-                    rows.swap_remove(k);
+                    if alpha_dense {
+                        rows.remove(k);
+                    } else {
+                        rows.swap_remove(k);
+                    }
                 }
                 rows
             },
