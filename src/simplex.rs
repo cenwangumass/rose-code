@@ -1023,6 +1023,8 @@ struct Solver<'a> {
     mirror: Option<Mir>,
     /// The same factor in extended precision, kept after a quad pass (`Handoff::quad`): the basic solution is read from it.
     mirror_q: Option<crate::ftran_order::RefStruct<crate::f80::F80>>,
+    /// Full precision solution at the last fresh x87 basic-solution recomputation.
+    x_q: Option<Vec<crate::f80::F80>>,
     /// The reference's work counter (`crate::work`).
     work: crate::work::Work,
     /// The last pivot, whose primal update the reference runs at the start of the next iteration (`0x105f20`).
@@ -2103,6 +2105,7 @@ impl<'a> Solver<'a> {
     }
 
     fn recompute_primal_x(&mut self) {
+        self.x_q = None;
         let p = self.p;
         let mut r = p.rhs.clone();
         for (ri, sh) in r.iter_mut().zip(&self.rhs_shift) {
@@ -2165,6 +2168,11 @@ impl<'a> Solver<'a> {
             for (pos, &j) in self.basic.iter().enumerate() {
                 self.x[j] = xb[pos].to_f64();
             }
+            let mut xq: Vec<F80> = self.x.iter().map(|&v| F80::from_f64(v)).collect();
+            for (pos, &j) in self.basic.iter().enumerate() {
+                xq[j] = xb[pos];
+            }
+            self.x_q = Some(xq);
             return;
         }
         if let Some(mi) = self.mirror.as_mut() {
@@ -4581,6 +4589,7 @@ fn solve_primal(
         shifted: false,
         mirror: None,
         mirror_q: None,
+        x_q: None,
         work: crate::work::Work::default(),
         last_pivot: None,
         p1_tol_on: false,
@@ -6402,6 +6411,18 @@ fn solve_primal(
     }
     let nm = model.num_cols();
     let x: Vec<f64> = s.x[..nm].to_vec();
+    if status == Status::Optimal {
+        if let Some(xq) = &s.x_q {
+            let xr = xq
+                .iter()
+                .map(|&v| {
+                    let hi = v.to_f64();
+                    (hi, (v - crate::f80::F80::from_f64(hi)).to_f64())
+                })
+                .collect();
+            crate::dual::set_x87_result(xr);
+        }
+    }
     let mut dual: Vec<f64> = y.iter().map(|v| sgn * v).collect();
     if status == Status::Optimal {
         s.sign_zero_duals(model, sgn, &mut dual);

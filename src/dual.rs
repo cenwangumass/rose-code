@@ -646,6 +646,12 @@ fn objective_in<R: Real>(model: &crate::model::LpModel, x: &[f64]) -> f64 {
     (acc + R::c(model.offset)).to_f64()
 }
 
+/// Preserve the x87 primal's freshly recomputed basic values for the unscaled objective.
+pub(crate) fn set_x87_result(x: Vec<(f64, f64)>) {
+    QUAD_XR.with(|c| *c.borrow_mut() = Some(x));
+    QUAD_RESULT.with(|c| c.set(true));
+}
+
 /// The objective of the unscaled solution of the dual's last result: `long double` accumulation when its final pass was the quad pass. Clears the mark.
 pub fn unscaled_objective(model: &crate::model::LpModel, x: &[f64], col: &[f64]) -> f64 {
     if QUAD_RESULT.with(|c| c.replace(false)) {
