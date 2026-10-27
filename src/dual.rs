@@ -3414,7 +3414,7 @@ impl<'a, R: Real> Dual<'a, R> {
     }
 
     /// Work of `0xe45c0` after a refactorization (site `0xe7000`): two copies of x_B and d's rows (`2 m`), the status pass (`m + 2 n`), a pass over all variables
-    /// when the level was not zero, and the tail that is longer for the confirming refactorization (request 4 or 6). With the perturbation flag set (`ctx+0x338`
+    /// when the level was not zero, and the tail that is longer for a request-4 confirmation with a nonzero incoming level (or request 6). With the perturbation flag set (`ctx+0x338`
     /// != 0, kept to the end of the solve) the request-4 tail is the plain `1.5 n` and every such factorization adds `2 m + n` (the cost recompute with the shift
     /// array, `0xe555c`; ADLITTLE, BOEING2, PILOT4).
     fn set_level_work(&mut self, level_was_set: bool) {
@@ -3423,7 +3423,7 @@ impl<'a, R: Real> Dual<'a, R> {
         if level_was_set {
             est += 0.5 * (n + m);
         }
-        est += if (self.request == 4 || self.request == 6) && self.pert == 0 {
+        est += if ((self.request == 4 && level_was_set) || self.request == 6) && self.pert == 0 {
             2.0 * n + (n + m)
         } else {
             1.5 * n
