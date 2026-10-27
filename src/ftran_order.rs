@@ -2651,13 +2651,13 @@ impl<R: Real> RefStruct<R> {
         // A demotion (`conv`) happens only when the spike references the tail, so the new column is not kept in place even when the demoted column was
         // the spike's only tail entry (FIT2P call 2263: column 175, the reference creates the row eta of the leaving column).
         let keep = (old != -2 && av.is_empty() && conv.is_none()) || (old == -2 && !moved);
-        // Row r of U: the tail columns that reference r (`0xf2a51`), unless the column stays in its slot.
+        // Row r of U: the tail columns that reference r (`0xf2a51`), unless the column stays in its slot or the empty spike skips the row solve.
         let refs = (0..m)
             .filter(|&x| {
                 x != r && self.kind[x] == -2 && (self.a[x].contains(&r) || self.b[x].contains(&r))
             })
             .count();
-        if refs > 0 && !(keep && !moved) {
+        if refs > 0 && !sp.is_empty() && !(keep && !moved) {
             self.upd_work
                 .push((0xf2a51, 3.0 * refs as f64, crate::work::CTX));
         }
