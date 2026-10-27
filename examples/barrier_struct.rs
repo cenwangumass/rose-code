@@ -26,16 +26,25 @@ fn main() {
             json!({"n": pat.n, "n1": n1, "rows": n1, "dense": dense.len()}),
         );
     }
-    match order::structure(&model, dense_min) {
+    let r = if std::env::var("AUTO").is_ok() {
+        order::structure_order(&model, dense_min, true)
+    } else {
+        order::structure(&model, dense_min)
+    };
+    match r {
         Ok(s) => {
             if on(k) {
                 emit_tag(k, "ORDIN", json!({"n": s.pattern.n, "perm": s.levels}));
                 emit_tag(
                     k,
                     "ORD",
-                    json!({"n": s.pattern.n, "perm": s.order.perm, "nz": s.order.nz, "ops": s.order.ops}),
+                    json!({"n": s.pattern.n, "perm": s.order.perm, "nz": s.order.nz, "ops": s.order.ops, "work": s.order.work}),
                 );
-                emit_tag(k, "ORDFIX", json!({"nz": s.sym.exact_nz}));
+                emit_tag(
+                    k,
+                    "ORDFIX",
+                    json!({"nz": s.sym.exact_nz, "ops": s.sym.exact_ops, "ratio": s.ratio, "extra": s.extra}),
+                );
                 let y = &s.sym;
                 emit_tag(
                     k,

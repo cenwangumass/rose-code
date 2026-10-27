@@ -49,12 +49,17 @@ pub struct OrderResult {
     pub perm: Vec<i64>,
     pub nz: i64,
     pub ops: f64,
+    /// Work units the core adds to the manager's counter (`0x323507`, `0x3231f5`, `0x323827`): `5.25 elen_i` and `3.75 len_i` per variable of every pivot
+    /// list, `15 |kept|` per pivot (the ordering manager `0x31da80` compares the spent work with its estimate).
+    pub work: f64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Symbolic {
     /// Exact nnz(L) with the diagonal in the ordering's numbering (the value of `0x31ebb0`).
     pub exact_nz: i64,
+    /// Sum of the squared exact column counts (`0x31f620`: the ordering driver replaces the core's Ops by it; the manager `0x31da80` budgets against it).
+    pub exact_ops: f64,
     pub perm: Vec<i64>,
     pub nz: i64,
     pub ops: f64,
@@ -199,6 +204,22 @@ pub fn dense_threshold(n: usize, nnz: usize) -> i64 {
 
 /// Labels of the partition routine `0x325850` for a component: `bisect(size, colptr, rowind)`, label 2 = vertex separator.
 pub type Bisect<'a> = &'a mut dyn FnMut(usize, &[usize], &[usize]) -> Vec<i64>;
+
+thread_local! {
+    /// Work units the partition code adds to the ordering manager's counter since the last [`take_partition_work`].
+    static PARTITION_WORK: std::cell::Cell<f64> = const { std::cell::Cell::new(0.0) };
+}
+
+/// Adds `(a deg + b) 0.75` work units (all values are multiples of 1/4, so the sum does not depend on the order).
+fn add_work(deg: usize, a: f64, b: f64) {
+    PARTITION_WORK.with(|w| w.set(w.get() + (a * deg as f64 + b) * 0.75));
+}
+
+/// Returns and clears the work of the partitions run on this thread: per fine vertex of the coarse-adjacency build `(3 deg + 2) 0.75`
+/// (`0x326d88`), per vertex pulled into the separator by a move `(6 deg + 10) 0.75` (`0x327b1b`) and per one restored by the undo `(3 deg + 4) 0.75` (`0x327f57`).
+pub fn take_partition_work() -> f64 {
+    PARTITION_WORK.with(|w| w.replace(0.0))
+}
 
 /// The generator `0x88a870` (31 bits): `state = state * 0x5851f42d4c957f2d + 0x14057b7ef767814f`, tempering of the high word.
 fn rand31(rng: &mut u64) -> u32 {
@@ -399,6 +420,7 @@ fn coarsen(
         mark[c] = c;
         let mut w = 0;
         for &v in &members[cptr[c]..cptr[c + 1]] {
+            add_work(xadj[v + 1] - xadj[v], 3.0, 2.0);
             w += vw[v];
             for &u in &adj[xadj[v]..xadj[v + 1]] {
                 let cu = matched[u];
@@ -517,6 +539,7 @@ fn refine(
                     lab[u] = 2;
                     pw[other] -= vw[u];
                     pulled.push(u);
+                    add_work(xadj[u + 1] - xadj[u], 6.0, 10.0);
                     ed[0][u] = 0;
                     ed[1][u] = 0;
                     pw[2] += vw[u];
@@ -560,6 +583,7 @@ fn refine(
                 }
             }
             for &u in &pulled[poff[j]..poff[j + 1]] {
+                add_work(xadj[u + 1] - xadj[u], 3.0, 4.0);
                 pw[2] -= vw[u];
                 pw[1 - s] += vw[u];
                 lab[u] = 1 - s as i64;
@@ -882,6 +906,7 @@ pub fn order(p: &Pattern, levels: &[i64]) -> Result<OrderResult, StructError> {
     let mut hsh = vec![0f64; n];
     let mut nz: i64 = 0;
     let mut ops = 0f64;
+    let mut work = 0f64;
     let mut nelim: i64 = 0;
     let thr = if n > 0 {
         dense_threshold(n, p.nnz())
@@ -1013,6 +1038,7 @@ pub fn order(p: &Pattern, levels: &[i64]) -> Result<OrderResult, StructError> {
                         ln[e] = 0;
                     }
                 }
+                work += 5.25 * elen[i] as f64;
             }
             for &i in &lme {
                 if perm[i] == -level {
@@ -1041,6 +1067,7 @@ pub fn order(p: &Pattern, levels: &[i64]) -> Result<OrderResult, StructError> {
                     }
                 }
                 ln[i] = na.len() as i64;
+                work += 3.75 * ln[i] as f64;
                 adj[i] = na;
                 elen[i] = ne;
                 let dd = degme + deg[i] - nv[i];
@@ -1071,6 +1098,7 @@ pub fn order(p: &Pattern, levels: &[i64]) -> Result<OrderResult, StructError> {
                 + ((k as f64 * s as f64 * s as f64 + ops) - s as f64 * kk);
             nelim += k;
             nv[v] = degme;
+            work += 15.0 * keep.len() as f64;
             for &i in &keep {
                 let i = i as usize;
                 deg[i] = (ni - 1).min(degme - nv[i] + deg[i]);
@@ -1138,7 +1166,12 @@ pub fn order(p: &Pattern, levels: &[i64]) -> Result<OrderResult, StructError> {
             perm[r] += 1;
         }
     }
-    Ok(OrderResult { perm, nz, ops })
+    Ok(OrderResult {
+        perm,
+        nz,
+        ops,
+        work,
+    })
 }
 
 /// Symbolic factorization `0x2fedb0`: relaxed supernodes, the final permutation, Factor NZ/Ops and the row lists.
@@ -1173,6 +1206,7 @@ pub fn symbolic(p: &Pattern, perm1: &[i64], n1: usize) -> Symbolic {
     }
     let cnt: Vec<usize> = rows.iter().map(|r| r.len()).collect();
     let exact_nz: usize = cnt.iter().sum();
+    let exact_ops: f64 = cnt.iter().map(|&c| (c * c) as f64).sum();
     // 2. fundamental supernodes
     let mut first = Vec::new();
     let mut width: Vec<i64> = Vec::new();
@@ -1341,6 +1375,7 @@ pub fn symbolic(p: &Pattern, perm1: &[i64], n1: usize) -> Symbolic {
     }
     Symbolic {
         exact_nz: exact_nz as i64,
+        exact_ops,
         perm,
         nz,
         ops,
@@ -1361,6 +1396,9 @@ pub struct Structure {
     pub levels: Vec<i64>,
     pub order: OrderResult,
     pub sym: Symbolic,
+    /// `BarOrder = -1`: the first ordering's work over its budget (`xmm1` of `0x31dd14`) and the number of extra orderings run.
+    pub ratio: f64,
+    pub extra: usize,
 }
 
 /// Runs the stage with the dense columns chosen by [`dense_columns`]`(m, dense_min)`. Errors name the undecoded routine reached.
@@ -1391,34 +1429,56 @@ pub fn structure_order(
     let (pattern, n1) = aat_pattern(m, &dense);
     let run = |seed: u64, repeat: bool| -> Result<(Vec<i64>, OrderResult, Symbolic), StructError> {
         let mut rng = seed;
+        take_partition_work();
         let lv = levels_mode(&pattern, n1, None, &mut rng, repeat)?;
-        let o = order(&pattern, &lv)?;
+        let pw = take_partition_work();
+        let mut o = order(&pattern, &lv)?;
+        o.work += pw;
         let mut s = symbolic(&pattern, &o.perm, n1);
         s.rng = rng;
         Ok((lv, o, s))
     };
     let first = run(0, false);
+    let mut ratio = 0.0;
+    let mut extra = 0usize;
     let best = match first {
-        // `BarOrder = -1` (the release default): when `n > 1000`, `500 nnz <= ops` and `nnz <= nz` of the first ordering (`0x31dd40..0x31dd88`; the reference also needs its work estimate `xmm1 <= 2`, not modelled) the driver runs five more
-        // with generator seeds `AUTO_ORDER_SEED + t` (`t = 0 .. 5`, mode 1 of `0x324330`) and keeps the cheapest by operations (the first on ties).
-        Ok(f)
-            if auto
-                && n_nodes(&pattern) > 1000
-                && 500.0 * pattern.nnz() as f64 <= f.1.ops
-                && pattern.nnz() as i64 <= f.1.nz + n_nodes(&pattern) as i64 =>
-        {
-            // The generator the iterations draw from (early centering) keeps the state of the first ordering: the tasks run on their own seeded states.
-            let rng0 = f.2.rng;
-            let mut best = f;
-            for t in 0..5 {
-                if let Ok(c) = run(AUTO_ORDER_SEED + t, true) {
-                    if c.1.ops < best.1.ops {
-                        best = c;
+        // `BarOrder = -1` (the release default), ordering manager `0x31da80` with one task per round (Threads = 1): `spent` is the work the first ordering added to
+        // the manager's counter (`OrderResult::work`) and `budget` the sum of the squared exact column counts. Extra orderings (generator seeds
+        // `AUTO_ORDER_SEED + t`, mode 1 of `0x324330`) run when `spent / budget < 0.1`, or when `n > 1000`, `500 nnz <= budget`, `nnz <= NZ` and `spent / budget <= 2`.
+        // They run one per round, at most five, the counter growing by each one's work; the rounds stop once `(counter - start) / budget > 0.05`. The cheapest by
+        // operations wins (the first on ties).
+        Ok(f) if auto => {
+            let budget = f.2.exact_ops;
+            let nnz = pattern.nnz() as f64;
+            let spent = f.1.work;
+            ratio = if budget > 0.0 { spent / budget } else { 0.0 };
+            let go = ratio < 0.1
+                || (n_nodes(&pattern) > 1000
+                    && 500.0 * nnz <= budget
+                    && nnz <= f.2.exact_nz as f64
+                    && ratio <= 2.0);
+            if go {
+                // The generator the iterations draw from (early centering) keeps the state of the first ordering: the tasks run on their own seeded states.
+                let rng0 = f.2.rng;
+                let mut total = spent;
+                let mut best = f;
+                for t in 0..5 {
+                    if let Ok(c) = run(AUTO_ORDER_SEED + t, true) {
+                        extra += 1;
+                        total += c.1.work;
+                        if c.1.ops < best.1.ops {
+                            best = c;
+                        }
+                    }
+                    if budget <= 0.0 || total / budget > 0.05 {
+                        break;
                     }
                 }
+                best.2.rng = rng0;
+                Ok(best)
+            } else {
+                Ok(f)
             }
-            best.2.rng = rng0;
-            Ok(best)
         }
         other => other,
     };
@@ -1430,6 +1490,8 @@ pub fn structure_order(
             levels,
             order,
             sym,
+            ratio,
+            extra,
         }),
         Err(e) => Err((pattern, n1, dense, e)),
     }
