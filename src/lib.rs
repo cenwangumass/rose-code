@@ -5,6 +5,7 @@ pub mod basis;
 pub mod chol;
 pub mod dual;
 pub mod dump;
+pub mod early;
 pub mod f80;
 pub mod ftran_order;
 pub mod lu;

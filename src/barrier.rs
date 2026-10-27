@@ -1152,8 +1152,10 @@ fn update(
     ad: f64,
     ncomp: usize,
     hk: Option<HsdStep>,
+    early: bool,
 ) -> (State, (f64, f64, f64), Option<HsdOut>) {
-    let g0 = 1e-6;
+    // `0x30d53f`: the 64-bit word `Q+0x288` (with `Q+0x28c`, early centering) selects 0.1, else 1e-6 (no cones).
+    let g0 = if early { 0.1 } else { 1e-6 };
     let steps = |g: f64| ((ap * (1.0 - g)).min(1.0), ((1.0 - g) * ad).min(1.0));
     let (sp, sd) = steps(g0);
     let (mut tot, mut minp) = (0.0, 1e100);
@@ -1233,6 +1235,8 @@ pub struct Residuals {
     pub q138: f64,
     pub q140: f64,
     pub q148: f64,
+    /// `Q+0x190`: `sqrt(|rp|^2 + |ru|^2)` (the tolerance of the early-centering solve is a tenth of it).
+    pub q190: f64,
     pub q198: f64,
     pub q1a0: f64,
     pub q1a8: f64,
@@ -1324,12 +1328,15 @@ pub fn residuals(
             ru[j] = (f.ub[j] * tau - s.x[j]) - s.u[j];
         }
     }
-    let q1a0 = dot_lanes(&rp, &rp, 0).sqrt();
-    let q1c0 = if hi > lo {
-        dot_lanes(&ru[lo..hi], &ru[lo..hi], lo).sqrt()
+    let q1a0_sq = dot_lanes(&rp, &rp, 0);
+    let q1a0 = q1a0_sq.sqrt();
+    let ru_sq = if hi > lo {
+        dot_lanes(&ru[lo..hi], &ru[lo..hi], lo)
     } else {
         0.0
     };
+    let q190 = (ru_sq + q1a0_sq).sqrt();
+    let q1c0 = ru_sq.sqrt();
     let q1b0 = dot_lanes(&rd, &rd, 0).sqrt();
     let mut mx = 0.0;
     for &t in rp
@@ -1380,6 +1387,7 @@ pub fn residuals(
         q138,
         q140,
         q148,
+        q190,
         q198: q1a0 / tau,
         q1a0,
         q1a8: q1b0 / tau,
@@ -1901,6 +1909,12 @@ pub trait NormalSolver {
         kind: DirKind,
         rhs: &Rhs,
     ) -> Result<Direction, BarrierError>;
+
+    /// `0x34a480` (early centering): called before the starting point (`it = -1`) and before the factorization of every iteration with `Q+0x190`;
+    /// true when the solves of this stage are the conjugate residual solves of `0x34a580` ([`crate::early`]) and the factorization is skipped.
+    fn early_decision(&mut self, _f: &StdForm, _it: i32, _q190: f64) -> bool {
+        false
+    }
 
     /// Per iteration, before the directions: `Q+0x800` (`zx`) and the refinement threshold `Q+0x280` for the solvers that refine.
     fn prepare(&mut self, _zx: &[f64], _thr: f64) {}
@@ -2933,6 +2947,7 @@ pub fn run<S: NormalSolver>(
     let c_file = f.c.clone();
     let sc = setup_scalars(&f.b_file, &c_file, o.tol);
     // Starting point.
+    solver.early_decision(f, -1, 1e100);
     solver.factor(f, &start_diag(f))?;
     if let Some(wk) = work.as_mut() {
         wk.factor();
@@ -3144,6 +3159,7 @@ pub fn run<S: NormalSolver>(
         let hsd = kappa > 0.0;
         // Predictor.
         let (zx, dd) = normal_diag(f, &st, res.q130);
+        let early = solver.early_decision(f, it, res.q190);
         solver.factor_iter(f, &dd, &zx)?;
         if let Some(wk) = work.as_mut() {
             wk.factor();
@@ -3229,13 +3245,22 @@ pub fn run<S: NormalSolver>(
                 None
             },
         );
-        let mut target = sigma_target(res.q1f0, aff);
+        let mut target = if early {
+            // `0x2e207d`: `mu max(sigma, 0.1)`.
+            let r = aff / res.q1f0.max(1e-30);
+            res.q1f0 * (r * r * r.min(0.1)).max(0.1)
+        } else {
+            sigma_target(res.q1f0, aff)
+        };
         if it > qf4 {
             // `0x2e2047`: the last update with a step product above 5e-5 was not the previous iteration.
             target = res.q1f0 * 0.9;
         }
+        if early {
+            q298 = 1; // `0x2e2092`
+        }
         // Corrector loop (`0x2e20e3..0x2e2276`): the direction so far starts as the predictor and becomes the combined direction after each selection.
-        if !release {
+        if !release && !early {
             q298 = 1; // `0x2e20b5`: `Q+0x298 = max(BarCorrectors, 1)`
         }
         let ntry = solver.ntry(
@@ -3362,7 +3387,7 @@ pub fn run<S: NormalSolver>(
         } else {
             None
         };
-        let (mut next, (g, _sp, _sd), hout) = update(f, &st, &comb, cp, cd, ncomp, hk);
+        let (mut next, (g, _sp, _sd), hout) = update(f, &st, &comb, cp, cd, ncomp, hk, early);
         // `Q+0x220..0x240` (`0x30ebbf`): norms of the updated iterate, before the dual iterate is rescaled.
         h.nrm = Norms {
             x2: dot_seq(&next.x),

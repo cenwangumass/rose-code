@@ -1326,7 +1326,7 @@ pub fn numeric_factor(
 /// Sum of the rounded products `term(i)`, `i < n`, as `0x2ec200` / `0x2ec480` add them, accumulator starting at 0: fewer than 8 terms (or fewer than
 /// `peel + 8`): sequential; else `peel` (0, or 1 when the 16-byte alignment of the value pointer is 8) terms sequentially, blocks of 8 into eight
 /// lanes (lane `l` of the block gets term `l`; lane 0 starts from the peeled sum), total `((l0 + l2) + (l4 + l6)) + ((l1 + l3) + (l5 + l7))`, then the scalar tail.
-fn dot8(n: usize, peel: usize, term: &dyn Fn(usize) -> f64) -> f64 {
+pub(crate) fn dot8(n: usize, peel: usize, term: &dyn Fn(usize) -> f64) -> f64 {
     if n < 8 || n < peel + 8 {
         let mut a = 0.0;
         for i in 0..n {
@@ -1535,7 +1535,7 @@ impl Amat {
     }
 
     /// `0x2ec200`: `out_i` = sum over the row ([`dot8`], peel = start parity) + `w[nc + i]` unless the row is '='.
-    fn aw(&self, f: &StdForm, w: &[f64]) -> Vec<f64> {
+    pub(crate) fn aw(&self, f: &StdForm, w: &[f64]) -> Vec<f64> {
         let mut out = Vec::with_capacity(self.m);
         for i in 0..self.m {
             let (s, e) = (self.rstart[i], self.rstart[i + 1]);
@@ -1553,7 +1553,7 @@ impl Amat {
     }
 
     /// `0x2ec480` (unscaled): `out_j` = sum over the column ([`dot8`], peel = start parity), then `out[nc + i] = y_i` for rows other than '=', else 0.
-    fn aty(&self, f: &StdForm, y: &[f64]) -> Vec<f64> {
+    pub(crate) fn aty(&self, f: &StdForm, y: &[f64]) -> Vec<f64> {
         let mut out = Vec::with_capacity(self.nc + self.m);
         for j in 0..self.nc {
             let (s, e) = (f.col_start[j], f.col_start[j + 1]);
@@ -1682,6 +1682,15 @@ pub struct CholSolver {
     /// `NZ` and `S` of the symbolic factor (work model of the release profile) and the correction solves of the refinement since the last query.
     nz_s: (f64, f64),
     extra: std::cell::Cell<usize>,
+    /// Early centering (`Q+0x28c`, `Q+0x290`, `Q+0x40`, `Q+0x190`): see [`crate::early`]. `early_on` is `Q+0x28c != 0`, `q290` the steps of the solves since the last
+    /// decision (`-1` before the first), `rng` the generator `ctx+0xb0`, `sym_work` is `SYM+0x60 + SYM+0x58`.
+    early_on: bool,
+    early: bool,
+    q290: std::cell::Cell<i64>,
+    rng: std::cell::Cell<u64>,
+    it: i32,
+    q190: f64,
+    sym_work: f64,
 }
 
 impl CholSolver {
@@ -1702,19 +1711,48 @@ impl CholSolver {
             raw_norms: (0.0, 0.0),
             nz_s: (sym.nz as f64, sym_rho_s(f, sym).1),
             extra: std::cell::Cell::new(0),
+            early_on: true,
+            early: false,
+            q290: std::cell::Cell::new(-1),
+            rng: std::cell::Cell::new(sym.rng),
+            it: -1,
+            q190: 1e100,
+            sym_work: sym.ops,
         }
     }
 
     fn solve(&self, f: &StdForm, rx: &[f64], ry: &[f64]) -> (Vec<f64>, Vec<f64>) {
-        let out = solve305(
-            &self.a,
-            &self.plan,
-            self.fac.as_ref().expect("factor before solve"),
-            f,
-            &self.d,
-            rx,
-            ry,
-        );
+        let out = if self.early {
+            let mut g = self.rng.get();
+            let r = crate::early::solve(&self.a, f, &self.d, rx, ry, self.it, self.q190, &mut g);
+            self.rng.set(g);
+            let cap = 100 * f.m as i64;
+            let inc = if r.steps < cap { r.steps } else { i64::MAX };
+            self.q290.set(self.q290.get().saturating_add(inc));
+            if crate::dump::on("barrier_cg") {
+                let bits = |v: &[f64]| {
+                    v.iter()
+                        .map(|x| format!("{:016x}", x.to_bits()))
+                        .collect::<Vec<_>>()
+                };
+                crate::dump::emit_tag(
+                    "barrier_cg",
+                    "CG1",
+                    serde_json::json!({"it": self.it, "k": r.steps, "tol": r.tol.to_bits(), "q290": self.q290.get(), "rng": g, "rhs": bits(rx), "addv": bits(ry), "D": bits(&self.d), "out_n": bits(&r.dx), "out_m": bits(&r.dy)}),
+                );
+            }
+            (r.dx, r.dy)
+        } else {
+            solve305(
+                &self.a,
+                &self.plan,
+                self.fac.as_ref().expect("factor before solve"),
+                f,
+                &self.d,
+                rx,
+                ry,
+            )
+        };
         if crate::dump::on("barrier_solve") {
             static CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
             let s = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -1838,8 +1876,36 @@ impl NormalSolver for CholSolver {
         r
     }
 
+    fn early_decision(&mut self, f: &StdForm, it: i32, q190: f64) -> bool {
+        // `0x34a480`.
+        self.it = it;
+        self.q190 = q190;
+        if !self.early_on {
+            self.early = false;
+            return false;
+        }
+        let q290 = self.q290.get();
+        let keep = if q290 == i64::MAX {
+            false
+        } else {
+            let ratio = self.sym_work / (f.row_idx.len() as f64 * 2.0 + 1.0) / 2000.0;
+            if q290 >= 0 {
+                ratio >= q290 as f64
+            } else {
+                ratio > 20.0
+            }
+        };
+        self.early_on = keep;
+        self.early = keep;
+        self.q290.set(0);
+        keep
+    }
+
     fn factor(&mut self, f: &StdForm, d: &[f64]) -> Result<(), BarrierError> {
         self.d = d.to_vec();
+        if self.early {
+            return Ok(());
+        }
         let fno = self.nfac;
         self.nfac += 1;
         let on = dump::on("barrier_factor");

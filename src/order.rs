@@ -62,6 +62,8 @@ pub struct Symbolic {
     pub count: Vec<i64>,
     pub rowoff: Vec<i64>,
     pub idx: Vec<i64>,
+    /// State of the reference's generator (`ctx+0xb0`, `0x88a870`) after the ordering: the early-centering solve draws its start vector from it.
+    pub rng: u64,
 }
 
 /// Constraint columns' row lists (explicit zero coefficients dropped), in the model's column order.
@@ -619,6 +621,16 @@ pub fn partition(size: usize, colptr: &[usize], rowind: &[usize], rng: &mut u64)
 /// the -1 nodes larger than `max(600, n/100)` goes through the partition routine [`partition`] (one generator, state 0, shared by the components);
 /// `bisect` replaces it.
 pub fn levels(p: &Pattern, n1: usize, bisect: Option<Bisect>) -> Result<Vec<i64>, StructError> {
+    levels_rng(p, n1, bisect, &mut 0)
+}
+
+/// [`levels`] that also returns the generator state after the partitions in `rng_out`.
+pub fn levels_rng(
+    p: &Pattern,
+    n1: usize,
+    bisect: Option<Bisect>,
+    rng_out: &mut u64,
+) -> Result<Vec<i64>, StructError> {
     let n = p.n;
     let n1 = n1.min(n);
     let thr = dense_threshold(n, p.nnz());
@@ -689,6 +701,8 @@ pub fn levels(p: &Pattern, n1: usize, bisect: Option<Bisect>) -> Result<Vec<i64>
             }
         }
     }
+    drop(default);
+    *rng_out = rng;
     Ok(lv)
 }
 
@@ -1314,6 +1328,7 @@ pub fn symbolic(p: &Pattern, perm1: &[i64], n1: usize) -> Symbolic {
         count,
         rowoff,
         idx,
+        rng: 0,
     }
 }
 
@@ -1346,9 +1361,11 @@ pub fn structure(
     };
     let (pattern, n1) = aat_pattern(m, &dense);
     let run = || -> Result<(Vec<i64>, OrderResult, Symbolic), StructError> {
-        let lv = levels(&pattern, n1, None)?;
+        let mut rng = 0u64;
+        let lv = levels_rng(&pattern, n1, None, &mut rng)?;
         let o = order(&pattern, &lv)?;
-        let s = symbolic(&pattern, &o.perm, n1);
+        let mut s = symbolic(&pattern, &o.perm, n1);
+        s.rng = rng;
         Ok((lv, o, s))
     };
     match run() {
