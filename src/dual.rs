@@ -5571,7 +5571,8 @@ fn solve_pass<R: Real>(
         }
         crate::simplex::PRIMAL_SINGULAR.with(|c| c.set(None));
         crate::simplex::PRIMAL_START_SINGULAR.with(|c| c.set(false));
-        let prres = match crate::simplex::solve(model, Some(&from_dual), &popts) {
+        crate::simplex::PRIMAL_REPAIRED.with(|c| c.set(false));
+        let mut prres = match crate::simplex::solve(model, Some(&from_dual), &popts) {
             Err(SolveError::SingularBasis) if R::QUAD && s.art_exit => {
                 // A failed x87 handoff factorization returns -1002 to the
                 // controller, which restores the saved snapshot (seed 8825).
@@ -5600,6 +5601,36 @@ fn solve_pass<R: Real>(
             }
             other => other.ok(),
         };
+        // An artificial-bound dual exit can also hand off to a primal whose
+        // start factorization drops a singular column. Restore that column and
+        // retry the primal when its failed scan ends with the repair still out.
+        if R::QUAD && s.art_exit && crate::simplex::PRIMAL_REPAIRED.with(|c| c.take()) {
+            if let Some(pr) = prres.as_mut().filter(|pr| pr.status == Status::Infeasible) {
+                crate::simplex::HANDOFF.with(|c| {
+                    c.set(Some(crate::simplex::Handoff {
+                        stale: None,
+                        nref0: s.nref() + pr.refactorizations,
+                        thr: s.lu_thr,
+                        retries: s.retries as usize + 1,
+                        pert: false,
+                        pair_tol: PAIR_TOL.with(|c| c.get()),
+                        quad: true,
+                        dual_level: s.level,
+                        shifted_exit: false,
+                        iters: (s.it_base + s.iters) as f64,
+                        pricing_iters: (s.it_base + s.iters + pr.iterations) as f64,
+                        snap: (s.it_base + s.stall_it as usize) as f64,
+                        c178: C178.with(|c| c.get()),
+                        preserve_ratio: true,
+                        excl: None,
+                    }))
+                });
+                let mut retry = crate::simplex::solve(model, Some(&pr.basis), &popts)?;
+                retry.iterations += pr.iterations;
+                retry.refactorizations += pr.refactorizations;
+                *pr = retry;
+            }
+        }
         if R::QUAD && s.art_exit {
             if let Some(pr) = prres
                 .as_ref()
