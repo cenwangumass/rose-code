@@ -1064,6 +1064,8 @@ struct Solver<'a> {
     y_q: Option<Vec<crate::f80::F80>>,
     /// The Devex weights in extended precision (after a quad dual): valid for `j` while it rounds to `w[j]`.
     wf: Vec<crate::f80::F80>,
+    /// Long double twin of `d` in the x87 primal: kept while `d` still holds its rounded value (the reference stores `d` as a long double).
+    df: Vec<crate::f80::F80>,
     /// `P[0x3c0]`: the phase 1 scan tolerance is this times `PHASE1_M` (1e-7, then 1e-9 after the failed scan).
     p3c0: f64,
     /// The stale pivot-check pair (`ctx+0x300`, `ctx+0x308`), read by the first pricing call (`0x144fe1`).
@@ -2194,6 +2196,9 @@ impl<'a> Solver<'a> {
         let cost = |j: usize| if cf { 0.0 } else { p.cost[j] };
         let offs = &p.offs;
         let col_off = |j: usize| offs[j] & 1;
+        if self.df.len() != self.d.len() {
+            self.df = vec![crate::f80::F80::ZERO; self.d.len()];
+        }
         for j in 0..p.n + p.m {
             self.d[j] = if self.pos_of[j] == NONE {
                 if self.excluded == Some(j) {
@@ -2221,6 +2226,7 @@ impl<'a> Solver<'a> {
                     for &(i, a) in &p.fcols[j] {
                         acc -= yq[i] * crate::f80::F80::c(a);
                     }
+                    self.df[j] = acc;
                     acc.to_f64()
                 } else {
                     let mut acc = cost(j);
@@ -2466,9 +2472,35 @@ impl<'a> Solver<'a> {
     /// `ROSE_DUMP=xpricing`: the duals, weights and candidate list at a scan of the primal started by a quad dual (the x87 primal), with the iterations made in the run.
     fn dump_xpricing(&self, tag: &str) {
         if crate::dump::on("xpricing") && self.handoff.is_some_and(|h| h.quad) {
+            let ld = |v: crate::f80::F80| {
+                let (m, se) = v.repr();
+                [format!("{m:#x}"), format!("{se:#x}")]
+            };
+            let dq: Vec<[String; 2]> = (0..self.d.len())
+                .map(|j| {
+                    ld(
+                        if self.df.len() == self.d.len() && self.df[j].to_f64() == self.d[j] {
+                            self.df[j]
+                        } else {
+                            crate::f80::F80::from_f64(self.d[j])
+                        },
+                    )
+                })
+                .collect();
+            let wq: Vec<[String; 2]> = (0..self.w.len())
+                .map(|j| {
+                    ld(
+                        if self.wf.len() == self.w.len() && self.wf[j].to_f64() == self.w[j] {
+                            self.wf[j]
+                        } else {
+                            crate::f80::F80::from_f64(self.w[j])
+                        },
+                    )
+                })
+                .collect();
             crate::dump::emit(
                 "xpricing",
-                serde_json::json!({"tag": tag, "done": self.iters_done, "excl": self.excluded, "d": self.d, "w": self.w, "list": self.list, "basic": self.basic}),
+                serde_json::json!({"dq": dq, "wq": wq, "tag": tag, "done": self.iters_done, "excl": self.excluded, "d": self.d, "w": self.w, "list": self.list, "basic": self.basic}),
             );
         }
     }
@@ -4547,6 +4579,7 @@ fn solve_primal(
         y_costfree: false,
         y_q: None,
         wf: Vec::new(),
+        df: Vec::new(),
         p3c0: 1e-7,
         stale: handoff.and_then(|h| h.stale),
         accuracy: 0,
@@ -5943,6 +5976,31 @@ fn solve_primal(
             Some(pq) => Some(pq.iter().map(|&x| crate::real::Real::to_f64(x)).collect()),
             None => rho_rank.as_ref().map(|rank| p.rank_products(&rho, rank)),
         };
+        if s.df.len() != s.d.len() {
+            s.df = vec![crate::f80::F80::ZERO; s.d.len()];
+        }
+        // The d of the x87 primal in long double: the stored d keeps its low bits while it still equals its rounded twin.
+        let dval = |s: &Solver<'_>, j: usize| -> crate::f80::F80 {
+            if s.df[j].to_f64() == s.d[j] {
+                s.df[j]
+            } else {
+                crate::f80::F80::from_f64(s.d[j])
+            }
+        };
+        let theta_dq: Option<crate::f80::F80> = match (qw, prods_q.as_ref()) {
+            (Some((a_rq, _)), Some(_)) => Some(dval(&s, q) / a_rq),
+            _ => None,
+        };
+        let dsub = |s: &mut Solver<'_>, j: usize, prod: crate::f80::F80| {
+            if let Some(th) = theta_dq {
+                let nd = dval(s, j) - th * prod;
+                s.df[j] = nd;
+                s.d[j] = nd.to_f64();
+                true
+            } else {
+                false
+            }
+        };
         let leave_arj = match prods.as_ref() {
             Some(pr) => pr[leave],
             None => 1.0,
@@ -5973,7 +6031,9 @@ fn solve_primal(
                 };
                 if arj.abs() > ROW_DROP_TOL {
                     if !s.is_fixed(j) {
-                        s.d[j] -= theta_d * arj;
+                        if !prods_q.as_ref().is_some_and(|pq| dsub(&mut s, j, pq[j])) {
+                            s.d[j] -= theta_d * arj;
+                        }
                     }
                     // Mode 2 gives the basic slack's noise product the weight update too, which puts it into the reference framework
                     // (`w > 0`), GREENBEA iteration 6094: a product below the update tolerance leaves `w = 1`.
@@ -6040,7 +6100,9 @@ fn solve_primal(
             }
             if !s.is_fixed(j) {
                 // The reference sums the row product in the order of the BTRAN output list.
-                s.d[j] -= theta_d * arj;
+                if !prods_q.as_ref().is_some_and(|pq| dsub(&mut s, j, pq[j])) {
+                    s.d[j] -= theta_d * arj;
+                }
             }
             // The variable dropped from a singular start basis is not in the reference's row copy, so not in its pivot row.
             if s.excluded != Some(j) {
