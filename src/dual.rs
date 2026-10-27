@@ -87,6 +87,30 @@ pub(crate) fn has_restart_snapshot() -> bool {
     SNAP_QUALITY.with(|c| c.get() > 0)
 }
 
+/// Save the x87 primal's current status at its progress check (`0x27e75a`,
+/// `0xd40b0` mode 0). Quality uses primal infeasibility, not the dual sum.
+pub(crate) fn primal_snapshot(
+    basic: &[usize], at_upper: &[bool], infeas: f64, retries: usize, excluded: bool,
+) {
+    let quality = if infeas > 0.0 { 1 } else { 2 };
+    if retries >= 5 || excluded || SNAP_QUALITY.with(|c| quality < c.get()) {
+        return;
+    }
+    SNAP_QUALITY.with(|c| c.set(quality));
+    SNAP.with(|c| *c.borrow_mut() = Some((basic.to_vec(), at_upper.to_vec())));
+    #[cfg(test)]
+    PRIMAL_SNAPSHOT_TEST.with(|c| {
+        if let Some(records) = c.borrow_mut().as_mut() {
+            records.push((basic.to_vec(), at_upper.to_vec(), quality));
+        }
+    });
+}
+
+#[cfg(test)]
+thread_local! {
+    pub(crate) static PRIMAL_SNAPSHOT_TEST: std::cell::RefCell<Option<Vec<(Vec<usize>, Vec<bool>, u32)>>> = const { std::cell::RefCell::new(None) };
+}
+
 pub(crate) fn set_dual_infeas_sum(v: f64) {
     DUAL_INFEAS_SUM.with(|c| c.set(v));
 }

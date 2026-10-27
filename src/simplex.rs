@@ -554,9 +554,19 @@ fn quad_progress_carried_objective_and_stall_exit() {
     let mut opts = SolveOptions::dual_release();
     opts.max_iterations = 5210;
     QUAD_PROGRESS_TEST.with(|c| *c.borrow_mut() = Some(Vec::new()));
+    crate::dual::PRIMAL_SNAPSHOT_TEST.with(|c| *c.borrow_mut() = Some(Vec::new()));
     // This checks the first stall exit; later controller passes are a separate comparison.
     let _result = crate::solve(&model, None, &opts);
     let records = QUAD_PROGRESS_TEST.with(|c| c.borrow_mut().take().unwrap());
+    let snapshots = crate::dual::PRIMAL_SNAPSHOT_TEST.with(|c| c.borrow_mut().take().unwrap());
+    // The first x87 progress check replaces the prior dual snapshot (native
+    // mode-0 save at total iteration 109); all 51 checks save this basis.
+    assert!(snapshots.len() >= 51);
+    for (basic, upper, quality) in &snapshots[..51] {
+        assert_eq!(*basic, [23, 31, 32, 6, 1, 8, 5, 10, 21, 18, 16]);
+        assert!(upper.iter().all(|&u| !u));
+        assert_eq!(*quality, 2);
+    }
     assert!(records.len() >= 51);
     for (i, &(it, base, old, new, calls, stalls, stalled)) in records[..51].iter().enumerate() {
         assert_eq!(it as f64 + base, 109.0 + 102.0 * i as f64);
@@ -1705,6 +1715,10 @@ impl<'a> Solver<'a> {
                 sum += x - range;
             }
         }
+        crate::dual::primal_snapshot(
+            &self.basic, &self.at_upper, sum, h.retries,
+            self.excluded.is_some() || self.repaired,
+        );
         let prev = STALL_PREV.with(|c| c.replace(sum));
         // The progress routine writes a fresh objective even on an infeasible
         // check. Its structural loop uses x87 basic values and double-rounded
