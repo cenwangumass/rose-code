@@ -1086,7 +1086,8 @@ impl<'a, R: Real> Dual<'a, R> {
                 // A fixed nonbasic variable that has a d (it left the basis, or the start gave it one) gets its true d like one at its lower bound
                 // (DEGEN2 d[700] after the refactorization at iteration 16); the fixed variables whose d is 0 keep it (PILOT4: 183 of 214).
                 if j < self.n {
-                    self.d[j] = R::c(self.cost[j]);
+                    // The cost in force: the double cost and, in the quad pass, its long-double remainder (seeds 8531, 7084).
+                    self.d[j] = R::c(self.cost[j]) + R::c(self.cost_lo[j]);
                 } else if self.d[j] != R::ZERO {
                     self.d[j] = dt[j];
                 }
