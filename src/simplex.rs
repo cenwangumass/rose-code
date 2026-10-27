@@ -6686,16 +6686,21 @@ fn solve_primal(
                     use crate::real::Real;
                     let ratio = pq[j] / a_rq;
                     let mut vj = crate::f80::F80::ZERO;
-                    // The x87 kernel consumes short columns from the last entry to the first
-                    // (0x257356..0x2573d1); cancellation makes this order observable.
-                    if p.fcols[j].len() < 8 {
-                        for &(i, a) in p.fcols[j].iter().rev() {
-                            vj += crate::f80::F80::c(a) * tq[i];
+                    // Eight independent x87 accumulators for full blocks, reduced in
+                    // lane order; the remaining entries are consumed backwards.
+                    let col = &p.fcols[j];
+                    let mut lanes = [crate::f80::F80::ZERO; 8];
+                    let blocks = col.len() / 8;
+                    for block in col[..blocks * 8].chunks_exact(8) {
+                        for (lane, &(i, a)) in lanes.iter_mut().zip(block) {
+                            *lane += crate::f80::F80::c(a) * tq[i];
                         }
-                    } else {
-                        for &(i, a) in &p.fcols[j] {
-                            vj += crate::f80::F80::c(a) * tq[i];
-                        }
+                    }
+                    for lane in lanes {
+                        vj += lane;
+                    }
+                    for &(i, a) in col[blocks * 8..].iter().rev() {
+                        vj += crate::f80::F80::c(a) * tq[i];
                     }
                     if s.wf.len() != s.w.len() {
                         s.wf = vec![crate::f80::F80::ZERO; s.w.len()];
@@ -6705,7 +6710,7 @@ fn solve_primal(
                     } else {
                         crate::f80::F80::c(s.w[j])
                     };
-                    let nw = ratio * ((wq_q * ratio - vj) - vj) + old;
+                    let nw = ratio * (wq_q * ratio - crate::f80::F80::c(2.0) * vj) + old;
                     s.wf[j] = nw;
                     s.w[j] = nw.to_f64();
                 } else {
