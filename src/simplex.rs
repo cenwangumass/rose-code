@@ -2751,10 +2751,9 @@ impl<'a> Solver<'a> {
             // does the driver restart below.
             if self.factor.num_updates() > 0 {
                 if self.repaired && self.handoff.is_some_and(|h| h.quad) && self.p1_tol_on {
-                    // A failed x87 scan with a repaired exclusion takes the pure phase-1
-                    // cost before the requested refactorization (3981, iteration 20).
+                    // With updates, a failed x87 phase-one scan removes the true
+                    // cost before requesting a factor; the tolerance stays put.
                     self.costfree = true;
-                    self.p3c0 = 1e-9;
                 }
                 // This refactorization follows a failed scan, so the latest update is
                 // included in the factor statistics used by the method decision.
@@ -2780,6 +2779,21 @@ impl<'a> Solver<'a> {
                     let retry = self.price_faithful()?;
                     if retry.is_some() {
                         return Ok(retry);
+                    }
+                    if self.p1_tol_on && self.costfree && self.p3c0 > 1e-9 {
+                        // On a fresh factor a second failed pre-list scan tightens
+                        // the x87 phase-one tolerance and requests another factor.
+                        self.p3c0 = 1e-9;
+                        self.work.trig();
+                        self.work.decided(self.work.w);
+                        self.pre_restart = true;
+                        let r = self.refactor();
+                        self.pre_restart = false;
+                        r?;
+                        let retry = self.price_faithful()?;
+                        if retry.is_some() {
+                            return Ok(retry);
+                        }
                     }
                 }
             }
@@ -4778,6 +4792,9 @@ fn solve_primal(
                 {
                     excluded = Some(e);
                     singular_work = w;
+                    if handoff.is_some_and(|h| h.quad) {
+                        PRIMAL_REPAIRED.with(|c| c.set(true));
+                    }
                 }
             }
             b
@@ -4799,7 +4816,7 @@ fn solve_primal(
             serde_json::json!({"cols": basis.basic, "mat": basis.basic.iter().map(|&j| (j, &p.cols[j])).collect::<Vec<_>>()}),
         );
     }
-    let mut kept_out = false;
+    let mut kept_out = excluded.is_some() && handoff.is_some_and(|h| h.quad);
     if excluded.is_none() {
         if let Some(e) = handoff
             .and_then(|h| h.excl)
@@ -5480,7 +5497,6 @@ fn solve_primal(
                     //  - on a fresh factor without the cost: the tolerance falls to 1e-9, and a scan that fails at 1e-9 ends the primal (`cf0 = 3`, the Farkas path below).
                     // The scan right after a factorization runs inside `0x145520`, not as a pricing call.
                     let fresh = s.factor.num_updates() == 0;
-                    let first = !s.rescan2;
                     s.costfree = true;
                     if fresh {
                         s.p3c0 = 1e-9;
@@ -5488,13 +5504,6 @@ fn solve_primal(
                     }
                     s.list.clear();
                     s.level = 0;
-                    if !fresh && first && s.handoff.is_some_and(|h| h.quad) {
-                        // Preserve the x87 handoff's rescan until its reference path is separately recovered.
-                        s.rescan2 = true;
-                        s.dual_btran_work("rescan");
-                        s.recompute_dual()?;
-                        continue;
-                    }
                     s.work.trig();
                     s.work.decided(s.work.w);
                     if let Some(mi) = s.mirror.as_mut() {
