@@ -5112,6 +5112,11 @@ fn solve_pass<R: Real>(
                 else {
                     return Err(SolveError::SingularBasis);
                 };
+                if s.retries < 5 {
+                    // The primal LU singular handler increments the same counter
+                    // used by the next dual ratio test (0xf58f7 / 0x248f99).
+                    C178.with(|c| c.set(c.get() + 1));
+                }
                 if !R::QUAD && s.rejected_end {
                     // The double primal after a rejected end made its pivots and ended with status -1004 (`0xe404a`, seed 3981), then the dual restarts in quad.
                     C35C.with(|c| c.set(c.get() + 1));
