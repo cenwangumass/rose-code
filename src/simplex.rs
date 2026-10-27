@@ -4838,18 +4838,15 @@ pub fn solve(
     let handoff = HANDOFF.with(|c| c.take());
     if handoff.is_none() {
         // A standalone solve starts a new context; handoffs retain the dual's counters.
+        TOTAL_ITERS.with(|c| c.set(0.0));
+        EARLIER_ITERS.with(|c| c.set(0));
         crate::dual::set_dual_tol(1e-6);
         crate::dual::set_resid_fails(0);
         crate::dual::reset_primal_snapshot();
-        TOTAL_ITERS.with(|c| c.set(0.0));
     }
     if let Some(h) = handoff {
-        // `ctx+0x2a8` at the double primal's start: the dual's iterations. The x87 primal after a quad dual that made no iterations continues a context in which
-        // an earlier x87 run of two iterations (a cycle back to the start basis) has been made (seed 2717).
-        if !h.quad {
-            TOTAL_ITERS.with(|c| c.set(h.iters));
-        } else if h.iters == 0.0 && QUAD_PRIMALS.with(|c| c.get()) == 0 {
-            TOTAL_ITERS.with(|c| c.set(c.get() + 2.0));
+        // An earlier x87 run of two iterations is included in the public count (seed 2717).
+        if h.quad && h.iters == 0.0 && QUAD_PRIMALS.with(|c| c.get()) == 0 {
             EARLIER_ITERS.with(|c| c.set(2));
         }
     }

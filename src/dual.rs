@@ -1044,6 +1044,7 @@ impl<'a, R: Real> Dual<'a, R> {
         self.st[j] = r as i32;
         self.head[r] = j;
         self.iters += 1;
+        crate::simplex::TOTAL_ITERS.with(|c| c.set(c.get() + 1.0));
         if self.mirror.refactor_due() {
             self.refactor("free_pivot")?;
         } else {
@@ -3312,6 +3313,8 @@ impl<'a, R: Real> Dual<'a, R> {
             col.swap_remove(k);
         }
         let tau: Vec<R> = col.iter().map(|e| tau_dense[e.0]).collect();
+        // Each accepted pivot and each bound flip advances the shared clock.
+        crate::simplex::TOTAL_ITERS.with(|c| c.set(c.get() + 1.0 + flips.len() as f64));
         // Bound flips: x_B and the statuses (`0xcd720`).
         if !flips.is_empty() {
             let mut rhs = vec![R::ZERO; m];
@@ -3464,7 +3467,7 @@ impl<'a, R: Real> Dual<'a, R> {
 impl<'a, R: Real> Dual<'a, R> {
     fn snapshot(&self, k: usize) -> serde_json::Value {
         serde_json::json!({
-            "c2d8": dual_infeas_sum(), "k": k, "lvl": self.level, "req": self.request, "it": self.iters as f64, "head": self.head, "xB": self.xb.iter().map(|v| v.json()).collect::<Vec<_>>(), "d": self.d.iter().map(|v| v.json()).collect::<Vec<_>>(), "W": self.w.iter().map(|v| v.json()).collect::<Vec<_>>(),
+            "c2d8": dual_infeas_sum(), "k": k, "lvl": self.level, "req": self.request, "it": self.iters as f64, "context_it": (self.it_base + self.iters) as f64, "clock": crate::simplex::TOTAL_ITERS.with(|c| c.get()), "head": self.head, "xB": self.xb.iter().map(|v| v.json()).collect::<Vec<_>>(), "d": self.d.iter().map(|v| v.json()).collect::<Vec<_>>(), "W": self.w.iter().map(|v| v.json()).collect::<Vec<_>>(),
             "st": self.st, "flags": self.flags, "prio": self.prio.iter().map(|v| v.to_f64()).collect::<Vec<_>>(), "diag": self.mirror.numerics().0.iter().map(|v| v.json()).collect::<Vec<_>>(),
             "list": if self.value_mode { self.list.clone() } else { self.list[..self.walk_len.min(self.list.len())].to_vec() },
             "thr": self.thr.to_f64(), "p40": self.value_mode as u8, "cur": self.cursor,
@@ -4444,6 +4447,10 @@ fn solve_frame(
         nref0: 0,
         pstep: None,
     };
+    if CLEANUP_PASS.with(|c| c.get()).is_none() {
+        crate::simplex::TOTAL_ITERS.with(|c| c.set(0.0));
+        crate::simplex::EARLIER_ITERS.with(|c| c.set(0));
+    }
     set_dual_tol(DUAL_TOL0);
     set_dual_infeas_sum(0.0);
     set_primal_tol(PRIMAL_TOL);
@@ -5286,10 +5293,6 @@ fn solve_pass<R: Real>(
             basic: s.head.clone(),
             at_upper: s.st.iter().map(|&t| t == UB).collect(),
         };
-        if R::QUAD {
-            // The shared clock includes the quad dual's iterations before its primal starts.
-            crate::simplex::TOTAL_ITERS.with(|c| c.set(c.get() + s.iters as f64));
-        }
         crate::simplex::HANDOFF.with(|c| {
             c.set(Some(crate::simplex::Handoff {
                 stale: Some(s.pair),
@@ -5619,7 +5622,6 @@ fn solve_pass<R: Real>(
             if crate::simplex::QUAD_PRIMALS.with(|c| c.get()) == 0 && s.iters > 0 {
                 popts.pricing0 = C35C.with(|c| c.get()) == 1;
             }
-            crate::simplex::TOTAL_ITERS.with(|c| c.set(c.get() + s.iters as f64));
             crate::simplex::HANDOFF.with(|c| {
                 c.set(Some(crate::simplex::Handoff {
                     stale: Some(s.pair),
