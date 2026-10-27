@@ -3688,12 +3688,12 @@ pub fn solve_release(model: &LpModel, o: &Options) -> Result<Solution, BarrierEr
 
 /// `Method::Barrier` of [`crate::solve`]: [`solve_exact`] with the options mapped (`barrier_tol`, `max_iterations`), the result in the public types.
 /// Status: optimal, the iteration limit (API 7), unbounded (code 5, API 5) and infeasible (code 3, never observed); infeasible-or-unbounded (code 0xc, API 12)
-/// code 6 is `Cutoff`, and other codes (including 0xb) are reported as `NumericalFailure` (no certificate is produced, NaN objective); code 0xd (API 13, stalled) is `Suboptimal` and keeps the saved best iterate.
+/// code 6 is `Cutoff`, code 0xb is `Interrupted`, and code 0xd (API 13, stalled) is `Suboptimal`; other codes are reported as `NumericalFailure` (no certificate is produced, NaN objective).
 pub fn solve_method(
     model: &LpModel,
     opts: &crate::SolveOptions,
 ) -> Result<crate::SolveResult, crate::simplex::SolveError> {
-    use crate::simplex::{SolveError, Status};
+    use crate::simplex::SolveError;
     let o = Options {
         tol: opts.barrier_tol,
         max_iter: opts.max_iterations.min(i32::MAX as usize) as i32,
@@ -3707,22 +3707,7 @@ pub fn solve_method(
     .map_err(|e| match e {
         BarrierError::Unsupported(s) | BarrierError::Solver(s) => SolveError::Unsupported(s),
     })?;
-    let status = match sol.run.status {
-        BarrierStatus::Optimal => Status::Optimal,
-        BarrierStatus::IterationLimit => Status::IterationLimit,
-        // 5: unbounded (API 5, fx_unbounded); 3: infeasible (never observed); 0xc: infeasible or unbounded (API 12, fx_infeasible), reported like PDHG's 12.
-        BarrierStatus::Other(5) => Status::Unbounded,
-        BarrierStatus::Other(3) => Status::Infeasible,
-        BarrierStatus::Other(6) => Status::Cutoff,
-        // 0xd after the best-iterate checks of the end (`0x2e2e64`): API 13, the best iterate is returned (stalled, GREENBEA release).
-        BarrierStatus::Other(13) => Status::Suboptimal,
-        BarrierStatus::Other(_) => Status::NumericalFailure,
-    };
-    // Cutoff and code 13 return the saved best iterate; other failure codes have no objective.
-    let objective = match sol.run.status {
-        BarrierStatus::Other(c) if !matches!(c, 3 | 5 | 6 | 13) => f64::NAN,
-        _ => sol.objective,
-    };
+    let (status, objective) = method_readout(sol.run.status, sol.objective);
     Ok(crate::SolveResult {
         status,
         objective,
@@ -3738,6 +3723,28 @@ pub fn solve_method(
     })
 }
 
+fn method_readout(barrier_status: BarrierStatus, point_objective: f64) -> (crate::simplex::Status, f64) {
+    use crate::simplex::Status;
+    let status = match barrier_status {
+        BarrierStatus::Optimal => Status::Optimal,
+        BarrierStatus::IterationLimit => Status::IterationLimit,
+        // 5: unbounded (API 5, fx_unbounded); 3: infeasible (never observed); 0xc: infeasible or unbounded (API 12, fx_infeasible), reported like PDHG's 12.
+        BarrierStatus::Other(5) => Status::Unbounded,
+        BarrierStatus::Other(3) => Status::Infeasible,
+        BarrierStatus::Other(6) => Status::Cutoff,
+        BarrierStatus::Other(11) => Status::Interrupted,
+        // 0xd after the best-iterate checks of the end (`0x2e2e64`): API 13, the best iterate is returned (stalled, GREENBEA release).
+        BarrierStatus::Other(13) => Status::Suboptimal,
+        BarrierStatus::Other(_) => Status::NumericalFailure,
+    };
+    // Interrupted and code 13 return the saved primal objective; cutoff returns the best dual objective.
+    let objective = match barrier_status {
+        BarrierStatus::Other(c) if !matches!(c, 3 | 5 | 6 | 11 | 13) => f64::NAN,
+        _ => point_objective,
+    };
+    (status, objective)
+}
+
 /// [`solve_with`] on the plain f64 [`DenseSolver`] (not bit-exact, tests at tolerance).
 pub fn solve_dense(model: &LpModel) -> Result<Solution, BarrierError> {
     solve_with(model, &mut DenseSolver::default(), &Options::default())
@@ -3746,6 +3753,14 @@ pub fn solve_dense(model: &LpModel) -> Result<Solution, BarrierError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn interrupted_method_readout_preserves_saved_primal_objective() {
+        let (status, objective) = method_readout(BarrierStatus::Other(11), -157.02439183174215);
+        assert_eq!(status, crate::Status::Interrupted);
+        assert_eq!(objective, -157.02439183174215);
+        assert!(method_readout(BarrierStatus::Other(12), 1.0).1.is_nan());
+    }
 
     #[test]
     fn ext_rounds_to_64_bits() {

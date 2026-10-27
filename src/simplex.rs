@@ -192,6 +192,8 @@ pub enum Status {
     IterationLimit,
     /// The objective cutoff was exceeded; the barrier returns its saved iterate.
     Cutoff,
+    /// The solve was interrupted and returns the available iterate.
+    Interrupted,
     NumericalFailure,
     /// The solve stopped short of the tolerances and returns its best iterate (the barrier's API status 13, `SUBOPTIMAL`).
     Suboptimal,
