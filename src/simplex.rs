@@ -1024,6 +1024,8 @@ struct Solver<'a> {
     /// The final factorization of a solve that ended with right-hand-side shifts: the reference removes the shifts in a dual clean-up pass
     /// that factorizes the basis in ascending index order (`0xf6a00`), instead of refactorizing in pivot order.
     cleanup: bool,
+    /// The final clean-up factorization after dual pivots takes the basis head as the pivots left it (the reference updates the factor between the pivots).
+    cleanup_keep_head: bool,
     /// The pivot row and `extra` of the last list update from the pivot step (`0x1442ab`), which `0x107e14` repeats.
     last_upd: Option<(Vec<usize>, usize)>,
     /// The pivot row's values (`arj`) of that update, and the row being built for the next one.
@@ -1311,7 +1313,7 @@ impl<'a> Solver<'a> {
     fn refactor(&mut self) -> Result<(), SolveError> {
         let mut sw_avg = 0usize;
         if self.opts.faithful_positions {
-            if self.cleanup || self.restart {
+            if (self.cleanup && !self.cleanup_keep_head) || self.restart {
                 self.basic.sort_unstable();
             }
             // The driver restart after a repaired basis (`0xcda5b`) factors like the starting factorization.
@@ -3289,6 +3291,8 @@ impl<'a> Solver<'a> {
         let p = self.p;
         let tol = self.opts.feasibility_tol;
         let mut pivots = 0;
+        let mut head = self.basic.clone();
+        let count = self.refactorizations;
         while pivots < 10 * p.m {
             let sg = self.sig();
             // Leaving row: the largest violation.
@@ -3312,6 +3316,18 @@ impl<'a> Solver<'a> {
                 }
             }
             let Some((r, _, to_upper)) = best else {
+                if pivots > 0 {
+                    // The reference updates the factor between the pivots and refactors once at the end (request 4), on the head the pivots left.
+                    self.basic = head;
+                    for (pos, &j) in self.basic.iter().enumerate() {
+                        self.pos_of[j] = pos;
+                    }
+                    self.refactorizations = count;
+                    self.cleanup_keep_head = true;
+                    let res = self.refactor();
+                    self.cleanup_keep_head = false;
+                    res?;
+                }
                 return Ok(Some(pivots));
             };
             let _ = tol;
@@ -3355,6 +3371,9 @@ impl<'a> Solver<'a> {
                 return Ok(None);
             };
             let leave = self.basic[r];
+            if let Some(h) = head.iter().position(|&v| v == leave) {
+                head[h] = q;
+            }
             self.basic[r] = q;
             self.pos_of[q] = r;
             self.pos_of[leave] = NONE;
@@ -4368,6 +4387,7 @@ fn solve_primal(
         recomputed: false,
         rescan: false,
         cleanup: false,
+        cleanup_keep_head: false,
         last_upd: None,
         last_row: Vec::new(),
         pending_row: None,
@@ -4872,6 +4892,13 @@ fn solve_primal(
                             // The dual clean-up pass; the primal phase 1 only when it finds no entering variable.
                             if let Some(k) = s.dual_cleanup()? {
                                 iterations += k;
+                                if k > 0 {
+                                    // The pivots can leave a negative reduced cost (the ratio test's tolerance): the primal prices again.
+                                    s.recompute_dual();
+                                    s.list.clear();
+                                    s.level = 0;
+                                    continue;
+                                }
                             }
                         }
                         if s.has_infeasible_basic() {

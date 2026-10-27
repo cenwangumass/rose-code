@@ -281,3 +281,23 @@ fn infeasible_models_end_infeasible_in_every_simplex_profile() {
     assert_eq!(y.len(), 8);
     assert!(y[4] > 0.0 && y[6] > 0.0 && y[7] > 0.0, "{y:?}");
 }
+
+/// The dual clean-up pass after a shifted optimum (random LP `gen3` seed 243, controlled profile; reference run through `tools/ref_run.py`):
+/// it needs one clean-up pivot and then a primal pivot, because the dual pivot leaves a negative reduced cost (16 iterations; without the second
+/// pricing rose stopped at 15 and 9.999967768276168).
+#[test]
+fn dual_cleanup_pivots_are_followed_by_a_pricing_scan() {
+    for (name, iters, obj) in [("fx_cleanup_one", 16, 9.999962571150556)] {
+        let Some(m) = fixture(name) else { continue };
+        let opts = SolveOptions {
+            faithful_weights: true,
+            faithful_positions: true,
+            faithful_ftran: true,
+            ..SolveOptions::default()
+        };
+        let r = solve(&m, None, &opts).unwrap();
+        assert_eq!(r.status, Status::Optimal, "{name}");
+        assert_eq!(r.iterations, iters, "{name}");
+        assert_eq!(r.objective.to_bits(), f64::to_bits(obj), "{name}");
+    }
+}
