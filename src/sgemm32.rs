@@ -245,12 +245,36 @@ pub fn sgemm_t_n(
                 };
                 gemv_dot(&a[i * lda..i * lda + k], &b[j * ldb..j * ldb + k], var == 4)
             } else {
-                acc(
-                    element_mode(m, n, i, j),
-                    k,
-                    &a[i * lda..i * lda + k],
-                    &b[j * ldb..j * ldb + k],
-                )
+                // The nocopy driver (`mkl_blas_avx2_xsgemm_nocopy_driver`) calls the kernel per piece of `k`: blocks of 256 while more than 512 remain, then
+                // `ceil(r / 2)` and the rest when `r > 256` (traced for k = 257 .. 1100); each piece is a `beta = 1` update of `C`.
+                let mode = element_mode(m, n, i, j);
+                if !copy_path(m, n) && k > 256 {
+                    let (mut k0, mut r) = (0, k);
+                    let mut ps = Vec::new();
+                    while r > 512 {
+                        ps.push(256);
+                        r -= 256;
+                    }
+                    if r > 256 {
+                        ps.push((r + 1) / 2);
+                        r -= (r + 1) / 2;
+                    }
+                    ps.push(r);
+                    let mut cv = c[j * ldc + i];
+                    for kk in ps {
+                        let t = acc(
+                            mode,
+                            kk,
+                            &a[i * lda + k0..i * lda + k0 + kk],
+                            &b[j * ldb + k0..j * ldb + k0 + kk],
+                        );
+                        cv = rd(cv + t);
+                        k0 += kk;
+                    }
+                    c[j * ldc + i] = cv;
+                    continue;
+                }
+                acc(mode, k, &a[i * lda..i * lda + k], &b[j * ldb..j * ldb + k])
             };
             c[j * ldc + i] = rd(c[j * ldc + i] + s);
         }

@@ -693,12 +693,24 @@ pub fn dgemm_t_n(
         }
         return;
     }
-    // The nocopy driver (`0xa7be50`) cuts `k > 192` into two calls of the kernel, `ceil(k / 2)` then the rest, each a `beta = 1` update of `C`
-    // (the dispatch above sees the whole `k`; the copy-based kernel takes `k` up to 240 in one call).
-    let kb = if k > 192 { (k + 1) / 2 } else { k };
+    // The nocopy driver (`0xa7be50`) cuts `k > 192` into calls of the kernel, each a `beta = 1` update of `C` (the dispatch above sees the whole `k`;
+    // the copy-based kernel takes `k` up to 240 in one call).
+    // The pieces: while more than 384 remain a block of 192; then up to 384 `ceil(r / 2)` and the rest; up to 192 one call (traced for k = 385, 400, 512, 700).
+    let mut ps = Vec::new();
+    let mut r = k;
+    while r > 384 {
+        ps.push(192);
+        r -= 192;
+    }
+    if r > 192 {
+        ps.push((r + 1) / 2);
+        r -= (r + 1) / 2;
+    }
+    if r > 0 {
+        ps.push(r);
+    }
     let mut k0 = 0;
-    while k0 < k {
-        let kk = (k - k0).min(kb);
+    for &kk in &ps {
         let mut j0 = 0;
         for nb in nocopy_n_blocks(n) {
             for j in 0..nb {
