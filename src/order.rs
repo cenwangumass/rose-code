@@ -1467,7 +1467,7 @@ pub fn structure_order(
         // the manager's counter (`OrderResult::work`) and `budget` the sum of the squared exact column counts. Extra orderings (generator seeds
         // `AUTO_ORDER_SEED + t`, mode 1 of `0x324330`) run when `spent / budget < 0.1`, or when `n > 1000`, `500 nnz <= budget`, `nnz <= NZ` and `spent / budget <= 2`.
         // They run one per round, at most five, the counter growing by each one's work; the rounds stop once `(counter - start) / budget > 0.05`. The cheapest by
-        // operations wins (the first on ties).
+        // exact factor operations wins (the first on ties).
         Ok(f) if auto => {
             let budget = f.2.exact_ops;
             let nnz = pattern.nnz() as f64;
@@ -1487,7 +1487,7 @@ pub fn structure_order(
                     if let Ok(c) = run(AUTO_ORDER_SEED + t, true, t as i32) {
                         extra += 1;
                         total += c.1.work;
-                        if c.1.ops < best.1.ops {
+                        if c.2.exact_ops < best.2.exact_ops {
                             best = c;
                         }
                     }
