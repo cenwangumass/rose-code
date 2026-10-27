@@ -438,7 +438,7 @@ impl<R: Real> RefStruct<R> {
             for &v in &touched {
                 if v < t
                     && (xv[v].abs() > R::c(TOL)
-                        || (!changed[v] && xv[v] != R::ZERO && kind[v] >= 0))
+                        || (!changed[v] && xv[v] != R::ZERO && (kind[v] >= 0 || st.phase[v] == 4)))
                 {
                     ents.push((v, xv[v]));
                 }
@@ -459,9 +459,11 @@ impl<R: Real> RefStruct<R> {
             for e in &ents {
                 epos[e.0] = usize::MAX;
             }
-            // The reference's tail columns hold no residues below the tolerance. An entry copied from the matrix and never updated by the L solve is kept
-            // at any size when its row is a nucleus position (fx_e2_r25: a scaled 2^-44 in row 0 enters the x_B row dot); in a tail row it is dropped.
-            ents.retain(|e| e.1.abs() > R::c(TOL) || (!changed[e.0] && kind[e.0] >= 0));
+            // A singleton-row pivot copies active entries without a magnitude test (`0xe0872`, `0xe2a14`, `0xdc546`), including tail positions.
+            // Unchanged nucleus entries are also retained (fx_e2_r25).
+            ents.retain(|e| {
+                e.1.abs() > R::c(TOL) || (!changed[e.0] && (kind[e.0] >= 0 || st.phase[e.0] == 4))
+            });
             for &v in &lst {
                 xv[v] = R::ZERO;
                 cnt[v] = 0;
