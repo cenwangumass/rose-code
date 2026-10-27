@@ -1382,8 +1382,7 @@ pub fn numeric_factor(
     let _guard = SingleGuard::new(plan.single);
     // Dense columns: the factor has `nt = m + nd` nodes (the dense nodes last), pivots regularise (`SYM+0x110`, `Q+0x218 > 0`), and the sparse supernodes are
     // assembled as without dense columns (`0x2f83e0` for `w >= 3`, else the generic routine; `fx_bar_densecol`); the dense supernode starts from the diagonal `-1/D[j]` of its columns, and a row's dense-node entries are the raw
-    // coefficients `A[i][j]` (no `D`). The diagonal of a dense node is `-zx_j` (`z/x + v/u` of the iterate; the starting point has no `zx`: `-1/D_j`, as for a
-    // clamped `D = 1e12`).
+    // coefficients `A[i][j]` (no `D`). The diagonal of a dense node is `-zx_j` (`z/x + v/u` of the iterate; the starting point has no `zx`: `-1/D_j`). The iterate uses `-zx_j` even when `D` is clamped to `1e12`.
     let nt = plan.n;
     let reg = !f.dense.is_empty();
     let mut dnode_col = vec![NONE; nt];
@@ -1413,7 +1412,7 @@ pub fn numeric_factor(
             for t in 0..w {
                 let jd = dnode_col[col + t];
                 mm[t * w + t] = match zx {
-                    Some(z) if z[jd] > 0.0 && d[jd] != 1e12 => -z[jd],
+                    Some(z) if z[jd] > 0.0 => -z[jd],
                     _ => -1.0 / d[jd],
                 };
             }
