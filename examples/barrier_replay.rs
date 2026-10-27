@@ -11,7 +11,8 @@ use serde_json::json;
 fn main() {
     let a: Vec<String> = std::env::args().collect();
     let model = mps::parse(&std::fs::read_to_string(&a[1]).unwrap()).unwrap();
-    let s = match order::structure(&model, order::DENSE_COL_MIN) {
+    let auto = std::env::var("ORD_AUTO").is_ok();
+    let s = match order::structure_order(&model, order::DENSE_COL_MIN, auto) {
         Ok(s) => s,
         Err(e) => {
             println!("unsupported: {}", e.3);

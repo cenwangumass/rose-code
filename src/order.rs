@@ -624,7 +624,7 @@ pub fn levels(p: &Pattern, n1: usize, bisect: Option<Bisect>) -> Result<Vec<i64>
     levels_rng(p, n1, bisect, &mut 0)
 }
 
-/// [`levels`] that also returns the generator state after the partitions in `rng_out`.
+/// [`levels`] with the generator state `*rng_out` at the start (0 for the first run), which also returns the state after the partitions in `rng_out`.
 pub fn levels_rng(
     p: &Pattern,
     n1: usize,
@@ -669,7 +669,7 @@ pub fn levels_rng(
     }
     let big = 600.max(n / 100);
     let mut bisect = bisect;
-    let mut rng = 0u64;
+    let mut rng = *rng_out;
     let mut default = |sz: usize, cp: &[usize], ri: &[usize]| partition(sz, cp, ri, &mut rng);
     for (c, &sz) in sizes.iter().enumerate() {
         if sz > big {
@@ -1348,6 +1348,15 @@ pub fn structure(
     m: &LpModel,
     dense_min: usize,
 ) -> Result<Structure, (Pattern, usize, Vec<usize>, StructError)> {
+    structure_order(m, dense_min, false)
+}
+
+/// [`structure`] with `BarOrder = -1` (`auto`: the release profile) or `0`.
+pub fn structure_order(
+    m: &LpModel,
+    dense_min: usize,
+    auto: bool,
+) -> Result<Structure, (Pattern, usize, Vec<usize>, StructError)> {
     let dense = if dense_min == DENSE_AUTO {
         match dense_rule(m) {
             Ok(d) => d,
@@ -1360,15 +1369,32 @@ pub fn structure(
         dense_columns(m, dense_min)
     };
     let (pattern, n1) = aat_pattern(m, &dense);
-    let run = || -> Result<(Vec<i64>, OrderResult, Symbolic), StructError> {
-        let mut rng = 0u64;
+    let run = |seed: u64| -> Result<(Vec<i64>, OrderResult, Symbolic), StructError> {
+        let mut rng = seed;
         let lv = levels_rng(&pattern, n1, None, &mut rng)?;
         let o = order(&pattern, &lv)?;
         let mut s = symbolic(&pattern, &o.perm, n1);
         s.rng = rng;
         Ok((lv, o, s))
     };
-    match run() {
+    let first = run(0);
+    let best = match first {
+        // `BarOrder = -1` (the release default): when the first ordering is expensive (more than [`AUTO_ORDER_OPS`] operations) the driver runs five more
+        // with generator seeds `AUTO_ORDER_SEED + t` (`t = 0 .. 5`, mode 1 of `0x324330`) and keeps the cheapest by operations (the first on ties).
+        Ok(f) if auto && f.1.ops > AUTO_ORDER_OPS => {
+            let mut best = f;
+            for t in 0..5 {
+                if let Ok(c) = run(AUTO_ORDER_SEED + t) {
+                    if c.1.ops < best.1.ops {
+                        best = c;
+                    }
+                }
+            }
+            Ok(best)
+        }
+        other => other,
+    };
+    match best {
         Ok((levels, order, sym)) => Ok(Structure {
             pattern,
             n1,
@@ -1380,6 +1406,14 @@ pub fn structure(
         Err(e) => Err((pattern, n1, dense, e)),
     }
 }
+
+/// Operations of the first ordering above which `BarOrder = -1` tries more orderings (guess: the flops threshold 1e10 of the replaced pivots; 1.0098e10 tries,
+/// everything captured below 1e7 does not).
+pub const AUTO_ORDER_OPS: f64 = 1e10;
+/// Generator state of the first extra ordering (`BarOrder = -1`): `Seed + task + 11` (`0x31e07d..0x31e09c`, `Seed` = `P+0x2cd0` = 0). The orderings of tasks 0, 1, 2, 4 of `fx_bar_dense3400`
+/// match the reference bit for bit; task 3 does not, and none of the five do on `fx_bar_mixed12` (mode 1 of `0x324330` differs from mode 3 in more than the seed), so the
+/// release profile does not use it yet.
+pub const AUTO_ORDER_SEED: u64 = 11;
 
 #[cfg(test)]
 mod tests {
