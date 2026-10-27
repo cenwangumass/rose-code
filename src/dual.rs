@@ -5118,7 +5118,9 @@ fn solve_pass<R: Real>(
                 snap: (s.it_base + s.stall_it as usize) as f64,
                 c178: C178.with(|c| c.get()),
                 preserve_ratio: false,
-                excl: if R::QUAD && (s.pert == 0 || s.art_exit) {
+                // A shifted artificial-bound exit restores the repaired variable
+                // before starting primal pricing (seed 6575, status -1 at entry).
+                excl: if R::QUAD && s.pert == 0 {
                     s.repaired
                 } else {
                     None
