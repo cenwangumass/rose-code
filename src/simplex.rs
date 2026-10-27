@@ -2529,13 +2529,13 @@ impl<'a> Solver<'a> {
         crate::dual::set_dual_infeas_sum(sum);
     }
 
-    /// The primal's call of the duals and residual check (`0x145520`) in a run started by the dual controller: it shares the dual tolerance and the failure
+    /// The primal's call of the duals and residual check (`0x145520`): it shares the dual tolerance and the failure
     /// counter of the dual (`ctx+0x388`, `ctx+0x174`). At the start of a call (`0x1455d3`), more than two failures raise the tolerance tenfold (up to 1e-3) and reset
     /// the counter; the residual `max |c_j - a_j y|` over the basic structurals is then compared with the tolerance (`0x145a36..0x145a56`) when the factorization
     /// count is 4 modulo 5, the request is 4, 5 or 7, or the counter is not zero.
     fn handoff_residual(&mut self, y: &[f64]) -> Result<(), SolveError> {
         // The tolerance raise and the residual compare sit behind the `ctx+0x2d0 == 0` tests of `0x1455ca` and `0x14577a`: in phase 1 (an infeasible basic variable) the call leaves the tolerance and the counter alone.
-        if self.handoff.is_none() || self.has_infeasible_basic() {
+        if self.has_infeasible_basic() {
             return Ok(());
         }
         let tol = crate::dual::dual_tol();
@@ -2547,6 +2547,8 @@ impl<'a> Solver<'a> {
             );
         }
         let mut abort = false;
+        // Standalone primal also requests -1002 at the limit, but its snapshot-based
+        // quad restart is not yet implemented; continue tracking until it is.
         if cnt > 2 {
             if tol < 1e-3 {
                 crate::dual::set_dual_tol(10.0 * tol);
@@ -4777,6 +4779,11 @@ pub fn solve(
         return crate::dual::solve(model, start, opts);
     }
     let handoff = HANDOFF.with(|c| c.take());
+    if handoff.is_none() {
+        // A standalone solve starts a new context; handoffs retain the dual's counters.
+        crate::dual::set_dual_tol(1e-6);
+        crate::dual::set_resid_fails(0);
+    }
     if let Some(h) = handoff {
         // `ctx+0x2a8` at the double primal's start: the dual's iterations. The x87 primal after a quad dual that made no iterations continues a context in which
         // an earlier x87 run of two iterations (a cycle back to the start basis) has been made (seed 2717).
