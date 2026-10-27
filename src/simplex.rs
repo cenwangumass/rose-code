@@ -5552,7 +5552,11 @@ fn solve_primal(
                                 }
                             }
                         }
-                        if s.has_infeasible_basic() {
+                        // A fresh factor can reveal an improving reduced cost even
+                        // when the preceding scan found no candidate.
+                        if s.has_infeasible_basic()
+                            || (0..s.p.n + s.p.m).any(|j| s.score(j).is_some())
+                        {
                             continue;
                         }
                     }
