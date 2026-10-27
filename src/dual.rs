@@ -1088,7 +1088,9 @@ impl<'a, R: Real> Dual<'a, R> {
                 if j < self.n {
                     // The cost in force: the double cost and, in the quad pass, its long-double remainder (seeds 8531, 7084).
                     self.d[j] = R::c(self.cost[j]) + R::c(self.cost_lo[j]);
-                } else if self.d[j] != R::ZERO {
+                } else if self.d[j] != R::ZERO || R::QUAD {
+                    // The quad pass's d recompute (`0x273cd0`) subtracts y from the slack of every row whatever the status (seed 7084: d = -4.87e-6 on a
+                    // fixed slack that had d = 0).
                     self.d[j] = dt[j];
                 }
             } else if self.st[j] < 0 {
