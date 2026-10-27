@@ -15,7 +15,7 @@ pub const KINDS: &[(&str, &str, &str)] = &[
     ("pricing0", "P0", "`pricing0` scan: list, position, duals and stored d at entry (tag in), and the chosen variable with its d (tag out)"),
     ("xpricing", "XPR", "x87 primal (after a quad dual): at each scan (tag scan) and after the recompute of the duals (tag rescan): iterations done, d, w, candidate list, basis"),
     ("xmove", "XMOVE", "x87 primal: long-double basic distances and entering distance after a move, in the previous basis order"),
-    ("qprogress", "QPROGRESS", "x87 primal progress check: local iterations and handoff baseline, total clock, previous and recomputed objective, infeasibility sum, and check and stall counts"),
+    ("qprogress", "QPROGRESS", "x87 primal progress check: local iterations and handoff baseline, total clock, previous and recomputed objective, infeasibility sum, check and stall counts, basis and long-double basic values"),
     ("ftran", "FTR", "pivot-column FTRAN input rows and result in output order"),
     ("ustage", "USTG", "U-stage state of each pivot-column FTRAN: the L-stage result (spike, ascending), the diagonal, the tail columns' U entries and slots"),
     ("lstage", "LST", "dense x (by position) of each pivot-column FTRAN after the L stage (l) and after the row etas (e)"),

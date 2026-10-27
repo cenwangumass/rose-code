@@ -5609,10 +5609,20 @@ fn solve_pass<R: Real>(
             }
             other => other.ok(),
         };
+        // A progress exit after an artificial-bound handoff resumes dual from
+        // the primal basis and increments the shared -1004 counter.
+        let primal_stalled = R::QUAD && crate::simplex::PRIMAL_STALL.with(|c| c.take());
+        if primal_stalled {
+            C35C.with(|c| c.set(c.get() + 1));
+        }
         // An artificial-bound dual exit can also hand off to a primal whose
         // start factorization drops a singular column. Restore that column and
         // retry the primal when its failed scan ends with the repair still out.
-        if R::QUAD && s.art_exit && crate::simplex::PRIMAL_REPAIRED.with(|c| c.take()) {
+        if R::QUAD
+            && s.art_exit
+            && !primal_stalled
+            && crate::simplex::PRIMAL_REPAIRED.with(|c| c.take())
+        {
             if let Some(pr) = prres.as_mut().filter(|pr| pr.status == Status::Infeasible) {
                 crate::simplex::HANDOFF.with(|c| {
                     c.set(Some(crate::simplex::Handoff {
@@ -5696,10 +5706,14 @@ fn solve_pass<R: Real>(
                     avg_touch: 0.0,
                     last_cap: 0,
                     inf_count: 0,
-                    after_pivot: false,
+                    after_pivot: primal_stalled,
                     it_base: s.it_base + s.iters + pit,
                     nref0: s.nref() + pfac.max(1),
-                    pstep: None,
+                    pstep: if primal_stalled && s.pstep > 0.0 {
+                        Some(maxsd(1e-7, s.pstep * 0.05))
+                    } else {
+                        None
+                    },
                 };
                 let again = solve_pass::<R>(model, resume.as_ref().or(start), opts, &carry3, false);
                 NO_ART_EXIT.with(|c| c.set(false));
