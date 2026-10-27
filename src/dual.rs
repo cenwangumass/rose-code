@@ -915,7 +915,7 @@ impl<'a, R: Real> Dual<'a, R> {
     /// ascending index, is pivoted into the basis. Its column is transformed; among the rows whose basic variable has a finite lower bound the entry of
     /// largest magnitude wins (first in the result's order on ties; below `PIVOT_FLOOR` the variable is deferred, unexercised). The leaving variable
     /// goes to its lower bound (fixed when the range is zero). The factor is updated, or refactorized when the work-based trigger is due.
-    fn free_pivots(&mut self) -> Result<bool, SolveError> {
+    fn free_pivots(&mut self) -> Result<Option<(usize, f64)>, SolveError> {
         let n = self.n;
         let free: Vec<usize> = (0..n).filter(|&j| self.st[j] == FREE).collect();
         let mut deferred = Vec::new();
@@ -927,7 +927,7 @@ impl<'a, R: Real> Dual<'a, R> {
             }
         }
         if deferred.is_empty() || skip {
-            return Ok(false);
+            return Ok(None);
         }
         // Second pass (`0xe8fc6..0xe98e1`): request 10, a refactorization; then for each deferred variable in turn the reduced cost `d = c - y a` with
         // `y = B^-T c_B` (recomputed after every pivot of this pass). Within `dual_tol()` the variable stays free and nonbasic; beyond it the column is
@@ -952,12 +952,12 @@ impl<'a, R: Real> Dual<'a, R> {
                 }
                 match self.free_candidate(j, 0.01 * PIVOT_FLOOR) {
                     Some((r, alpha)) => self.pivot_free(j, r, alpha)?,
-                    None => return Ok(true),
+                    None => return Ok(Some((j, d))),
                 }
                 break;
             }
         }
-        Ok(false)
+        Ok(None)
     }
 
     /// The pivot row of a free column: the column is transformed and the entry of largest magnitude among the rows whose basic variable has a finite lower
@@ -4687,11 +4687,11 @@ fn solve_pass<R: Real>(
     s.work.decided(s.work.w);
     s.factor_work(&stc, &rows, 0.0);
     let free_phase = (0..n).any(|j| s.st[j] == FREE);
-    let mut setup_unbounded = false;
+    let mut setup_free = None;
     if free_phase {
-        setup_unbounded = s.free_pivots()?;
-        s.setup_unbounded = setup_unbounded;
-        if !setup_unbounded {
+        setup_free = s.free_pivots()?;
+        s.setup_unbounded = setup_free.is_some();
+        if setup_free.is_none() {
             s.refactor()?;
         }
     }
@@ -4813,12 +4813,22 @@ fn solve_pass<R: Real>(
     let mut farkas = None;
     let mut status;
     // A deferred free column that has a reduced cost and no row to enter on ends the dual before its first iteration (`0xea0b7`, status 5).
-    if setup_unbounded {
-        s.dual_unbounded();
+    if let Some((j, d)) = setup_free {
+        // The deferred-free exit records its free column at ctx+0x2fc; its unit step and the basic response form the ray.
+        let dir = -d.signum();
+        let mut col = vec![0.0; m];
+        for &(i, a) in &p.fcols[j] { col[i] = a * dir; }
+        s.factor.ftran(&mut col);
+        let mut ray = vec![0.0; n + m];
+        ray[j] = dir;
+        for (i, &v) in col.iter().enumerate() { ray[s.head[i]] = -v; }
+        ray.truncate(s.nm);
+        s.ray = Some(ray);
+        s.status = Some(Status::Unbounded);
     }
     loop {
         k += 1;
-        if setup_unbounded {
+        if setup_free.is_some() {
             status = Status::Unbounded;
             break;
         }
