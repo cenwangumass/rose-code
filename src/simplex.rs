@@ -1343,6 +1343,7 @@ impl<'a> Solver<'a> {
 
     fn refactor(&mut self) -> Result<(), SolveError> {
         let mut sw_avg = 0usize;
+        let mut accepted_rows = None;
         if self.opts.faithful_positions {
             if (self.cleanup && !self.cleanup_keep_head) || self.restart {
                 self.basic.sort_unstable();
@@ -1390,6 +1391,11 @@ impl<'a> Solver<'a> {
                 return Err(SolveError::SingularBasis);
             }
             debug_assert_eq!(order.len(), self.basic.len());
+            // Use the reference-accepted pivots for the auxiliary factor too:
+            // its own ordering can reject a basis that this factorization accepted.
+            if self.handoff.is_some_and(|h| !h.quad) {
+                accepted_rows = Some(st.pivots.iter().map(|p| p.0).collect::<Vec<_>>());
+            }
             for (pos, &j) in order.iter().enumerate() {
                 self.pos_of[j] = pos;
             }
@@ -1464,9 +1470,14 @@ impl<'a> Solver<'a> {
         } else {
             1e-11
         };
-        self.factor = Factor::with_floor(self.p.m, &cols, floor).map_err(|_| {
+        self.factor = if let Some(rows) = accepted_rows {
+            Factor::with_pivot_rows(self.p.m, &cols, &rows)
+        } else {
+            Factor::with_floor(self.p.m, &cols, floor)
+        }
+        .map_err(|_| {
             if self.handoff.is_some() {
-                // The numerical factor finds no acceptable pivot for a column that the structural order placed (the reference's `p13` > 0): same restart as above.
+                // The auxiliary factor failed after the structural factorization; signal a restart.
                 PRIMAL_SINGULAR.with(|c| {
                     c.set(Some((
                         self.iters_done,
