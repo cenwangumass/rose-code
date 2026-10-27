@@ -463,8 +463,6 @@ pub(crate) struct Handoff {
     pub retries: usize,
     /// The dual ended with cost shifts in force: the primal's failed scan ends with status -1004 (the dual runs again), not the cost-free fallback.
     pub pert: bool,
-    /// The dual ended after a cost perturbation was applied (`pert` == 3), not merely planned (2).
-    pub pert3: bool,
     /// The relative tolerance of the pivot-pair check (`ctx+0x3a0`): the parameter default 3e-6, 1e-7 once the controller has restored a dropped variable.
     pub pair_tol: f64,
     /// The dual ran in extended precision (the quad pass): the reference's primal keeps using the x87 factor, FTRAN and BTRAN kernels (`ctx+0x28` stays 1).
@@ -953,9 +951,6 @@ struct Solver<'a> {
     rescan3: bool,
     /// The x87 primal's tiny-pivot reject (status -7 of the reference, seed 6610): the entering variable whose pivot raised the threshold takes the pivot when it comes back.
     tiny7: Option<usize>,
-    x87_final: bool,
-    /// A tiny pivot raised the LU threshold in this x87 primal: its end refactorizes (request 4) and ends optimal on a feasible basis (seed 6610; seed 2133 ends without).
-    tiny_raised: bool,
     /// The drift test of the primal update (`ctx+0x380`, `ctx+0x170`): tolerance and count of excesses.
     drift_tol: f64,
     drift_cnt: u32,
@@ -4369,8 +4364,6 @@ fn solve_primal(
         rescan2: false,
         rescan3: false,
         tiny7: None,
-        x87_final: false,
-        tiny_raised: false,
         drift_tol: if handoff.is_some() {
             crate::dual::primal_tol()
         } else {
@@ -4917,16 +4910,6 @@ fn solve_primal(
                 }
                 None if s.handoff.is_some_and(|h| h.quad && h.pert) => {
                     // As above, in phase 2: the x87 primal with cost shifts in force ends with status -1004 at its first failed scan.
-                    if iterations > 0 && s.factor.num_updates() > 0 && !s.x87_final && s.tiny_raised
-                    {
-                        // After pivots the reference refactorizes (request 4) and, the basis being feasible, ends optimal with that factorization's x_B (seed 6610).
-                        s.x87_final = true;
-                        s.work.trig();
-                        s.refactor()?;
-                        if !s.has_infeasible_basic() {
-                            break Status::Optimal;
-                        }
-                    }
                     break Status::Infeasible;
                 }
                 None => {
@@ -5448,7 +5431,6 @@ fn solve_primal(
                     crate::lu_order::raise_threshold(0.125);
                     s.forced = true;
                     s.tiny7 = Some(q);
-                    s.tiny_raised = true;
                 } else {
                     s.excl6[q] = true;
                     s.rej6.push(q);

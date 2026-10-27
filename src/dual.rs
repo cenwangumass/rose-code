@@ -4771,7 +4771,6 @@ fn solve_pass<R: Real>(
                 thr: s.lu_thr,
                 retries: s.retries as usize,
                 pert: s.pert >= 2 && !s.rejected_end,
-                pert3: s.pert == 3,
                 pair_tol: PAIR_TOL.with(|c| c.get()),
                 quad: R::QUAD,
                 iters: (s.it_base + s.iters) as f64,
@@ -4850,7 +4849,6 @@ fn solve_pass<R: Real>(
                     thr: s.lu_thr,
                     retries: s.retries as usize + 1,
                     pert: false,
-                    pert3: false,
                     pair_tol: PAIR_TOL.with(|c| c.get()),
                     quad: R::QUAD,
                     iters: (s.it_base + s.iters) as f64,
@@ -5007,8 +5005,9 @@ fn solve_pass<R: Real>(
                     stale: Some(s.pair),
                     thr: s.lu_thr,
                     retries: s.retries as usize,
-                    pert: s.pert >= 2 && !s.rejected_end,
-                    pert3: s.pert == 3,
+                    // The quad dual driver ends with status 2 or 5 (an unbounded verdict here) clear the cost shifts `ctx+0x338` (`0x24a539`), so the x87 primal runs without them and
+                    // ends with a refactorization and an optimal verdict (seed 6610) instead of the request-9 end that restores the dual (seeds 2133, 2950).
+                    pert: false,
                     pair_tol: PAIR_TOL.with(|c| c.get()),
                     quad: true,
                     iters: (s.it_base + s.iters) as f64,
