@@ -1342,6 +1342,12 @@ impl<'a> Solver<'a> {
             {
                 // After five restarts the driver refuses another one and repairs in place (`0xf5978..0xf5b9a`, as in the dual): the columns without a pivot leave the basis
                 // for the slacks of the rows left without one, and the last one dropped stays out of the pricing until the scan finds nothing else.
+                if crate::dump::on("luin") {
+                    crate::dump::emit(
+                        "luin",
+                        serde_json::json!({"n": self.refactorizations, "cols": self.basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "phase": st.phase, "singular": true}),
+                    );
+                }
                 self.repair_in_place(&st);
                 gate0 = crate::lu_order::gate_get();
                 (order, st, rows) = self.reference_order(fac_no);
@@ -2511,9 +2517,12 @@ impl<'a> Solver<'a> {
                 r.ok()?;
             }
             // After the in-place repair the reference keeps the dropped variable out until the primal has ended (`cf0 = 3`; the controller restores it).
-            if !self.repaired {
-                self.excluded = None;
+            if self.repaired {
+                // The in-place repair keeps the dropped variable out: the run ends here and the controller starts the next one (`compare.py lu`,
+                // fx_midsing_1106: one sorted factorization after the pre-restart one, not two).
+                return None;
             }
+            self.excluded = None;
             // Admitting the variable rebuilds the candidate list (`0x138532`: one pass over all variables) and the row-wise copy
             // (`0x132d88`: `2 nnz(A)`), before the driver restarts.
             let nnz_a: usize = (0..self.p.n).map(|j| self.p.cols[j].len()).sum();
