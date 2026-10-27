@@ -182,6 +182,7 @@ impl SolveOptions {
 pub enum Status {
     Optimal,
     Infeasible,
+    /// The reference's improving-ray exit. Primal feasibility is not established; a contradictory model can also take this exit.
     Unbounded,
     IterationLimit,
     NumericalFailure,
@@ -510,6 +511,7 @@ thread_local! {
 pub struct SolveResult {
     pub status: Status,
     pub objective: f64,
+    /// Returned primal values. For `Unbounded`, these are not a feasible-point certificate.
     pub x: Vec<f64>,
     /// Row duals in the sign convention of the original objective sense.
     pub dual: Vec<f64>,
@@ -520,7 +522,8 @@ pub struct SolveResult {
     pub trace: Vec<TraceEvent>,
     /// Row multipliers `y` proving infeasibility (see `verify::check_farkas`) when the status is `Infeasible`.
     pub farkas: Option<Vec<f64>>,
-    /// Recession direction over the original columns proving unboundedness when the status is `Unbounded`.
+    /// Improving recession direction over the original columns when the status is `Unbounded`.
+    /// A feasible point is additionally required to prove mathematical unboundedness; the reference's exit does not establish one.
     pub ray: Option<Vec<f64>>,
 }
 

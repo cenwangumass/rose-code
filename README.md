@@ -30,9 +30,10 @@ unbounded, 3 for iteration limit and numerical failure, 1 for invalid input, 2 f
 | `primal` | `SolveOptions::default()`: no scaling, `SimplexPricing=1`, no perturbation | `SolveOptions::release()`: scaling, initial `SimplexPricing=0` pricing |
 | `dual` | `SolveOptions::dual()`: no scaling, no perturbation | `SolveOptions::dual_release()`: scaling and cost perturbation `0.0002` (the library defaults) |
 
-The controlled profiles match the reference's decisions on all twelve corpus models; the release profiles match on the ten smaller ones (primal: all
-twelve) and are correct but not decision-identical on the dual's 80BAU3B and FIT2P. Pick `release` for the reference's default behaviour, `controlled`
-(the default) for the best-verified path. The option order on the command line does not matter.
+The original twelve models match the reference's iteration counts in all four simplex configurations and pass the independent checker.
+Decision traces also agree on the expanded 26-model corpus in both profiles. Generated ill-conditioned witnesses still expose arithmetic and
+restart differences; see `reverse-engineer/PLAN.md` and `STATE.md` for current coverage. Pick `release` for the reference's default behaviour,
+`controlled` (the default) to disable scaling and perturbation. The option order on the command line does not matter.
 
 Library: `rose::{mps::parse, solve, SolveOptions, LpModel, Basis, Status}`; `SolveOptions::default()` (primal, controlled profile), `SolveOptions::dual()`,
 `SolveOptions::dual_release()` and `SolveOptions::release()` select the reference profiles recovered so far.
@@ -42,34 +43,24 @@ Library: `rose::{mps::parse, solve, SolveOptions, LpModel, Basis, Status}`; `Sol
 Cold start (a crash basis that is dual feasible by choice of bounds, artificial bounds of 1e30 for variables without the bound they need: the
 reference's phase 1), warm start from any basis, equality, inequality, ranged and free rows, boxed, one-sided, fixed and free variables, both senses,
 objective offsets, bound flipping in the ratio test, dual steepest edge pricing, cost shifts, refactorization by the reference's work-based trigger.
-Statuses: optimal; infeasible with a Farkas certificate (the BTRAN row of the failed ratio test); unbounded with a recession ray and a feasible
-point (the dual is infeasible; a zero-objective dual run proves the primal feasible, otherwise the status is infeasible); iteration limit (finite
-point, not feasible); numerical failure is reported by the primal path only (a singular factorization during the dual raises an error).
+Statuses follow the reference's exits: optimal; infeasible with a Farkas certificate; unbounded with a recession ray; iteration limit;
+and numerical failure. An unbounded exit establishes an improving direction, but does not establish primal feasibility. A contradictory model
+can therefore return `unbounded`, and `x` is not a feasible-point certificate for this status. Rose does not run an extra feasibility solve to
+reclassify the reference's result. `verify::check` remains strict: it requires a feasible point as well as a valid ray when checking unboundedness,
+so the CLI's `diagnostics.check` can report a failure for a faithfully reproduced reference exit.
 
-Verified: all twelve Netlib models (AFIRO, SC50A, BLEND, ADLITTLE, BORE3D, BOEING2, DEGEN2, DEGEN3, PILOT4, PEROLD, 80BAU3B, FIT2P) pass the independent
-exact checker (`reverse-engineer/tools/check_rose.py`) under both dual profiles and reach the reference's objective of the same profile within
-`1e-7 + 1e-8 max(|z|)` (`reverse-engineer/benchmarks/README.md`); the controlled dual decisions equal the reference's on all twelve, the release
-dual decisions on the ten smaller models (`tests/dual_traces.rs` pins AFIRO, SC50A, BLEND, ADLITTLE from versioned fixtures); random-model agreement with
-the primal (`tests/dual_random.rs`), the metamorphic checks, the general LP tests and the fixture corpus (`tests/fixture_corpus.rs`: infeasible,
-unbounded, near-dependent, badly scaled, tied, warm-started and singular-basis fixtures) run under the primal and both dual profiles.
+Verified: all twelve original Netlib models (AFIRO, SC50A, BLEND, ADLITTLE, BORE3D, BOEING2, DEGEN2, DEGEN3, PILOT4, PEROLD, 80BAU3B, FIT2P)
+pass the independent exact checker (`reverse-engineer/tools/check_rose.py`) under both dual profiles, with the reference's iteration counts
+and objectives within `1e-7 + 1e-8 max(|z|)`. The expanded 26-model decision traces agree in both profiles. Certificate and ray fixtures,
+random models, metamorphic checks and supplied-basis tests run in the release test suite.
 
 ## Recovery gaps (dual)
 
-Details and disassembly addresses: `reverse-engineer/specs/dual-simplex.md`, "Unresolved recovery gaps of the dual path".
-
-- Dual-release on 80BAU3B and FIT2P: correct results, but pivot sequences and iteration counts differ from the reference's (5154 against 5185 and
-  8203 against 7183 iterations).
-- Branches no corpus model exercises (free variables in the cost-shift code, the single-candidate and relaxed-fallback paths, the pivot-floor failure,
-  the forced-row stack, the type-0 pricing fallback, the deferred second pass of the free-column pivots, the perturbation branches with
-  `ctx+0x338 < 2`, status -1004): implemented from the disassembly or not at all.
-- Full floating-point state agrees bit for bit only on AFIRO and SC50A (ulp-level differences elsewhere); the work counter is not exact at a few
-  sites, so free-running refactorization schedules reach the reference's iteration counts on the smaller models without being guaranteed to elsewhere.
-- Variables with an infinite lower bound, the reference's `INF_OR_UNBD` status and the zero-objective feasibility step that separates `unbounded`
-  from `infeasible` are rose's own design, checked by the independent checker and the random tests, not by reference traces.
-- A singular factorization in the middle of a dual run is an error, not a recovery (no refactorization with replaced columns).
-- Four singular supplied-basis fixtures and the warm starts from non-optimal bases (AFIRO 14/13, SC50A 33/34, ADLITTLE 65/59 controlled; rose/reference)
-  differ from the reference in iteration count only; results agree. The reference reports 0 to 3 iterations on the tiny unbounded fixtures, rose 0 to 2.
-- Mixed-integer models, presolve and crossover are out of scope.
+The current recovery plan is `reverse-engineer/PLAN.md`; rules and remaining branch details are in
+`reverse-engineer/specs/dual-simplex.md`. Generated ill-conditioned models still differ in extended-precision arithmetic, primal handoffs
+and restart control. Full-state and work-counter comparisons of the largest models cover bounded intervals; equal final iteration counts
+do not establish every internal transition. Several forced-row and rare numerical branches remain without a witness.
+Presolve, crossover, mixed-integer, quadratic and conic models are out of scope.
 
 ## Tests
 
