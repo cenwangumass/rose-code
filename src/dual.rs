@@ -3287,12 +3287,9 @@ impl<'a, R: Real> Dual<'a, R> {
 
     /// The no-leaving-row handler (`0x1aa280`): a refactorization request, optimality or infeasibility.
     fn no_row(&mut self) {
-        if R::QUAD
-            && self.updates != 0
-            && self.pert == 0
-            && self.level != 0
-            && self.artificial_count() != 0
-        {
+        let bad_recomputed =
+            R::QUAD && self.updates != 0 && self.level != 0 && self.artificial_count() != 0;
+        if bad_recomputed {
             // The quad driver's post-iteration function (`0x237750`) with the confirming refactorization pending (`ctx+0x294` = 4) and updates on the
             // factor: it recomputes d from the costs with the updated factor (`0x26ce00` BTRAN, `0x273cd0`) and runs the status count (`0x238c38..0x238d1f`);
             // variables at the bound that d turns wrong, with an infinite range on the far side, end the pass with status -1004 before the refactorization.
