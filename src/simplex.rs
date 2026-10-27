@@ -949,6 +949,8 @@ struct Solver<'a> {
     rescan2: bool,
     /// The scan that found nothing has been repeated on freshly recomputed duals (`0x145520` then the pricing again, seed 2717).
     rescan3: bool,
+    /// The x87 primal's tiny-pivot reject (status -7 of the reference, seed 6610): the entering variable whose pivot raised the threshold takes the pivot when it comes back.
+    tiny7: Option<usize>,
     /// The drift test of the primal update (`ctx+0x380`, `ctx+0x170`): tolerance and count of excesses.
     drift_tol: f64,
     drift_cnt: u32,
@@ -4361,6 +4363,7 @@ fn solve_primal(
         rej6: Vec::new(),
         rescan2: false,
         rescan3: false,
+        tiny7: None,
         drift_tol: if handoff.is_some() {
             crate::dual::primal_tol()
         } else {
@@ -5420,10 +5423,14 @@ fn solve_primal(
             // A pivot at or below the scan tolerance `ctx+0x398` (3e-8) after the ratio test (`0x1436dd..0x1437e8`): below a factorization threshold of 0.125 the threshold
             // rises to it and the factorization is redone (request 6); otherwise the entering variable gets status -6 and the pricing goes on without an iteration
             // (fx_midsing_1106: pivots of 1.93e-8 rejected, 3.86e-8 taken).
-            if entries[k].1.abs() <= 3e-8 {
-                if crate::lu_order::threshold() < 0.125 {
+            let quad_retry = s.handoff.as_ref().is_some_and(|h| h.quad) && s.tiny7 == Some(q);
+            if entries[k].1.abs() <= 3e-8 && !quad_retry {
+                if crate::lu_order::threshold() < 0.125
+                    || s.handoff.as_ref().is_some_and(|h| h.quad)
+                {
                     crate::lu_order::raise_threshold(0.125);
                     s.forced = true;
+                    s.tiny7 = Some(q);
                 } else {
                     s.excl6[q] = true;
                     s.rej6.push(q);
@@ -5436,6 +5443,7 @@ fn solve_primal(
         }
         s.rescan2 = false;
         s.rescan3 = false;
+        s.tiny7 = None;
         // A phase 1 step may be negative (a basic variable inside its tolerance leaves from the wrong side of its bound).
         iterations += 1;
         s.iters_done = iterations;
