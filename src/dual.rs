@@ -1660,8 +1660,9 @@ impl<'a, R: Real> Dual<'a, R> {
             }
         }
         // Entries that cancelled to (nearly) nothing are dropped (the smallest captured entry is 1.04e-13).
-        // A single entry in rho takes the scaled-copy path of `0x134d90` (`0x1360ac`), which has no tolerance test (fx_e2_r25 call 1: entries of 6e-14 stay).
-        if rho.len() != 1 {
+        // A single entry in rho takes the scaled-copy path of `0x134d90` (`0x1360ac`), which has no tolerance test for a scale of 1 or more (fx_e2_r25 call 1: entries of 6e-14 stay).
+        // The copy keeps its entries only for a scale of magnitude 1 or more; below 1 the same tolerance filter as the general path follows (`0x136629`: `|scale| < 1.0`; seed 50165 call 5: rho -5e-5, a product of 1.25e-17 is dropped).
+        if rho.len() != 1 || rho[0].1.abs() < R::ONE {
             order.retain(|&j| acc[j].abs() > R::c(DROP_TOL));
         }
         let nst = order.len();
