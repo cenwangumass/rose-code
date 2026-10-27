@@ -1079,10 +1079,13 @@ impl<'a, R: Real> Dual<'a, R> {
         for (i, v) in out {
             xb[i] = v;
         }
-        let mut res = r.clone();
+        // The reference forms B*x_B from zero first, then subtracts it from the
+        // right-hand side (`0x115d60`, `0xc1480`); subtracting each term from
+        // the right-hand side directly can change the residual and its gate.
+        let mut product = vec![R::ZERO; p.m];
         for (pos, &j) in self.head.iter().enumerate() {
             for &(i, a) in &p.cols[j] {
-                res[i] -= R::c(a) * xb[pos];
+                product[i] += R::c(a) * xb[pos];
             }
         }
         // `0xc10ab..0xc1129`, `0xc1480..0xc1517`: R = max(1e-9, max|rhs|), the largest |x_B| and the residual of B x_B against the rhs, both relative to R;
@@ -1090,7 +1093,18 @@ impl<'a, R: Real> Dual<'a, R> {
         let rmax = r.iter().fold(R::c(1e-9), |a, v| a.max(v.abs()));
         let xmax = xb.iter().fold(R::ZERO, |a, v| a.max(v.abs()));
         let e2 = if self.nref() % 5 == 4 || matches!(req, 4 | 6 | 8) {
-            res.iter().fold(R::ZERO, |a, v| a.max(v.abs())) / rmax
+            let residual = r
+                .iter()
+                .zip(&product)
+                .fold(R::ZERO, |a, (b, v)| a.max((*b - *v).abs()));
+            if self.level == 0 && residual > R::c(primal_tol()) {
+                self.work.add(
+                    0xc177e,
+                    4.0 * p.m as f64 + 2.0 * cols as f64,
+                    crate::work::CTX,
+                );
+            }
+            residual / rmax
         } else {
             R::ZERO
         };
