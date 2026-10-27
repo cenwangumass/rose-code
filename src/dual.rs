@@ -3983,6 +3983,15 @@ impl<'a, R: Real> Dual<'a, R> {
         };
     }
 
+    #[cfg(test)]
+    fn lowgate_record(&self, tag: &'static str, req: u32) {
+        LOWGATE_TEST.with(|c| {
+            if let Some(v) = c.borrow_mut().as_mut() {
+                v.push((tag, self.iters, req, self.lu_thr, self.head.clone()));
+            }
+        });
+    }
+
     /// The post-iteration passes `0xf6c82..0xf6d0a`: factor update or refactorization, the dual update, the primal and weight update.
     fn post(&mut self, pv: Option<&Pivot<R>>, schedule_due: bool) -> Result<(), SolveError> {
         self.post_inner(pv, schedule_due)?;
@@ -4057,6 +4066,10 @@ impl<'a, R: Real> Dual<'a, R> {
             if self.request == 0 {
                 self.request = 10;
             }
+            #[cfg(test)]
+            if self.iters == 15 && self.request == 4 {
+                self.lowgate_record("postfactor", self.request);
+            }
             self.recompute_d();
             self.shift_wrong_d();
             let level_before = self.level;
@@ -4090,9 +4103,21 @@ impl<'a, R: Real> Dual<'a, R> {
             );
             self.snapshot_recomputed();
             self.flags_work();
+            #[cfg(test)]
+            if !R::QUAD && self.iters == 15 && req == 4 && self.status.is_none()
+                && level_before == 0 && self.tiny_infeasibility()
+            {
+                LOWGATE_TEST.with(|c| {
+                    if let Some(v) = c.borrow_mut().as_mut() {
+                        v.push(("eligible", self.iters, req, self.lu_thr, self.head.clone()));
+                        if v.iter().filter(|x| x.0 == "eligible").count() == 1 {
+                            self.lu_thr = 0.03125;
+                        }
+                    }
+                });
+            }
             if self.status.is_none()
                 && if R::QUAD { self.level == 0 } else { level_before == 0 }
-                && self.lu_thr >= 0.5
                 && (req == 4 || if R::QUAD {
                     crate::simplex::QUAD_PRIMALS.with(|c| c.get()) >= 10
                 } else {
@@ -4100,11 +4125,22 @@ impl<'a, R: Real> Dual<'a, R> {
                 })
                 && self.tiny_infeasibility()
             {
-                // A confirming recompute, or one after ten handoffs, accepts residual-scale
-                // infeasibilities as feasible (`0xc1fe3..0xc21f6`, quad `0x21a315..0x21a4b6`).
-                self.flags.iter_mut().for_each(|f| *f = 2);
-                self.list.clear();
-                self.status = Some(Status::Optimal);
+                // At a low double LU threshold the recompute returns the pending request
+                // to the driver for another factorization before accepting infeasibilities.
+                if !R::QUAD && self.lu_thr < 0.5 {
+                    self.lu_thr = (4.0 * self.lu_thr).min(0.5);
+                    self.request = req;
+                    #[cfg(test)]
+                    self.lowgate_record("after", self.request);
+                    return self.post_inner(None, false);
+                }
+                if self.lu_thr >= 0.5 {
+                    self.flags.iter_mut().for_each(|f| *f = 2);
+                    self.list.clear();
+                    self.status = Some(Status::Optimal);
+                    #[cfg(test)]
+                    self.lowgate_record("optimal", 0);
+                }
             }
             // The recompute pass `0xbf5b0` (called from `0xf6d0f`) runs the no-leaving-row handler itself when the pricing is in the list-walk mode
             // (`P+0x40 == 0`) and the list is empty (`P+0x3c == 0`, `0xbffbe`): no pricing call follows (RECIPE call 46).
@@ -6084,4 +6120,38 @@ fn quad_working_objective_captured_stores() {
     for (index, (actual, expected)) in actual.iter().zip(expected).enumerate() {
         assert_eq!(actual.to_bits(), f64::to_bits(expected), "store {index}");
     }
+}
+
+#[cfg(test)]
+thread_local! {
+    static LOWGATE_TEST: std::cell::RefCell<Option<Vec<(&'static str, usize, u32, f64, Vec<usize>)>>> = const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(test)]
+#[test]
+fn lowgate_counterfactual_refactor_replay() {
+    let model = crate::mps::parse(include_str!("../tests/fixtures/bh50028.mps")).unwrap();
+    let mut opts = crate::SolveOptions::dual();
+    opts.max_iterations = 30;
+    opts.refactor_schedule = Some(vec![3, 8, 12]);
+    LOWGATE_TEST.with(|c| *c.borrow_mut() = Some(Vec::new()));
+    let result = crate::solve(&model, None, &opts).unwrap();
+    let records = LOWGATE_TEST.with(|c| c.borrow_mut().take().unwrap());
+    // Reference gdb_dual_lowgate_head_replay, CF=1: the intervention changes
+    // only the LU threshold at the first eligible gate, after 16 matching calls.
+    let head = vec![20, 19, 18, 26, 2, 6, 13, 17, 12];
+    let expected = [
+        ("postfactor", 15, 4, 0.5),
+        ("eligible", 15, 4, 0.5),
+        ("after", 15, 4, 0.125),
+        ("postfactor", 15, 4, 0.125),
+        ("eligible", 15, 4, 0.5),
+        ("optimal", 15, 0, 0.5),
+    ];
+    assert_eq!(records.len(), expected.len());
+    for ((tag, it, req, thr, actual_head), expected) in records.iter().zip(expected) {
+        assert_eq!((*tag, *it, *req, *thr), expected);
+        assert_eq!(*actual_head, head);
+    }
+    assert_eq!(result.status, Status::Optimal);
 }
