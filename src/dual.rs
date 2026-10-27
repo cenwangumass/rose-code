@@ -209,7 +209,6 @@ struct Dual<'a, R: Real = f64> {
     rejected_end: bool,
     /// The pass ended at the request-4 refactorization with variables at an artificial bound (status -1004): the primal decides the outcome.
     art_exit: bool,
-    q4_shifted: bool,
     worst: f64,
     worst_row: i64,
     /// The retry of the worst rejected row (`ctx+0x420` negated, `0x21cf50` / `0xc4fe0`): the ratio test rejects nothing.
@@ -3524,9 +3523,6 @@ impl<'a, R: Real> Dual<'a, R> {
                 None
             };
             if let Some(s) = shift {
-                if self.request == 4 {
-                    self.q4_shifted = true;
-                }
                 if R::QUAD {
                     // `0x239ff7..0x23a02e`: the shift array takes `-d` (lower bound, free) or `+d` (upper bound) in long double.
                     self.add_shift_q(j, s);
@@ -4464,7 +4460,6 @@ fn solve_pass<R: Real>(
         old_rej: 0,
         rejected_end: false,
         art_exit: false,
-        q4_shifted: false,
         worst: 0.0,
         worst_row: -1,
         retry: false,
@@ -4829,15 +4824,12 @@ fn solve_pass<R: Real>(
         if let Some(stt) = s.status {
             status = stt;
             if R::QUAD
-                && stt == Status::Optimal
+                && matches!(stt, Status::Optimal | Status::Unbounded)
                 && s.pert != 0
                 && !NO_ART_EXIT.with(|c| c.get())
-                && (s.level != 0 || s.q4_shifted || s.true_cost_infeasible())
             {
                 // The quad driver's end (`0x24a4f6..0x24a548`): a final status 2 (dual optimal) or 5 with the cost shifts in force (`ctx+0x338` != 0) clears them and returns
                 // status -1004; the controller hands over to the x87 primal (seeds 5247, 6972, 6610, 8179). It replaces the double dual's exit at the request-4 refactor.
-                // The reference exits for every final status 2 with `ctx+0x338` != 0 (`c35c` up to 10); rose keeps the exit to the cases where the true costs make a d wrong-signed or the
-                // pass shifted (the x87 primal makes pivots there), the others end in the clean-up pass whose values equal the x87 primal's without pivots (seeds 4821, 4874, 7358).
                 s.art_exit = true;
                 s.dual_unbounded();
                 status = Status::Unbounded;
@@ -4893,7 +4885,9 @@ fn solve_pass<R: Real>(
     if status == Status::Infeasible && s.pert != 0 && PERT_RERUNS.with(|c| c.get()) >= 10 {
         status = Status::NumericalFailure;
     }
-    if (restored.is_some() && matches!(status, Status::Optimal | Status::Infeasible))
+    if (restored.is_some()
+        && (matches!(status, Status::Optimal | Status::Infeasible)
+            || (R::QUAD && s.art_exit && status == Status::Unbounded)))
         || (status == Status::Infeasible && s.rejected_end)
     {
         if restored.is_some() {
@@ -4935,13 +4929,13 @@ fn solve_pass<R: Real>(
                 stale: Some(s.pair),
                 thr: s.lu_thr,
                 retries: s.retries as usize,
-                pert: s.pert >= 2 && !s.rejected_end,
+                pert: s.pert >= 2 && !s.rejected_end && !s.art_exit,
                 pair_tol: PAIR_TOL.with(|c| c.get()),
                 quad: R::QUAD,
                 iters: (s.it_base + s.iters) as f64,
                 snap: (s.it_base + s.stall_it as usize) as f64,
                 c178: C178.with(|c| c.get()),
-                excl: if R::QUAD && s.pert == 0 {
+                excl: if R::QUAD && (s.pert == 0 || s.art_exit) {
                     s.repaired
                 } else {
                     None
@@ -4956,7 +4950,7 @@ fn solve_pass<R: Real>(
             c.set(c.get() + 1);
             c.get()
         });
-        if !(R::QUAD && s.pert != 0 && !s.rejected_end) {
+        if !(R::QUAD && s.pert != 0 && !s.rejected_end && !s.art_exit) {
             C35C.with(|c| c.set(c.get() + 1));
         }
         let c35c = if R::QUAD {
@@ -5202,6 +5196,21 @@ fn solve_pass<R: Real>(
             });
         }
         let prres = crate::simplex::solve(model, Some(&from_dual), &popts).ok();
+        if R::QUAD && s.art_exit {
+            if let Some(pr) = prres
+                .as_ref()
+                .filter(|pr| pr.status == Status::Infeasible && pr.farkas.is_some())
+            {
+                // A completed phase-1 infeasibility verdict ends the controller;
+                // a failed scan requesting a restart resumes below. The reference's
+                // raw Farkas vector need not verify on ill-conditioned models.
+                let mut r = pr.clone();
+                r.iterations += s.iters;
+                r.refactorizations += s.refactorizations;
+                FARKAS_LEAVE.with(|c| c.set(None));
+                return Ok(r);
+            }
+        }
         if R::QUAD && s.art_exit {
             if let Some(pr) = prres
                 .as_ref()

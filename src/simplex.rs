@@ -5067,6 +5067,18 @@ fn solve_primal(
                 {
                     continue;
                 }
+                None if s.handoff.is_some_and(|h| h.quad)
+                    && s.costfree
+                    && s.p3c0 <= 1e-9
+                    && (s.rescan2 || s.factor.num_updates() == 0) =>
+                {
+                    // After a recomputed scan fails at the pure-penalty tolerance,
+                    // the x87 driver returns infeasible even with factor updates
+                    // (0x281cd5..0x281d2e). Its Farkas readout refactors first.
+                    s.refactor_for_farkas()?;
+                    farkas = Some(s.farkas_dual());
+                    break Status::Infeasible;
+                }
                 None if s.handoff.map_or(PLAIN_FAILED_SCAN, |h| !h.pert)
                     && (!s.costfree || s.factor.num_updates() != 0 || s.p3c0 > 1e-9) =>
                 {
