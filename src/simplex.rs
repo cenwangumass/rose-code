@@ -3292,6 +3292,7 @@ impl<'a> Solver<'a> {
         let tol = self.opts.feasibility_tol;
         let mut pivots = 0;
         let mut head = self.basic.clone();
+        if std::env::var("CLBASIS").is_ok() { eprintln!("CLB {}", serde_json::json!({"basic": self.basic, "at_upper": self.at_upper})); }
         let count = self.refactorizations;
         while pivots < 10 * p.m {
             let sg = self.sig();

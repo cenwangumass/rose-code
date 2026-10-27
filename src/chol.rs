@@ -42,6 +42,9 @@ pub struct Plan {
     /// `SYM+0x80` = max(480, n, widest supernode squared) (`0x2e8680`): the workspace size that bounds the row blocks of a child update.
     pub sym80: usize,
     pub n: usize,
+    /// `SYM+0xc0` (replaced pivots): the factor is computed by the single-precision routine `0x33c710`. Set here when the symbolic flops exceed 1e10 (the one
+    /// captured case, `fx_bar_dense3400`; the exact rule is not decoded).
+    pub single: bool,
 }
 
 impl Plan {
@@ -100,7 +103,12 @@ impl Plan {
         }
         let maxw = sns.iter().map(|s| s.w).max().unwrap_or(0);
         let sym80 = 480.max(n).max(maxw * maxw);
-        Plan { sns, sym80, n }
+        Plan {
+            sns,
+            sym80,
+            n,
+            single: sym.ops > 1e10,
+        }
     }
 }
 
@@ -130,14 +138,43 @@ fn model_rows_all(f: &StdForm) -> Vec<Vec<(usize, usize)>> {
     rows
 }
 
+thread_local! {
+    /// The single-precision factor (`0x33c710`, replaced pivots): every stored entry of the front is a float; arithmetic is double on the promoted floats.
+    static SINGLE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+struct SingleGuard(bool);
+
+impl SingleGuard {
+    fn new(on: bool) -> SingleGuard {
+        SingleGuard(SINGLE.with(|c| c.replace(on)))
+    }
+}
+
+impl Drop for SingleGuard {
+    fn drop(&mut self) {
+        SINGLE.with(|c| c.set(self.0));
+    }
+}
+
+/// Round a stored value to float when the single-precision factor is being computed.
+#[inline(always)]
+fn rf(x: f64) -> f64 {
+    if SINGLE.with(|c| c.get()) {
+        x as f32 as f64
+    } else {
+        x
+    }
+}
+
 #[inline(always)]
 fn add_m(mm: &mut [f64], r: &mut [f64], w: usize, a: usize, mq: usize, v: f64) {
     if mq < w {
         let k = mq * w + a;
-        mm[k] = v + mm[k];
+        mm[k] = rf(v + mm[k]);
     } else {
         let k = (mq - w) * w + a;
-        r[k] = v + r[k];
+        r[k] = rf(v + r[k]);
     }
 }
 
@@ -180,9 +217,9 @@ pub fn assemble(
                 let (sv3, sv1) = ((sj * sj) * dd, sj * (dd * sj));
                 while j + 2 < l24 {
                     let (a, b, cc) = (mp[idx[j]], mp[idx[j + 1]], mp[idx[j + 2]]);
-                    mm[a * w + a] = sv3 + mm[a * w + a];
-                    mm[b * w + a] = sv3 + mm[b * w + a];
-                    mm[b * w + b] = sv3 + mm[b * w + b];
+                    mm[a * w + a] = rf(sv3 + mm[a * w + a]);
+                    mm[b * w + a] = rf(sv3 + mm[b * w + a]);
+                    mm[b * w + b] = rf(sv3 + mm[b * w + b]);
                     for q in j + 2..l24 {
                         let mq = mp[idx[q]];
                         add_m(&mut mm, &mut r, w, a, mq, sv3);
@@ -201,7 +238,7 @@ pub fn assemble(
                 }
                 while j < l24 {
                     let a = mp[idx[j]];
-                    mm[a * w + a] = sv1 + mm[a * w + a];
+                    mm[a * w + a] = rf(sv1 + mm[a * w + a]);
                     for q in j + 1..l24 {
                         add_m(&mut mm, &mut r, w, a, mp[idx[q]], sv1);
                     }
@@ -219,9 +256,9 @@ pub fn assemble(
                 let (a, b, cc) = (mp[idx[j]], mp[idx[j + 1]], mp[idx[j + 2]]);
                 let (a0, a1, a2) = (val[j], val[j + 1], val[j + 2]);
                 let (t0, t1, t2) = (a0 * dd, a1 * dd, a2 * dd);
-                mm[a * w + a] = a0 * t0 + mm[a * w + a];
-                mm[b * w + a] = a1 * t0 + mm[b * w + a];
-                mm[b * w + b] = a1 * t1 + mm[b * w + b];
+                mm[a * w + a] = rf(a0 * t0 + mm[a * w + a]);
+                mm[b * w + a] = rf(a1 * t0 + mm[b * w + a]);
+                mm[b * w + b] = rf(a1 * t1 + mm[b * w + b]);
                 for q in j + 2..l24 {
                     let (mq, v) = (mp[idx[q]], val[q]);
                     add_m(&mut mm, &mut r, w, a, mq, t0 * v);
@@ -241,7 +278,7 @@ pub fn assemble(
             while j < l24 {
                 let (a, v0) = (mp[idx[j]], val[j]);
                 let t = dd * v0;
-                mm[a * w + a] = v0 * t + mm[a * w + a];
+                mm[a * w + a] = rf(v0 * t + mm[a * w + a]);
                 for q in j + 1..l24 {
                     add_m(&mut mm, &mut r, w, a, mp[idx[q]], val[q] * t);
                 }
@@ -256,7 +293,7 @@ pub fn assemble(
         }
         if f.sense[i] != b'=' {
             let k = (i - col) * w + (i - col);
-            mm[k] = mm[k] + d[n2 + i];
+            mm[k] = rf(mm[k] + d[n2 + i]);
         }
     }
     (mm, r)
@@ -309,16 +346,16 @@ pub fn assemble_generic(
         }
         for &m in &touched {
             if m < w {
-                mm[m * w + a] = acc[m];
+                mm[m * w + a] = rf(acc[m]);
             } else {
-                r[(m - w) * w + a] = acc[m];
+                r[(m - w) * w + a] = rf(acc[m]);
             }
             acc[m] = 0.0;
             seen[m] = false;
         }
         touched.clear();
         if f.sense[i] != b'=' {
-            mm[a * w + a] = mm[a * w + a] + d[n2 + i];
+            mm[a * w + a] = rf(mm[a * w + a] + d[n2 + i]);
         }
     }
     (mm, r)
@@ -591,6 +628,56 @@ fn nocopy_n_blocks(n: usize) -> Vec<usize> {
     out
 }
 
+/// SGEMM('T','N', alpha = 1, beta = 1) (`0xa009a0`), measured for k <= 4: rows in complete blocks of 16 (`m - m % 16`) run an fma chain from the first product,
+/// `s = fma(a_k b_k, s)`; the remaining rows run two accumulators, even and odd k (`s0 = p0`, `s0 = fma(a_2 b_2, s0)`, `s1 = p1`, `s1 = fma(a_3 b_3, s1)`), `s0 + s1`.
+/// Either result is added to C (rounded to float). Larger k (the 192/193/240-wide children) is not modelled: sequential float products and sums.
+fn sgemm_t_n(
+    m: usize,
+    n: usize,
+    k: usize,
+    a: &[f64],
+    lda: usize,
+    b: &[f64],
+    ldb: usize,
+    c: &mut [f64],
+    ldc: usize,
+) {
+    let main = m - m % 16;
+    for j in 0..n {
+        for i in 0..m {
+            let av = |q: usize| a[i * lda + q] as f32;
+            let bv = |q: usize| b[j * ldb + q] as f32;
+            let s = if k <= 4 {
+                if i < main {
+                    let mut s = av(0) * bv(0);
+                    for q in 1..k {
+                        s = av(q).mul_add(bv(q), s);
+                    }
+                    s
+                } else {
+                    let mut s0 = av(0) * bv(0);
+                    let mut s1 = if k > 1 { av(1) * bv(1) } else { 0.0 };
+                    for q in 2..k {
+                        if q % 2 == 0 {
+                            s0 = av(q).mul_add(bv(q), s0);
+                        } else {
+                            s1 = av(q).mul_add(bv(q), s1);
+                        }
+                    }
+                    s0 + s1
+                }
+            } else {
+                let mut s = 0.0f32;
+                for q in 0..k {
+                    s = s + av(q) * bv(q);
+                }
+                s
+            };
+            c[j * ldc + i] = (c[j * ldc + i] as f32 + s) as f64;
+        }
+    }
+}
+
 /// DGEMM('T','N', m, n, k, alpha = 1, A, lda, B, ldb, beta = 1, C, ldc): `C(i,j) += sum_k A(k,i) B(k,j)`, Fortran column-major (`A(k,i) = a[i lda + k]`).
 /// `m == 1` is DGEMV('T') of `B` against the row, `n == 1` of `A` against the column; everything else goes to `gemm_path2` (copy-based
 /// 12-row tile kernel or the nocopy TN kernel per column block).
@@ -605,6 +692,10 @@ fn dgemm_t_n(
     c: &mut [f64],
     ldc: usize,
 ) {
+    if SINGLE.with(|c| c.get()) {
+        sgemm_t_n(m, n, k, a, lda, b, ldb, c, ldc);
+        return;
+    }
     if m == 1 {
         dgemv_t(b, ldb, k, n, &a[..k], 1.0, c, ldc);
         return;
@@ -897,8 +988,43 @@ fn dot_update(mm: &[f64], w: usize, i: usize, j: usize, temp: &[f64]) -> f64 {
     t
 }
 
+/// Single-precision `dot_update` (`0x33cd..0x33d095`): float products and sums. `j < 8`: sequential. Else two four-lane accumulators over blocks of 8 (the first starts
+/// with `M[i][j]` in lane 0), `x1 += x0`, `(x1[0] + x1[2], x1[1] + x1[3])`, their sum, then the tail sequentially.
+fn dot_update32(mm: &[f64], w: usize, i: usize, j: usize, temp: &[f64]) -> f64 {
+    let l = |k: usize| mm[i * w + k] as f32;
+    let t = |k: usize| temp[k] as f32;
+    let acc0 = mm[i * w + j] as f32;
+    if j < 8 {
+        let mut a = acc0;
+        for k in 0..j {
+            a = a + l(k) * t(k);
+        }
+        return a as f64;
+    }
+    let end = j - (j & 7);
+    let (mut x1, mut x0) = ([acc0, 0.0f32, 0.0, 0.0], [0.0f32; 4]);
+    let mut k = 0;
+    while k < end {
+        for q in 0..4 {
+            x1[q] = x1[q] + l(k + q) * t(k + q);
+            x0[q] = x0[q] + l(k + 4 + q) * t(k + 4 + q);
+        }
+        k += 8;
+    }
+    for q in 0..4 {
+        x1[q] = x1[q] + x0[q];
+    }
+    let y = [x1[0] + x1[2], x1[1] + x1[3]];
+    let mut r = y[0] + y[1];
+    for k in end..j {
+        r = r + l(k) * t(k);
+    }
+    r as f64
+}
+
 /// The pivot test of `0x2f1940` (normal mode): `|orig| 1e-16 < |d|` keeps `d` with reciprocal `1 / d`, else `d = 0` and reciprocal 0.
 fn pivot(dj: f64, orig: f64, reg: Option<(usize, usize)>) -> (f64, f64) {
+    let dj = rf(dj);
     match reg {
         None => {
             if orig.abs() * 1e-16 < dj.abs() {
@@ -935,7 +1061,11 @@ fn dense_ldl(
     for j in 0..w {
         for i in j..w {
             if j > 0 {
-                mm[i * w + j] = dot_update(mm, w, i, j, &temp);
+                mm[i * w + j] = if SINGLE.with(|c| c.get()) {
+                    dot_update32(mm, w, i, j, &temp)
+                } else {
+                    dot_update(mm, w, i, j, &temp)
+                };
             }
             if i == j {
                 let (dj, rj) = pivot(mm[j * w + j], orig[j], reg.map(|(c0, n1)| (c0 + j, n1)));
@@ -943,12 +1073,12 @@ fn dense_ldl(
                 rcp[j] = rj;
                 mm[j * w + j] = dj;
             } else {
-                mm[i * w + j] = mm[i * w + j] * rcp[j];
+                mm[i * w + j] = rf(mm[i * w + j] * rcp[j]);
             }
         }
         if j + 1 < w {
             for k in 0..=j {
-                temp[k] = (-mm[(j + 1) * w + k]) * d[k];
+                temp[k] = rf((-mm[(j + 1) * w + k]) * d[k]);
             }
         }
     }
@@ -993,17 +1123,35 @@ fn factor_block(
     if rows != 0 {
         if dense {
             for rr in 0..rows {
-                let x = dtrsm_llu_col(mm, w, &r[rr * w..(rr + 1) * w], rr, rows);
+                let x = if SINGLE.with(|c| c.get()) {
+                    strsm_seq(mm, w, &r[rr * w..(rr + 1) * w])
+                } else {
+                    dtrsm_llu_col(mm, w, &r[rr * w..(rr + 1) * w], rr, rows)
+                };
                 r[rr * w..(rr + 1) * w].copy_from_slice(&x);
             }
         }
         for rr in 0..rows {
             for k in 0..w {
-                r[rr * w + k] = r[rr * w + k] * if rcp[k] != 0.0 { rcp[k] } else { 1.0 };
+                r[rr * w + k] = rf(r[rr * w + k] * if rcp[k] != 0.0 { rf(rcp[k]) } else { 1.0 });
             }
         }
     }
     (d, rcp)
+}
+
+/// STRSM('L','U','T','U') (`0xa00350`) of one right-hand side, measured for `w` = 2 and 4: sequential substitution with every product and difference rounded to float,
+/// `x_i = ((b_i - L_i0 x_0) - L_i1 x_1) - ...`.
+fn strsm_seq(l: &[f64], w: usize, b: &[f64]) -> Vec<f64> {
+    let mut x = vec![0.0f32; w];
+    for i in 0..w {
+        let mut v = b[i] as f32;
+        for j in 0..i {
+            v = v - (l[i * w + j] as f32) * x[j];
+        }
+        x[i] = v;
+    }
+    x.iter().map(|&v| v as f64).collect()
 }
 
 fn pack(mm: &[f64], r: &[f64], w: usize) -> Vec<f64> {
@@ -1044,10 +1192,10 @@ fn child_update_w1(
             for u in t..cc {
                 if u < e {
                     let k = mpr[u] * wp + mpr[t];
-                    mpm[k] = l[u] * f + mpm[k];
+                    mpm[k] = rf(l[u] * f + mpm[k]);
                 } else {
                     let k = (mpr[u] - wp) * wp + mpr[t];
-                    rp[k] = f * l[u] + rp[k];
+                    rp[k] = rf(f * l[u] + rp[k]);
                 }
             }
         }
@@ -1058,12 +1206,12 @@ fn child_update_w1(
         if t < e {
             for u in cnt..=t {
                 let k = mpr[t] * wp + mpr[u];
-                mpm[k] = l[u] * f + mpm[k];
+                mpm[k] = rf(l[u] * f + mpm[k]);
             }
         } else {
             for u in cnt..e {
                 let k = (mpr[t] - wp) * wp + mpr[u];
-                rp[k] = f * l[u] + rp[k];
+                rp[k] = rf(f * l[u] + rp[k]);
             }
         }
     }
@@ -1101,7 +1249,7 @@ fn child_update(
     for t in cnt..e {
         let lr = lrow(t);
         for k in 0..wc {
-            temp.push((-lr[k]) * d[k]);
+            temp.push(rf((-lr[k]) * d[k]));
         }
     }
     let first = mp[rows_c[cnt]];
@@ -1124,17 +1272,19 @@ fn child_update(
             dgemm_t_n(mmr, nb, wc, &temp, wc, &b, wc, &mut cm, mmr);
             for jj in 0..nb {
                 for ii in 0..mmr {
-                    mpm[(first + j0 + jj) * wp + first + ii] = cm[jj * mmr + ii];
+                    mpm[(first + j0 + jj) * wp + first + ii] = rf(cm[jj * mmr + ii]);
                 }
             }
         } else {
             let mut cn = vec![0.0; m * nb];
-            dgemm_t_n(m, nb, wc, &temp, wc, &b, wc, &mut cn, m);
+            // Single precision: the call covers the rows `0..j0 + nb` only (the float code does not compute the part above the diagonal block).
+            let mr = if SINGLE.with(|c| c.get()) { j0 + nb } else { m };
+            dgemm_t_n(mr, nb, wc, &temp, wc, &b, wc, &mut cn, m);
             for jj in 0..nb {
                 let t = j0 + jj;
                 for u in 0..=t {
                     let (r, cl) = (mp[rows_c[cnt + t]], mp[rows_c[cnt + u]]);
-                    mpm[r * wp + cl] = mpm[r * wp + cl] + cn[jj * m + u];
+                    mpm[r * wp + cl] = rf(mpm[r * wp + cl] + cn[jj * m + u]);
                 }
             }
         }
@@ -1167,7 +1317,7 @@ fn child_update(
             dgemm_t_n(m, nr, wc, &temp, wc, &b, wc, &mut cm, m);
             for jj in 0..nr {
                 for ii in 0..m {
-                    rp[(r_first - wp + jj) * wp + first + ii] = cm[jj * m + ii];
+                    rp[(r_first - wp + jj) * wp + first + ii] = rf(cm[jj * m + ii]);
                 }
             }
         } else {
@@ -1182,7 +1332,7 @@ fn child_update(
                 let r = mp[rows_c[t0 + jj]];
                 for u in 0..m {
                     let cl = mp[rows_c[cnt + u]];
-                    rp[(r - wp) * wp + cl] = rp[(r - wp) * wp + cl] + cn[jj * m + u];
+                    rp[(r - wp) * wp + cl] = rf(rp[(r - wp) * wp + cl] + cn[jj * m + u]);
                 }
             }
         }
@@ -1218,6 +1368,7 @@ pub fn numeric_factor(
     mut on_sn: Option<&mut dyn FnMut(usize, &Supernode, &[f64], &[f64])>,
 ) -> Factor {
     let m = f.m;
+    let _guard = SingleGuard::new(plan.single);
     // Dense columns: the factor has `nt = m + nd` nodes (the dense nodes last), pivots regularise (`SYM+0x110`, `Q+0x218 > 0`), and every sparse supernode is
     // assembled by the generic routine; the dense supernode starts from the diagonal `-1/D[j]` of its columns, and a row's dense-node entries are the raw
     // coefficients `A[i][j]` (no `D`). The diagonal of a dense node is `-zx_j` (`z/x + v/u` of the iterate; the starting point has no `zx`: `-1/D_j`, as for a
@@ -1271,6 +1422,33 @@ pub fn numeric_factor(
             }
         }
         let orig: Vec<f64> = (0..w).map(|i| mm[i * w + i]).collect();
+        let front_col = if dump::on("barrier_front") {
+            std::env::var("FRONT_COL")
+                .ok()
+                .and_then(|v| v.parse::<usize>().ok())
+        } else {
+            None
+        };
+        let front_ent: Vec<(usize, usize)> = std::env::var("FRONT_ENT")
+            .unwrap_or_else(|_| "0:0,1:0,1:1".into())
+            .split(',')
+            .filter_map(|t| t.split_once(':'))
+            .filter_map(|(a, b)| Some((a.parse().ok()?, b.parse().ok()?)))
+            .collect();
+        let front_rec = |tag: &str, child: i64, mm: &[f64]| {
+            let v: Vec<String> = front_ent
+                .iter()
+                .map(|&(i, j)| format!("{:08x}", (mm[i * w + j] as f32).to_bits()))
+                .collect();
+            dump::emit_tag(
+                "barrier_front",
+                tag,
+                json!({"col": col, "child": child, "m": v}),
+            );
+        };
+        if front_col == Some(col) {
+            front_rec("ASM", -1, &mm);
+        }
         for &ci in &s.upd {
             let cs = &plan.sns[ci];
             let ch = Child {
@@ -1281,6 +1459,9 @@ pub fn numeric_factor(
                 d: &dvec[ci],
             };
             child_update(&ch, w, col, plan.sym80, &mp, &mut mm, &mut r);
+            if front_col == Some(col) {
+                front_rec("UPD", ci as i64, &mm);
+            }
         }
         let (dd, rc) = factor_block(
             &mut mm,
