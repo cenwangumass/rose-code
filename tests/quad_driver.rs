@@ -1,6 +1,13 @@
 use rose::{mps, solve, verify, SolveOptions, Status};
 
 #[test]
+fn quad_restart_resumes_primal_after_snapshot_and_fresh_crash() {
+    let model = mps::parse(include_str!("fixtures/fx_quad_obj_5371.mps")).unwrap();
+    let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
+    assert_eq!((result.status, result.iterations), (Status::Infeasible, 5319));
+}
+
+#[test]
 fn singular_quad_primal_handoff_restarts_from_snapshot() {
     let model = mps::parse(include_str!("fixtures/quad_8825.mps")).unwrap();
     let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();

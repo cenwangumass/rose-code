@@ -54,6 +54,10 @@ thread_local! {
     static INITIAL_SNAP: std::cell::RefCell<Option<(Vec<usize>, Vec<bool>)>> = const { std::cell::RefCell::new(None) };
     /// Snapshot quality (`ctx+0x188`).
     static SNAP_QUALITY: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+    static SNAP_PRIMAL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static SINGULAR_FROM_PRIMAL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static SINGULAR_TOL_ABORT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    pub(crate) static RESTORED_PRIMAL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The relative tolerance of the primal's pivot-pair check (`ctx+0x3a0`): 3e-6 from the parameters, 1e-7 from the first restore of a dropped variable on (`0x1551d4`).
     static PAIR_TOL: std::cell::Cell<f64> = const { std::cell::Cell::new(3e-6) };
     /// The primal's start basis when its drift test ended it (status -1002): the restart takes it (`0xcedb0`, seed 2717).
@@ -105,6 +109,7 @@ pub(crate) fn primal_snapshot(
         return;
     }
     SNAP_QUALITY.with(|c| c.set(quality));
+    SNAP_PRIMAL.with(|c| c.set(true));
     SNAP.with(|c| *c.borrow_mut() = Some((basic.to_vec(), at_upper.to_vec())));
     #[cfg(test)]
     PRIMAL_SNAPSHOT_TEST.with(|c| {
@@ -1267,6 +1272,7 @@ impl<'a, R: Real> Dual<'a, R> {
             return;
         }
         SNAP_QUALITY.with(|c| c.set(quality));
+        SNAP_PRIMAL.with(|c| c.set(false));
         let basic = self.head.clone();
         let at_upper = self.st.iter().map(|&t| t == UB).collect();
         if c40 == -100.0 {
@@ -4461,6 +4467,7 @@ fn solve_frame(
     SNAP.with(|c| *c.borrow_mut() = None);
     INITIAL_SNAP.with(|c| *c.borrow_mut() = None);
     SNAP_QUALITY.with(|c| c.set(0));
+    SNAP_PRIMAL.with(|c| c.set(false));
     DRIFT_START.with(|c| *c.borrow_mut() = None);
     SNAP_C40.with(|c| c.set(-100.0));
     PAIR_TOL.with(|c| c.set(3e-6));
@@ -4475,6 +4482,7 @@ fn solve_frame(
     let mut quad = false;
     let mut switch_start: Option<Basis> = None;
     let mut restart_start: Option<Basis> = None;
+    let mut restart_primal = false;
     // The factor's `+0x0c`: zero supplies the current statuses to setup,
     // one asks setup for a fresh crash basis.
     let mut factor_crash = start.is_none();
@@ -4483,6 +4491,8 @@ fn solve_frame(
     LOOP_TOL.with(|c| c.set(dual_tol()));
     loop {
         SINGULAR.with(|c| c.set(None));
+        SINGULAR_FROM_PRIMAL.with(|c| c.set(false));
+        SINGULAR_TOL_ABORT.with(|c| c.set(false));
         SINGULAR_BASIS.with(|c| *c.borrow_mut() = None);
         SWITCH.with(|c| c.set(None));
         let sw = switch_start.take();
@@ -4494,7 +4504,52 @@ fn solve_frame(
             .or(restart_basis.as_ref())
             .or_else(|| if carry.retries == 0 { start } else { None });
         FROM_SWITCH.with(|c| c.set(sw.is_some()));
-        let res = if quad {
+        let res = if restart_primal {
+            restart_primal = false;
+            let fresh = restart_basis.is_none();
+            if fresh {
+                set_dual_tol(DUAL_TOL0);
+                set_primal_tol(PRIMAL_TOL);
+                LARGE_XB.with(|c| c.set(false));
+            }
+            let mut popts = opts.clone();
+            popts.method = crate::simplex::Method::Primal;
+            popts.refactor_schedule = None;
+            popts.pricing0 = false;
+            popts.sw_carry = Some(crate::simplex::SwCarry {
+                iters: 0.0, degenerate: 0, snap_degenerate: 0, snap_iters: 0.0,
+                factorizations: 0, level: 0,
+                pert: if fresh { opts.perturb * 0.05 } else { 0.0 },
+            });
+            crate::simplex::HANDOFF.with(|c| c.set(Some(crate::simplex::Handoff {
+                stale: None, working_obj: None, nref0: 0, thr: carry.thr,
+                retries: carry.retries as usize, pert: !fresh && SNAP_QUALITY.with(|c| c.get() == 2),
+                pair_tol: PAIR_TOL.with(|c| c.get()), quad: true, dual_level: 0,
+                shifted_exit: false, iters: 0.0, pricing_iters: 0.0, snap: 0.0,
+                c178: C178.with(|c| c.get()), preserve_ratio: false, excl: None,
+            })));
+            crate::simplex::PRIMAL_STALL.with(|c| c.set(false));
+            crate::simplex::PRIMAL_SHIFT_END.with(|c| c.set(false));
+            RESTORED_PRIMAL.with(|c| c.set(true));
+            let pr = crate::simplex::solve(model, restart_basis.as_ref(), &popts);
+            RESTORED_PRIMAL.with(|c| c.set(false));
+            match pr {
+                Ok(r) if crate::simplex::PRIMAL_STALL.with(|c| c.take())
+                    || crate::simplex::PRIMAL_SHIFT_END.with(|c| c.take()) => {
+                    C35C.with(|c| c.set(c.get() + 1));
+                    carry.fac += r.refactorizations;
+                    carry.it_base = r.iterations;
+                    carry.nref0 = r.refactorizations.max(1);
+                    carry.after_pivot = true;
+                    let result = solve_pass::<crate::f80::F80>(model, Some(&r.basis), opts, &carry, false);
+                    if result.is_ok() {
+                        carry.iters += r.iterations;
+                    }
+                    result
+                }
+                other => other,
+            }
+        } else if quad {
             solve_pass::<crate::f80::F80>(model, start_now, opts, &carry, restart_basis.is_some())
         } else {
             solve_pass::<f64>(model, start_now, opts, &carry, restart_basis.is_some())
@@ -4541,6 +4596,7 @@ fn solve_frame(
                 switch_start = Some(b);
             }
             Err(SolveError::SingularBasis) if carry.retries < 100 => {
+                let failed_quad_dual = quad && !SINGULAR_FROM_PRIMAL.with(|c| c.get());
                 crate::simplex::HANDOFF_ROWS.with(|c| *c.borrow_mut() = None);
                 let Some((
                     iters,
@@ -4569,15 +4625,21 @@ fn solve_frame(
                 }
                 // The third restart starts the pricing from scratch (list-walk mode, empty running averages): the reference's p40/thr schedule over the
                 // restarts is value (thr maxp/1e3), value (thr maxp/1e5), list-walk, then value again (fx_midsing_m5, seeds 1494, 1390, 1496, 50010).
-                let fresh = pass_retries + 1 == 3;
+                // The primal tolerance-exhaustion exit writes -1002 without
+                // incrementing ctx+0x184; a singular factor handler increments
+                // it before entering the common restart handler.
+                let next_retries = pass_retries + u32::from(!SINGULAR_TOL_ABORT.with(|c| c.get()));
+                let fresh = next_retries == 3;
                 if fresh {
                     factor_crash = true;
+                    restart_primal = failed_quad_dual && SNAP_PRIMAL.with(|c| c.get());
                 } else if context_iters > 0 && SNAP_QUALITY.with(|c| c.get() > 0) {
                     factor_crash = false;
                     let snap = SNAP
                         .with(|c| c.borrow().clone())
                         .or_else(|| INITIAL_SNAP.with(|c| c.borrow().clone()));
                     restart_start = snap.map(|(basic, at_upper)| Basis { basic, at_upper });
+                    restart_primal = failed_quad_dual && SNAP_PRIMAL.with(|c| c.get());
                 } else if !factor_crash {
                     restart_start = SINGULAR_BASIS.with(|c| c.borrow_mut().take());
                 }
@@ -4591,10 +4653,10 @@ fn solve_frame(
                     (avg_touch, last_cap, inf_count)
                 };
                 carry = Carry {
-                    retries: pass_retries + 1,
+                    retries: next_retries,
                     thr: thr.max(if pass_retries == 0 { 0.5 } else { 0.9 }),
                     fac,
-                    iters: carry.iters + iters,
+                    iters: carry.iters + if restart_primal { context_iters } else { iters },
                     avg_touch,
                     last_cap,
                     inf_count,
@@ -5360,6 +5422,7 @@ fn solve_pass<R: Real>(
         LOOP_TOL.with(|c| c.set(dual_tol() / tol_factor));
         let mut r = match primal_result {
             Err(SolveError::SingularBasis) => {
+                SINGULAR_FROM_PRIMAL.with(|c| c.set(true));
                 // The primal's factorization has a column without a pivot (status -1002): the controller restarts the dual from the slack basis, like the dual's
                 // own failed factorization, with the primal's iterations counted.
                 let Some((pit, pfac, pthr)) = crate::simplex::PRIMAL_SINGULAR.with(|c| c.take())
@@ -5367,6 +5430,7 @@ fn solve_pass<R: Real>(
                     return Err(SolveError::SingularBasis);
                 };
                 let tol_abort = crate::simplex::PRIMAL_TOL_ABORT.with(|c| c.take());
+                SINGULAR_TOL_ABORT.with(|c| c.set(tol_abort));
                 if s.retries < 5 && !tol_abort {
                     // The primal LU singular handler increments the same counter
                     // used by the next dual ratio test (0xf58f7 / 0x248f99).
@@ -5652,6 +5716,7 @@ fn solve_pass<R: Real>(
         crate::simplex::PRIMAL_REPAIRED.with(|c| c.set(false));
         let mut prres = match crate::simplex::solve(model, Some(&from_dual), &popts) {
             Err(SolveError::SingularBasis) if R::QUAD && s.art_exit => {
+                SINGULAR_FROM_PRIMAL.with(|c| c.set(true));
                 // A failed x87 handoff factorization returns -1002 to the
                 // controller, which restores the saved snapshot (seed 8825).
                 let Some((pit, pfac, pthr)) = crate::simplex::PRIMAL_SINGULAR.with(|c| c.take())

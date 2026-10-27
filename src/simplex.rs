@@ -4923,7 +4923,7 @@ fn solve_primal(
             // The reference gets a basis as variable statuses, so its incoming position order is the variable order.
             b.basic.sort_unstable();
             if let Some(h) =
-                handoff.filter(|h| h.quad && h.retries < 5 && crate::dual::has_restart_snapshot())
+                handoff.filter(|h| h.quad && h.retries < 5 && crate::dual::has_restart_snapshot() && !crate::dual::RESTORED_PRIMAL.with(|c| c.get()))
             {
                 // Before the retry limit the x87 factor driver reports a
                 // singular handoff to the controller rather than repairing
@@ -5621,6 +5621,7 @@ fn solve_primal(
                     if s.handoff.is_some_and(|h| h.quad && h.pert) {
                         // The x87 primal with cost shifts in force ends with status -1004 at the failed scan: the controller reruns the dual, it does not restore the dropped variable.
                         PRIMAL_REPAIRED.with(|c| c.set(false));
+                        PRIMAL_SHIFT_END.with(|c| c.set(true));
                     }
                     // `price_admitting` made the reference's last factorization (request 5) and the scan still finds nothing: `cf0 = 3`, the primal ends infeasible with the
                     // dropped variable out; the controller restores it and runs the primal again.
@@ -5759,6 +5760,7 @@ fn solve_primal(
                     // exits with request 9 before checking the stale pivot pair
                     // when `ctx+0x2cc` and the candidate count are zero
                     // (0x281c1c; seed 5653).
+                    PRIMAL_SHIFT_END.with(|c| c.set(true));
                     break Status::Infeasible;
                 }
                 None if s.stale.is_some_and(|(a, b)| {
@@ -5791,6 +5793,7 @@ fn solve_primal(
                 }
                 None if s.handoff.is_some_and(|h| h.quad && h.pert) => {
                     // As above, in phase 2: the x87 primal with cost shifts in force ends with status -1004 at its first failed scan.
+                    PRIMAL_SHIFT_END.with(|c| c.set(true));
                     break Status::Infeasible;
                 }
                 None => {
