@@ -335,6 +335,8 @@ struct Dual<'a, R: Real = f64> {
     pert: u8,
     /// Objective offset of the cost shifts (`ctx+0x130`).
     obj_off: f64,
+    /// Quad working objective, absent after a writer whose arithmetic is not yet modelled.
+    working_obj: Option<f64>,
     /// `ctx+0x3fc` (-1 once set): the second selection among the bound flips of the ratio test. Set at a refactorization (`0xe6dcc`) when the
     /// perturbation flag is 3 or more or 3 iterations exceed the row count (`ctx+0x178`, which also sets it, is 0 in every capture).
     flip_select: bool,
@@ -1164,6 +1166,26 @@ impl<'a, R: Real> Dual<'a, R> {
         // The reference keeps the solution of its own factor whatever its residual (no refinement): with an ill-conditioned factor x_B is garbage of the size
         // 1e12 and more, and the next passes work on it (fx_midsing_1390 calls 7, 46).
         self.xb = xb;
+        if R::QUAD {
+            let mut sum = R::ZERO;
+            for j in 0..p.n {
+                let x = if self.st[j] >= 0 {
+                    self.xb[self.st[j] as usize]
+                } else {
+                    R::c(self.nonbasic_value(j))
+                };
+                sum += x * (R::c(self.cost[j]) + R::c(self.cost_lo[j]));
+            }
+            self.working_obj = Some(((sum + R::c(self.obj_off)) / R::c(self.obj_scale)).to_f64());
+            #[cfg(test)]
+            record_quad_obj(self.working_obj.unwrap());
+            if crate::dump::on("qobj") {
+                crate::dump::emit(
+                    "qobj",
+                    serde_json::json!({"kind":"recompute", "it":self.iters, "value":self.working_obj}),
+                );
+            }
+        }
     }
 
     /// d recomputed from the costs after a factorization, in the reference frame.
@@ -3039,7 +3061,7 @@ impl<'a, R: Real> Dual<'a, R> {
         let flips: Vec<usize> = rt.flips.iter().map(|&e| row[e].0).collect();
         // The objective progress flag `ctx+0x110` (`0x21cf50` at `0x31dc95`, `0xc56f0` in the double code): cleared by a pivot below 1e-6, a leaving
         // infeasibility above 1e8, or when the gain accumulated since the recompute (times `ctx+0xf8`, 1e-13) exceeds 100 times the dual tolerance.
-        {
+        let obj_increment = {
             let infeas = if above {
                 R::c(p.up[leave]) - xbr
             } else {
@@ -3072,7 +3094,8 @@ impl<'a, R: Real> Dual<'a, R> {
                     self.prog_on = false;
                 }
             }
-        }
+            ob
+        };
         if !flips.is_empty() {
             self.work
                 .add(0xc561a, 7.0 * flips.len() as f64, crate::work::CTX);
@@ -3233,6 +3256,20 @@ impl<'a, R: Real> Dual<'a, R> {
         if let Some(o) = rec.as_mut().and_then(|s| s.as_object_mut()) {
             // A mismatch the ladder accepted (agreeing signs past the sixth retry) is an iteration: no mismatch mark in the record.
             o.remove("mismatch");
+        }
+        if R::QUAD {
+            if let Some(old) = self.working_obj {
+                let new = (R::c(old) + obj_increment).to_f64();
+                self.working_obj = Some(new);
+                #[cfg(test)]
+                record_quad_obj(new);
+                if crate::dump::on("qobj") {
+                    crate::dump::emit(
+                        "qobj",
+                        serde_json::json!({"kind":"pivot", "it":self.iters, "old":old, "delta":obj_increment.to_f64(), "value":new}),
+                    );
+                }
+            }
         }
         // Column without the pivot entry: the last entry moves into the pivot's slot.
         // A dense FTRAN result (count -1) is compacted by an ascending scan that skips the pivot and the entries up to the drop tolerance (`0x12013c`).
@@ -3863,6 +3900,7 @@ impl<'a, R: Real> Dual<'a, R> {
         if f <= 1.0 {
             return;
         }
+        self.working_obj = None;
         for v in self.cost.iter_mut() {
             *v *= f;
         }
@@ -3883,6 +3921,7 @@ impl<'a, R: Real> Dual<'a, R> {
     /// direction that increases `d'` (the cost goes up at the lower bound and down at a finite upper bound; a variable at an infinite upper bound with
     /// `d' <= delta` is moved to its lower bound first). The scale grows threefold for the next perturbation.
     fn perturb(&mut self) {
+        self.working_obj = None;
         let p = self.p;
         let sc = self.pstep / 500.0;
         // The perturbation has its own generator, seeded with the iteration count (`0x115220`, state = it + the `Seed` parameter); the generator of the
@@ -4697,6 +4736,7 @@ fn solve_pass<R: Real>(
         rng: RNG_CELL.with(|c| c.get()),
         pert: 0,
         obj_off: 0.0,
+        working_obj: None,
         flip_select: start.is_some(),
         work: if R::QUAD {
             crate::work::Work::dual_quad()
@@ -4976,6 +5016,8 @@ fn solve_pass<R: Real>(
                 s.driver_return();
             }
             Step::Reject => {
+                // The native iteration has non-pivot objective stores not yet modelled.
+                s.working_obj = None;
                 // A row dropped in the list-walk mode returns from the iteration function with the request it set (`0xc9577`): the post-iteration pass refactorizes.
                 if s.request != 0 && s.status.is_none() {
                     s.post(None, false)?;
@@ -4983,6 +5025,7 @@ fn solve_pass<R: Real>(
                 }
             }
             Step::Mismatch => {
+                s.working_obj = None;
                 if s.status.is_none() {
                     s.post(None, false)?;
                 }
@@ -5049,6 +5092,7 @@ fn solve_pass<R: Real>(
                 s.driver_return();
             }
             Step::Unbounded(y) => {
+                s.working_obj = None;
                 if s.updates != 0 {
                     // No entering variable on a factor with updates (ctx+0x294 = 5, RECIPE-like bgdbg1 calls 29 and 31): refactorize and price again; the
                     // certificate is the row of the first such failure on a fresh factor.
@@ -5893,6 +5937,7 @@ mod captured_bh305_ratio {
             rng: 101,
             pert: 0,
             obj_off: 0.0,
+            working_obj: None,
             flip_select: false,
             work: crate::work::Work::dual(),
             pivot_cols: None,
@@ -5946,5 +5991,42 @@ mod captured_bh305_ratio {
             case["expected"]["a308"].as_f64().unwrap().to_bits()
         );
         assert!(result.reject.is_none());
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    static QUAD_OBJ_TEST: std::cell::RefCell<Option<Vec<f64>>> = const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(test)]
+fn record_quad_obj(value: f64) {
+    QUAD_OBJ_TEST.with(|c| {
+        if let Some(values) = c.borrow_mut().as_mut() {
+            values.push(value);
+        }
+    });
+}
+
+#[cfg(test)]
+#[test]
+fn quad_working_objective_captured_stores() {
+    // Reference stores at 0x217d6c and 0x21dd67 through the first quad dual.
+    let expected = [0.0, 0.25, 0.33347262103511405, 0.5165277613548308,
+        0.5165277613548308, 0.8565894421544799, 1.4295000733793137,
+        3.5351275804953075, 3.5357673398085137, 3.5955687150231457,
+        3.595568715023162, 4.517244820478645, 4.517246676550257,
+        349.14162441750926, 349.14813281525466, 6352.899623308976,
+        6352.899623308975, 95526943.50521018, 221699539.5595171,
+        221699549.95117602];
+    let model = crate::mps::parse(include_str!("../tests/fixtures/fx_quad_obj_5371.mps")).unwrap();
+    let mut opts = crate::SolveOptions::dual_release();
+    opts.max_iterations = 200;
+    QUAD_OBJ_TEST.with(|c| *c.borrow_mut() = Some(Vec::new()));
+    crate::solve(&model, None, &opts).unwrap();
+    let actual = QUAD_OBJ_TEST.with(|c| c.borrow_mut().take().unwrap());
+    assert!(actual.len() >= expected.len());
+    for (index, (actual, expected)) in actual.iter().zip(expected).enumerate() {
+        assert_eq!(actual.to_bits(), f64::to_bits(expected), "store {index}");
     }
 }

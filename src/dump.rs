@@ -54,6 +54,7 @@ pub const KINDS: &[(&str, &str, &str)] = &[
     ("barrier_cg", "CG1", "early-centering solve (`crate::early`, `0x34a580`), per call: iteration, last step index, tolerance bits, `Q+0x290` after it, generator state and the results dx, dy as hex bit patterns (shaped like CG1 of `replay/gdb_barrier_cg.py`)"),
     ("barrier_front", "ASM", "single-precision factor, supernode `FRONT_COL`: the lower triangle (6 x 6) of the front as float bits after the assembly (ASM) and after each child update (UPD, child column), like `replay/gdb_barrier_chol32_watch.py`"),
     ("fillparts", "FILLP", "per factor update: pool fill on entry, eta size, new column entries added, and the row growths (row, cnt, cap, extra)"),
+    ("qobj", "QOBJ", "quad dual working objective recomputes and accepted pivot updates"),
     ("qtau", "QTAU", "quad dual, per two-vector FTRAN: r, pricing mode, dense_in, the second vector (in), the pivot column result (col) and tau at its positions (tau), as long-double values"),
 ];
 
