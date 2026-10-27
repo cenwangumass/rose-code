@@ -5392,7 +5392,13 @@ fn solve_primal(
                 chk = Some((mi.refactor_due(), mi.updates(), nnz_a));
             }
         }
-        if let Some((a, b)) = s.stale.take() {
+        // The x87 pricing0 path (0x281126) uses its own residual test and
+        // bypasses the Devex pivot-pair check at 0x281097 (seed 7089).
+        if let Some((a, b)) = s
+            .stale
+            .take()
+            .filter(|_| !(s.handoff.is_some_and(|h| h.quad) && s.p0.is_some()))
+        {
             // The pivot check of `0x144ff9..0x145064` on the pair the dual's last iteration left in `ctx+0x300` / `ctx+0x308`: a disagreement (the column's
             // value below 1e-13, or the relative difference above 3e-6) zeroes both, counts an accuracy event (`ctx+0x178`), and requests a refactorization (6).
             let (a, b) = (a.abs(), b.abs());
