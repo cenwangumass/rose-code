@@ -1065,10 +1065,12 @@ fn dense_ldl(
                 };
             }
             if i == j {
+                let raw = rf(mm[j * w + j]);
                 let (dj, rj) = pivot(mm[j * w + j], orig[j], reg.map(|(c0, n1)| (c0 + j, n1)));
                 d[j] = dj;
                 rcp[j] = rj;
-                mm[j * w + j] = dj;
+                // A regularised pivot keeps the computed value in the factor's diagonal slot (`FOUT diag`), the replacement only in the pivot and reciprocal arrays.
+                mm[j * w + j] = if reg.is_some() { raw } else { dj };
             } else {
                 mm[i * w + j] = rf(mm[i * w + j] * rcp[j]);
             }
@@ -1092,10 +1094,11 @@ fn diag_only(
     let mut d = vec![0.0; w];
     let mut rcp = vec![0.0; w];
     for j in 0..w {
+        let raw = rf(mm[j * w + j]);
         let (dj, rj) = pivot(mm[j * w + j], orig[j], reg.map(|(c0, n1)| (c0 + j, n1)));
         d[j] = dj;
         rcp[j] = rj;
-        mm[j * w + j] = dj;
+        mm[j * w + j] = if reg.is_some() { raw } else { dj };
     }
     (d, rcp)
 }
@@ -1377,8 +1380,8 @@ pub fn numeric_factor(
 ) -> Factor {
     let m = f.m;
     let _guard = SingleGuard::new(plan.single);
-    // Dense columns: the factor has `nt = m + nd` nodes (the dense nodes last), pivots regularise (`SYM+0x110`, `Q+0x218 > 0`), and every sparse supernode is
-    // assembled by the generic routine; the dense supernode starts from the diagonal `-1/D[j]` of its columns, and a row's dense-node entries are the raw
+    // Dense columns: the factor has `nt = m + nd` nodes (the dense nodes last), pivots regularise (`SYM+0x110`, `Q+0x218 > 0`), and the sparse supernodes are
+    // assembled as without dense columns (`0x2f83e0` for `w >= 3`, else the generic routine; `fx_bar_densecol`); the dense supernode starts from the diagonal `-1/D[j]` of its columns, and a row's dense-node entries are the raw
     // coefficients `A[i][j]` (no `D`). The diagonal of a dense node is `-zx_j` (`z/x + v/u` of the iterate; the starting point has no `zx`: `-1/D_j`, as for a
     // clamped `D = 1e12`).
     let nt = plan.n;
@@ -1415,7 +1418,7 @@ pub fn numeric_factor(
                 };
             }
             (mm, vec![0.0; (c - w) * w])
-        } else if !reg && w >= 3 && c * w <= 30000 {
+        } else if w >= 3 && c * w <= 30000 {
             assemble(f, rows, d, &mp, col, w, c)
         } else {
             assemble_generic(f, rows, d, &mp, col, w, c)
@@ -1424,7 +1427,7 @@ pub fn numeric_factor(
             for (t, &rr) in s.rows.iter().enumerate() {
                 if rr >= m && t >= w {
                     for a in 0..w {
-                        r[(t - w) * w + a] = dval[rr][col + a];
+                        r[(t - w) * w + a] = rf(dval[rr][col + a]);
                     }
                 }
             }
@@ -1881,11 +1884,11 @@ pub fn sym_col_sq(f: &StdForm) -> f64 {
 }
 
 /// `SYM+0xc0` (replaced pivots; `0x2e11b4..0x2e1269`): needs `P+0x2be0 != 0` (the hidden parameter `GURO_PAR_BARQUICKSTART`, default -1, 0 = never), a linear
-/// continuous model (`0x88de50` returns 0), no dense columns (`SYM+0x138`) and no GPU barrier (`Q+0x928`, never on this host). Then `BarQuickStart = 1` sets it, else
+/// continuous model (`0x88de50` returns 0), `SYM+0x138 == 0` (a model with dense columns has 0 there too: `fx_bar_densecol`) and no GPU barrier (`Q+0x928`, never on this host). Then `BarQuickStart = 1` sets it, else
 /// `SYM+0x60` (the flops, [`Symbolic::ops`]) must exceed 1e10, 1000 `SYM+0x48` ([`sym_col_sq`]), 500 NZ (`SYM+0x38`) and 1000 nnz(A).
 /// `quick` is the value of `GURO_PAR_BARQUICKSTART` (-1 by default; 2 is stored as -1).
 pub fn replaced_pivots(f: &StdForm, sym: &Symbolic, quick: i32) -> bool {
-    if quick == 0 || !f.dense.is_empty() {
+    if quick == 0 {
         return false;
     }
     if quick == 1 {
