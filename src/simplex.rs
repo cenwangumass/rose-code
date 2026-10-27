@@ -6111,8 +6111,16 @@ fn solve_primal(
                     use crate::real::Real;
                     let ratio = pq[j] / a_rq;
                     let mut vj = crate::f80::F80::ZERO;
-                    for &(i, a) in &p.fcols[j] {
-                        vj += crate::f80::F80::c(a) * tq[i];
+                    // The x87 kernel consumes short columns from the last entry to the first
+                    // (0x257356..0x2573d1); cancellation makes this order observable.
+                    if p.fcols[j].len() < 8 {
+                        for &(i, a) in p.fcols[j].iter().rev() {
+                            vj += crate::f80::F80::c(a) * tq[i];
+                        }
+                    } else {
+                        for &(i, a) in &p.fcols[j] {
+                            vj += crate::f80::F80::c(a) * tq[i];
+                        }
                     }
                     if s.wf.len() != s.w.len() {
                         s.wf = vec![crate::f80::F80::ZERO; s.w.len()];
