@@ -21,6 +21,7 @@ pub const KINDS: &[(&str, &str, &str)] = &[
     ("dualtol", "DTOL", "dual residual check after a refactorization: meas, tol, failure count, request, factorization count; the primal of a dual handoff adds src primal (call, before the raise) and primal-cmp (compare, in phase 2 only)"),
     ("dual", "BTY", "dual BTRAN after a factorization, in output order"),
     ("costchg", "BTC", "phase 1 cost-change BTRAN (`0x10804b`, `cost_change_work`): the sparse input (position, cost change) and the result in output order"),
+    ("bare", "BARE", "each bare replacement column with `old >= 0` (`ftran_order.rs`, column replacement): position r, old kind and whether a tail column's B list holds r (`held`); the unheld ones are the unverified case of `specs/lu-factor.md`"),
     ("ord", "ORD", "pivot-row input list and changed columns per pivot (CORD for the cost-change pass)"),
     ("xb", "XB", "right-hand side and x_B of the basic-solution recompute"),
     ("fstruct", "FSTRUCT", "U-factor structure (kinds, nucleus list, tail start, slots) before each column replacement"),

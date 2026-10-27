@@ -2555,6 +2555,13 @@ impl<R: Real> RefStruct<R> {
         }
         if old >= 0 {
             let held = (0..m).any(|x| x != r && self.kind[x] == -2 && self.b[x].contains(&r));
+            if bare && crate::dump::on("bare") {
+                let tail = (0..m).filter(|&x| self.kind[x] == -2).count();
+                crate::dump::emit(
+                    "bare",
+                    serde_json::json!({"r": r, "old": old, "held": held, "tail": tail}),
+                );
+            }
             if !bare || !held {
                 self.drop_nuc(r);
                 if bare {
