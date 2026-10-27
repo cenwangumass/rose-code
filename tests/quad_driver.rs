@@ -1,6 +1,16 @@
 use rose::{mps, solve, verify, SolveOptions, Status};
 
 #[test]
+fn quad_primal_repeated_repairs_resume_dual() {
+    let model = mps::parse(include_str!("fixtures/quad_4737.mps")).unwrap();
+    let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
+    assert_eq!(
+        (result.status, result.iterations),
+        (Status::NumericalFailure, 228)
+    );
+}
+
+#[test]
 fn x87_tiny_pivot_retries_the_active_pricing_bucket() {
     for (text, status, iterations) in [
         (include_str!("fixtures/quad_6230.mps"), Status::Infeasible, 40),

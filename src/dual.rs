@@ -5173,17 +5173,38 @@ fn solve_pass<R: Real>(
             }
             other => other?,
         };
-        let repaired =
+        let mut repaired =
             crate::simplex::PRIMAL_REPAIRED.with(|c| c.take()) && r.status == Status::Infeasible;
+        let had_repair = repaired;
         let shift_end = crate::simplex::PRIMAL_SHIFT_END.with(|c| c.take());
-        if repaired {
-            // The primal repaired its basis in place and ended infeasible with the dropped variable out (`0x155117`): the controller restores it and the primal
-            // runs again from its basis.
+        let mut restore_dual = false;
+        let mut repair_count = 0usize;
+        while repaired {
+            repair_count += 1;
+            if R::QUAD {
+                // Each dropped-variable restore increments the controller's
+                // counter. The first two retry primal; from the third it
+                // switches back to dual, and the eleventh ends numerically
+                // (`0x1551ac..0x15527c`, seed 4737).
+                let count = PERT_RERUNS.with(|c| {
+                    c.set(c.get() + 1);
+                    c.get()
+                });
+                if count > 10 {
+                    r.status = Status::NumericalFailure;
+                    break;
+                }
+                if count >= 3 {
+                    restore_dual = true;
+                    break;
+                }
+            }
+            // Restore the dropped variable and restart primal from its basis.
             crate::simplex::HANDOFF.with(|c| {
                 c.set(Some(crate::simplex::Handoff {
                     stale: None,
                     thr: s.lu_thr,
-                    retries: s.retries as usize + 1,
+                    retries: s.retries as usize + repair_count,
                     pert: false,
                     pair_tol: PAIR_TOL.with(|c| c.get()),
                     quad: R::QUAD,
@@ -5206,9 +5227,30 @@ fn solve_pass<R: Real>(
             r.dual = r2.dual;
             r.reduced_cost = r2.reduced_cost;
             r.basis = r2.basis;
+            repaired = R::QUAD
+                && crate::simplex::PRIMAL_REPAIRED.with(|c| c.take())
+                && r.status == Status::Infeasible;
         }
         r.iterations += s.iters + crate::simplex::EARLIER_ITERS.with(|c| c.take());
         r.refactorizations += s.refactorizations;
+        if restore_dual {
+            let carry2 = Carry {
+                retries: s.retries + repair_count as u32,
+                thr: s.lu_thr.max(0.5),
+                fac: r.refactorizations,
+                iters: r.iterations,
+                avg_touch: 0.0,
+                last_cap: 0,
+                inf_count: 0,
+                after_pivot: true,
+                it_base: s.it_base + r.iterations,
+                nref0: s.nref() + (r.refactorizations - s.refactorizations).max(1),
+                pstep: None,
+            };
+            let mut r2 = solve_pass::<R>(model, Some(&r.basis), opts, &carry2)?;
+            r2.iterations += carry2.iters;
+            return Ok(r2);
+        }
         if R::QUAD && crate::simplex::PRIMAL_STALL.with(|c| c.take()) {
             C35C.with(|c| c.set(c.get() + 1));
             // The x87 primal ended on its progress check (status -1004): the controller runs the quad dual again from the primal's basis, and the primal after it.
@@ -5241,7 +5283,7 @@ fn solve_pass<R: Real>(
         }
         if status == Status::Infeasible
             && s.pert != 0
-            && !repaired
+            && !had_repair
             && PERT_RERUNS.with(|c| c.get()) >= 10
         {
             // The controller's restore counter (`ebx` of `0x1551ac`) passes 10 at the eleventh restore: status 12 (`0x15553e`).
@@ -5252,7 +5294,7 @@ fn solve_pass<R: Real>(
         // (fx_e2_r03125 and fx_e2_r0625: the reference has no additional dual pass or factorization).
         if status == Status::Infeasible
             && s.pert != 0
-            && !repaired
+            && !had_repair
             && (R::QUAD || r.status != Status::Optimal)
             && (!(R::QUAD && s.rejected_end) || shift_end)
             && PERT_RERUNS.with(|c| {
