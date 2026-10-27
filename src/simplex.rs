@@ -1697,6 +1697,8 @@ impl<'a> Solver<'a> {
             } else {
                 self.has_infeasible_basic()
             },
+            stability: self.handoff.is_none() && self.accuracy > 0,
+            can_switch: !self.pre_restart,
         };
         let before = self.sw.clone();
         let switch = self.sw.decide(&inp);
@@ -2050,7 +2052,25 @@ impl<'a> Solver<'a> {
                 serde_json::json!({"refactor": self.refactorizations, "site": site, "out": crate::dump::sparse(&out)}),
             );
         }
-        let caller = if self.cleanup { 0xe53a7 } else { 0x109289 };
+        let caller = if self.cleanup {
+            0xe53a7
+        } else if self.p0.is_some() {
+            if site == "phase1_end" || site == "scan_none_upd" {
+                0xfdc31
+            } else if site == "full"
+                && self.restart
+                && self.accuracy > 0
+                && self.sw.iters != 0.0
+                && self.sw.iters != self.sw.snap_iters
+            {
+                // The reference switches before this restart's dual recompute.
+                0x109289
+            } else {
+                0xfbca8
+            }
+        } else {
+            0x109289
+        };
         self.work
             .add_from(0x12de50, caller, mi.work(), crate::work::FAC);
         let mut y = vec![0.0; p.m];
@@ -2602,6 +2622,11 @@ impl<'a> Solver<'a> {
             // the factorization before the status add of `0x155139`, the excluded variable still out of the row copy); only then
             // does the driver restart below.
             if self.factor.num_updates() > 0 {
+                // This refactorization follows a failed scan, so the latest update is
+                // included in the factor statistics used by the method decision.
+                if let Some(mi) = self.mirror.as_mut() {
+                    mi.count_all_updates();
+                }
                 // As at the optimality exit: the duals are recomputed once more when the scan finds nothing (`0x145520`).
                 if self.mirror.is_some() && !self.recomputed && !self.fresh_duals {
                     self.dual_btran_work("scan_none_upd");
@@ -2612,6 +2637,9 @@ impl<'a> Solver<'a> {
                 let r = self.refactor();
                 self.pre_restart = false;
                 r.ok()?;
+                if self.p0.is_some() {
+                    self.p0_rebuild();
+                }
             }
             // After the in-place repair the reference keeps the dropped variable out until the primal has ended (`cf0 = 3`; the controller restores it).
             // An x87 primal that fails its first scan before any pivot admits the variable the quad dual's repair left out and goes on (seeds 3981, 5367: the entry
@@ -2633,8 +2661,10 @@ impl<'a> Solver<'a> {
             let nnz_a: usize = (0..self.p.n).map(|j| self.p.cols[j].len()).sum();
             let nm = self.p.n + self.p.m;
             self.work.add(0x138532, 2.0 * nm as f64, crate::work::CTX);
-            self.work
-                .add(0x132d88, 2.0 * nnz_a as f64, crate::work::CTX);
+            if self.p0.is_none() {
+                self.work
+                    .add(0x132d88, 2.0 * nnz_a as f64, crate::work::CTX);
+            }
             // The rebuilt row-wise copy holds every nonbasic, non-fixed structural (the admitted one included), in index order.
             self.rrows = vec![Vec::new(); self.p.m];
             for j in 0..self.p.n {
@@ -4632,7 +4662,7 @@ fn solve_primal(
         df: Vec::new(),
         p3c0: 1e-7,
         stale: handoff.and_then(|h| h.stale),
-        accuracy: 0,
+        accuracy: usize::from(!singular_work.is_empty()),
         iters_done: 0,
         forced: false,
         repaired: kept_out,
@@ -5124,6 +5154,9 @@ fn solve_primal(
                     if s.factor.num_updates() > 0 {
                         s.cleanup = s.mirror.is_some() && !s.rhs_shift.is_empty();
                         s.work.trig();
+                        if let Some(mi) = s.mirror.as_mut() {
+                            mi.count_all_updates();
+                        }
                         s.refactor()?;
                         if s.cleanup && s.has_infeasible_basic() {
                             // The dual clean-up pass; the primal phase 1 only when it finds no entering variable.

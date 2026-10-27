@@ -28,6 +28,25 @@ fn infeasible_and_unbounded_statuses_match_reference() {
 }
 
 #[test]
+fn singular_release_restart_matches_reference_pivots() {
+    let m = mps::parse(include_str!("fixtures/fx_sing_dup_n2m3.mps")).unwrap();
+    let basis = Basis {
+        basic: vec![0, 1, 4],
+        at_upper: vec![false; 5],
+    };
+    let r = solve(&m, Some(&basis), &SolveOptions::release()).unwrap();
+    assert_eq!(r.status, Status::Optimal);
+    assert_eq!(r.x, vec![4.0, 0.0]);
+    assert_eq!(
+        r.trace
+            .iter()
+            .map(|e| (e.entering, e.leaving))
+            .collect::<Vec<_>>(),
+        vec![(3, Some(2)), (0, Some(1))]
+    );
+}
+
+#[test]
 fn neardep_and_badscale_solutions_match_reference_bits() {
     for (name, x, z) in [
         ("fx_neardep", vec![0.0, 4.0], -8.0),

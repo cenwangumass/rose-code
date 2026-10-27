@@ -33,6 +33,37 @@ pub struct Method {
     pub keep468: bool,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::{Inputs, Method};
+
+    #[test]
+    fn stability_switch_waits_for_restart_after_failed_scan() {
+        let mut method = Method {
+            factorizations: 1,
+            iters: 1.0,
+            ..Method::default()
+        };
+        let mut inputs = Inputs {
+            rows: 3,
+            cols: 2,
+            avg: 2,
+            l_total: 4,
+            u_total: 3,
+            infeasible: false,
+            stability: true,
+            can_switch: false,
+        };
+        assert!(!method.decide(&inputs));
+        assert_eq!(method.factorizations, 2);
+        inputs.avg = 0;
+        inputs.can_switch = true;
+        assert!(method.decide(&inputs));
+        assert_eq!(method.mode, 1);
+        assert_eq!(method.factorizations, 3);
+    }
+}
+
 /// What the decision reads from the factor and the model.
 pub struct Inputs {
     /// Rows and columns (`ctx+0x64`, `ctx+0x68`).
@@ -45,6 +76,10 @@ pub struct Inputs {
     pub u_total: usize,
     /// Basic variables violate their bounds (`ctx+0x2d0 != 0`, `P+0xc == 1`).
     pub infeasible: bool,
+    /// Stability events (`ctx+0x178`) force Devex when the other decision gates pass.
+    pub stability: bool,
+    /// Refactorizations requested by the end-of-scan handler do not switch.
+    pub can_switch: bool,
 }
 
 /// Tolerance of the degenerate-step count (`ctx+0x380`).
@@ -74,7 +109,7 @@ impl Method {
         self.factorizations += 1;
         let (a, b) = (self.iters, self.snap_iters);
         let mut switch = false;
-        if self.mode != 1 && a != 0.0 && a != b {
+        if inp.can_switch && self.mode != 1 && a != 0.0 && a != b {
             let rows = inp.rows as f64;
             let cols = inp.cols as f64;
             // `ctx+0x338 >> 1` (the perturbation level, even) joins the degenerate share.
@@ -96,7 +131,7 @@ impl Method {
             };
             let denom = inp.u_total as f64 - 2.0 * rows + 3.0 * inp.l_total as f64;
             let rhs = p3b0 / (inp.avg as f64 + 1.0) + 1.0 + 9.0 * cols / denom;
-            if big + big > rhs {
+            if inp.stability || big + big > rhs {
                 self.mode = 1;
                 self.keep468 = false;
                 switch = true;
