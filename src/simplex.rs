@@ -4728,24 +4728,43 @@ fn solve_primal(
     } else {
         None
     };
+    let start_factor_in_reference_order =
+        initial_order.is_some() && !handoff.is_some_and(|h| h.quad);
     let mut pos_of = vec![NONE; n + m];
     for (pos, &j) in basis.basic.iter().enumerate() {
         pos_of[j] = pos;
     }
     let in_r0: Vec<bool> = (0..n + m).map(|j| pos_of[j] == NONE).collect();
-    let cols: Vec<Column> = basis.basic.iter().map(|&j| p.cols[j].clone()).collect();
-    // A handoff from the dual factors with the primal's numeric floor 1e-13 (`ctx+0x3a8`), as the start factorization below does.
-    let factor = Factor::with_floor(
-        m,
-        &cols,
-        if handoff.as_ref().is_some_and(|h| h.quad) {
-            0.0
-        } else if handoff.is_some() {
-            1e-13
-        } else {
-            1e-11
-        },
-    )
+    let cols: Vec<Column> = initial_order
+        .as_ref()
+        .filter(|_| start_factor_in_reference_order)
+        .map(|(_, order, _, _)| order)
+        .unwrap_or(&basis.basic)
+        .iter()
+        .map(|&j| p.cols[j].clone())
+        .collect();
+    // A shifted handoff has already passed the reference factorization's
+    // singularity test. Build the auxiliary factor with those same pivots:
+    // its independent sparse ordering can create a much smaller pivot and
+    // incorrectly reject a basis accepted by the reference.
+    let factor = if let Some((_, _, st, _)) = initial_order
+        .as_ref()
+        .filter(|_| start_factor_in_reference_order)
+    {
+        Factor::with_pivot_rows(m, &cols, &st.pivots.iter().map(|p| p.0).collect::<Vec<_>>())
+    } else {
+        Factor::with_floor(
+            m,
+            &cols,
+            if handoff.as_ref().is_some_and(|h| h.quad) {
+                0.0
+            } else if handoff.is_some() {
+                1e-13
+            } else {
+                1e-11
+            },
+        )
+    }
     .map_err(|_| SolveError::SingularBasis)?;
     let mut s = Solver {
         p: &p,
@@ -4932,18 +4951,20 @@ fn solve_primal(
         lu_work.extend(mi.fresh_work());
 
         let cols: Vec<&Column> = s.basic.iter().map(|&j| &s.p.cols[j]).collect();
-        s.factor = Factor::with_floor(
-            m,
-            &cols,
-            if handoff.as_ref().is_some_and(|h| h.quad) {
-                0.0
-            } else if handoff.is_some() {
-                1e-13
-            } else {
-                1e-11
-            },
-        )
-        .map_err(|_| SolveError::SingularBasis)?;
+        if !start_factor_in_reference_order {
+            s.factor = Factor::with_floor(
+                m,
+                &cols,
+                if handoff.as_ref().is_some_and(|h| h.quad) {
+                    0.0
+                } else if handoff.is_some() {
+                    1e-13
+                } else {
+                    1e-11
+                },
+            )
+            .map_err(|_| SolveError::SingularBasis)?;
+        }
     }
     s.work.trig();
     s.work.decided(s.work.w);

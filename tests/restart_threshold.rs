@@ -90,24 +90,32 @@ fn repaired_confirmation_child() {
 }
 
 #[test]
-fn repaired_confirmation_hands_off_without_extra_dual_pricing() {
+fn repaired_confirmation_hands_off_after_142_dual_calls() {
     let output = Command::new(std::env::current_exe().unwrap())
         .args(["--exact", "repaired_confirmation_child", "--nocapture"])
         .env("ROSE_REPAIR_CONFIRM_TEST", "1")
-        .env("ROSE_DUMP", "dsx,lustart")
+        .env("ROSE_DUMP", "dsx,lustart,pricing")
         .output()
         .unwrap();
     assert!(output.status.success());
     let stderr = String::from_utf8(output.stderr).unwrap();
-    assert_eq!(
-        stderr.lines().filter(|l| l.starts_with("DSX ")).count(),
-        142
-    );
-    assert!(stderr
-        .lines()
-        .filter_map(|l| l.strip_prefix("LUSTART "))
-        .map(|l| serde_json::from_str::<serde_json::Value>(l).unwrap())
-        .any(|v| v["primal"] == true));
+    let mut dual_calls = 0;
+    let mut reached_primal = false;
+    for line in stderr.lines() {
+        if line.starts_with("DSX ") {
+            dual_calls += 1;
+        }
+        if let Some(body) = line.strip_prefix("LUSTART ") {
+            let v: serde_json::Value = serde_json::from_str(body).unwrap();
+            if v["primal"] == true {
+                assert_eq!(dual_calls, 142);
+                reached_primal = true;
+                break;
+            }
+        }
+    }
+    assert!(reached_primal);
+    assert!(stderr.lines().any(|line| line.starts_with("PLIST ")));
 }
 
 #[test]

@@ -37,10 +37,32 @@ impl Factor {
         cols: &[C],
         floor: f64,
     ) -> Result<Factor, usize> {
+        Self::factor(m, cols, floor, None)
+    }
+
+    /// Factor columns already in an accepted pivot order using the corresponding
+    /// pivot rows. Singularity has been decided by the reference factorization;
+    /// only an exactly zero auxiliary pivot is rejected here.
+    pub fn with_pivot_rows<C: std::borrow::Borrow<Column>>(
+        m: usize,
+        cols: &[C],
+        rows: &[usize],
+    ) -> Result<Factor, usize> {
+        Self::factor(m, cols, 0.0, Some(rows))
+    }
+
+    fn factor<C: std::borrow::Borrow<Column>>(
+        m: usize,
+        cols: &[C],
+        floor: f64,
+        rows: Option<&[usize]>,
+    ) -> Result<Factor, usize> {
         let cols: Vec<&Column> = cols.iter().map(|c| c.borrow()).collect();
         // Eliminate sparser columns first (slack singletons first).
         let mut col_order: Vec<usize> = (0..m).collect();
-        col_order.sort_by_key(|&p| (cols[p].len(), p));
+        if rows.is_none() {
+            col_order.sort_by_key(|&p| (cols[p].len(), p));
+        }
         let mut step_of_row = vec![NONE; m];
         let mut pivot_row = Vec::with_capacity(m);
         let mut l: Vec<Vec<(usize, f64)>> = Vec::with_capacity(m);
@@ -113,6 +135,12 @@ impl Factor {
                     {
                         best = r;
                     }
+                }
+            }
+            if let Some(rows) = rows {
+                best = rows[k];
+                if w[best] == 0.0 {
+                    return Err(p);
                 }
             }
             let d = w[best];
