@@ -37,6 +37,8 @@ thread_local! {
 thread_local! {
     /// The number of passes started in this solve (selects the entry of a per-pass refactorization schedule).
     static LOOP_TOL: std::cell::Cell<f64> = const { std::cell::Cell::new(1e-6) };
+    /// Dual passes ended with a primal handoff in this solve (`ctx+0x35c` - 1 outside the quad passes).
+    static DUAL_HANDOFFS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
     static PASS_NO: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     /// The stability counter `ctx+0x178`: one per pivot-check mismatch (`0xc5a35`, quad `0x21da43`) and per singular quad restart (`0x248f99`); never reset in a solve.
     static C178: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
@@ -3925,6 +3927,7 @@ fn solve_frame(
     SNAP_C40.with(|c| c.set(-100.0));
     PAIR_TOL.with(|c| c.set(3e-6));
     PASS_NO.with(|c| c.set(0));
+    DUAL_HANDOFFS.with(|c| c.set(0));
     C178.with(|c| c.set(0));
     crate::simplex::QUAD_PRIMALS.with(|c| c.set(0));
     // The quad mode (`ctx+0x28`): once the controller switched, every later pass runs the extended-precision twin of the dual.
@@ -4614,16 +4617,27 @@ fn solve_pass<R: Real>(
                 },
             }))
         });
-        // The controller scales the tolerance by a factor of `ctx+0x35c`, the count of primals started in quad mode, plus one (`0x154cff..0x154d13`, store
-        // `0x15647a`): 1 up to 5, 0.5 for 6 and 7, 0.2 above (seed 2950: `ctx+0x388` 1e-6, 5e-7, 2e-7).
-        let tol_factor = if R::QUAD {
-            match crate::simplex::QUAD_PRIMALS.with(|c| c.get()) + 1 {
+        // The controller scales the tolerance by a factor of `ctx+0x35c` (`0x154cf0..0x154d13`, store `0x15647a`): 1 up to 5, 0.5 for 6 and 7, 0.2 above (seed 2950:
+        // `ctx+0x388` 1e-6, 5e-7, 2e-7), and 1 when the tolerance now in force is above the parameter's 1e-6 (`0x156464`; fx_midsing_1106 keeps 1e-3). `ctx+0x35c` is 1 at the
+        // start and counts the dual passes ended with status -1004 (`0xe404a`, `0xf8691`): the primals the controller starts after a dual (fx_midsing_1496: 2, 3, 4, 5, 6 -> 5e-7,
+        // 7); a primal rerun after the restore does not count. In a quad solve rose counts the quad primals started.
+        let handoffs = DUAL_HANDOFFS.with(|c| {
+            c.set(c.get() + 1);
+            c.get()
+        });
+        let c35c = if R::QUAD {
+            crate::simplex::QUAD_PRIMALS.with(|c| c.get()) + 1
+        } else {
+            handoffs + 1
+        };
+        let tol_factor = if dual_tol() > DUAL_TOL0 {
+            1.0
+        } else {
+            match c35c {
                 0..=5 => 1.0,
                 6 | 7 => 0.5,
                 _ => 0.2,
             }
-        } else {
-            1.0
         };
         set_dual_tol(LOOP_TOL.with(|c| c.get()) * tol_factor);
         crate::simplex::PRIMAL_SINGULAR.with(|c| c.set(None));

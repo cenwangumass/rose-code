@@ -2136,11 +2136,18 @@ impl<'a> Solver<'a> {
     /// the counter; the residual `max |c_j - a_j y|` over the basic structurals is then compared with the tolerance (`0x145a36..0x145a56`) when the factorization
     /// count is 4 modulo 5, the request is 4, 5 or 7, or the counter is not zero.
     fn handoff_residual(&mut self, y: &[f64]) {
-        if self.handoff.is_none() {
+        // The tolerance raise and the residual compare sit behind the `ctx+0x2d0 == 0` tests of `0x1455ca` and `0x14577a`: in phase 1 (an infeasible basic variable) the call leaves the tolerance and the counter alone.
+        if self.handoff.is_none() || self.has_infeasible_basic() {
             return;
         }
         let tol = crate::dual::dual_tol();
         let cnt = crate::dual::resid_fails();
+        if crate::dump::on("dualtol") {
+            crate::dump::emit(
+                "dualtol",
+                serde_json::json!({"src": "primal", "tol": tol, "cnt": cnt, "n": self.refactorizations}),
+            );
+        }
         if cnt > 2 {
             if tol < 1e-3 {
                 crate::dual::set_dual_tol(10.0 * tol);
@@ -2157,6 +2164,12 @@ impl<'a> Solver<'a> {
             if j < p.n {
                 meas = meas.max((p.cost[j] - dot(&p.cols[j], y)).abs());
             }
+        }
+        if crate::dump::on("dualtol") {
+            crate::dump::emit(
+                "dualtol",
+                serde_json::json!({"src": "primal-cmp", "meas": meas, "tol": crate::dual::dual_tol(), "cnt": crate::dual::resid_fails(), "n": nref}),
+            );
         }
         if meas > crate::dual::dual_tol() {
             crate::dual::set_resid_fails(crate::dual::resid_fails() + 1);

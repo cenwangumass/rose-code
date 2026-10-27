@@ -18,7 +18,7 @@ pub const KINDS: &[(&str, &str, &str)] = &[
     ("lstage", "LST", "dense x (by position) of each pivot-column FTRAN after the L stage (l) and after the row etas (e)"),
     ("rho", "BTR", "pivot-row BTRAN result in output order"),
     ("tau", "BTT", "Devex cross-term BTRAN result in output order"),
-    ("dualtol", "DTOL", "dual residual check after a refactorization: meas, tol, failure count, request, factorization count"),
+    ("dualtol", "DTOL", "dual residual check after a refactorization: meas, tol, failure count, request, factorization count; the primal of a dual handoff adds src primal (call, before the raise) and primal-cmp (compare, in phase 2 only)"),
     ("dual", "BTY", "dual BTRAN after a factorization, in output order"),
     ("ord", "ORD", "pivot-row input list and changed columns per pivot (CORD for the cost-change pass)"),
     ("xb", "XB", "right-hand side and x_B of the basic-solution recompute"),
