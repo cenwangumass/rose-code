@@ -481,6 +481,9 @@ pub(crate) struct Handoff {
     pub shifted_exit: bool,
     /// `ctx+0x2a0` and `ctx+0x2b0` (iterations so far and the last snapshot) and the stability counter `ctx+0x178` at the handoff.
     pub iters: f64,
+    /// Pricing dump baseline for `ctx+0x2a0`; restored-variable retries include prior primal pivots.
+    /// Kept separate from `iters`, which remains the input to the handoff decisions.
+    pub pricing_iters: f64,
     pub snap: f64,
     pub c178: u32,
     /// A restored variable restarts primal in the same quad context.
@@ -2682,7 +2685,7 @@ impl<'a> Solver<'a> {
                 .collect();
             crate::dump::emit(
                 "xpricing",
-                serde_json::json!({"dq": dq, "wq": wq, "tag": tag, "done": self.iters_done, "pass": QUAD_PRIMALS.with(|c| c.get()), "c35c": crate::dual::C35C.with(|c| c.get()), "it_base": self.handoff.map(|h| h.iters), "fac": self.refactorizations, "excl": self.excluded, "d": self.d, "w": self.w, "list": self.list, "basic": self.basic}),
+                serde_json::json!({"dq": dq, "wq": wq, "tag": tag, "done": self.iters_done, "pass": QUAD_PRIMALS.with(|c| c.get()), "c35c": crate::dual::C35C.with(|c| c.get()), "it_base": self.handoff.map(|h| h.pricing_iters), "fac": self.refactorizations, "excl": self.excluded, "d": self.d, "w": self.w, "list": self.list, "basic": self.basic}),
             );
         }
     }

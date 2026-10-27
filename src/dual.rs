@@ -5173,6 +5173,7 @@ fn solve_pass<R: Real>(
                 dual_level: s.level,
                 shifted_exit: !R::QUAD && s.rejected_end && s.pert != 0,
                 iters: (s.it_base + s.iters) as f64,
+                pricing_iters: (s.it_base + s.iters) as f64,
                 snap: (s.it_base + s.stall_it as usize) as f64,
                 c178: C178.with(|c| c.get()),
                 preserve_ratio: false,
@@ -5305,6 +5306,9 @@ fn solve_pass<R: Real>(
                     dual_level: s.level,
                     shifted_exit: false,
                     iters: (s.it_base + s.iters) as f64,
+                    // The native context keeps its iteration counter across this retry;
+                    // `r.iterations` includes every completed primal run here.
+                    pricing_iters: (s.it_base + s.iters + r.iterations) as f64,
                     snap: (s.it_base + s.stall_it as usize) as f64,
                     c178: C178.with(|c| c.get()),
                     preserve_ratio: R::QUAD,
@@ -5495,6 +5499,7 @@ fn solve_pass<R: Real>(
                     dual_level: s.level,
                     shifted_exit: false,
                     iters: (s.it_base + s.iters) as f64,
+                    pricing_iters: (s.it_base + s.iters) as f64,
                     snap: (s.it_base + s.stall_it as usize) as f64,
                     c178: C178.with(|c| c.get()),
                     preserve_ratio: false,
