@@ -480,6 +480,8 @@ thread_local! {
     pub(crate) static QUAD_PRIMALS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
     pub(crate) static QUAD_EEFA: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     pub(crate) static HANDOFF: std::cell::Cell<Option<Handoff>> = const { std::cell::Cell::new(None) };
+    /// Row-wise matrix retained by the controller across a dual/primal handoff.
+    pub(crate) static HANDOFF_ROWS: std::cell::RefCell<Option<Vec<Vec<usize>>>> = const { std::cell::RefCell::new(None) };
     /// The primal ended with status -1002 from its drift test (not from a singular factorization): the controller restarts from the primal's start basis.
     /// The reference's iteration counter `ctx+0x2a8` (all dual and primal iterations of the solve), the infeasibility sum `ctx+0x120` at the last progress check (it outlives
     /// the primal restarts), and the stall exit of the x87 primal (`0x27e100`, status -1004 at `0x27e6e4`).
@@ -4693,6 +4695,11 @@ fn solve_primal(
             }
         }
     }
+    if handoff.is_some_and(|h| !h.quad) {
+        HANDOFF_ROWS.with(|c| *c.borrow_mut() = Some(s.rrows.clone()));
+    } else {
+        HANDOFF_ROWS.with(|c| *c.borrow_mut() = None);
+    }
     // The starting factorization's work, which the reference counts after its first refactorization check.
     let mut lu_work = Vec::new();
     if opts.faithful_ftran && opts.faithful_positions {
@@ -6113,7 +6120,7 @@ fn solve_primal(
             Some(pr) => pr[q],
             None => dot(&p.cols[q], &rho),
         };
-        if s.handoff.is_some() {
+        if s.handoff.is_some_and(|h| !h.quad) {
             // The pair of the pivot check at the next pricing (`ctx+0x300`, `ctx+0x308`): the pivot from the column and from the row.
             // A structural entering variable's row value is the pivot element itself (as in the update of its `d`); a slack's is the row product.
             s.stale = Some((alpha_rq, if q < n { alpha_rq } else { arq_x }));
@@ -6303,6 +6310,24 @@ fn solve_primal(
             for &(i, _) in &p.cols[leave] {
                 s.rrows[i].push(leave);
             }
+        }
+        if s.handoff.is_some() {
+            HANDOFF_ROWS.with(|c| {
+                if let Some(rows) = c.borrow_mut().as_mut() {
+                    if q < n {
+                        for &(i, _) in &p.cols[q] {
+                            if let Some(k) = rows[i].iter().position(|&j| j == q) {
+                                rows[i].swap_remove(k);
+                            }
+                        }
+                    }
+                    if leave < n && !s.is_fixed(leave) {
+                        for &(i, _) in &p.cols[leave] {
+                            rows[i].push(leave);
+                        }
+                    }
+                }
+            });
         }
         s.factor.update(r, alpha);
         if let Some(mi) = s.mirror.as_mut() {

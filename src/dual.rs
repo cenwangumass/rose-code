@@ -4184,6 +4184,7 @@ fn solve_frame(
     DUAL_HANDOFFS.with(|c| c.set(0));
     C35C.with(|c| c.set(1));
     C178.with(|c| c.set(0));
+    crate::simplex::HANDOFF_ROWS.with(|c| *c.borrow_mut() = None);
     LARGE_XB.with(|c| c.set(false));
     crate::simplex::QUAD_PRIMALS.with(|c| c.set(0));
     // The quad mode (`ctx+0x28`): once the controller switched, every later pass runs the extended-precision twin of the dual.
@@ -4243,6 +4244,7 @@ fn solve_frame(
                 switch_start = Some(b);
             }
             Err(SolveError::SingularBasis) if carry.retries < 100 => {
+                crate::simplex::HANDOFF_ROWS.with(|c| *c.borrow_mut() = None);
                 let Some((
                     iters,
                     fac,
@@ -4548,6 +4550,9 @@ fn solve_pass<R: Real>(
         }
     }
     s.build_rrows();
+    if let Some(rows) = crate::simplex::HANDOFF_ROWS.with(|c| c.borrow_mut().take()) {
+        s.rrows = rows;
+    }
     let dt = s.true_d();
     s.work
         .add_from(0x12de50, 0xe53a7, s.mirror.work, crate::work::FAC);
@@ -5110,6 +5115,9 @@ fn solve_pass<R: Real>(
                 },
             };
             let snap_basis = snap.map(|(basic, at_upper)| Basis { basic, at_upper });
+            if from_snap {
+                crate::simplex::HANDOFF_ROWS.with(|c| *c.borrow_mut() = None);
+            }
             let mut r2 =
                 solve_pass::<R>(model, snap_basis.as_ref().or(Some(&r.basis)), opts, &carry2)?;
             r2.iterations += carry2.iters;
