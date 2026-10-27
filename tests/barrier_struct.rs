@@ -147,10 +147,12 @@ fn dense_rule_cut() {
     assert_eq!(order::dense_rule(&m).unwrap(), vec![0, 1]);
     let m = rose::mps::parse(&mps(999, &[999, 999], 20)).unwrap();
     assert!(order::dense_rule(&m).unwrap().is_empty());
-    // Two full columns plus 100 columns of 150 entries and 5000 singletons: cut 1000, thr2 = 100, so the 150-entry columns reach the cost scan.
-    let m = rose::mps::parse(&mps(1000, &[vec![1000; 2], vec![150; 100]].concat(), 5000)).unwrap();
-    assert!(matches!(
-        order::dense_rule(&m),
-        Err(order::StructError::DenseScan)
-    ));
+    // The overlapping columns trigger the cost scan; increasing the number of
+    // rows and singletons raises its cutoff enough that no columns are selected.
+    let m = rose::mps::parse(&mps(1000, &vec![100; 21], 1000)).unwrap();
+    let mut dense = order::dense_rule(&m).unwrap();
+    dense.sort_unstable();
+    assert_eq!(dense, (0..21).collect::<Vec<_>>());
+    let m = rose::mps::parse(&mps(3000, &vec![100; 21], 3000)).unwrap();
+    assert!(order::dense_rule(&m).unwrap().is_empty());
 }

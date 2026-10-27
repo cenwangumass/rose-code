@@ -4,14 +4,12 @@
 //! Conventions: `perm[original] = position`. A [`Pattern`] is the strictly off-diagonal symmetric pattern of `A A'` over the
 //! model's rows in file order, with each dense column an extra node after the rows.
 //!
-//! Known gaps, reported as errors (never approximated):
-//! - the cost scan `0x31bc1a` of the dense-column rule (columns between the two dense thresholds): [`StructError::DenseScan`] (not reached by the 12 models).
 use crate::model::LpModel;
 use std::collections::VecDeque;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum StructError {
-    /// A column count between the two dense thresholds starts the cost scan `0x31bc1a` (not decoded).
+    /// Reserved for compatibility; the dense-column scan is implemented.
     DenseScan,
 }
 
@@ -19,7 +17,7 @@ impl std::fmt::Display for StructError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             StructError::DenseScan => {
-                write!(f, "dense-column cost scan 0x31bc1a needed (not decoded)")
+                write!(f, "dense-column scan error")
             }
         }
     }
@@ -86,14 +84,15 @@ fn columns(m: &LpModel) -> Vec<Vec<usize>> {
 /// The dense columns of the model conversion `0x31af70` (`P+0x218`; port of `dense_columns` of `tools/barrier_order.py`, `specs/barrier.md` "Dense columns").
 /// With `nrows < 1000` there are none. Otherwise: the histogram of the column counts is walked from `d = 0` with `S` = sum of `d'^2 hist[d']` (double) over
 /// `d' < d` and `T` = number of columns with count `>= d`; the first `d` with `hist[d] > 0`, `d^2 > S` and `d > 5 T` is the cut (none: `int(max(50 nnz /
-/// max(ncols, 1), 500))`). Dense = columns with count `>= cut`. A column with `int(max(10 nnz / max(ncols, 1), 100)) <= count < cut` starts a cost scan
-/// (`0x31bc1a`) that is not decoded ([`StructError::DenseScan`]; no model reaches it).
+/// max(ncols, 1), 500))`). Columns at or above the cut are dense. A remaining column with at least `int(max(10 nnz / max(ncols, 1), 100))` entries starts
+/// the cost scan `0x31bc1a`, which can select further columns.
 pub fn dense_rule(m: &LpModel) -> Result<Vec<usize>, StructError> {
     let nrows = m.num_rows();
     if nrows < 1000 {
         return Ok(Vec::new());
     }
-    let cnt: Vec<usize> = columns(m).iter().map(|c| c.len()).collect();
+    let cols = columns(m);
+    let cnt: Vec<usize> = cols.iter().map(|c| c.len()).collect();
     let (nc, nnz) = (cnt.len(), cnt.iter().sum::<usize>());
     let mut hist = vec![0usize; nrows + 1];
     for &c in &cnt {
@@ -113,19 +112,60 @@ pub fn dense_rule(m: &LpModel) -> Result<Vec<usize>, StructError> {
     let avg = nnz as f64 / nc.max(1) as f64;
     let cut = cut.unwrap_or_else(|| (50.0 * avg).max(500.0) as usize);
     let thr2 = (10.0 * avg).max(100.0) as usize;
-    if cnt.iter().any(|&c| c >= thr2 && c < cut) {
-        return Err(StructError::DenseScan);
-    }
-    Ok(cnt
+    let mut dense: Vec<usize> = cnt
         .iter()
         .enumerate()
         .filter(|&(_, &c)| c >= cut)
         .map(|(j, _)| j)
-        .collect())
+        .collect();
+    if cnt.iter().any(|&c| c >= thr2 && c < cut) {
+        let mut ids: Vec<i64> = (0..nc)
+            .filter(|&j| cnt[j] < cut)
+            .map(|j| j as i64)
+            .collect();
+        let keys: Vec<f64> = cnt.iter().map(|&c| c as f64).collect();
+        shellsort(&mut ids, &keys);
+        let mut incident = vec![Vec::new(); nrows];
+        for &j in &ids {
+            for &r in &cols[j as usize] {
+                incident[r].push(j as usize);
+            }
+        }
+        // For each row, charge each column for its newly exposed neighbors;
+        // earlier columns in sorted order own the neighbors they share.
+        let mut seen = vec![usize::MAX; nrows];
+        let mut cost = vec![0.0; nc];
+        for r in 0..nrows {
+            seen[r] = r;
+            for &j in &incident[r] {
+                let mut k = 0;
+                for &s in &cols[j] {
+                    if seen[s] != r {
+                        seen[s] = r;
+                        k += 1;
+                        cost[j] += k as f64;
+                    }
+                }
+            }
+        }
+        // Walk backward, resetting both totals whenever the cost clears the threshold.
+        let (mut start, mut c, mut s) = (ids.len(), 0.0, 0.0);
+        for i in (0..ids.len()).rev() {
+            c += cost[ids[i] as usize];
+            s += (nc + nrows - i) as f64;
+            if c > 10.0 * s + 1000.0 {
+                start = i;
+                c = 0.0;
+                s = 0.0;
+            }
+        }
+        dense.extend(ids[start..].iter().map(|&j| j as usize));
+    }
+    Ok(dense)
 }
 
-/// The columns taken as dense, ascending: the reference's rule ([`dense_rule`]) when `min_nnz` is [`DENSE_AUTO`], else every column with at least
-/// `min_nnz` nonzeros (tests). Panics when the rule reaches the undecoded cost scan.
+/// The columns taken as dense, in dense-node order: the reference's rule ([`dense_rule`]) when `min_nnz` is [`DENSE_AUTO`], else every column with at least
+/// `min_nnz` nonzeros (tests).
 pub fn dense_columns(m: &LpModel, min_nnz: usize) -> Vec<usize> {
     if min_nnz == DENSE_AUTO {
         return dense_rule(m).unwrap_or_else(|e| panic!("{e}"));
