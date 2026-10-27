@@ -142,3 +142,61 @@ fn terminal_fresh_scan_is_not_a_pricing_call() {
     }
     assert_eq!(calls, 25, "expected the reference's pricing call count");
 }
+
+#[test]
+fn primal_residual_child() {
+    if std::env::var_os("ROSE_RESID_TEST").is_none() {
+        return;
+    }
+    let model = mps::parse(include_str!("fixtures/fx_midsing_1106.mps")).unwrap();
+    let mut opts = SolveOptions::dual();
+    opts.max_iterations = 200;
+    opts.refactor_schedule = Some(vec![
+        4,
+        10,
+        16,
+        16,
+        16,
+        usize::MAX,
+        4,
+        10,
+        usize::MAX,
+        4,
+        10,
+        usize::MAX,
+        4,
+        10,
+        usize::MAX,
+        4,
+        11,
+        18,
+        usize::MAX,
+        7,
+        9,
+        9,
+    ]);
+    solve(&model, None, &opts).unwrap();
+}
+
+#[test]
+fn primal_handoff_residuals_use_reference_accumulation_order() {
+    let output = Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", "primal_residual_child", "--nocapture"])
+        .env("ROSE_RESID_TEST", "1")
+        .env("ROSE_DUMP", "dualtol")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    let vals: Vec<f64> = stderr
+        .lines()
+        .filter_map(|line| line.strip_prefix("DTOL "))
+        .map(|line| serde_json::from_str::<serde_json::Value>(line).unwrap())
+        .filter(|r| r["src"] == "primal-cmp")
+        .map(|r| r["meas"].as_f64().unwrap())
+        .collect();
+    assert_eq!(
+        vals,
+        [7.75, 9.375, 7.75, 9.375, 7.75, 9.375, 13.1875, 7.75, 9.375, 13.1875]
+    );
+}

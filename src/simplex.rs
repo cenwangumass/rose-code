@@ -2363,7 +2363,13 @@ impl<'a> Solver<'a> {
         let mut meas = 0.0f64;
         for &j in &self.basic {
             if j < p.n {
-                meas = meas.max((p.cost[j] - dot(&p.cols[j], y)).abs());
+                let residual = if self.handoff.is_some_and(|h| h.quad) {
+                    p.cost[j] - dot(&p.cols[j], y)
+                } else {
+                    // The double residual kernel subtracts in stored-column order, with eight lanes above the alignment peel (0x145808..0x1459c5).
+                    dot_lanes_from(&p.fcols[j], y, p.offs[j] & 1, p.cost[j])
+                };
+                meas = meas.max(residual.abs());
             }
         }
         if crate::dump::on("dualtol") {
