@@ -3083,7 +3083,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 }
             }
             // The reference's input vector (`0xcd720`): a dense one when twice the summed column counts exceed m, else the touched
-            // rows in order of first touch. Then the plain FTRAN of the factor.
+            // rows above the drop tolerance in order of first touch (`0xcdb53..0xcdb8a`). Then the plain FTRAN of the factor.
             let dense_in = 2 * est > m;
             // Work of `0xcd720`: the input vector (`4 sum len` for a list, `2 m` for a dense one, doubled) before the FTRAN.
             self.work.add(
@@ -3099,6 +3099,9 @@ impl<'a, R: Real> Dual<'a, R> {
                 (0..m).filter(|&i| rhs[i] != R::ZERO).collect()
             } else {
                 touched
+                    .into_iter()
+                    .filter(|&i| rhs[i].abs() > R::c(DROP_TOL))
+                    .collect()
             };
             let vals: Vec<R> = rows.iter().map(|&i| rhs[i]).collect();
             let dense_est = if dense_in {
