@@ -631,6 +631,17 @@ pub fn levels_rng(
     bisect: Option<Bisect>,
     rng_out: &mut u64,
 ) -> Result<Vec<i64>, StructError> {
+    levels_mode(p, n1, bisect, rng_out, false)
+}
+
+/// [`levels_rng`] in mode 1 of `0x324330` (`repeat`): the component pass is repeated until no component of -1 nodes exceeds the size limit.
+pub fn levels_mode(
+    p: &Pattern,
+    n1: usize,
+    bisect: Option<Bisect>,
+    rng_out: &mut u64,
+    repeat: bool,
+) -> Result<Vec<i64>, StructError> {
     let n = p.n;
     let n1 = n1.min(n);
     let thr = dense_threshold(n, p.nnz());
@@ -647,58 +658,67 @@ pub fn levels_rng(
             }
         })
         .collect();
-    let mut comp = vec![usize::MAX; n];
-    let mut sizes = Vec::new();
-    for st in 0..n {
-        if lv[st] == -1 && comp[st] == usize::MAX {
-            let c = sizes.len();
-            comp[st] = c;
-            let mut stack = vec![st];
-            let mut cnt = 1;
-            while let Some(u) = stack.pop() {
-                for &x in p.adj(u) {
-                    if lv[x] == -1 && comp[x] == usize::MAX {
-                        comp[x] = c;
-                        stack.push(x);
-                        cnt += 1;
-                    }
-                }
-            }
-            sizes.push(cnt);
-        }
-    }
     let big = 600.max(n / 100);
     let mut bisect = bisect;
     let mut rng = *rng_out;
     let mut default = |sz: usize, cp: &[usize], ri: &[usize]| partition(sz, cp, ri, &mut rng);
-    for (c, &sz) in sizes.iter().enumerate() {
-        if sz > big {
-            let b: Bisect = match bisect.as_mut() {
-                Some(b) => &mut **b,
-                None => &mut default,
-            };
-            let nodes: Vec<usize> = (0..n).filter(|&i| comp[i] == c).collect();
-            let mut loc = vec![usize::MAX; n];
-            for (k, &v) in nodes.iter().enumerate() {
-                loc[v] = k;
+    loop {
+        let sep0 = lv.iter().filter(|&&x| x == -2).count();
+        let mut comp = vec![usize::MAX; n];
+        let mut sizes = Vec::new();
+        for st in 0..n {
+            if lv[st] == -1 && comp[st] == usize::MAX {
+                let c = sizes.len();
+                comp[st] = c;
+                let mut stack = vec![st];
+                let mut cnt = 1;
+                while let Some(u) = stack.pop() {
+                    for &x in p.adj(u) {
+                        if lv[x] == -1 && comp[x] == usize::MAX {
+                            comp[x] = c;
+                            stack.push(x);
+                            cnt += 1;
+                        }
+                    }
+                }
+                sizes.push(cnt);
             }
-            let mut cp = vec![0];
-            let mut ri = Vec::new();
-            for &v in &nodes {
-                ri.extend(
-                    p.adj(v)
-                        .iter()
-                        .filter(|&&x| loc[x] != usize::MAX)
-                        .map(|&x| loc[x]),
-                );
-                cp.push(ri.len());
-            }
-            let lab = b(sz, &cp, &ri);
-            for (k, &v) in nodes.iter().enumerate() {
-                if lab[k] == 2 {
-                    lv[v] = -2;
+        }
+        for (c, &sz) in sizes.iter().enumerate() {
+            if sz > big {
+                let b: Bisect = match bisect.as_mut() {
+                    Some(b) => &mut **b,
+                    None => &mut default,
+                };
+                let nodes: Vec<usize> = (0..n).filter(|&i| comp[i] == c).collect();
+                let mut loc = vec![usize::MAX; n];
+                for (k, &v) in nodes.iter().enumerate() {
+                    loc[v] = k;
+                }
+                let mut cp = vec![0];
+                let mut ri = Vec::new();
+                for &v in &nodes {
+                    ri.extend(
+                        p.adj(v)
+                            .iter()
+                            .filter(|&&x| loc[x] != usize::MAX)
+                            .map(|&x| loc[x]),
+                    );
+                    cp.push(ri.len());
+                }
+                let lab = b(sz, &cp, &ri);
+                for (k, &v) in nodes.iter().enumerate() {
+                    if lab[k] == 2 {
+                        lv[v] = -2;
+                    }
                 }
             }
+        }
+        if !repeat
+            || !sizes.iter().any(|&z| z > big)
+            || lv.iter().filter(|&&x| x == -2).count() == sep0
+        {
+            break;
         }
     }
     drop(default);
@@ -1369,27 +1389,35 @@ pub fn structure_order(
         dense_columns(m, dense_min)
     };
     let (pattern, n1) = aat_pattern(m, &dense);
-    let run = |seed: u64| -> Result<(Vec<i64>, OrderResult, Symbolic), StructError> {
+    let run = |seed: u64, repeat: bool| -> Result<(Vec<i64>, OrderResult, Symbolic), StructError> {
         let mut rng = seed;
-        let lv = levels_rng(&pattern, n1, None, &mut rng)?;
+        let lv = levels_mode(&pattern, n1, None, &mut rng, repeat)?;
         let o = order(&pattern, &lv)?;
         let mut s = symbolic(&pattern, &o.perm, n1);
         s.rng = rng;
         Ok((lv, o, s))
     };
-    let first = run(0);
+    let first = run(0, false);
     let best = match first {
-        // `BarOrder = -1` (the release default): when the first ordering is expensive (more than [`AUTO_ORDER_OPS`] operations) the driver runs five more
+        // `BarOrder = -1` (the release default): when `n > 1000`, `500 nnz <= ops` and `nnz <= nz` of the first ordering (`0x31dd40..0x31dd88`; the reference also needs its work estimate `xmm1 <= 2`, not modelled) the driver runs five more
         // with generator seeds `AUTO_ORDER_SEED + t` (`t = 0 .. 5`, mode 1 of `0x324330`) and keeps the cheapest by operations (the first on ties).
-        Ok(f) if auto && f.1.ops > AUTO_ORDER_OPS => {
+        Ok(f)
+            if auto
+                && n_nodes(&pattern) > 1000
+                && 500.0 * pattern.nnz() as f64 <= f.1.ops
+                && pattern.nnz() as i64 <= f.1.nz + n_nodes(&pattern) as i64 =>
+        {
+            // The generator the iterations draw from (early centering) keeps the state of the first ordering: the tasks run on their own seeded states.
+            let rng0 = f.2.rng;
             let mut best = f;
             for t in 0..5 {
-                if let Ok(c) = run(AUTO_ORDER_SEED + t) {
+                if let Ok(c) = run(AUTO_ORDER_SEED + t, true) {
                     if c.1.ops < best.1.ops {
                         best = c;
                     }
                 }
             }
+            best.2.rng = rng0;
             Ok(best)
         }
         other => other,
@@ -1407,9 +1435,10 @@ pub fn structure_order(
     }
 }
 
-/// Operations of the first ordering above which `BarOrder = -1` tries more orderings (guess: the flops threshold 1e10 of the replaced pivots; 1.0098e10 tries,
-/// everything captured below 1e7 does not).
-pub const AUTO_ORDER_OPS: f64 = 1e10;
+fn n_nodes(p: &Pattern) -> usize {
+    p.n
+}
+
 /// Generator state of the first extra ordering (`BarOrder = -1`): `Seed + task + 11` (`0x31e07d..0x31e09c`, `Seed` = `P+0x2cd0` = 0). The orderings of tasks 0, 1, 2, 4 of `fx_bar_dense3400`
 /// match the reference bit for bit; task 3 does not, and none of the five do on `fx_bar_mixed12` (mode 1 of `0x324330` differs from mode 3 in more than the seed), so the
 /// release profile does not use it yet.

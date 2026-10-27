@@ -3656,7 +3656,7 @@ pub fn solve_exact(model: &LpModel, o: &Options) -> Result<Solution, BarrierErro
 /// The release profile of the reference (`reverse-engineer/specs/barrier-release.md`): the model scaled by [`crate::scale::compute_with_ranges`] over [`range_columns`], adaptive correctors.
 pub fn solve_release(model: &LpModel, o: &Options) -> Result<Solution, BarrierError> {
     let sc = crate::scale::compute_with_ranges(model, &range_columns(model));
-    let s = crate::order::structure(model, crate::order::DENSE_COL_MIN)
+    let s = crate::order::structure_order(model, crate::order::DENSE_COL_MIN, true)
         .map_err(|e| BarrierError::Unsupported(e.3.to_string()))?;
     let f = std_form_scaled(model, &s.sym.perm, Some(&sc))?;
     let mut solver = crate::chol::CholSolver::new(&f, &s.sym);

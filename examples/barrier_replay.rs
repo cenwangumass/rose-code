@@ -11,7 +11,7 @@ use serde_json::json;
 fn main() {
     let a: Vec<String> = std::env::args().collect();
     let model = mps::parse(&std::fs::read_to_string(&a[1]).unwrap()).unwrap();
-    let auto = std::env::var("ORD_AUTO").is_ok();
+    let auto = std::env::var("BARRIER_PROFILE").map_or(false, |v| v == "release");
     let s = match order::structure_order(&model, order::DENSE_COL_MIN, auto) {
         Ok(s) => s,
         Err(e) => {
