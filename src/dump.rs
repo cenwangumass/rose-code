@@ -34,7 +34,7 @@ pub const KINDS: &[(&str, &str, &str)] = &[
     ("startbasis", "STARTBASIS", "primal initial basis and scaled columns before auxiliary factorization"),
     ("luout", "LUOUT", "numerics of each fresh factor: the diagonal and the L columns (the reference's lu_in `diag`, `Lcp`/`Lidx`/`Lval`)"),
     ("ent", "ENT", "phase 1 ratio-test inputs: the signed FTRAN list, and distance, range and type per basis position"),
-    ("ent2", "ENT2", "phase 2 ratio-test inputs: the signed FTRAN list, and distance to the lower bound, range and free flag per basis position"),
+    ("ent2", "ENT2", "phase 2 ratio-test inputs: the signed FTRAN list, and distance to the lower bound, range and free flag per basis position; ENT2OUT records request-2 aborts"),
     ("bsolve", "BSOLVE", "basic-solution FTRAN (after a factorization): L-stage result, x after the tail columns, final x, kinds, slots, diag"),
     ("switch", "SWITCH", "method decision after each refactorization (`0x142500`): the counters it reads and whether it switched to Devex pricing"),
     ("dcr", "DCR", "the dual start basis: the (column, row) assignments of the crash in order"),

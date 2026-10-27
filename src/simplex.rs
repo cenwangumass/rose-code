@@ -4457,6 +4457,7 @@ fn ratio_test(
     col_count: &dyn Fn(usize) -> Option<usize>,
     is_free: &dyn Fn(usize) -> bool,
     passes: &mut Vec<(usize, usize)>,
+    empty_retry: &mut bool,
 ) -> (Option<usize>, f64, f64) {
     let mut first = true;
     let mut prior = (None, INF, 0.0);
@@ -4496,6 +4497,7 @@ fn ratio_test(
             return (None, own, 0.0);
         }
         if theta >= INF || cands.is_empty() {
+            *empty_retry = !first;
             return prior;
         }
         let (mut best_w, mut chosen, mut step) = (0.0, NONE, 0.0);
@@ -5869,6 +5871,7 @@ fn solve_primal(
         } else {
             INF
         };
+        let mut empty_retry = false;
         let mut leave_to_upper: Option<bool> = None;
         let (mut chosen, mut step, _pivot) = if infeasible {
             let (xs, basic, lo, up) = (&s.x, &s.basic, &p.lo, &p.up);
@@ -6059,6 +6062,7 @@ fn solve_primal(
                 &col_count,
                 &free,
                 &mut passes,
+                &mut empty_retry,
             );
             if let Some(mi) = s.mirror.as_ref() {
                 // The reference's ratio test (`0xef960`): per pass, a scan of the FTRAN result and its stored candidates.
@@ -6084,6 +6088,26 @@ fn solve_primal(
             }
             res
         };
+        // The empty strict rescan requests a fresh factor after 16 updates
+        // (0xeff6d..0xeff92). No pivot or iteration is booked.
+        if empty_retry
+            && s.mirror.as_ref().map_or(s.factor.num_updates(), |mi| mi.updates()) > 16
+        {
+            if crate::dump::on("ent2") {
+                crate::dump::emit_tag(
+                    "ent2",
+                    "ENT2OUT",
+                    serde_json::json!({"iter": iterations, "q": q, "request": 2}),
+                );
+            }
+            if let Some(mi) = s.mirror.as_mut() {
+                mi.count_all_updates();
+            }
+            s.quad_switch_allowed = true;
+            s.refactor()?;
+            s.quad_switch_allowed = false;
+            continue;
+        }
         if crate::dump::on("ent") {
             crate::dump::emit_tag(
                 "ent",
@@ -7181,6 +7205,23 @@ mod tests {
             (Status::Optimal, 1, -100.0)
         );
         assert_eq!(result.x, vec![100.0]);
+    }
+
+    #[test]
+    fn ratio_empty_strict_retry_reports_first_selection() {
+        let entries = [(0, -1e14), (1, 0.01)];
+        let down = |_| 1.0;
+        let up = |_| INF;
+        let col_count = |_| None;
+        let free = |_| false;
+        let mut passes = Vec::new();
+        let mut empty_retry = false;
+        let result = ratio_test(1e-6, 1e-9, INF, &entries, &down, &up,
+                                &col_count, &free, &mut passes, &mut empty_retry);
+        assert_eq!(result, (Some(1), 100.0, 0.01));
+        assert!(empty_retry);
+        assert_eq!(passes.len(), 2);
+        assert_eq!(passes[1].1, 0);
     }
 
     #[test]
