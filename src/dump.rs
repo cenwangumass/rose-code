@@ -14,6 +14,7 @@ pub const KINDS: &[(&str, &str, &str)] = &[
     ("scale", "SCALE", "once per solve: the scale factors, columns (structurals, then range columns) and rows"),
     ("pricing0", "P0", "`pricing0` scan: list, position, duals and stored d at entry (tag in), and the chosen variable with its d (tag out)"),
     ("xpricing", "XPR", "x87 primal (after a quad dual): at each scan (tag scan) and after the recompute of the duals (tag rescan): iterations done, d, w, candidate list, basis"),
+    ("xmove", "XMOVE", "x87 primal: long-double basic distances and entering distance after a move, in the previous basis order"),
     ("ftran", "FTR", "pivot-column FTRAN input rows and result in output order"),
     ("ustage", "USTG", "U-stage state of each pivot-column FTRAN: the L-stage result (spike, ascending), the diagonal, the tail columns' U entries and slots"),
     ("lstage", "LST", "dense x (by position) of each pivot-column FTRAN after the L stage (l) and after the row etas (e)"),

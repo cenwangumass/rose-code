@@ -5628,6 +5628,8 @@ fn solve_primal(
                 let j = basic[pos];
                 classify(xs[j], lo[j], up[j], tol, s.dst[j])
             };
+            let eefa = (s.sw.mode != 0 && !s.sw.keep468)
+                || (s.handoff.is_some_and(|h| h.quad) && QUAD_EEFA.with(|c| c.get()));
             if crate::dump::on("ent") {
                 let ld = |v: crate::f80::F80| {
                     let (m, se) = v.repr();
@@ -5659,13 +5661,12 @@ fn solve_primal(
                     "idx": entries.iter().map(|e| e.0).collect::<Vec<_>>(), "val": entries.iter().map(|e| e.1).collect::<Vec<_>>(),
                     "d": dist, "rng": rng, "typ": typ, "dense": ft_dense, "bl": bl, "kinds": kinds, "dims": dims,
                     "quad": s.handoff.is_some_and(|h| h.quad),
+                    "algorithm": if eefa { "harris" } else { "breakpoint" },
                     "basic": s.basic, "dq": s.dst_q.as_ref().map(|d| s.basic.iter().map(|&j| ld(d[j])).collect::<Vec<_>>()),
                     "aq": entq.as_ref().map(|v| v.iter().map(|&a| ld(a)).collect::<Vec<_>>())}),
                 );
             }
             let mut passes = Vec::new();
-            let eefa = (s.sw.mode != 0 && !s.sw.keep468)
-                || (s.handoff.is_some_and(|h| h.quad) && QUAD_EEFA.with(|c| c.get()));
             let mut passes2: Vec<(usize, usize)> = Vec::new();
             let pick = if eefa {
                 phase1_eefa0(tol, opts.pivot_tol, own, &entries, &info, &mut passes2)
@@ -6001,21 +6002,27 @@ fn solve_primal(
         // Phase 2 does not move the point by a negative Harris step (reference, PEROLD ratio calls 50, 82, 354, ...: the
         // basics stay as they are, the entering variable stays at its bound and the leaving one keeps its computed value).
         let move_step = if infeasible { step } else { step.max(0.0) };
-        let move_q = if infeasible && p.lo[q] == 0.0 && s.x[q] == 0.0 && dir > 0.0 {
-            chosen.and_then(|k| {
-                let j = s.basic[entries[k].0];
-                if is_inf(p.lo[j]) || entq.is_none() {
-                    return None;
-                }
-                let d = s.dst_q.as_ref()?.get(j).copied()?;
-                let upper = leave_to_upper
-                    .unwrap_or(entries[k].1 < 0.0)
-                    .then_some((p.lo[j], p.up[j]));
-                Some(x87_move_step(d, entries[k].1, upper))
-            })
+        let before_move_q = if crate::dump::on("xmove") {
+            s.dst_q.clone()
         } else {
             None
         };
+        let move_q =
+            if (infeasible || step >= 0.0) && !is_inf(p.lo[q]) && s.x[q] == p.lo[q] && dir > 0.0 {
+                chosen.and_then(|k| {
+                    let j = s.basic[entries[k].0];
+                    if is_inf(p.lo[j]) || entq.is_none() {
+                        return None;
+                    }
+                    let d = s.dst_q.as_ref()?.get(j).copied()?;
+                    let upper = leave_to_upper
+                        .unwrap_or(entries[k].1 < 0.0)
+                        .then_some((p.lo[j], p.up[j]));
+                    Some(x87_move_step(d, entries[k].1, upper))
+                })
+            } else {
+                None
+            };
         if move_q.is_none() {
             s.x_q = None;
             s.dst_q = None;
@@ -6068,11 +6075,10 @@ fn solve_primal(
                 crate::f80::F80::from_f64(q_base)
             };
             x[q] = base + crate::f80::F80::from_f64(dir) * move_q;
-            d[q] = if is_inf(p.lo[q]) {
-                crate::f80::F80::from_f64(p.up[q]) - x[q]
-            } else {
-                x[q] - crate::f80::F80::from_f64(p.lo[q])
-            };
+            // The x87 basic array stores the distance from the lower bound.
+            // An entrant at that bound therefore starts at the move itself;
+            // subtracting its bound again would lose the low bits.
+            d[q] = move_q;
             s.x[q] = x[q].to_f64();
             s.dst[q] = d[q].to_f64();
         }
@@ -6144,6 +6150,16 @@ fn solve_primal(
             }
         }
         let alpha_rq = alpha[r];
+        if crate::dump::on("xmove") && s.handoff.is_some_and(|h| h.quad) {
+            let ld = |v: crate::f80::F80| {
+                let (m, se) = v.repr();
+                [format!("{m:#x}"), format!("{se:#x}")]
+            };
+            crate::dump::emit(
+                "xmove",
+                serde_json::json!({"q": q, "leave": leave, "basic": s.basic, "before": before_move_q.as_ref().map(|d| s.basic.iter().map(|&j| ld(d[j])).collect::<Vec<_>>()), "dq": s.dst_q.as_ref().map(|d| s.basic.iter().map(|&j| ld(d[j])).collect::<Vec<_>>()), "qdist": s.dst_q.as_ref().map(|d| ld(d[q]))}),
+            );
+        }
 
         if s.p0.is_some() {
             // `pricing0`: no pivot row, no Devex weights, no maintained `d`; the next pricing call updates the duals by one BTRAN.
@@ -6864,6 +6880,28 @@ mod tests {
         let x = F80::from_repr(0xd1d4358125a9b3c0, 0x3ffa);
         let alpha = F80::from_repr(0xacafd5901e0fc4b2, 0x3ff8);
         assert_eq!((x - step * alpha).repr(), (0xd1bcee96debddfb0, 0x3ffa));
+    }
+
+    #[test]
+    fn x87_phase_two_move_uses_double_pivot() {
+        use crate::f80::F80;
+        // The first phase-two move on seed 2378; its ratio step is different.
+        let leaving = F80::from_repr(0xd76eda6230faf424, 0x402f);
+        let step = x87_move_step(leaving, 0.33218128348940384, None);
+        assert_eq!(step.repr(), (0xa22297c0e062703e, 0x4031));
+    }
+
+    #[test]
+    fn x87_nonzero_lower_entry_uses_distance_from_bound() {
+        use crate::f80::F80;
+        // Modified seed 4250, q19 enters from its scaled lower bound 0.256.
+        let leaving = F80::from_repr(0xad052befc9a40000, 0xc002);
+        let step = x87_move_step(leaving, -3.9999999995503153, None);
+        assert_eq!(step.repr(), (0xad052bf01d2ec002, 0x4000));
+        // Rebuilding a distance from a large bound and the actual value can
+        // erase it even though the native distance remains nonzero.
+        let base = F80::from_f64(1e20);
+        assert_ne!(((base + step) - base).repr(), step.repr());
     }
 
     #[test]
