@@ -58,3 +58,10 @@ fn x87_pure_penalty_rescans_updated_duals_before_ending() {
     let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
     assert_eq!((result.status, result.iterations), (Status::Optimal, 16010));
 }
+
+#[test]
+fn shifted_quad_retry_selects_pricing_from_handoff_count() {
+    let model = mps::parse(include_str!("fixtures/quad_3196.mps")).unwrap();
+    let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
+    assert_eq!((result.status, result.iterations), (Status::Infeasible, 142));
+}
