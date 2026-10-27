@@ -4,6 +4,15 @@
 
 use rose::{mps, solve, SolveOptions, Status};
 
+#[test]
+fn accepted_crash_basis_reaches_primal_iteration() {
+    let model = mps::parse(include_str!("fixtures/primal_5959.mps")).unwrap();
+    let mut opts = SolveOptions::release();
+    opts.max_iterations = 1;
+    let result = solve(&model, None, &opts).unwrap();
+    assert_eq!((result.status, result.iterations), (Status::IterationLimit, 1));
+}
+
 fn check(name: &str) {
     check_rows(name, usize::MAX);
 }

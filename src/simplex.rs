@@ -4751,6 +4751,12 @@ fn solve_primal(
         }
     };
     basis.validate(n, m).map_err(SolveError::InvalidBasis)?;
+    if crate::dump::on("startbasis") {
+        crate::dump::emit(
+            "startbasis",
+            serde_json::json!({"cols": basis.basic, "mat": basis.basic.iter().map(|&j| (j, &p.cols[j])).collect::<Vec<_>>()}),
+        );
+    }
     let mut kept_out = false;
     if excluded.is_none() {
         if let Some(e) = handoff
@@ -4766,7 +4772,7 @@ fn solve_primal(
     // Inspect the reference order before constructing the numeric factor, so
     // an incomplete factor returns through the ordinary singular handler.
     let mut start_work = crate::work::Work::default();
-    let initial_order = if handoff.is_some_and(|h| h.shifted_exit)
+    let mut initial_order = if handoff.is_some_and(|h| h.shifted_exit)
         && opts.faithful_ftran
         && opts.faithful_positions
     {
@@ -4796,7 +4802,7 @@ fn solve_primal(
     } else {
         None
     };
-    let start_factor_in_reference_order =
+    let mut start_factor_in_reference_order =
         initial_order.is_some() && !handoff.is_some_and(|h| h.quad);
     let mut pos_of = vec![NONE; n + m];
     for (pos, &j) in basis.basic.iter().enumerate() {
@@ -4832,8 +4838,45 @@ fn solve_primal(
                 1e-11
             },
         )
-    }
-    .map_err(|_| SolveError::SingularBasis)?;
+    };
+    let factor = match factor {
+        Ok(factor) => factor,
+        Err(_) if handoff.is_none() && opts.faithful_ftran && opts.faithful_positions => {
+            // The auxiliary ordering may reject a basis that the reference
+            // accepts. Retry only after the reference-order factor accepts it.
+            let repair_gate = excluded.is_some().then(crate::lu_order::gate_get);
+            crate::lu_order::reset_pair_gate();
+            if let Some(gate) = repair_gate {
+                crate::lu_order::gate_set(gate);
+            }
+            if let Some(r) = rs {
+                crate::lu_order::set_threshold(r.thr);
+            }
+            crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
+            let gate = crate::lu_order::gate_get();
+            let (order, st, rows) = reference_order_for(&p, &basis.basic, 1);
+            if crate::dump::on("lustart") {
+                crate::dump::emit(
+                    "lustart",
+                    serde_json::json!({"cols": basis.basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "primal": true}),
+                );
+            }
+            if order.len() != m {
+                return Err(SolveError::SingularBasis);
+            }
+            let ordered_cols: Vec<&Column> = order.iter().map(|&j| &p.cols[j]).collect();
+            let factor = Factor::with_pivot_rows(
+                m,
+                &ordered_cols,
+                &st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(),
+            )
+            .map_err(|_| SolveError::SingularBasis)?;
+            initial_order = Some((gate, order, st, rows));
+            start_factor_in_reference_order = true;
+            factor
+        }
+        Err(_) => return Err(SolveError::SingularBasis),
+    };
     let mut s = Solver {
         p: &p,
         opts,
