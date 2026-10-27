@@ -1997,60 +1997,85 @@ impl<'a, R: Real> Dual<'a, R> {
         }
         let mut nflip = 0usize;
         if bestc + xmm10 < R::ZERO {
-            let mut s = xmm10;
-            let (mut lo, mut hi) = (0usize, nn - 1);
-            while lo < hi {
-                sel += (hi - lo + 4) as f64;
-                let (pr, pc) = (ratio_arr[lo], con[lo]);
-                let mut h = hi + 1;
-                let mut l = lo as isize - 1;
-                loop {
-                    h -= 1;
-                    while pr > ratio_arr[h] {
-                        h -= 1;
-                    }
-                    while ratio_arr[h] == pr && con[h] > pc {
+            let mut second = false;
+            loop {
+                let mut s = xmm10;
+                sel = 0.0;
+                let (mut lo, mut hi) = (0usize, nn - 1);
+                while lo < hi {
+                    sel += (hi - lo + 4) as f64;
+                    let (pr, pc) = (ratio_arr[lo], con[lo]);
+                    let mut h = hi + 1;
+                    let mut l = lo as isize - 1;
+                    loop {
                         h -= 1;
                         while pr > ratio_arr[h] {
                             h -= 1;
                         }
-                    }
-                    l += 1;
-                    while ratio_arr[l as usize] > pr
-                        || (ratio_arr[l as usize] == pr && pc > con[l as usize])
-                    {
+                        while ratio_arr[h] == pr && con[h] > pc {
+                            h -= 1;
+                            while pr > ratio_arr[h] {
+                                h -= 1;
+                            }
+                        }
                         l += 1;
+                        while ratio_arr[l as usize] > pr
+                            || (ratio_arr[l as usize] == pr && pc > con[l as usize])
+                        {
+                            l += 1;
+                        }
+                        if l as usize >= h {
+                            break;
+                        }
+                        let lu = l as usize;
+                        if ratio_arr[h] > ratio_arr[lu] || con[lu] > con[h] {
+                            ratio_arr.swap(lu, h);
+                            con.swap(lu, h);
+                            lst.swap(lu, h);
+                        }
                     }
-                    if l as usize >= h {
-                        break;
+                    if s < R::ZERO {
+                        s = accumulate(s, &con[lo..=h], lo % 2, false);
+                    } else {
+                        s = accumulate(s, &con[h + 1..=hi], (h + 1) % 2, true);
                     }
-                    let lu = l as usize;
-                    if ratio_arr[h] > ratio_arr[lu] || con[lu] > con[h] {
-                        ratio_arr.swap(lu, h);
-                        con.swap(lu, h);
-                        lst.swap(lu, h);
+                    if R::ZERO > s {
+                        lo = h + 1;
+                    } else {
+                        hi = h;
                     }
                 }
-                if s < R::ZERO {
-                    s = accumulate(s, &con[lo..=h], lo % 2, false);
-                } else {
-                    s = accumulate(s, &con[h + 1..=hi], (h + 1) % 2, true);
+                nflip = lo;
+                sel_sep = R::c(-self.ptol()) > s;
+                if self.level == 0 && R::c(-self.ptol()) > s + con[lo] {
+                    self.work.add(0xc7c4f, 5.0 * nn as f64, crate::work::CTX);
+                    return Ratio {
+                        q: None,
+                        flips: Vec::new(),
+                        reject: None,
+                    };
                 }
-                if R::ZERO > s {
-                    lo = h + 1;
-                } else {
-                    hi = h;
+                // Level != 0 and the candidates cannot absorb the infeasibility (`0xcbcc8..0xcbdd4`, first pass only): a candidate at its upper bound
+                // (status -2) whose bound is infinite takes the contribution `2 infeas` (the collection does it for a status -1 one only, and only from
+                // iteration m on) and the selection runs again from the start on the arrays as the first pass left them (`0xc96c5`; random LP seed 305,
+                // call 1: three such candidates against an infeasibility of 6e36).
+                if self.level != 0 && !second && sel_sep && R::c(-self.ptol()) > s + con[lo] {
+                    let mut changed = false;
+                    for t in 0..nn {
+                        let j = row[lst[t]].0;
+                        if self.st[j] == UB && p.up[j] >= BIG {
+                            con[t] = xmm12;
+                            changed = true;
+                        }
+                    }
+                    if changed {
+                        // The first pass's partition work is booked at its own site (`0xcbcae`).
+                        self.work.add(0xcbcae, 3.0 * sel, crate::work::CTX);
+                        second = true;
+                        continue;
+                    }
                 }
-            }
-            nflip = lo;
-            sel_sep = R::c(-self.ptol()) > s;
-            if self.level == 0 && R::c(-self.ptol()) > s + con[lo] {
-                self.work.add(0xc7c4f, 5.0 * nn as f64, crate::work::CTX);
-                return Ratio {
-                    q: None,
-                    flips: Vec::new(),
-                    reject: None,
-                };
+                break;
             }
         } else if best_i > 0 {
             let b = best_i as usize;
