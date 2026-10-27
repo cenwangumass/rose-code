@@ -241,7 +241,7 @@ struct Dual<'a, R: Real = f64> {
     /// Iterations made (`ctx+0x2a0`).
     iters: usize,
     // Pricing object P (`ctx+0x478`).
-    prio: Vec<f64>,
+    prio: Vec<R>,
     /// Pricing type `P+0x44`: 0 plain dual steepest edge priorities, 1 scaled by `P70[var] / P68[row]`, 2 by `1 / P68[row]`.
     ptype: u8,
     /// Per-row weights `P+0x68` (by position) and per-variable constants `P+0x70` of the scaled priorities.
@@ -253,7 +253,7 @@ struct Dual<'a, R: Real = f64> {
     p58: f64,
     flags: Vec<u8>,
     list: Vec<usize>,
-    thr: f64,
+    thr: R,
     value_mode: bool,
     cursor: usize,
     walk_len: usize,
@@ -704,15 +704,19 @@ impl<'a, R: Real> Dual<'a, R> {
     }
 
     fn infeas(&self, r: usize) -> f64 {
+        self.infeas_real(r).to_f64()
+    }
+
+    fn infeas_real(&self, r: usize) -> R {
         let v = self.head[r];
         let x = self.xb[r];
         let (lo, up) = (self.p.lo[v], self.p.up[v]);
         if lo > -BIG && x < R::c(lo) {
-            (R::c(lo) - x).to_f64()
+            R::c(lo) - x
         } else if up < BIG && x > R::c(up) {
-            (x - R::c(up)).to_f64()
+            x - R::c(up)
         } else {
-            0.0
+            R::ZERO
         }
     }
 
@@ -1256,11 +1260,11 @@ impl<'a, R: Real> Dual<'a, R> {
 
     /// Priority of row `r` with primal infeasibility `f` (`0xc0861`, `0xc23fe`, `0xcdc9`): `f^2 / W[r]`, scaled by the pricing type
     /// (the factor 1 of the reference's variable-class multiplier holds for continuous variables).
-    fn pri(&self, r: usize, f: f64) -> f64 {
-        let base = f * f / self.w[r].to_f64();
+    fn pri(&self, r: usize, f: R) -> R {
+        let base = f * f / self.w[r];
         match self.ptype {
-            1 => base * (self.p70[self.head[r]] / self.p68[r]),
-            2 => base / self.p68[r],
+            1 => base * R::c(self.p70[self.head[r]] / self.p68[r]),
+            2 => base / R::c(self.p68[r]),
             _ => base,
         }
     }
@@ -1392,7 +1396,7 @@ impl<'a, R: Real> Dual<'a, R> {
             if f > ptol {
                 self.flags[r] = 0;
                 rows.push(r);
-                keys.push(-self.pri(r, f));
+                keys.push((-self.pri(r, self.infeas_real(r))).to_f64());
             } else {
                 self.flags[r] = 2;
             }
@@ -1408,10 +1412,7 @@ impl<'a, R: Real> Dual<'a, R> {
     /// are merged into the entries still waiting (flag 0, kept in order); ties go to the waiting entries.
     fn merge_walk_list(&mut self) {
         let mut fresh: Vec<usize> = (0..self.m).filter(|&r| self.flags[r] == 1).collect();
-        let key = |s: &Self, r: usize| {
-            let f = s.infeas(r);
-            -s.pri(r, f)
-        };
+        let key = |s: &Self, r: usize| (-s.pri(r, s.infeas_real(r))).to_f64();
         let mut keys: Vec<f64> = fresh.iter().map(|&r| key(self, r)).collect();
         ref_sort(&mut keys, &mut fresh);
         let old: Vec<usize> = self.list[..self.walk_len.min(self.list.len())]
@@ -1465,14 +1466,14 @@ impl<'a, R: Real> Dual<'a, R> {
     fn recompute_flags(&mut self, big: bool, after_pivot: bool) {
         let ptol = self.ptol();
         self.rebuilds = 40;
-        let mut maxp = 0.0f64;
+        let mut maxp = R::ZERO;
         let mut inf = vec![false; self.m];
         for r in 0..self.m {
             let f = self.infeas(r);
             if f > ptol {
                 inf[r] = true;
-                self.prio[r] = self.pri(r, f);
-                maxp = maxsd(maxp, self.prio[r]);
+                self.prio[r] = self.pri(r, self.infeas_real(r));
+                maxp = maxr(maxp, self.prio[r]);
             }
         }
         let count_now = inf.iter().filter(|&&f| f).count();
@@ -1523,9 +1524,9 @@ impl<'a, R: Real> Dual<'a, R> {
         } else {
             1e3
         };
-        let new = maxp / div;
-        self.thr = if thr_old != 0.0 && maxp > thr_old {
-            maxsd(new, thr_old)
+        let new = maxp / R::c(div);
+        self.thr = if thr_old != R::ZERO && maxp > thr_old {
+            maxr(new, thr_old)
         } else {
             new
         };
@@ -1601,9 +1602,11 @@ impl<'a, R: Real> Dual<'a, R> {
                         + (5.0 + if self.ptype == 1 { 1.0 } else { 0.0 }) * infeas as f64
                 };
                 self.work.add(0xbe039, scan, crate::work::CTX);
-                self.work.add(0xbe0a1, (old_len + 2 * old) as f64, crate::work::CTX);
+                self.work
+                    .add(0xbe0a1, (old_len + 2 * old) as f64, crate::work::CTX);
                 self.work.add(0xbe17e, (2 * fresh) as f64, crate::work::CTX);
-                self.work.add(0xbe34d, (old + fresh) as f64, crate::work::CTX);
+                self.work
+                    .add(0xbe34d, (old + fresh) as f64, crate::work::CTX);
                 self.build_walk_list();
                 if self.walk_len == 0 {
                     return None;
@@ -1615,7 +1618,7 @@ impl<'a, R: Real> Dual<'a, R> {
         }
         // Value mode (`0xccd77`): the list is compacted; a row that is feasible (flag 2..4) leaves it with flag 2, one below the threshold leaves it with
         // flag 0; the leaving row is the first maximum of the priority among the rest.
-        let mut best = 0.5 * self.thr;
+        let mut best = R::c(0.5) * self.thr;
         let mut row = None;
         let mut kept = Vec::with_capacity(self.list.len());
         let (walked, mut removed) = (self.list.len(), 0usize);
@@ -1645,8 +1648,8 @@ impl<'a, R: Real> Dual<'a, R> {
         self.list = kept;
         if row.is_none() {
             // Refresh (`0xcd031`): argmax over the rows with flag 0, threshold divided by 10, those at or above it join the list.
-            self.thr /= 10.0;
-            let mut b = 0.0;
+            self.thr /= R::c(10.0);
+            let mut b = R::ZERO;
             let before = self.list.len();
             for r in 0..self.m {
                 if self.flags[r] == 0 {
@@ -1674,7 +1677,7 @@ impl<'a, R: Real> Dual<'a, R> {
                     self.flags[r] = 1;
                     self.thr = b;
                 } else {
-                    self.thr = 1e-13;
+                    self.thr = R::c(1e-13);
                 }
             }
         }
@@ -1699,7 +1702,7 @@ impl<'a, R: Real> Dual<'a, R> {
             } else if f <= ptol {
                 self.flags[r] |= 2;
             } else {
-                self.prio[r] = self.pri(r, f);
+                self.prio[r] = self.pri(r, self.infeas_real(r));
                 match self.flags[r] {
                     3 => self.flags[r] = 1,
                     1 | 5 | 7 => {}
@@ -3273,9 +3276,9 @@ impl<'a, R: Real> Dual<'a, R> {
     fn snapshot(&self, k: usize) -> serde_json::Value {
         serde_json::json!({
             "k": k, "lvl": self.level, "req": self.request, "it": self.iters as f64, "head": self.head, "xB": self.xb.iter().map(|v| v.json()).collect::<Vec<_>>(), "d": self.d.iter().map(|v| v.json()).collect::<Vec<_>>(), "W": self.w.iter().map(|v| v.json()).collect::<Vec<_>>(),
-            "st": self.st, "flags": self.flags, "prio": self.prio, "diag": self.mirror.numerics().0.iter().map(|v| v.json()).collect::<Vec<_>>(),
+            "st": self.st, "flags": self.flags, "prio": self.prio.iter().map(|v| v.to_f64()).collect::<Vec<_>>(), "diag": self.mirror.numerics().0.iter().map(|v| v.json()).collect::<Vec<_>>(),
             "list": if self.value_mode { self.list.clone() } else { self.list[..self.walk_len.min(self.list.len())].to_vec() },
-            "thr": self.thr, "p40": self.value_mode as u8, "cur": self.cursor,
+            "thr": self.thr.to_f64(), "p40": self.value_mode as u8, "cur": self.cursor,
         })
     }
 
@@ -3303,8 +3306,7 @@ impl<'a, R: Real> Dual<'a, R> {
             let v = self.head[r];
             let (x, lo, up) = (self.xb[r].to_f64(), self.p.lo[v], self.p.up[v]);
             if (lo > -BIG && lo - tol > x) || (up < BIG && x > tol + up) {
-                let f = self.infeas(r);
-                self.prio[r] = self.pri(r, f);
+                self.prio[r] = self.pri(r, self.infeas_real(r));
                 self.flags[r] = 0;
             } else {
                 self.flags[r] = 2;
@@ -3328,8 +3330,7 @@ impl<'a, R: Real> Dual<'a, R> {
             let v = self.head[r];
             let (x, lo, up) = (self.xb[r].to_f64(), self.p.lo[v], self.p.up[v]);
             if (lo > -BIG && lo - tol > x) || (up < BIG && x > tol + up) {
-                let f = self.infeas(r);
-                self.prio[r] = self.pri(r, f);
+                self.prio[r] = self.pri(r, self.infeas_real(r));
                 self.flags[r] = 0;
                 if self.value_mode && self.prio[r] >= self.thr {
                     self.list.push(r);
@@ -4036,7 +4037,7 @@ impl<'a, R: Real> Dual<'a, R> {
         self.avg_touch = (2.0 * pv.col.len() as f64 + (it - 2.0) * self.avg_touch) / it;
         if self.value_mode {
             if ninf > self.avg_touch.max((self.m as f64).powf(0.45).floor()) {
-                self.thr *= 1.1;
+                self.thr *= R::c(1.1);
             }
             // The pivot row leaves the list at the next pricing call whatever its value (`0xc0732`); its priority is refreshed for the entering variable.
             // An entering variable that lands beyond its bound stays on the list with its infeasibility (BOEING2 call 57); a feasible one gets the distance
@@ -4044,9 +4045,9 @@ impl<'a, R: Real> Dual<'a, R> {
             let q = self.head[r];
             let fi = self.infeas(r);
             if fi > self.ptol() {
-                self.prio[r] = self.pri(r, fi);
+                self.prio[r] = self.pri(r, self.infeas_real(r));
             } else {
-                let d = (self.xb[r] - R::c(self.p.lo[q])).to_f64();
+                let d = self.xb[r] - R::c(self.p.lo[q]);
                 self.prio[r] = self.pri(r, d);
                 self.flags[r] = 3;
             }
@@ -4506,7 +4507,7 @@ fn solve_pass<R: Real>(
         level: 0,
         request: 0,
         iters: 0,
-        prio: vec![0.0; m],
+        prio: vec![R::ZERO; m],
         ptype: 0,
         p68: Vec::new(),
         p70: Vec::new(),
@@ -4514,7 +4515,7 @@ fn solve_pass<R: Real>(
         p58: 0.0,
         flags: vec![2; m],
         list: Vec::new(),
-        thr: 0.0,
+        thr: R::ZERO,
         value_mode: false,
         cursor: 0,
         walk_len: 0,
