@@ -5829,15 +5829,13 @@ fn solve_primal(
             break Status::Unbounded;
         }
         if let Some(k) = chosen.filter(|_| s.mirror.is_some()) {
-            // A pivot at or below `ctx+0x398` (3e-8) requests factorization 6 if the threshold is below 0.125 or the pricing object has moves since the last factorization.
+            // A pivot at or below `ctx+0x398` (3e-8) requests factorization 6 if the threshold is below 0.125 or the pricing object has moves since the last factorization
+            // (the x87 path uses the same gates at `0x27f8eb..0x27f9c4`).
             // Otherwise reject the entering variable. If no other candidate remains, restore it and retry with its own bound removed; in this retry a tiny pivot is accepted
             // (`0x1436dd..0x1437e8`, fx_ladder_386 and fx_midsing_1106).
             let quad_retry = s.handoff.as_ref().is_some_and(|h| h.quad) && s.tiny7 == Some(q);
             if entries[k].1.abs() <= 3e-8 && !quad_retry && !retry_unbounded {
-                if crate::lu_order::threshold() < 0.125
-                    || s.pricing_moves > 0
-                    || s.handoff.as_ref().is_some_and(|h| h.quad)
-                {
+                if crate::lu_order::threshold() < 0.125 || s.pricing_moves > 0 {
                     crate::lu_order::raise_threshold(0.125);
                     s.forced = true;
                     s.tiny7 = Some(q);

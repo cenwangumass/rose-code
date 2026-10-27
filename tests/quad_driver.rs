@@ -1,6 +1,18 @@
 use rose::{mps, solve, verify, SolveOptions, Status};
 
 #[test]
+fn x87_tiny_pivot_retries_the_active_pricing_bucket() {
+    for (text, status, iterations) in [
+        (include_str!("fixtures/quad_6230.mps"), Status::Infeasible, 40),
+        (include_str!("fixtures/quad_4564.mps"), Status::Infeasible, 117),
+    ] {
+        let model = mps::parse(text).unwrap();
+        let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
+        assert_eq!((result.status, result.iterations), (status, iterations));
+    }
+}
+
+#[test]
 fn shifted_quad_handoff_retries_until_restore_limit() {
     let model = mps::parse(include_str!("fixtures/quad_3076.mps")).unwrap();
     let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
