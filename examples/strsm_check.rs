@@ -30,16 +30,8 @@ fn main() {
         let mut first = None;
         for c in 0..n {
             let mut x = b[c * m..(c + 1) * m].to_vec();
-            if m >= 25 {
+            if true {
                 rose::sgemm32::strsm_llu_col(&l, m, &mut x, c, n);
-            } else {
-                for i in 0..m {
-                    let mut v = x[i];
-                    for j in 0..i {
-                        v = v - l[i * m + j] * x[j];
-                    }
-                    x[i] = v;
-                }
             }
             for i in 0..m {
                 if x[i].to_bits() != r[c * m + i].to_bits() {

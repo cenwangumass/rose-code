@@ -2144,6 +2144,8 @@ impl NormalSolver for DenseSolver {
 /// iteration). Test-only input of `examples/barrier_replay.rs`; the factor call is ignored.
 #[derive(Default)]
 pub struct ReplaySolver {
+    /// Iterations whose solves are the early-centering ones (`Q+0x28c != 0` after `0x34a480`), from the `barrier_early` capture.
+    early: std::collections::HashSet<i32>,
     starts: Vec<(Vec<f64>, Vec<f64>)>,
     dirs: Vec<Direction>,
     ntry: Vec<Option<usize>>,
@@ -2168,7 +2170,7 @@ fn direction_json(v: &Value, sfx: &str) -> Direction {
 }
 
 impl ReplaySolver {
-    /// `{"start": {"x1", "y1", "r2", "y2"}, "iters": [{"pred": {dx, dy, dz, du, dv}, "corr": {dx2, dy2, dz2, du2, dv2}, "ntry": n}, ...]}`
+    /// `{"start": {"x1", "y1", "r2", "y2"}, "iters": [{"pred": {dx, dy, dz, du, dv}, "corr": {dx2, dy2, dz2, du2, dv2}, "ntry": n}, ...], "early": [iterations]}`
     /// (`dy` over the rows, `du`, `dv` over the columns, the others over all variables; `ntry` optional).
     pub fn from_json(v: &Value) -> ReplaySolver {
         let s = &v["start"];
@@ -2183,7 +2185,16 @@ impl ReplaySolver {
             dirs.push(direction_json(&it["corr"], "2"));
             ntry.push(it["ntry"].as_u64().map(|n| n as usize));
         }
+        let early = v["early"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .filter_map(|x| x.as_i64().map(|i| i as i32))
+                    .collect()
+            })
+            .unwrap_or_default();
         ReplaySolver {
+            early,
             starts,
             dirs,
             ntry,
@@ -2201,6 +2212,10 @@ impl ReplaySolver {
 impl NormalSolver for ReplaySolver {
     fn factor(&mut self, _f: &StdForm, _d: &[f64]) -> Result<(), BarrierError> {
         Ok(())
+    }
+
+    fn early_decision(&mut self, _f: &StdForm, it: i32, _q190: f64) -> bool {
+        self.early.contains(&it)
     }
 
     fn start(

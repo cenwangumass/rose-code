@@ -1100,7 +1100,7 @@ fn factor_block(
     let rows = c - w;
     if rows != 0 {
         if dense {
-            let big32 = SINGLE.with(|c| c.get()) && w >= 25;
+            let big32 = SINGLE.with(|c| c.get()) && w >= 2;
             let l32: Vec<f32> = if big32 {
                 mm.iter().map(|&v| v as f32).collect()
             } else {
@@ -1853,11 +1853,27 @@ pub fn ntry_first(f: &StdForm, sym: &Symbolic) -> usize {
     }
 }
 
-/// `SYM+0xc0` (`0x2e1200..0x2e1269`, no dense columns, `P+0x2be0 != 0`): `SYM+0x60` (the flops, [`Symbolic::ops`]) exceeds 1e10, 500 NZ (`SYM+0x38`) and 1000 nnz(A).
-/// The further test `ops > 1000 SYM+0x48` is not applied (`SYM+0x48` is not decoded); `SYM+0x58` is 0 on the captured model.
-pub fn replaced_pivots(f: &StdForm, sym: &Symbolic) -> bool {
-    f.dense.is_empty()
-        && sym.ops > 1e10
+/// `SYM.0x48` of the reference: the sum of the squared column counts of the non-dense columns (`a` of [`ntry_first`]'s work model).
+pub fn sym_col_sq(f: &StdForm) -> f64 {
+    (0..f.n2)
+        .filter(|j| !f.dense.contains(j))
+        .map(|j| ((f.col_start[j + 1] - f.col_start[j]) as i64).pow(2))
+        .sum::<i64>() as f64
+}
+
+/// `SYM+0xc0` (replaced pivots; `0x2e11b4..0x2e1269`): needs `P+0x2be0 != 0` (the hidden parameter `GURO_PAR_BARQUICKSTART`, default -1, 0 = never), a linear
+/// continuous model (`0x88de50` returns 0), no dense columns (`SYM+0x138`) and no GPU barrier (`Q+0x928`, never on this host). Then `BarQuickStart = 1` sets it, else
+/// `SYM+0x60` (the flops, [`Symbolic::ops`]) must exceed 1e10, 1000 `SYM+0x48` ([`sym_col_sq`]), 500 NZ (`SYM+0x38`) and 1000 nnz(A).
+/// `quick` is the value of `GURO_PAR_BARQUICKSTART` (-1 by default; 2 is stored as -1).
+pub fn replaced_pivots(f: &StdForm, sym: &Symbolic, quick: i32) -> bool {
+    if quick == 0 || !f.dense.is_empty() {
+        return false;
+    }
+    if quick == 1 {
+        return true;
+    }
+    sym.ops > 1e10
+        && sym.ops > 1000.0 * sym_col_sq(f)
         && sym.ops > 500.0 * sym.nz as f64
         && sym.ops > 1000.0 * f.row_idx.len() as f64
 }
@@ -1921,11 +1937,16 @@ pub struct CholSolver {
 
 impl CholSolver {
     /// `sym` is the symbolic factorization of the structure stage ([`crate::order::structure`]) the `StdForm` was permuted with.
+    /// Sets `GURO_PAR_BARQUICKSTART` (the hidden parameter at `P+0x2be0`; 1 forces the single-precision factor, 0 forbids it).
+    pub fn set_quick_start(&mut self, f: &StdForm, sym: &Symbolic, quick: i32) {
+        self.plan.single = replaced_pivots(f, sym, quick);
+    }
+
     pub fn new(f: &StdForm, sym: &Symbolic) -> CholSolver {
         CholSolver {
             plan: {
                 let mut p = Plan::new(sym);
-                p.single = replaced_pivots(f, sym);
+                p.single = replaced_pivots(f, sym, -1);
                 p
             },
             rows: model_rows(f),

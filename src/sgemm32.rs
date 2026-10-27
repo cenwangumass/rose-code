@@ -266,6 +266,18 @@ pub fn sgemm_t_n(
 /// update from all rows solved before it, `x_i = b_i + acc` (accumulator structure of [`copy_mode`] per tile and column kernel), then the chain inside
 /// the tile. Smaller `w` is not modelled here.
 pub fn strsm_llu_col(l: &[f32], w: usize, x: &mut [f32], col: usize, n: usize) {
+    if n == 1 {
+        strsv_utu_small(l, w, x);
+        return;
+    }
+    if w < 25 {
+        if w >= 8 && col < 8 * (n / 8) {
+            strsm_a8_col(l, w, x);
+        } else {
+            strsm_left_ker(l, w, x);
+        }
+        return;
+    }
     let ck = col_kernel(n, col);
     let blk = 24;
     for i in 0..blk.min(w) {
@@ -297,5 +309,101 @@ pub fn strsm_llu_col(l: &[f32], w: usize, x: &mut [f32], col: usize, n: usize) {
             x[i] = v;
         }
         r0 += t;
+    }
+}
+
+/// `strsm_left_ker` (`m <= 24` with fewer than 8 right-hand sides, and the remainder columns of the 8-row kernel): `x_i = b_i - sum_{j<i} l_ij x_j` with
+/// rounded products and sums; rows `i < 16` sequentially, rows `i >= 16` in 8 lanes over blocks of 8 terms (lane 0 starts at `b_i`),
+/// `((l0 + l4) + (l2 + l6)) + ((l1 + l5) + (l3 + l7))`, then the remaining terms sequentially.
+pub fn strsm_left_ker(l: &[f32], w: usize, x: &mut [f32]) {
+    for i in 0..w {
+        let mut v = x[i];
+        let mut j0 = 0;
+        if i >= 16 {
+            let nch = i / 8;
+            let mut lane = [0.0f32; 8];
+            lane[0] = v;
+            for c in 0..nch {
+                for k in 0..8 {
+                    let j = 8 * c + k;
+                    lane[k] = rd(lane[k] - rd(l[i * w + j] * x[j]));
+                }
+            }
+            v = rd(rd(rd(lane[0] + lane[4]) + rd(lane[2] + lane[6]))
+                + rd(rd(lane[1] + lane[5]) + rd(lane[3] + lane[7])));
+            j0 = 8 * nch;
+        }
+        for j in j0..i {
+            v = rd(v - rd(l[i * w + j] * x[j]));
+        }
+        x[i] = v;
+    }
+}
+
+/// `strsm_ker_llu_a8_b8` for the columns of full blocks of 8 right-hand sides (`8 <= w <= 24`; the other columns use [`strsm_left_ker`]): the first `8 (w / 8)` rows an fma chain from `b`, the
+/// remaining rows `x_i = b_i - s` with `s` the 8-lane sum over the solved rows (see [`strsm_left_ker`] for the lanes), then the chain over the rows of the tail.
+pub fn strsm_a8_col(l: &[f32], w: usize, x: &mut [f32]) {
+    let r0 = 8 * (w / 8);
+    for i in 0..r0 {
+        let mut v = x[i];
+        for j in 0..i {
+            v = (-l[i * w + j]).mul_add(x[j], v);
+        }
+        x[i] = v;
+    }
+    for i in r0..w {
+        let mut lane = [0.0f32; 8];
+        for c in 0..r0 / 8 {
+            for k in 0..8 {
+                let j = 8 * c + k;
+                lane[k] = rd(rd(l[i * w + j] * x[j]) + lane[k]);
+            }
+        }
+        let s = rd(rd(rd(lane[0] + lane[4]) + rd(lane[2] + lane[6]))
+            + rd(rd(lane[1] + lane[5]) + rd(lane[3] + lane[7])));
+        let mut v = rd(x[i] + (-s));
+        for j in r0..i {
+            v = rd(v - rd(l[i * w + j] * x[j]));
+        }
+        x[i] = v;
+    }
+}
+
+/// `strsv_utu` (`n == 1`): rows in pairs `(p, p + 1)`, `p` even (a last odd row alone). `reduce(p)` is `b_p` minus the products of the first `p` solved rows: `p < 8`
+/// sequentially, else 8 lanes over blocks of 8 terms (lane 0 starts at `b`) reduced as in [`strsm_left_ker`], then the remaining terms sequentially; all with rounded
+/// products and sums. A lone last row uses the threshold 16 of [`strsm_left_ker`] instead of 8. Row `p` takes `reduce(p)`; row `p + 1` takes `fma(-x_p, l_{p+1,p}, reduce_{p+1}(p))`. Verified for `w <= 24` only.
+pub fn strsv_utu_small(l: &[f32], w: usize, x: &mut [f32]) {
+    let reduce = |x: &[f32], i: usize, p: usize, thr: usize| -> f32 {
+        let mut v = x[i];
+        let mut j0 = 0;
+        if p >= thr {
+            let nch = p / 8;
+            let mut lane = [0.0f32; 8];
+            lane[0] = v;
+            for c in 0..nch {
+                for k in 0..8 {
+                    let j = 8 * c + k;
+                    lane[k] = rd(lane[k] - rd(l[i * w + j] * x[j]));
+                }
+            }
+            v = rd(rd(rd(lane[0] + lane[4]) + rd(lane[2] + lane[6]))
+                + rd(rd(lane[1] + lane[5]) + rd(lane[3] + lane[7])));
+            j0 = 8 * nch;
+        }
+        for j in j0..p {
+            v = rd(v - rd(l[i * w + j] * x[j]));
+        }
+        v
+    };
+    let mut p = 0;
+    while p + 1 < w {
+        let v0 = reduce(x, p, p, 8);
+        let v1 = reduce(x, p + 1, p, 8);
+        x[p] = v0;
+        x[p + 1] = (-v0).mul_add(l[(p + 1) * w + p], v1);
+        p += 2;
+    }
+    if p < w {
+        x[p] = reduce(x, p, p, 16);
     }
 }

@@ -49,6 +49,7 @@ fn main() {
         release,
         ..Options::default()
     };
+    let mut quick = -1;
     // PARAMS="K=V,...": the reference parameters the run is compared under (BarIterLimit).
     for kv in std::env::var("PARAMS")
         .unwrap_or_default()
@@ -58,8 +59,14 @@ fn main() {
         if let Some(("BarIterLimit", v)) = kv.split_once('=') {
             o.max_iter = v.parse().expect("BarIterLimit");
         }
+        if let Some(("GURO_PAR_BARQUICKSTART", v)) = kv.split_once('=') {
+            quick = v.parse().expect("GURO_PAR_BARQUICKSTART");
+        }
     }
     let mut solver = rose::chol::CholSolver::new(&f, &s.sym);
+    if quick != -1 {
+        solver.set_quick_start(&f, &s.sym, quick);
+    }
     let run = if a.get(2).map(String::as_str) == Some("dense") {
         barrier::run(&f, &mut DenseSolver::default(), &o)
     } else if let Some(p) = a.get(2) {
