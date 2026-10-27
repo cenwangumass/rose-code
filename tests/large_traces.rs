@@ -1,15 +1,13 @@
 //! FIT2P and 80BAU3B (controlled profile) reproduce every reference decision and the returned solution bit for bit.
-//! The models, reference traces and reference runs live in `reverse-engineer/`; the tests are ignored by default (about
+//! The models and compact reference fixtures are in `tests/fixtures/`; the tests are ignored by default (about
 //! 30 s each in the release build): `cargo test --release --test large_traces -- --ignored`.
 
 use rose::{mps, solve, SolveOptions, Status};
 
 fn check(name: &str) {
-    let root = format!("{}/../reverse-engineer", env!("CARGO_MANIFEST_DIR"));
-    let model = mps::parse(
-        &std::fs::read_to_string(format!("{root}/corpus/netlib/mps/{name}.mps")).unwrap(),
-    )
-    .unwrap();
+    let root = format!("{}/tests/fixtures", env!("CARGO_MANIFEST_DIR"));
+    let model =
+        mps::parse(&std::fs::read_to_string(format!("{root}/{name}.mps")).unwrap()).unwrap();
     let opts = SolveOptions {
         faithful_weights: true,
         faithful_positions: true,
@@ -19,33 +17,24 @@ fn check(name: &str) {
     let r = solve(&model, None, &opts).unwrap();
     assert_eq!(r.status, Status::Optimal);
 
-    // Reference decisions: rows with a pivot (`f2fc` is the entering variable); the leaving variable is the one whose new
-    // position is -1 (absent for a bound flip or a slack leaving from its own row).
-    let rows: Vec<serde_json::Value> =
-        std::fs::read_to_string(format!("{root}/traces/{name}-controlled.jsonl"))
-            .unwrap()
-            .lines()
-            .map(|l| serde_json::from_str(l).unwrap())
-            .filter(|r: &serde_json::Value| r["f2fc"].as_i64().unwrap_or(-1) != -1)
-            .collect();
-    assert_eq!(r.trace.len(), rows.len(), "pivot count");
-    for (k, (row, e)) in rows.iter().zip(&r.trace).enumerate() {
-        let entering = row["f2fc"].as_u64().unwrap() as usize;
-        assert_eq!(e.entering, entering, "row {k}: entering");
-        let leaving = row["changed"].as_array().unwrap().iter().find_map(|c| {
-            (c[2].as_i64() == Some(-1) && c[0].as_u64() != Some(entering as u64))
-                .then(|| c[0].as_u64().unwrap() as usize)
-        });
-        if leaving.is_some() {
-            assert_eq!(e.leaving, leaving, "row {k}: leaving");
-        }
-    }
-
-    let run: serde_json::Value = serde_json::from_str(
-        &std::fs::read_to_string(format!("{root}/runs/{name}-controlled.json")).unwrap(),
+    let fx: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(format!("{root}/{name}-primal-controlled.json")).unwrap(),
     )
     .unwrap();
-    let res = &run["result"];
+    assert_eq!(fx["version"], 1);
+    let rows = fx["decisions"].as_array().unwrap();
+    assert_eq!(r.trace.len(), rows.len(), "pivot count");
+    for (k, (row, e)) in rows.iter().zip(&r.trace).enumerate() {
+        assert_eq!(
+            e.entering,
+            row[0].as_u64().unwrap() as usize,
+            "row {k}: entering"
+        );
+        if let Some(leaving) = row[1].as_u64() {
+            assert_eq!(e.leaving, Some(leaving as usize), "row {k}: leaving");
+        }
+    }
+    let res = &fx["result"];
     let bits = |v: &serde_json::Value| {
         v.as_array()
             .unwrap()

@@ -1,6 +1,6 @@
 //! Diagnostic coverage of `Method::Barrier` (`SolveOptions::barrier()`, the controlled profile): the barrier's own interior point is checked by the
 //! independent report of `rose::verify` (relative to the objective's magnitude), the optimum against the primal simplex, and the statuses of the
-//! infeasible and unbounded fixtures. Models: reverse-engineer/corpus/fixtures/fx_*.mps (skipped if absent) and inline models.
+//! infeasible and unbounded fixtures. Models: tests/fixtures/fx_*.mps and inline models.
 //!
 //! Unsupported or different from the primal result, on purpose:
 //! - `fx_infeasible`: the barrier ends with its status 0xd (API status 12, infeasible or unbounded), reported as `NumericalFailure`; no certificate.
@@ -11,14 +11,12 @@ use rose::verify;
 use rose::{mps, solve, LpModel, SolveOptions, Status};
 
 fn load(path: String) -> Option<LpModel> {
-    std::fs::read_to_string(path)
-        .ok()
-        .map(|t| mps::parse(&t).unwrap())
+    Some(std::fs::read_to_string(path).unwrap()).map(|t| mps::parse(&t).unwrap())
 }
 
 fn fixture(name: &str) -> Option<LpModel> {
     load(format!(
-        "{}/../reverse-engineer/corpus/fixtures/{name}.mps",
+        "{}/tests/fixtures/{name}.mps",
         env!("CARGO_MANIFEST_DIR")
     ))
 }

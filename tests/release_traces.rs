@@ -1,6 +1,6 @@
 //! AFIRO (release profile, `SimplexPricing=-1` before its switch) reproduces every reference decision and the returned solution bit
 //! for bit with the `pricing0` and `scaling` options; SC50A and BLEND also reproduce the method switch (`0x142500`)
-//! and the Devex pricing after it. The models, reference traces and reference runs live in `reverse-engineer/`.
+//! and the Devex pricing after it. The model, compact reference decisions and results are in `tests/fixtures/`.
 
 use rose::{mps, solve, SolveOptions, Status};
 
@@ -10,7 +10,10 @@ fn accepted_crash_basis_reaches_primal_iteration() {
     let mut opts = SolveOptions::release();
     opts.max_iterations = 1;
     let result = solve(&model, None, &opts).unwrap();
-    assert_eq!((result.status, result.iterations), (Status::IterationLimit, 1));
+    assert_eq!(
+        (result.status, result.iterations),
+        (Status::IterationLimit, 1)
+    );
 }
 
 fn check(name: &str) {
@@ -19,9 +22,12 @@ fn check(name: &str) {
 
 /// The first `limit` decisions (all of them for `usize::MAX`, which also checks the returned solution).
 fn check_rows(name: &str, limit: usize) {
-    let root = format!("{}/../reverse-engineer", env!("CARGO_MANIFEST_DIR"));
     let model = mps::parse(
-        &std::fs::read_to_string(format!("{root}/corpus/netlib/mps/{name}.mps")).unwrap(),
+        &std::fs::read_to_string(format!(
+            "{}/tests/fixtures/{name}.mps",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap(),
     )
     .unwrap();
     let r = solve(&model, None, &SolveOptions::release()).unwrap();
@@ -29,38 +35,34 @@ fn check_rows(name: &str, limit: usize) {
         assert_eq!(r.status, Status::Optimal);
     }
 
-    // Reference decisions: rows with a pivot (`f2fc` is the entering variable); the leaving variable is the one whose new
-    // position is -1 (absent for a bound flip or a slack leaving from its own row).
-    let rows: Vec<serde_json::Value> =
-        std::fs::read_to_string(format!("{root}/traces/{name}-release.jsonl"))
-            .unwrap()
-            .lines()
-            .map(|l| serde_json::from_str(l).unwrap())
-            .filter(|r: &serde_json::Value| r["f2fc"].as_i64().unwrap_or(-1) != -1)
-            .collect();
+    let fx: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(format!(
+            "{}/tests/fixtures/{name}-primal-release.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(fx["version"], 1);
+    let rows = fx["decisions"].as_array().unwrap();
     if limit == usize::MAX {
         assert_eq!(r.trace.len(), rows.len(), "pivot count");
     }
     for (k, (row, e)) in rows.iter().zip(&r.trace).enumerate().take(limit) {
-        let entering = row["f2fc"].as_u64().unwrap() as usize;
-        assert_eq!(e.entering, entering, "row {k}: entering");
-        let leaving = row["changed"].as_array().unwrap().iter().find_map(|c| {
-            (c[2].as_i64() == Some(-1) && c[0].as_u64() != Some(entering as u64))
-                .then(|| c[0].as_u64().unwrap() as usize)
-        });
-        if leaving.is_some() {
-            assert_eq!(e.leaving, leaving, "row {k}: leaving");
+        assert_eq!(
+            e.entering,
+            row[0].as_u64().unwrap() as usize,
+            "row {k}: entering"
+        );
+        if let Some(leaving) = row[1].as_u64() {
+            assert_eq!(e.leaving, Some(leaving as usize), "row {k}: leaving");
         }
     }
 
     if limit != usize::MAX {
         return;
     }
-    let run: serde_json::Value = serde_json::from_str(
-        &std::fs::read_to_string(format!("{root}/runs/{name}-release.json")).unwrap(),
-    )
-    .unwrap();
-    let res = &run["result"];
+    let res = &fx["result"];
     let bits = |v: &serde_json::Value| {
         v.as_array()
             .unwrap()
@@ -173,25 +175,20 @@ fn fit2p_release_matches_the_reference() {
     check("fit2p");
 }
 
-/// The scale factors against the reference's (`replay/gdb_scale_factors.py`, captured by `compare.py scale`; skipped where a
-/// capture is missing, as the captures are not under version control).
+/// All available reference scale captures, packaged with the test fixtures.
 #[test]
 fn scale_factors_match_the_reference() {
-    let root = format!("{}/../reverse-engineer", env!("CARGO_MANIFEST_DIR"));
-    let mut checked = 0;
-    for name in [
-        "afiro", "sc50a", "blend", "adlittle", "bore3d", "boeing2", "degen2", "pilot4", "perold",
-        "degen3",
-    ] {
-        let Ok(text) = std::fs::read_to_string(format!(
-            "{root}/captures/{name}-release/scale_factors.LIM=1.jsonl"
-        )) else {
-            continue;
-        };
-        let line = text.lines().find(|l| l.starts_with("SCALE ")).unwrap();
-        let rec: serde_json::Value = serde_json::from_str(&line[6..]).unwrap();
+    let scales: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/primal-release-scales.json")).unwrap();
+    let scales = scales.as_object().unwrap();
+    assert_eq!(scales.len(), 8);
+    for (name, rec) in scales {
         let model = mps::parse(
-            &std::fs::read_to_string(format!("{root}/corpus/netlib/mps/{name}.mps")).unwrap(),
+            &std::fs::read_to_string(format!(
+                "{}/tests/fixtures/{name}.mps",
+                env!("CARGO_MANIFEST_DIR")
+            ))
+            .unwrap(),
         )
         .unwrap();
         let sc = rose::scale::compute(&model);
@@ -204,7 +201,5 @@ fn scale_factors_match_the_reference() {
         };
         assert_eq!(sc.col, f(&rec["col"]), "{name}: column factors");
         assert_eq!(sc.row, f(&rec["row"]), "{name}: row factors");
-        checked += 1;
     }
-    eprintln!("{checked} models checked");
 }

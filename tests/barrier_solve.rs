@@ -1,7 +1,7 @@
 //! The whole barrier solve from the MPS alone (`rose::barrier` with the bit-exact `rose::chol::CholSolver`) against the reference
 //! (`tests/fixtures/barrier-solve-controlled.json`, written by `reverse-engineer/tools/make_barrier_solve_fixture.py`): every iteration's state and
 //! decisions, and the returned x, duals, reduced costs and objective, agree bit for bit on AFIRO, SC50A, BLEND, ADLITTLE, BORE3D, DEGEN2, BOEING2 (ranged
-//! rows, implied upper bounds dropped), PILOT4 (free columns, refinement, step caps, restart), DEGEN3 (scaled columns `Q+0x648`, supernodes cut to 192 columns, generic assembly of the root) and the two ranged-row fixtures (`fx_bar_rngL`, `fx_bar_rngGE`: L, G and E rows, R of both signs and 0). FIT2P (25 dense columns as factor nodes, regularising pivots, refinement; the 2.2 MB model is not copied) is checked from the analysis repository's corpus when it is present.
+//! rows, implied upper bounds dropped), PILOT4 (free columns, refinement, step caps, restart), DEGEN3 (scaled columns `Q+0x648`, supernodes cut to 192 columns, generic assembly of the root) and the two ranged-row fixtures (`fx_bar_rngL`, `fx_bar_rngGE`: L, G and E rows, R of both signs and 0). FIT2P exercises dense columns, regularising pivots and refinement.
 use rose::barrier::{self, BarrierStatus, Options};
 use rose::{mps, solve, SolveOptions, Status};
 use serde_json::Value;
@@ -240,33 +240,23 @@ fn maximization_doubled_ranges_and_homogeneous_statuses_match_reference_bitwise(
     }
 }
 
-/// FIT2P, from the analysis repository's corpus (skipped where it is absent).
+/// FIT2P, from the packaged corpus.
 #[test]
-fn fit2p_matches_reference_bitwise_when_the_corpus_is_present() {
-    let Ok(text) = std::fs::read_to_string(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../reverse-engineer/corpus/netlib/mps/fit2p.mps"
-    )) else {
-        return;
-    };
+fn fit2p_matches_reference_bitwise() {
+    let text = include_str!("fixtures/fit2p.mps");
     let fx: Value =
         serde_json::from_str(include_str!("fixtures/barrier-solve-controlled.json")).unwrap();
-    check_whole_solve(&fx, "fit2p", &text);
+    check_whole_solve(&fx, "fit2p", text);
 }
 
-/// GREENBEA, from the analysis repository's corpus (skipped where it is absent): restart A at iteration 73, then the homogeneous algorithm with upper-bounded
+/// GREENBEA, from the packaged corpus: restart A at iteration 73, then the homogeneous algorithm with upper-bounded
 /// columns, refinement of both solves and the read-out divided by tau (128 iterations).
 #[test]
-fn greenbea_matches_reference_bitwise_when_the_corpus_is_present() {
-    let Ok(text) = std::fs::read_to_string(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../reverse-engineer/corpus/netlib/mps/greenbea.mps"
-    )) else {
-        return;
-    };
+fn greenbea_matches_reference_bitwise() {
+    let text = include_str!("fixtures/greenbea.mps");
     let fx: Value =
         serde_json::from_str(include_str!("fixtures/barrier-solve-controlled.json")).unwrap();
-    check_whole_solve(&fx, "greenbea", &text);
+    check_whole_solve(&fx, "greenbea", text);
 }
 
 /// The public entry point: `Method::Barrier` returns the same solution in the `SolveResult` fields.

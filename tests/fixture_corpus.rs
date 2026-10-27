@@ -1,16 +1,11 @@
 //! NEW FILE (reference-corpus cases C11/C12/C14). Only cases where rose agrees with the controlled-profile reference
-//! (statuses, x, ray, entering/leaving). Fixtures: reverse-engineer/corpus/fixtures/fx_*.mps; skipped if absent.
+//! (statuses, x, ray, entering/leaving). Fixtures: tests/fixtures/fx_*.mps.
 
 use rose::{mps, solve, Basis, LpModel, SolveOptions, Status};
 
 fn fixture(name: &str) -> Option<LpModel> {
-    let p = format!(
-        "{}/../reverse-engineer/corpus/fixtures/{name}.mps",
-        env!("CARGO_MANIFEST_DIR")
-    );
-    std::fs::read_to_string(p)
-        .ok()
-        .map(|t| mps::parse(&t).unwrap())
+    let p = format!("{}/tests/fixtures/{name}.mps", env!("CARGO_MANIFEST_DIR"));
+    Some(std::fs::read_to_string(p).unwrap()).map(|t| mps::parse(&t).unwrap())
 }
 
 #[test]

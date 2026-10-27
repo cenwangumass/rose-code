@@ -1,6 +1,6 @@
 //! Metamorphic tests: transformed models must give the same optimal objective (up to the
 //! known effect of the transformation) and pass the independent check in `verify`. Pivot sequences may differ.
-//! Models: tests/fixtures/*.mps and reverse-engineer/corpus/fixtures/fx_*.mps (skipped if absent).
+//! Models: tests/fixtures/*.mps and tests/fixtures/fx_*.mps.
 
 use rose::model::{Sense, INF};
 use rose::verify;
@@ -15,9 +15,7 @@ thread_local! {
 }
 
 fn load(path: String) -> Option<LpModel> {
-    std::fs::read_to_string(path)
-        .ok()
-        .map(|t| mps::parse(&t).unwrap())
+    Some(std::fs::read_to_string(path).unwrap()).map(|t| mps::parse(&t).unwrap())
 }
 
 fn small() -> Vec<(String, LpModel)> {
@@ -42,7 +40,7 @@ fn small() -> Vec<(String, LpModel)> {
         if BARRIER.get() && n == "fx_badscale" {
             continue;
         }
-        if let Some(m) = load(format!("{d}/../reverse-engineer/corpus/fixtures/{n}.mps")) {
+        if let Some(m) = load(format!("{d}/tests/fixtures/{n}.mps")) {
             v.push((n.to_string(), m));
         }
     }

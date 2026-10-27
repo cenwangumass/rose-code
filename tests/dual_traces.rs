@@ -27,14 +27,7 @@ fn check_profile(name: &str, profile: &str) {
         serde_json::from_str(&fixture(&format!("{name}-{profile}.decisions.json"))).unwrap();
     assert_eq!(fx["version"], 1);
     let file = fx["model"].as_str().unwrap();
-    let local = format!("{}/tests/fixtures/{file}", env!("CARGO_MANIFEST_DIR"));
-    let text = std::fs::read_to_string(&local).unwrap_or_else(|_| {
-        std::fs::read_to_string(format!(
-            "{}/../reverse-engineer/corpus/netlib/mps/{file}",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-        .unwrap()
-    });
+    let text = fixture(file);
     let model = mps::parse(&text).unwrap();
     let schedule: Vec<usize> = fx["refactor_schedule"]
         .as_array()
