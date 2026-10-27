@@ -6499,9 +6499,10 @@ fn solve_primal(
             Some(pr) => pr[q],
             None => dot(&p.cols[q], &rho),
         };
-        if s.handoff.is_some_and(|h| !h.quad) {
+        if s.handoff.is_some() {
             // The pair of the pivot check at the next pricing (`ctx+0x300`, `ctx+0x308`): the pivot from the column and from the row.
             // A structural entering variable's row value is the pivot element itself (as in the update of its `d`); a slack's is the row product.
+            // The x87 primal also retains this pair (seed 6575, request 6 at iteration 19).
             s.stale = Some((alpha_rq, if q < n { alpha_rq } else { arq_x }));
         }
         let mut norm_reset = false;
