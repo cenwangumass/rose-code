@@ -3284,6 +3284,19 @@ impl<'a, R: Real> Dual<'a, R> {
 
     /// The no-leaving-row handler (`0x1aa280`): a refactorization request, optimality or infeasibility.
     fn no_row(&mut self) {
+        if R::QUAD
+            && self.updates != 0
+            && self.pert == 0
+            && self.level != 0
+            && self.artificial_count() != 0
+        {
+            // The quad driver's post-iteration function (`0x237750`) with the confirming refactorization pending (`ctx+0x294` = 4) and updates on the
+            // factor: it recomputes d from the costs with the updated factor (`0x26ce00` BTRAN, `0x273cd0`) and runs the status count (`0x238c38..0x238d1f`);
+            // variables at the bound that d turns wrong, with an infinite range on the far side, end the pass with status -1004 before the refactorization.
+            self.art_exit = true;
+            self.dual_unbounded();
+            return;
+        }
         if self.updates != 0 {
             // `ctx+0x3f8 != 0` in all captures: confirm on a fresh factor (`0x1aa280`). The cost shifts stay in force through the confirming refactorization
             // (`ctx+0x290` is 0, `0xe4891` is not taken) and are removed at the end of the solve.
@@ -3318,6 +3331,27 @@ impl<'a, R: Real> Dual<'a, R> {
                 self.request = 4;
             }
         }
+    }
+
+    /// The status count of the quad post-iteration function (`0x238c38..0x238d1f`) on d recomputed with the current factor: a variable at its lower bound
+    /// (status -1) with `d < -tol` and no finite upper bound, or at its upper bound (status -2) with `d > tol` and no finite upper bound, counts.
+    fn artificial_count(&mut self) -> usize {
+        let y = self.last_y.clone();
+        let dt = self.true_d();
+        self.last_y = y;
+        let tol = R::c(dual_tol());
+        let mut count = 0;
+        for j in 0..self.n + self.m {
+            let inf = self.p.up[j] >= BIG;
+            if self.st[j] == LB {
+                if dt[j] < -tol && inf {
+                    count += 1;
+                }
+            } else if self.st[j] == UB && inf && (-dt[j]) > tol {
+                count += 1;
+            }
+        }
+        count
     }
 
     /// Nonbasic at an artificial (infinite, 1e30) bound: at the upper bound of a variable without one, or at the lower bound of a variable without one.
@@ -4097,6 +4131,7 @@ fn solve_frame(
     DUAL_HANDOFFS.with(|c| c.set(0));
     C178.with(|c| c.set(0));
     crate::simplex::QUAD_PRIMALS.with(|c| c.set(0));
+    crate::simplex::QUAD_STALLS.with(|c| c.set(0));
     // The quad mode (`ctx+0x28`): once the controller switched, every later pass runs the extended-precision twin of the dual.
     let mut quad = false;
     let mut switch_start: Option<Basis> = None;
@@ -5041,6 +5076,19 @@ fn solve_pass<R: Real>(
             });
         }
         let prres = crate::simplex::solve(model, Some(&from_dual), &popts).ok();
+        if R::QUAD && s.art_exit {
+            if let Some(pr) = prres
+                .as_ref()
+                .filter(|pr| pr.status == Status::NumericalFailure)
+            {
+                // The x87 primal ended with status 12 (`0x280dd9`: no leaving row for the entering variable, again after the request-7 refactorization, with updates on
+                // the factor): the controller ends the solve with it (seed 8179).
+                let mut r = pr.clone();
+                r.iterations += s.iters;
+                r.refactorizations += s.refactorizations;
+                return Ok(r);
+            }
+        }
         // The primal's unit step of the entering variable belongs to its own ray only, not to the dual's artificial-bound point.
         let prres_enter = crate::simplex::RAY_ENTER.with(|c| c.take());
         if s.art_exit
@@ -5058,6 +5106,7 @@ fn solve_pass<R: Real>(
                 })
             {
                 // A quad pass resumes as a quad pass from the primal's basis (the x87 primal gave up at its first scan), the counters going on (random LP seed 5247).
+                crate::simplex::QUAD_STALLS.with(|c| c.set(c.get() + 1));
                 let pit = prres.as_ref().map_or(0, |pr| pr.iterations);
                 let pfac = prres.as_ref().map_or(0, |pr| pr.refactorizations);
                 let carry3 = Carry {
