@@ -1883,8 +1883,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 }
             }
         }
-        let base = if R::QUAD { self.it_base } else { 0 };
-        let variant = self.level != 0 && self.iters + base > self.m;
+        let variant = self.level != 0 && self.iters + self.it_base > self.m;
         for i in 0..esi.min(cnt) {
             let (j, v) = row[i];
             if v < R::c(-ALPHA_TOL) {
