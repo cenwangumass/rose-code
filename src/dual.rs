@@ -2730,23 +2730,36 @@ impl<'a, R: Real> Dual<'a, R> {
     }
 }
 
-/// The running sum of the ratio test's selection (`0xcba58..0xcbc3a`): `s` plus (or minus) the entries of `c` in the reference's vectorized order. Fewer
+/// The running sum of the ratio test's selection. The double path (`0xcba58..0xcbc3a`) uses vectorized order: fewer
 /// than `peel + 8` entries are added one by one. Otherwise `peel` entries (one when the first is at an odd index of the 16-byte aligned array, so that the
 /// pairs are aligned) go in one by one, then blocks of eight enter four two-lane accumulators (lane 0 of the first one starts at `s`), which are combined
-/// as `(a0 + a1) + (a2 + a3)` and then lane 0 + lane 1, and the remaining entries follow one by one.
+/// as `(a0 + a1) + (a2 + a3)` and then lane 0 + lane 1, and the remaining entries follow one by one. The quad path (`0x22342b..0x2236d4`) uses eight scalar lanes without a peel, reduces them in order, then walks the remainder backward.
 fn accumulate<R: Real>(s: R, c: &[R], peel: usize, sub: bool) -> R {
     let step = |a: R, x: R| if sub { a - x } else { a + x };
     let n = c.len();
     let mut s = s;
-    if !R::LANES && n < 8 {
-        // The quad selection's unrolled remainder walks from the last entry
-        // down to the first (0x223542..0x223574, 0x2236a6..0x2236d4).
-        for &x in c.iter().rev() {
+    if !R::LANES {
+        let vend = n & !7;
+        if vend != 0 {
+            // Seed the first x87 lane with the running sum.
+            let mut a = [R::ZERO; 8];
+            a[0] = s;
+            for block in c[..vend].chunks_exact(8) {
+                for i in 0..8 {
+                    a[i] = step(a[i], block[i]);
+                }
+            }
+            s = a[0];
+            for &lane in &a[1..] {
+                s = s + lane;
+            }
+        }
+        for &x in c[vend..].iter().rev() {
             s = step(s, x);
         }
         return s;
     }
-    if !R::LANES || n < peel + 8 {
+    if n < peel + 8 {
         for &x in c {
             s = step(s, x);
         }
@@ -5697,4 +5710,33 @@ fn solve_pass<R: Real>(
         farkas,
         ray: s.ray.take(),
     })
+}
+
+#[cfg(test)]
+mod captured_quad_partition {
+    use super::accumulate;
+    use crate::f80::F80;
+    use serde_json::Value;
+
+    fn value(v: &Value) -> F80 {
+        let part =
+            |i| u64::from_str_radix(v[i].as_str().unwrap().trim_start_matches("0x"), 16).unwrap();
+        F80::from_repr(part(0), part(1) as u16)
+    }
+
+    #[test]
+    fn captured_add_and_subtract() {
+        // qwide8360, call 70: reference partition operands and x87 results.
+        let cases: Value = serde_json::from_str(include_str!(
+            "../tests/fixtures/quad_partition_capture.json"
+        ))
+        .unwrap();
+        for case in cases.as_array().unwrap() {
+            let c: Vec<_> = case["con"].as_array().unwrap().iter().map(value).collect();
+            assert_eq!(
+                accumulate(value(&case["start"]), &c, 0, case["sub"].as_bool().unwrap()).repr(),
+                value(&case["end"]).repr()
+            );
+        }
+    }
 }
