@@ -676,6 +676,8 @@ pub(crate) fn build(model: &LpModel) -> Internal {
 /// count of still-unassigned equality rows is within the pass limit; a column takes the unassigned equality row with the
 /// largest `|a|` (first on ties) and marks all of its equality rows used. Recovered from the assignments of the reference on
 /// ADLITTLE, BLEND, SC50A and BORE3D (the set of crash columns matches on all four).
+const PLAIN_FAILED_SCAN: bool = true;
+
 pub fn crash_basis(model: &LpModel) -> Basis {
     let p = build(model);
     let (n, m) = (p.n, p.m);
@@ -906,22 +908,23 @@ fn flip_to_upper(p: &Internal, b: &mut Basis) {
     ref_sort(&mut keys, &mut cand);
     for j in cand {
         let range = p.up[j] - p.lo[j];
+        // The reference accumulates the two infeasibility terms of each row one after the other into one sum (`0x138f31..0x138f98`),
+        // not as the difference of the two terms (rounding matters when the activities are large: fx_ladder_386, column 4).
         let mut gain = 0.0;
         for &(i, a) in &p.cols[j] {
             let hi = p.up[n + i];
-            let infeas = |x: f64| {
-                if x >= 0.0 {
-                    if hi < x {
-                        x - hi
-                    } else {
-                        0.0
-                    }
-                } else {
-                    -x
-                }
-            };
             let x = sact[i];
-            gain += infeas(x) - infeas(x - a / sign[i] * range);
+            if x < 0.0 {
+                gain -= x;
+            } else if x > hi {
+                gain += x - hi;
+            }
+            let y = x - a / sign[i] * range;
+            if y < 0.0 {
+                gain += y;
+            } else if y > hi {
+                gain -= y - hi;
+            }
         }
         if gain > 0.0 || (gain == 0.0 && p.cost[j] < 0.0) {
             // A crash column keeps its basic status (the reference writes the positions afterwards) but its placement moves the row activities.
@@ -4929,7 +4932,7 @@ fn solve_primal(
                     // dropped variable out; the controller restores it and runs the primal again.
                     break Status::Infeasible;
                 }
-                None if s.handoff.is_some_and(|h| !h.pert)
+                None if s.handoff.map_or(PLAIN_FAILED_SCAN, |h| !h.pert)
                     && (!s.costfree || s.factor.num_updates() != 0 || s.p3c0 > 1e-9) =>
                 {
                     // The failed scan of a primal started by the dual controller (`0x145520`, `0x145aed..0x145bd3`): the factorization is requested again (5), and
