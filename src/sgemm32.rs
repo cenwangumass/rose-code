@@ -294,7 +294,7 @@ pub fn strsm_llu_col(l: &[f32], w: usize, x: &mut [f32], col: usize, n: usize) {
         strsv_utu_small(l, w, x);
         return;
     }
-    if w < 25 {
+    if w < 25 || (w % 8 == 0 && w <= 128) {
         if w >= 8 && col < 8 * (n / 8) {
             strsm_a8_col(l, w, x);
         } else {
@@ -340,27 +340,29 @@ pub fn strsm_llu_col(l: &[f32], w: usize, x: &mut [f32], col: usize, n: usize) {
 /// rounded products and sums; rows `i < 16` sequentially, rows `i >= 16` in 8 lanes over blocks of 8 terms (lane 0 starts at `b_i`),
 /// `((l0 + l4) + (l2 + l6)) + ((l1 + l5) + (l3 + l7))`, then the remaining terms sequentially.
 pub fn strsm_left_ker(l: &[f32], w: usize, x: &mut [f32]) {
+    // literal port of the executed path of `mkl_blas_avx2_strsm_pst` (0xa8b762..0xa8b885, alpha = 1, unit diagonal): rows `i < 16` sequential with
+    // rounded products; rows `i >= 16`: blocks of 16 terms into two fused 8-lane accumulators (the first starting with lane 0 = `b`), added, reduced
+    // by `red8`, then the remaining terms sequentially with rounded products.
     for i in 0..w {
         let mut v = x[i];
         let mut j0 = 0;
         if i >= 16 {
-            let nch = i / 8;
-            let mut lane = [0.0f32; 8];
-            lane[0] = v;
-            for c in 0..nch {
+            let nb = i / 16 * 16;
+            let mut a = [0.0f32; 8];
+            let mut c = [0.0f32; 8];
+            a[0] = v;
+            for blk in 0..nb / 16 {
+                let j = 16 * blk;
                 for k in 0..8 {
-                    let j = 8 * c + k;
-                    // The first block of lanes is fused (`b - l x` in one rounding, visible when `l_i0 x_0` cancels `b_i`), the later blocks unfused.
-                    lane[k] = if c == 0 {
-                        (-l[i * w + j]).mul_add(x[j], lane[k])
-                    } else {
-                        rd(lane[k] - rd(l[i * w + j] * x[j]))
-                    };
+                    a[k] = (-l[i * w + j + k]).mul_add(x[j + k], a[k]);
+                    c[k] = (-l[i * w + j + 8 + k]).mul_add(x[j + 8 + k], c[k]);
                 }
             }
-            v = rd(rd(rd(lane[0] + lane[4]) + rd(lane[2] + lane[6]))
-                + rd(rd(lane[1] + lane[5]) + rd(lane[3] + lane[7])));
-            j0 = 8 * nch;
+            for k in 0..8 {
+                a[k] = rd(a[k] + c[k]);
+            }
+            v = red8(&a);
+            j0 = nb;
         }
         for j in j0..i {
             v = rd(v - rd(l[i * w + j] * x[j]));
@@ -402,37 +404,126 @@ pub fn strsm_a8_col(l: &[f32], w: usize, x: &mut [f32]) {
 /// sequentially, else 8 lanes over blocks of 8 terms (lane 0 starts at `b`) reduced as in [`strsm_left_ker`], then the remaining terms sequentially; all with rounded
 /// products and sums. A lone last row uses the threshold 16 of [`strsm_left_ker`] instead of 8. Row `p` takes `reduce(p)`; row `p + 1` takes `fma(-x_p, l_{p+1,p}, reduce_{p+1}(p))`. Verified for `w <= 24` only.
 pub fn strsv_utu_small(l: &[f32], w: usize, x: &mut [f32]) {
-    let reduce = |x: &[f32], i: usize, p: usize, thr: usize| -> f32 {
-        let mut v = x[i];
-        let mut j0 = 0;
-        if p >= thr {
-            let nch = p / 8;
-            let mut lane = [0.0f32; 8];
-            lane[0] = v;
-            for c in 0..nch {
-                for k in 0..8 {
-                    let j = 8 * c + k;
-                    lane[k] = rd(lane[k] - rd(l[i * w + j] * x[j]));
-                }
+    // `mkl_blas_avx2_xstrsv` cuts the rows into blocks of 32: block `k >= 1` first takes `y = y - A[0..32k, block]' x[0..32k]` (SGEMV('T'),
+    // see `gemv_dot`), then the block's own triangle goes through `strsv_utu_ker`.
+    let mut r0 = 0;
+    while r0 < w {
+        let sz = (w - r0).min(32);
+        if r0 > 0 {
+            let n4 = sz - sz % 4;
+            for j in 0..sz {
+                let d = gemv_dot(&l[(r0 + j) * w..(r0 + j) * w + r0], &x[..r0], j < n4);
+                x[r0 + j] = rd(x[r0 + j] - d);
             }
-            v = rd(rd(rd(lane[0] + lane[4]) + rd(lane[2] + lane[6]))
-                + rd(rd(lane[1] + lane[5]) + rd(lane[3] + lane[7])));
-            j0 = 8 * nch;
         }
-        for j in j0..p {
-            v = rd(v - rd(l[i * w + j] * x[j]));
-        }
-        v
-    };
+        let sub: Vec<f32> = (0..sz)
+            .flat_map(|i| (0..sz).map(move |j| (i, j)))
+            .map(|(i, j)| l[(r0 + i) * w + r0 + j])
+            .collect();
+        let mut xb = x[r0..r0 + sz].to_vec();
+        strsv_utu_ker(&sub, sz, &mut xb);
+        x[r0..r0 + sz].copy_from_slice(&xb);
+        r0 += sz;
+    }
+}
+
+/// 8-lane accumulator reduction of `vextractf128; vaddps; vmovhlps; vaddps; vshufps f5; vaddss`.
+fn red8(a: &[f32; 8]) -> f32 {
+    let s = [
+        rd(a[0] + a[4]),
+        rd(a[1] + a[5]),
+        rd(a[2] + a[6]),
+        rd(a[3] + a[7]),
+    ];
+    let t = [rd(s[0] + s[2]), rd(s[1] + s[3])];
+    rd(t[0] + t[1])
+}
+
+/// `mkl_blas_avx2_strsv_utu` (0x1ceabd0) with incx = 1: rows in pairs `(p, p + 1)`. Per row the `p` previous terms: 16-term blocks first
+/// (row `p`: two fused 8-lane accumulators, first and second half of each block, lane 0 of the first starting at `b`, added at the end;
+/// row `p + 1`: one 8-lane accumulator through both halves with rounded products), reduced by [`red8`]; then, if 8 or more terms remain, 8-lane
+/// blocks with rounded products (lane 0 starting at the value); then the scalar rest with rounded products. Row `p + 1` finally takes
+/// `fma(-x_p, l_{p+1,p}, v)`. A last odd row alone uses fused 16-term blocks (both accumulators) and the scalar rest.
+fn strsv_utu_ker(l: &[f32], w: usize, x: &mut [f32]) {
     let mut p = 0;
     while p + 1 < w {
-        let v0 = reduce(x, p, p, 8);
-        let v1 = reduce(x, p + 1, p, 8);
+        let (r0, r1) = (p * w, (p + 1) * w);
+        let (mut v0, mut v1) = (x[p], x[p + 1]);
+        let nb = p / 16 * 16;
+        if nb > 0 {
+            let mut a0 = [0.0f32; 8];
+            let mut a1 = [0.0f32; 8];
+            let mut c = [0.0f32; 8];
+            a0[0] = v0;
+            let mut b = [0.0f32; 8];
+            b[0] = v1;
+            for blk in 0..nb / 16 {
+                let j = 16 * blk;
+                for k in 0..8 {
+                    a0[k] = x[j + k].mul_add(-l[r0 + j + k], a0[k]);
+                    c[k] = x[j + 8 + k].mul_add(-l[r0 + j + 8 + k], c[k]);
+                    b[k] = rd(b[k] - rd(x[j + k] * l[r1 + j + k]));
+                    b[k] = rd(b[k] - rd(x[j + 8 + k] * l[r1 + j + 8 + k]));
+                }
+            }
+            for k in 0..8 {
+                a1[k] = rd(a0[k] + c[k]);
+            }
+            v0 = red8(&a1);
+            v1 = red8(&b);
+        }
+        let rest = p - nb;
+        let mut j0 = nb;
+        if nb < p && rest >= 8 {
+            let nc = rest / 8;
+            let mut a = [0.0f32; 8];
+            let mut b = [0.0f32; 8];
+            a[0] = v0;
+            b[0] = v1;
+            for c in 0..nc {
+                for k in 0..8 {
+                    let j = j0 + 8 * c + k;
+                    a[k] = rd(a[k] - rd(x[j] * l[r0 + j]));
+                    b[k] = rd(b[k] - rd(x[j] * l[r1 + j]));
+                }
+            }
+            v0 = red8(&a);
+            v1 = red8(&b);
+            j0 += 8 * nc;
+        }
+        for j in j0..p {
+            v0 = rd(v0 - rd(x[j] * l[r0 + j]));
+            v1 = rd(v1 - rd(x[j] * l[r1 + j]));
+        }
         x[p] = v0;
-        x[p + 1] = (-v0).mul_add(l[(p + 1) * w + p], v1);
+        x[p + 1] = (-v0).mul_add(l[r1 + p], v1);
         p += 2;
     }
     if p < w {
-        x[p] = reduce(x, p, p, 16);
+        let r0 = p * w;
+        let mut v = x[p];
+        let nb = p / 16 * 16;
+        let mut j0 = 0;
+        if nb > 0 {
+            let mut a = [0.0f32; 8];
+            let mut c = [0.0f32; 8];
+            a[0] = v;
+            for blk in 0..nb / 16 {
+                let j = 16 * blk;
+                for k in 0..8 {
+                    a[k] = x[j + k].mul_add(-l[r0 + j + k], a[k]);
+                    c[k] = x[j + 8 + k].mul_add(-l[r0 + j + 8 + k], c[k]);
+                }
+            }
+            for k in 0..8 {
+                a[k] = rd(a[k] + c[k]);
+            }
+            v = red8(&a);
+            j0 = nb;
+        }
+        for j in j0..p {
+            v = rd(v - rd(x[j] * l[r0 + j]));
+        }
+        x[p] = v;
     }
 }
