@@ -1708,7 +1708,8 @@ impl<'a> Solver<'a> {
             } else {
                 self.has_infeasible_basic()
             },
-            stability: self.handoff.is_none() && self.accuracy > 0,
+            // The dual and primal share the stability counter across handoffs (seed 50177).
+            stability: self.accuracy > 0 || self.handoff.is_some_and(|h| h.c178 > 0),
             can_switch: !self.pre_restart,
         };
         let before = self.sw.clone();
