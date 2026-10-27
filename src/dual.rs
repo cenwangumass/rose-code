@@ -2102,6 +2102,10 @@ impl<'a, R: Real> Dual<'a, R> {
             && bestc + xmm10 < R::ZERO
             && R::c(-self.ptol()) > bestc + xmm10
             && (self.level == 0 || self.updates > 0)
+            // The same level-nonzero re-selection used for larger lists first
+            // gives an artificial upper-bound candidate 2 * infeasibility
+            // (`0xcbcc8`, quad `0x223793`), so it can absorb the row.
+            && !(self.level != 0 && self.st[row[lst[0]].0] == UB && p.up[row[lst[0]].0] >= BIG)
         {
             self.work.add(0xc7c4f, 5.0, crate::work::CTX);
             return self.no_absorb();
