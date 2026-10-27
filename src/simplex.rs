@@ -1040,6 +1040,8 @@ struct Solver<'a> {
     mirror_q: Option<crate::ftran_order::RefStruct<crate::f80::F80>>,
     /// Full precision solution at the last fresh x87 basic-solution recomputation.
     x_q: Option<Vec<crate::f80::F80>>,
+    /// Maintained basic distances in the x87 primal, indexed by variable.
+    dst_q: Option<Vec<crate::f80::F80>>,
     /// The reference's work counter (`crate::work`).
     work: crate::work::Work,
     /// The last pivot, whose primal update the reference runs at the start of the next iteration (`0x105f20`).
@@ -1647,6 +1649,9 @@ impl<'a> Solver<'a> {
         if let Some(h) = self.handoff.as_mut().filter(|h| h.quad) {
             h.pert = true;
         }
+        // The x87 perturbation has a separate distance-update kernel.
+        self.x_q = None;
+        self.dst_q = None;
         let (p, m) = (self.p, self.p.m);
         let tol = self.opts.feasibility_tol;
         let size = self.sw.pert;
@@ -2119,6 +2124,22 @@ impl<'a> Solver<'a> {
             let j = self.basic[pos];
             self.dst[j] = self.dist_of(j, self.x[j]);
         }
+        self.dst_q = self.x_q.as_ref().map(|x| {
+            let mut d: Vec<_> = self
+                .dst
+                .iter()
+                .map(|&v| crate::f80::F80::from_f64(v))
+                .collect();
+            for &j in &self.basic {
+                d[j] = if is_inf(self.p.lo[j]) {
+                    crate::f80::F80::from_f64(self.p.up[j]) - x[j]
+                } else {
+                    x[j] - crate::f80::F80::from_f64(self.p.lo[j])
+                };
+                self.dst[j] = d[j].to_f64();
+            }
+            d
+        });
     }
 
     fn dist_of(&self, j: usize, x: f64) -> f64 {
@@ -3753,6 +3774,17 @@ fn classify(x: f64, lo: f64, up: f64, tol: f64, kept: f64) -> Option<(f64, f64, 
     Some((dist, range, t, mirrored))
 }
 
+/// The x87 primal recomputes the move step from its stored double pivot, not
+/// the full-precision pivot used by the ratio test (0x259847..0x259889).
+fn x87_move_step(d: crate::f80::F80, pivot: f64, upper: Option<(f64, f64)>) -> crate::f80::F80 {
+    use crate::f80::F80;
+    let d = match upper {
+        Some((lo, up)) => (d - F80::from_f64(up)) + F80::from_f64(lo),
+        None => d,
+    };
+    d / F80::from_f64(pivot)
+}
+
 /// `s` plus (`sign` = 1) or minus (`sign` = -1) the weights of `part`, in the reference's order (`0xf0a58`..`0xf0cc0`):
 /// fewer than 8 terms sequentially; otherwise four two-lane accumulators over blocks of 8 (`s` in lane 0 of the first),
 /// combined as `((a0 + a1) + (a2 + a3))`, then lane 0 + lane 1, then the remaining terms one by one.
@@ -4763,6 +4795,7 @@ fn solve_primal(
         mirror: None,
         mirror_q: None,
         x_q: None,
+        dst_q: None,
         work: start_work,
         last_pivot: None,
         p1_tol_on: false,
@@ -5596,6 +5629,10 @@ fn solve_primal(
                 classify(xs[j], lo[j], up[j], tol, s.dst[j])
             };
             if crate::dump::on("ent") {
+                let ld = |v: crate::f80::F80| {
+                    let (m, se) = v.repr();
+                    [format!("{m:#x}"), format!("{se:#x}")]
+                };
                 let dims = s.mirror.as_ref().map(|mi| mi.dims());
                 let kinds = s.mirror.as_ref().map(|mi| mi.kinds().to_vec());
                 let bl = s
@@ -5620,7 +5657,10 @@ fn solve_primal(
                     "ent",
                     serde_json::json!({"iter": iterations, "q": q, "own": (own < INF).then_some(own),
                     "idx": entries.iter().map(|e| e.0).collect::<Vec<_>>(), "val": entries.iter().map(|e| e.1).collect::<Vec<_>>(),
-                    "d": dist, "rng": rng, "typ": typ, "dense": ft_dense, "bl": bl, "kinds": kinds, "dims": dims}),
+                    "d": dist, "rng": rng, "typ": typ, "dense": ft_dense, "bl": bl, "kinds": kinds, "dims": dims,
+                    "quad": s.handoff.is_some_and(|h| h.quad),
+                    "basic": s.basic, "dq": s.dst_q.as_ref().map(|d| s.basic.iter().map(|&j| ld(d[j])).collect::<Vec<_>>()),
+                    "aq": entq.as_ref().map(|v| v.iter().map(|&a| ld(a)).collect::<Vec<_>>())}),
                 );
             }
             let mut passes = Vec::new();
@@ -5961,6 +6001,25 @@ fn solve_primal(
         // Phase 2 does not move the point by a negative Harris step (reference, PEROLD ratio calls 50, 82, 354, ...: the
         // basics stay as they are, the entering variable stays at its bound and the leaving one keeps its computed value).
         let move_step = if infeasible { step } else { step.max(0.0) };
+        let move_q = if infeasible && p.lo[q] == 0.0 && s.x[q] == 0.0 && dir > 0.0 {
+            chosen.and_then(|k| {
+                let j = s.basic[entries[k].0];
+                if is_inf(p.lo[j]) || entq.is_none() {
+                    return None;
+                }
+                let d = s.dst_q.as_ref()?.get(j).copied()?;
+                let upper = leave_to_upper
+                    .unwrap_or(entries[k].1 < 0.0)
+                    .then_some((p.lo[j], p.up[j]));
+                Some(x87_move_step(d, entries[k].1, upper))
+            })
+        } else {
+            None
+        };
+        if move_q.is_none() {
+            s.x_q = None;
+            s.dst_q = None;
+        }
         for &(i, a) in &entries {
             let j = s.basic[i];
             s.x[j] -= move_step * a;
@@ -5970,11 +6029,27 @@ fn solve_primal(
                 s.dst[j] - move_step * a
             };
         }
+        if let (Some(x), Some(d), Some(a), Some(move_q)) = (&mut s.x_q, &mut s.dst_q, &entq, move_q)
+        {
+            for (k, &(i, _)) in entries.iter().enumerate() {
+                let j = s.basic[i];
+                let delta = move_q * a[k];
+                x[j] -= delta;
+                d[j] = if is_inf(p.lo[j]) {
+                    d[j] + delta
+                } else {
+                    d[j] - delta
+                };
+                s.x[j] = x[j].to_f64();
+                s.dst[j] = d[j].to_f64();
+            }
+        }
         let dq_base = s.dist_of(q, s.nonbasic_value(q));
         if s.unsnapped.remove(&q) {
             // A variable that left outside its bound enters from the bound, not from the value it kept.
             s.x[q] = s.nonbasic_value(q);
         }
+        let q_base = s.x[q];
         s.x[q] += dir * move_step;
         s.dst[q] = if is_inf(p.lo[q]) {
             dq_base - dir * move_step
@@ -5986,6 +6061,21 @@ fn solve_primal(
         } else {
             dq_base + dir * move_step
         };
+        if let (Some(x), Some(d), Some(move_q)) = (&mut s.x_q, &mut s.dst_q, move_q) {
+            let base = if x[q].to_f64() == q_base {
+                x[q]
+            } else {
+                crate::f80::F80::from_f64(q_base)
+            };
+            x[q] = base + crate::f80::F80::from_f64(dir) * move_q;
+            d[q] = if is_inf(p.lo[q]) {
+                crate::f80::F80::from_f64(p.up[q]) - x[q]
+            } else {
+                x[q] - crate::f80::F80::from_f64(p.lo[q])
+            };
+            s.x[q] = x[q].to_f64();
+            s.dst[q] = d[q].to_f64();
+        }
         let Some(k) = chosen else {
             // Bound flip: the entering variable travels to its opposite bound.
             for (site, est, scale) in std::mem::take(&mut pending_upd) {
@@ -6033,6 +6123,9 @@ fn solve_primal(
         };
         if infeasible || !outside {
             s.x[leave] = bound;
+            if let Some(x) = &mut s.x_q {
+                x[leave] = crate::f80::F80::from_f64(bound);
+            }
             s.unsnapped.remove(&leave);
         } else {
             s.x[leave] = x_before[0];
@@ -6759,6 +6852,19 @@ fn solve_primal(
 mod tests {
     use super::*;
     use crate::mps;
+
+    #[test]
+    fn x87_primal_move_uses_double_pivot_and_carries_basic_value() {
+        use crate::f80::F80;
+        // Captured at the second x87 primal ratio/update of seed 4250.
+        let leaving = F80::from_repr(0xe3514cd84d08b9a7, 0xbff6);
+        let pivot = F80::from_repr(0xd2cd5ade632cdce2, 0xbfff).to_f64();
+        let step = x87_move_step(leaving, pivot, None);
+        assert_eq!(step.repr(), (0x8a073a13bed6da50, 0x3ff6));
+        let x = F80::from_repr(0xd1d4358125a9b3c0, 0x3ffa);
+        let alpha = F80::from_repr(0xacafd5901e0fc4b2, 0x3ff8);
+        assert_eq!((x - step * alpha).repr(), (0xd1bcee96debddfb0, 0x3ffa));
+    }
 
     #[test]
     fn solves_a_small_lp_with_slack_start() {
