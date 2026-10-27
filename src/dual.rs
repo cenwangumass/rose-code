@@ -1566,6 +1566,29 @@ impl<'a, R: Real> Dual<'a, R> {
                     self.request = 3;
                     return None;
                 }
+                // Work of the pricing-side walk rebuild (`0xbdc10`): classify
+                // all rows, retain waiting entries, and merge the newly infeasible rows.
+                let ptol = self.ptol();
+                let infeas = (0..self.m).filter(|&i| self.infeas(i) > ptol).count();
+                let old_len = self.walk_len.min(self.list.len());
+                let old = self.list[..old_len]
+                    .iter()
+                    .filter(|&&i| self.flags[i] == 0 && self.infeas(i) > ptol)
+                    .count();
+                let fresh = (0..self.m)
+                    .filter(|&i| self.flags[i] != 0 && self.infeas(i) > ptol)
+                    .count();
+                let m = self.m as f64;
+                let scan = if self.level == 0 {
+                    3.0 * m
+                } else {
+                    3.0 * (self.m - infeas) as f64
+                        + (5.0 + if self.ptype == 1 { 1.0 } else { 0.0 }) * infeas as f64
+                };
+                self.work.add(0xbe039, scan, crate::work::CTX);
+                self.work.add(0xbe0a1, (old_len + 2 * old) as f64, crate::work::CTX);
+                self.work.add(0xbe17e, (2 * fresh) as f64, crate::work::CTX);
+                self.work.add(0xbe34d, (old + fresh) as f64, crate::work::CTX);
                 self.build_walk_list();
                 if self.walk_len == 0 {
                     return None;
