@@ -5204,6 +5204,7 @@ fn solve_pass<R: Real>(
         };
         set_dual_tol(LOOP_TOL.with(|c| c.get()) * tol_factor);
         crate::simplex::PRIMAL_SINGULAR.with(|c| c.set(None));
+        crate::simplex::PRIMAL_TOL_ABORT.with(|c| c.set(false));
         crate::simplex::PRIMAL_START_SINGULAR.with(|c| c.set(false));
         crate::simplex::PRIMAL_FARKAS_SKIPPED.with(|c| c.set(0));
         crate::simplex::PRIMAL_REPAIRED.with(|c| c.set(false));
@@ -5220,12 +5221,14 @@ fn solve_pass<R: Real>(
                 else {
                     return Err(SolveError::SingularBasis);
                 };
-                if s.retries < 5 {
+                let tol_abort = crate::simplex::PRIMAL_TOL_ABORT.with(|c| c.take());
+                if s.retries < 5 && !tol_abort {
                     // The primal LU singular handler increments the same counter
                     // used by the next dual ratio test (0xf58f7 / 0x248f99).
                     C178.with(|c| c.set(c.get() + 1));
                 }
-                if !R::QUAD
+                if !tol_abort
+                    && !R::QUAD
                     && s.rejected_end
                     && !crate::simplex::PRIMAL_START_SINGULAR.with(|c| c.take())
                 {

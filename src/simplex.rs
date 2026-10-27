@@ -60,6 +60,8 @@ pub struct SolveOptions {
     /// Scale the model the way the reference does by default (`ScaleFlag`, power-of-two factors, `crate::scale`) and unscale the
     /// result. Off by default; on in `SolveOptions::release()`.
     pub scaling: bool,
+    /// Allow the default numerical restart to switch to extended precision.
+    pub automatic_quad: bool,
     /// `PerturbValue` of the dual's cost perturbation (`crate::dual`, `reverse-engineer/specs/dual-simplex.md`): 0 turns it off (the controlled
     /// profile), 0.0002 is the library default.
     pub perturb: f64,
@@ -104,6 +106,7 @@ impl Default for SolveOptions {
             faithful_ftran: true,
             pricing0: false,
             scaling: false,
+            automatic_quad: false,
             perturb: 0.0,
             obj_scale: 1.0,
             scaled: false,
@@ -163,6 +166,7 @@ impl SolveOptions {
     pub fn dual_release() -> Self {
         SolveOptions {
             scaling: true,
+            automatic_quad: true,
             perturb: 0.0002,
             ..SolveOptions::dual()
         }
@@ -173,6 +177,7 @@ impl SolveOptions {
         SolveOptions {
             pricing0: true,
             scaling: true,
+            automatic_quad: true,
             ..SolveOptions::default()
         }
     }
@@ -503,6 +508,7 @@ thread_local! {
     pub(crate) static PRIMAL_SHIFT_END: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// Factorizations the primal of a dual handoff left out at its end (the Farkas pair, see `refactor_for_farkas`): the dual controller books them as made.
     pub(crate) static PRIMAL_FARKAS_SKIPPED: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    pub(crate) static PRIMAL_TOL_ABORT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     pub(crate) static PRIMAL_DRIFT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The primal's factorization found the basis singular (status -1002, `0xf5921`): iterations and refactorizations of the primal, and its pivot threshold.
     /// The primal repaired its basis in place after a singular factorization (the controller then restores the dropped variable and runs the primal again).
@@ -1551,7 +1557,7 @@ impl<'a> Solver<'a> {
             self.primal_full_work();
             self.dual_btran_work("full");
         }
-        self.recompute_dual();
+        self.recompute_dual()?;
         if let Some(p0) = self.p0.as_mut() {
             p0.rebuild = true;
             p0.pending = None;
@@ -1569,7 +1575,7 @@ impl<'a> Solver<'a> {
             self.residual_check_work();
         }
         if self.sw.active && !self.cleanup {
-            self.method_decision(sw_avg);
+            self.method_decision(sw_avg)?;
             if self.sw.perturb_due {
                 self.perturb();
             }
@@ -1714,7 +1720,7 @@ impl<'a> Solver<'a> {
     }
 
     /// The method decision after a factorization (`0x142500`): switches from `pricing0` to Devex pricing, restarting the weights and the list.
-    fn method_decision(&mut self, avg: usize) {
+    fn method_decision(&mut self, avg: usize) -> Result<(), SolveError> {
         let mi = self.mirror.as_ref().unwrap();
         let inp = crate::method::Inputs {
             rows: self.p.m,
@@ -1782,7 +1788,7 @@ impl<'a> Solver<'a> {
                 self.reduced_cost_work();
                 // The reduced-cost pass (`0x1021b0`) recomputes the nonbasic d sequentially in stored column order, not with the
                 // `pricing0` eight-lane kernel.
-                self.recompute_dual();
+                self.recompute_dual()?;
             }
             self.reset_weights();
             self.sw.ratio_sum = 0.0;
@@ -1790,6 +1796,7 @@ impl<'a> Solver<'a> {
             self.list.clear();
             self.level = 0;
         }
+        Ok(())
     }
 
     /// The sign of a zero in the returned duals (`Pi` getter `0x1a7430`, range loop `0x1a78ea..0x1a7928`): a row whose slack is basic returns `+0.0`;
@@ -2365,14 +2372,14 @@ impl<'a> Solver<'a> {
         }
     }
 
-    fn recompute_dual(&mut self) {
+    fn recompute_dual(&mut self) -> Result<(), SolveError> {
         let p = self.p;
         if let Some(y) = self.y_ref.take() {
             self.set_d_from_y(&y);
             self.update_dual_infeas_sum();
-            self.handoff_residual(&y);
+            let result = self.handoff_residual(&y);
             self.y_ref = Some(y);
-            return;
+            return result;
         }
         let mut y: Vec<f64> = self.basic.iter().map(|&j| p.cost[j]).collect();
         self.factor.btran(&mut y);
@@ -2384,7 +2391,7 @@ impl<'a> Solver<'a> {
             };
         }
         self.update_dual_infeas_sum();
-        self.handoff_residual(&y);
+        self.handoff_residual(&y)
     }
 
     /// The full primal dual recompute replaces ctx+0x2d8 with the sum of
@@ -2414,10 +2421,10 @@ impl<'a> Solver<'a> {
     /// counter of the dual (`ctx+0x388`, `ctx+0x174`). At the start of a call (`0x1455d3`), more than two failures raise the tolerance tenfold (up to 1e-3) and reset
     /// the counter; the residual `max |c_j - a_j y|` over the basic structurals is then compared with the tolerance (`0x145a36..0x145a56`) when the factorization
     /// count is 4 modulo 5, the request is 4, 5 or 7, or the counter is not zero.
-    fn handoff_residual(&mut self, y: &[f64]) {
+    fn handoff_residual(&mut self, y: &[f64]) -> Result<(), SolveError> {
         // The tolerance raise and the residual compare sit behind the `ctx+0x2d0 == 0` tests of `0x1455ca` and `0x14577a`: in phase 1 (an infeasible basic variable) the call leaves the tolerance and the counter alone.
         if self.handoff.is_none() || self.has_infeasible_basic() {
-            return;
+            return Ok(());
         }
         let tol = crate::dual::dual_tol();
         let cnt = crate::dual::resid_fails();
@@ -2427,16 +2434,31 @@ impl<'a> Solver<'a> {
                 serde_json::json!({"src": "primal", "tol": tol, "cnt": cnt, "n": self.refactorizations}),
             );
         }
+        let mut abort = false;
         if cnt > 2 {
             if tol < 1e-3 {
                 crate::dual::set_dual_tol(10.0 * tol);
                 crate::dual::set_resid_fails(0);
+            } else if self
+                .handoff
+                .is_some_and(|h| !h.quad && self.opts.automatic_quad)
+            {
+                // Set status -1002 here; the residual routine still completes its check (0x1455ca..0x14562c).
+                PRIMAL_TOL_ABORT.with(|c| c.set(true));
+                PRIMAL_SINGULAR.with(|c| {
+                    c.set(Some((
+                        self.iters_done,
+                        self.refactorizations,
+                        crate::lu_order::threshold(),
+                    )))
+                });
+                abort = true;
             }
         }
         // The periodic residual check reads the shared count, including the dual factors (seed 5959).
         let nref = self.refactorizations + self.handoff.map_or(0, |h| h.nref0);
         if !(nref % 5 == 4 || crate::dual::resid_fails() != 0) {
-            return;
+            return if abort { Err(SolveError::SingularBasis) } else { Ok(()) };
         }
         let p = self.p;
         let mut meas = 0.0f64;
@@ -2463,6 +2485,7 @@ impl<'a> Solver<'a> {
         if meas > tol && meas > 1e-4 * crate::dual::dual_infeas_sum() {
             crate::dual::set_resid_fails(crate::dual::resid_fails() + 1);
         }
+        if abort { Err(SolveError::SingularBasis) } else { Ok(()) }
     }
 
     fn is_fixed(&self, j: usize) -> bool {
@@ -2664,7 +2687,7 @@ impl<'a> Solver<'a> {
         }
     }
 
-    fn price_faithful(&mut self) -> Option<usize> {
+    fn price_faithful(&mut self) -> Result<Option<usize>, SolveError> {
         self.list_failed = false;
         self.recomputed = false;
         self.dump_xpricing(if self.admit_scan { "admit" } else { "scan" });
@@ -2673,7 +2696,7 @@ impl<'a> Solver<'a> {
             self.list_failed = false;
             self.recomputed = true;
             self.dual_btran_work("listfail");
-            self.recompute_dual();
+            self.recompute_dual()?;
             self.list.clear();
             self.level = 0;
             self.dump_xpricing("rescan");
@@ -2690,19 +2713,19 @@ impl<'a> Solver<'a> {
                 }
                 PRC.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             }
-            return q;
+            return Ok(q);
         }
-        q
+        Ok(q)
     }
 
     /// `price_faithful`, except that the variable dropped from a singular supplied basis stays out of the scan until the scan finds no
     /// other candidate; it is then admitted and the list rebuilt (the reference adds 3 to its status, -4 -> -1, in `0xcda5b`).
-    fn price_admitting(&mut self) -> Option<usize> {
+    fn price_admitting(&mut self) -> Result<Option<usize>, SolveError> {
         let w0 = self.work.w;
         let q = if self.p0.is_some() {
             self.price0()
         } else {
-            self.price_faithful()
+            self.price_faithful()?
         };
         // The x87 primal with cost shifts in force does not admit the dropped variable: its first failed scan ends the primal with status -1004.
         if q.is_none() && self.excluded.is_some() && !self.handoff.is_some_and(|h| h.quad && h.pert)
@@ -2735,16 +2758,16 @@ impl<'a> Solver<'a> {
                 self.pre_restart = true;
                 let r = self.refactor();
                 self.pre_restart = false;
-                r.ok()?;
+                r?;
                 if self.p0.is_some() {
                     self.p0_rebuild();
                 }
                 if self.repaired && self.handoff.is_some_and(|h| h.quad) {
                     // The refactor can make an eligible column reappear; the reference
                     // scans again with the dropped variable still excluded.
-                    let retry = self.price_faithful();
+                    let retry = self.price_faithful()?;
                     if retry.is_some() {
-                        return retry;
+                        return Ok(retry);
                     }
                 }
             }
@@ -2759,7 +2782,7 @@ impl<'a> Solver<'a> {
             {
                 // The in-place repair keeps the dropped variable out: the run ends here and the controller starts the next one (`compare.py lu`,
                 // fx_midsing_1106: one sorted factorization after the pre-restart one, not two).
-                return None;
+                return Ok(None);
             }
             self.excluded = None;
             self.repaired = false;
@@ -2788,9 +2811,7 @@ impl<'a> Solver<'a> {
             self.restart = false;
             self.restarted = true;
             self.admitted = true;
-            if r.is_err() {
-                return None;
-            }
+            r?;
             self.list.clear();
             self.level = 0;
             let w1 = self.work.w;
@@ -2798,15 +2819,15 @@ impl<'a> Solver<'a> {
             let q = if self.p0.is_some() {
                 self.price0()
             } else {
-                self.price_faithful()
+                self.price_faithful()?
             };
             self.admit_scan = false;
             if q.is_none() {
                 self.work.rollback(w1);
             }
-            return q;
+            return Ok(q);
         }
-        q
+        Ok(q)
     }
 
     /// The reference's "Resetting Norm" (`0x102d20`, after the basis change): w = 1 and framework membership for every nonbasic
@@ -5066,13 +5087,13 @@ fn solve_primal(
         s.sw.level = c.level;
         s.sw.pert = c.pert;
         s.quad_switch_allowed = true;
-        s.method_decision(0);
+        s.method_decision(0)?;
         s.quad_switch_allowed = false;
     }
     s.recompute_primal();
     s.primal_full_work();
     s.dual_btran_work("start");
-    s.recompute_dual();
+    s.recompute_dual()?;
     if s.sw.active && s.sw.perturb_due {
         // The perturbation of the first factorization's decision (`0x141a60`), like the one after a later factorization.
         s.perturb();
@@ -5171,6 +5192,7 @@ fn solve_primal(
                 s.work.add(0x107b57, est, crate::work::CTX);
             }
         }
+        let mut pending_tol_error = false;
         let infeasible = s.has_infeasible_basic();
         s.inf_seen = infeasible;
         s.p1_tol_on = infeasible;
@@ -5262,7 +5284,8 @@ fn solve_primal(
             let cc_pass = s.mirror.is_some() && last.is_some() && !dc.is_empty() && !first_end;
             if !due && !s.p0.is_some() && !cc_pass {
                 s.dual_btran_work("ending");
-                s.recompute_dual();
+                // The phase transition enters pricing once before the driver observes -1002 (seed 5371).
+                pending_tol_error = s.recompute_dual().is_err();
                 s.fresh_duals = true;
             }
         }
@@ -5288,8 +5311,12 @@ fn solve_primal(
         if let Some(p0) = s.p0.as_mut() {
             p0.tol = if infeasible { P0_DTOL_P1 } else { P0_DTOL };
         }
+        let price = s.price_admitting()?;
+        if pending_tol_error {
+            return Err(SolveError::SingularBasis);
+        }
         let q = if infeasible && !s.p0.is_some() {
-            match s.price_admitting() {
+            match price {
                 Some(q) => q,
                 None if s.repaired => {
                     if s.handoff.is_some_and(|h| h.quad && h.pert) {
@@ -5310,7 +5337,7 @@ fn solve_primal(
                 None if s.mirror.is_some() && !s.recomputed && s.factor.num_updates() > 0 && {
                     // The failed scan enters 0x145520, which recomputes the duals and builds a list before deciding whether to refactor.
                     s.dual_btran_work("phase1_none");
-                    s.recompute_dual();
+                    s.recompute_dual()?;
                     s.list.clear();
                     s.level = 0;
                     (0..s.p.n + s.p.m).any(|j| s.score(j).is_some())
@@ -5359,7 +5386,7 @@ fn solve_primal(
                         // Preserve the x87 handoff's rescan until its reference path is separately recovered.
                         s.rescan2 = true;
                         s.dual_btran_work("rescan");
-                        s.recompute_dual();
+                        s.recompute_dual()?;
                         continue;
                     }
                     s.work.trig();
@@ -5386,7 +5413,7 @@ fn solve_primal(
                     s.composite_dual(true);
                     s.list.clear();
                     s.level = 0;
-                    match s.price_admitting() {
+                    match s.price_admitting()? {
                         Some(q) => q,
                         None => {
                             if s.handoff.is_some_and(|h| h.pert && !h.quad) && !s.repaired {
@@ -5412,7 +5439,7 @@ fn solve_primal(
                 }
             }
         } else {
-            match s.price_admitting() {
+            match price {
                 Some(q) => q,
                 None if std::mem::take(&mut s.want_refactor) => {
                     s.work.trig();
@@ -5493,7 +5520,7 @@ fn solve_primal(
                                 s.work.trig();
                                 s.refactor()?;
                             }
-                            s.recompute_dual();
+                            s.recompute_dual()?;
                             s.rescan3 = true;
                             s.list.clear();
                             s.level = 0;
@@ -5569,7 +5596,7 @@ fn solve_primal(
                                         );
                                         break Status::Infeasible;
                                     }
-                                    s.recompute_dual();
+                                    s.recompute_dual()?;
                                     s.list.clear();
                                     s.level = 0;
                                     continue;
@@ -5578,7 +5605,7 @@ fn solve_primal(
                                 iterations += k;
                                 if k > 0 {
                                     // The pivots can leave a negative reduced cost (the ratio test's tolerance): the primal prices again.
-                                    s.recompute_dual();
+                                    s.recompute_dual()?;
                                     s.list.clear();
                                     s.level = 0;
                                     continue;
@@ -5599,7 +5626,7 @@ fn solve_primal(
                         s.composite_dual(true);
                         s.list.clear();
                         s.level = 0;
-                        match s.price_admitting() {
+                        match s.price_admitting()? {
                             Some(q) => q,
                             None => {
                                 s.refactor_for_farkas()?;
@@ -6960,7 +6987,7 @@ fn solve_primal(
         s.work.mute = s.cleanup;
         s.recompute_primal();
         s.work.mute = false;
-        s.recompute_dual();
+        s.recompute_dual()?;
     }
     let sgn = if model.sense == Sense::Maximize {
         -1.0
