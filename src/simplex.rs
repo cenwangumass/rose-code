@@ -2316,6 +2316,11 @@ impl<'a> Solver<'a> {
                 self.acc_thr = self
                     .acc_thr
                     .max(crate::dual::accuracy_threshold(xmax / rmax, e2));
+                // The primal recompute raises the live pivot threshold for a
+                // severe basic-solution magnitude or residual (0x1077a2..0x1077f6).
+                if xmax > 1e10 * rmax || e2 > 1e-8 {
+                    crate::lu_order::raise_threshold(0.5);
+                }
             }
             let scale = 1.0 + r.iter().fold(0.0f64, |a, v| a.max(v.abs()));
             if self.handoff.is_some() || res.iter().all(|v| v.abs() <= 1e-7 * scale) {
