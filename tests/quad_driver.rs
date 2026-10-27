@@ -144,3 +144,10 @@ fn x87_primal_basic_values_keep_update_precision() {
     let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
     assert_eq!((result.status, result.iterations), (Status::Infeasible, 85));
 }
+
+#[test]
+fn x87_repaired_farkas_factor_resumes_pricing() {
+    let model = mps::parse(include_str!("fixtures/quad_4250.mps")).unwrap();
+    let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
+    assert_eq!((result.status, result.iterations), (Status::Infeasible, 123));
+}

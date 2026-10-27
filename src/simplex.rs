@@ -5233,7 +5233,15 @@ fn solve_primal(
                     // After a recomputed scan fails at the pure-penalty tolerance,
                     // the x87 driver returns infeasible even with factor updates
                     // (0x281cd5..0x281d2e). Its Farkas readout refactors first.
+                    let was = s.repaired;
                     s.refactor_for_farkas()?;
+                    if s.repaired && !was {
+                        // A singular factor repair changes the basis; resume
+                        // phase-one pricing before deciding infeasibility.
+                        s.y_ref = None;
+                        s.composite_dual(false);
+                        continue;
+                    }
                     farkas = Some(s.farkas_dual());
                     break Status::Infeasible;
                 }
