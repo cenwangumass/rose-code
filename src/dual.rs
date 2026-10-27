@@ -45,6 +45,8 @@ thread_local! {
     static PASS_NO: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     /// The stability counter `ctx+0x178`: one per pivot-check mismatch (`0xc5a35`, quad `0x21da43`) and per singular quad restart (`0x248f99`); never reset in a solve.
     static C178: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+    /// Large basic-value flag (`ctx+0x2c8`), retained across dual passes.
+    static LARGE_XB: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The basis snapshot of the reference's log timer (`ctx+0x190`) and the iteration count of the last one (`ctx+0x40`).
     static SNAP: std::cell::RefCell<Option<(Vec<usize>, Vec<bool>)>> = const { std::cell::RefCell::new(None) };
     /// The relative tolerance of the primal's pivot-pair check (`ctx+0x3a0`): 3e-6 from the parameters, 1e-7 from the first restore of a dropped variable on (`0x1551d4`).
@@ -192,6 +194,8 @@ struct Dual<'a, R: Real = f64> {
     refactorizations: usize,
     /// The relative pivot threshold of the LU (`ctx+0x390`, 2^-7 at the start): raised after a recompute of x_B by `accuracy_threshold`, never lowered.
     lu_thr: f64,
+    /// Whether either side of the last basic-value recompute has large values.
+    big_pricing: bool,
     /// The pricing mode `ctx+0x3ec`: 1 for dual steepest edge, 3 after the switch of `0xf770d` (weights restarted at 1).
     pmode: u8,
     /// The number of infeasible rows at the last value-mode recompute (`P+0x3c`).
@@ -1087,6 +1091,14 @@ impl<'a, R: Real> Dual<'a, R> {
             R::ZERO
         };
         let (rmax, xmax, e2) = (rmax.to_f64(), xmax.to_f64(), e2.to_f64());
+        if !R::QUAD {
+            let large = rmax + xmax > 1e20;
+            self.big_pricing = LARGE_XB.with(|c| {
+                let old = c.get();
+                c.set(large);
+                old || large
+            });
+        }
         let t = accuracy_threshold(xmax / rmax, e2);
         if crate::dump::on("dualacc") {
             crate::dump::emit(
@@ -1484,7 +1496,7 @@ impl<'a, R: Real> Dual<'a, R> {
         }
         self.value_mode = true;
         self.cursor = 0;
-        // New threshold (`0xc1e92..0xc1ee9`): max priority / 1e5, or / 1e3 when the level was zero before this factorization (no huge infeasibilities)
+        // New threshold (`0xc1e92..0xc1ee9`): max priority / 1e5, or / 1e3 when neither the old nor the new basic values are huge
         // and the list is not shorter than the pivot column's entry count (always, after a no-row call); an existing threshold below the maximum
         // priority is only ever raised.
         let thr_old = self.thr;
@@ -3862,7 +3874,14 @@ impl<'a, R: Real> Dual<'a, R> {
             self.weight_overflow_gate(req);
             self.prog_on = self.level == 0;
             self.prog_acc = 0.0;
-            self.recompute_flags(level_before != 0, pv.is_some());
+            self.recompute_flags(
+                if R::QUAD {
+                    level_before != 0
+                } else {
+                    self.big_pricing
+                },
+                pv.is_some(),
+            );
             self.flags_work();
             if R::QUAD
                 && self.status.is_none()
@@ -4162,6 +4181,7 @@ fn solve_frame(
     DUAL_HANDOFFS.with(|c| c.set(0));
     C35C.with(|c| c.set(1));
     C178.with(|c| c.set(0));
+    LARGE_XB.with(|c| c.set(false));
     crate::simplex::QUAD_PRIMALS.with(|c| c.set(0));
     // The quad mode (`ctx+0x28`): once the controller switched, every later pass runs the extended-precision twin of the dual.
     let mut quad = false;
@@ -4291,6 +4311,7 @@ fn solve_pass<R: Real>(
         // The fresh start of the third restart initialises the context again (`0xcf29b`): the tolerance goes back to the parameter, the counter stays.
         set_dual_tol(DUAL_TOL0);
         set_primal_tol(PRIMAL_TOL);
+        LARGE_XB.with(|c| c.set(false));
     }
     let p = build(model);
     let (n, m) = (p.n, p.m);
@@ -4400,6 +4421,7 @@ fn solve_pass<R: Real>(
         absorb_request: false,
         refactorizations: carry.fac + 1,
         lu_thr: carry_thr,
+        big_pricing: false,
         pmode: if start.is_some() || (carry.retries > 0 && !fresh_pass::<R>(carry.retries)) {
             3
         } else {
@@ -4605,7 +4627,11 @@ fn solve_pass<R: Real>(
     s.prog_acc = 0.0;
     s.work.add(0xc391f, m as f64, crate::work::CTX);
     s.recompute_flags(
-        s.warm && s.level != 0,
+        if R::QUAD {
+            s.warm && s.level != 0
+        } else {
+            s.big_pricing
+        },
         carry.retries > 0 && carry.after_pivot,
     );
     // The carried average decides the pricing mode of the first recompute; the running average of the pass (`P+0x48`) starts at 0 (m6, m5 captures).
