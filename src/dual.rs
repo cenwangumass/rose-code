@@ -3768,8 +3768,14 @@ impl<'a, R: Real> Dual<'a, R> {
         if self.pstep <= 0.0 && self.pert_param <= 0.0 {
             return;
         }
-        // The test runs at every second refactorization (every fifth once the perturbation flag has reached 3).
-        let period = if self.pert > 2 { 5 } else { 2 };
+        // Quad 0x23904b..0x239085: the period is 2, 5, or 10000 according to
+        // whether neither, one, or both of the handoff counter and perturbation flag exceed 2.
+        let handoffs = R::QUAD && C35C.with(|c| c.get()) > 2;
+        let period = match (handoffs, self.pert > 2) {
+            (true, true) => 10_000,
+            (true, false) | (false, true) => 5,
+            (false, false) => 2,
+        };
         if self.nref() % period != 1 {
             return;
         }
