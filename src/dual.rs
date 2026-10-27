@@ -291,7 +291,7 @@ struct Dual<'a, R: Real = f64> {
     /// Entry count of the last pivot column (`*(ctx+0x210)`).
     last_cap: usize,
     /// The duals `y = B^-T c_B` of the last recompute.
-    last_y: Vec<f64>,
+    last_y: Vec<R>,
     /// The factorization count the pass started from (`ctx+0x2c0` counts from there).
     fac0: usize,
     /// `ctx+0x2c0` at the start of the pass (`Carry::nref0`), and the factorizations that `refactorizations` counts but `ctx+0x2c0` does not (the failed one of the in-place repair:
@@ -1242,27 +1242,53 @@ impl<'a, R: Real> Dual<'a, R> {
         if !(self.nref() % 5 == 4 || req == 4 || req == 6) {
             return;
         }
-        let mut meas = 0.0f64;
+        let mut meas = R::ZERO;
+        let y_double: Vec<f64> = if R::QUAD {
+            Vec::new()
+        } else {
+            self.last_y.iter().map(|v| v.to_f64()).collect()
+        };
         for &j in &self.head {
             // The kernel of `0xe59a1..0xe5bd9`: the cost (with the shift), minus the column products, sequentially below 8 entries past the alignment peel, else the eight-lane
             // body of the read-out kernel (fx_midsing_1127: 165.177734375 against 142.407).
-            let acc = crate::simplex::dot_lanes_from(
-                &self.p.fcols[j],
-                &self.last_y,
-                self.p.offs[j] & 1,
-                self.cost[j],
-            );
-            meas = meas.max(acc.abs());
+            let acc = if R::QUAD {
+                // The x87 residual check (`0x2387b6..0x238a4d`) accumulates eight
+                // long-double lanes, folds them left to right, then walks the tail backwards.
+                let col = &self.p.fcols[j];
+                let n8 = col.len() / 8 * 8;
+                let mut lanes = [R::ZERO; 8];
+                lanes[0] = R::c(self.cost[j]) + R::c(self.cost_lo[j]);
+                for i in 0..n8 {
+                    let (row, a) = col[i];
+                    lanes[i % 8] -= R::c(a) * self.last_y[row];
+                }
+                let mut sum = lanes[0];
+                for lane in &lanes[1..] {
+                    sum += *lane;
+                }
+                for &(row, a) in col[n8..].iter().rev() {
+                    sum -= R::c(a) * self.last_y[row];
+                }
+                sum
+            } else {
+                R::c(crate::simplex::dot_lanes_from(
+                    &self.p.fcols[j],
+                    &y_double,
+                    self.p.offs[j] & 1,
+                    self.cost[j],
+                ))
+            };
+            meas = maxr(meas, acc.abs());
         }
         let tol = dual_tol();
         if crate::dump::on("dualtol") {
             crate::dump::emit(
                 "dualtol",
-                serde_json::json!({"meas": meas, "tol": tol, "cnt": RESID_FAILS.with(|c| c.get()), "req": req, "n": self.nref()}),
+                serde_json::json!({"meas": meas.to_f64(), "tol": tol, "cnt": RESID_FAILS.with(|c| c.get()), "req": req, "n": self.nref()}),
             );
         }
         let mut cnt = RESID_FAILS.with(|c| c.get());
-        if meas > tol {
+        if meas > R::c(tol) {
             cnt += 1;
         }
         if cnt > 5 && tol < 1e-3 {
@@ -1294,7 +1320,7 @@ impl<'a, R: Real> Dual<'a, R> {
         for &(i, v) in out.iter() {
             y[i] = v;
         }
-        self.last_y = y.iter().map(|v| v.to_f64()).collect();
+        self.last_y = y.clone();
         let mut d = vec![R::ZERO; p.n + p.m];
         for j in 0..p.n + p.m {
             if self.st[j] < 0 {

@@ -35,6 +35,13 @@ fn shifted_primal_handoff_continues_from_its_basis_with_a_snapshot() {
 }
 
 #[test]
+fn quad_residual_uses_extended_precision() {
+    let model = mps::parse(include_str!("fixtures/quad_7374.mps")).unwrap();
+    let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
+    assert_eq!((result.status, result.iterations), (Status::NumericalFailure, 79));
+}
+
+#[test]
 fn shifted_quad_handoff_retries_until_restore_limit() {
     let model = mps::parse(include_str!("fixtures/quad_3076.mps")).unwrap();
     let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
