@@ -296,7 +296,7 @@ impl Scaling {
                 ray[j] *= self.col[j];
             }
         }
-        r.objective = crate::dual::unscaled_objective(model, &r.x);
+        r.objective = crate::dual::unscaled_objective(model, &r.x, &self.col);
         r
     }
 }

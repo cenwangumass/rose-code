@@ -627,6 +627,8 @@ fn reference_order<R: Real>(
 
 thread_local! {
     static QUAD_RESULT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The scaled long-double solution of a quad final pass as (high, low) double pairs, for the reference's objective read-out.
+    static QUAD_XR: std::cell::RefCell<Option<Vec<(f64, f64)>>> = const { std::cell::RefCell::new(None) };
 }
 
 /// The objective read-out accumulates in the working precision of the final pass (`long double` in the quad pass: seed 2150, the double sum is one
@@ -641,8 +643,21 @@ fn objective_in<R: Real>(model: &crate::model::LpModel, x: &[f64]) -> f64 {
 }
 
 /// The objective of the unscaled solution of the dual's last result: `long double` accumulation when its final pass was the quad pass. Clears the mark.
-pub fn unscaled_objective(model: &crate::model::LpModel, x: &[f64]) -> f64 {
+pub fn unscaled_objective(model: &crate::model::LpModel, x: &[f64], col: &[f64]) -> f64 {
     if QUAD_RESULT.with(|c| c.replace(false)) {
+        use crate::f80::F80;
+        if let Some(xr) = QUAD_XR.with(|c| c.borrow_mut().take()) {
+            if xr.len() >= model.obj.len() {
+                // The scale factors are powers of two: the scaled long-double value times the column scale is exact.
+                let mut acc = F80::ZERO;
+                for (j, c) in model.obj.iter().enumerate() {
+                    let v =
+                        (F80::from_f64(xr[j].0) + F80::from_f64(xr[j].1)) * F80::from_f64(col[j]);
+                    acc = acc + F80::from_f64(*c) * v;
+                }
+                return (acc + F80::from_f64(model.offset)).to_f64();
+            }
+        }
         objective_in::<crate::f80::F80>(model, x)
     } else {
         model.objective(x)
@@ -5084,7 +5099,18 @@ fn solve_pass<R: Real>(
         1.0
     };
     let mut x = vec![0.0; n + m];
+    let mut xr: Vec<(f64, f64)> = Vec::new();
     for j in 0..n + m {
+        if R::QUAD {
+            // The long-double value the quad pass holds (exact as two doubles): the reference's objective is computed from it, not from the rounded x.
+            let v = if s.st[j] >= 0 {
+                s.xb[s.st[j] as usize]
+            } else {
+                R::c(s.nonbasic_value(j))
+            };
+            let hi = v.to_f64();
+            xr.push((hi, (v - R::c(hi)).to_f64()));
+        }
         x[j] = if s.st[j] >= 0 {
             let v = s.xb[s.st[j] as usize];
             let (lo, up) = (s.p.lo[j], s.p.up[j]);
@@ -5111,6 +5137,7 @@ fn solve_pass<R: Real>(
     let nm = model.num_cols();
     let xs: Vec<f64> = x[..nm].to_vec();
     let at_upper: Vec<bool> = s.st.iter().map(|&t| t == UB).collect();
+    QUAD_XR.with(|c| *c.borrow_mut() = if R::QUAD { Some(xr) } else { None });
     Ok(SolveResult {
         status,
         objective: objective_in::<R>(model, &xs),
