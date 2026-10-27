@@ -460,6 +460,8 @@ impl Mir {
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Handoff {
     pub stale: Option<(f64, f64)>,
+    /// Factorization count (`ctx+0x2c0`) inherited from the dual.
+    pub nref0: usize,
     pub thr: f64,
     pub retries: usize,
     /// The dual ended with cost shifts in force: the primal's failed scan ends with status -1004 (the dual runs again), not the cost-free fallback.
@@ -2431,7 +2433,8 @@ impl<'a> Solver<'a> {
                 crate::dual::set_resid_fails(0);
             }
         }
-        let nref = self.refactorizations;
+        // The periodic residual check reads the shared count, including the dual factors (seed 5959).
+        let nref = self.refactorizations + self.handoff.map_or(0, |h| h.nref0);
         if !(nref % 5 == 4 || crate::dual::resid_fails() != 0) {
             return;
         }

@@ -5150,6 +5150,7 @@ fn solve_pass<R: Real>(
         crate::simplex::HANDOFF.with(|c| {
             c.set(Some(crate::simplex::Handoff {
                 stale: Some(s.pair),
+                nref0: s.nref(),
                 thr: s.lu_thr,
                 retries: s.retries as usize,
                 pert: s.pert >= 2 && !s.rejected_end && !s.art_exit,
@@ -5278,6 +5279,7 @@ fn solve_pass<R: Real>(
             crate::simplex::HANDOFF.with(|c| {
                 c.set(Some(crate::simplex::Handoff {
                     stale: None,
+                    nref0: s.nref() + r.refactorizations,
                     thr: s.lu_thr,
                     retries: s.retries as usize + repair_count,
                     pert: false,
@@ -5465,6 +5467,7 @@ fn solve_pass<R: Real>(
             crate::simplex::HANDOFF.with(|c| {
                 c.set(Some(crate::simplex::Handoff {
                     stale: Some(s.pair),
+                    nref0: s.nref(),
                     thr: s.lu_thr,
                     retries: s.retries as usize,
                     // The quad dual driver ends with status 2 or 5 (an unbounded verdict here) clear the cost shifts `ctx+0x338` (`0x24a539`), so the x87 primal runs without them and
