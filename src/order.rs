@@ -5,15 +5,12 @@
 //! model's rows in file order, with each dense column an extra node after the rows.
 //!
 //! Known gaps, reported as errors (never approximated):
-//! - the quicksort partition of the sorter `0x8c8b70` for lists of 100 or more: [`StructError::SortLarge`] (not reached by the 12 models);
 //! - the cost scan `0x31bc1a` of the dense-column rule (columns between the two dense thresholds): [`StructError::DenseScan`] (not reached by the 12 models).
 use crate::model::LpModel;
 use std::collections::VecDeque;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum StructError {
-    /// The sorter `0x8c8b70` meets a list of 100 or more keys (quicksort partition, not decoded).
-    SortLarge(usize),
     /// A column count between the two dense thresholds starts the cost scan `0x31bc1a` (not decoded).
     DenseScan,
 }
@@ -21,10 +18,6 @@ pub enum StructError {
 impl std::fmt::Display for StructError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            StructError::SortLarge(n) => write!(
-                f,
-                "sorter 0x8c8b70 quicksort partition needed for {n} keys (not decoded)"
-            ),
             StructError::DenseScan => {
                 write!(f, "dense-column cost scan 0x31bc1a needed (not decoded)")
             }
@@ -699,34 +692,133 @@ pub fn levels(p: &Pattern, n1: usize, bisect: Option<Bisect>) -> Result<Vec<i64>
     Ok(lv)
 }
 
-/// `0x8c8b70` for fewer than 100 keys: shell sort, gap `n/2` then `int(gap/2.2)` (a gap of 2 is followed by 1), insertion with a strict `>` shift.
-fn shellsort(idx: &mut [i64], key: &[f64]) -> Result<(), StructError> {
-    let n = idx.len();
-    if n >= 100 {
-        return Err(StructError::SortLarge(n));
-    }
-    let mut gap = n / 2;
+/// Shell sort of `[lo, hi)` of the paired lists (keys `k`, payload `id`): gap `size/2`, then `int(gap/2.2)` (a gap of 2 is followed by 1), insertion with a strict `>` shift.
+fn shell_range(k: &mut [f64], id: &mut [i64], lo: usize, hi: usize) {
+    let mut gap = (hi - lo) / 2;
     while gap > 0 {
-        let gaps: &[usize] = if gap == 2 { &[2, 1] } else { &[gap][..] };
-        for &g in gaps {
-            for i in g..n {
-                let x = idx[i];
-                let kx = key[x as usize];
-                let mut j = i;
-                while j >= g {
-                    let y = idx[j - g];
-                    if key[y as usize] <= kx {
-                        break;
-                    }
-                    idx[j] = y;
-                    j -= g;
+        for i in lo + gap..hi {
+            let (kx, x) = (k[i], id[i]);
+            let mut j = i;
+            while j >= lo + gap && k[j - gap] > kx {
+                k[j] = k[j - gap];
+                id[j] = id[j - gap];
+                j -= gap;
+            }
+            k[j] = kx;
+            id[j] = x;
+        }
+        gap = if gap == 2 {
+            1
+        } else {
+            (gap as f64 / 2.2) as usize
+        };
+    }
+}
+
+/// The quicksort loop of `0x8c8b70` (`0x8bf1f0`): while the range holds 100 or more entries and fewer than 50 partitions were made on
+/// this call chain, a three-way partition around the median-of-three key (first, middle, last) puts `< pivot`, `== pivot` and
+/// `> pivot` in that order; the smaller side is sorted by a recursive call (depth + 1), the loop continues on the larger one; the
+/// remaining range gets the shell sort.
+fn quick_range(k: &mut [f64], id: &mut [i64], mut lo: usize, mut hi: usize, mut depth: u32) {
+    while depth < 50 && hi - lo >= 100 {
+        let (a, b, c) = (k[lo], k[lo + (hi - lo) / 2], k[hi - 1]);
+        let p = if a > b {
+            if c > a {
+                a
+            } else if a == c {
+                a
+            } else if b > c {
+                b
+            } else {
+                c
+            }
+        } else if c > b {
+            b
+        } else if c > a {
+            c
+        } else {
+            a
+        };
+        let (mut i, mut eq, mut j) = (lo, lo, hi);
+        if p > k[lo] {
+            loop {
+                i += 1;
+                if i >= hi {
+                    eq = i;
+                    break;
                 }
-                idx[j] = x;
+                if p > k[i] {
+                    continue;
+                }
+                eq = i;
+                break;
             }
         }
-        gap = (gap as f64 / 2.2) as usize;
+        while i < j {
+            let x = k[i];
+            if p > x {
+                k[i] = k[eq];
+                k[eq] = x;
+                id.swap(i, eq);
+                i += 1;
+                eq += 1;
+            } else if x == p {
+                i += 1;
+            } else {
+                j -= 1;
+                let mut y = k[j];
+                loop {
+                    if p > y {
+                        if i < j {
+                            let xi = id[i];
+                            k[i] = k[eq];
+                            id[i] = id[eq];
+                            k[eq] = k[j];
+                            id[eq] = id[j];
+                            k[j] = x;
+                            id[j] = xi;
+                            i += 1;
+                            eq += 1;
+                        }
+                        break;
+                    } else if y == p {
+                        if i < j {
+                            let xi = id[i];
+                            k[i] = y;
+                            id[i] = id[j];
+                            k[j] = x;
+                            id[j] = xi;
+                            i += 1;
+                        }
+                        break;
+                    } else {
+                        if i >= j {
+                            break;
+                        }
+                        j -= 1;
+                        y = k[j];
+                    }
+                }
+            }
+        }
+        depth += 1;
+        if eq - lo <= hi - j {
+            quick_range(k, id, lo, eq, depth);
+            lo = j;
+        } else {
+            quick_range(k, id, j, hi, depth);
+            hi = eq;
+        }
     }
-    Ok(())
+    shell_range(k, id, lo, hi);
+}
+
+/// The sorter `0x8c8b70`: ascending by `key[idx]`, not stable. The keys are copied in list order and sorted together with the list
+/// (the same result as the indirect variant used below 32 entries); below 100 entries it is the shell sort alone.
+fn shellsort(idx: &mut [i64], key: &[f64]) {
+    let mut k: Vec<f64> = idx.iter().map(|&x| key[x as usize]).collect();
+    let n = idx.len();
+    quick_range(&mut k, idx, 0, n, 0);
 }
 
 /// The ordering core `0x320fa0`: an approximate-minimum-degree variant on the quotient graph. `levels` are the input flags
@@ -950,7 +1042,7 @@ pub fn order(p: &Pattern, levels: &[i64]) -> Result<OrderResult, StructError> {
                 deg[i] = (ni - 1).min(degme - nv[i] + deg[i]);
             }
             let mut lst = keep;
-            shellsort(&mut lst, &hsh)?;
+            shellsort(&mut lst, &hsh);
             let m = lst.len();
             let mut pos = 0;
             while pos < m {
@@ -1269,5 +1361,25 @@ pub fn structure(
             sym,
         }),
         Err(e) => Err((pattern, n1, dense, e)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The sorter `0x8c8b70` on 1000 keys with many ties: ascending, a permutation of the input list (the exact tie order is
+    /// checked against the reference captures by `compare.py barrier-struct`, `fx_bar_dense3400`).
+    #[test]
+    fn sorter_large_ascending_permutation() {
+        let key: Vec<f64> = (0..1000).map(|i| ((i * 7919) % 37) as f64).collect();
+        let mut idx: Vec<i64> = (0..1000).collect();
+        shellsort(&mut idx, &key);
+        assert!(idx
+            .windows(2)
+            .all(|w| key[w[0] as usize] <= key[w[1] as usize]));
+        let mut s = idx.clone();
+        s.sort();
+        assert_eq!(s, (0..1000).collect::<Vec<i64>>());
     }
 }
