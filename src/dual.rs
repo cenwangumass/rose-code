@@ -745,7 +745,9 @@ impl<'a, R: Real> Dual<'a, R> {
 
     /// The payload of a pass that ends in a restart (`SINGULAR`): the state the next pass inherits.
     fn singular_payload(&self) {
-        if R::QUAD {
+        // The double driver's singular handler increments the stability counter while
+        // its retry count is below five (`0xf58f7`, default environment).
+        if R::QUAD || self.retries < 5 {
             C178.with(|c| c.set(c.get() + 1));
         }
         SINGULAR.with(|c| {
