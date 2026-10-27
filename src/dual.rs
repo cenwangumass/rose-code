@@ -2710,9 +2710,17 @@ impl<'a, R: Real> Dual<'a, R> {
             if rt.q.is_none() && self.retry_end == 2 {
                 self.retry_end = 0;
                 self.request = 5;
+                if let Some(mut sn) = snap {
+                    sn["r"] = serde_json::json!(r);
+                    sn["var"] = serde_json::json!(leave);
+                    sn["rho"] = crate::dump::sparse_r(&rho);
+                    sn["row"] = crate::dump::sparse_r(&row);
+                    sn["q"] = serde_json::json!(-1);
+                    *dump = Some(sn);
+                }
                 return Step::Mismatch;
             }
-            if rt.q.is_some() && R::QUAD {
+            if rt.q.is_some() {
                 // The wrapper releases after the call returns; the worst row of the call (the mismatch ladder reads it) stays.
                 let (w, wr) = (self.worst, self.worst_row);
                 self.release_all();
