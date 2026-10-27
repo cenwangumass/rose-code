@@ -3611,9 +3611,9 @@ impl<'a, R: Real> Dual<'a, R> {
     /// `ctx+0x338` becomes at least 2. A free nonbasic variable (status -3) with `|d| > tol` is shifted like the lower-bound case. Fixed ones (status -4) stay.
     /// In a quad pass the request-4 refactorization shifts too (the reference keeps st and sets d = 0 where the double dual moves the variable to its other bound; seed 5247).
     fn shift_wrong_d(&mut self) {
-        // The double dual's confirming refactorization (request 4) shifts only with the cost shifts already in force (`ctx+0x338` != 0; seed 3981: d = -29 and -58 at
-        // a lower bound with an infinite range have d = 0 at the next call, not a level of artificial bounds).
-        if self.request == 1 || (self.request == 4 && !R::QUAD && self.pert == 0) {
+        // The double post-refactor pass (`0xe5d54..0xe5ead`) chooses the bound-count path when the previous level (`ctx+0x2cc`) is nonzero;
+        // otherwise request 4 shifts wrong-signed reduced costs even when `ctx+0x338` was zero (randlp5802).
+        if self.request == 1 || (self.request == 4 && !R::QUAD && self.level != 0) {
             return;
         }
         for j in 0..self.n + self.m {
