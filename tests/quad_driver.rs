@@ -151,3 +151,10 @@ fn x87_repaired_farkas_factor_resumes_pricing() {
     let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
     assert_eq!((result.status, result.iterations), (Status::Infeasible, 123));
 }
+
+#[test]
+fn quad_restart_keeps_snapshot_bound_sides_and_shifts() {
+    let model = mps::parse(include_str!("fixtures/quad_8631.mps")).unwrap();
+    let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
+    assert_eq!((result.status, result.iterations), (Status::NumericalFailure, 164));
+}

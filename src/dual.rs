@@ -4350,9 +4350,9 @@ fn solve_frame(
             .or_else(|| if carry.retries == 0 { start } else { None });
         FROM_SWITCH.with(|c| c.set(sw.is_some()));
         let res = if quad {
-            solve_pass::<crate::f80::F80>(model, start_now, opts, &carry)
+            solve_pass::<crate::f80::F80>(model, start_now, opts, &carry, restart_basis.is_some())
         } else {
-            solve_pass::<f64>(model, start_now, opts, &carry)
+            solve_pass::<f64>(model, start_now, opts, &carry, restart_basis.is_some())
         };
         match res {
             Err(SolveError::SingularBasis) if SWITCH.with(|c| c.get()).is_some() => {
@@ -4479,6 +4479,7 @@ fn solve_pass<R: Real>(
     start: Option<&Basis>,
     opts: &SolveOptions,
     carry: &Carry,
+    snapshot_restart: bool,
 ) -> Result<SolveResult, SolveError> {
     if fresh_pass::<R>(carry.retries) {
         // The fresh start of the third restart initialises the context again (`0xcf29b`): the tolerance goes back to the parameter, the counter stays.
@@ -4696,6 +4697,8 @@ fn solve_pass<R: Real>(
             FIXED
         } else if is_inf(lo) && is_inf(up) {
             FREE
+        } else if R::QUAD && snapshot_restart && basis.at_upper[j] {
+            UB
         } else {
             LB
         };
@@ -4745,6 +4748,10 @@ fn solve_pass<R: Real>(
             };
             continue;
         }
+        if R::QUAD && snapshot_restart {
+            s.d[j] = if s.st[j] == UB { -dt[j] } else { dt[j] };
+            continue;
+        }
         if dt[j] < R::c(-dual_tol()) {
             s.st[j] = UB;
         } else if dt[j] > R::c(dual_tol()) {
@@ -4755,6 +4762,38 @@ fn solve_pass<R: Real>(
             s.st[j] = UB;
         }
         s.d[j] = if s.st[j] == UB { -dt[j] } else { dt[j] };
+    }
+    // A restarted quad setup with a supplied saved basis retains the saved
+    // bound sides (`0x23a9b0`). Its request-1 recompute (`0x23a6d5`) shifts
+    // negative reduced costs by only the random fraction of their magnitude;
+    // they may consequently remain negative at the first pricing call.
+    if R::QUAD && snapshot_restart {
+        for j in 0..n + m {
+            if (s.st[j] != LB && s.st[j] != UB) || s.d[j] >= R::c(-1e-13) {
+                continue;
+            }
+            let magnitude = -s.d[j];
+            let delta = R::c(dual_tol());
+            let small = delta * R::c(0.0005) > magnitude
+                || (delta * R::c(0.05) > magnitude
+                    && delta * R::c(0.1) > R::c(p.up[j] - p.lo[j]) * magnitude);
+            let factor = if small {
+                s.raise_pert(1);
+                s.rng_double()
+            } else {
+                s.raise_pert(2);
+                ((s.rng_int() as i32 % 500 + 111) as f64) / 1000.0
+            };
+            let shift = magnitude * R::c(factor);
+            s.d[j] += shift;
+            if s.st[j] == UB {
+                s.add_shift_q(j, -shift);
+                s.obj_off += p.up[j] * shift.to_f64();
+            } else {
+                s.add_shift_q(j, shift);
+                s.obj_off -= p.lo[j] * shift.to_f64();
+            }
+        }
     }
     if !free_phase {
         s.reset_pricing(&stc, &rows);
@@ -5285,7 +5324,7 @@ fn solve_pass<R: Real>(
                 nref0: s.nref() + (r.refactorizations - s.refactorizations).max(1),
                 pstep: None,
             };
-            let mut r2 = solve_pass::<R>(model, Some(&r.basis), opts, &carry2)?;
+            let mut r2 = solve_pass::<R>(model, Some(&r.basis), opts, &carry2, false)?;
             r2.iterations += carry2.iters;
             return Ok(r2);
         }
@@ -5310,7 +5349,7 @@ fn solve_pass<R: Real>(
                     None
                 },
             };
-            let mut r2 = solve_pass::<R>(model, Some(&r.basis), opts, &carry2)?;
+            let mut r2 = solve_pass::<R>(model, Some(&r.basis), opts, &carry2, false)?;
             r2.iterations += carry2.iters;
             return Ok(r2);
         }
@@ -5382,7 +5421,7 @@ fn solve_pass<R: Real>(
                     None
                 },
             };
-            let mut r2 = solve_pass::<R>(model, Some(&r.basis), opts, &carry2)?;
+            let mut r2 = solve_pass::<R>(model, Some(&r.basis), opts, &carry2, false)?;
             r2.iterations += carry2.iters;
             return Ok(r2);
         }
@@ -5500,7 +5539,7 @@ fn solve_pass<R: Real>(
                     nref0: s.nref() + pfac.max(1),
                     pstep: None,
                 };
-                let again = solve_pass::<R>(model, resume.as_ref().or(start), opts, &carry3);
+                let again = solve_pass::<R>(model, resume.as_ref().or(start), opts, &carry3, false);
                 NO_ART_EXIT.with(|c| c.set(false));
                 let mut again = again?;
                 again.iterations += carry3.iters;
