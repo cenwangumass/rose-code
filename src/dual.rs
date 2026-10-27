@@ -51,6 +51,9 @@ thread_local! {
     static LARGE_XB: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The basis snapshot of the reference's log timer (`ctx+0x190`) and the iteration count of the last one (`ctx+0x40`).
     static SNAP: std::cell::RefCell<Option<(Vec<usize>, Vec<bool>)>> = const { std::cell::RefCell::new(None) };
+    static INITIAL_SNAP: std::cell::RefCell<Option<(Vec<usize>, Vec<bool>)>> = const { std::cell::RefCell::new(None) };
+    /// Snapshot quality (`ctx+0x188`).
+    static SNAP_QUALITY: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
     /// The relative tolerance of the primal's pivot-pair check (`ctx+0x3a0`): 3e-6 from the parameters, 1e-7 from the first restore of a dropped variable on (`0x1551d4`).
     static PAIR_TOL: std::cell::Cell<f64> = const { std::cell::Cell::new(3e-6) };
     /// The primal's start basis when its drift test ended it (status -1002): the restart takes it (`0xcedb0`, seed 2717).
@@ -234,6 +237,7 @@ struct Dual<'a, R: Real = f64> {
     retries: u32,
     /// The variable the in-place repair after the retry limit left out of the dual (`[ctx+0x454]` list, status -4); the controller restores it and runs the primal.
     repaired: Option<usize>,
+    snapshot_excluded: bool,
     /// Set at a restart: the next flag recompute compares the stale `inf_count`.
     stale_count: bool,
     /// The last `post` call followed a pivot (the leaving row `ctx+0x2f8` is set).
@@ -778,6 +782,12 @@ impl<'a, R: Real> Dual<'a, R> {
         if R::QUAD || self.retries < 5 {
             C178.with(|c| c.set(c.get() + 1));
         }
+        SINGULAR_BASIS.with(|c| {
+            *c.borrow_mut() = Some(Basis {
+                basic: self.head.clone(),
+                at_upper: self.st.iter().map(|&t| t == UB).collect(),
+            })
+        });
         SINGULAR.with(|c| {
             c.set(Some((
                 self.iters,
@@ -789,6 +799,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 self.inf_count,
                 self.last_pivoted,
                 self.retries,
+                self.it_base + self.iters,
             )))
         });
     }
@@ -1181,11 +1192,42 @@ impl<'a, R: Real> Dual<'a, R> {
             return;
         }
         SNAP_C40.with(|c| c.set(total));
-        if c40 > -100.0 {
-            let basic = self.head.clone();
-            let at_upper = self.st.iter().map(|&t| t == UB).collect();
+        let quality = if dual_infeas_sum() > 0.0 { 1 } else { 2 };
+        // The dual snapshot (`0xd40b0`) skips a dropped variable and keeps a
+        // previous snapshot of higher quality. The forced-row stack gate
+        // remains unmodelled (no witness in the release profile).
+        if self.snapshot_excluded
+            || self.repaired.is_some()
+            || SNAP_QUALITY.with(|c| quality < c.get())
+        {
+            return;
+        }
+        SNAP_QUALITY.with(|c| c.set(quality));
+        let basic = self.head.clone();
+        let at_upper = self.st.iter().map(|&t| t == UB).collect();
+        if c40 == -100.0 {
+            INITIAL_SNAP.with(|c| *c.borrow_mut() = Some((basic, at_upper)));
+        } else {
             SNAP.with(|c| *c.borrow_mut() = Some((basic, at_upper)));
         }
+    }
+
+    /// Full dual recompute of `ctx+0x2d8` (`0xbf5b0`, quad `0x217600`).
+    /// Its terms are positive reduced costs at artificial upper bounds.
+    fn snapshot_recomputed(&self) {
+        if R::QUAD && !self.value_mode {
+            return;
+        }
+        let tol = R::c(dual_tol());
+        let mut sum = R::ZERO;
+        if self.level != 0 {
+            for j in 0..self.n + self.m {
+                if self.st[j] == UB && self.p.up[j] >= BIG && self.d[j] > tol {
+                    sum = sum + self.d[j];
+                }
+            }
+        }
+        set_dual_infeas_sum(sum.to_f64());
     }
 
     /// The dual residual check of the post-refactor pass (`0xe5965..0xe5d4c`): `max |c_j - y a_j|` over the basic variables, read when the factorization count is 4 mod 5
@@ -3285,7 +3327,7 @@ impl<'a, R: Real> Dual<'a, R> {
 impl<'a, R: Real> Dual<'a, R> {
     fn snapshot(&self, k: usize) -> serde_json::Value {
         serde_json::json!({
-            "k": k, "lvl": self.level, "req": self.request, "it": self.iters as f64, "head": self.head, "xB": self.xb.iter().map(|v| v.json()).collect::<Vec<_>>(), "d": self.d.iter().map(|v| v.json()).collect::<Vec<_>>(), "W": self.w.iter().map(|v| v.json()).collect::<Vec<_>>(),
+            "c2d8": dual_infeas_sum(), "k": k, "lvl": self.level, "req": self.request, "it": self.iters as f64, "head": self.head, "xB": self.xb.iter().map(|v| v.json()).collect::<Vec<_>>(), "d": self.d.iter().map(|v| v.json()).collect::<Vec<_>>(), "W": self.w.iter().map(|v| v.json()).collect::<Vec<_>>(),
             "st": self.st, "flags": self.flags, "prio": self.prio.iter().map(|v| v.to_f64()).collect::<Vec<_>>(), "diag": self.mirror.numerics().0.iter().map(|v| v.json()).collect::<Vec<_>>(),
             "list": if self.value_mode { self.list.clone() } else { self.list[..self.walk_len.min(self.list.len())].to_vec() },
             "thr": self.thr.to_f64(), "p40": self.value_mode as u8, "cur": self.cursor,
@@ -3949,6 +3991,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 },
                 pv.is_some(),
             );
+            self.snapshot_recomputed();
             self.flags_work();
             if R::QUAD
                 && self.status.is_none()
@@ -4147,7 +4190,7 @@ struct Carry {
 thread_local! {
     /// Set where a mid-run factorization found no pivot for a basic column: `(iterations done, factorizations including the failed one, LU threshold)`.
     /// The pass ended with the quad switch (`Step::SwitchQuad`): the counters and the basis the quad pass continues from.
-    static SWITCH: std::cell::Cell<Option<(usize, usize, f64, f64, usize, usize, bool, u32, usize)>> = const { std::cell::Cell::new(None) };
+    static SWITCH: std::cell::Cell<Option<(usize, usize, f64, f64, usize, usize, bool, u32, usize, usize)>> = const { std::cell::Cell::new(None) };
     static FROM_SWITCH: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static SWITCH_BASIS: std::cell::RefCell<Option<Basis>> = const { std::cell::RefCell::new(None) };
     /// Set by the primal's clean-up pass: the dual runs inside the primal's context, with the LU threshold the primal's accuracy ladder left in `ctx+0x390` (gen3 seeds 247, 680: raised to 0.5 at the first x_B recompute; with 2^-7 the pivot order of the final factorization differs).
@@ -4156,7 +4199,8 @@ thread_local! {
     /// Out of a clean-up pass dual: (the dual ended with cost shifts, so its last factorization was the sorted primal clean-up one, the LU threshold at the end).
     pub static CLEANUP_OUT: std::cell::Cell<(bool, f64)> = const { std::cell::Cell::new((false, 0.0)) };
     static SWITCH_PERT: std::cell::Cell<Option<u8>> = const { std::cell::Cell::new(None) };
-    static SINGULAR: std::cell::Cell<Option<(usize, usize, f64, f64, usize, usize, bool, u32)>> = const { std::cell::Cell::new(None) };
+    static SINGULAR: std::cell::Cell<Option<(usize, usize, f64, f64, usize, usize, bool, u32, usize)>> = const { std::cell::Cell::new(None) };
+    static SINGULAR_BASIS: std::cell::RefCell<Option<Basis>> = const { std::cell::RefCell::new(None) };
 }
 
 /// Dual simplex from a cold start (the crash basis) or a supplied basis. A singular factorization in the middle of the run restarts the dual from
@@ -4242,6 +4286,8 @@ fn solve_frame(
     QUAD_RESUMES.with(|c| c.set(0));
     RNG_CELL.with(|c| c.set(101));
     SNAP.with(|c| *c.borrow_mut() = None);
+    INITIAL_SNAP.with(|c| *c.borrow_mut() = None);
+    SNAP_QUALITY.with(|c| c.set(0));
     DRIFT_START.with(|c| *c.borrow_mut() = None);
     SNAP_C40.with(|c| c.set(-100.0));
     PAIR_TOL.with(|c| c.set(3e-6));
@@ -4255,26 +4301,25 @@ fn solve_frame(
     // The quad mode (`ctx+0x28`): once the controller switched, every later pass runs the extended-precision twin of the dual.
     let mut quad = false;
     let mut switch_start: Option<Basis> = None;
+    let mut restart_start: Option<Basis> = None;
+    // The factor's `+0x0c`: zero supplies the current statuses to setup,
+    // one asks setup for a fresh crash basis.
+    let mut factor_crash = start.is_none();
     // The controller snapshots the tolerance once (`0x154ccc`), before any
     // singular retries; its primal handoffs scale this original value.
     LOOP_TOL.with(|c| c.set(dual_tol()));
     loop {
         SINGULAR.with(|c| c.set(None));
+        SINGULAR_BASIS.with(|c| *c.borrow_mut() = None);
         SWITCH.with(|c| c.set(None));
-        let snap_start;
         let sw = switch_start.take();
+        let restart_basis = restart_start.take();
         let drift_start = DRIFT_START.with(|c| c.borrow_mut().take());
-        let start_now = match (start, SNAP.with(|c| c.borrow().clone())) {
-            _ if sw.is_some() => sw.as_ref(),
-            _ if drift_start.is_some() => drift_start.as_ref(),
-            // A restart takes the basis of the last snapshot (`0xcedb0`, `0xd40b0`): the log timer of the wrapper (`0xf9306`) saves the basis at the first
-            // fresh factorization after every 100 iterations (the slack basis at the start, which a restart from scratch reproduces).
-            (None, Some((basic, at_upper))) if carry.iters > 0 => {
-                snap_start = Basis { basic, at_upper };
-                Some(&snap_start)
-            }
-            _ => start,
-        };
+        let start_now = sw
+            .as_ref()
+            .or(drift_start.as_ref())
+            .or(restart_basis.as_ref())
+            .or_else(|| if carry.retries == 0 { start } else { None });
         FROM_SWITCH.with(|c| c.set(sw.is_some()));
         let res = if quad {
             solve_pass::<crate::f80::F80>(model, start_now, opts, &carry)
@@ -4283,8 +4328,18 @@ fn solve_frame(
         };
         match res {
             Err(SolveError::SingularBasis) if SWITCH.with(|c| c.get()).is_some() => {
-                let (iters, fac, thr, avg_touch, last_cap, inf_count, after_pivot, pass_retries, nref) =
-                    SWITCH.with(|c| c.take()).unwrap();
+                let (
+                    iters,
+                    fac,
+                    thr,
+                    avg_touch,
+                    last_cap,
+                    inf_count,
+                    after_pivot,
+                    pass_retries,
+                    it_base,
+                    nref,
+                ) = SWITCH.with(|c| c.take()).unwrap();
                 let b = SWITCH_BASIS.with(|c| c.borrow_mut().take()).unwrap();
                 if crate::dump::on("dcr") {
                     crate::dump::emit(
@@ -4293,6 +4348,7 @@ fn solve_frame(
                     );
                 }
                 quad = true;
+                factor_crash = false;
                 carry = Carry {
                     retries: pass_retries,
                     thr,
@@ -4302,9 +4358,10 @@ fn solve_frame(
                     last_cap,
                     inf_count,
                     after_pivot,
-                    it_base: 0,
-                    // A direct switch keeps the context's factor count; a
-                    // singular restart clears it at 0xcf079 (seed 7950).
+                    // The precision switch keeps the iteration count in the
+                    // same context; a singular restart below starts it anew.
+                    it_base,
+                    // A direct switch keeps the factor count as well.
                     nref0: nref,
                     pstep: None,
                 };
@@ -4321,6 +4378,7 @@ fn solve_frame(
                     inf_count,
                     after_pivot,
                     pass_retries,
+                    context_iters,
                 )) = SINGULAR.with(|c| c.take())
                 else {
                     return Err(SolveError::SingularBasis);
@@ -4339,6 +4397,17 @@ fn solve_frame(
                 // The third restart starts the pricing from scratch (list-walk mode, empty running averages): the reference's p40/thr schedule over the
                 // restarts is value (thr maxp/1e3), value (thr maxp/1e5), list-walk, then value again (fx_midsing_m5, seeds 1494, 1390, 1496, 50010).
                 let fresh = pass_retries + 1 == 3;
+                if fresh {
+                    factor_crash = true;
+                } else if context_iters > 0 && SNAP_QUALITY.with(|c| c.get() > 0) {
+                    factor_crash = false;
+                    let snap = SNAP
+                        .with(|c| c.borrow().clone())
+                        .or_else(|| INITIAL_SNAP.with(|c| c.borrow().clone()));
+                    restart_start = snap.map(|(basic, at_upper)| Basis { basic, at_upper });
+                } else if !factor_crash {
+                    restart_start = SINGULAR_BASIS.with(|c| c.borrow_mut().take());
+                }
                 let (avg_touch, last_cap, inf_count) = if fresh {
                     (0.0, 0, 0)
                 } else {
@@ -4405,6 +4474,7 @@ fn solve_pass<R: Real>(
                 // The basis the quad switch carries over is not a supplied one: when its quad factorization is singular (the double structure finds the same columns
                 // dependent), the pass ends before its first iteration and the restart takes the snapshot basis (seed 2706: first quad factorization has `p13` = 1,
                 // the next one is the slack basis, `ctx+0x184` = 1).
+                SINGULAR_BASIS.with(|c| *c.borrow_mut() = Some(b.clone()));
                 SINGULAR.with(|c| {
                     c.set(Some((
                         0,
@@ -4415,6 +4485,7 @@ fn solve_pass<R: Real>(
                         carry.inf_count,
                         carry.after_pivot,
                         carry.retries,
+                        carry.it_base,
                     )))
                 });
                 return Err(SolveError::SingularBasis);
@@ -4503,6 +4574,7 @@ fn solve_pass<R: Real>(
         inf_count: carry.inf_count,
         retries: carry.retries,
         repaired: None,
+        snapshot_excluded: dropped.is_some(),
         bad_rows: Vec::new(),
         old_rej: 0,
         rejected_end: false,
@@ -4708,6 +4780,7 @@ fn solve_pass<R: Real>(
         },
         carry.retries > 0 && carry.after_pivot,
     );
+    s.snapshot_recomputed();
     // The carried average decides the pricing mode of the first recompute; the running average of the pass (`P+0x48`) starts at 0 (m6, m5 captures).
     s.avg_touch = 0.0;
     s.flags_work();
@@ -4802,6 +4875,12 @@ fn solve_pass<R: Real>(
                 s.driver_return();
             }
             Step::Restart => {
+                SINGULAR_BASIS.with(|c| {
+                    *c.borrow_mut() = Some(Basis {
+                        basic: s.head.clone(),
+                        at_upper: s.st.iter().map(|&t| t == UB).collect(),
+                    })
+                });
                 SINGULAR.with(|c| {
                     c.set(Some((
                         s.iters,
@@ -4817,6 +4896,7 @@ fn solve_pass<R: Real>(
                         // The stale leaving row is cleared on this path (`ctx+0x2f8` = -1 in the recompute of the next pass, fx_midsing_1390).
                         false,
                         s.retries,
+                        s.it_base + s.iters,
                     )))
                 });
                 return Err(SolveError::SingularBasis);
@@ -4832,6 +4912,7 @@ fn solve_pass<R: Real>(
                         s.inf_count,
                         false,
                         s.retries,
+                        s.it_base + s.iters,
                         s.nref(),
                     )))
                 });
@@ -5040,6 +5121,7 @@ fn solve_pass<R: Real>(
                 }
                 // The reference's iteration counter (`ctx+0x2a8`, the log timer's clock) runs five above the primal's pivots here (fx_midsing_1106: 9 per run).
 
+                SINGULAR_BASIS.with(|c| *c.borrow_mut() = Some(b.clone()));
                 SINGULAR.with(|c| {
                     c.set(Some((
                         s.iters + pit,
@@ -5050,6 +5132,7 @@ fn solve_pass<R: Real>(
                         s.inf_count,
                         false,
                         s.retries,
+                        s.it_base + s.iters + pit,
                     )))
                 });
                 return Err(SolveError::SingularBasis);

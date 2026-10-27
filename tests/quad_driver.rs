@@ -8,6 +8,27 @@ fn primal_stale_pivot_rejection_carries_stability_to_quad_dual() {
 }
 
 #[test]
+fn quad_switch_keeps_iteration_count_for_infinite_bound_ratio() {
+    let model = mps::parse(include_str!("fixtures/quad_8151.mps")).unwrap();
+    let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
+    assert_eq!((result.status, result.iterations), (Status::Infeasible, 31));
+}
+
+#[test]
+fn quad_switch_carries_iteration_count_to_ratio_selection() {
+    let model = mps::parse(include_str!("fixtures/quad_5103.mps")).unwrap();
+    let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
+    assert_eq!((result.status, result.iterations), (Status::Optimal, 27));
+}
+
+#[test]
+fn quad_singular_restart_restores_initial_snapshot() {
+    let model = mps::parse(include_str!("fixtures/quad_7973.mps")).unwrap();
+    let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
+    assert_eq!((result.status, result.iterations), (Status::Optimal, 54));
+}
+
+#[test]
 fn shifted_quad_handoff_checks_recomputed_reduced_costs() {
     let model = mps::parse(include_str!("fixtures/quad_8179.mps")).unwrap();
     let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
