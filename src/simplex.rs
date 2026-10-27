@@ -549,6 +549,23 @@ fn record_quad_progress(record: QuadProgressRecord) {
 
 #[cfg(test)]
 #[test]
+fn standalone_primal_initial_progress_snapshot() {
+    let model = crate::mps::parse(include_str!("../tests/fixtures/primal_5959.mps")).unwrap();
+    let mut opts = SolveOptions::release();
+    opts.max_iterations = 1;
+    crate::dual::PRIMAL_SNAPSHOT_TEST.with(|c| *c.borrow_mut() = Some(Vec::new()));
+    crate::solve(&model, None, &opts).unwrap();
+    let records = crate::dual::PRIMAL_SNAPSHOT_TEST.with(|c| c.borrow_mut().take().unwrap());
+    // Native mode-0 save, first factorization at total iteration 0. The
+    // reference's ctx+0x120 is 2.034581090761116e16 and its quality is 1.
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0].0, [2, 1, 3, 17, 19, 20, 21, 22, 25]);
+    assert!(records[0].1.iter().all(|&upper| !upper));
+    assert_eq!(records[0].2, 1);
+}
+
+#[cfg(test)]
+#[test]
 fn quad_progress_carried_objective_and_stall_exit() {
     let model = crate::mps::parse(include_str!("../tests/fixtures/fx_quad_obj_5371.mps")).unwrap();
     let mut opts = SolveOptions::dual_release();
@@ -1680,7 +1697,7 @@ impl<'a> Solver<'a> {
                 self.perturb();
             }
         }
-        if !self.cleanup && self.p0.is_none() {
+        if !self.cleanup {
             self.progress_check();
         }
         Ok(())
@@ -1727,12 +1744,11 @@ impl<'a> Solver<'a> {
     }
 
     /// The progress check of the primal (`0x27e100` in the x87 primal; its double twin keeps the same timer): at a factorization, once the iteration counter `ctx+0x2a8` is 100 past
-    /// `ctx+0x40` it sets `ctx+0x40` to it; the x87 primal then sums the bound violations of the basic variables (`ctx+0x120`, tolerance `ctx+0x380`) and counts the check
+    /// `ctx+0x40` it stores `(total / 100) * 100` in `ctx+0x40`; the primal then sums the bound violations of the basic variables (`ctx+0x120`, tolerance `ctx+0x380`) and counts the check
     /// (`ctx+0x378`) and, unless the sum fell by more than 1e-13, a check without progress (`ctx+0x37c`). More than 50 of these and 20 times their count above the checks end
     /// the primal with status -1004 (seed 2717: 7714 and 15415 iterations).
     fn progress_check(&mut self) {
-        let Some(h) = self.handoff else { return };
-        if !crate::dual::timer_check(TOTAL_ITERS.with(|c| c.get())) || !h.quad {
+        if !crate::dual::timer_check(TOTAL_ITERS.with(|c| c.get())) {
             return;
         }
         let p = self.p;
@@ -1755,9 +1771,11 @@ impl<'a> Solver<'a> {
             }
         }
         crate::dual::primal_snapshot(
-            &self.basic, &self.at_upper, sum, h.retries,
+            &self.basic, &self.at_upper, sum,
+            self.handoff.map_or(self.restarts, |h| h.retries),
             self.excluded.is_some() || self.repaired,
         );
+        let Some(h) = self.handoff.filter(|h| h.quad) else { return };
         let prev = STALL_PREV.with(|c| c.replace(sum));
         // The progress routine writes a fresh objective even on an infeasible
         // check. Its structural loop uses x87 basic values and double-rounded
@@ -4822,6 +4840,8 @@ pub fn solve(
         // A standalone solve starts a new context; handoffs retain the dual's counters.
         crate::dual::set_dual_tol(1e-6);
         crate::dual::set_resid_fails(0);
+        crate::dual::reset_primal_snapshot();
+        TOTAL_ITERS.with(|c| c.set(0.0));
     }
     if let Some(h) = handoff {
         // `ctx+0x2a8` at the double primal's start: the dual's iterations. The x87 primal after a quad dual that made no iterations continues a context in which
@@ -5360,6 +5380,10 @@ fn solve_primal(
     if s.sw.active && s.sw.perturb_due {
         // The perturbation of the first factorization's decision (`0x141a60`), like the one after a later factorization.
         s.perturb();
+    }
+    // The first standalone factorization also passes through the progress driver.
+    if handoff.is_none() {
+        s.progress_check();
     }
     let mut trace = Vec::new();
     let mut iterations = 0usize;

@@ -71,6 +71,14 @@ pub(crate) fn timer_check(total: f64) -> bool {
     true
 }
 
+/// A standalone primal starts with a fresh snapshot and progress clock.
+pub(crate) fn reset_primal_snapshot() {
+    SNAP.with(|c| *c.borrow_mut() = None);
+    SNAP_QUALITY.with(|c| c.set(0));
+    SNAP_C40.with(|c| c.set(-100.0));
+    set_primal_tol(PRIMAL_TOL);
+}
+
 pub(crate) fn resid_fails() -> u32 {
     RESID_FAILS.with(|c| c.get())
 }
@@ -87,7 +95,7 @@ pub(crate) fn has_restart_snapshot() -> bool {
     SNAP_QUALITY.with(|c| c.get() > 0)
 }
 
-/// Save the x87 primal's current status at its progress check (`0x27e75a`,
+/// Save the primal's current status at its progress check (`0x1422a5`, `0x27e75a`,
 /// `0xd40b0` mode 0). Quality uses primal infeasibility, not the dual sum.
 pub(crate) fn primal_snapshot(
     basic: &[usize], at_upper: &[bool], infeas: f64, retries: usize, excluded: bool,
