@@ -2966,6 +2966,9 @@ impl<'a> Solver<'a> {
         for j in 0..nm {
             let nb = self.pos_of[j] == NONE;
             self.w[j] = if nb { 1.0 } else { 0.0 };
+            if self.wf.len() == nm {
+                self.wf[j] = crate::f80::F80::from_f64(self.w[j]);
+            }
             self.in_r0[j] = nb;
         }
     }
