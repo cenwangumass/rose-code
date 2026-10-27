@@ -18,6 +18,7 @@ pub mod order;
 pub mod pdhg;
 pub mod real;
 pub mod scale;
+pub mod sgemm32;
 pub mod simplex;
 pub mod work;
 

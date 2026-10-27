@@ -627,9 +627,7 @@ fn nocopy_n_blocks(n: usize) -> Vec<usize> {
     out
 }
 
-/// SGEMM('T','N', alpha = 1, beta = 1) (`0xa009a0`), measured for k <= 4: rows in complete blocks of 16 (`m - m % 16`) run an fma chain from the first product,
-/// `s = fma(a_k b_k, s)`; the remaining rows run two accumulators, even and odd k (`s0 = p0`, `s0 = fma(a_2 b_2, s0)`, `s1 = p1`, `s1 = fma(a_3 b_3, s1)`), `s0 + s1`.
-/// Either result is added to C (rounded to float). Larger k (the 192/193/240-wide children) is not modelled: sequential float products and sums.
+/// SGEMM('T','N', alpha = 1, beta = 1) (`0xa009a0`) on float data held in doubles: see [`crate::sgemm32`].
 fn sgemm_t_n(
     m: usize,
     n: usize,
@@ -641,39 +639,12 @@ fn sgemm_t_n(
     c: &mut [f64],
     ldc: usize,
 ) {
-    let main = m - m % 16;
-    for j in 0..n {
-        for i in 0..m {
-            let av = |q: usize| a[i * lda + q] as f32;
-            let bv = |q: usize| b[j * ldb + q] as f32;
-            let s = if k <= 4 {
-                if i < main {
-                    let mut s = av(0) * bv(0);
-                    for q in 1..k {
-                        s = av(q).mul_add(bv(q), s);
-                    }
-                    s
-                } else {
-                    let mut s0 = av(0) * bv(0);
-                    let mut s1 = if k > 1 { av(1) * bv(1) } else { 0.0 };
-                    for q in 2..k {
-                        if q % 2 == 0 {
-                            s0 = av(q).mul_add(bv(q), s0);
-                        } else {
-                            s1 = av(q).mul_add(bv(q), s1);
-                        }
-                    }
-                    s0 + s1
-                }
-            } else {
-                let mut s = 0.0f32;
-                for q in 0..k {
-                    s = s + av(q) * bv(q);
-                }
-                s
-            };
-            c[j * ldc + i] = (c[j * ldc + i] as f32 + s) as f64;
-        }
+    let af: Vec<f32> = a.iter().map(|&x| x as f32).collect();
+    let bf: Vec<f32> = b.iter().map(|&x| x as f32).collect();
+    let mut cf: Vec<f32> = c.iter().map(|&x| x as f32).collect();
+    crate::sgemm32::sgemm_t_n(m, n, k, &af, lda, &bf, ldb, &mut cf, ldc);
+    for (d, s) in c.iter_mut().zip(cf) {
+        *d = s as f64;
     }
 }
 
@@ -1121,8 +1092,19 @@ fn factor_block(
     let rows = c - w;
     if rows != 0 {
         if dense {
+            let big32 = SINGLE.with(|c| c.get()) && w >= 25;
+            let l32: Vec<f32> = if big32 {
+                mm.iter().map(|&v| v as f32).collect()
+            } else {
+                Vec::new()
+            };
             for rr in 0..rows {
-                let x = if SINGLE.with(|c| c.get()) {
+                let x = if big32 {
+                    let mut x: Vec<f32> =
+                        r[rr * w..(rr + 1) * w].iter().map(|&v| v as f32).collect();
+                    crate::sgemm32::strsm_llu_col(&l32, w, &mut x, rr, rows);
+                    x.iter().map(|&v| v as f64).collect()
+                } else if SINGLE.with(|c| c.get()) {
                     strsm_seq(mm, w, &r[rr * w..(rr + 1) * w])
                 } else {
                     dtrsm_llu_col(mm, w, &r[rr * w..(rr + 1) * w], rr, rows)

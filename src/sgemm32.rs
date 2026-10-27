@@ -1,0 +1,301 @@
+//! Bit model of single-precision `SGEMM('T', 'N', alpha = 1, beta = 1)` (`0xa009a0`, MKL `avx2`): `C(i,j) += sum_q A(q,i) B(q,j)`, column-major,
+//! `A(q,i) = a[i lda + q]`, `B(q,j) = b[j ldb + q]`. Per-element accumulation order, recovered by running the library on random data
+//! (`tools/mkl_probe.c`) and checked bit for bit against it for every shape the factorisation produces.
+//!
+//! Paths (`mkl_blas_avx2_xsgemm`): `m == 1` or `n == 1`: SGEMV; `m >= 56 && n >= 56`: copy-based `sgemm_kernel_0` (A in panels of 24 rows,
+//! then the bits 16, 8, 4, 2, 1 of `m % 24`; B in columns kernels of 4, then a 2 and a 1); otherwise `sgemm_kernel_nocopy_TN_b1` (rows in blocks of 16,
+//! a last block of 9..15 rows is a masked 16-row block, 1..8 rows an 8-row block; columns in blocks of 6 per driver column block with remainders).
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Mode {
+    /// One accumulator, fma over all terms from 0.
+    Chain,
+    /// Accumulators of the even and the odd terms over the first `2 (k / 2)` terms (fma), their sum, then the remaining terms fma'd into the sum.
+    Par,
+    /// As `Par` with rounded products and rounded sums.
+    ParU,
+    /// As `Par` over the first `4 (k / 4)` terms (the copy-based kernel).
+    Par4,
+}
+
+fn rd(x: f32) -> f32 {
+    std::hint::black_box(x)
+}
+
+/// Sum of the products `a[q] b[q]`, `q < k`, in the order of `mode`.
+pub fn acc(mode: Mode, k: usize, a: &[f32], b: &[f32]) -> f32 {
+    match mode {
+        Mode::Chain => {
+            let mut s = 0.0f32;
+            for q in 0..k {
+                s = a[q].mul_add(b[q], s);
+            }
+            s
+        }
+        Mode::Par | Mode::Par4 => {
+            let m4 = if mode == Mode::Par {
+                k - k % 2
+            } else {
+                k - k % 4
+            };
+            let (mut e, mut o) = (0.0f32, 0.0f32);
+            for q in 0..m4 {
+                if q % 2 == 0 {
+                    e = a[q].mul_add(b[q], e);
+                } else {
+                    o = a[q].mul_add(b[q], o);
+                }
+            }
+            let mut s = e + o;
+            for q in m4..k {
+                s = a[q].mul_add(b[q], s);
+            }
+            s
+        }
+        Mode::ParU => {
+            let m4 = k - k % 2;
+            let (mut e, mut o) = (0.0f32, 0.0f32);
+            for q in 0..m4 {
+                let p = rd(a[q] * b[q]);
+                if q % 2 == 0 {
+                    e = rd(e + p);
+                } else {
+                    o = rd(o + p);
+                }
+            }
+            let mut s = rd(e + o);
+            for q in m4..k {
+                s = rd(s + rd(a[q] * b[q]));
+            }
+            s
+        }
+    }
+}
+
+/// Column blocks of the nocopy driver (`0xa7be50`): remaining >= 192: 96; > 144: ceil(rem / 2); else rem.
+pub fn n_blocks(n: usize) -> Vec<usize> {
+    let mut out = Vec::new();
+    let mut rem = n;
+    while rem > 0 {
+        let b = if rem >= 192 {
+            96
+        } else if rem > 144 {
+            (rem + 1) / 2
+        } else {
+            rem
+        };
+        out.push(b);
+        rem -= b;
+    }
+    out
+}
+
+/// Row tile heights of the copy-based kernel: panels of 24, then the bits 16, 8, 4, 2, 1 of `m % 24`.
+fn tiles24(m: usize) -> Vec<usize> {
+    let mut t = vec![24; m / 24];
+    for g in [16usize, 8, 4, 2, 1] {
+        if (m % 24) & g != 0 {
+            t.push(g);
+        }
+    }
+    t
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ColK {
+    G4,
+    C2,
+    C1,
+}
+
+fn col_kernel(n: usize, j: usize) -> ColK {
+    let (q, r) = (n / 4, n % 4);
+    if j < 4 * q {
+        return ColK::G4;
+    }
+    match r {
+        1 => ColK::C1,
+        2 => ColK::C2,
+        _ => {
+            if j < 4 * q + 2 {
+                ColK::C2
+            } else {
+                ColK::C1
+            }
+        }
+    }
+}
+
+fn copy_mode(tile: usize, ck: ColK) -> Mode {
+    match (tile, ck) {
+        (24, _) | (16, _) => Mode::Chain,
+        (1, ColK::C1) => Mode::Par4,
+        (1, _) => Mode::Chain,
+        (_, ColK::G4) | (_, ColK::C1) => Mode::Par4,
+        (_, ColK::C2) => Mode::Chain,
+    }
+}
+
+/// `true`: copy-based kernel, `false`: nocopy driver.
+pub fn copy_path(m: usize, n: usize) -> bool {
+    m >= 56 && n >= 56
+}
+
+/// Mode of element (i, j) of the nocopy path; `cg` is the width of the column group (6 for a full group of 6).
+fn nocopy_mode(m: usize, i: usize, cg: usize) -> Mode {
+    let r = m % 16;
+    let big = i < m - r || r >= 9;
+    if cg >= 4 {
+        if big {
+            Mode::Chain
+        } else {
+            Mode::Par
+        }
+    } else if cg == 3 {
+        Mode::Par
+    } else {
+        Mode::ParU
+    }
+}
+
+/// Accumulation mode of element (i, j) (also for tests), `m, n >= 2`.
+pub fn element_mode(m: usize, n: usize, i: usize, j: usize) -> Mode {
+    if copy_path(m, n) {
+        let mut r0 = 0;
+        for t in tiles24(m) {
+            if i < r0 + t {
+                return copy_mode(t, col_kernel(n, j));
+            }
+            r0 += t;
+        }
+        unreachable!()
+    }
+    let mut j0 = 0;
+    for nb in n_blocks(n) {
+        if j < j0 + nb {
+            let jj = j - j0;
+            let r6 = nb % 6;
+            let cg = if jj < nb - r6 { 6 } else { r6 };
+            return nocopy_mode(m, i, cg);
+        }
+        j0 += nb;
+    }
+    unreachable!()
+}
+
+/// One dot product of the SGEMV('T') kernel (`mkl_blas_avx2_xsgemv_t`), the float analogue of `dgemv_t_col`: 8 lanes; blocks of 16 terms
+/// `t = fma(x_c, a_c, x_{c+8} a_{c+8})`, `lane += t`; then a block of 8 (`fused`: fma, else rounded product and sum) and the remaining `k % 8` terms fma'd
+/// into lanes `0..`; the lanes are reduced as `((l0 + l1) + (l4 + l5)) + ((l2 + l3) + (l6 + l7))`.
+fn gemv_dot(a: &[f32], x: &[f32], fused: bool) -> f32 {
+    let k = a.len();
+    let mut l = [0.0f32; 8];
+    let main = k - k % 16;
+    let tail8 = (k % 16) & !7;
+    let r = k % 8;
+    let mut c = 0;
+    while c < main {
+        for q in 0..8 {
+            let t = x[c + q].mul_add(a[c + q], rd(x[c + 8 + q] * a[c + 8 + q]));
+            l[q] = rd(t + l[q]);
+        }
+        c += 16;
+    }
+    let mut p = main;
+    if tail8 != 0 {
+        for q in 0..8 {
+            l[q] = if fused {
+                x[p + q].mul_add(a[p + q], l[q])
+            } else {
+                rd(rd(x[p + q] * a[p + q]) + l[q])
+            };
+        }
+        p += 8;
+    }
+    for q in 0..r {
+        l[q] = x[p + q].mul_add(a[p + q], l[q]);
+    }
+    rd(rd(rd(l[0] + l[1]) + rd(l[4] + l[5])) + rd(rd(l[2] + l[3]) + rd(l[6] + l[7])))
+}
+
+/// `C += A^T B`, in place (`ldc` row stride of the column-major `C`).
+pub fn sgemm_t_n(
+    m: usize,
+    n: usize,
+    k: usize,
+    a: &[f32],
+    lda: usize,
+    b: &[f32],
+    ldb: usize,
+    c: &mut [f32],
+    ldc: usize,
+) {
+    for j in 0..n {
+        for i in 0..m {
+            let s = if m == 1 || n == 1 {
+                let var = if m == 1 {
+                    if j < n - n % 4 {
+                        4
+                    } else {
+                        1
+                    }
+                } else if i < m - m % 4 {
+                    4
+                } else {
+                    1
+                };
+                gemv_dot(&a[i * lda..i * lda + k], &b[j * ldb..j * ldb + k], var == 4)
+            } else {
+                acc(
+                    element_mode(m, n, i, j),
+                    k,
+                    &a[i * lda..i * lda + k],
+                    &b[j * ldb..j * ldb + k],
+                )
+            };
+            c[j * ldc + i] = rd(c[j * ldc + i] + s);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// STRSM('L', 'U', 'T', 'U')
+
+/// STRSM('L','U','T','U', alpha = 1) with `n` right-hand sides (`0xa00350`); `l[i * w + j]` (row-major, `j < i`) is the unit lower triangle of the
+/// `w x w` block (the transposed upper triangle of the call), `x` the column `col` of `n` right-hand sides, solved in place.
+/// `w >= 25`: `strsm_kernel_ll_0`: rows 0..23 an fnma chain from `b`; then tiles of 24 rows and the bits 16, 8, 4, 2, 1 of the rest, each with the
+/// update from all rows solved before it, `x_i = b_i + acc` (accumulator structure of [`copy_mode`] per tile and column kernel), then the chain inside
+/// the tile. Smaller `w` is not modelled here.
+pub fn strsm_llu_col(l: &[f32], w: usize, x: &mut [f32], col: usize, n: usize) {
+    let ck = col_kernel(n, col);
+    let blk = 24;
+    for i in 0..blk.min(w) {
+        let mut v = x[i];
+        for j in 0..i {
+            v = (-l[i * w + j]).mul_add(x[j], v);
+        }
+        x[i] = v;
+    }
+    let mut r0 = blk;
+    let mut tiles = vec![24usize; (w - blk) / 24];
+    for g in [16usize, 8, 4, 2, 1] {
+        if ((w - blk) % 24) & g != 0 {
+            tiles.push(g);
+        }
+    }
+    for t in tiles {
+        let mode = copy_mode(t, ck);
+        for i in r0..r0 + t {
+            let neg: Vec<f32> = (0..r0).map(|j| -l[i * w + j]).collect();
+            let acc = acc(mode, r0, &neg, &x[..r0]);
+            x[i] = rd(x[i] + acc);
+        }
+        for i in r0..r0 + t {
+            let mut v = x[i];
+            for j in r0..i {
+                v = (-l[i * w + j]).mul_add(x[j], v);
+            }
+            x[i] = v;
+        }
+        r0 += t;
+    }
+}
