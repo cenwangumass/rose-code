@@ -5100,9 +5100,12 @@ fn solve_pass<R: Real>(
             r.status = Status::NumericalFailure;
             return Ok(r);
         }
+        // A double primal that reaches an optimum ends the controller: do not restart the dual just because its earlier perturbation flag was set
+        // (fx_e2_r03125 and fx_e2_r0625: the reference has no additional dual pass or factorization).
         if status == Status::Infeasible
             && s.pert != 0
             && !repaired
+            && (R::QUAD || r.status != Status::Optimal)
             && !(R::QUAD && s.rejected_end)
             && PERT_RERUNS.with(|c| {
                 c.set(c.get() + 1);
