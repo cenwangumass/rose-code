@@ -202,6 +202,7 @@ struct Dual<'a, R: Real = f64> {
     rejected_end: bool,
     /// The pass ended at the request-4 refactorization with variables at an artificial bound (status -1004): the primal decides the outcome.
     art_exit: bool,
+    q4_shifted: bool,
     worst: f64,
     worst_row: i64,
     /// The retry of the worst rejected row (`ctx+0x420` negated, `0x21cf50` / `0xc4fe0`): the ratio test rejects nothing.
@@ -3310,8 +3311,12 @@ impl<'a, R: Real> Dual<'a, R> {
                 }
             }
             // No artificial bound is required by its d (`ctx+0x290 = 1`, read in the reference but not observed): a refactorization puts those variables
-            // on their finite bound (`set_level`) and recomputes x_B without the sentinels.
-            self.request = 4;
+            // on their finite bound (`set_level`) and recomputes x_B without the sentinels. The quad driver ends with status 2 on the fresh factor whatever the level.
+            if R::QUAD {
+                self.status = Some(Status::Optimal);
+            } else {
+                self.request = 4;
+            }
         }
     }
 
@@ -3397,8 +3402,9 @@ impl<'a, R: Real> Dual<'a, R> {
     /// a nonbasic variable at its lower bound (status -1) with `d < -tol`, or at its upper bound (status -2, d in the negated frame) with `d < -tol`, takes the
     /// exact shift that zeroes its true d (`cost -= d` at the lower bound, `cost += d` at the upper), and its d becomes 0.0; the perturbation flag
     /// `ctx+0x338` becomes at least 2. A free nonbasic variable (status -3) with `|d| > tol` is shifted like the lower-bound case. Fixed ones (status -4) stay.
+    /// In a quad pass the request-4 refactorization shifts too (the reference keeps st and sets d = 0 where the double dual moves the variable to its other bound; seed 5247).
     fn shift_wrong_d(&mut self) {
-        if self.request == 1 || self.request == 4 {
+        if self.request == 1 || (self.request == 4 && !R::QUAD) {
             return;
         }
         for j in 0..self.n + self.m {
@@ -3414,6 +3420,9 @@ impl<'a, R: Real> Dual<'a, R> {
                 None
             };
             if let Some(s) = shift {
+                if self.request == 4 {
+                    self.q4_shifted = true;
+                }
                 if R::QUAD {
                     // `0x239ff7..0x23a02e`: the shift array takes `-d` (lower bound, free) or `+d` (upper bound) in long double.
                     self.add_shift_q(j, s);
@@ -3774,7 +3783,7 @@ impl<'a, R: Real> Dual<'a, R> {
             self.request = 0;
             self.recompute_xb(req);
             if req == 4
-                && self.level != 0
+                && (!R::QUAD && self.level != 0)
                 && self.status.is_none()
                 && !NO_ART_EXIT.with(|c| c.get())
             {
@@ -4337,6 +4346,7 @@ fn solve_pass<R: Real>(
         old_rej: 0,
         rejected_end: false,
         art_exit: false,
+        q4_shifted: false,
         worst: 0.0,
         worst_row: -1,
         retry: false,
@@ -4693,6 +4703,19 @@ fn solve_pass<R: Real>(
         }
         if let Some(stt) = s.status {
             status = stt;
+            if R::QUAD
+                && (s.level != 0 || s.q4_shifted)
+                && stt == Status::Optimal
+                && s.pert != 0
+                && !NO_ART_EXIT.with(|c| c.get())
+            {
+                // The quad driver's end (`0x24a4f6..0x24a548`): a final status 2 (dual optimal) or 5 with the cost shifts in force (`ctx+0x338` != 0) clears them and returns
+                // status -1004; the controller hands over to the x87 primal (seeds 5247, 6972, 6610, 8179). It replaces the double dual's exit at the request-4 refactor.
+                s.art_exit = true;
+                s.dual_unbounded();
+                status = Status::Unbounded;
+                break;
+            }
             if stt == Status::Optimal && s.pert != 0 {
                 // The end of the dual with the cost shifts in force (`ctx+0x338` != 0, `0xf7033`): the shifts are removed (status -1004) and the primal
                 // clean-up starts with a factorization (`0x142350` from `0xe3ee1`), the reference's last one.
