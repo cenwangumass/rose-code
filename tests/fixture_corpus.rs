@@ -1,6 +1,5 @@
 //! NEW FILE (reference-corpus cases C11/C12/C14). Only cases where rose agrees with the controlled-profile reference
 //! (statuses, x, ray, entering/leaving). Fixtures: reverse-engineer/corpus/fixtures/fx_*.mps; skipped if absent.
-//! Open: fx_sing_dense4 (singular 4x4 basis: the reference's x differs from rose's in the last digit of two entries).
 
 use rose::{mps, solve, Basis, LpModel, SolveOptions, Status};
 

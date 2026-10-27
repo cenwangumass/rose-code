@@ -5043,13 +5043,12 @@ fn solve_primal(
                 let leave = s.basic[entries[k].0];
                 if let Some(c) = info(entries[k].0).filter(|_| pick.to_upper) {
                     let bound = p.up[leave];
-                    let xr = if is_inf(p.lo[leave]) {
-                        p.up[leave] - c.0
-                    } else {
-                        c.0 + p.lo[leave]
-                    };
                     if !is_inf(bound) && entries[k].1 != 0.0 {
-                        step_used = (xr - bound) / entries[k].1;
+                        step_used = if is_inf(p.lo[leave]) {
+                            (p.up[leave] - c.0) - bound
+                        } else {
+                            (c.0 - bound) + p.lo[leave]
+                        } / entries[k].1;
                     }
                 }
             }
@@ -5303,9 +5302,10 @@ fn solve_primal(
         s.x[q] += dir * move_step;
         s.dst[q] = if is_inf(p.lo[q]) {
             dq_base - dir * move_step
-        } else if dir < 0.0 {
-            // An entering variable that leaves its upper bound has its distance rebuilt from the moved value (PILOT.JA
-            // iteration 1187: (3.5 - step) - 2.0, not 1.5 - step).
+        } else if dir < 0.0 && s.p0.is_none() {
+            // Outside `pricing0`, an entering variable that leaves its upper bound has its distance rebuilt from the moved value (PILOT.JA
+            // iteration 1187: (3.5 - step) - 2.0, not 1.5 - step). In `pricing0` mode it is the range less the step (80BAU3B release
+            // iteration 2742: (up - lo) - step, not (up - step) - lo).
             s.dist_of(q, s.x[q])
         } else {
             dq_base + dir * move_step
