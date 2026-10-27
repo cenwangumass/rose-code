@@ -358,7 +358,7 @@ fn infeasible_dual_cleanup_returns_its_reference_certificate() {
 fn phase_one_retries_preserve_pricing_after_bound_flips() {
     let model = mps::parse(include_str!("fixtures/fx_ladder_386.mps")).unwrap();
     let opts = SolveOptions {
-        max_iterations: 24,
+        max_iterations: 40,
         ..SolveOptions::default()
     };
     let r = solve(&model, None, &opts).unwrap();
@@ -378,7 +378,13 @@ fn phase_one_retries_preserve_pricing_after_bound_flips() {
             (28, None),
             (40, None),
             (40, None),
-            (36, Some(57))
+            (36, Some(57)),
+            (40, Some(29)),
+            (29, Some(40)),
+            (40, Some(18))
         ]
     );
+    assert_eq!(r.status, Status::Optimal);
+    assert_eq!(r.iterations, 27);
+    assert_eq!(r.objective, -1721192.1086904146);
 }

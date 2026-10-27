@@ -992,6 +992,8 @@ struct Solver<'a> {
     in_r0: Vec<bool>,
     factor: Factor,
     refactorizations: usize,
+    /// Pricing moves since the latest factorization (`P+0x8`), including bound flips.
+    pricing_moves: usize,
     /// Persistent pricing candidate list and its bucket level (see `bucket`).
     level: usize,
     list: Vec<usize>,
@@ -1472,6 +1474,7 @@ impl<'a> Solver<'a> {
             SolveError::SingularBasis
         })?;
         self.refactorizations += 1;
+        self.pricing_moves = 0;
         self.list.clear();
         if self.cleanup {
             // The clean-up pass removes the shifts before it solves for the basic values.
@@ -4618,6 +4621,7 @@ fn solve_primal(
         in_r0,
         factor,
         refactorizations: 1,
+        pricing_moves: 0,
         level: 0,
         list: Vec::new(),
         p1_prev: Vec::new(),
@@ -4829,6 +4833,8 @@ fn solve_primal(
     }
     let mut phase1 = false;
     let mut refactor_next = false;
+    // `ctx+0x420 < 0`: all rejected variables were restored, and the best rejected candidate is retried without its own bound.
+    let mut retry_unbounded = false;
     let mut farkas: Option<Vec<f64>> = None;
     let mut ray: Option<Vec<f64>> = None;
     let status = loop {
@@ -5029,6 +5035,24 @@ fn solve_primal(
                     // dropped variable out; the controller restores it and runs the primal again.
                     break Status::Infeasible;
                 }
+                None if !s.rej6.is_empty() => {
+                    for j in std::mem::take(&mut s.rej6) {
+                        s.excl6[j] = false;
+                    }
+                    retry_unbounded = true;
+                    continue;
+                }
+                None if s.mirror.is_some() && !s.recomputed && s.factor.num_updates() > 0 && {
+                    // The failed scan enters 0x145520, which recomputes the duals and builds a list before deciding whether to refactor.
+                    s.dual_btran_work("phase1_none");
+                    s.recompute_dual();
+                    s.list.clear();
+                    s.level = 0;
+                    (0..s.p.n + s.p.m).any(|j| s.score(j).is_some())
+                } =>
+                {
+                    continue;
+                }
                 None if s.handoff.map_or(PLAIN_FAILED_SCAN, |h| !h.pert)
                     && (!s.costfree || s.factor.num_updates() != 0 || s.p3c0 > 1e-9) =>
                 {
@@ -5116,6 +5140,7 @@ fn solve_primal(
                     }
                     s.list.clear();
                     s.level = 0;
+                    retry_unbounded = true;
                     continue;
                 }
                 None if s.stale.is_some_and(|(a, b)| {
@@ -5166,7 +5191,9 @@ fn solve_primal(
                             s.rescan3 = true;
                             s.list.clear();
                             s.level = 0;
-                            continue;
+                            if (0..s.p.n + s.p.m).any(|j| s.score(j).is_some()) {
+                                continue;
+                            }
                         }
                     }
                     // Before declaring optimality, rebuild the basic solution from a fresh factorization: drift in the updated
@@ -5374,7 +5401,7 @@ fn solve_primal(
                 .map(|&(i, _)| if dir < 0.0 { -v[i] } else { v[i] })
                 .collect()
         });
-        let own = if !is_inf(p.lo[q]) && !is_inf(p.up[q]) {
+        let own = if !retry_unbounded && !is_inf(p.lo[q]) && !is_inf(p.up[q]) {
             p.up[q] - p.lo[q]
         } else {
             INF
@@ -5667,13 +5694,14 @@ fn solve_primal(
             ray = Some(dir_x);
             break Status::Unbounded;
         }
-        if let (Some(k), true) = (chosen, s.handoff.is_some()) {
-            // A pivot at or below the scan tolerance `ctx+0x398` (3e-8) after the ratio test (`0x1436dd..0x1437e8`): below a factorization threshold of 0.125 the threshold
-            // rises to it and the factorization is redone (request 6); otherwise the entering variable gets status -6 and the pricing goes on without an iteration
-            // (fx_midsing_1106: pivots of 1.93e-8 rejected, 3.86e-8 taken).
+        if let Some(k) = chosen.filter(|_| s.mirror.is_some()) {
+            // A pivot at or below `ctx+0x398` (3e-8) requests factorization 6 if the threshold is below 0.125 or the pricing object has moves since the last factorization.
+            // Otherwise reject the entering variable. If no other candidate remains, restore it and retry with its own bound removed; in this retry a tiny pivot is accepted
+            // (`0x1436dd..0x1437e8`, fx_ladder_386 and fx_midsing_1106).
             let quad_retry = s.handoff.as_ref().is_some_and(|h| h.quad) && s.tiny7 == Some(q);
-            if entries[k].1.abs() <= 3e-8 && !quad_retry {
+            if entries[k].1.abs() <= 3e-8 && !quad_retry && !retry_unbounded {
                 if crate::lu_order::threshold() < 0.125
+                    || s.pricing_moves > 0
                     || s.handoff.as_ref().is_some_and(|h| h.quad)
                 {
                     crate::lu_order::raise_threshold(0.125);
@@ -5682,6 +5710,12 @@ fn solve_primal(
                 } else {
                     s.excl6[q] = true;
                     s.rej6.push(q);
+                    if !(0..s.p.n + s.p.m).any(|j| s.score(j).is_some()) {
+                        for j in std::mem::take(&mut s.rej6) {
+                            s.excl6[j] = false;
+                        }
+                        retry_unbounded = true;
+                    }
                 }
                 continue;
             }
@@ -5692,8 +5726,10 @@ fn solve_primal(
         s.rescan2 = false;
         s.rescan3 = false;
         s.tiny7 = None;
+        retry_unbounded = false;
         // A phase 1 step may be negative (a basic variable inside its tolerance leaves from the wrong side of its bound).
         iterations += 1;
+        s.pricing_moves += 1;
         s.iters_done = iterations;
         TOTAL_ITERS.with(|c| c.set(c.get() + 1.0));
         if s.handoff.as_ref().is_some_and(|h| h.quad) {
