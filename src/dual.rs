@@ -3205,14 +3205,13 @@ impl<'a, R: Real> Dual<'a, R> {
         // The factor's update is made by the post-iteration pass (it refactorizes instead when one is due).
         let alpha_vec = alpha_dense;
         self.pending_alpha = Some(alpha_vec);
-        // The ratio test leaves the entries of the row list below 1e-10 in magnitude as exact zeros (RIN against ROUT of `0xc74a0`: 41376 entries on PEROLD,
-        // largest 9.9997e-11, smallest kept 1.0000751e-10), so that the d update does not see them.
+        // The ratio test zeroes row entries of magnitude at most 1e-10 (`0xc7747..0xc7769`, `0xcc606`; bh50022 has an entry exactly -1e-10).
         let row: Vec<(usize, R)> = row
             .into_iter()
             .map(|(j, v)| {
                 (
                     j,
-                    if v.abs() < R::c(ALPHA_TOL) {
+                    if v.abs() <= R::c(ALPHA_TOL) {
                         R::ZERO
                     } else {
                         v
