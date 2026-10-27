@@ -1447,6 +1447,11 @@ impl<R: Real> RefStruct<R> {
         (&self.diag, l)
     }
 
+    /// Fresh U columns in the stored solve order, indexed by pivot position.
+    pub fn u_numerics(&self) -> &[Vec<(usize, R)>] {
+        &self.uc
+    }
+
     pub fn blists(&self) -> &[Vec<usize>] {
         &self.b
     }

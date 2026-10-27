@@ -745,9 +745,14 @@ impl<'a, R: Real> Dual<'a, R> {
                 .iter()
                 .map(|c| c.iter().map(|e| (e.0, e.1.to_f64())).collect())
                 .collect();
+            let u: Vec<Vec<(usize, f64)>> = mi
+                .u_numerics()
+                .iter()
+                .map(|c| c.iter().map(|e| (e.0, e.1.to_f64())).collect())
+                .collect();
             crate::dump::emit(
                 "luout",
-                serde_json::json!({"n": self.refactorizations, "diag": diag, "l": l}),
+                serde_json::json!({"n": self.refactorizations, "diag": diag, "l": l, "u": u}),
             );
         }
         (order, st, rows, mi)
