@@ -582,6 +582,21 @@ fn crash_pass3(
 }
 
 /// The reference's pivot order of the basis columns (`lu_order`), as in the primal path.
+/// The `lustart` record of a pass's starting factorization.
+fn dump_start<R: Real>(
+    cols: &[usize],
+    order: &[usize],
+    st: &crate::lu_order::Structure<R>,
+    thr: f64,
+) {
+    if crate::dump::on("lustart") {
+        crate::dump::emit(
+            "lustart",
+            serde_json::json!({"cols": cols, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "thr": thr}),
+        );
+    }
+}
+
 fn reference_order<R: Real>(
     p: &Internal,
     basic: &[usize],
@@ -1935,6 +1950,21 @@ impl<'a, R: Real> Dual<'a, R> {
         // The partition passes of the selection book `3 (hi - lo + 4)` each; the store is separate (`0xcbcae`) when the final sum is below minus the primal tolerance (`xmm9 = -1e19` at a nonzero level, else `-1e-6`, against `xmm10` at `0xcbc8d`).
         let mut sel = 0.0f64;
         let mut sel_sep = false;
+        // The candidates cannot absorb the infeasibility (`0xcbcb3..0xcbcc8`: the sum of the contributions with the last one added is below minus the primal
+        // tolerance, `xmm9`; only at level 0: `0xcbcc8` tests `ctx+0x2cc`, the level != 0 path was not read): no entering variable, as for an empty list (row of a primal infeasible model; found on random LPs, e.g. 3 rows and one structural
+        // candidate with range * |a| = 2000 against an infeasibility of 2003).
+        if nn == 1
+            && self.level == 0
+            && bestc + xmm10 < R::ZERO
+            && R::c(-self.ptol()) > bestc + xmm10
+        {
+            self.work.add(0xc7c4f, 5.0, crate::work::CTX);
+            return Ratio {
+                q: None,
+                flips: Vec::new(),
+                reject: None,
+            };
+        }
         if nn == 1 {
             self.work.add(0xc7c4f, 5.0, crate::work::CTX);
             let (q, _) = self.shift_entering(row, &[lst[0]], lst[0], R::ZERO, R::ZERO, 0);
@@ -2014,6 +2044,14 @@ impl<'a, R: Real> Dual<'a, R> {
             }
             nflip = lo;
             sel_sep = R::c(-self.ptol()) > s;
+            if self.level == 0 && R::c(-self.ptol()) > s + con[lo] {
+                self.work.add(0xc7c4f, 5.0 * nn as f64, crate::work::CTX);
+                return Ratio {
+                    q: None,
+                    flips: Vec::new(),
+                    reject: None,
+                };
+            }
         } else if best_i > 0 {
             let b = best_i as usize;
             ratio_arr.swap(0, b);
@@ -2033,7 +2071,11 @@ impl<'a, R: Real> Dual<'a, R> {
         if nflip > 0 && !(self.d[row[lst[nflip]].0] > delta) {
             nflip = 0;
         }
-        let pivtol = maxr(R::ZERO, maxr(R::c(1e-13) * maxa, R::c(PIVOT_FLOOR)));
+        // The pivot floor is `max(|ctx+0x438|, 1e-13 maxa, 3e-8)`: the measure of the worst rejected row counts (random LP seed 278: 0.0667 left by an earlier rejection).
+        let pivtol = maxr(
+            R::c(self.worst.abs()),
+            maxr(R::c(1e-13) * maxa, R::c(PIVOT_FLOOR)),
+        );
         if !(pivtol <= maxa) {
             return Ratio {
                 q: None,
@@ -2048,7 +2090,7 @@ impl<'a, R: Real> Dual<'a, R> {
         for t in b..nn {
             let e = lst[t];
             let (j, av) = row[e];
-            let dj = self.d[j];
+            let dj = self.shift_below_delta(j, delta);
             if pivtol > -av {
                 continue;
             }
@@ -2070,7 +2112,7 @@ impl<'a, R: Real> Dual<'a, R> {
             for t in 0..b {
                 let e = lst[t];
                 let (j, av) = row[e];
-                let dj = self.d[j];
+                let dj = self.shift_below_delta(j, delta);
                 if pivtol > -av {
                     continue;
                 }
@@ -2237,6 +2279,24 @@ impl<'a, R: Real> Dual<'a, R> {
     /// `m = -d'`, `d'` grows by `m (1 + u)` with `u` uniform in [0, 1) when `m` is tiny (below 5e-4 delta, or below 0.05 delta with `0.1 delta` above the
     /// range times `m`), else by `m ((r mod 500 + 111) / 1000 + 1)` with `r` an integer draw, so that `d'` becomes positive (0.1 to 0.6 of `m`). The cost
     /// takes the shift (plus at the lower bound, minus at the upper), the objective offset the shift times the bound.
+    /// The Harris filter's read of `d_j` (`0xc8138..0xc8194`): a candidate with `d_j < -delta` goes through `0xc4ca0` first (before the pivot-floor skip) and the
+    /// filter uses the new value. A variable at a bound gets its cost shifted (`shift_cost`), a free one has `d` zeroed with the perturbation flag raised.
+    /// Found on random near-dependent LPs (`fx_dual_dneg_1934`: a candidate with `a = -1.4e-10`, `d = -3.3e-5`).
+    fn shift_below_delta(&mut self, j: usize, delta: R) -> R {
+        if -delta > self.d[j] {
+            if self.st[j] == LB || self.st[j] == UB {
+                self.shift_cost(j);
+            } else if self.st[j] == FREE {
+                let a = self.d[j].abs();
+                if a > R::c(1e-13) {
+                    self.raise_pert(if delta * R::c(0.0005) > a { 1 } else { 2 });
+                }
+                self.d[j] = R::ZERO;
+            }
+        }
+        self.d[j]
+    }
+
     fn shift_cost(&mut self, j: usize) {
         let delta = R::c(dual_tol());
         let m = -self.d[j];
@@ -4120,6 +4180,7 @@ fn solve_pass<R: Real>(
     crate::lu_order::set_threshold(carry.thr);
     crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
     let (mut order, mut stc, mut rows) = reference_order::<R>(&p, &basis.basic, carry.fac + 1);
+    dump_start(&basis.basic, &order, &stc, carry.thr);
     let mut mirror = RefStruct::fresh(m, n, &stc, &rows);
     let mut carry_thr = carry.thr;
     // Growth check of the setup factorization (quad setup `0x246d39..0x246df1`, double driver `0xf351d..0xf3629`): max|diag| / min|diag| above 1e15 (1e12 scaled)
@@ -4139,6 +4200,7 @@ fn solve_pass<R: Real>(
             carry_thr = if carry_thr < 0.5 { 0.5 } else { 0.9 };
             crate::lu_order::set_threshold(carry_thr);
             (order, stc, rows) = reference_order::<R>(&p, &basis.basic, carry.fac + 1);
+            dump_start(&basis.basic, &order, &stc, carry_thr);
             if order.len() != m {
                 break;
             }
@@ -4641,6 +4703,7 @@ fn solve_pass<R: Real>(
         };
         set_dual_tol(LOOP_TOL.with(|c| c.get()) * tol_factor);
         crate::simplex::PRIMAL_SINGULAR.with(|c| c.set(None));
+        crate::simplex::PRIMAL_FARKAS_SKIPPED.with(|c| c.set(0));
         crate::simplex::PRIMAL_REPAIRED.with(|c| c.set(false));
         let mut r = match crate::simplex::solve(model, Some(&b), &popts) {
             Err(SolveError::SingularBasis) => {
@@ -4782,7 +4845,9 @@ fn solve_pass<R: Real>(
                         + if R::QUAD {
                             l.max(1)
                         } else {
-                            l.saturating_sub(2)
+                            l.saturating_sub(
+                                2 - crate::simplex::PRIMAL_FARKAS_SKIPPED.with(|c| c.take()),
+                            )
                         }
                 },
                 pstep: if R::QUAD && !from_snap && s.pstep > 0.0 {

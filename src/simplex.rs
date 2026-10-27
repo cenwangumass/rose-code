@@ -617,10 +617,13 @@ pub(crate) fn build(model: &LpModel) -> Internal {
         let (sign, r, slo, sup) = match (is_inf(rl), is_inf(ru)) {
             (false, false) if rl == ru => (1.0, ru, 0.0, 0.0),
             (false, false) => {
-                cols.push(vec![(i, 1.0)]);
+                // A ranged `>=` row anchors at its lower side: `a x + s - g = rl` (the range column is `-1`, the fixed slack `+1`; the
+                // reference's x_B of the range column is `-rl` and its pivot row entry of the slack `-1`).
+                let g = model.row_kind.get(i) == Some(&b'G');
+                cols.push(vec![(i, if g { -1.0 } else { 1.0 })]);
                 lo.push(0.0);
                 up.push(model.range_width(i));
-                (1.0, ru, 0.0, 0.0)
+                (1.0, if g { rl } else { ru }, 0.0, 0.0)
             }
             (true, false) => (1.0, ru, 0.0, INF),
             (false, true) => (-1.0, rl, 0.0, INF),
@@ -1686,7 +1689,11 @@ impl<'a> Solver<'a> {
                 let g = model.row_kind.get(i) == Some(&b'G') || p.cols[p.n + i][0].1 < 0.0;
                 // d = -0.0 (alive) or +0.0 (freed); the getter returns d for a `>` row, else -d.
                 let d_neg = !self.shifted;
-                if g { d_neg } else { !d_neg }
+                if g {
+                    d_neg
+                } else {
+                    !d_neg
+                }
             };
             *v = if neg ^ (sgn < 0.0) { -0.0 } else { 0.0 };
         }
@@ -2634,7 +2641,7 @@ const P0_DTOL: f64 = 1e-6;
 const P0_DTOL_P1: f64 = 1e-7 * PHASE1_M;
 
 impl<'a> Solver<'a> {
-    /// Nonbasic, not fixed, and not the variable dropped from a singular start (status -4, key 0 like a basic one): the variables the `pricing0` list ranks (status -1, -2 or -3 of the reference).
+    /// Nonbasic, not fixed: the variables the `pricing0` list ranks (status -1, -2 or -3 of the reference).
     fn p0_eligible(&self, j: usize) -> bool {
         self.pos_of[j] == NONE && !self.is_fixed(j) && self.excluded != Some(j)
     }
