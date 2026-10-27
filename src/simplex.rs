@@ -5954,7 +5954,7 @@ fn solve_primal(
                 }
                 t
             };
-            (a_rq, wq_q)
+            (crate::f80::F80::from_f64(a_rq.to_f64()), wq_q)
         });
         let col_off = &p.offs;
         let rho_rank: Option<Vec<usize>> = rho_ref.as_ref().map(|rr| {
