@@ -957,6 +957,14 @@ struct Solver<'a> {
     /// The progress check's counters `ctx+0x378` (checks) and `ctx+0x37c` (checks without a fall of the infeasibility sum), reset at the primal's start.
     stall_calls: u32,
     stall_cnt: u32,
+    /// The cycle detector of the x87 primal (`ctx+0x4c8`, `0x4c0`, `0x4cc`, `0x4d0`; `0x27fc20..0x27fc59`): the entering variable it follows (-1 none, -2 take the next),
+    /// the iteration it was first seen at, the distance of its first return, and the returns at a multiple of that distance.
+    cyc_var: i64,
+    cyc_start: f64,
+    cyc_period: i64,
+    cyc_count: u32,
+    /// `ctx+0x2fc`: the entering variable of the last iteration (-2 before the first).
+    cyc_last: i64,
     stalled: bool,
     want_drift: bool,
     drift_err: Option<f64>,
@@ -1531,6 +1539,46 @@ impl<'a> Solver<'a> {
             self.progress_check();
         }
         Ok(())
+    }
+
+    /// The cycle detector's per-iteration step (`0x27fc20..0x27fc59`, after `ctx+0x2a0` is incremented): the entering variable `q` of a followed variable's return.
+    fn cycle_note(&mut self, q: usize) {
+        let it = TOTAL_ITERS.with(|c| c.get());
+        let q = q as i64;
+        self.cyc_last = q;
+        if self.cyc_var == -2 {
+            self.cyc_var = q;
+            self.cyc_start = it;
+            self.cyc_period = 0;
+        } else if self.cyc_var == q {
+            let dt = (it - self.cyc_start) as i64;
+            if self.cyc_period == 0 {
+                self.cyc_period = dt;
+            } else if dt % self.cyc_period == 0 {
+                self.cyc_count += 1;
+            }
+        }
+    }
+
+    /// The cycle check at a requested factorization (`0x24684a..0x24694a` in `0x244cd0`): more than `m/5` iterations since the followed variable was first seen and more
+    /// than 30 returns end the primal with status -1004 (seed 8179: 72 iterations alternating two entering variables); otherwise the followed variable is replaced once
+    /// more than `2m` iterations have passed.
+    fn cycle_check(&mut self) {
+        let it = TOTAL_ITERS.with(|c| c.get());
+        let m = self.p.m as f64;
+        let d = it - self.cyc_start;
+        if d <= (self.p.m / 5) as f64 {
+            return;
+        }
+        if self.cyc_count > 30 {
+            self.stalled = true;
+            return;
+        }
+        if self.cyc_count == 0 || self.cyc_var == -1 || d > 2.0 * m {
+            self.cyc_var = self.cyc_last;
+            self.cyc_start = it;
+            self.cyc_period = 0;
+        }
     }
 
     /// The progress check of the primal (`0x27e100` in the x87 primal; its double twin keeps the same timer): at a factorization, once the iteration counter `ctx+0x2a8` is 100 past
@@ -4372,6 +4420,11 @@ fn solve_primal(
         drift_cnt: 0,
         stall_calls: 0,
         stall_cnt: 0,
+        cyc_var: -2,
+        cyc_start: 0.0,
+        cyc_period: 0,
+        cyc_count: 0,
+        cyc_last: -2,
         stalled: false,
         want_drift: false,
         drift_err: None,
@@ -4620,6 +4673,9 @@ fn solve_primal(
         let mut chk: Option<(bool, usize, usize)> = None;
         if due {
             s.refactor()?;
+            if s.handoff.as_ref().is_some_and(|h| h.quad) {
+                s.cycle_check();
+            }
             if s.stalled {
                 PRIMAL_STALL.with(|c| c.set(true));
                 break Status::Infeasible;
@@ -5448,6 +5504,9 @@ fn solve_primal(
         iterations += 1;
         s.iters_done = iterations;
         TOTAL_ITERS.with(|c| c.set(c.get() + 1.0));
+        if s.handoff.as_ref().is_some_and(|h| h.quad) {
+            s.cycle_note(q);
+        }
         if s.sw.active {
             let counted = chosen.is_some_and(|k| !s.is_fixed(s.basic[entries[k].0]))
                 && !(is_inf(p.lo[q]) && is_inf(p.up[q]));
