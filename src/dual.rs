@@ -4776,6 +4776,11 @@ fn solve_pass<R: Real>(
             {
                 // The double dual ends optimal for the shifted costs but the true costs make a nonbasic d wrong-signed: the controller's primal runs from this basis (-1004).
 
+                // The double dual ended optimal for the shifted costs; the primal runs on the true ones for a few pivots (the reference's primal, seed 3981: enters 19 and 4)
+                // and ends with status -1004, then the dual runs again from the primal's basis, like after a rejected end.
+                s.rejected_end = true;
+                status = Status::Infeasible;
+                break;
                 s.art_exit = true;
                 s.dual_unbounded();
                 status = Status::Unbounded;
