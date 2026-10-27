@@ -802,7 +802,15 @@ impl<'a, R: Real> Dual<'a, R> {
     }
 
     /// Factorize the basis (`0xd4190`): the positions follow the pivot order of the reference's LU; the weights move with their variables.
-    fn refactor(&mut self) -> Result<(), SolveError> {
+    fn refactor(&mut self, cause: &str) -> Result<(), SolveError> {
+        if crate::dump::on("facctx") {
+            crate::dump::emit(
+                "facctx",
+                serde_json::json!({"it": self.iters, "it_base": self.it_base, "total_it": self.it_base + self.iters,
+                    "n": self.refactorizations, "req": self.request, "cause": cause, "quad": R::QUAD,
+                    "level": self.level, "updates": self.updates, "pert": self.pert}),
+            );
+        }
         // LU driver (`0xf32a4..0xf32ec`): a factorization requested as 5, 6 or 7 (no entering variable, pivot mismatch) first raises `ctx+0x390` to 0.5.
         if (5..=7).contains(&self.request) && self.lu_thr < 0.5 {
             self.lu_thr = 0.5;
@@ -928,7 +936,7 @@ impl<'a, R: Real> Dual<'a, R> {
         // transformed again and pivoted in on the largest entry among the rows whose basic variable has a finite lower bound (floor `0.01 PIVOT_FLOOR`);
         // without such an entry the dual is infeasible at once (`0xea0b7`: status 5, `ctx+0x2fc` the variable), before any iteration. `s70`, `s143`.
         self.request = 10;
-        self.refactor()?;
+        self.refactor("free_deferred")?;
         self.request = 0;
         let mut k = 0;
         while k < deferred.len() {
@@ -999,7 +1007,7 @@ impl<'a, R: Real> Dual<'a, R> {
         self.head[r] = j;
         self.iters += 1;
         if self.mirror.refactor_due() {
-            self.refactor()?;
+            self.refactor("free_pivot")?;
         } else {
             self.factor
                 .update(r, alpha.iter().map(|v| v.to_f64()).collect());
@@ -3906,7 +3914,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 // The weights of the pivot are updated before the factorization renumbers the positions; the basic solution is recomputed.
                 self.update_weights(pv);
                 self.pivot_cols = Some(pv.col.len());
-                self.refactor()?;
+                self.refactor(if schedule_due { "scheduled" } else { "request" })?;
             } else {
                 self.factor
                     .update(pv.r, alpha.iter().map(|v| v.to_f64()).collect());
@@ -3953,7 +3961,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 old_leave - theta * lcoef
             };
         } else if refactor {
-            self.refactor()?;
+            self.refactor(if schedule_due { "scheduled" } else { "request" })?;
         }
         if refactor {
             self.pricing_switch();
@@ -4679,7 +4687,7 @@ fn solve_pass<R: Real>(
     if free_phase {
         setup_free = s.free_pivots()?;
         if setup_free.is_none() {
-            s.refactor()?;
+            s.refactor("free_setup")?;
         }
     }
     s.build_rrows();
@@ -5007,7 +5015,7 @@ fn solve_pass<R: Real>(
                     s.st[v] = pos as i32;
                     s.w[pos] = wv[v];
                 }
-                if let Err(e) = s.refactor() {
+                if let Err(e) = s.refactor("optimal_cleanup") {
                     // The double driver's shifted optimum returns -1004 and
                     // increments ctx+0x35c before the primal cleanup. If our
                     // substitute cleanup factor is singular, preserve that

@@ -28,6 +28,7 @@ pub const KINDS: &[(&str, &str, &str)] = &[
     ("fstruct", "FSTRUCT", "U-factor structure (kinds, nucleus list, tail start, slots) before each column replacement"),
     ("pairgate", "PGATE", "each attempted doubleton pairing pass: remaining rows, prior attempts, gate, factorization number"),
     ("luin", "LUIN", "basis column order handed to each factorization (the reference's lu_in `cols`), and the order it returns"),
+    ("facctx", "FACCTX", "dual factorization entry: pass and cumulative iterations, factor count, request, and the code path that requested the factorization"),
     ("lustart", "LUSTART", "the factorization a pass makes at its start (dual or primal, `luin` does not record it): the columns in the order handed to the LU and the order it returns"),
     ("luout", "LUOUT", "numerics of each fresh factor: the diagonal and the L columns (the reference's lu_in `diag`, `Lcp`/`Lidx`/`Lval`)"),
     ("ent", "ENT", "phase 1 ratio-test inputs: the signed FTRAN list, and distance, range and type per basis position"),
