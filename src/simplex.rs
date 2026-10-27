@@ -5117,6 +5117,10 @@ fn solve_primal(
                     break Status::Infeasible;
                 }
                 None => {
+                    if due && s.costfree && s.handoff.is_some_and(|h| !h.quad) {
+                        // The last failed scan after the request-5 factorization is inside 0x145520, including the terminal 1e-9 scan (fx_midsing_1496).
+                        retract_pricing();
+                    }
                     // No improving column for the penalised cost: try the pure sum of infeasibilities, which either
                     // continues the search or proves infeasibility with the multipliers as certificate.
                     s.composite_dual(true);

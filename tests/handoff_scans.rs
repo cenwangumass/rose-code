@@ -93,3 +93,52 @@ fn optimal_primal_handoff_ends_without_an_extra_dual_pass() {
         );
     }
 }
+
+#[test]
+fn terminal_handoff_child() {
+    if std::env::var_os("ROSE_TERMINAL_TEST").is_none() {
+        return;
+    }
+    let model = mps::parse(include_str!("fixtures/fx_midsing_1496.mps")).unwrap();
+    let mut opts = SolveOptions::dual();
+    opts.max_iterations = 200;
+    opts.refactor_schedule = Some(vec![
+        3,
+        usize::MAX,
+        3,
+        usize::MAX,
+        3,
+        usize::MAX,
+        3,
+        usize::MAX,
+        3,
+        usize::MAX,
+        3,
+    ]);
+    solve(&model, None, &opts).unwrap();
+}
+
+#[test]
+fn terminal_fresh_scan_is_not_a_pricing_call() {
+    let output = Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", "terminal_handoff_child", "--nocapture"])
+        .env("ROSE_TERMINAL_TEST", "1")
+        .env("ROSE_DUMP", "pricing")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    let mut calls = 0;
+    for line in stderr
+        .lines()
+        .filter_map(|line| line.strip_prefix("PLIST "))
+    {
+        let record: serde_json::Value = serde_json::from_str(line).unwrap();
+        if record["retract"] == true {
+            calls -= 1;
+        } else {
+            calls += 1;
+        }
+    }
+    assert_eq!(calls, 25, "expected the reference's pricing call count");
+}
