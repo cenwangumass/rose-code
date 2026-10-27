@@ -2552,7 +2552,8 @@ impl<'a, R: Real> Dual<'a, R> {
         let tol = R::c(1000.0) * delta;
         let mut xm5 = xm5;
         let mut best: Option<usize> = None;
-        // The sites `0xc92b8` and `0xc9431` add to another accumulator than the driver's W (no write to W in any capture), so nothing is booked here.
+        // The flip-selection scan books four units per original flip (`0xc92b8`).
+        self.work.add(0xc92bd, 4.0 * flips.len() as f64, crate::work::CTX);
         for (k, &e) in flips.iter().enumerate() {
             let (j, aj) = row[e];
             let dj = self.d[j];
@@ -2591,6 +2592,12 @@ impl<'a, R: Real> Dual<'a, R> {
             .copied()
             .filter(|&e| e != qe && self.d[row[e].0] <= row[e].1 * theta2)
             .collect();
+        // A replacement also books the scan and the rebuilt flip count (`0xc9431`).
+        self.work.add(
+            0xc9436,
+            (4 * flips.len() + kept.len()) as f64,
+            crate::work::CTX,
+        );
         (qe, kept)
     }
 }
