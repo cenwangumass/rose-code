@@ -1639,7 +1639,14 @@ impl<'a, R: Real> Dual<'a, R> {
             if f > R::c(tol) {
                 any = true;
                 a = a.max(f);
-                rel = rel.max(f / (x.abs() + R::ONE));
+                if R::QUAD {
+                    rel = rel.max(f / (x.abs() + R::ONE));
+                } else {
+                    let denominator = x.abs() + R::ONE;
+                    if f > rel * denominator {
+                        rel = f / denominator;
+                    }
+                }
             }
         }
         let s3 = self.xb_residual.max(R::c(tol * 1e-4));
@@ -4013,15 +4020,18 @@ impl<'a, R: Real> Dual<'a, R> {
             );
             self.snapshot_recomputed();
             self.flags_work();
-            if R::QUAD
-                && self.status.is_none()
-                && self.level == 0
+            if self.status.is_none()
+                && if R::QUAD { self.level == 0 } else { level_before == 0 }
                 && self.lu_thr >= 0.5
-                && (req == 4 || crate::simplex::QUAD_PRIMALS.with(|c| c.get()) >= 10)
+                && (req == 4 || if R::QUAD {
+                    crate::simplex::QUAD_PRIMALS.with(|c| c.get()) >= 10
+                } else {
+                    C35C.with(|c| c.get()) > 10
+                })
                 && self.tiny_infeasibility()
             {
-                // The recompute after a factorization of a pass that follows the tenth quad primal (`ctx+0x35c` above 10, `0x21a315..0x21a4b6`) takes the basic solution as
-                // feasible when the infeasibilities are small against the size of x_B: the flags are all 2 and the dual ends optimal (seed 2950, 3e11 against 7e-3).
+                // A confirming recompute, or one after ten handoffs, accepts residual-scale
+                // infeasibilities as feasible (`0xc1fe3..0xc21f6`, quad `0x21a315..0x21a4b6`).
                 self.flags.iter_mut().for_each(|f| *f = 2);
                 self.list.clear();
                 self.status = Some(Status::Optimal);
