@@ -4160,9 +4160,10 @@ fn solve_frame(
     // The quad mode (`ctx+0x28`): once the controller switched, every later pass runs the extended-precision twin of the dual.
     let mut quad = false;
     let mut switch_start: Option<Basis> = None;
+    // The controller snapshots the tolerance once (`0x154ccc`), before any
+    // singular retries; its primal handoffs scale this original value.
+    LOOP_TOL.with(|c| c.set(dual_tol()));
     loop {
-        // The controller loop reads the tolerance at its top (`0x154ccc`) and sets it again for the primal it starts (`0x15647a`).
-        LOOP_TOL.with(|c| c.set(dual_tol()));
         SINGULAR.with(|c| c.set(None));
         SWITCH.with(|c| c.set(None));
         let snap_start;
@@ -4912,7 +4913,11 @@ fn solve_pass<R: Real>(
         crate::simplex::PRIMAL_SINGULAR.with(|c| c.set(None));
         crate::simplex::PRIMAL_FARKAS_SKIPPED.with(|c| c.set(0));
         crate::simplex::PRIMAL_REPAIRED.with(|c| c.set(false));
-        let mut r = match crate::simplex::solve(model, Some(&b), &popts) {
+        let primal_result = crate::simplex::solve(model, Some(&b), &popts);
+        // The controller saves the tolerance left by the primal, undoing the
+        // handoff scale (`0x1564a4`), for the next handoff.
+        LOOP_TOL.with(|c| c.set(dual_tol() / tol_factor));
+        let mut r = match primal_result {
             Err(SolveError::SingularBasis) => {
                 // The primal's factorization has a column without a pivot (status -1002): the controller restarts the dual from the slack basis, like the dual's
                 // own failed factorization, with the primal's iterations counted.
