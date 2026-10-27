@@ -2398,7 +2398,11 @@ impl<'a> Solver<'a> {
     /// other candidate; it is then admitted and the list rebuilt (the reference adds 3 to its status, -4 -> -1, in `0xcda5b`).
     fn price_admitting(&mut self) -> Option<usize> {
         let w0 = self.work.w;
-        let q = self.price_faithful();
+        let q = if self.p0.is_some() {
+            self.price0()
+        } else {
+            self.price_faithful()
+        };
         // The x87 primal with cost shifts in force does not admit the dropped variable: its first failed scan ends the primal with status -1004.
         if q.is_none() && self.excluded.is_some() && !self.handoff.is_some_and(|h| h.quad && h.pert)
         {
@@ -2453,7 +2457,11 @@ impl<'a> Solver<'a> {
             self.list.clear();
             self.level = 0;
             let w1 = self.work.w;
-            let q = self.price_faithful();
+            let q = if self.p0.is_some() {
+                self.price0()
+            } else {
+                self.price_faithful()
+            };
             if q.is_none() {
                 self.work.rollback(w1);
             }
@@ -2626,9 +2634,9 @@ const P0_DTOL: f64 = 1e-6;
 const P0_DTOL_P1: f64 = 1e-7 * PHASE1_M;
 
 impl<'a> Solver<'a> {
-    /// Nonbasic, not fixed: the variables the `pricing0` list ranks (status -1, -2 or -3 of the reference).
+    /// Nonbasic, not fixed, and not the variable dropped from a singular start (status -4, key 0 like a basic one): the variables the `pricing0` list ranks (status -1, -2 or -3 of the reference).
     fn p0_eligible(&self, j: usize) -> bool {
-        self.pos_of[j] == NONE && !self.is_fixed(j)
+        self.pos_of[j] == NONE && !self.is_fixed(j) && self.excluded != Some(j)
     }
 
     /// The reference's score `s` of a nonbasic variable (`d`, negated at the upper bound) and whether it is free, from the duals `y`.
@@ -4787,11 +4795,7 @@ fn solve_primal(
                 }
             }
         } else {
-            match if s.p0.is_some() {
-                s.price0()
-            } else {
-                s.price_admitting()
-            } {
+            match s.price_admitting() {
                 Some(q) => q,
                 None if std::mem::take(&mut s.want_refactor) => {
                     s.work.trig();
