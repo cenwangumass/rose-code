@@ -1589,6 +1589,7 @@ impl<'a, R: Real> Dual<'a, R> {
             // Refresh (`0xcd031`): argmax over the rows with flag 0, threshold divided by 10, those at or above it join the list.
             self.thr /= 10.0;
             let mut b = 0.0;
+            let before = self.list.len();
             for r in 0..self.m {
                 if self.flags[r] == 0 {
                     let p = self.prio[r];
@@ -1602,6 +1603,13 @@ impl<'a, R: Real> Dual<'a, R> {
                     }
                 }
             }
+            // The refresh scan books two units per row and one per newly listed row,
+            // before the fallback that can add the argmax (`0xcd18c`).
+            self.work.add(
+                0xcd191,
+                2.0 * self.m as f64 + (self.list.len() - before) as f64,
+                crate::work::CTX,
+            );
             if self.list.is_empty() {
                 if let Some(r) = row {
                     self.list.push(r);
