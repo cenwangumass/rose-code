@@ -184,6 +184,8 @@ struct Dual<'a, R: Real = f64> {
     factor: Factor,
     /// Row-wise copy of the nonbasic, non-fixed structurals in the reference's storage order.
     rrows: Vec<Vec<usize>>,
+    /// The ratio test asked for a refactorization (request 5) instead of ending the dual: the iteration returns without a pivot.
+    absorb_request: bool,
     refactorizations: usize,
     /// The relative pivot threshold of the LU (`ctx+0x390`, 2^-7 at the start): raised after a recompute of x_B by `accuracy_threshold`, never lowered.
     lu_thr: f64,
@@ -1955,16 +1957,12 @@ impl<'a, R: Real> Dual<'a, R> {
         // tolerance, `xmm9`; only at level 0: `0xcbcc8` tests `ctx+0x2cc`, the level != 0 path was not read): no entering variable, as for an empty list (row of a primal infeasible model; found on random LPs, e.g. 3 rows and one structural
         // candidate with range * |a| = 2000 against an infeasibility of 2003).
         if nn == 1
-            && self.level == 0
             && bestc + xmm10 < R::ZERO
             && R::c(-self.ptol()) > bestc + xmm10
+            && (self.level == 0 || self.updates > 0)
         {
             self.work.add(0xc7c4f, 5.0, crate::work::CTX);
-            return Ratio {
-                q: None,
-                flips: Vec::new(),
-                reject: None,
-            };
+            return self.no_absorb();
         }
         if nn == 1 {
             self.work.add(0xc7c4f, 5.0, crate::work::CTX);
@@ -2050,11 +2048,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 sel_sep = R::c(-self.ptol()) > s;
                 if self.level == 0 && R::c(-self.ptol()) > s + con[lo] {
                     self.work.add(0xc7c4f, 5.0 * nn as f64, crate::work::CTX);
-                    return Ratio {
-                        q: None,
-                        flips: Vec::new(),
-                        reject: None,
-                    };
+                    return self.no_absorb();
                 }
                 // Level != 0 and the candidates cannot absorb the infeasibility (`0xcbcc8..0xcbdd4`, first pass only): a candidate at its upper bound
                 // (status -2) whose bound is infinite takes the contribution `2 infeas` (the collection does it for a status -1 one only, and only from
@@ -2075,6 +2069,14 @@ impl<'a, R: Real> Dual<'a, R> {
                         second = true;
                         continue;
                     }
+                }
+                if self.level != 0
+                    && self.updates > 0
+                    && sel_sep
+                    && R::c(-self.ptol()) > s + con[lo]
+                {
+                    self.work.add(0xc7c4f, 5.0 * nn as f64, crate::work::CTX);
+                    return self.no_absorb();
                 }
                 break;
             }
@@ -2691,6 +2693,17 @@ impl<'a, R: Real> Dual<'a, R> {
         self.row_product_work(&rho, row.len() - esi);
         self.p58 += rho.iter().map(|e| self.rrows[e.0].len()).sum::<usize>() as f64;
         let rt = self.ratio_test(&row, esi, leave, above, xbr);
+        if std::mem::take(&mut self.absorb_request) {
+            if let Some(mut sn) = snap {
+                sn["r"] = serde_json::json!(r);
+                sn["var"] = serde_json::json!(leave);
+                sn["rho"] = crate::dump::sparse_r(&rho);
+                sn["row"] = crate::dump::sparse_r(&row);
+                sn["q"] = serde_json::json!(-1);
+                *dump = Some(sn);
+            }
+            return Step::Mismatch;
+        }
         let was_retry = self.retry;
         if self.retry {
             self.retry = false;
@@ -3209,6 +3222,21 @@ impl<'a, R: Real> Dual<'a, R> {
             } else {
                 self.flags[r] = 2;
             }
+        }
+    }
+
+    /// The candidates cannot absorb the infeasibility (`0xcc061`: the sum of all contributions with the infeasibility is below minus the primal tolerance): on a factor with
+    /// updates the ratio test asks for a refactorization (request 5, `0xcc1d6`, `ctx+0x3f8` != 0) and returns no entering variable without ending the dual (random LP seed
+    /// 31249 call 3: one candidate of range 10 against an infeasibility of 2.9e19 at level 1); on a fresh factor the dual ends as with an empty row.
+    fn no_absorb(&mut self) -> Ratio {
+        if self.updates > 0 {
+            self.request = 5;
+            self.absorb_request = true;
+        }
+        Ratio {
+            q: None,
+            flips: Vec::new(),
+            reject: None,
         }
     }
 
@@ -4258,6 +4286,7 @@ fn solve_pass<R: Real>(
         mirror,
         factor,
         rrows: vec![Vec::new(); m],
+        absorb_request: false,
         refactorizations: carry.fac + 1,
         lu_thr: carry_thr,
         pmode: if start.is_some() || (carry.retries > 0 && !fresh_pass::<R>(carry.retries)) {
