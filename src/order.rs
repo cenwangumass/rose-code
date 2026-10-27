@@ -210,6 +210,17 @@ thread_local! {
     static PARTITION_WORK: std::cell::Cell<f64> = const { std::cell::Cell::new(0.0) };
 }
 
+thread_local! {
+    /// Matching scheme of the partition routine (its last argument, `0xf0(rsp)` of `0x325850`): 3 = the first unmatched neighbour in adjacency order (`0x326eb3`), every other
+    /// value (-1 for the first ordering, the task index 0..4 for the `BarOrder = -1` extra orderings) = the unmatched neighbour of smallest degree (`0x326e45`).
+    static MATCH_SCHEME: std::cell::Cell<i32> = const { std::cell::Cell::new(-1) };
+}
+
+/// Sets the matching scheme of the partitions run on this thread (see [`partition`]); -1 is the default.
+pub fn set_match_scheme(s: i32) {
+    MATCH_SCHEME.with(|c| c.set(s));
+}
+
 /// Adds `(a deg + b) 0.75` work units (all values are multiples of 1/4, so the sum does not depend on the order).
 fn add_work(deg: usize, a: f64, b: f64) {
     PARTITION_WORK.with(|w| w.set(w.get() + (a * deg as f64 + b) * 0.75));
@@ -398,10 +409,14 @@ fn coarsen(
             continue;
         }
         let (mut best, mut bd) = (usize::MAX, n + 1);
+        let first = MATCH_SCHEME.with(|c| c.get()) == 3;
         for &u in &adj[xadj[v]..xadj[v + 1]] {
-            if matched[u] == usize::MAX && deg[u] < bd {
+            if matched[u] == usize::MAX && (first || deg[u] < bd) {
                 bd = deg[u];
                 best = u;
+                if first {
+                    break;
+                }
             }
         }
         let c = cptr.len() - 1;
@@ -1427,10 +1442,16 @@ pub fn structure_order(
         dense_columns(m, dense_min)
     };
     let (pattern, n1) = aat_pattern(m, &dense);
-    let run = |seed: u64, repeat: bool| -> Result<(Vec<i64>, OrderResult, Symbolic), StructError> {
+    let run = |seed: u64,
+               repeat: bool,
+               scheme: i32|
+     -> Result<(Vec<i64>, OrderResult, Symbolic), StructError> {
         let mut rng = seed;
         take_partition_work();
-        let lv = levels_mode(&pattern, n1, None, &mut rng, repeat)?;
+        set_match_scheme(scheme);
+        let lv = levels_mode(&pattern, n1, None, &mut rng, repeat);
+        set_match_scheme(-1);
+        let lv = lv?;
         let pw = take_partition_work();
         let mut o = order(&pattern, &lv)?;
         o.work += pw;
@@ -1438,7 +1459,7 @@ pub fn structure_order(
         s.rng = rng;
         Ok((lv, o, s))
     };
-    let first = run(0, false);
+    let first = run(0, false, -1);
     let mut ratio = 0.0;
     let mut extra = 0usize;
     let best = match first {
@@ -1463,7 +1484,7 @@ pub fn structure_order(
                 let mut total = spent;
                 let mut best = f;
                 for t in 0..5 {
-                    if let Ok(c) = run(AUTO_ORDER_SEED + t, true) {
+                    if let Ok(c) = run(AUTO_ORDER_SEED + t, true, t as i32) {
                         extra += 1;
                         total += c.1.work;
                         if c.1.ops < best.1.ops {
