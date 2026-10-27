@@ -42,8 +42,7 @@ pub struct Plan {
     /// `SYM+0x80` = max(480, n, widest supernode squared) (`0x2e8680`): the workspace size that bounds the row blocks of a child update.
     pub sym80: usize,
     pub n: usize,
-    /// `SYM+0xc0` (replaced pivots): the factor is computed by the single-precision routine `0x33c710`. Set here when the symbolic flops exceed 1e10 (the one
-    /// captured case, `fx_bar_dense3400`; the exact rule is not decoded).
+    /// `SYM+0xc0` (replaced pivots): the factor is computed by the single-precision routine `0x33c710` (set by [`replaced_pivots`]).
     pub single: bool,
 }
 
@@ -107,7 +106,7 @@ impl Plan {
             sns,
             sym80,
             n,
-            single: sym.ops > 1e10,
+            single: false,
         }
     }
 }
@@ -1817,6 +1816,15 @@ pub fn ntry_first(f: &StdForm, sym: &Symbolic) -> usize {
     }
 }
 
+/// `SYM+0xc0` (`0x2e1200..0x2e1269`, no dense columns, `P+0x2be0 != 0`): `SYM+0x60` (the flops, [`Symbolic::ops`]) exceeds 1e10, 500 NZ (`SYM+0x38`) and 1000 nnz(A).
+/// The further test `ops > 1000 SYM+0x48` is not applied (`SYM+0x48` is not decoded); `SYM+0x58` is 0 on the captured model.
+pub fn replaced_pivots(f: &StdForm, sym: &Symbolic) -> bool {
+    f.dense.is_empty()
+        && sym.ops > 1e10
+        && sym.ops > 500.0 * sym.nz as f64
+        && sym.ops > 1000.0 * f.row_idx.len() as f64
+}
+
 /// `(rho, S)` of [`ntry_first`]; `S = SYM+0x168` also scales the work of a factorization (the dense columns are nodes after the rows: `n = m + dense`).
 pub fn sym_rho_s(f: &StdForm, sym: &Symbolic) -> (f64, f64) {
     let ff = |t: i64| t * (t + 1) * (2 * t + 1) / 6;
@@ -1878,7 +1886,11 @@ impl CholSolver {
     /// `sym` is the symbolic factorization of the structure stage ([`crate::order::structure`]) the `StdForm` was permuted with.
     pub fn new(f: &StdForm, sym: &Symbolic) -> CholSolver {
         CholSolver {
-            plan: Plan::new(sym),
+            plan: {
+                let mut p = Plan::new(sym);
+                p.single = replaced_pivots(f, sym);
+                p
+            },
             rows: model_rows(f),
             a: Amat::new(f),
             d: Vec::new(),
