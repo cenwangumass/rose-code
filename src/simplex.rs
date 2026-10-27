@@ -178,6 +178,7 @@ impl SolveOptions {
             pricing0: true,
             scaling: true,
             automatic_quad: true,
+            perturb: 0.0002,
             ..SolveOptions::default()
         }
     }
@@ -1904,6 +1905,7 @@ impl<'a> Solver<'a> {
             }
         }
         self.sw.perturbed();
+        crate::dual::set_primal_pert_size(self.sw.pert);
     }
 
     /// The method decision after a factorization (`0x142500`): switches from `pricing0` to Devex pricing, restarting the weights and the list.
@@ -3197,8 +3199,6 @@ fn p0_key2(s: f64, div: Option<f64>) -> usize {
     (if s < 0.0 { 0x41 + k } else { 0x23 - k }) as usize
 }
 
-/// `PerturbValue` default (`ctx+0x340` at the start).
-const PERTURB_VALUE: f64 = 0.0002;
 
 /// Initial window of the `pricing0` scan: it ends at the first position more than this many past its start once a candidate was counted (`P+0x50`).
 const P0_WINDOW: usize = 10;
@@ -4861,6 +4861,8 @@ pub fn solve(
     let handoff = HANDOFF.with(|c| c.take());
     if handoff.is_none() {
         // A standalone solve starts a new context; handoffs retain the dual's counters.
+        crate::dual::reset_pert_sizes(opts.perturb);
+        crate::dual::C35C.with(|c| c.set(1));
         TOTAL_ITERS.with(|c| c.set(0.0));
         EARLIER_ITERS.with(|c| c.set(0));
         crate::dual::set_dual_tol(1e-6);
@@ -4936,6 +4938,7 @@ fn solve_primal(
     handoff: Option<Handoff>,
     rs: Option<PlainRestart>,
 ) -> Result<SolveResult, SolveError> {
+    let primal_pert_size = crate::dual::enter_primal_pert_size();
     let p = build(model);
     let (n, m) = (p.n, p.m);
     let mut excluded = None;
@@ -5356,7 +5359,7 @@ fn solve_primal(
             "pricing0 needs faithful_ftran and faithful_positions"
         );
         s.sw.active = true;
-        s.sw.pert = PERTURB_VALUE;
+        s.sw.pert = primal_pert_size;
         let nnz: usize = (0..n).map(|j| p.cols[j].len()).sum();
         s.p0 = Some(P0 {
             list: Vec::new(),
@@ -5389,7 +5392,7 @@ fn solve_primal(
         s.sw.snap_iters = c.snap_iters;
         s.sw.factorizations = c.factorizations;
         s.sw.level = c.level;
-        s.sw.pert = c.pert;
+        s.sw.pert = primal_pert_size;
         s.quad_switch_allowed = true;
         s.method_decision(0)?;
         s.quad_switch_allowed = false;

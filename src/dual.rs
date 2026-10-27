@@ -24,6 +24,37 @@ const BIG: f64 = 1e30;
 const PRIMAL_TOL: f64 = 1e-6;
 const DUAL_TOL0: f64 = 1e-6;
 
+// These independent context fields survive method handoffs and ordinary restarts.
+thread_local! {
+    static PRIMAL_PERT_SIZE: std::cell::Cell<f64> = const { std::cell::Cell::new(0.0) };
+    static DUAL_PERT_SIZE: std::cell::Cell<f64> = const { std::cell::Cell::new(0.0) };
+}
+
+pub(crate) fn reset_pert_sizes(value: f64) {
+    PRIMAL_PERT_SIZE.with(|c| c.set(value));
+    DUAL_PERT_SIZE.with(|c| c.set(value));
+}
+
+fn enter_pert_size(cell: &'static std::thread::LocalKey<std::cell::Cell<f64>>, primal: bool) -> f64 {
+    let count = C35C.with(|c| c.get());
+    let size = cell.with(|c| {
+        let old = c.get();
+        let size = if count > 1 && old > 1e-7 { maxsd(1e-7, old / 20.0) } else { old };
+        c.set(size);
+        size
+    });
+    C35C.with(|c| c.set(if primal { count.wrapping_abs() } else if count == -1 { 0 } else { count }));
+    size
+}
+
+fn enter_dual_pert_size() -> (f64, i64) {
+    let left = if C35C.with(|c| c.get()) == -1 { 1 } else { 1_000_000_000 };
+    (enter_pert_size(&DUAL_PERT_SIZE, false), left)
+}
+
+pub(crate) fn enter_primal_pert_size() -> f64 { enter_pert_size(&PRIMAL_PERT_SIZE, true) }
+pub(crate) fn set_primal_pert_size(value: f64) { PRIMAL_PERT_SIZE.with(|c| c.set(value)); }
+
 thread_local! {
     /// The dual feasibility tolerance (`ctx+0x388`) and the counter of failed dual residual checks (`ctx+0x174`); both outlive the restarts of one solve.
     static DUAL_TOL_CELL: std::cell::Cell<f64> = const { std::cell::Cell::new(DUAL_TOL0) };
@@ -43,7 +74,7 @@ thread_local! {
     static DUAL_HANDOFFS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
     /// `ctx+0x35c`: 1 at the start, plus one for every run that ends with status -1004 (writers `0xf8691` double dual, `0xe404a` double primal, `0x24b98b` quad dual,
     /// `0x2371bd` x87 primal; `replay/gdb_c35c_trace.py`). The quad primals' method (`ctx+0x3ec`) and the switch of the first ones read it.
-    pub(crate) static C35C: std::cell::Cell<u32> = const { std::cell::Cell::new(1) };
+    pub(crate) static C35C: std::cell::Cell<i32> = const { std::cell::Cell::new(1) };
     static PASS_NO: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     /// The stability counter `ctx+0x178`: one per pivot-check mismatch (`0xc5a35`, quad `0x21da43`) and per singular quad restart (`0x248f99`); never reset in a solve.
     pub(crate) static C178: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
@@ -4044,6 +4075,7 @@ impl<'a, R: Real> Dual<'a, R> {
         } else {
             minsd(1000.0 * self.pert_param, x)
         };
+        DUAL_PERT_SIZE.with(|c| c.set(self.pstep));
     }
 
     #[cfg(test)]
@@ -4382,8 +4414,6 @@ struct Carry {
     /// The factorization count `ctx+0x2c0` at the start of the pass: 0 after a restart (a fresh context), the count so far plus the primal's factorizations when the dual runs again
     /// after the primal.
     nref0: usize,
-    /// The perturbation scale `ctx+0x348` the pass starts with: the default, or after the primal's clean-up max(1e-7, 0.05 times the previous pass's scale) (reference quad runs, seeds 2950, 2840).
-    pstep: Option<f64>,
 }
 
 thread_local! {
@@ -4410,6 +4440,10 @@ pub fn solve(
     start: Option<&Basis>,
     opts: &SolveOptions,
 ) -> Result<SolveResult, SolveError> {
+    if CLEANUP_PASS.with(|c| c.get()).is_none() {
+        reset_pert_sizes(opts.perturb);
+        C35C.with(|c| c.set(1));
+    }
     // The reference works on the mirror image of a column with no lower bound and a finite upper bound (`x' = -x`, bounds `[-up, inf)`, `0xeb61b`
     // sees `lb = -5` for `x in (-inf, 5]`): every rule below (crash tests on the coefficient sign, the status by the cost sign, the d signs) runs on that frame.
     let flip: Vec<bool> = (0..model.num_cols())
@@ -4473,7 +4507,6 @@ fn solve_frame(
         after_pivot: false,
         it_base: 0,
         nref0: 0,
-        pstep: None,
     };
     if CLEANUP_PASS.with(|c| c.get()).is_none() {
         crate::simplex::STALL_PREV.with(|c| c.set(0.0));
@@ -4496,7 +4529,6 @@ fn solve_frame(
     PAIR_TOL.with(|c| c.set(3e-6));
     PASS_NO.with(|c| c.set(0));
     DUAL_HANDOFFS.with(|c| c.set(0));
-    C35C.with(|c| c.set(1));
     C178.with(|c| c.set(0));
     crate::simplex::HANDOFF_ROWS.with(|c| *c.borrow_mut() = None);
     LARGE_XB.with(|c| c.set(false));
@@ -4542,7 +4574,7 @@ fn solve_frame(
             popts.sw_carry = Some(crate::simplex::SwCarry {
                 iters: 0.0, degenerate: 0, snap_degenerate: 0, snap_iters: 0.0,
                 factorizations: 0, level: 0,
-                pert: if fresh { opts.perturb * 0.05 } else { 0.0 },
+                pert: 0.0,
             });
             crate::simplex::HANDOFF.with(|c| c.set(Some(crate::simplex::Handoff {
                 stale: None, working_obj: None, nref0: 0, thr: carry.thr,
@@ -4614,7 +4646,6 @@ fn solve_frame(
                     it_base,
                     // A direct switch keeps the factor count as well.
                     nref0: nref,
-                    pstep: None,
                 };
                 switch_start = Some(b);
             }
@@ -4654,6 +4685,7 @@ fn solve_frame(
                 let next_retries = pass_retries + u32::from(!SINGULAR_TOL_ABORT.with(|c| c.get()));
                 let fresh = next_retries == 3;
                 if fresh {
+                    reset_pert_sizes(opts.perturb);
                     factor_crash = true;
                     restart_primal = failed_quad_dual && SNAP_PRIMAL.with(|c| c.get());
                 } else if context_iters > 0 && SNAP_QUALITY.with(|c| c.get() > 0) {
@@ -4686,7 +4718,6 @@ fn solve_frame(
                     after_pivot,
                     it_base: 0,
                     nref0: 0,
-                    pstep: None,
                 };
             }
             Ok(mut r) => {
@@ -4717,6 +4748,7 @@ fn solve_pass<R: Real>(
         set_primal_tol(PRIMAL_TOL);
         LARGE_XB.with(|c| c.set(false));
     }
+    let (dual_pert_size, dual_pert_left) = enter_dual_pert_size();
     let p = build(model);
     let (n, m) = (p.n, p.m);
     let mut dropped = None;
@@ -4905,14 +4937,14 @@ fn solve_pass<R: Real>(
         },
         pivot_cols: None,
         nnz_a: p.cols[..n].iter().map(Vec::len).sum(),
-        pstep: carry.pstep.unwrap_or(opts.perturb),
+        pstep: dual_pert_size,
         stall: 0,
         stall_snap: 0,
         stall_it: 0.0,
         prog_on: false,
         prog_acc: 0.0,
         best_obj: -1e100,
-        pert_left: 1_000_000_000,
+        pert_left: dual_pert_left,
         pert_param: opts.perturb,
         obj_scale: opts.obj_scale,
         scaled: opts.scaled,
@@ -5359,7 +5391,7 @@ fn solve_pass<R: Real>(
             // to 1, 2, or at least 3. The post-factor decision can also move
             // method 0 to 1 when the dual made iterations since its snapshot.
             let increments = !(s.pert != 0 && !s.rejected_end && !s.art_exit);
-            let c35c_at_start = C35C.with(|c| c.get()) + u32::from(increments);
+            let c35c_at_start = C35C.with(|c| c.get()) + i32::from(increments);
             let fires = C178.with(|c| c.get()) > 0 && s.stall_it != s.iters as f64;
             popts.pricing0 = c35c_at_start == 1 && !fires;
         }
@@ -5371,7 +5403,7 @@ fn solve_pass<R: Real>(
                 snap_iters: s.stall_it,
                 factorizations: s.refactorizations as u32,
                 level: 0,
-                pert: s.pstep * 0.05,
+                pert: 0.0,
             });
         }
         let b = Basis {
@@ -5418,19 +5450,17 @@ fn solve_pass<R: Real>(
         if !(R::QUAD && s.pert != 0 && !s.rejected_end && !s.art_exit) {
             C35C.with(|c| c.set(c.get() + 1));
         }
-        let c35c = if R::QUAD {
-            C35C.with(|c| c.get())
+        let (at_most_five, at_most_seven) = if R::QUAD {
+            C35C.with(|c| (c.get() <= 5, c.get() <= 7))
         } else {
-            handoffs + 1
+            (handoffs < 5, handoffs < 7)
         };
-        let tol_factor = if dual_tol() > DUAL_TOL0 {
+        let tol_factor = if dual_tol() > DUAL_TOL0 || at_most_five {
             1.0
+        } else if at_most_seven {
+            0.5
         } else {
-            match c35c {
-                0..=5 => 1.0,
-                6 | 7 => 0.5,
-                _ => 0.2,
-            }
+            0.2
         };
         set_dual_tol(LOOP_TOL.with(|c| c.get()) * tol_factor);
         crate::simplex::PRIMAL_SINGULAR.with(|c| c.set(None));
@@ -5573,7 +5603,6 @@ fn solve_pass<R: Real>(
                 after_pivot: true,
                 it_base: s.it_base + r.iterations,
                 nref0: s.nref() + (r.refactorizations - s.refactorizations).max(1),
-                pstep: None,
             };
             let mut r2 = solve_pass::<R>(model, Some(&r.basis), opts, &carry2, false)?;
             r2.iterations += carry2.iters;
@@ -5594,11 +5623,6 @@ fn solve_pass<R: Real>(
                 after_pivot: true,
                 it_base: s.it_base + r.iterations,
                 nref0: s.nref() + l.max(1),
-                pstep: if s.pstep > 0.0 {
-                    Some(maxsd(1e-7, s.pstep * 0.05))
-                } else {
-                    None
-                },
             };
             let mut r2 = solve_pass::<R>(model, Some(&r.basis), opts, &carry2, false)?;
             r2.iterations += carry2.iters;
@@ -5666,11 +5690,6 @@ fn solve_pass<R: Real>(
                             )
                         }
                 },
-                pstep: if R::QUAD && s.pstep > 0.0 {
-                    Some(maxsd(1e-7, s.pstep * 0.05))
-                } else {
-                    None
-                },
             };
             let mut r2 = solve_pass::<R>(model, Some(&r.basis), opts, &carry2, false)?;
             r2.iterations += carry2.iters;
@@ -5696,7 +5715,7 @@ fn solve_pass<R: Real>(
                 factorizations: s.refactorizations as u32,
 
                 level: 0,
-                pert: s.pstep * 0.05,
+                pert: 0.0,
             });
         }
         let from_dual = Basis {
@@ -5867,11 +5886,6 @@ fn solve_pass<R: Real>(
                     after_pivot: primal_stalled,
                     it_base: s.it_base + s.iters + pit,
                     nref0: s.nref() + pfac.max(1),
-                    pstep: if primal_stalled && s.pstep > 0.0 {
-                        Some(maxsd(1e-7, s.pstep * 0.05))
-                    } else {
-                        None
-                    },
                 };
                 let again = solve_pass::<R>(model, resume.as_ref().or(start), opts, &carry3, false);
                 NO_ART_EXIT.with(|c| c.set(false));
@@ -6276,4 +6290,39 @@ fn lowgate_counterfactual_refactor_replay() {
         assert_eq!(*actual_head, head);
     }
     assert_eq!(result.status, Status::Optimal);
+}
+
+#[cfg(test)]
+mod perturb_size_lifecycle_tests {
+    use super::*;
+
+    #[test]
+    fn captured_sizes_and_signed_entry_rules() {
+        reset_pert_sizes(0.0002);
+        C35C.with(|c| c.set(1));
+        assert_eq!(enter_pert_size(&DUAL_PERT_SIZE, false).to_bits(), 0.0002_f64.to_bits());
+        C35C.with(|c| c.set(2));
+        assert_eq!(enter_primal_pert_size().to_bits(), 1e-5_f64.to_bits());
+        assert_eq!(DUAL_PERT_SIZE.with(|c| c.get()).to_bits(), 0.0002_f64.to_bits());
+        assert_eq!(enter_pert_size(&DUAL_PERT_SIZE, false).to_bits(), 1e-5_f64.to_bits());
+        C35C.with(|c| c.set(3));
+        assert_eq!(enter_primal_pert_size().to_bits(), 5.000000000000001e-7_f64.to_bits());
+        C35C.with(|c| c.set(4));
+        assert_eq!(enter_pert_size(&DUAL_PERT_SIZE, false).to_bits(), 5.000000000000001e-7_f64.to_bits());
+        assert_eq!(enter_primal_pert_size().to_bits(), 1e-7_f64.to_bits());
+        C35C.with(|c| c.set(-4));
+        assert_eq!(enter_pert_size(&DUAL_PERT_SIZE, false).to_bits(), 5.000000000000001e-7_f64.to_bits());
+        assert_eq!(C35C.with(|c| c.get()), -4);
+        enter_primal_pert_size();
+        assert_eq!(C35C.with(|c| c.get()), 4);
+        C35C.with(|c| c.set(-1));
+        assert_eq!(enter_dual_pert_size().1, 1);
+        assert_eq!(C35C.with(|c| c.get()), 0);
+        C35C.with(|c| c.set(-4));
+        assert_eq!(enter_dual_pert_size().1, 1_000_000_000);
+        assert_eq!(C35C.with(|c| c.get()), -4);
+        reset_pert_sizes(0.0002);
+        assert_eq!(PRIMAL_PERT_SIZE.with(|c| c.get()), 0.0002);
+        assert_eq!(DUAL_PERT_SIZE.with(|c| c.get()), 0.0002);
+    }
 }
