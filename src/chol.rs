@@ -1583,14 +1583,22 @@ fn dsub2(x0: f64, a: &[f64], b: &[f64], peel: usize) -> f64 {
 fn forward(plan: &Plan, fac: &Factor, x: &mut [f64]) {
     for (k, s) in plan.sns.iter().enumerate() {
         let (col, w, c) = (s.col, s.w, s.c);
+        // The float clone `0x3460e0` peels by the parity of the `x` pointer (`x + col`), the double code by that of the factor pointer.
         let par = fac.par[k];
+        let pk = |off: usize| {
+            if plan.single {
+                col & 1
+            } else {
+                (par + off) & 1
+            }
+        };
         let vals = &fac.vals[k];
         let mut xs: Vec<f64> = x[col..col + w].to_vec();
         for i in 0..w {
             let mut v = xs[i];
             if i > 0 {
                 let off = i * (i + 1) / 2;
-                v = dsub8(v, &vals[off..off + i], &xs[..i], (par + off) & 1);
+                v = dsub8(v, &vals[off..off + i], &xs[..i], pk(off));
             }
             if fac.diag[col + i] == 0.0 && fac.rcp[col + i] == 0.0 {
                 v = 0.0;
@@ -1603,7 +1611,7 @@ fn forward(plan: &Plan, fac: &Factor, x: &mut [f64]) {
         let g = rr / 4;
         for gi in 0..g {
             let p0 = gi * 4;
-            let peel = (par + base + (p0 + 3) * w) & 1;
+            let peel = pk(base + (p0 + 3) * w);
             for r in p0..p0 + 4 {
                 let row = s.rows[w + r];
                 x[row] = dsub2(x[row], &vals[base + r * w..base + (r + 1) * w], &xs, peel);
@@ -1615,7 +1623,7 @@ fn forward(plan: &Plan, fac: &Factor, x: &mut [f64]) {
                 x[row],
                 &vals[base + r * w..base + (r + 1) * w],
                 &xs,
-                (par + base + r * w) & 1,
+                pk(base + r * w),
             );
         }
     }
@@ -1762,11 +1770,50 @@ fn solve305(
     for (r, &j) in f.dense.iter().enumerate() {
         x[f.m + f.dense_k[r]] = rx[j];
     }
+    let stage = crate::dump::on("barrier_stage");
+    let hexv = |v: &[f64]| {
+        v.iter()
+            .map(|x| format!("{:016x}", x.to_bits()))
+            .collect::<Vec<_>>()
+    };
+    if stage {
+        crate::dump::emit_tag(
+            "barrier_stage",
+            "STG",
+            serde_json::json!({"k": "SA", "v": hexv(&t)}),
+        );
+        crate::dump::emit_tag(
+            "barrier_stage",
+            "STG",
+            serde_json::json!({"k": "SFin", "v": hexv(&x[..f.m])}),
+        );
+    }
     forward(plan, fac, &mut x);
+    if stage {
+        crate::dump::emit_tag(
+            "barrier_stage",
+            "STG",
+            serde_json::json!({"k": "SFout", "v": hexv(&x[..f.m])}),
+        );
+    }
     for i in 0..fac.n {
         x[i] = x[i] * fac.rcp[i];
     }
+    if stage {
+        crate::dump::emit_tag(
+            "barrier_stage",
+            "STG",
+            serde_json::json!({"k": "SBin", "v": hexv(&x[..f.m])}),
+        );
+    }
     backward(plan, fac, &mut x);
+    if stage {
+        crate::dump::emit_tag(
+            "barrier_stage",
+            "STG",
+            serde_json::json!({"k": "SBout", "v": hexv(&x[..f.m])}),
+        );
+    }
     let s = a.aty(f, &x[..f.m]);
     let mut dx: Vec<f64> = (0..n)
         .map(|j| {
