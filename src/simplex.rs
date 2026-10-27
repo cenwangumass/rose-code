@@ -2627,6 +2627,12 @@ impl<'a> Solver<'a> {
             // the factorization before the status add of `0x155139`, the excluded variable still out of the row copy); only then
             // does the driver restart below.
             if self.factor.num_updates() > 0 {
+                if self.repaired && self.handoff.is_some_and(|h| h.quad) && self.p1_tol_on {
+                    // A failed x87 scan with a repaired exclusion takes the pure phase-1
+                    // cost before the requested refactorization (3981, iteration 20).
+                    self.costfree = true;
+                    self.p3c0 = 1e-9;
+                }
                 // This refactorization follows a failed scan, so the latest update is
                 // included in the factor statistics used by the method decision.
                 if let Some(mi) = self.mirror.as_mut() {
@@ -2644,6 +2650,14 @@ impl<'a> Solver<'a> {
                 r.ok()?;
                 if self.p0.is_some() {
                     self.p0_rebuild();
+                }
+                if self.repaired && self.handoff.is_some_and(|h| h.quad) {
+                    // The refactor can make an eligible column reappear; the reference
+                    // scans again with the dropped variable still excluded.
+                    let retry = self.price_faithful();
+                    if retry.is_some() {
+                        return retry;
+                    }
                 }
             }
             // After the in-place repair the reference keeps the dropped variable out until the primal has ended (`cf0 = 3`; the controller restores it).
@@ -5665,6 +5679,23 @@ fn solve_primal(
             continue;
         }
         if chosen.is_none() && step >= INF {
+            if !infeasible && s.handoff.is_some_and(|h| h.quad) && s.factor.num_updates() > 0 {
+                // The x87 no-row path requests a refactorization before its verdict.
+                if let Some(mi) = s.mirror.as_mut() {
+                    mi.count_all_updates();
+                }
+                s.refactor()?;
+                continue;
+            }
+            if !infeasible
+                && s.handoff.is_some_and(|h| h.quad)
+                && s.repaired
+                && s.excluded.is_some()
+            {
+                // The reference returns status 5 here, but the controller first restores
+                // the repaired exclusion and reruns the primal. Signal that handover.
+                break Status::Infeasible;
+            }
             if infeasible {
                 // Rebuild the factorization once and price again.
                 if s.factor.num_updates() > 0 {
