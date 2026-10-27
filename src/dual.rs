@@ -5117,6 +5117,7 @@ fn solve_pass<R: Real>(
                 iters: (s.it_base + s.iters) as f64,
                 snap: (s.it_base + s.stall_it as usize) as f64,
                 c178: C178.with(|c| c.get()),
+                preserve_ratio: false,
                 excl: if R::QUAD && (s.pert == 0 || s.art_exit) {
                     s.repaired
                 } else {
@@ -5242,6 +5243,7 @@ fn solve_pass<R: Real>(
                     iters: (s.it_base + s.iters) as f64,
                     snap: (s.it_base + s.stall_it as usize) as f64,
                     c178: C178.with(|c| c.get()),
+                    preserve_ratio: R::QUAD,
                     excl: None,
                 }))
             });
@@ -5430,6 +5432,7 @@ fn solve_pass<R: Real>(
                     iters: (s.it_base + s.iters) as f64,
                     snap: (s.it_base + s.stall_it as usize) as f64,
                     c178: C178.with(|c| c.get()),
+                    preserve_ratio: false,
                     excl: if s.pert == 0 { s.repaired } else { None },
                 }))
             });

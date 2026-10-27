@@ -476,6 +476,8 @@ pub(crate) struct Handoff {
     pub iters: f64,
     pub snap: f64,
     pub c178: u32,
+    /// A restored variable restarts primal in the same quad context.
+    pub preserve_ratio: bool,
     /// The variable the dual's in-place repair dropped, still out of the primal's scan (status -4) when the quad dual ended without cost shifts (seed 2594: the second quad primal prices without it until its scan finds nothing, then the controller restores it).
     pub excl: Option<usize>,
 }
@@ -986,6 +988,8 @@ struct Solver<'a> {
     drift_err: Option<f64>,
     restart: bool,
     pre_restart: bool,
+    /// Whether the current x87 factorization request permits a method switch.
+    quad_switch_allowed: bool,
     /// The duals were recomputed at the start of this iteration (the end of phase 1), so the scan that finds nothing does not recompute them again.
     fresh_duals: bool,
     /// Phase 1 has ended once in this run (`P+0xc` of the reference went from 1 to 2, `0xe4379`): that first end forces a recomputation of the duals.
@@ -1708,9 +1712,17 @@ impl<'a> Solver<'a> {
             } else {
                 self.has_infeasible_basic()
             },
-            // The dual and primal share the stability counter across handoffs (seed 50177).
-            stability: self.accuracy > 0 || self.handoff.is_some_and(|h| h.c178 > 0),
-            can_switch: !self.pre_restart,
+            // The dual and primal share stability events across handoffs.
+            stability: if self.handoff.is_some_and(|h| h.quad) {
+                crate::dual::C178.with(|c| c.get() > 0)
+            } else {
+                self.accuracy > 0 || self.handoff.is_some_and(|h| h.c178 > 0)
+            },
+            can_switch: if self.handoff.is_some_and(|h| h.quad) {
+                self.quad_switch_allowed
+            } else {
+                !self.pre_restart
+            },
         };
         let before = self.sw.clone();
         let switch = self.sw.decide(&inp);
@@ -1722,6 +1734,9 @@ impl<'a> Solver<'a> {
             );
         }
         if switch {
+            if self.handoff.is_some_and(|h| h.quad) {
+                QUAD_EEFA.with(|c| c.set(true));
+            }
             // The switch books the Devex initialization (`0x142c4c`: `3 (n + m)`; `0x132d88`: `2 nnz(A)`), then the reference runs the Devex
             // factorization handling too: the primal update's `x_B` pass (`0x107b57`) and the reduced-cost pass (`0x1021b0`), on top of the
             // `pricing0` handling already booked.
@@ -4576,7 +4591,7 @@ pub fn solve(
         // `ctx+0x35c` (the count of runs ended with status -1004, plus one) decides: the first two quad primals are in methods 0/2, the later ones in method 1.
         let k = crate::dual::C35C.with(|c| c.get());
         let switch = k <= 2 && h.iters != 0.0 && h.iters != h.snap && h.c178 > 0;
-        QUAD_EEFA.with(|c| c.set(switch));
+        QUAD_EEFA.with(|c| c.set(switch || (h.preserve_ratio && c.get())));
     }
     if handoff.is_some() || !opts.faithful_positions {
         return solve_primal(model, start, opts, handoff, None);
@@ -4757,6 +4772,7 @@ fn solve_primal(
         drift_err: None,
         restart: false,
         pre_restart: false,
+        quad_switch_allowed: false,
         fresh_duals: false,
         feas_seen: false,
         restarted: false,
@@ -4821,7 +4837,7 @@ fn solve_primal(
                     h.quad
                         && (h.iters == 0.0
                             || crate::dual::C35C.with(|c| c.get()) >= 3
-                            || QUAD_EEFA.with(|c| c.get()))
+                            || (!h.preserve_ratio && QUAD_EEFA.with(|c| c.get())))
                 }) {
                     1
                 } else {
@@ -4981,7 +4997,9 @@ fn solve_primal(
         s.sw.factorizations = c.factorizations;
         s.sw.level = c.level;
         s.sw.pert = c.pert;
+        s.quad_switch_allowed = true;
         s.method_decision(0);
+        s.quad_switch_allowed = false;
     }
     s.recompute_primal();
     s.primal_full_work();
@@ -5027,7 +5045,11 @@ fn solve_primal(
         let mut pending_upd: Vec<(u32, f64, f64)> = Vec::new();
         let mut chk: Option<(bool, usize, usize)> = None;
         if due {
+            // Requests 3..8 skip the x87 method decision; a scheduled
+            // refactorization (request 2 or 10) may switch.
+            s.quad_switch_allowed = !forced;
             s.refactor()?;
+            s.quad_switch_allowed = false;
             if s.handoff.as_ref().is_some_and(|h| h.quad) {
                 s.cycle_check();
             }
