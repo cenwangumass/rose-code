@@ -4137,7 +4137,7 @@ struct Carry {
 thread_local! {
     /// Set where a mid-run factorization found no pivot for a basic column: `(iterations done, factorizations including the failed one, LU threshold)`.
     /// The pass ended with the quad switch (`Step::SwitchQuad`): the counters and the basis the quad pass continues from.
-    static SWITCH: std::cell::Cell<Option<(usize, usize, f64, f64, usize, usize, bool, u32)>> = const { std::cell::Cell::new(None) };
+    static SWITCH: std::cell::Cell<Option<(usize, usize, f64, f64, usize, usize, bool, u32, usize)>> = const { std::cell::Cell::new(None) };
     static FROM_SWITCH: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static SWITCH_BASIS: std::cell::RefCell<Option<Basis>> = const { std::cell::RefCell::new(None) };
     /// Set by the primal's clean-up pass: the dual runs inside the primal's context, with the LU threshold the primal's accuracy ladder left in `ctx+0x390` (gen3 seeds 247, 680: raised to 0.5 at the first x_B recompute; with 2^-7 the pivot order of the final factorization differs).
@@ -4272,7 +4272,7 @@ fn solve_frame(
         };
         match res {
             Err(SolveError::SingularBasis) if SWITCH.with(|c| c.get()).is_some() => {
-                let (iters, fac, thr, avg_touch, last_cap, inf_count, after_pivot, pass_retries) =
+                let (iters, fac, thr, avg_touch, last_cap, inf_count, after_pivot, pass_retries, nref) =
                     SWITCH.with(|c| c.take()).unwrap();
                 let b = SWITCH_BASIS.with(|c| c.borrow_mut().take()).unwrap();
                 if crate::dump::on("dcr") {
@@ -4292,7 +4292,9 @@ fn solve_frame(
                     inf_count,
                     after_pivot,
                     it_base: 0,
-                    nref0: 0,
+                    // A direct switch keeps the context's factor count; a
+                    // singular restart clears it at 0xcf079 (seed 7950).
+                    nref0: nref,
                     pstep: None,
                 };
                 switch_start = Some(b);
@@ -4819,6 +4821,7 @@ fn solve_pass<R: Real>(
                         s.inf_count,
                         false,
                         s.retries,
+                        s.nref(),
                     )))
                 });
                 SWITCH_PERT.with(|c| c.set(Some(s.pert)));
