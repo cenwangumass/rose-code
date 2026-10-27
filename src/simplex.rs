@@ -478,9 +478,6 @@ pub(crate) struct Handoff {
 thread_local! {
     /// Quad primals run so far in this solve, and whether the running quad primal's phase 1 uses the Harris test `0x241da0` (`ctx+0x468` cleared by the decision `0x27ecad..0x27ecc9`; every quad pass setup `0x23abb1` sets it again: `0x243150`).
     pub(crate) static QUAD_PRIMALS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
-    /// Primals that ended with status -1004 (their progress check) before the one now starting: each one adds to the controller's `ctx+0x35c` (`0x2371bd`) beyond the
-    /// count of quad primals started (8179: 4 at the second primal).
-    pub(crate) static QUAD_STALLS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
     pub(crate) static QUAD_EEFA: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     pub(crate) static HANDOFF: std::cell::Cell<Option<Handoff>> = const { std::cell::Cell::new(None) };
     /// The primal ended with status -1002 from its drift test (not from a singular factorization): the controller restarts from the primal's start basis.
@@ -4527,9 +4524,7 @@ fn solve_primal(
                 0
             } else if opts.sw_carry.is_some() {
                 if handoff.is_some_and(|h| {
-                    h.quad
-                        && (h.iters == 0.0
-                            || QUAD_PRIMALS.with(|c| c.get()) + QUAD_STALLS.with(|c| c.get()) >= 3)
+                    h.quad && (h.iters == 0.0 || crate::dual::C35C.with(|c| c.get()) >= 3)
                 }) {
                     1
                 } else {

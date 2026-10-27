@@ -4151,7 +4151,6 @@ fn solve_frame(
     C35C.with(|c| c.set(1));
     C178.with(|c| c.set(0));
     crate::simplex::QUAD_PRIMALS.with(|c| c.set(0));
-    crate::simplex::QUAD_STALLS.with(|c| c.set(0));
     // The quad mode (`ctx+0x28`): once the controller switched, every later pass runs the extended-precision twin of the dual.
     let mut quad = false;
     let mut switch_start: Option<Basis> = None;
@@ -5153,7 +5152,6 @@ fn solve_pass<R: Real>(
                 })
             {
                 // A quad pass resumes as a quad pass from the primal's basis (the x87 primal gave up at its first scan), the counters going on (random LP seed 5247).
-                crate::simplex::QUAD_STALLS.with(|c| c.set(c.get() + 1));
                 let pit = prres.as_ref().map_or(0, |pr| pr.iterations);
                 let pfac = prres.as_ref().map_or(0, |pr| pr.refactorizations);
                 let carry3 = Carry {
