@@ -4961,7 +4961,8 @@ fn solve_pass<R: Real>(
         {
             // The primal gives up from the dual's basis: the dual runs on past the request-4 refactorization instead.
             NO_ART_EXIT.with(|c| c.set(true));
-            let again = solve_frame(model, start, opts);
+            let resume = prres.as_ref().map(|pr| pr.basis.clone());
+            let again = solve_frame(model, resume.as_ref().or(start), opts);
             NO_ART_EXIT.with(|c| c.set(false));
             return again;
         }
