@@ -4426,6 +4426,10 @@ fn solve_frame(
                 } else if !factor_crash {
                     restart_start = SINGULAR_BASIS.with(|c| c.borrow_mut().take());
                 }
+                if !quad {
+                    // The double dual setup clears ctx+0x2c8 (`0xe7e1b`) before the restarted pass's first pricing rebuild (randlp50154).
+                    LARGE_XB.with(|c| c.set(false));
+                }
                 let (avg_touch, last_cap, inf_count) = if fresh {
                     (0.0, 0, 0)
                 } else {
