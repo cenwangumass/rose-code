@@ -2738,6 +2738,14 @@ fn accumulate<R: Real>(s: R, c: &[R], peel: usize, sub: bool) -> R {
     let step = |a: R, x: R| if sub { a - x } else { a + x };
     let n = c.len();
     let mut s = s;
+    if !R::LANES && n < 8 {
+        // The quad selection's unrolled remainder walks from the last entry
+        // down to the first (0x223542..0x223574, 0x2236a6..0x2236d4).
+        for &x in c.iter().rev() {
+            s = step(s, x);
+        }
+        return s;
+    }
     if !R::LANES || n < peel + 8 {
         for &x in c {
             s = step(s, x);
