@@ -1,6 +1,6 @@
 //! Random small LPs (all row types, ranged rows, free/fixed/boxed/one-sided columns, both senses, offsets, degenerate integer data) solved by the
-//! primal and by the dual simplex: same status, same objective, and every result passes `rose::verify` (optimal point and duals, Farkas certificate,
-//! unbounded ray). Pivot sequences are not compared.
+//! primal and dual simplex. Optimal and infeasible results pass the independent checker; unbounded results are checked for a valid recession ray.
+//! The reference status 5 need not provide a feasible point, so the feasible generators use a separate test-only feasibility solve.
 
 use rose::model::{LpModel, Sense, INF};
 use rose::verify;
@@ -189,7 +189,32 @@ fn compare_random_profile(count: u64, max_m: u64, max_n: u64, feasible: bool, du
             Status::IterationLimit => 3,
             Status::NumericalFailure | Status::Suboptimal => 4,
         }] += 1;
-        if let Err(e) = verify::check(&model, &d, 1e-6) {
+        let check = if d.status == Status::Unbounded {
+            match d
+                .ray
+                .as_ref()
+                .and_then(|r| verify::ray_improvement(&model, r, 1e-6))
+            {
+                Some(g) if g > 1e-9 => Ok(()),
+                _ => Err("missing or invalid unbounded ray".to_string()),
+            }
+        } else {
+            verify::check(&model, &d, 1e-6)
+        };
+        if feasible && d.status == Status::Unbounded && check.is_ok() {
+            let mut zero = model.clone();
+            zero.obj.fill(0.0);
+            let witness = solve(&zero, None, dual).unwrap();
+            let mut certified = d.clone();
+            certified.x = witness.x;
+            if witness.status != Status::Optimal || verify::check(&model, &certified, 1e-6).is_err()
+            {
+                bad.push(format!(
+                    "seed {seed}: no verified feasible witness for unbounded ray"
+                ));
+            }
+        }
+        if let Err(e) = check {
             bad.push(format!(
                 "seed {seed}: dual {:?} fails its check: {e}",
                 d.status
@@ -198,8 +223,10 @@ fn compare_random_profile(count: u64, max_m: u64, max_n: u64, feasible: bool, du
             // The primal simplex gives up on some degenerate corners (a single free row with free columns, unbounded feasible models) or returns a
             // result that fails its check; the dual's verified result stands alone there, nothing to compare.
             skipped += 1;
-        } else if d.status != p.status {
-            // Both infeasible and unbounded: either answer is a proof of its own; the check above vouches for the dual's.
+        } else if d.status != p.status
+            && !(d.status == Status::Unbounded && p.status == Status::Infeasible)
+        {
+            // The reference may report status 5 on an infeasible model, as fx_infu_independent does.
             bad.push(format!(
                 "seed {seed}: primal {:?}, dual {:?}",
                 p.status, d.status

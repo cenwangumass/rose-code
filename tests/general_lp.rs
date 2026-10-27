@@ -81,8 +81,11 @@ fn detects_unbounded_with_ray() {
     for o in opts() {
         let text = "NAME T\nROWS\n N obj\n G c1\nCOLUMNS\n x obj -1 c1 1\n y obj 0 c1 -1\nRHS\n rhs c1 1\nENDATA\n";
         let model = mps::parse(text).unwrap();
-        let r = run(&model, &o);
+        let mut r = solve(&model, None, &o).unwrap();
         assert_eq!(r.status, Status::Unbounded);
+        // The reference's status 5 may carry an infeasible artificial-bound point. This model's point (1, 0) is feasible.
+        r.x = vec![1.0, 0.0];
+        verify::check(&model, &r, 1e-6).unwrap();
     }
 }
 

@@ -334,11 +334,6 @@ struct Dual<'a, R: Real = f64> {
     /// `ctx+0x3fc` (-1 once set): the second selection among the bound flips of the ratio test. Set at a refactorization (`0xe6dcc`) when the
     /// perturbation flag is 3 or more or 3 iterations exceed the row count (`ctx+0x178`, which also sets it, is 0 in every capture).
     flip_select: bool,
-    /// The dual ended infeasible because of a free nonbasic variable with a nonzero d (not an artificial bound).
-    unb_free: bool,
-    setup_unbounded: bool,
-    /// A confirming refactorization (request 4) was made by the no-row handler: the reference hands an infeasible dual that was confirmed to the primal.
-    confirmed: bool,
     /// The reference's work counter (`ctx+0x118`); in the dual path every estimate is on the scale 1.3.
     work: crate::work::Work,
     /// Entry count of the pivot column when the pending factorization follows a pivot (its weight update and spike discard are booked then).
@@ -919,14 +914,13 @@ impl<'a, R: Real> Dual<'a, R> {
         let n = self.n;
         let free: Vec<usize> = (0..n).filter(|&j| self.st[j] == FREE).collect();
         let mut deferred = Vec::new();
-        let skip = NO_DEFERRED.with(|c| c.get());
         for j in free {
             match self.free_candidate(j, PIVOT_FLOOR) {
                 Some((r, alpha)) => self.pivot_free(j, r, alpha)?,
                 None => deferred.push(j),
             }
         }
-        if deferred.is_empty() || skip {
+        if deferred.is_empty() {
             return Ok(None);
         }
         // Second pass (`0xe8fc6..0xe98e1`): request 10, a refactorization; then for each deferred variable in turn the reduced cost `d = c - y a` with
@@ -2641,7 +2635,8 @@ impl<'a, R: Real> Dual<'a, R> {
         let mut xm5 = xm5;
         let mut best: Option<usize> = None;
         // The flip-selection scan books four units per original flip (`0xc92b8`).
-        self.work.add(0xc92bd, 4.0 * flips.len() as f64, crate::work::CTX);
+        self.work
+            .add(0xc92bd, 4.0 * flips.len() as f64, crate::work::CTX);
         for (k, &e) in flips.iter().enumerate() {
             let (j, aj) = row[e];
             let dj = self.d[j];
@@ -3447,7 +3442,6 @@ impl<'a, R: Real> Dual<'a, R> {
             // `ctx+0x3f8 != 0` in all captures: confirm on a fresh factor (`0x1aa280`). The cost shifts stay in force through the confirming refactorization
             // (`ctx+0x290` is 0, `0xe4891` is not taken) and are removed at the end of the solve.
             self.request = 4;
-            self.confirmed = true;
         } else if !self.bad_rows.is_empty() {
             // Rows were rejected by the ratio test (pivot row too small) and the fresh factor leaves none to price: the dual ends with the cost shifts in
             // force (status -1004 in the reference); the controller hands over to the primal, which removes them, and reruns the dual (rnd1496 pass 1).
@@ -3455,7 +3449,6 @@ impl<'a, R: Real> Dual<'a, R> {
             self.rejected_end = true;
         } else if self.free_infeasible() {
             // A free nonbasic variable (never pivoted in: no basic variable with a finite lower bound) with a nonzero d.
-            self.unb_free = true;
             self.dual_unbounded();
         } else if self.level == 0 {
             self.status = Some(Status::Optimal);
@@ -4260,9 +4253,7 @@ pub fn solve(
 thread_local! {
     /// Quad resumes after the primal gave up at an artificial-bound exit (one per solve).
     static QUAD_RESUMES: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
-    /// Set while a rerun skips the second pass of the free-column pivots (the early verdict's ray did not verify).
     static NO_ART_EXIT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
-    static NO_DEFERRED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 fn solve_frame(
@@ -4641,9 +4632,6 @@ fn solve_pass<R: Real>(
         pert: 0,
         obj_off: 0.0,
         flip_select: start.is_some(),
-        unb_free: false,
-        setup_unbounded: false,
-        confirmed: false,
         work: if R::QUAD {
             crate::work::Work::dual_quad()
         } else {
@@ -4690,7 +4678,6 @@ fn solve_pass<R: Real>(
     let mut setup_free = None;
     if free_phase {
         setup_free = s.free_pivots()?;
-        s.setup_unbounded = setup_free.is_some();
         if setup_free.is_none() {
             s.refactor()?;
         }
@@ -4814,14 +4801,19 @@ fn solve_pass<R: Real>(
     let mut status;
     // A deferred free column that has a reduced cost and no row to enter on ends the dual before its first iteration (`0xea0b7`, status 5).
     if let Some((j, d)) = setup_free {
-        // The deferred-free exit records its free column at ctx+0x2fc; its unit step and the basic response form the ray.
+        // The deferred-free exit records the entering column in ctx+0x2fc. Its ray is the unit step against d and the corresponding basic response,
+        // not the aggregate artificial-bound point used by the no-row handler.
         let dir = -d.signum();
         let mut col = vec![0.0; m];
-        for &(i, a) in &p.fcols[j] { col[i] = a * dir; }
+        for &(i, a) in &p.fcols[j] {
+            col[i] = a * dir;
+        }
         s.factor.ftran(&mut col);
         let mut ray = vec![0.0; n + m];
         ray[j] = dir;
-        for (i, &v) in col.iter().enumerate() { ray[s.head[i]] = -v; }
+        for (i, &v) in col.iter().enumerate() {
+            ray[s.head[i]] = -v;
+        }
         ray.truncate(s.nm);
         s.ray = Some(ray);
         s.status = Some(Status::Unbounded);
@@ -5317,15 +5309,11 @@ fn solve_pass<R: Real>(
         }
         return Ok(r);
     }
-    if status == Status::Unbounded {
+    if status == Status::Unbounded && s.art_exit {
         if R::QUAD && s.art_exit {
             C35C.with(|c| c.set(c.get() + 1));
         }
-        // The dual is infeasible (a nonbasic variable stayed at an artificial bound, or a free one has a nonzero d). That proves the primal unbounded only
-        // if it is feasible, and the point the dual loop holds is a finite point plus 1e30 times the ray, not a feasible point. A zero objective is dual
-        // feasible, so the dual simplex on it decides: a feasible point (unbounded) or a Farkas certificate (primal and dual infeasible).
-        // The reference goes on with the primal simplex from the dual's basis (nonbasic variables at their finite bound, the artificial ones at the lower
-        // bound) and counts its pivots after the dual's.
+        // A request-4 artificial-bound exit returns -1004 to the controller, which runs the primal from this basis. Its completed status is final.
         let mut popts = opts.clone();
         popts.method = crate::simplex::Method::Primal;
         if opts.perturb != 0.0 {
@@ -5450,82 +5438,19 @@ fn solve_pass<R: Real>(
                 return Ok(r);
             }
         }
-        let zero = LpModel {
-            obj: vec![0.0; model.num_cols()],
-            offset: 0.0,
-            ..model.clone()
-        };
-        // No cost perturbation here: the stall trigger would perturb the zero costs and the loop could end unbounded again, without end.
-        let mut zopts = opts.clone();
-        zopts.perturb = 0.0;
-        if crate::dump::on("dcr") {
-            crate::dump::emit(
-                "dcr",
-                serde_json::json!({"unbounded_pass_iterations": s.iters, "free": s.unb_free, "pert": s.pert}),
-            );
+        if let Some(mut r) = prres {
+            r.iterations += s.iters;
+            r.refactorizations += s.refactorizations;
+            crate::simplex::RAY_ENTER.with(|c| c.set(prres_enter));
+            return Ok(r);
         }
-        let mut r = solve(&zero, start, &zopts)?;
-        if crate::dump::on("dcr") {
-            if let Some(pr) = &prres {
-                let tr: Vec<_> = pr
-                    .trace
-                    .iter()
-                    .map(|e| (e.entering, e.leaving, e.position))
-                    .collect();
-                crate::dump::emit(
-                    "dcr",
-                    serde_json::json!({"primal_status": format!("{:?}", pr.status), "primal_trace": tr}),
-                );
-            }
-        }
-        let primal_iters = prres.as_ref().map(|pr| pr.iterations);
-        if crate::dump::on("dcr") {
-            crate::dump::emit(
-                "dcr",
-                serde_json::json!({"unbounded_primal_iterations": primal_iters}),
-            );
-        }
-        r.iterations = s.iters
-            + if s.confirmed {
-                primal_iters.unwrap_or(r.iterations)
-            } else {
-                0
-            };
-        r.refactorizations += s.refactorizations;
-        if r.status == Status::Optimal {
-            r.status = Status::Unbounded;
-            if s.setup_unbounded && !NO_DEFERRED.with(|c| c.get()) {
-                // The early verdict's ray: the artificial-bound point must verify, else the dual runs on without the second pass.
-                let ok = s.ray.as_ref().is_some_and(|ray| {
-                    crate::verify::ray_improvement(model, ray, 1e-9).is_some_and(|g| g > 0.0)
-                });
-                if !ok {
-                    NO_DEFERRED.with(|c| c.set(true));
-                    let again = solve_frame(model, start, opts);
-                    NO_DEFERRED.with(|c| c.set(false));
-                    let again = again?;
-                    // Only the ray comes from the longer run; the counts stay those of the early verdict.
-                    r.ray = again.ray;
-                    return Ok(r);
-                }
-            }
-            r.objective = objective_in::<R>(model, &r.x);
-            r.ray = s.ray.take().filter(|ray| {
-                crate::verify::ray_improvement(model, ray, 1e-9).is_some_and(|g| g > 0.0)
-            });
-            if r.ray.is_none() {
-                // The ray of the artificial-bound point did not verify; the primal run from the dual's basis may have found one.
-                r.ray = prres.as_ref().and_then(|pr| pr.ray.clone());
-                crate::simplex::RAY_ENTER.with(|c| c.set(prres_enter.filter(|_| r.ray.is_some())));
-            }
-            if r.ray.is_none() {
-                // The primal simplex from the slack basis may still find one.
-                let mut popts = opts.clone();
-                popts.method = crate::simplex::Method::Primal;
-                r.ray = crate::simplex::solve(model, None, &popts)?.ray;
-            }
-        }
-        return Ok(r);
+        return Err(SolveError::SingularBasis);
+    }
+    if status == Status::Unbounded {
+        // Status 5 on the dual itself goes directly to the controller's final status store. Keep its raw artificial-bound ray and return the finite
+        // point obtained by clearing the artificial bounds, without solving a second feasibility problem.
+        s.zero_artificial = true;
+        s.recompute_xb(0);
     }
     if status == Status::IterationLimit && s.level != 0 {
         s.zero_artificial = true;
