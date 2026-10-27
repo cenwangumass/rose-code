@@ -1091,6 +1091,10 @@ struct Solver<'a> {
     p0: Option<P0>,
     /// Set by `price0` when the scan found nothing after many updates: refactorize and price again.
     want_refactor: bool,
+    /// Previous pivot checked against the updated pricing duals and cached basic-cost scale.
+    p0_check: Option<usize>,
+    p0_scale: f64,
+    p0_accuracy: bool,
     /// Counters of the method decision (`crate::method`).
     sw: crate::method::Method,
     /// Started by the dual controller (`Handoff`).
@@ -2730,6 +2734,9 @@ impl<'a> Solver<'a> {
         } else {
             self.price_faithful()?
         };
+        if self.p0_accuracy {
+            return Ok(None);
+        }
         // The x87 primal with cost shifts in force does not admit the dropped variable: its first failed scan ends the primal with status -1004.
         if q.is_none() && self.excluded.is_some() && !self.handoff.is_some_and(|h| h.quad && h.pert)
         {
@@ -3476,6 +3483,35 @@ impl<'a> Solver<'a> {
         let mut q = self.p0_scan();
         dump(self, "out", q);
         self.p0.as_mut().unwrap().calls += 1;
+        // `0xfbe60` checks the previous entering column after updating y;
+        // `0x14509b` rejects the scan before any failed-scan rebuild.
+        if let Some(j) = self.p0_check.take().filter(|&j| self.pos_of[j] != NONE) {
+            let r = self.pos_of[j];
+            let sg = self.sig();
+            let cost = if self.costfree && self.p1_tol_on {
+                0.0
+            } else {
+                self.p.cost[j]
+            } + PHASE1_M * f64::from(sg[r]);
+            let y = &self.p0.as_ref().unwrap().y;
+            let err = dot_lanes_from(&self.p.fcols[j], y, self.p.offs[j] & 1, cost).abs();
+            if err > 3e-6 && err > 3e-6 * self.p0_scale {
+                self.p0_scale = self
+                    .basic
+                    .iter()
+                    .filter(|&&v| v < self.p.n)
+                    .map(|&v| self.p.cost[v].abs())
+                    .fold(0.0, f64::max);
+                if self.p1_tol_on {
+                    self.p0_scale = self.p0_scale.max(PHASE1_M);
+                }
+                self.work.add(0x1451e8, 3.0 * self.p.m as f64, crate::work::CTX);
+                if err > 3e-6 * self.p0_scale {
+                    self.p0_accuracy = true;
+                    return None;
+                }
+            }
+        }
         if q.is_none()
             && self
                 .mirror
@@ -4939,6 +4975,9 @@ fn solve_primal(
         y_rank: Vec::new(),
         unsnapped: Default::default(),
         want_refactor: false,
+        p0_check: None,
+        p0_scale: 0.0,
+        p0_accuracy: false,
         dst: vec![0.0; p.n + p.m],
         rhs_shift: Vec::new(),
         shifted: false,
@@ -5357,7 +5396,22 @@ fn solve_primal(
         if let Some(p0) = s.p0.as_mut() {
             p0.tol = if infeasible { P0_DTOL_P1 } else { P0_DTOL };
         }
+        s.p0_check = last.as_ref().map(|lp| lp.q).filter(|&q| q != NONE);
         let price = s.price_admitting()?;
+        if std::mem::take(&mut s.p0_accuracy) {
+            s.accuracy += 1;
+            if s.handoff.is_some() {
+                crate::dual::C178.with(|c| c.set(c.get() + 1));
+            }
+            s.work.trig();
+            s.work.decided(s.work.w);
+            if let Some(mi) = s.mirror.as_mut() {
+                mi.count_all_updates();
+            }
+            crate::lu_order::raise_threshold(0.5);
+            s.forced = true;
+            continue;
+        }
         if pending_tol_error {
             return Err(SolveError::SingularBasis);
         }
