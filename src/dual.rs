@@ -5309,26 +5309,19 @@ fn solve_pass<R: Real>(
             C35C.with(|c| c.set(c.get() + 1));
             // The dual ended with cost shifts in force: the primal removes them and ends with status -1004 (its price scan finds nothing), and the
             // controller runs the dual again from the primal's basis (m5: one primal pivot, then the dual proves the infeasibility on the true costs).
-            // With a basis snapshot (`0xd40b0`, taken after 100 iterations) the controller restarts from it instead (`0xcedb0`; fx_midsing_1106 call 113).
-            let snap = SNAP.with(|c| c.borrow().clone());
-            let from_snap = snap.is_some();
+            // Status -1004 switches methods without a restart (`0x155024`);
+            // only -1002 calls the snapshot restart handler (seed 4918, 1106).
             let carry2 = Carry {
-                retries: s.retries + from_snap as u32,
+                retries: s.retries,
                 thr: s.lu_thr,
                 fac: r.refactorizations,
                 iters: r.iterations,
                 avg_touch: 0.0,
                 last_cap: 0,
                 inf_count: 0,
-                after_pivot: !from_snap,
-                it_base: if from_snap {
-                    r.iterations
-                } else {
-                    s.it_base + r.iterations
-                },
-                nref0: if from_snap {
-                    0
-                } else {
+                after_pivot: true,
+                it_base: s.it_base + r.iterations,
+                nref0: {
                     // `ctx+0x2c0` after the primal: its start factorization counts one (the primal's own refactorizations at its end, two in rose, do not appear in the
                     // reference's `lu_in`: fx_midsing_m5, 1494, 1390, `dual_acc` captures). The x87 primal with shifts in force ends at its first failed scan with
                     // status -1004 and makes no such factorizations: every one counts (seed 2950: four in the reference, `ctx+0x2c0` 24 -> 28).
@@ -5342,18 +5335,13 @@ fn solve_pass<R: Real>(
                             )
                         }
                 },
-                pstep: if R::QUAD && !from_snap && s.pstep > 0.0 {
+                pstep: if R::QUAD && s.pstep > 0.0 {
                     Some(maxsd(1e-7, s.pstep * 0.05))
                 } else {
                     None
                 },
             };
-            let snap_basis = snap.map(|(basic, at_upper)| Basis { basic, at_upper });
-            if from_snap {
-                crate::simplex::HANDOFF_ROWS.with(|c| *c.borrow_mut() = None);
-            }
-            let mut r2 =
-                solve_pass::<R>(model, snap_basis.as_ref().or(Some(&r.basis)), opts, &carry2)?;
+            let mut r2 = solve_pass::<R>(model, Some(&r.basis), opts, &carry2)?;
             r2.iterations += carry2.iters;
             return Ok(r2);
         }

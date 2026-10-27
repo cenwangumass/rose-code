@@ -23,6 +23,18 @@ fn x87_tiny_pivot_retries_the_active_pricing_bucket() {
 }
 
 #[test]
+fn shifted_primal_handoff_continues_from_its_basis_with_a_snapshot() {
+    for (input, status, iterations) in [
+        (include_str!("fixtures/quad_4918.mps"), Status::Optimal, 182),
+        (include_str!("fixtures/quad_5147.mps"), Status::Infeasible, 194),
+    ] {
+        let model = mps::parse(input).unwrap();
+        let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
+        assert_eq!((result.status, result.iterations), (status, iterations));
+    }
+}
+
+#[test]
 fn shifted_quad_handoff_retries_until_restore_limit() {
     let model = mps::parse(include_str!("fixtures/quad_3076.mps")).unwrap();
     let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
