@@ -6475,8 +6475,21 @@ fn solve_primal(
             tau_ref = Some(Vec::new());
             if !m2 && (dense_in || !inp.is_empty()) {
                 let tau = if let Some(aqv) = aq.as_ref() {
-                    let inq: Vec<(usize, crate::f80::F80)> =
-                        inp.iter().map(|&(i, _)| (i, aqv[i])).collect();
+                    // The reference stores the pivot in double before putting it
+                    // into the cross-term BTRAN; the other entries retain x87 bits.
+                    let inq: Vec<(usize, crate::f80::F80)> = inp
+                        .iter()
+                        .map(|&(i, _)| {
+                            (
+                                i,
+                                if i == r {
+                                    crate::f80::F80::from_f64(alpha_rq)
+                                } else {
+                                    aqv[i]
+                                },
+                            )
+                        })
+                        .collect();
                     let oq = mi.btran_ld(&inq, false, dense_in).unwrap();
                     let mut v = vec![crate::f80::F80::ZERO; m];
                     for &(i, x) in &oq {
@@ -6566,8 +6579,8 @@ fn solve_primal(
             let wq_q = if ftran_out.is_empty() {
                 crate::f80::F80::c(s.w[q])
             } else {
-                // The x87 mode-2 sum counts positive-weight basics and squares the
-                // double pivot in double precision; the other terms stay extended.
+                // The x87 sum squares the stored double pivot in double precision;
+                // other terms stay extended. Mode 2 counts positive-weight basics.
                 let inr = |j: usize| if m2 { s.w[j] > 0.0 } else { s.in_r0[j] };
                 let mut t = if m2 || s.in_r0[q] {
                     crate::f80::F80::ONE
@@ -6575,11 +6588,7 @@ fn solve_primal(
                     crate::f80::F80::ZERO
                 };
                 if inr(s.basic[r]) {
-                    t += if m2 {
-                        crate::f80::F80::c(alpha_rq * alpha_rq)
-                    } else {
-                        a_rq * a_rq
-                    };
+                    t += crate::f80::F80::c(alpha_rq * alpha_rq);
                 }
                 let mut order: Vec<(usize, crate::f80::F80)> =
                     ftran_out.iter().map(|&(i, _)| (i, aqv[i])).collect();
