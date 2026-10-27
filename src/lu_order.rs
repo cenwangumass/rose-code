@@ -71,7 +71,21 @@ pub fn factor_structure_r<R: Real>(
         d.reverse();
         nuc.push((pos, d));
     }
-    let nuc_nnz = nuc.iter().map(|c| c.1.len()).sum();
+    // The work estimate counts every input entry in active rows and columns
+    // before the numeric nucleus applies its magnitude filter (0xd4e4b,
+    // 0xdf521..0xdf5ed); scaled entries below ABS_TOL still contribute.
+    let nuc_nnz = cols
+        .iter()
+        .enumerate()
+        .filter(|(pos, _)| !done_c.contains(pos))
+        .map(|(_, (slack, rows, _))| {
+            if *slack {
+                1
+            } else {
+                rows.iter().filter(|r| !done_r.contains(r)).count()
+            }
+        })
+        .sum();
     let (np, nl, nv, npiv, nu, nuc_work) = nucleus(m, cols.iter().map(|c| c.1.len()).sum(), &nuc);
     seq.extend(np);
     phase.resize(seq.len(), 0);
