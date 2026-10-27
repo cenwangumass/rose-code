@@ -2,8 +2,7 @@
 //!
 //! The reference's quad mode (`Quad = -1` in the release profile switches to it on a numerical failure of the dual) runs the whole
 //! dual simplex on `long double` arrays with the x87 unit, so its values are reproduced bit for bit by this type: every operation
-//! is the correctly rounded result at 64 bits (the processor's default precision control on Linux). Subnormal and out-of-range
-//! results are not modelled (they flush to zero or infinity); the quad run never gets near them.
+//! is rounded to 64 bits (the processor's default precision control on Linux), including gradual underflow.
 //!
 //! `repr` / `from_repr` give the 10 stored bytes as the explicit significand and the sign/exponent word.
 
@@ -73,6 +72,9 @@ impl F80 {
         if self.m == 0 {
             return (0, s);
         }
+        if self.e < E_MIN {
+            return (self.m >> (E_MIN - self.e), s);
+        }
         (self.m, s | (self.e + 16383) as u16)
     }
 
@@ -107,11 +109,24 @@ impl F80 {
         let lz = mant.leading_zeros() as i32;
         let mant = mant << lz;
         let exp = exp - lz;
-        let mut hi = (mant >> 64) as u64;
-        let rem = mant as u64;
-        let half = 1u64 << 63;
         let mut e = exp + 127;
-        if rem > half || (rem == half && (sticky || hi & 1 == 1)) {
+        // Round once at the destination's precision. Subnormals have fewer
+        // significand bits; rounding first to 64 bits would double-round.
+        let shift = 64 + (E_MIN - e).max(0);
+        let (mut hi, round_up) = if shift < 128 {
+            let hi = (mant >> shift) as u64;
+            let rem = mant & ((1u128 << shift) - 1);
+            let half = 1u128 << (shift - 1);
+            (hi, rem > half || (rem == half && (sticky || hi & 1 != 0)))
+        } else if shift == 128 {
+            (
+                0,
+                mant > (1u128 << 127) || (mant == (1u128 << 127) && sticky),
+            )
+        } else {
+            (0, false)
+        };
+        if round_up {
             let (h, carry) = hi.overflowing_add(1);
             if carry {
                 hi = 1 << 63;
@@ -127,8 +142,16 @@ impl F80 {
                 m: 1 << 63,
             };
         }
-        if e < E_MIN {
+        if hi == 0 {
             return F80 { neg, ..F80::ZERO };
+        }
+        if e < E_MIN {
+            let lz = hi.leading_zeros() as i32;
+            return F80 {
+                neg,
+                e: E_MIN - lz,
+                m: hi << lz,
+            };
         }
         F80 { neg, e, m: hi }
     }
@@ -616,8 +639,159 @@ mod tests {
             F80::from_repr(m, e | if neg { 0x8000 } else { 0 })
         }
 
+        // Set the same 64-bit precision and round-to-nearest mode as the
+        // reference; restore the calling thread's control word on exit.
+        struct ControlWord(u16);
+        impl ControlWord {
+            fn nearest_extended() -> Self {
+                let mut old = 0u16;
+                let cw = 0x037fu16;
+                unsafe {
+                    asm!("fnstcw [{old}]", "fldcw [{cw}]", old = in(reg) &mut old, cw = in(reg) &cw, options(nostack));
+                }
+                Self(old)
+            }
+        }
+        impl Drop for ControlWord {
+            fn drop(&mut self) {
+                unsafe {
+                    asm!("fldcw [{cw}]", cw = in(reg) &self.0, options(nostack));
+                }
+            }
+        }
+
+        fn hw_to_f64(x: F80) -> f64 {
+            let a = bytes(x);
+            let mut out = 0f64;
+            unsafe {
+                asm!("fld tbyte ptr [{a}]", "fstp qword ptr [{o}]", a = in(reg) a.as_ptr(), o = in(reg) &mut out, out("st(0)") _, options(nostack));
+            }
+            out
+        }
+
+        #[test]
+        fn conversion_boundaries_match_x87() {
+            let _cw = ControlWord::nearest_extended();
+            for bits in [
+                0,
+                1,
+                2,
+                (1u64 << 52) - 1,
+                1u64 << 52,
+                (1u64 << 52) + 1,
+                0x7fef_ffff_ffff_ffff,
+                0x7ff0_0000_0000_0000,
+            ] {
+                for sign in [0, 1u64 << 63] {
+                    let x = f64::from_bits(bits | sign);
+                    assert_eq!(F80::from_f64(x).to_f64().to_bits(), x.to_bits());
+                }
+            }
+            // Double normal/subnormal transition, half-way ties and overflow.
+            for e in [
+                -16445, -16383, -1076, -1075, -1074, -1023, -1022, 1023, 1024,
+            ] {
+                for m in [
+                    1u64 << 63,
+                    (1u64 << 63) + 1,
+                    (1u64 << 63) + 1024,
+                    (1u64 << 63) + 1025,
+                    u64::MAX,
+                ] {
+                    let x = F80::pack(false, m as u128, e - 63, false);
+                    for x in [x, -x] {
+                        assert_eq!(
+                            x.to_f64().to_bits(),
+                            hw_to_f64(x).to_bits(),
+                            "{:?}",
+                            x.repr()
+                        );
+                    }
+                }
+            }
+        }
+
+        #[test]
+        fn subnormal_boundaries_match_x87() {
+            let _cw = ControlWord::nearest_extended();
+            let values = [
+                (0, 0),
+                (0, 0x8000),
+                (1, 0),
+                (2, 0),
+                (3, 0),
+                (0x3fff_ffff_ffff_ffff, 0),
+                (0x4000_0000_0000_0000, 0),
+                (0x7fff_ffff_ffff_fffe, 0),
+                (0x7fff_ffff_ffff_ffff, 0),
+                (0x8000_0000_0000_0000, 1),
+                (0x8000_0000_0000_0001, 1),
+                (0xffff_ffff_ffff_ffff, 1),
+                (0x8000_0000_0000_0000, 2),
+                (0x8000_0000_0000_0000, 0x3ffe),
+                (0xc000_0000_0000_0000, 0x3ffe),
+                (0x8000_0000_0000_0000, 0x3fff),
+                (0xc000_0000_0000_0000, 0x3fff),
+                (0x8000_0000_0000_0000, 0x4000),
+                (0xffff_ffff_ffff_ffff, 0x7ffe),
+                (0x8000_0000_0000_0000, 0x7fff),
+            ];
+            for &(m, se) in &values {
+                for sign in [0, 0x8000] {
+                    let a = F80::from_repr(m, se ^ sign);
+                    assert_eq!(a.repr(), (m, se ^ sign));
+                    if !a.is_sign_negative() {
+                        let h = op(b'q', a, a);
+                        assert_eq!(h.repr(), a.sqrt().repr(), "sqrt {:?}", a.repr());
+                    }
+                    for &(n, te) in &values {
+                        for sign2 in [0, 0x8000] {
+                            let b = F80::from_repr(n, te ^ sign2);
+                            for (c, soft) in
+                                [(b'+', a + b), (b'-', a - b), (b'*', a * b), (b'/', a / b)]
+                            {
+                                let h = op(c, a, b);
+                                if h.is_nan() {
+                                    assert!(soft.is_nan());
+                                } else {
+                                    assert_eq!(
+                                        h.repr(),
+                                        soft.repr(),
+                                        "{} {:?} {:?}",
+                                        c as char,
+                                        a.repr(),
+                                        b.repr()
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // Exact, half-way and sticky products on both sides of the
+            // subnormal-to-normal boundary, plus very small round-to-zero.
+            let mut seed = 11u64;
+            for _ in 0..20_000 {
+                seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+                let a = F80::from_repr((seed & 0x7fff_ffff_ffff_ffff) | 1, 0);
+                seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+                let b = F80::from_repr(seed | (1 << 63), 0x3ffd + (seed % 4) as u16);
+                for (c, soft) in [(b'+', a + b), (b'-', a - b), (b'*', a * b), (b'/', a / b)] {
+                    assert_eq!(
+                        op(c, a, b).repr(),
+                        soft.repr(),
+                        "{} {:?} {:?}",
+                        c as char,
+                        a.repr(),
+                        b.repr()
+                    );
+                }
+            }
+        }
+
         #[test]
         fn matches_the_x87_unit() {
+            let _cw = ControlWord::nearest_extended();
             let mut s = 12345u64;
             for i in 0..200_000 {
                 let (a, b) = (rnd(&mut s), rnd(&mut s));
