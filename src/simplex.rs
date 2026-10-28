@@ -3020,6 +3020,12 @@ impl<'a> Solver<'a> {
     }
 
     fn price_faithful(&mut self) -> Result<Option<usize>, SolveError> {
+        // The x87 list check (`0x281777..0x2817fb`): after ten handoffs (`ctx+0x35c` > 10) and with no shift in force (`ctx+0x338` = 0), a measure `ctx+0x2e0` below
+        // min(1e-4, 10 * `env+0x2470`) (times ten above twenty handoffs) resets the dual tolerance to `1e-10 + ctx+0x2e0` (the measure is 0 in 5959:
+        // `c388_writers`, tolerance 0.01 -> 1e-10 at iteration 125 of the pass ending at 130).
+        if self.handoff.is_some_and(|h| h.quad) && self.rhs_shift_q.is_empty() && crate::dual::C35C.with(|c| c.get()) > 10 {
+            crate::dual::set_dual_tol(1e-10);
+        }
         self.list_failed = false;
         self.recomputed = false;
         if !self.retry_scan {
