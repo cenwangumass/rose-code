@@ -5030,6 +5030,10 @@ fn solve_pass_callback<R: Real>(
                 return Err(SolveError::SingularBasis);
             }
             dropped = crate::simplex::repair_basis(&p, &mut b).map(|(j, _)| j);
+            if R::QUAD && carry.after_pivot && carry.retries >= 5 && dropped.is_some() {
+                // The singular handler counts the in-place repair after the retry limit too (`0x248f99`, `standalone_restart_context` dual-out with status 3: `ctx+0x178` 8 -> 9).
+                C178.with(|c| c.set(c.get() + 1));
+            }
             b
         }
         None => {
@@ -5635,11 +5639,11 @@ fn solve_pass_callback<R: Real>(
         popts.method = crate::simplex::Method::Primal;
         // The dual's teacher-forced factorization schedule does not apply to the primal, which decides its own (work based).
         popts.refactor_schedule = None;
-        if R::QUAD && crate::simplex::QUAD_PRIMALS.with(|c| c.get()) == 0 && s.iters > 0 {
+        if R::QUAD && s.iters > 0 {
             // The x87 start selects method 0, 2, or 1 for ctx+0x35c equal
             // to 1, 2, or at least 3. The post-factor decision can also move
             // method 0 to 1 when the dual made iterations since its snapshot.
-            let increments = !(s.pert != 0 && !s.rejected_end && !s.art_exit);
+            let increments = !(s.pert != 0 && !s.rejected_end && !s.art_exit) && !(s.retries >= 5 && dropped.is_some() && s.pert == 0 && carry.after_pivot);
             let c35c_at_start = C35C.with(|c| c.get()) + i32::from(increments);
             let fires = C178.with(|c| c.get()) > 0 && s.stall_it != s.iters as f64;
             popts.pricing0 = c35c_at_start == 1 && !fires;
@@ -5688,7 +5692,9 @@ fn solve_pass_callback<R: Real>(
                 },
             }))
         });
-        if !(R::QUAD && s.pert != 0 && !s.rejected_end && !s.art_exit) {
+        // The in-place repair after the retry limit ends the dual with status 3, not -1004: `ctx+0x35c` stays (`standalone_restart_context`, 5959 dual-out 3).
+        let repaired_end = R::QUAD && s.retries >= 5 && dropped.is_some() && s.pert == 0 && carry.after_pivot;
+        if !(R::QUAD && s.pert != 0 && !s.rejected_end && !s.art_exit) && !repaired_end {
             C35C.with(|c| c.set(c.get() + 1));
         }
         crate::simplex::PRIMAL_SINGULAR.with(|c| c.set(None));
