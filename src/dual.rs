@@ -1419,15 +1419,20 @@ impl<'a, R: Real> Dual<'a, R> {
     /// The log timer of the wrapper (`0xf9306..0xf6e13`): on a fresh factor with no request pending, the first time the total iteration count is 100 past the last
     /// snapshot, the basis is saved (`0xd40b0`, only while the restart counter is below 5). The first one (at the start) is the basis a restart from scratch builds.
     fn log_snapshot(&mut self) {
-        if self.updates != 0 || self.request != 0 || self.retries >= 5 || self.status.is_some() {
+        if self.updates != 0 || self.request != 0 || self.status.is_some() {
             return;
         }
-        let total = (self.it0 + self.iters) as f64;
+        // `ctx+0x2a8`: every iteration and bound flip of the controller, which `it0 + iters` misses after a restore (5959: the dual from iteration 130 reaches 401).
+        let total = if R::QUAD { crate::simplex::TOTAL_ITERS.with(|c| c.get()) } else { (self.it0 + self.iters) as f64 };
         let c40 = SNAP_C40.with(|c| c.get());
         if total - c40 < 100.0 {
             return;
         }
         SNAP_C40.with(|c| c.set(total));
+        // The timer advances at every restart counter; only the save is skipped from five (standalone_restart_context 5959: `ctx+0x40` = 401 after the dual that ended at iteration 147 with `ctx+0x184` = 9).
+        if self.retries >= 5 {
+            return;
+        }
         let quality = if dual_infeas_sum() > 0.0 { 1 } else { 2 };
         // The dual snapshot (`0xd40b0`) skips a dropped variable and keeps a
         // previous snapshot of higher quality. The forced-row stack gate
