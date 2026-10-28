@@ -318,6 +318,12 @@ impl Scaling {
     }
 }
 
+thread_local! {
+    /// The unscaled model of the running scaled solve with its column and row factors: the primal's end-of-solve test and its dual clean-up pass use it
+    /// (the reference's `0xcff40` measures the primal infeasibility of the unscaled problem and `0x1bbd80` runs the dual on it).
+    pub static ORIG: std::cell::RefCell<Option<(LpModel, Vec<f64>, Vec<f64>)>> = const { std::cell::RefCell::new(None) };
+}
+
 /// Solves the scaled model and returns the solution of `model`.
 pub fn solve(
     model: &LpModel,
@@ -340,7 +346,10 @@ pub fn solve(
                 ..inner
             };
             crate::simplex::RAY_ENTER.with(|c| c.set(None));
-            let r = crate::simplex::solve(&scaled, start, &inner)?;
+            ORIG.with(|c| *c.borrow_mut() = Some((model.clone(), sc.col.clone(), sc.row.clone())));
+            let r = crate::simplex::solve(&scaled, start, &inner);
+            ORIG.with(|c| *c.borrow_mut() = None);
+            let r = r?;
             let mut out = sc.unscale(model, r);
             if let (Some(ray), Some((q, n))) = (
                 out.ray.as_mut(),

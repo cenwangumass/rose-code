@@ -4159,6 +4159,23 @@ impl<'a> Solver<'a> {
         Ok(None)
     }
 
+    /// The largest bound violation of the basic variables in the unscaled problem (a structural is `C` times its scaled value, a slack `1/R` times), `None`
+    /// when the solve is not scaled.
+    fn unscaled_violation(&self) -> Option<f64> {
+        crate::scale::ORIG.with(|c| {
+            let o = c.borrow();
+            let (_, col, row) = o.as_ref()?;
+            let n = self.p.n;
+            let mut worst = 0.0f64;
+            for &j in &self.basic {
+                let v = (self.p.lo[j] - self.x[j]).max(self.x[j] - self.p.up[j]).max(0.0);
+                let f = if j < n { col[j] } else { 1.0 / row[j - n] };
+                worst = worst.max(v * f);
+            }
+            Some(worst)
+        })
+    }
+
     fn has_infeasible_basic(&self) -> bool {
         self.sig().iter().any(|&c| c != 0)
     }
@@ -6103,21 +6120,29 @@ fn solve_primal(
                             PRIMAL_STALL.with(|c| c.set(true));
                             break Status::Infeasible;
                         }
-                        if s.cleanup && s.has_infeasible_basic() {
+                        // The reference's primal ends with the maximum bound violation of the basic variables in the unscaled problem (`0xcff40`, `r9+0x90`);
+                        // above the feasibility tolerance (`rbp+0x2460`, 1e-6) the driver runs the dual loop on the unscaled model (`0x154d95`).
+                        let unscaled = if !s.cleanup && s.mirror.is_some() && s.opts.pricing0 && !infeasible {
+                            s.unscaled_violation().filter(|&v| v > 1e-6)
+                        } else {
+                            None
+                        };
+                        if (s.cleanup && s.has_infeasible_basic()) || unscaled.is_some() {
                             // The dual clean-up pass; the primal phase 1 only when it finds no entering variable.
                             let b = Basis {
                                 basic: s.basic.clone(),
                                 at_upper: s.at_upper.clone(),
                             };
+                            let orig = if unscaled.is_some() { crate::scale::ORIG.with(|c| c.borrow().as_ref().map(|o| o.0.clone())) } else { None };
                             let dopts = SolveOptions {
                                 method: Method::Dual,
-                                scaled: opts.scaled,
-                                obj_scale: opts.obj_scale,
+                                scaled: opts.scaled && orig.is_none(),
+                                obj_scale: if orig.is_some() { SolveOptions::default().obj_scale } else { opts.obj_scale },
                                 record_trace: true,
                                 ..SolveOptions::default()
                             };
                             crate::dual::CLEANUP_PASS.with(|c| c.set(Some(s.acc_thr)));
-                            let via = crate::dual::solve(model, Some(&b), &dopts);
+                            let via = crate::dual::solve(orig.as_ref().unwrap_or(model), Some(&b), &dopts);
                             crate::dual::CLEANUP_PASS.with(|c| c.set(None));
                             let via = via.ok().filter(|r| {
                                 matches!(r.status, Status::Optimal | Status::Infeasible)
@@ -7742,4 +7767,15 @@ mod tests {
         let r = solve(&model, Some(&start), &SolveOptions::default()).unwrap();
         assert_eq!(r.status, Status::Unbounded);
     }
+}
+
+#[cfg(test)]
+#[test]
+fn release_primal_runs_the_dual_on_the_unscaled_model_when_it_is_infeasible() {
+    // Seed 9010 (gen3): the final basis violates a bound by 1.544967130528395e-4 in the unscaled problem (-3.77e-8 scaled); the reference's `0xcff40`
+    // measures it, sets the driver flag and the dual loop makes one pivot (3 pricing calls) on the unscaled model.
+    let model = crate::mps::parse(include_str!("../tests/fixtures/fx_pricing0_order_9010.mps")).unwrap();
+    let r = crate::solve(&model, None, &SolveOptions::release()).unwrap();
+    assert_eq!(r.status, Status::Optimal);
+    assert_eq!(r.iterations, 6);
 }
