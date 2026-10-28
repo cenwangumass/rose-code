@@ -5791,6 +5791,16 @@ fn solve_pass<R: Real>(
         let primal_stalled = R::QUAD && crate::simplex::PRIMAL_STALL.with(|c| c.take());
         if primal_stalled {
             C35C.with(|c| c.set(c.get() + 1));
+            // The controller ends a -1004 cycle at status 12 once the
+            // shared handoff counter exceeds 20 (0x15557d..0x15558c).
+            if C35C.with(|c| c.get() > 20) {
+                if let Some(mut r) = prres {
+                    r.status = Status::NumericalFailure;
+                    r.iterations += s.iters;
+                    r.refactorizations += s.refactorizations;
+                    return Ok(r);
+                }
+            }
         }
         // An artificial-bound dual exit can also hand off to a primal whose
         // start factorization drops a singular column. Restore that column and
@@ -5869,10 +5879,12 @@ fn solve_pass<R: Real>(
             if R::QUAD
                 && QUAD_RESUMES.with(|c| {
                     c.set(c.get() + 1);
-                    c.get() <= 1
+                    c.get() <= 1 || primal_stalled
                 })
             {
-                // A quad pass resumes as a quad pass from the primal's basis (the x87 primal gave up at its first scan), the counters going on (random LP seed 5247).
+                // A stalled x87 primal can resume quad repeatedly, retaining
+                // the context and its clocks (5959). Other routes retain the
+                // existing single-resume behavior pending their recovery.
                 let pit = prres.as_ref().map_or(0, |pr| pr.iterations);
                 let pfac = prres.as_ref().map_or(0, |pr| pr.refactorizations);
                 let carry3 = Carry {
