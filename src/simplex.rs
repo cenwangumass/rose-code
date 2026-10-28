@@ -3890,7 +3890,7 @@ impl<'a> Solver<'a> {
                 if self.p1_tol_on {
                     self.p0_scale = self.p0_scale.max(PHASE1_M);
                 }
-                self.work.add(0x1451e8, 3.0 * self.p.m as f64, crate::work::CTX);
+                self.work.add(0x144173, 3.0 * self.p.m as f64, crate::work::CTX);
                 if err > 3e-6 * self.p0_scale {
                     self.p0_accuracy = true;
                     return None;
