@@ -5601,7 +5601,8 @@ fn solve_primal(
         s.perturb();
     }
     // The first standalone factorization also passes through the progress driver.
-    if handoff.is_none() {
+    // The x87 primal checks its progress at the start factorization of every pass (5959 dual-release: the timer `ctx+0x40` is 10400 at the end of the 3-iteration restart from 10400).
+    if handoff.is_none() || handoff.is_some_and(|h| h.quad) {
         s.progress_check();
     }
     let mut trace = Vec::new();
