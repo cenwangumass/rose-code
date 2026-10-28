@@ -53,6 +53,7 @@ fn enter_dual_pert_size() -> (f64, i64) {
 }
 
 pub(crate) fn enter_primal_pert_size() -> f64 { enter_pert_size(&PRIMAL_PERT_SIZE, true) }
+pub(crate) fn primal_pert_size() -> f64 { PRIMAL_PERT_SIZE.with(|c| c.get()) }
 pub(crate) fn set_primal_pert_size(value: f64) { PRIMAL_PERT_SIZE.with(|c| c.set(value)); }
 
 // State held by the native simplex controller, outside either callback.
@@ -148,6 +149,8 @@ thread_local! {
     static SINGULAR_FROM_PRIMAL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static SINGULAR_TOL_ABORT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     pub(crate) static RESTORED_PRIMAL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The pending flag `ctx+0x180` (`0xcef91..0xcef9b`): a quality-2 snapshot restore asks the restarted x87 primal for the infeasible-basic repair at its first basic-value recompute.
+    pub(crate) static RESTORE_REPAIR: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The relative tolerance of the primal's pivot-pair check (`ctx+0x3a0`): 3e-6 from the parameters, 1e-7 from the first restore of a dropped variable on (`0x1551d4`).
     static PAIR_TOL: std::cell::Cell<f64> = const { std::cell::Cell::new(3e-6) };
     /// The primal's start basis when its drift test ended it (status -1002): the restart takes it (`0xcedb0`, seed 2717).
@@ -242,7 +245,7 @@ const ALPHA_TOL: f64 = 1e-10;
 const W_EPS: f64 = 1e-8;
 
 /// The reference's integer generator (`0x88a870`): a 64-bit congruential step, the high word tempered, 31 bits.
-fn lcg_int(state: &mut u64) -> u32 {
+pub(crate) fn lcg_int(state: &mut u64) -> u32 {
     *state = state
         .wrapping_mul(0x5851f42d4c957f2d)
         .wrapping_add(0x14057b7ef767814f);
@@ -4774,6 +4777,7 @@ fn solve_frame(
             crate::simplex::PRIMAL_STALL.with(|c| c.set(false));
             crate::simplex::PRIMAL_SHIFT_END.with(|c| c.set(false));
             RESTORED_PRIMAL.with(|c| c.set(true));
+            RESTORE_REPAIR.with(|c| c.set(restart_basis.is_some() && SNAP_QUALITY.with(|q| q.get() == 2)));
             let pr = primal_callback(model, restart_basis.as_ref(), &popts);
             RESTORED_PRIMAL.with(|c| c.set(false));
             match pr {

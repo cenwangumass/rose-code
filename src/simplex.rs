@@ -1205,6 +1205,10 @@ struct Solver<'a> {
     /// for its column; the recomputation of `x_B` starts from `b + shift` and the shift is never reset (PEROLD: it stays after the
     /// variable re-enters).
     rhs_shift: Vec<f64>,
+    /// The same shift in extended precision (x87 repair of a restored snapshot): empty when no repair was made.
+    rhs_shift_q: Vec<crate::f80::F80>,
+    /// The objective offset `ctx+0x130` of the x87 repair.
+    x87_offset: f64,
     /// A shift of the right-hand side was made during the solve (kept after the clean-up clears `rhs_shift`): the reference frees its pricing object at the shifted optimum.
     shifted: bool,
     /// Mirror of the reference's FTRAN structure (`faithful_ftran`).
@@ -2414,6 +2418,53 @@ impl<'a> Solver<'a> {
         Ok(())
     }
 
+
+    /// The infeasible-basic repair of a restored quality-2 snapshot (`0x27d7b0`, called at the x87 basic-value recompute `0x25b7d1`; `primal_rhs_perturb::repair`): the basic
+    /// variables beyond a bound by more than the tolerance are moved inside by a random fraction of the perturbation size, the move goes to the persistent right-hand side shift.
+    fn restored_repair(&mut self) {
+        use crate::f80::F80;
+        let p = self.p;
+        let tol = crate::dual::primal_tol();
+        let size = crate::dual::primal_pert_size();
+        let m = p.m;
+        let Some(mut dq) = self.dst_q.take() else { return };
+        let Some(mut xq) = self.x_q.take() else { return };
+        let mut types = vec![b'N'; m];
+        let mut dist = vec![F80::ZERO; m];
+        let mut x = vec![F80::ZERO; m];
+        for (i, &j) in self.basic.iter().enumerate() {
+            let range = if is_inf(p.lo[j]) || is_inf(p.up[j]) { 1e30 } else { p.up[j] - p.lo[j] };
+            dist[i] = F80::from_f64(range);
+            x[i] = dq[j];
+            types[i] = if dq[j] < F80::from_f64(-tol) {
+                b'B'
+            } else if range < 1e30 && dq[j] > dist[i] + F80::from_f64(tol) {
+                b'A'
+            } else {
+                b'N'
+            };
+        }
+        let mut rhs = if self.rhs_shift_q.is_empty() { vec![F80::ZERO; m] } else { self.rhs_shift_q.clone() };
+        let mut offset = self.x87_offset;
+        let mut state = 0u64;
+        crate::primal_rhs_perturb::repair(
+            &self.basic, &mut types, &mut x, &dist, &mut rhs, &p.cols, &p.cost, &mut offset, size, tol,
+            || crate::dual::lcg_int(&mut state),
+        );
+        self.x87_offset = offset;
+        for (i, &j) in self.basic.iter().enumerate() {
+            dq[j] = x[i];
+            let v = if is_inf(p.lo[j]) { F80::from_f64(p.up[j]) - x[i] } else { F80::from_f64(p.lo[j]) + x[i] };
+            xq[j] = v;
+            self.x[j] = v.to_f64();
+            self.dst[j] = x[i].to_f64();
+        }
+        self.rhs_shift = rhs.iter().map(|v| v.to_f64()).collect();
+        self.rhs_shift_q = rhs;
+        self.dst_q = Some(dq);
+        self.x_q = Some(xq);
+    }
+
     fn recompute_primal(&mut self) {
         self.recompute_primal_x();
         for pos in 0..self.basic.len() {
@@ -2482,8 +2533,8 @@ impl<'a> Solver<'a> {
             use crate::f80::F80;
             use crate::real::Real;
             let mut r: Vec<F80> = p.rhs.iter().map(|&v| F80::c(v)).collect();
-            for (ri, sh) in r.iter_mut().zip(&self.rhs_shift) {
-                *ri += F80::c(*sh);
+            for (i, (ri, sh)) in r.iter_mut().zip(&self.rhs_shift).enumerate() {
+                *ri += if self.rhs_shift_q.is_empty() { F80::c(*sh) } else { self.rhs_shift_q[i] };
             }
             for j in 0..p.n + p.m {
                 if self.pos_of[j] == NONE {
@@ -5325,6 +5376,8 @@ fn solve_primal(
         p0_accuracy: false,
         dst: vec![0.0; p.n + p.m],
         rhs_shift: Vec::new(),
+        rhs_shift_q: Vec::new(),
+        x87_offset: 0.0,
         shifted: false,
         mirror: None,
         mirror_q: None,
@@ -5530,6 +5583,9 @@ fn solve_primal(
         s.quad_switch_allowed = false;
     }
     s.recompute_primal();
+    if crate::dual::RESTORE_REPAIR.with(|c| c.take()) && s.x_q.is_some() {
+        s.restored_repair();
+    }
     s.check_primal_drift()?;
     s.primal_full_work();
     s.dual_btran_work("start");
