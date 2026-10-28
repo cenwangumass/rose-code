@@ -5697,6 +5697,11 @@ fn solve_pass_callback<R: Real>(
         if !(R::QUAD && s.pert != 0 && !s.rejected_end && !s.art_exit) && !repaired_end {
             C35C.with(|c| c.set(c.get() + 1));
         }
+        // The status-3 end of the in-place repair is a restore of the controller (`ebx` of `0x1551ac`, `controller_restore_count`: 1 at iteration 16, 2 at 24, 3 at 122, 4 at 130
+        // in 5959): from the third the controller alternates the methods, so the next primal's own restore switches to the dual.
+        if repaired_end {
+            PERT_RERUNS.with(|c| c.set(c.get() + 1));
+        }
         crate::simplex::PRIMAL_SINGULAR.with(|c| c.set(None));
         crate::simplex::PRIMAL_TOL_ABORT.with(|c| c.set(false));
         crate::simplex::PRIMAL_START_SINGULAR.with(|c| c.set(false));
