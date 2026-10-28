@@ -508,6 +508,8 @@ struct Dual<'a, R: Real = f64> {
     prog_acc: f64,
     best_obj: f64,
     pert_left: i64,
+    /// Set by `perturb` inside the post-factorization pass, which the reference books into the same `0xe7000` total.
+    perturbed: bool,
     pert_param: f64,
     obj_scale: f64,
     /// The model was scaled (`ctx+0xe0` non-null): the growth check of the factorization uses 1e12.
@@ -3875,7 +3877,7 @@ impl<'a, R: Real> Dual<'a, R> {
     /// when the level was not zero, and the tail that is longer for a request-4 confirmation with a nonzero incoming level (or request 6). With the perturbation flag set (`ctx+0x338`
     /// != 0, kept to the end of the solve) the request-4 tail is the plain `1.5 n` and every such factorization adds `2 m + n` (the cost recompute with the shift
     /// array, `0xe555c`; ADLITTLE, BOEING2, PILOT4).
-    fn set_level_work(&mut self, level_was_set: bool) {
+    fn set_level_work(&mut self, level_was_set: bool) -> f64 {
         let (n, m) = (self.n as f64, self.m as f64);
         let mut est = 2.0 * m + (m + 2.0 * n);
         if level_was_set {
@@ -3889,7 +3891,7 @@ impl<'a, R: Real> Dual<'a, R> {
         if self.pert != 0 {
             est += 2.0 * m + n;
         }
-        self.work.add(0xe7000, est, crate::work::CTX);
+        est
     }
 
     /// Work of the pricing setup after a refactorization: the list of infeasible rows (`5 m + 4 len`, len the walk list or, in the value mode, the number of infeasible rows `P+0x3c`; `0xc4329` in the walk mode, `0xc1fe3` in the value mode)
@@ -4160,6 +4162,7 @@ impl<'a, R: Real> Dual<'a, R> {
     /// direction that increases `d'` (the cost goes up at the lower bound and down at a finite upper bound; a variable at an infinite upper bound with
     /// `d' <= delta` is moved to its lower bound first). The scale grows threefold for the next perturbation.
     fn perturb(&mut self) {
+        self.perturbed = true;
         self.working_obj = None;
         let p = self.p;
         let sc = self.pstep / 500.0;
@@ -4317,8 +4320,13 @@ impl<'a, R: Real> Dual<'a, R> {
             self.recompute_d();
             self.shift_wrong_d();
             let level_before = self.level;
-            self.set_level_work(level_before != 0);
+            let level_work = self.set_level_work(level_before != 0);
+            self.perturbed = false;
             self.set_level(level_before);
+            // A cost perturbation made by the stall check inside the same pass adds `2 m + 4 n` to the `0xe6fdd` total (kb2 release, iteration 15:
+            // 522.5 = 272.5 + 250 in extended units of 1.3; sctap1, grow7 the same).
+            let perturb_work = if self.perturbed && !R::QUAD { 2.0 * self.m as f64 + 4.0 * self.n as f64 } else { 0.0 };
+            self.work.add(0xe7000, level_work + perturb_work, crate::work::CTX);
             #[allow(unused_mut)]
             let mut req = self.request;
             self.request = 0;
@@ -5211,6 +5219,7 @@ fn solve_pass_callback<R: Real>(
         prog_acc: 0.0,
         best_obj: -1e100,
         pert_left: dual_pert_left,
+        perturbed: false,
         pert_param: opts.perturb,
         obj_scale: opts.obj_scale,
         scaled: opts.scaled,
@@ -5256,7 +5265,8 @@ fn solve_pass_callback<R: Real>(
     s.work
         .add_from(0x12de50, 0xe53a7, s.mirror.work, crate::work::FAC);
     s.request = 1;
-    s.set_level_work(false);
+    let level_work = s.set_level_work(false);
+    s.work.add(0xe7000, level_work, crate::work::CTX);
     s.request = 0;
     for j in 0..n + m {
         if s.st[j] >= 0 {
@@ -6504,6 +6514,7 @@ mod captured_bh305_ratio {
             prog_acc: 0.0,
             best_obj: -1e100,
             pert_left: 1_000_000_000,
+            perturbed: false,
             pert_param: 0.0,
             obj_scale: 1.0,
             scaled: false,
