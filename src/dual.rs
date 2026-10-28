@@ -5292,9 +5292,10 @@ fn solve_pass_callback<R: Real>(
     // bound sides (`0x23a9b0`). Its request-1 recompute (`0x23a6d5`) shifts
     // negative reduced costs by only the random fraction of their magnitude;
     // they may consequently remain negative at the first pricing call.
+    // Only a reduced cost beyond the dual tolerance is shifted: 4250's restart keeps a wrong-signed d of -3.6e-10 unshifted (8631 shifts -0.36).
     if R::QUAD && snapshot_restart {
         for j in 0..n + m {
-            if (s.st[j] != LB && s.st[j] != UB) || s.d[j] >= R::c(-1e-13) {
+            if (s.st[j] != LB && s.st[j] != UB) || s.d[j] >= R::c(-dual_tol()) {
                 continue;
             }
             let magnitude = -s.d[j];
