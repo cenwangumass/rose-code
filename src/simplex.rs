@@ -5884,6 +5884,27 @@ fn solve_primal(
                     retry_unbounded = true;
                     continue;
                 }
+                None if s.handoff.is_some_and(|h| h.quad && h.pert)
+                    && s.mirror.is_some()
+                    && !s.recomputed
+                    && !s.fresh_duals
+                    && !s.rescan3
+                    && s.p0.is_none()
+                    && s.factor.num_updates() > 0 =>
+                {
+                    // The x87 post-factor list check (`0x281c1c`) counts the attractive variables on the recomputed duals (`0x2815e0`): the exit with request 9
+                    // only follows when there are none (5959 restarts: the primal goes on at iterations 1 and 2 and ends at 3).
+                    s.dual_btran_work("none");
+                    s.recompute_dual()?;
+                    s.rescan3 = true;
+                    s.list.clear();
+                    s.level = 0;
+                    if (0..s.p.n + s.p.m).any(|j| s.score(j).is_some()) {
+                        continue;
+                    }
+                    PRIMAL_SHIFT_END.with(|c| c.set(true));
+                    break Status::Infeasible;
+                }
                 None if s
                     .handoff
                     .is_some_and(|h| h.quad && h.pert && h.dual_level == 0) =>
