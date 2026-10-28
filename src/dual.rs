@@ -4639,6 +4639,18 @@ thread_local! {
     static NO_ART_EXIT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
+thread_local! {
+    /// The standalone primal's tolerance-ceiling exit hands its state to the controller (`0xcedb0`): iterations of the aborted run, the LU threshold, the inherited pivot pair.
+    static STANDALONE_RESUME: std::cell::Cell<Option<(usize, f64, Option<(f64, f64)>)>> = const { std::cell::Cell::new(None) };
+}
+
+/// The controller of a standalone primal after its tolerance-ceiling exit: the first pass is the x87 primal from the crash basis (the pricing0 start of the aborted run kept),
+/// the counters of the aborted run survive; what follows is the dual controller's loop (primal -1004 -> x87 dual -> restarts).
+pub(crate) fn resume_standalone_controller(model: &LpModel, opts: &SolveOptions, iters: usize, thr: f64, pair: Option<(f64, f64)>) -> Result<SolveResult, SolveError> {
+    STANDALONE_RESUME.with(|c| c.set(Some((iters, thr, pair))));
+    solve_frame(model, None, opts)
+}
+
 fn solve_frame(
     model: &LpModel,
     start: Option<&Basis>,
@@ -4658,6 +4670,13 @@ fn solve_frame(
         it_base: 0,
         nref0: 0,
     };
+    let resume = STANDALONE_RESUME.with(|c| c.take());
+    if let Some((iters, thr, _)) = resume {
+        carry.iters = iters;
+        carry.thr = thr;
+    }
+    if resume.is_some() {
+    } else {
     if CLEANUP_PASS.with(|c| c.get()).is_none() {
         crate::simplex::STALL_PREV.with(|c| c.set(0.0));
         crate::simplex::TOTAL_ITERS.with(|c| c.set(0.0));
@@ -4682,17 +4701,21 @@ fn solve_frame(
     crate::simplex::HANDOFF_ROWS.with(|c| *c.borrow_mut() = None);
     LARGE_XB.with(|c| c.set(false));
     crate::simplex::QUAD_PRIMALS.with(|c| c.set(0));
+    }
     // The quad mode (`ctx+0x28`): once the controller switched, every later pass runs the extended-precision twin of the dual.
-    let mut quad = false;
+    let mut quad = resume.is_some();
     let mut switch_start: Option<Basis> = None;
     let mut restart_start: Option<Basis> = None;
-    let mut restart_primal = false;
+    let mut restart_primal = resume.is_some();
+    let mut first_resume = resume.is_some();
     // The factor's `+0x0c`: zero supplies the current statuses to setup,
     // one asks setup for a fresh crash basis.
     let mut factor_crash = start.is_none();
     // The controller snapshots the tolerance once (`0x154ccc`), before any
     // singular retries; its primal handoffs scale this original value.
-    callback_reset();
+    if resume.is_none() {
+        callback_reset();
+    }
     loop {
         SINGULAR.with(|c| c.set(None));
         SINGULAR_FROM_PRIMAL.with(|c| c.set(false));
@@ -4713,7 +4736,8 @@ fn solve_frame(
         pass_opts.max_iterations = opts.max_iterations.saturating_sub(carry.iters);
         let res = if restart_primal {
             restart_primal = false;
-            let fresh = restart_basis.is_none();
+            let resumed = std::mem::take(&mut first_resume);
+            let fresh = restart_basis.is_none() && !resumed;
             if fresh {
                 set_dual_tol(DUAL_TOL0);
                 set_primal_tol(PRIMAL_TOL);
@@ -4722,18 +4746,23 @@ fn solve_frame(
             let mut popts = pass_opts.clone();
             popts.method = crate::simplex::Method::Primal;
             popts.refactor_schedule = None;
-            popts.pricing0 = false;
-            popts.sw_carry = Some(crate::simplex::SwCarry {
-                iters: 0.0, degenerate: 0, snap_degenerate: 0, snap_iters: 0.0,
-                factorizations: 0, level: 0,
-                pert: 0.0,
-            });
+            // The tolerance-ceiling restart keeps the aborted run's `pricing0` start (x87 method 0, `ctx+0x3ec` re-initialized at the entry).
+            if !resumed {
+                popts.pricing0 = false;
+                popts.sw_carry = Some(crate::simplex::SwCarry {
+                    iters: 0.0, degenerate: 0, snap_degenerate: 0, snap_iters: 0.0,
+                    factorizations: 0, level: 0,
+                    pert: 0.0,
+                });
+            } else {
+                popts.sw_carry = None;
+            }
             crate::simplex::HANDOFF.with(|c| c.set(Some(crate::simplex::Handoff {
-                stale: None, working_obj: None, nref0: 0, thr: carry.thr,
+                stale: if resumed { resume.and_then(|r| r.2) } else { None }, working_obj: None, nref0: 0, thr: carry.thr,
                 retries: carry.retries as usize, pert: !fresh && SNAP_QUALITY.with(|c| c.get() == 2),
                 pair_tol: PAIR_TOL.with(|c| c.get()), quad: true, dual_level: 0,
                 shifted_exit: false, iters: 0.0, pricing_iters: 0.0, snap: 0.0,
-                c178: C178.with(|c| c.get()), preserve_ratio: false, excl: None,
+                c178: C178.with(|c| c.get()), preserve_ratio: resumed, excl: None,
             })));
             crate::simplex::PRIMAL_STALL.with(|c| c.set(false));
             crate::simplex::PRIMAL_SHIFT_END.with(|c| c.set(false));
@@ -4974,7 +5003,7 @@ fn solve_pass_callback<R: Real>(
             supplied = Some(b.basic.clone());
             // A singular basis loses the columns that get no pivot in the reference's LU order and takes the slacks of the uncovered rows instead.
             let mut probe = b.clone();
-            if FROM_SWITCH.with(|c| c.get())
+            if (FROM_SWITCH.with(|c| c.get()) || (R::QUAD && carry.after_pivot && carry.retries < 5))
                 && crate::simplex::repair_basis(&p, &mut probe).is_some()
             {
                 // The basis the quad switch carries over is not a supplied one: when its quad factorization is singular (the double structure finds the same columns

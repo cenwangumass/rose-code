@@ -4989,33 +4989,12 @@ pub fn solve(
                 iters += pit;
                 facs += pfac;
                 if PRIMAL_TOL_ABORT.with(|c| c.take()) {
-                    // The tolerance-ceiling exit (`0xcedb0`, gate `0xcee26`) restarts the primal from the crash basis in x87 mode.
-                    let c178 = crate::dual::C178.with(|c| c.get());
-                    let h = Handoff {
-                        stale: PRIMAL_RESTART_PAIR.with(|c| c.take()),
-                        working_obj: None,
-                        nref0: 0,
-                        thr: pthr,
-                        retries: 5,
-                        pert: false,
-                        pair_tol: 1e-6,
-                        quad: true,
-                        dual_level: 0,
-                        shifted_exit: false,
-                        iters: 0.0,
-                        pricing_iters: 0.0,
-                        snap: 0.0,
-                        c178,
-                        preserve_ratio: false,
-                        excl: None,
-                    };
-                    QUAD_PRIMALS.with(|c| c.set(c.get() + 1));
-                    // `ctx+0x468` stays as the standalone run left it: cleared once its Devex switch happened, so the phase 1 ratio test is the Harris one.
+                    // The tolerance-ceiling exit (`0xcedb0`, gate `0xcee26`) restarts the primal from the crash basis in x87 mode with `ctx+0x468` cleared (Harris phase 1),
+                    // then the controller's loop continues (primal -1004 -> x87 dual -> restarts).
                     QUAD_EEFA.with(|c| c.set(true));
-                    let mut qopts = opts.clone();
-                    qopts.max_iterations = opts.max_iterations.saturating_sub(iters);
-                    let mut r = solve_primal(model, None, &qopts, Some(h), None)?;
-                    r.iterations += iters;
+                    QUAD_PRIMALS.with(|c| c.set(1));
+                    let pair = PRIMAL_RESTART_PAIR.with(|c| c.take());
+                    let mut r = crate::dual::resume_standalone_controller(model, opts, iters, pthr, pair)?;
                     r.refactorizations += facs;
                     return Ok(r);
                 }
@@ -5944,7 +5923,8 @@ fn solve_primal(
                     s.forced = true;
                     continue;
                 }
-                None if s.handoff.is_some_and(|h| h.quad && h.pert) => {
+                None if s.handoff.is_some_and(|h| h.quad && h.pert) =>
+                {
                     // As above, in phase 2: the x87 primal with cost shifts in force ends with status -1004 at its first failed scan.
                     PRIMAL_SHIFT_END.with(|c| c.set(true));
                     break Status::Infeasible;
