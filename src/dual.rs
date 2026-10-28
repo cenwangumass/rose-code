@@ -4274,8 +4274,8 @@ impl<'a, R: Real> Dual<'a, R> {
                 self.work
                     .add(0xe7000, 3.0 * row_cnt as f64, crate::work::CTX);
             }
-            // The x87 iteration clamps the leaving variable's stored d from below at -dual_tol before the step when the forced-row stack is empty (`0x21dd8e..0x21ddcd`, `fcomip`/`jbe`: d <= -tol gives d = -tol; 6762 call 43: -1.7136e-6 -> -1e-6).
-            if R::QUAD && self.d[pv.leave] <= R::c(-dual_tol()) {
+            // The iteration clamps the leaving variable's stored d from below at -dual_tol before the step when the forced-row stack is empty (`0x21dd8e..0x21ddcd`, `fcomip`/`jbe`: d <= -tol gives d = -tol; the double iteration has the same `maxsd` at `0xc5d85..0xc5dab`; 6762 call 43: -1.7136e-6 -> -1e-6).
+            if self.d[pv.leave] <= R::c(-dual_tol()) {
                 self.d[pv.leave] = R::c(-dual_tol());
             }
             let old_leave = self.d[pv.leave];
