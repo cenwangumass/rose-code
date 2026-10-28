@@ -2895,12 +2895,15 @@ impl<'a, R: Real> Dual<'a, R> {
                 }
             }
             if next.is_empty() {
-                // The empty-list branch combines the re-pass and selection work in one store (`0xc8b62`).
-                self.work.add(
-                    0xc8b67,
-                    (3 * kept.len() + 4 * nflips) as f64,
-                    crate::work::CTX,
-                );
+                // The empty-list branch combines the re-pass and selection work in one store (`0xc8b62`). A list of one entry never reaches it
+                // (GREENBEA dual-controlled iteration 150: no `0xc8dd3` hit and no booking; the captured hits all have two or more entries).
+                if kept.len() > 1 {
+                    self.work.add(
+                        0xc8b67,
+                        (3 * kept.len() + 4 * nflips) as f64,
+                        crate::work::CTX,
+                    );
+                }
                 chosen = kept[0];
                 xm5 = R::ZERO;
             } else {
@@ -3883,7 +3886,7 @@ impl<'a, R: Real> Dual<'a, R> {
         if level_was_set {
             est += 0.5 * (n + m);
         }
-        est += if ((self.request == 4 && level_was_set) || self.request == 6) && self.pert == 0 {
+        est += if (self.request == 4 && level_was_set) || (self.request == 6 && self.pert == 0) {
             2.0 * n + (n + m)
         } else {
             1.5 * n
