@@ -1357,6 +1357,9 @@ struct P0 {
     calls: usize,
     /// Scan window (`P+0x50`): set at each refactorization to `max(10, trunc(avg / 2))`, `avg = trunc(S / U)` the mean FTRAN result count of the `U` updates since the last one.
     window: usize,
+    /// The scanned list length `L` (`P+0x58`): `m`, or after a rebuild that found an attractive variable the larger of `m` and the number of variables whose key is
+    /// within seven buckets of the highest one (`0x100821..0x100865`, the suffix histogram of the counting sort; seed 9010: 7 of 8 attractive for `m` = 6).
+    len: usize,
     /// The bucket-chain variant of the candidate list (`P+0x80 == 2`, see `Buckets`), for models with at least twice as many columns as
     /// rows per column entry (`0x137fc9`); `list` is unused then.
     bk: Option<Buckets>,
@@ -3411,6 +3414,8 @@ impl<'a> Solver<'a> {
         let col_off = |j: usize| offs[j] & 1;
         let mut dstore = vec![0.0; nm];
         let mut keys = vec![0usize; nm];
+        let tol = self.p0.as_ref().unwrap().tol;
+        let mut nattr = 0usize;
         // Work of the sort routine `0xfffc0`: the bucket table (101), 2 per column entry of every eligible structural, then 4 per
         // structural, 5 per row and 3 per variable (the count and placement passes).
         let mut sort_work: Vec<(u32, f64)> = vec![(0x100fa5, 101.0)];
@@ -3429,6 +3434,9 @@ impl<'a> Solver<'a> {
                 None
             };
             keys[j] = if free { 100 } else { p0_key(s, div) };
+            if free || s < -tol {
+                nattr += 1;
+            }
         }
         if self.p0.as_ref().unwrap().bk.is_some() {
             // Bucket chains: the variables of each key in index order (`0xfecb0`, the loop that appends to `P+0x21c + 4 key`).
@@ -3487,6 +3495,11 @@ impl<'a> Solver<'a> {
         let mut list: Vec<usize> = (0..nm).collect();
         list.sort_by(|&a, &b| keys[b].cmp(&keys[a]).then(b.cmp(&a)));
         let p0 = self.p0.as_mut().unwrap();
+        if nattr > 0 {
+            let top = keys.iter().copied().max().unwrap_or(0);
+            let within = keys.iter().filter(|&&k| top < 7 || k + 7 >= top).count();
+            p0.len = self.p.m.max(within);
+        }
         p0.list = list;
         p0.dstore = dstore;
         p0.y = y;
@@ -3545,13 +3558,14 @@ impl<'a> Solver<'a> {
         let offs = self.p0_col_offsets();
         let col_off = |j: usize| offs[j] & 1;
         let mut p0 = self.p0.take().unwrap();
+        let ll = p0.len;
         let start = p0.pos;
         let (mut i, mut cnt, mut best, mut q): (usize, usize, f64, Option<(usize, f64)>) =
             (start, 0, 0.0, None);
         let mut marked = vec![false; nm];
         // Work of the reference's scan (`0xfdef9`): 2 per entry visited, and per candidate 6 plus 2 per column entry of a structural.
         let mut scan_est = 0.0f64;
-        if start < m {
+        if start < ll {
             loop {
                 let j = p0.list[i];
                 scan_est += 2.0;
@@ -3589,7 +3603,7 @@ impl<'a> Solver<'a> {
                     break;
                 }
                 i += 1;
-                if i >= m {
+                if i >= ll {
                     break;
                 }
             }
@@ -5563,6 +5577,7 @@ fn solve_primal(
             rebuild: true,
             calls: 0,
             window: P0_WINDOW,
+            len: m,
             bk: p0_bucket_mode(n, m, nnz).then(|| Buckets {
                 head: [-1; 101],
                 tail: [-1; 101],
