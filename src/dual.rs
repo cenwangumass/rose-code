@@ -5009,6 +5009,10 @@ fn solve_pass_callback<R: Real>(
                 // The basis the quad switch carries over is not a supplied one: when its quad factorization is singular (the double structure finds the same columns
                 // dependent), the pass ends before its first iteration and the restart takes the snapshot basis (seed 2706: first quad factorization has `p13` = 1,
                 // the next one is the slack basis, `ctx+0x184` = 1).
+                if !FROM_SWITCH.with(|c| c.get()) {
+                    // The x87 dual run after a primal's -1004 fails its start factorization (`0x248f99`): the stability counter counts it.
+                    C178.with(|c| c.set(c.get() + 1));
+                }
                 SINGULAR_BASIS.with(|c| *c.borrow_mut() = Some(b.clone()));
                 SINGULAR.with(|c| {
                     c.set(Some((
