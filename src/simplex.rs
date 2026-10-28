@@ -537,6 +537,7 @@ type QuadProgressRecord = (usize, f64, f64, Option<f64>, Option<f64>, u32, u32, 
 #[cfg(test)]
 thread_local! {
     static QUAD_PROGRESS_TEST: std::cell::RefCell<Option<Vec<QuadProgressRecord>>> = const { std::cell::RefCell::new(None) };
+    static QUAD_MODE_TEST: std::cell::Cell<Option<u8>> = const { std::cell::Cell::new(None) };
 }
 
 #[cfg(test)]
@@ -570,6 +571,33 @@ fn progress_uses_previous_infeasibility() {
     // Native 5371: the last dual recompute leaves zero, so this check uses
     // the objective. A positive fresh sum exercises the branch boundary.
     assert!(primal_progress_stalled(0.0, 1.0, Some(221699549.95117602), Some(268371380.61310527)));
+}
+
+#[cfg(test)]
+#[test]
+fn restored_x87_primal_selects_native_initial_mode() {
+    // Native randlp5959-release x87_mode_init: c35c 2, it 0, c178 4
+    // starts mode 2; c35c 3, it 0, c178 5 starts mode 1.
+    let model = crate::mps::parse(include_str!("../tests/fixtures/primal_5959.mps")).unwrap();
+    let scaling = crate::scale::compute(&model);
+    let scaled = scaling.apply(&model).unwrap();
+    // Native x87_dw scan 165: the restored basis at the first outer scan.
+    let basis = Basis { basic: vec![17,19,22,3,12,11,6,1,10], at_upper: vec![false; 26] };
+    let mut opts = SolveOptions::release();
+    opts.pricing0 = false;
+    opts.scaling = false;
+    opts.scaled = true;
+    opts.obj_scale = scaling.obj;
+    opts.max_iterations = 0;
+    opts.sw_carry = Some(SwCarry { iters: 0.0, degenerate: 0, snap_degenerate: 0, snap_iters: 0.0, factorizations: 0, level: 0, pert: 0.0 });
+    for (c35c, c178, expected) in [(2, 4, 2), (3, 5, 1)] {
+        crate::dual::C35C.with(|c| c.set(c35c));
+        QUAD_EEFA.with(|c| c.set(false));
+        QUAD_MODE_TEST.with(|c| c.set(None));
+        let handoff = Handoff { stale: None, working_obj: None, nref0: 0, thr: 0.5, retries: 5, pert: false, pair_tol: 1e-6, quad: true, dual_level: 0, shifted_exit: false, iters: 0.0, pricing_iters: 0.0, snap: 0.0, c178, preserve_ratio: false, excl: None };
+        solve_primal(&scaled, Some(&basis), &opts, Some(handoff), None).unwrap();
+        assert_eq!(QUAD_MODE_TEST.with(|c| c.take()), Some(expected));
+    }
 }
 
 #[cfg(test)]
@@ -5248,12 +5276,14 @@ fn solve_primal(
         sw: crate::method::Method {
             // The x87 start decision (`0x27e9b0`) also selects method 1 when
             // it clears `ctx+0x468`; keep the weights and ratio test in that mode.
+            // The second x87 pass starts in mode 2 even when its iteration counter is zero
+            // (`0x275913`); a later start-factor decision can still switch it to mode 1.
             mode: if opts.pricing0 {
                 0
             } else if opts.sw_carry.is_some() {
                 if handoff.is_some_and(|h| {
                     h.quad
-                        && (h.iters == 0.0
+                        && ((h.iters == 0.0 && crate::dual::C35C.with(|c| c.get()) != 2)
                             || (crate::dual::C35C.with(|c| c.get()) >= 3 && h.c178 > 0)
                             || (!h.preserve_ratio && QUAD_EEFA.with(|c| c.get())))
                 }) {
@@ -5284,6 +5314,8 @@ fn solve_primal(
         admit_scan: false,
         restarts: rs.map_or(0, |r| r.count),
     };
+    #[cfg(test)]
+    QUAD_MODE_TEST.with(|c| c.set(Some(s.sw.mode)));
     s.rows = vec![Vec::new(); m];
     s.rrows = vec![Vec::new(); m];
     for j in 0..n {
