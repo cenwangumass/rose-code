@@ -2971,8 +2971,14 @@ impl<'a> Solver<'a> {
     fn price_faithful(&mut self) -> Result<Option<usize>, SolveError> {
         self.list_failed = false;
         self.recomputed = false;
-        self.dump_xpricing(if self.admit_scan { "admit" } else if self.retry_scan { "retry" } else { "scan" });
+        if !self.retry_scan {
+            self.dump_xpricing(if self.admit_scan { "admit" } else { "scan" });
+        }
         let q = self.price();
+        // The reference's scan hook records the scan after a failed scan's refactorization only when it finds a candidate (`x87_admission`, scans 366 -> 367 and 370 -> 371 against 372 -> end).
+        if self.retry_scan && q.is_some() {
+            self.dump_xpricing("scan");
+        }
         if q.is_none()
             && self.list_failed
             && self.repaired
@@ -3060,7 +3066,10 @@ impl<'a> Solver<'a> {
                 if self.repaired && self.handoff.is_some_and(|h| h.quad) {
                     // The refactor can make an eligible column reappear; the reference
                     // scans again with the dropped variable still excluded.
-                    let retry = self.price_faithful()?;
+                    self.retry_scan = true;
+                    let retry = self.price_faithful();
+                    self.retry_scan = false;
+                    let retry = retry?;
                     if retry.is_some() {
                         return Ok(retry);
                     }
