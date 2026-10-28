@@ -4911,7 +4911,9 @@ pub fn solve(
     loop {
         PRIMAL_SINGULAR.with(|c| c.set(None));
         PRIMAL_REPAIRED.with(|c| c.set(false));
-        match solve_primal(model, start, opts, None, rs) {
+        let mut pass_opts = opts.clone();
+        pass_opts.max_iterations = opts.max_iterations.saturating_sub(iters);
+        match solve_primal(model, start, &pass_opts, None, rs) {
             Err(SolveError::SingularBasis) => {
                 let Some((pit, pfac, pthr)) = PRIMAL_SINGULAR.with(|c| c.take()) else {
                     return Err(SolveError::SingularBasis);
@@ -4932,7 +4934,9 @@ pub fn solve(
                         count: r.count + 1,
                         ..r
                     });
-                    let r2 = solve_primal(model, Some(&r.basis), opts, None, rs2)?;
+                    let mut retry_opts = pass_opts.clone();
+                    retry_opts.max_iterations = pass_opts.max_iterations.saturating_sub(r.iterations);
+                    let r2 = solve_primal(model, Some(&r.basis), &retry_opts, None, rs2)?;
                     let (it, fa) = (r.iterations, r.refactorizations);
                     r = r2;
                     r.iterations += it;

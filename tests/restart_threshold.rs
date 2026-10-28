@@ -8,7 +8,8 @@ fn restart_threshold_child() {
     }
     let model = mps::parse(include_str!("fixtures/randlp50154.mps")).unwrap();
     let mut opts = SolveOptions::dual();
-    opts.max_iterations = 25;
+    // The tested pricing call follows several restarted passes.
+    opts.max_iterations = 60;
     opts.refactor_schedule = Some(vec![
         4,
         11,

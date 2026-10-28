@@ -4559,6 +4559,9 @@ fn solve_frame(
             .or(restart_basis.as_ref())
             .or_else(|| if carry.retries == 0 { start } else { None });
         FROM_SWITCH.with(|c| c.set(sw.is_some()));
+        // Each pass shares the controller's iteration allowance.
+        let mut pass_opts = opts.clone();
+        pass_opts.max_iterations = opts.max_iterations.saturating_sub(carry.iters);
         let res = if restart_primal {
             restart_primal = false;
             let fresh = restart_basis.is_none();
@@ -4567,7 +4570,7 @@ fn solve_frame(
                 set_primal_tol(PRIMAL_TOL);
                 LARGE_XB.with(|c| c.set(false));
             }
-            let mut popts = opts.clone();
+            let mut popts = pass_opts.clone();
             popts.method = crate::simplex::Method::Primal;
             popts.refactor_schedule = None;
             popts.pricing0 = false;
@@ -4596,7 +4599,9 @@ fn solve_frame(
                     carry.it_base = r.iterations;
                     carry.nref0 = r.refactorizations.max(1);
                     carry.after_pivot = true;
-                    let result = solve_pass::<crate::f80::F80>(model, Some(&r.basis), opts, &carry, false);
+                    let mut dual_opts = pass_opts.clone();
+                    dual_opts.max_iterations = pass_opts.max_iterations.saturating_sub(r.iterations);
+                    let result = solve_pass::<crate::f80::F80>(model, Some(&r.basis), &dual_opts, &carry, false);
                     if result.is_ok() {
                         carry.iters += r.iterations;
                     }
@@ -4605,9 +4610,9 @@ fn solve_frame(
                 other => other,
             }
         } else if quad {
-            solve_pass::<crate::f80::F80>(model, start_now, opts, &carry, restart_basis.is_some())
+            solve_pass::<crate::f80::F80>(model, start_now, &pass_opts, &carry, restart_basis.is_some())
         } else {
-            solve_pass::<f64>(model, start_now, opts, &carry, restart_basis.is_some())
+            solve_pass::<f64>(model, start_now, &pass_opts, &carry, restart_basis.is_some())
         };
         match res {
             Err(SolveError::SingularBasis) if SWITCH.with(|c| c.get()).is_some() => {
@@ -5383,6 +5388,7 @@ fn solve_pass<R: Real>(
         // the variable goes back to a bound (status -4 + 3) and the primal runs from the dual's basis; the dropped variable is priced again (a bound flip
         // or a pivot, each one an iteration).
         let mut popts = opts.clone();
+        popts.max_iterations = opts.max_iterations.saturating_sub(s.iters);
         popts.method = crate::simplex::Method::Primal;
         // The dual's teacher-forced factorization schedule does not apply to the primal, which decides its own (work based).
         popts.refactor_schedule = None;
@@ -5570,7 +5576,9 @@ fn solve_pass<R: Real>(
                 }))
             });
             let b2 = r.basis.clone();
-            let r2 = crate::simplex::solve(model, Some(&b2), &popts)?;
+            let mut retry_opts = popts.clone();
+            retry_opts.max_iterations = popts.max_iterations.saturating_sub(r.iterations);
+            let r2 = crate::simplex::solve(model, Some(&b2), &retry_opts)?;
             r.iterations += r2.iterations;
             r.refactorizations += r2.refactorizations;
             r.status = r2.status;
@@ -5604,7 +5612,9 @@ fn solve_pass<R: Real>(
                 it_base: s.it_base + r.iterations,
                 nref0: s.nref() + (r.refactorizations - s.refactorizations).max(1),
             };
-            let mut r2 = solve_pass::<R>(model, Some(&r.basis), opts, &carry2, false)?;
+            let mut retry_opts = opts.clone();
+            retry_opts.max_iterations = opts.max_iterations.saturating_sub(carry2.iters);
+            let mut r2 = solve_pass::<R>(model, Some(&r.basis), &retry_opts, &carry2, false)?;
             r2.iterations += carry2.iters;
             return Ok(r2);
         }
@@ -5624,7 +5634,9 @@ fn solve_pass<R: Real>(
                 it_base: s.it_base + r.iterations,
                 nref0: s.nref() + l.max(1),
             };
-            let mut r2 = solve_pass::<R>(model, Some(&r.basis), opts, &carry2, false)?;
+            let mut retry_opts = opts.clone();
+            retry_opts.max_iterations = opts.max_iterations.saturating_sub(carry2.iters);
+            let mut r2 = solve_pass::<R>(model, Some(&r.basis), &retry_opts, &carry2, false)?;
             r2.iterations += carry2.iters;
             return Ok(r2);
         }
@@ -5691,7 +5703,9 @@ fn solve_pass<R: Real>(
                         }
                 },
             };
-            let mut r2 = solve_pass::<R>(model, Some(&r.basis), opts, &carry2, false)?;
+            let mut retry_opts = opts.clone();
+            retry_opts.max_iterations = opts.max_iterations.saturating_sub(carry2.iters);
+            let mut r2 = solve_pass::<R>(model, Some(&r.basis), &retry_opts, &carry2, false)?;
             r2.iterations += carry2.iters;
             return Ok(r2);
         }
@@ -5703,6 +5717,7 @@ fn solve_pass<R: Real>(
         }
         // A request-4 artificial-bound exit returns -1004 to the controller, which runs the primal from this basis. Its completed status is final.
         let mut popts = opts.clone();
+        popts.max_iterations = opts.max_iterations.saturating_sub(s.iters);
         popts.method = crate::simplex::Method::Primal;
         if opts.perturb != 0.0 {
             // The release profile: the primal goes on in method 2 with the dual's counters (`compare.py switch` call 0 of `dual-release`: iterations, the stall
@@ -5832,7 +5847,9 @@ fn solve_pass<R: Real>(
                         excl: None,
                     }))
                 });
-                let mut retry = crate::simplex::solve(model, Some(&pr.basis), &popts)?;
+                let mut retry_opts = popts.clone();
+                retry_opts.max_iterations = popts.max_iterations.saturating_sub(pr.iterations);
+                let mut retry = crate::simplex::solve(model, Some(&pr.basis), &retry_opts)?;
                 retry.iterations += pr.iterations;
                 retry.refactorizations += pr.refactorizations;
                 *pr = retry;
@@ -5899,7 +5916,9 @@ fn solve_pass<R: Real>(
                     it_base: s.it_base + s.iters + pit,
                     nref0: s.nref() + pfac.max(1),
                 };
-                let again = solve_pass::<R>(model, resume.as_ref().or(start), opts, &carry3, false);
+                let mut retry_opts = opts.clone();
+                retry_opts.max_iterations = opts.max_iterations.saturating_sub(carry3.iters);
+                let again = solve_pass::<R>(model, resume.as_ref().or(start), &retry_opts, &carry3, false);
                 NO_ART_EXIT.with(|c| c.set(false));
                 let mut again = again?;
                 again.iterations += carry3.iters;
@@ -6337,4 +6356,42 @@ mod perturb_size_lifecycle_tests {
         assert_eq!(PRIMAL_PERT_SIZE.with(|c| c.get()), 0.0002);
         assert_eq!(DUAL_PERT_SIZE.with(|c| c.get()), 0.0002);
     }
+}
+
+#[cfg(test)]
+#[test]
+fn method_handoffs_share_iteration_limit() {
+    for (source, limits) in [
+        (include_str!("../tests/fixtures/fx_quad_obj_5371.mps"), &[17, 32][..]),
+        (include_str!("../tests/fixtures/primal_5959.mps"), &[12, 32][..]),
+    ] {
+        let model = crate::mps::parse(source).unwrap();
+        for &limit in limits {
+            let mut opts = SolveOptions::dual_release();
+            opts.max_iterations = limit;
+            let result = crate::solve(&model, None, &opts).unwrap();
+            assert!(result.iterations <= limit, "limit {limit}, got {}", result.iterations);
+            let clock = crate::simplex::TOTAL_ITERS.with(|c| c.get());
+            assert!(clock <= limit as f64, "limit {limit}, clock {clock}");
+        }
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn iteration_limit_keeps_the_last_allowed_pivot() {
+    let model = crate::mps::parse(include_str!("../tests/fixtures/afiro.mps")).unwrap();
+    let opts = SolveOptions::dual_release();
+    let complete = crate::solve(&model, None, &opts).unwrap();
+    assert!(complete.iterations > 0);
+    let mut bounded = opts;
+    bounded.max_iterations = complete.iterations;
+    let result = crate::solve(&model, None, &bounded).unwrap();
+    assert_eq!(result.iterations, complete.iterations);
+    let mut bounded_basic = result.basis.basic.clone();
+    let mut complete_basic = complete.basis.basic.clone();
+    bounded_basic.sort_unstable();
+    complete_basic.sort_unstable();
+    assert_eq!(bounded_basic, complete_basic);
+    assert_eq!(result.basis.at_upper, complete.basis.at_upper);
 }
