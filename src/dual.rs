@@ -4274,6 +4274,10 @@ impl<'a, R: Real> Dual<'a, R> {
                 self.work
                     .add(0xe7000, 3.0 * row_cnt as f64, crate::work::CTX);
             }
+            // The x87 iteration clamps the leaving variable's stored d from below at -dual_tol before the step when the forced-row stack is empty (`0x21dd8e..0x21ddcd`, `fcomip`/`jbe`: d <= -tol gives d = -tol; 6762 call 43: -1.7136e-6 -> -1e-6).
+            if R::QUAD && self.d[pv.leave] <= R::c(-dual_tol()) {
+                self.d[pv.leave] = R::c(-dual_tol());
+            }
             let old_leave = self.d[pv.leave];
             // The reference's row holds a slack leaving variable with its computed coefficient (about 1, 0.9999999999999997 in PILOT.JA call 30657), the step on it uses that.
             let lcoef = pv.row.iter().find(|e| e.0 == pv.leave).map_or(R::ONE, |e| {
