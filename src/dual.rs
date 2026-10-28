@@ -366,6 +366,8 @@ struct Dual<'a, R: Real = f64> {
     rejected_end: bool,
     /// The pass ended at the request-4 refactorization with variables at an artificial bound (status -1004): the primal decides the outcome.
     art_exit: bool,
+    /// The primal gave up on the artificial-bound handoff of the enclosing pass: this pass runs past the request-4 refactorization. Only the first pass after the give-up (the enclosing controller's later passes end as usual: 5959 dual from iteration 5371, status -1004).
+    no_art_exit: bool,
     worst: f64,
     worst_row: i64,
     /// The retry of the worst rejected row (`ctx+0x420` negated, `0x21cf50` / `0xc4fe0`): the ratio test rejects nothing.
@@ -4321,7 +4323,7 @@ impl<'a, R: Real> Dual<'a, R> {
             if req == 4
                 && (!R::QUAD && self.level != 0)
                 && self.status.is_none()
-                && !NO_ART_EXIT.with(|c| c.get())
+                && !self.no_art_exit
             {
                 // The confirming refactorization leaves variables at an artificial bound: the post-refactor pass (`0xe45c0`, `0xe5e33..0xe5e63`) counts
                 // them and, with `ctx+0x35c` != 0 (1 from the start), ends the dual at once with status -1004 (s16, s198 `dual_exit`: the exit comes
@@ -5127,6 +5129,7 @@ fn solve_pass_callback<R: Real>(
         old_rej: 0,
         rejected_end: false,
         art_exit: false,
+        no_art_exit: NO_ART_EXIT.with(|c| c.replace(false)),
         worst: 0.0,
         worst_row: -1,
         retry: false,
@@ -5561,7 +5564,7 @@ fn solve_pass_callback<R: Real>(
             if R::QUAD
                 && matches!(stt, Status::Optimal | Status::Unbounded)
                 && s.pert != 0
-                && !NO_ART_EXIT.with(|c| c.get())
+                && !s.no_art_exit
             {
                 // The quad driver's end (`0x24a4f6..0x24a548`): a final status 2 (dual optimal) or 5 with the cost shifts in force (`ctx+0x338` != 0) clears them and returns
                 // status -1004; the controller hands over to the x87 primal (seeds 5247, 6972, 6610, 8179). It replaces the double dual's exit at the request-4 refactor.
@@ -5573,7 +5576,7 @@ fn solve_pass_callback<R: Real>(
             if !R::QUAD
                 && stt == Status::Optimal
                 && s.pert != 0
-                && !NO_ART_EXIT.with(|c| c.get())
+                && !s.no_art_exit
                 && CLEANUP_PASS.with(|c| c.get()).is_none()
             {
                 // The double dual ends optimal with cost shifts in force: restore the costs and start the primal (-1004).
@@ -6422,6 +6425,7 @@ mod captured_bh305_ratio {
             old_rej: 0,
             rejected_end: false,
             art_exit: false,
+            no_art_exit: false,
             worst: 0.0,
             worst_row: -1,
             retry: false,
