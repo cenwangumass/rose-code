@@ -7,6 +7,7 @@ use std::sync::OnceLock;
 
 /// Dump kinds, their line tags and what they record.
 pub const KINDS: &[(&str, &str, &str)] = &[
+    ("callback", "CALLBACK", "simplex controller callback entry and return tolerance state"),
     ("status", "STATUS", "once per solve, written by `examples/trace_dump` whatever ROSE_DUMP selects: final status, iterations, objective"),
     ("dualacc", "DACC", "dual: each x_B recompute (`0xc1861`): factorization count, request, R = max(1e-9, max|rhs|), max|x_B|, residual e2 (0 when not read), the threshold candidate and `ctx+0x390` before it"),
     ("header", "PHDR", "once per solve: n, m and the fixed variables (lo == up)"),
@@ -26,6 +27,7 @@ pub const KINDS: &[(&str, &str, &str)] = &[
     ("costchg", "BTC", "phase 1 cost-change BTRAN (`0x10804b`, `cost_change_work`): the sparse input (position, cost change) and the result in output order"),
     ("bare", "BARE", "each bare replacement column with `old >= 0` (`ftran_order.rs`, column replacement): position r, old kind and whether a tail column's B list holds r (`held`); the unheld ones are the unverified case of `specs/lu-factor.md`"),
     ("ord", "ORD", "pivot-row input list and changed columns per pivot (CORD for the cost-change pass)"),
+    ("pdrift", "PDRIFT", "primal drift check and counter state"),
     ("xb", "XB", "right-hand side and x_B of the basic-solution recompute"),
     ("fstruct", "FSTRUCT", "U-factor structure (kinds, nucleus list, tail start, slots) before each column replacement"),
     ("pairgate", "PGATE", "each attempted doubleton pairing pass: remaining rows, prior attempts, gate, factorization number"),

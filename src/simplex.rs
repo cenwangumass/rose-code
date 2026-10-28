@@ -89,6 +89,12 @@ pub struct SwCarry {
     pub pert: f64,
 }
 
+/// Effective tolerance used by the recovered default-profile reference gates.
+/// Custom native OptimalityTol values below 1e-6 are not modeled.
+pub(crate) fn reference_optimality_tol(opts: &SolveOptions) -> f64 {
+    opts.optimality_tol.max(1e-6)
+}
+
 impl Default for SolveOptions {
     fn default() -> Self {
         SolveOptions {
@@ -1130,7 +1136,6 @@ struct Solver<'a> {
     tiny7: Option<usize>,
     /// The drift test of the primal update (`ctx+0x380`, `ctx+0x170`): tolerance and count of excesses.
     drift_tol: f64,
-    drift_cnt: u32,
     /// The progress check's counters `ctx+0x378` (checks) and `ctx+0x37c` (checks without a fall of the infeasibility sum), reset at the primal's start.
     stall_calls: u32,
     stall_cnt: u32,
@@ -1145,7 +1150,7 @@ struct Solver<'a> {
     cyc_last: i64,
     stalled: bool,
     want_drift: bool,
-    drift_err: Option<f64>,
+    drift_err: Option<crate::f80::F80>,
     restart: bool,
     pre_restart: bool,
     /// Whether the current x87 factorization request permits a method switch.
@@ -1709,11 +1714,7 @@ impl<'a> Solver<'a> {
         // The primal's drift test (`0x105f20`, `0x1071a3`): at the factorizations with `ctx+0x2c0 % 5 == 4` the recomputed x_B is multiplied back and the largest
         // residual against the right-hand side is compared with `ctx+0x380` (1e-6 at the start). A sixth excess raises the tolerance tenfold and clears the count, or
         // ends the primal with status -1002 once the tolerance has reached 1e-3 (seed 2717: a cycle of 600 iterations on values of 1e17).
-        let c2c0 = if self.sw.active {
-            self.sw.factorizations as usize + 1
-        } else {
-            self.refactorizations
-        };
+        let c2c0 = self.refactorizations + self.handoff.map_or(0, |h| h.nref0);
         self.want_drift =
             !keep_x && !self.cleanup && self.mirror.is_some() && self.p0.is_none() && c2c0 % 5 == 4;
         self.drift_err = None;
@@ -1721,31 +1722,7 @@ impl<'a> Solver<'a> {
             self.recompute_primal();
         }
         self.want_drift = false;
-        if let Some(err) = self.drift_err.take() {
-            if err > self.drift_tol {
-                self.drift_cnt += 1;
-            }
-            if self.drift_cnt > 5 {
-                if self.drift_tol >= 1e-3 {
-                    if self.handoff.is_some() {
-                        PRIMAL_DRIFT.with(|c| c.set(true));
-                        PRIMAL_SINGULAR.with(|c| {
-                            c.set(Some((
-                                self.iters_done,
-                                self.refactorizations,
-                                crate::lu_order::threshold(),
-                            )))
-                        });
-                    }
-                    return Err(SolveError::SingularBasis);
-                }
-                self.drift_tol *= 10.0;
-                self.drift_cnt = 0;
-                if self.handoff.is_some() {
-                    crate::dual::set_primal_tol(self.drift_tol);
-                }
-            }
-        }
+        self.check_primal_drift()?;
         if self.cleanup {
             self.cleanup_work();
         } else {
@@ -2392,6 +2369,36 @@ impl<'a> Solver<'a> {
             .add(0x1021b0, 3.0 * (p.n + p.m + cols) as f64, crate::work::CTX);
     }
 
+    /// The residual counter belongs to the solve context and is tested on every recompute.
+    fn check_primal_drift(&mut self) -> Result<(), SolveError> {
+        use crate::f80::F80;
+        let err = self.drift_err.take();
+        if let Some(err) = err {
+            if crate::dump::on("pdrift") {
+                crate::dump::emit("pdrift", serde_json::json!({"quad": self.handoff.as_ref().is_some_and(|h| h.quad), "it": self.iters_done, "it_base": self.handoff.map(|h| h.iters), "total": TOTAL_ITERS.with(|c| c.get()), "ref": self.refactorizations, "nref0": self.handoff.map(|h| h.nref0), "nref": self.refactorizations + self.handoff.map_or(0, |h| h.nref0), "swfac": self.sw.factorizations, "err": err.to_f64(), "err_ld": crate::real::Real::json(err), "tol": self.drift_tol, "cnt": crate::dual::PRIMAL_DRIFT_COUNT.with(|c| c.get())}));
+            }
+            if err > F80::from_f64(self.drift_tol) {
+                crate::dual::PRIMAL_DRIFT_COUNT.with(|c| c.set(c.get() + 1));
+            }
+        }
+        if crate::dual::PRIMAL_DRIFT_COUNT.with(|c| c.get()) > 5 {
+            if self.drift_tol >= 1e-3 {
+                if !self.handoff.as_ref().is_some_and(|h| h.quad) && self.opts.automatic_quad {
+                    if self.handoff.is_some() {
+                        PRIMAL_DRIFT.with(|c| c.set(true));
+                        PRIMAL_SINGULAR.with(|c| c.set(Some((self.iters_done, self.refactorizations, crate::lu_order::threshold()))));
+                    }
+                    return Err(SolveError::SingularBasis);
+                }
+            } else {
+                self.drift_tol *= 10.0;
+                crate::dual::PRIMAL_DRIFT_COUNT.with(|c| c.set(0));
+                if self.handoff.is_some() { crate::dual::set_primal_tol(self.drift_tol); }
+            }
+        }
+        Ok(())
+    }
+
     fn recompute_primal(&mut self) {
         self.recompute_primal_x();
         for pos in 0..self.basic.len() {
@@ -2493,6 +2500,23 @@ impl<'a> Solver<'a> {
             for (pos, &j) in self.basic.iter().enumerate() {
                 xq[j] = xb[pos];
             }
+            if self.want_drift {
+                let mut product = vec![F80::ZERO; p.m];
+                for (pos, &j) in self.basic.iter().enumerate() {
+                    for &(i, a) in &p.cols[j] {
+                        product[i] += F80::c(a) * xb[pos];
+                    }
+                }
+                let mut residual = F80::ZERO;
+                for (&a, &b) in r.iter().zip(&product) {
+                    let d = (a - b).abs();
+                    if d > residual { residual = d; }
+                }
+                self.drift_err = Some(residual);
+                if crate::dump::on("pdrift") {
+                    crate::dump::emit("pdrift", serde_json::json!({"kind": "operands", "it": self.iters_done, "it_base": self.handoff.map(|h| h.iters), "total": TOTAL_ITERS.with(|c| c.get()), "basic": self.basic, "rhs": r.iter().map(|v| v.json()).collect::<Vec<_>>(), "xb": xb.iter().map(|v| v.json()).collect::<Vec<_>>(), "product": product.iter().map(|v| v.json()).collect::<Vec<_>>() }));
+                }
+            }
             self.x_q = Some(xq);
             return;
         }
@@ -2524,11 +2548,11 @@ impl<'a> Solver<'a> {
                         out[i] += a * xb[pos];
                     }
                 }
-                self.drift_err = Some(
+                self.drift_err = Some(crate::f80::F80::from_f64(
                     r.iter()
                         .zip(&out)
                         .fold(0.0f64, |e, (a, b)| e.max((a - b).abs())),
-                );
+                ));
             }
             {
                 let rmax = r.iter().fold(1e-9f64, |a, v| a.max(v.abs()));
@@ -2826,7 +2850,7 @@ impl<'a> Solver<'a> {
         let tol = if self.opts.faithful_weights && self.p1_tol_on {
             self.p3c0 * PHASE1_M
         } else if self.opts.faithful_weights {
-            self.opts.optimality_tol.max(1e-6)
+            reference_optimality_tol(self.opts)
         } else {
             self.opts.optimality_tol
         };
@@ -5200,7 +5224,6 @@ fn solve_primal(
         } else {
             opts.feasibility_tol
         },
-        drift_cnt: 0,
         stall_calls: 0,
         stall_cnt: 0,
         working_obj: handoff.and_then(|h| h.working_obj),
@@ -5454,6 +5477,7 @@ fn solve_primal(
         s.quad_switch_allowed = false;
     }
     s.recompute_primal();
+    s.check_primal_drift()?;
     s.primal_full_work();
     s.dual_btran_work("start");
     s.recompute_dual()?;

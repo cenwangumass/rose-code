@@ -200,3 +200,58 @@ fn primal_handoff_residuals_use_reference_accumulation_order() {
         [7.75, 9.375, 7.75, 9.375, 7.75, 9.375, 13.1875, 7.75, 9.375, 13.1875]
     );
 }
+
+#[test]
+fn dual_handoff_returns_before_controller_dispatches_primal() {
+    let output = Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", "optimal_handoff_child", "--nocapture"])
+        .env("ROSE_E2_TEST", "r03125")
+        .env("ROSE_DUMP", "callback")
+        .output().unwrap();
+    assert!(output.status.success());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    let events: Vec<serde_json::Value> = stderr.lines()
+        .filter_map(|line| line.strip_prefix("CALLBACK "))
+        .map(|line| serde_json::from_str(line).unwrap()).collect();
+    let labels: Vec<_> = events.iter().map(|event| event["event"].as_str().unwrap()).collect();
+    assert_eq!(labels, ["enter", "exit", "transfer", "enter", "exit", "primal_outcome"]);
+    assert_eq!(events[2]["status"], -1004);
+    assert_eq!(events[2]["selector"], 0);
+    assert_eq!(events[3]["selector"], 0);
+    assert_eq!(events[5]["error"], false);
+}
+
+#[test]
+fn artificial_handoff_child() {
+    if std::env::var_os("ROSE_ARTIFICIAL_TEST").is_none() {
+        return;
+    }
+    let model = mps::parse(include_str!("fixtures/primal_5959.mps")).unwrap();
+    let mut opts = SolveOptions::dual_release();
+    opts.max_iterations = 1000;
+    let _ = solve(&model, None, &opts);
+}
+
+#[test]
+fn artificial_handoff_returns_before_primal_entry() {
+    let output = Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", "artificial_handoff_child", "--nocapture"])
+        .env("ROSE_ARTIFICIAL_TEST", "1")
+        .env("ROSE_DUMP", "callback")
+        .output().unwrap();
+    assert!(output.status.success());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    let events: Vec<serde_json::Value> = stderr.lines()
+        .filter_map(|line| line.strip_prefix("CALLBACK "))
+        .map(|line| serde_json::from_str(line).unwrap()).collect();
+    let i = events.iter().position(|event| event["route"] == "artificial").unwrap();
+    assert_eq!(events[i - 1]["event"], "exit");
+    assert_eq!(events[i - 1]["selector"], 1);
+    assert_eq!(events[i]["status"], -1004);
+    assert_eq!(events[i + 1]["event"], "enter");
+    assert_eq!(events[i + 1]["selector"], 0);
+    assert_eq!(events[i - 1]["carry"], events[i + 1]["carry"]);
+    assert_eq!(events[i + 2]["event"], "exit");
+    assert_eq!(events[i + 3]["event"], "primal_outcome");
+    assert_eq!(events[i + 3]["error"], false);
+}

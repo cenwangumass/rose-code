@@ -55,10 +55,73 @@ fn enter_dual_pert_size() -> (f64, i64) {
 pub(crate) fn enter_primal_pert_size() -> f64 { enter_pert_size(&PRIMAL_PERT_SIZE, true) }
 pub(crate) fn set_primal_pert_size(value: f64) { PRIMAL_PERT_SIZE.with(|c| c.set(value)); }
 
+// State held by the native simplex controller, outside either callback.
+#[derive(Clone, Copy)]
+struct CallbackController {
+    selector: bool,
+    result: i32,
+    skip: bool,
+    primal_carry: f64,
+    dual_carry: f64,
+}
+thread_local! {
+    static CALLBACK: std::cell::Cell<CallbackController> = const { std::cell::Cell::new(CallbackController {
+        selector: true, result: 0, skip: false, primal_carry: PRIMAL_TOL, dual_carry: DUAL_TOL0,
+    }) };
+}
+fn callback_reset() {
+    CALLBACK.with(|c| c.set(CallbackController { selector: true, result: 0, skip: false,
+        primal_carry: primal_tol(), dual_carry: dual_tol() }));
+}
+struct CallbackGuard { dual: bool, factor: f64, active: bool }
+impl CallbackGuard {
+    fn enter(dual: bool, opts: &SolveOptions) -> Self {
+        let count = C35C.with(|c| c.get());
+        let mut factor = if count <= 5 { 1.0 } else if count <= 7 { 0.5 } else { 0.2 };
+        CALLBACK.with(|c| {
+            let mut st = c.get();
+            st.selector = dual;
+            // Only ordinary callback dispatches are wired up here. Native
+            // control-result and one-shot skip routing is not yet recovered.
+            assert!(st.result == 0 && !st.skip, "unimplemented callback control route");
+            if crate::dump::on("callback") {
+                crate::dump::emit("callback", serde_json::json!({"event":"enter", "selector":i32::from(dual), "result":st.result, "skip":st.skip, "count":count, "c380":primal_tol(), "c388":dual_tol(), "carry":st.primal_carry, "total":crate::simplex::TOTAL_ITERS.with(|c| c.get())}));
+            }
+            let live = if dual { primal_tol() } else { dual_tol() };
+            let parameter = if dual { opts.feasibility_tol } else { crate::simplex::reference_optimality_tol(opts) };
+            if live > parameter { factor = 1.0; }
+            if dual { set_primal_tol(st.primal_carry * factor); }
+            else { set_dual_tol(st.dual_carry * factor); }
+            c.set(st);
+        });
+        Self { dual, factor, active: true }
+    }
+    fn finish(&mut self) {
+        if !self.active { return; }
+        CALLBACK.with(|c| {
+            let mut st = c.get();
+            if self.dual { st.primal_carry = primal_tol() / self.factor; }
+            else { st.dual_carry = dual_tol() / self.factor; }
+            if crate::dump::on("callback") {
+                crate::dump::emit("callback", serde_json::json!({"event":"exit", "selector":i32::from(self.dual), "count":C35C.with(|c| c.get()), "c380":primal_tol(), "c388":dual_tol(), "carry":st.primal_carry, "total":crate::simplex::TOTAL_ITERS.with(|c| c.get())}));
+            }
+            c.set(st);
+        });
+        self.active = false;
+    }
+}
+impl Drop for CallbackGuard { fn drop(&mut self) { self.finish(); } }
+
+fn primal_callback(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions) -> Result<SolveResult, SolveError> {
+    let _callback = CallbackGuard::enter(false, opts);
+    crate::simplex::solve(model, start, opts)
+}
+
 thread_local! {
     /// The dual feasibility tolerance (`ctx+0x388`) and the counter of failed dual residual checks (`ctx+0x174`); both outlive the restarts of one solve.
     static DUAL_TOL_CELL: std::cell::Cell<f64> = const { std::cell::Cell::new(DUAL_TOL0) };
     /// The primal feasibility tolerance in force (`ctx+0x380`); the primal's drift test raises it (up to 1e-3), the dual passes after it read the raised value.
+    pub(crate) static PRIMAL_DRIFT_COUNT: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
     static PRIMAL_TOL_CELL: std::cell::Cell<f64> = const { std::cell::Cell::new(PRIMAL_TOL) };
     static RNG_CELL: std::cell::Cell<u64> = const { std::cell::Cell::new(101) };
     static PERT_RERUNS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
@@ -68,10 +131,6 @@ thread_local! {
 }
 
 thread_local! {
-    /// The number of passes started in this solve (selects the entry of a per-pass refactorization schedule).
-    static LOOP_TOL: std::cell::Cell<f64> = const { std::cell::Cell::new(1e-6) };
-    /// Dual passes ended with a primal handoff in this solve (`ctx+0x35c` - 1 outside the quad passes).
-    static DUAL_HANDOFFS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
     /// `ctx+0x35c`: 1 at the start, plus one for every run that ends with status -1004 (writers `0xf8691` double dual, `0xe404a` double primal, `0x24b98b` quad dual,
     /// `0x2371bd` x87 primal; `replay/gdb_c35c_trace.py`). The quad primals' method (`ctx+0x3ec`) and the switch of the first ones read it.
     pub(crate) static C35C: std::cell::Cell<i32> = const { std::cell::Cell::new(1) };
@@ -112,6 +171,7 @@ pub(crate) fn reset_primal_snapshot() {
     SNAP_QUALITY.with(|c| c.set(0));
     SNAP_C40.with(|c| c.set(-100.0));
     set_primal_tol(PRIMAL_TOL);
+    PRIMAL_DRIFT_COUNT.with(|c| c.set(0));
 }
 
 pub(crate) fn resid_fails() -> u32 {
@@ -248,6 +308,17 @@ fn maxsd(a: f64, b: f64) -> f64 {
     }
 }
 
+// The multiply and comparison stay in the working precision, including x87.
+fn primal_drift_excess<R: Real>(residual: R, violation: R) -> bool {
+    residual * R::c(100.0) > violation
+}
+
+fn primal_drift_action(count: u32, tol: f64, quad: bool, automatic_quad: bool) -> (f64, bool, bool) {
+    if count <= 2 { (tol, false, false) }
+    else if tol < 1e-3 { (tol * 10.0, true, false) }
+    else { (tol, false, !quad && automatic_quad) }
+}
+
 /// Outcome of the ratio test (`0xc74a0`).
 struct Ratio {
     /// Index into the row of the entering variable (`None`: no candidate, the dual is unbounded).
@@ -321,6 +392,7 @@ struct Dual<'a, R: Real = f64> {
     dflag: Vec<bool>,
     /// `SimplexPricing` left at its default (-1): the release profile, which may switch the pricing mode.
     switch_enabled: bool,
+    automatic_quad: bool,
     /// Tolerance level (`ctx+0x2cc`): the number of nonbasic variables at an artificial upper bound.
     level: usize,
     /// Pending refactorization request (`ctx+0x294`).
@@ -384,6 +456,9 @@ struct Dual<'a, R: Real = f64> {
     pair: (f64, f64),
     /// Final status once the loop ends.
     status: Option<Status>,
+    // ctx+0xf0 = -1002, pending until the recompute finishes: the
+    // residual-scale acceptance gate may replace it with optimal status.
+    drift_status: bool,
     /// Number of structural columns of the model (the length of a returned ray).
     nm: usize,
     ray: Option<Vec<f64>>,
@@ -1151,7 +1226,8 @@ impl<'a, R: Real> Dual<'a, R> {
     ///
     /// `req` is the refactorization request in force (`ctx+0x294`) when the recompute follows a factorization, 0 otherwise. The accuracy of the solve then
     /// raises the LU pivot threshold for the next factorizations (`0xc1861`, `accuracy_threshold`).
-    fn recompute_xb(&mut self, req: u32) {
+    fn recompute_xb(&mut self, req: u32) -> Result<(), SolveError> {
+        let mut tol_abort = false;
         let p = self.p;
         let mut r: Vec<R> = p.rhs.iter().map(|&v| R::c(v)).collect();
         for j in 0..p.n + p.m {
@@ -1203,11 +1279,48 @@ impl<'a, R: Real> Dual<'a, R> {
                 .zip(&product)
                 .fold(R::ZERO, |a, (b, v)| a.max((*b - *v).abs()));
             if self.level == 0 && residual > R::c(primal_tol()) {
+                #[cfg(test)]
+                CEILING_TEST.with(|c| {
+                    if !R::QUAD && req == 4 && self.iters == 16 && c.borrow().as_ref().is_some_and(|v| v.is_empty()) {
+                        PRIMAL_DRIFT_COUNT.with(|n| n.set(2));
+                        set_primal_tol(1e-3);
+                    }
+                });
                 self.work.add(
                     0xc177e,
                     4.0 * p.m as f64 + 2.0 * cols as f64,
                     crate::work::CTX,
                 );
+                {
+                    let violation = self.head.iter().enumerate().fold(R::ZERO, |max, (pos, &j)| {
+                        let x = xb[pos];
+                        let lo = R::c(p.lo[j]);
+                        let up = R::c(p.up[j]);
+                        if p.lo[j] > -BIG && lo > x { max.max(lo - x) }
+                        else if p.up[j] < BIG && x > up { max.max(x - up) }
+                        else { max }
+                    });
+                    if primal_drift_excess(residual, violation) {
+                        PRIMAL_DRIFT_COUNT.with(|c| c.set(c.get() + 1));
+                    }
+                    if crate::dump::on("pdrift") {
+                        crate::dump::emit("pdrift", serde_json::json!({"kind":"dual", "total": crate::simplex::TOTAL_ITERS.with(|c| c.get()), "nref":self.nref(), "req":req, "residual":residual.to_f64(), "violation":violation.to_f64(), "tol":primal_tol(), "cnt":PRIMAL_DRIFT_COUNT.with(|c| c.get())}));
+                    }
+                    let (tol, clear, abort) = primal_drift_action(
+                        PRIMAL_DRIFT_COUNT.with(|c| c.get()), primal_tol(), R::QUAD, self.automatic_quad,
+                    );
+                    if clear {
+                        set_primal_tol(tol);
+                        PRIMAL_DRIFT_COUNT.with(|c| c.set(0));
+                    }
+                    tol_abort = abort;
+                    #[cfg(test)]
+                    if abort {
+                        CEILING_TEST.with(|c| {
+                            if let Some(v) = c.borrow_mut().as_mut() { v.push(("pending", self.iters, req, self.head.clone())); }
+                        });
+                    }
+                }
             }
             residual / rmax
         } else {
@@ -1256,6 +1369,28 @@ impl<'a, R: Real> Dual<'a, R> {
                 );
             }
         }
+        self.drift_status |= tol_abort;
+        Ok(())
+    }
+
+    fn finish_drift_status(&mut self) -> Result<(), SolveError> {
+        if std::mem::take(&mut self.drift_status) {
+            #[cfg(test)]
+            CEILING_TEST.with(|c| {
+                if let Some(v) = c.borrow_mut().as_mut() { v.push(("restart", self.iters, self.request, self.head.clone())); }
+            });
+            // A tolerance abort writes status -1002 without a failed LU.
+            SINGULAR_TOL_ABORT.with(|c| c.set(true));
+            SINGULAR_BASIS.with(|c| *c.borrow_mut() = Some(Basis {
+                basic: self.head.clone(),
+                at_upper: self.st.iter().map(|&t| t == UB).collect(),
+            }));
+            SINGULAR.with(|c| c.set(Some((self.iters, self.refactorizations, self.lu_thr,
+                self.avg_touch, self.last_cap, self.inf_count, self.last_pivoted,
+                self.retries, self.it_base + self.iters))));
+            return Err(SolveError::SingularBasis);
+        }
+        Ok(())
     }
 
     /// d recomputed from the costs after a factorization, in the reference frame.
@@ -4170,9 +4305,14 @@ impl<'a, R: Real> Dual<'a, R> {
             let level_before = self.level;
             self.set_level_work(level_before != 0);
             self.set_level(level_before);
-            let req = self.request;
+            #[allow(unused_mut)]
+            let mut req = self.request;
             self.request = 0;
-            self.recompute_xb(req);
+            self.recompute_xb(req)?;
+            #[cfg(test)]
+            if self.drift_status && CEILING_NO_ACCEPT.with(|c| c.get()) {
+                req = 0;
+            }
             if req == 4
                 && (!R::QUAD && self.level != 0)
                 && self.status.is_none()
@@ -4227,6 +4367,7 @@ impl<'a, R: Real> Dual<'a, R> {
                     self.request = req;
                     #[cfg(test)]
                     self.lowgate_record("after", self.request);
+                    self.finish_drift_status()?;
                     return self.post_inner(None, false);
                 }
                 if self.lu_thr >= 0.5 {
@@ -4234,9 +4375,17 @@ impl<'a, R: Real> Dual<'a, R> {
                     self.list.clear();
                     self.status = Some(Status::Optimal);
                     #[cfg(test)]
+                    if self.drift_status {
+                        CEILING_TEST.with(|c| {
+                            if let Some(v) = c.borrow_mut().as_mut() { v.push(("accepted", self.iters, req, self.head.clone())); }
+                        });
+                    }
+                    self.drift_status = false;
+                    #[cfg(test)]
                     self.lowgate_record("optimal", 0);
                 }
             }
+            self.finish_drift_status()?;
             // The recompute pass `0xbf5b0` (called from `0xf6d0f`) runs the no-leaving-row handler itself when the pricing is in the list-walk mode
             // (`P+0x40 == 0`) and the list is empty (`P+0x3c == 0`, `0xbffbe`): no pricing call follows (RECIPE call 46).
             if !self.value_mode && self.list.is_empty() && self.status.is_none() {
@@ -4442,6 +4591,7 @@ pub fn solve(
 ) -> Result<SolveResult, SolveError> {
     if CLEANUP_PASS.with(|c| c.get()).is_none() {
         reset_pert_sizes(opts.perturb);
+        PRIMAL_DRIFT_COUNT.with(|c| c.set(0));
         C35C.with(|c| c.set(1));
     }
     // The reference works on the mirror image of a column with no lower bound and a finite upper bound (`x' = -x`, bounds `[-up, inf)`, `0xeb61b`
@@ -4528,7 +4678,6 @@ fn solve_frame(
     SNAP_C40.with(|c| c.set(-100.0));
     PAIR_TOL.with(|c| c.set(3e-6));
     PASS_NO.with(|c| c.set(0));
-    DUAL_HANDOFFS.with(|c| c.set(0));
     C178.with(|c| c.set(0));
     crate::simplex::HANDOFF_ROWS.with(|c| *c.borrow_mut() = None);
     LARGE_XB.with(|c| c.set(false));
@@ -4543,7 +4692,7 @@ fn solve_frame(
     let mut factor_crash = start.is_none();
     // The controller snapshots the tolerance once (`0x154ccc`), before any
     // singular retries; its primal handoffs scale this original value.
-    LOOP_TOL.with(|c| c.set(dual_tol()));
+    callback_reset();
     loop {
         SINGULAR.with(|c| c.set(None));
         SINGULAR_FROM_PRIMAL.with(|c| c.set(false));
@@ -4589,7 +4738,7 @@ fn solve_frame(
             crate::simplex::PRIMAL_STALL.with(|c| c.set(false));
             crate::simplex::PRIMAL_SHIFT_END.with(|c| c.set(false));
             RESTORED_PRIMAL.with(|c| c.set(true));
-            let pr = crate::simplex::solve(model, restart_basis.as_ref(), &popts);
+            let pr = primal_callback(model, restart_basis.as_ref(), &popts);
             RESTORED_PRIMAL.with(|c| c.set(false));
             match pr {
                 Ok(r) if crate::simplex::PRIMAL_STALL.with(|c| c.take())
@@ -4740,19 +4889,76 @@ fn fresh_pass<R: Real>(retries: u32) -> bool {
     retries > 0 && retries == 3
 }
 
-fn solve_pass<R: Real>(
+// These two handoffs return ownership to the controller; other historical
+// handoff paths still run through their existing recursive routes.
+struct HandoffSnapshot {
+    iters: usize, refactorizations: usize, lu_thr: f64, avg_touch: f64,
+    last_cap: usize, inf_count: usize, retries: u32, it_base: usize,
+    nref: usize, pert: u8, rejected_end: bool, level: usize, stall_it: f64, art_exit: bool,
+}
+struct PrimalTransfer {
+    basis: Basis, opts: SolveOptions, snapshot: HandoffSnapshot,
+    status: Status, trace: Vec<TraceEvent>, control_status: Option<i32>,
+    route: PrimalRoute,
+}
+enum PrimalRoute { Restored, Artificial { start: Option<Basis> } }
+enum DriverOutcome {
+    Finished(SolveResult),
+    ToPrimal(PrimalTransfer),
+}
+#[derive(Clone, Copy)]
+enum ControlTransfer { MethodSwitch, Restart }
+impl ControlTransfer {
+    fn status(self) -> i32 { match self { Self::MethodSwitch => -1004, Self::Restart => -1002 } }
+}
+struct PrimalOutcome {
+    result: Result<SolveResult, SolveError>,
+    control: Option<ControlTransfer>,
+}
+fn dispatch_primal(model: &LpModel, basis: &Basis, opts: &SolveOptions) -> PrimalOutcome {
+    let result = primal_callback(model, Some(basis), opts);
+    // These are the control routes represented by the current primal driver;
+    // other native callback statuses have not yet been surfaced.
+    let control = match &result {
+        Err(SolveError::SingularBasis) => Some(ControlTransfer::Restart),
+        Ok(_) if crate::simplex::PRIMAL_STALL.with(|c| c.get()) => Some(ControlTransfer::MethodSwitch),
+        _ => None,
+    };
+    PrimalOutcome { result, control }
+}
+
+fn solve_pass<R: Real>(model: &LpModel, start: Option<&Basis>, opts: &SolveOptions,
+    carry: &Carry, snapshot_restart: bool) -> Result<SolveResult, SolveError> {
+    match solve_pass_callback::<R>(model, start, opts, carry, snapshot_restart)? {
+        DriverOutcome::Finished(result) => Ok(result),
+        DriverOutcome::ToPrimal(transfer) => {
+            CALLBACK.with(|c| { let mut state = c.get(); state.selector = false; c.set(state); });
+            if crate::dump::on("callback") {
+                let route = match &transfer.route { PrimalRoute::Restored => "restored", PrimalRoute::Artificial { .. } => "artificial" };
+                crate::dump::emit("callback", serde_json::json!({"event":"transfer", "route":route, "selector":0, "result":0, "status":transfer.control_status, "total":crate::simplex::TOTAL_ITERS.with(|c| c.get())}));
+            }
+            match transfer.route {
+                PrimalRoute::Restored => resume_primal_transfer::<R>(model, opts, transfer),
+                PrimalRoute::Artificial { .. } => resume_artificial_transfer::<R>(model, opts, transfer),
+            }
+        },
+    }
+}
+
+fn solve_pass_callback<R: Real>(
     model: &LpModel,
     start: Option<&Basis>,
     opts: &SolveOptions,
     carry: &Carry,
     snapshot_restart: bool,
-) -> Result<SolveResult, SolveError> {
+) -> Result<DriverOutcome, SolveError> {
     if fresh_pass::<R>(carry.retries) {
         // The fresh start of the third restart initialises the context again (`0xcf29b`): the tolerance goes back to the parameter, the counter stays.
         set_dual_tol(DUAL_TOL0);
         set_primal_tol(PRIMAL_TOL);
         LARGE_XB.with(|c| c.set(false));
     }
+    let mut callback = CallbackGuard::enter(true, opts);
     let (dual_pert_size, dual_pert_left) = enter_dual_pert_size();
     let p = build(model);
     let (n, m) = (p.n, p.m);
@@ -4889,6 +5095,7 @@ fn solve_pass<R: Real>(
         it_base: carry.it_base,
         dflag: Vec::new(),
         switch_enabled: opts.perturb > 0.0,
+        automatic_quad: opts.automatic_quad,
         level: 0,
         request: 0,
         iters: 0,
@@ -4923,6 +5130,7 @@ fn solve_pass<R: Real>(
         pending_alpha: None,
         pair: (0.0, 0.0),
         status: None,
+        drift_status: false,
         nm: model.num_cols(),
         ray: None,
         zero_artificial: false,
@@ -5104,7 +5312,7 @@ fn solve_pass<R: Real>(
             s.pert = pert;
         }
     }
-    s.recompute_xb(0);
+    s.recompute_xb(0)?;
     s.prog_on = s.level == 0;
     s.prog_acc = 0.0;
     s.work.add(0xc391f, m as f64, crate::work::CTX);
@@ -5120,6 +5328,7 @@ fn solve_pass<R: Real>(
     // The carried average decides the pricing mode of the first recompute; the running average of the pass (`P+0x48`) starts at 0 (m6, m5 captures).
     s.avg_touch = 0.0;
     s.flags_work();
+    s.finish_drift_status()?;
     s.log_snapshot();
     // A schedule with `usize::MAX` separators is one list of per-pass iteration counts for each pass of a run with restarts (the counter restarts at 0).
     let pass_no = PASS_NO.with(|c| {
@@ -5360,7 +5569,8 @@ fn solve_pass<R: Real>(
                     }
                     return Err(e);
                 }
-                s.recompute_xb(0);
+                s.recompute_xb(0)?;
+                s.finish_drift_status()?;
                 cleaned = true;
                 CLEANUP_OUT.with(|c| c.set((true, s.lu_thr)));
             }
@@ -5445,40 +5655,369 @@ fn solve_pass<R: Real>(
                 },
             }))
         });
-        // The controller scales the tolerance by a factor of `ctx+0x35c` (`0x154cf0..0x154d13`, store `0x15647a`): 1 up to 5, 0.5 for 6 and 7, 0.2 above (seed 2950:
-        // `ctx+0x388` 1e-6, 5e-7, 2e-7), and 1 when the tolerance now in force is above the parameter's 1e-6 (`0x156464`; fx_midsing_1106 keeps 1e-3). `ctx+0x35c` is 1 at the
-        // start and counts the dual passes ended with status -1004 (`0xe404a`, `0xf8691`): the primals the controller starts after a dual (fx_midsing_1496: 2, 3, 4, 5, 6 -> 5e-7,
-        // 7); a primal rerun after the restore does not count. In a quad solve rose counts the quad primals started.
-        let handoffs = DUAL_HANDOFFS.with(|c| {
-            c.set(c.get() + 1);
-            c.get()
-        });
         if !(R::QUAD && s.pert != 0 && !s.rejected_end && !s.art_exit) {
             C35C.with(|c| c.set(c.get() + 1));
         }
-        let (at_most_five, at_most_seven) = if R::QUAD {
-            C35C.with(|c| (c.get() <= 5, c.get() <= 7))
-        } else {
-            (handoffs < 5, handoffs < 7)
-        };
-        let tol_factor = if dual_tol() > DUAL_TOL0 || at_most_five {
-            1.0
-        } else if at_most_seven {
-            0.5
-        } else {
-            0.2
-        };
-        set_dual_tol(LOOP_TOL.with(|c| c.get()) * tol_factor);
         crate::simplex::PRIMAL_SINGULAR.with(|c| c.set(None));
         crate::simplex::PRIMAL_TOL_ABORT.with(|c| c.set(false));
         crate::simplex::PRIMAL_START_SINGULAR.with(|c| c.set(false));
         crate::simplex::PRIMAL_FARKAS_SKIPPED.with(|c| c.set(0));
         crate::simplex::PRIMAL_REPAIRED.with(|c| c.set(false));
         crate::simplex::PRIMAL_SHIFT_END.with(|c| c.set(false));
-        let primal_result = crate::simplex::solve(model, Some(&b), &popts);
-        // The controller saves the tolerance left by the primal, undoing the
-        // handoff scale (`0x1564a4`), for the next handoff.
-        LOOP_TOL.with(|c| c.set(dual_tol() / tol_factor));
+        let transfer = PrimalTransfer {
+            basis: b, opts: popts, status, trace, route: PrimalRoute::Restored,
+            control_status: (!(R::QUAD && s.pert != 0 && !s.rejected_end && !s.art_exit)).then_some(-1004),
+            snapshot: HandoffSnapshot { iters: s.iters, refactorizations: s.refactorizations,
+                lu_thr: s.lu_thr, avg_touch: s.avg_touch, last_cap: s.last_cap,
+                inf_count: s.inf_count, retries: s.retries, it_base: s.it_base,
+                nref: s.nref(), pert: s.pert, rejected_end: s.rejected_end,
+                level: s.level, stall_it: s.stall_it, art_exit: s.art_exit },
+        };
+        callback.finish();
+        return Ok(DriverOutcome::ToPrimal(transfer));
+    }
+    if status == Status::Unbounded && s.art_exit {
+        if R::QUAD && s.art_exit {
+            C35C.with(|c| c.set(c.get() + 1));
+        }
+        // A request-4 artificial-bound exit returns -1004 to the controller, which runs the primal from this basis. Its completed status is final.
+        let mut popts = opts.clone();
+        popts.max_iterations = opts.max_iterations.saturating_sub(s.iters);
+        popts.method = crate::simplex::Method::Primal;
+        if opts.perturb != 0.0 {
+            // The release profile: the primal goes on in method 2 with the dual's counters (`compare.py switch` call 0 of `dual-release`: iterations, the stall
+            // counters, `ctx+0x2c0` one above the dual's factorizations, `ctx+0x340` = 1e-5 for the default `PerturbValue`).
+            popts.sw_carry = Some(crate::simplex::SwCarry {
+                iters: s.iters as f64,
+                degenerate: s.stall as i32,
+                snap_degenerate: s.stall_snap as i32,
+                snap_iters: s.stall_it,
+                factorizations: s.refactorizations as u32,
+
+                level: 0,
+                pert: 0.0,
+            });
+        }
+        let from_dual = Basis {
+            basic: s.head.clone(),
+            at_upper: (0..n + m).map(|j| s.st[j] == UB && p.up[j] < BIG).collect(),
+        };
+        if R::QUAD && s.art_exit {
+            // After a quad pass the reference's primal is the x87 one (`ctx+0x28` stays 1), whatever ended the dual (random LP seed 5247: the request-4
+            // exit of a quad pass; the double primal found the ill-conditioned basis singular and the run ended with an error).
+            if crate::simplex::QUAD_PRIMALS.with(|c| c.get()) == 0 && s.iters > 0 {
+                popts.pricing0 = C35C.with(|c| c.get()) == 1;
+            }
+            crate::simplex::HANDOFF.with(|c| {
+                c.set(Some(crate::simplex::Handoff {
+                    stale: Some(s.pair),
+                    working_obj: (s.obj_off == 0.0 && model.offset == 0.0)
+                        .then_some(s.working_obj)
+                        .flatten(),
+                    nref0: s.nref(),
+                    thr: s.lu_thr,
+                    retries: s.retries as usize,
+                    // The quad dual driver ends with status 2 or 5 (an unbounded verdict here) clear the cost shifts `ctx+0x338` (`0x24a539`), so the x87 primal runs without them and
+                    // ends with a refactorization and an optimal verdict (seed 6610) instead of the request-9 end that restores the dual (seeds 2133, 2950).
+                    pert: false,
+                    pair_tol: PAIR_TOL.with(|c| c.get()),
+                    quad: true,
+                    dual_level: s.level,
+                    shifted_exit: false,
+                    iters: (s.it_base + s.iters) as f64,
+                    pricing_iters: (s.it_base + s.iters) as f64,
+                    snap: (s.it_base + s.stall_it as usize) as f64,
+                    c178: C178.with(|c| c.get()),
+                    preserve_ratio: false,
+                    excl: if s.pert == 0 { s.repaired } else { None },
+                }))
+            });
+        }
+        crate::simplex::PRIMAL_SINGULAR.with(|c| c.set(None));
+        crate::simplex::PRIMAL_START_SINGULAR.with(|c| c.set(false));
+        crate::simplex::PRIMAL_REPAIRED.with(|c| c.set(false));
+        let transfer = PrimalTransfer {
+            basis: from_dual, opts: popts, status, trace, control_status: Some(-1004),
+            route: PrimalRoute::Artificial { start: start.cloned() },
+            snapshot: HandoffSnapshot { iters: s.iters, refactorizations: s.refactorizations,
+                lu_thr: s.lu_thr, avg_touch: s.avg_touch, last_cap: s.last_cap,
+                inf_count: s.inf_count, retries: s.retries, it_base: s.it_base,
+                nref: s.nref(), pert: s.pert, rejected_end: s.rejected_end,
+                level: s.level, stall_it: s.stall_it, art_exit: s.art_exit },
+        };
+        callback.finish();
+        return Ok(DriverOutcome::ToPrimal(transfer));
+    }
+    if status == Status::Unbounded {
+        // Status 5 on the dual itself goes directly to the controller's final status store. Keep its raw artificial-bound ray and return the finite
+        // point obtained by clearing the artificial bounds, without solving a second feasibility problem.
+        s.zero_artificial = true;
+        s.recompute_xb(0)?;
+        s.finish_drift_status()?;
+    }
+    if status == Status::IterationLimit && s.level != 0 {
+        s.zero_artificial = true;
+        s.recompute_xb(0)?;
+        s.finish_drift_status()?;
+    }
+    // Read-out.
+    let sgn = if model.sense == Sense::Maximize {
+        -1.0
+    } else {
+        1.0
+    };
+    let mut x = vec![0.0; n + m];
+    let mut xr: Vec<(f64, f64)> = Vec::new();
+    for j in 0..n + m {
+        if R::QUAD {
+            // The long-double value the quad pass holds (exact as two doubles): the reference's objective is computed from it, not from the rounded x.
+            let v = if s.st[j] >= 0 {
+                s.xb[s.st[j] as usize]
+            } else {
+                R::c(s.nonbasic_value(j))
+            };
+            let hi = v.to_f64();
+            xr.push((hi, (v - R::c(hi)).to_f64()));
+        }
+        x[j] = if s.st[j] >= 0 {
+            let v = s.xb[s.st[j] as usize];
+            let (lo, up) = (s.p.lo[j], s.p.up[j]);
+            // After the clean-up factorization the reference shifts the basic solution to zero lower bounds (`x - lo`, loop `0x10731f..0x1073d2`, run on
+            // the FTRAN result; the threshold `[rsp+0x78]` is `ctx+0x370` = 1e30) and adds the bound back at the read-out: a rounding round trip for a
+            // finite lower bound (not on the other exits: 80BAU3B is bit-equal without it). A variable with only an upper bound is mirrored in the
+            // reference (`x' = -x`, lower bound `-up`), so its round trip uses the upper bound: `(-x + up) - up` negated is `(x - up) + up`. A free basic
+            // variable stays as it is (bit-equal on fx_cleanrt_free_105, _1331, _2122: 19 to 36 nonzero free basic values each).
+            if cleaned && lo > -1e30 && lo.is_finite() {
+                ((v - R::c(lo)) + R::c(lo)).to_f64()
+            } else if cleaned && up < 1e30 && up.is_finite() {
+                ((v - R::c(up)) + R::c(up)).to_f64()
+            } else {
+                v.to_f64()
+            }
+        } else {
+            s.nonbasic_value(j)
+        };
+    }
+    s.cost.clone_from(&p.cost);
+    let mut y: Vec<f64> = s.head.iter().map(|&j| p.cost[j]).collect();
+    s.factor.btran(&mut y);
+    let dtrue: Vec<f64> = s.true_d().iter().map(|v| v.to_f64()).collect();
+    let nm = model.num_cols();
+    let xs: Vec<f64> = x[..nm].to_vec();
+    let at_upper: Vec<bool> = s.st.iter().map(|&t| t == UB).collect();
+    QUAD_XR.with(|c| *c.borrow_mut() = if R::QUAD { Some(xr) } else { None });
+    Ok(DriverOutcome::Finished(SolveResult {
+        status,
+        objective: objective_in::<R>(model, &xs),
+        x: xs,
+        dual: y.iter().map(|v| sgn * v).collect(),
+        reduced_cost: dtrue[..nm].iter().map(|v| sgn * v).collect(),
+        basis: Basis {
+            basic: s.head.clone(),
+            at_upper,
+        },
+        iterations: s.iters,
+        refactorizations: s.refactorizations,
+        trace,
+        farkas,
+        ray: s.ray.take(),
+    }))
+}
+
+// Resume the artificial-bound continuation after the dual callback has returned.
+fn resume_artificial_transfer<R: Real>(model: &LpModel, opts: &SolveOptions,
+    transfer: PrimalTransfer) -> Result<SolveResult, SolveError> {
+    let PrimalTransfer { basis: from_dual, opts: popts, snapshot: s, route, .. } = transfer;
+    let PrimalRoute::Artificial { start } = route else { unreachable!() };
+        let PrimalOutcome { result, control } = dispatch_primal(model, &from_dual, &popts);
+        if crate::dump::on("callback") {
+            crate::dump::emit("callback", serde_json::json!({"event":"primal_outcome", "result":if result.is_ok() { Some(0) } else { None }, "status":control.map(ControlTransfer::status), "error":result.is_err(), "total":crate::simplex::TOTAL_ITERS.with(|c| c.get())}));
+        }
+        let mut prres = match result {
+            Err(SolveError::SingularBasis) if R::QUAD && s.art_exit => {
+                SINGULAR_FROM_PRIMAL.with(|c| c.set(true));
+                // A failed x87 handoff factorization returns -1002 to the
+                // controller, which restores the saved snapshot (seed 8825).
+                let Some((pit, pfac, pthr)) = crate::simplex::PRIMAL_SINGULAR.with(|c| c.take())
+                else {
+                    return Err(SolveError::SingularBasis);
+                };
+                if s.retries < 5 {
+                    C178.with(|c| c.set(c.get() + 1));
+                }
+                SINGULAR_BASIS.with(|c| *c.borrow_mut() = Some(from_dual.clone()));
+                SINGULAR.with(|c| {
+                    c.set(Some((
+                        s.iters + pit,
+                        s.refactorizations + pfac,
+                        s.lu_thr.max(pthr),
+                        s.avg_touch,
+                        s.last_cap,
+                        s.inf_count,
+                        false,
+                        s.retries,
+                        s.it_base + s.iters + pit,
+                    )))
+                });
+                return Err(SolveError::SingularBasis);
+            }
+            other => other.ok(),
+        };
+        // A progress exit after an artificial-bound handoff resumes dual from
+        // the primal basis and increments the shared -1004 counter.
+        let primal_stalled = R::QUAD && crate::simplex::PRIMAL_STALL.with(|c| c.take());
+        if primal_stalled {
+            C35C.with(|c| c.set(c.get() + 1));
+            // The controller ends a -1004 cycle at status 12 once the
+            // shared handoff counter exceeds 20 (0x15557d..0x15558c).
+            if C35C.with(|c| c.get() > 20) {
+                if let Some(mut r) = prres {
+                    r.status = Status::NumericalFailure;
+                    r.iterations += s.iters;
+                    r.refactorizations += s.refactorizations;
+                    return Ok(r);
+                }
+            }
+        }
+        // An artificial-bound dual exit can also hand off to a primal whose
+        // start factorization drops a singular column. Restore that column and
+        // retry the primal when its failed scan ends with the repair still out.
+        if R::QUAD
+            && s.art_exit
+            && !primal_stalled
+            && crate::simplex::PRIMAL_REPAIRED.with(|c| c.take())
+        {
+            if let Some(pr) = prres.as_mut().filter(|pr| pr.status == Status::Infeasible) {
+                crate::simplex::HANDOFF.with(|c| {
+                    c.set(Some(crate::simplex::Handoff {
+                        stale: None,
+                        // Restored-variable objective carry is not yet recovered.
+                        working_obj: None,
+                        nref0: s.nref + pr.refactorizations,
+                        thr: s.lu_thr,
+                        retries: s.retries as usize + 1,
+                        pert: false,
+                        pair_tol: PAIR_TOL.with(|c| c.get()),
+                        quad: true,
+                        dual_level: s.level,
+                        shifted_exit: false,
+                        iters: (s.it_base + s.iters) as f64,
+                        pricing_iters: (s.it_base + s.iters + pr.iterations) as f64,
+                        snap: (s.it_base + s.stall_it as usize) as f64,
+                        c178: C178.with(|c| c.get()),
+                        preserve_ratio: true,
+                        excl: None,
+                    }))
+                });
+                let mut retry_opts = popts.clone();
+                retry_opts.max_iterations = popts.max_iterations.saturating_sub(pr.iterations);
+                let mut retry = primal_callback(model, Some(&pr.basis), &retry_opts)?;
+                retry.iterations += pr.iterations;
+                retry.refactorizations += pr.refactorizations;
+                *pr = retry;
+            }
+        }
+        if R::QUAD && s.art_exit {
+            if let Some(pr) = prres
+                .as_ref()
+                .filter(|pr| pr.status == Status::Infeasible && pr.farkas.is_some())
+            {
+                // A completed phase-1 infeasibility verdict ends the controller;
+                // a failed scan requesting a restart resumes below. The reference's
+                // raw Farkas vector need not verify on ill-conditioned models.
+                let mut r = pr.clone();
+                r.iterations += s.iters;
+                r.refactorizations += s.refactorizations;
+                FARKAS_LEAVE.with(|c| c.set(None));
+                return Ok(r);
+            }
+        }
+        if R::QUAD && s.art_exit {
+            if let Some(pr) = prres
+                .as_ref()
+                .filter(|pr| pr.status == Status::NumericalFailure)
+            {
+                // The x87 primal ended with status 12 (`0x280dd9`: no leaving row for the entering variable, again after the request-7 refactorization, with updates on
+                // the factor): the controller ends the solve with it (seed 8179).
+                let mut r = pr.clone();
+                r.iterations += s.iters;
+                r.refactorizations += s.refactorizations;
+                return Ok(r);
+            }
+        }
+        // The primal's unit step of the entering variable belongs to its own ray only, not to the dual's artificial-bound point.
+        let prres_enter = crate::simplex::RAY_ENTER.with(|c| c.take());
+        if s.art_exit
+            && !prres
+                .as_ref()
+                .is_some_and(|pr| matches!(pr.status, Status::Optimal | Status::Unbounded))
+        {
+            // The primal gives up from the dual's basis: the dual runs on past the request-4 refactorization instead.
+            NO_ART_EXIT.with(|c| c.set(true));
+            let resume = prres.as_ref().map(|pr| pr.basis.clone());
+            if R::QUAD
+                && QUAD_RESUMES.with(|c| {
+                    c.set(c.get() + 1);
+                    c.get() <= 1 || primal_stalled
+                })
+            {
+                // A stalled x87 primal can resume quad repeatedly, retaining
+                // the context and its clocks (5959). Other routes retain the
+                // existing single-resume behavior pending their recovery.
+                let pit = prres.as_ref().map_or(0, |pr| pr.iterations);
+                let pfac = prres.as_ref().map_or(0, |pr| pr.refactorizations);
+                let carry3 = Carry {
+                    retries: s.retries,
+                    thr: s.lu_thr,
+                    fac: s.refactorizations + pfac,
+                    iters: s.iters + pit,
+                    avg_touch: 0.0,
+                    last_cap: 0,
+                    inf_count: 0,
+                    after_pivot: primal_stalled,
+                    it_base: s.it_base + s.iters + pit,
+                    nref0: s.nref + pfac.max(1),
+                };
+                let mut retry_opts = opts.clone();
+                retry_opts.max_iterations = opts.max_iterations.saturating_sub(carry3.iters);
+                let again = solve_pass::<R>(model, resume.as_ref().or(start.as_ref()), &retry_opts, &carry3, false);
+                NO_ART_EXIT.with(|c| c.set(false));
+                let mut again = again?;
+                again.iterations += carry3.iters;
+                return Ok(again);
+            }
+            let again = solve_frame(model, resume.as_ref().or(start.as_ref()), opts);
+            NO_ART_EXIT.with(|c| c.set(false));
+            return again;
+        }
+        if s.art_exit {
+            if let Some(pr) = prres.as_ref().filter(|pr| pr.status == Status::Optimal) {
+                // The variables left at an artificial bound were not a proof: the primal from the dual's basis found the optimum.
+                let mut r = pr.clone();
+                r.iterations += s.iters;
+                r.refactorizations += s.refactorizations;
+                return Ok(r);
+            }
+        }
+        if let Some(mut r) = prres {
+            r.iterations += s.iters;
+            r.refactorizations += s.refactorizations;
+            crate::simplex::RAY_ENTER.with(|c| c.set(prres_enter));
+            return Ok(r);
+        }
+        return Err(SolveError::SingularBasis);
+    }
+// The callback has returned before this controller dispatch runs the primal.
+fn resume_primal_transfer<R: Real>(model: &LpModel, opts: &SolveOptions,
+    transfer: PrimalTransfer) -> Result<SolveResult, SolveError> {
+    let PrimalTransfer { basis: b, opts: popts, snapshot: s, status, mut trace, control_status: _, route: _ } = transfer;
+        let PrimalOutcome { result: primal_result, control } = dispatch_primal(model, &b, &popts);
+        // The inferred control status remains separate from the solve result
+        // and error so the legacy continuation can distinguish all three.
+        let control_status = control.map(ControlTransfer::status);
+        if crate::dump::on("callback") {
+            crate::dump::emit("callback", serde_json::json!({"event":"primal_outcome", "result":if primal_result.is_ok() { Some(0) } else { None }, "status":control_status, "error":primal_result.is_err(), "total":crate::simplex::TOTAL_ITERS.with(|c| c.get())}));
+        }
         let mut r = match primal_result {
             Err(SolveError::SingularBasis) => {
                 SINGULAR_FROM_PRIMAL.with(|c| c.set(true));
@@ -5557,7 +6096,7 @@ fn solve_pass<R: Real>(
                 c.set(Some(crate::simplex::Handoff {
                     stale: None,
                     working_obj: None,
-                    nref0: s.nref() + r.refactorizations,
+                    nref0: s.nref + r.refactorizations,
                     thr: s.lu_thr,
                     retries: s.retries as usize + repair_count,
                     pert: false,
@@ -5578,7 +6117,7 @@ fn solve_pass<R: Real>(
             let b2 = r.basis.clone();
             let mut retry_opts = popts.clone();
             retry_opts.max_iterations = popts.max_iterations.saturating_sub(r.iterations);
-            let r2 = crate::simplex::solve(model, Some(&b2), &retry_opts)?;
+            let r2 = primal_callback(model, Some(&b2), &retry_opts)?;
             r.iterations += r2.iterations;
             r.refactorizations += r2.refactorizations;
             r.status = r2.status;
@@ -5610,7 +6149,7 @@ fn solve_pass<R: Real>(
                 inf_count: 0,
                 after_pivot: true,
                 it_base: s.it_base + r.iterations,
-                nref0: s.nref() + (r.refactorizations - s.refactorizations).max(1),
+                nref0: s.nref + (r.refactorizations - s.refactorizations).max(1),
             };
             let mut retry_opts = opts.clone();
             retry_opts.max_iterations = opts.max_iterations.saturating_sub(carry2.iters);
@@ -5632,7 +6171,7 @@ fn solve_pass<R: Real>(
                 inf_count: 0,
                 after_pivot: true,
                 it_base: s.it_base + r.iterations,
-                nref0: s.nref() + l.max(1),
+                nref0: s.nref + l.max(1),
             };
             let mut retry_opts = opts.clone();
             retry_opts.max_iterations = opts.max_iterations.saturating_sub(carry2.iters);
@@ -5693,7 +6232,7 @@ fn solve_pass<R: Real>(
                     // reference's `lu_in`: fx_midsing_m5, 1494, 1390, `dual_acc` captures). The x87 primal with shifts in force ends at its first failed scan with
                     // status -1004 and makes no such factorizations: every one counts (seed 2950: four in the reference, `ctx+0x2c0` 24 -> 28).
                     let l = r.refactorizations - s.refactorizations;
-                    s.nref()
+                    s.nref
                         + if R::QUAD {
                             l.max(1)
                         } else {
@@ -5710,313 +6249,6 @@ fn solve_pass<R: Real>(
             return Ok(r2);
         }
         return Ok(r);
-    }
-    if status == Status::Unbounded && s.art_exit {
-        if R::QUAD && s.art_exit {
-            C35C.with(|c| c.set(c.get() + 1));
-        }
-        // A request-4 artificial-bound exit returns -1004 to the controller, which runs the primal from this basis. Its completed status is final.
-        let mut popts = opts.clone();
-        popts.max_iterations = opts.max_iterations.saturating_sub(s.iters);
-        popts.method = crate::simplex::Method::Primal;
-        if opts.perturb != 0.0 {
-            // The release profile: the primal goes on in method 2 with the dual's counters (`compare.py switch` call 0 of `dual-release`: iterations, the stall
-            // counters, `ctx+0x2c0` one above the dual's factorizations, `ctx+0x340` = 1e-5 for the default `PerturbValue`).
-            popts.sw_carry = Some(crate::simplex::SwCarry {
-                iters: s.iters as f64,
-                degenerate: s.stall as i32,
-                snap_degenerate: s.stall_snap as i32,
-                snap_iters: s.stall_it,
-                factorizations: s.refactorizations as u32,
-
-                level: 0,
-                pert: 0.0,
-            });
-        }
-        let from_dual = Basis {
-            basic: s.head.clone(),
-            at_upper: (0..n + m).map(|j| s.st[j] == UB && p.up[j] < BIG).collect(),
-        };
-        if R::QUAD && s.art_exit {
-            // After a quad pass the reference's primal is the x87 one (`ctx+0x28` stays 1), whatever ended the dual (random LP seed 5247: the request-4
-            // exit of a quad pass; the double primal found the ill-conditioned basis singular and the run ended with an error).
-            if crate::simplex::QUAD_PRIMALS.with(|c| c.get()) == 0 && s.iters > 0 {
-                popts.pricing0 = C35C.with(|c| c.get()) == 1;
-            }
-            crate::simplex::HANDOFF.with(|c| {
-                c.set(Some(crate::simplex::Handoff {
-                    stale: Some(s.pair),
-                    working_obj: (s.obj_off == 0.0 && model.offset == 0.0)
-                        .then_some(s.working_obj)
-                        .flatten(),
-                    nref0: s.nref(),
-                    thr: s.lu_thr,
-                    retries: s.retries as usize,
-                    // The quad dual driver ends with status 2 or 5 (an unbounded verdict here) clear the cost shifts `ctx+0x338` (`0x24a539`), so the x87 primal runs without them and
-                    // ends with a refactorization and an optimal verdict (seed 6610) instead of the request-9 end that restores the dual (seeds 2133, 2950).
-                    pert: false,
-                    pair_tol: PAIR_TOL.with(|c| c.get()),
-                    quad: true,
-                    dual_level: s.level,
-                    shifted_exit: false,
-                    iters: (s.it_base + s.iters) as f64,
-                    pricing_iters: (s.it_base + s.iters) as f64,
-                    snap: (s.it_base + s.stall_it as usize) as f64,
-                    c178: C178.with(|c| c.get()),
-                    preserve_ratio: false,
-                    excl: if s.pert == 0 { s.repaired } else { None },
-                }))
-            });
-        }
-        crate::simplex::PRIMAL_SINGULAR.with(|c| c.set(None));
-        crate::simplex::PRIMAL_START_SINGULAR.with(|c| c.set(false));
-        crate::simplex::PRIMAL_REPAIRED.with(|c| c.set(false));
-        let mut prres = match crate::simplex::solve(model, Some(&from_dual), &popts) {
-            Err(SolveError::SingularBasis) if R::QUAD && s.art_exit => {
-                SINGULAR_FROM_PRIMAL.with(|c| c.set(true));
-                // A failed x87 handoff factorization returns -1002 to the
-                // controller, which restores the saved snapshot (seed 8825).
-                let Some((pit, pfac, pthr)) = crate::simplex::PRIMAL_SINGULAR.with(|c| c.take())
-                else {
-                    return Err(SolveError::SingularBasis);
-                };
-                if s.retries < 5 {
-                    C178.with(|c| c.set(c.get() + 1));
-                }
-                SINGULAR_BASIS.with(|c| *c.borrow_mut() = Some(from_dual.clone()));
-                SINGULAR.with(|c| {
-                    c.set(Some((
-                        s.iters + pit,
-                        s.refactorizations + pfac,
-                        s.lu_thr.max(pthr),
-                        s.avg_touch,
-                        s.last_cap,
-                        s.inf_count,
-                        false,
-                        s.retries,
-                        s.it_base + s.iters + pit,
-                    )))
-                });
-                return Err(SolveError::SingularBasis);
-            }
-            other => other.ok(),
-        };
-        // A progress exit after an artificial-bound handoff resumes dual from
-        // the primal basis and increments the shared -1004 counter.
-        let primal_stalled = R::QUAD && crate::simplex::PRIMAL_STALL.with(|c| c.take());
-        if primal_stalled {
-            C35C.with(|c| c.set(c.get() + 1));
-            // The controller ends a -1004 cycle at status 12 once the
-            // shared handoff counter exceeds 20 (0x15557d..0x15558c).
-            if C35C.with(|c| c.get() > 20) {
-                if let Some(mut r) = prres {
-                    r.status = Status::NumericalFailure;
-                    r.iterations += s.iters;
-                    r.refactorizations += s.refactorizations;
-                    return Ok(r);
-                }
-            }
-        }
-        // An artificial-bound dual exit can also hand off to a primal whose
-        // start factorization drops a singular column. Restore that column and
-        // retry the primal when its failed scan ends with the repair still out.
-        if R::QUAD
-            && s.art_exit
-            && !primal_stalled
-            && crate::simplex::PRIMAL_REPAIRED.with(|c| c.take())
-        {
-            if let Some(pr) = prres.as_mut().filter(|pr| pr.status == Status::Infeasible) {
-                crate::simplex::HANDOFF.with(|c| {
-                    c.set(Some(crate::simplex::Handoff {
-                        stale: None,
-                        // Restored-variable objective carry is not yet recovered.
-                        working_obj: None,
-                        nref0: s.nref() + pr.refactorizations,
-                        thr: s.lu_thr,
-                        retries: s.retries as usize + 1,
-                        pert: false,
-                        pair_tol: PAIR_TOL.with(|c| c.get()),
-                        quad: true,
-                        dual_level: s.level,
-                        shifted_exit: false,
-                        iters: (s.it_base + s.iters) as f64,
-                        pricing_iters: (s.it_base + s.iters + pr.iterations) as f64,
-                        snap: (s.it_base + s.stall_it as usize) as f64,
-                        c178: C178.with(|c| c.get()),
-                        preserve_ratio: true,
-                        excl: None,
-                    }))
-                });
-                let mut retry_opts = popts.clone();
-                retry_opts.max_iterations = popts.max_iterations.saturating_sub(pr.iterations);
-                let mut retry = crate::simplex::solve(model, Some(&pr.basis), &retry_opts)?;
-                retry.iterations += pr.iterations;
-                retry.refactorizations += pr.refactorizations;
-                *pr = retry;
-            }
-        }
-        if R::QUAD && s.art_exit {
-            if let Some(pr) = prres
-                .as_ref()
-                .filter(|pr| pr.status == Status::Infeasible && pr.farkas.is_some())
-            {
-                // A completed phase-1 infeasibility verdict ends the controller;
-                // a failed scan requesting a restart resumes below. The reference's
-                // raw Farkas vector need not verify on ill-conditioned models.
-                let mut r = pr.clone();
-                r.iterations += s.iters;
-                r.refactorizations += s.refactorizations;
-                FARKAS_LEAVE.with(|c| c.set(None));
-                return Ok(r);
-            }
-        }
-        if R::QUAD && s.art_exit {
-            if let Some(pr) = prres
-                .as_ref()
-                .filter(|pr| pr.status == Status::NumericalFailure)
-            {
-                // The x87 primal ended with status 12 (`0x280dd9`: no leaving row for the entering variable, again after the request-7 refactorization, with updates on
-                // the factor): the controller ends the solve with it (seed 8179).
-                let mut r = pr.clone();
-                r.iterations += s.iters;
-                r.refactorizations += s.refactorizations;
-                return Ok(r);
-            }
-        }
-        // The primal's unit step of the entering variable belongs to its own ray only, not to the dual's artificial-bound point.
-        let prres_enter = crate::simplex::RAY_ENTER.with(|c| c.take());
-        if s.art_exit
-            && !prres
-                .as_ref()
-                .is_some_and(|pr| matches!(pr.status, Status::Optimal | Status::Unbounded))
-        {
-            // The primal gives up from the dual's basis: the dual runs on past the request-4 refactorization instead.
-            NO_ART_EXIT.with(|c| c.set(true));
-            let resume = prres.as_ref().map(|pr| pr.basis.clone());
-            if R::QUAD
-                && QUAD_RESUMES.with(|c| {
-                    c.set(c.get() + 1);
-                    c.get() <= 1 || primal_stalled
-                })
-            {
-                // A stalled x87 primal can resume quad repeatedly, retaining
-                // the context and its clocks (5959). Other routes retain the
-                // existing single-resume behavior pending their recovery.
-                let pit = prres.as_ref().map_or(0, |pr| pr.iterations);
-                let pfac = prres.as_ref().map_or(0, |pr| pr.refactorizations);
-                let carry3 = Carry {
-                    retries: s.retries,
-                    thr: s.lu_thr,
-                    fac: s.refactorizations + pfac,
-                    iters: s.iters + pit,
-                    avg_touch: 0.0,
-                    last_cap: 0,
-                    inf_count: 0,
-                    after_pivot: primal_stalled,
-                    it_base: s.it_base + s.iters + pit,
-                    nref0: s.nref() + pfac.max(1),
-                };
-                let mut retry_opts = opts.clone();
-                retry_opts.max_iterations = opts.max_iterations.saturating_sub(carry3.iters);
-                let again = solve_pass::<R>(model, resume.as_ref().or(start), &retry_opts, &carry3, false);
-                NO_ART_EXIT.with(|c| c.set(false));
-                let mut again = again?;
-                again.iterations += carry3.iters;
-                return Ok(again);
-            }
-            let again = solve_frame(model, resume.as_ref().or(start), opts);
-            NO_ART_EXIT.with(|c| c.set(false));
-            return again;
-        }
-        if s.art_exit {
-            if let Some(pr) = prres.as_ref().filter(|pr| pr.status == Status::Optimal) {
-                // The variables left at an artificial bound were not a proof: the primal from the dual's basis found the optimum.
-                let mut r = pr.clone();
-                r.iterations += s.iters;
-                r.refactorizations += s.refactorizations;
-                return Ok(r);
-            }
-        }
-        if let Some(mut r) = prres {
-            r.iterations += s.iters;
-            r.refactorizations += s.refactorizations;
-            crate::simplex::RAY_ENTER.with(|c| c.set(prres_enter));
-            return Ok(r);
-        }
-        return Err(SolveError::SingularBasis);
-    }
-    if status == Status::Unbounded {
-        // Status 5 on the dual itself goes directly to the controller's final status store. Keep its raw artificial-bound ray and return the finite
-        // point obtained by clearing the artificial bounds, without solving a second feasibility problem.
-        s.zero_artificial = true;
-        s.recompute_xb(0);
-    }
-    if status == Status::IterationLimit && s.level != 0 {
-        s.zero_artificial = true;
-        s.recompute_xb(0);
-    }
-    // Read-out.
-    let sgn = if model.sense == Sense::Maximize {
-        -1.0
-    } else {
-        1.0
-    };
-    let mut x = vec![0.0; n + m];
-    let mut xr: Vec<(f64, f64)> = Vec::new();
-    for j in 0..n + m {
-        if R::QUAD {
-            // The long-double value the quad pass holds (exact as two doubles): the reference's objective is computed from it, not from the rounded x.
-            let v = if s.st[j] >= 0 {
-                s.xb[s.st[j] as usize]
-            } else {
-                R::c(s.nonbasic_value(j))
-            };
-            let hi = v.to_f64();
-            xr.push((hi, (v - R::c(hi)).to_f64()));
-        }
-        x[j] = if s.st[j] >= 0 {
-            let v = s.xb[s.st[j] as usize];
-            let (lo, up) = (s.p.lo[j], s.p.up[j]);
-            // After the clean-up factorization the reference shifts the basic solution to zero lower bounds (`x - lo`, loop `0x10731f..0x1073d2`, run on
-            // the FTRAN result; the threshold `[rsp+0x78]` is `ctx+0x370` = 1e30) and adds the bound back at the read-out: a rounding round trip for a
-            // finite lower bound (not on the other exits: 80BAU3B is bit-equal without it). A variable with only an upper bound is mirrored in the
-            // reference (`x' = -x`, lower bound `-up`), so its round trip uses the upper bound: `(-x + up) - up` negated is `(x - up) + up`. A free basic
-            // variable stays as it is (bit-equal on fx_cleanrt_free_105, _1331, _2122: 19 to 36 nonzero free basic values each).
-            if cleaned && lo > -1e30 && lo.is_finite() {
-                ((v - R::c(lo)) + R::c(lo)).to_f64()
-            } else if cleaned && up < 1e30 && up.is_finite() {
-                ((v - R::c(up)) + R::c(up)).to_f64()
-            } else {
-                v.to_f64()
-            }
-        } else {
-            s.nonbasic_value(j)
-        };
-    }
-    s.cost.clone_from(&p.cost);
-    let mut y: Vec<f64> = s.head.iter().map(|&j| p.cost[j]).collect();
-    s.factor.btran(&mut y);
-    let dtrue: Vec<f64> = s.true_d().iter().map(|v| v.to_f64()).collect();
-    let nm = model.num_cols();
-    let xs: Vec<f64> = x[..nm].to_vec();
-    let at_upper: Vec<bool> = s.st.iter().map(|&t| t == UB).collect();
-    QUAD_XR.with(|c| *c.borrow_mut() = if R::QUAD { Some(xr) } else { None });
-    Ok(SolveResult {
-        status,
-        objective: objective_in::<R>(model, &xs),
-        x: xs,
-        dual: y.iter().map(|v| sgn * v).collect(),
-        reduced_cost: dtrue[..nm].iter().map(|v| sgn * v).collect(),
-        basis: Basis {
-            basic: s.head.clone(),
-            at_upper,
-        },
-        iterations: s.iters,
-        refactorizations: s.refactorizations,
-        trace,
-        farkas,
-        ray: s.ray.take(),
-    })
 }
 
 #[cfg(test)]
@@ -6151,6 +6383,7 @@ mod captured_bh305_ratio {
             it_base: 0,
             dflag: Vec::new(),
             switch_enabled: false,
+            automatic_quad: false,
             level: 0,
             request: 0,
             iters: 0,
@@ -6185,6 +6418,7 @@ mod captured_bh305_ratio {
             pending_alpha: None,
             pair: (0.0, 0.0),
             status: None,
+            drift_status: false,
             nm: n,
             ray: None,
             zero_artificial: false,
@@ -6292,6 +6526,40 @@ fn quad_working_objective_captured_stores() {
 #[cfg(test)]
 thread_local! {
     static LOWGATE_TEST: std::cell::RefCell<Option<Vec<(&'static str, usize, u32, f64, Vec<usize>)>>> = const { std::cell::RefCell::new(None) };
+    static CEILING_TEST: std::cell::RefCell<Option<Vec<(&'static str, usize, u32, Vec<usize>)>>> = const { std::cell::RefCell::new(None) };
+    static CEILING_NO_ACCEPT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[cfg(test)]
+#[test]
+fn drift_ceiling_without_acceptance_reaches_restart() {
+    // Native noaccept capture changes request 4 to 0 at c1fe3.
+    let model = crate::mps::parse(include_str!("../tests/fixtures/fx_quad_obj_5371.mps")).unwrap();
+    let mut opts = crate::SolveOptions::dual_release();
+    opts.max_iterations = 200;
+    CEILING_TEST.with(|c| *c.borrow_mut() = Some(Vec::new()));
+    CEILING_NO_ACCEPT.with(|c| c.set(true));
+    let _ = crate::solve(&model, None, &opts);
+    CEILING_NO_ACCEPT.with(|c| c.set(false));
+    let events = CEILING_TEST.with(|c| c.borrow_mut().take().unwrap());
+    let head = vec![23, 31, 32, 6, 1, 4, 5, 10, 21, 18, 20];
+    assert_eq!(events, vec![("pending", 16, 4, head.clone()), ("restart", 16, 0, head)]);
+}
+
+#[cfg(test)]
+#[test]
+fn drift_ceiling_acceptance_overwrites_pending_status() {
+    // Counterfactual native 5371 capture: count 2 and tolerance 1e-3 at
+    // c177e; c17e7 writes -1002, then c21f6 overwrites it with 2.
+    let model = crate::mps::parse(include_str!("../tests/fixtures/fx_quad_obj_5371.mps")).unwrap();
+    let mut opts = crate::SolveOptions::dual_release();
+    opts.max_iterations = 200;
+    CEILING_TEST.with(|c| *c.borrow_mut() = Some(Vec::new()));
+    let result = crate::solve(&model, None, &opts);
+    let events = CEILING_TEST.with(|c| c.borrow_mut().take().unwrap());
+    let head = vec![23, 31, 32, 6, 1, 4, 5, 10, 21, 18, 20];
+    assert_eq!(events, vec![("pending", 16, 4, head.clone()), ("accepted", 16, 4, head)]);
+    assert!(result.is_ok());
 }
 
 #[cfg(test)]
@@ -6394,4 +6662,46 @@ fn iteration_limit_keeps_the_last_allowed_pivot() {
     complete_basic.sort_unstable();
     assert_eq!(bounded_basic, complete_basic);
     assert_eq!(result.basis.at_upper, complete.basis.at_upper);
+}
+
+#[test]
+fn callback_carry_survives_primal_and_live_override() {
+    let opts = SolveOptions::dual_release();
+    set_primal_tol(1e-6);
+    set_dual_tol(1e-6);
+    callback_reset();
+    C35C.with(|c| c.set(8));
+    let mut dual = CallbackGuard::enter(true, &opts);
+    assert_eq!(primal_tol().to_bits(), (1e-6_f64 * 0.2).to_bits());
+    set_primal_tol(4e-7);
+    dual.finish();
+    let expected_carry = 4e-7_f64 / 0.2;
+    {
+        let _primal = CallbackGuard::enter(false, &opts);
+        set_primal_tol(1e-5);
+    }
+    let _dual = CallbackGuard::enter(true, &opts);
+    assert_eq!(primal_tol().to_bits(), expected_carry.to_bits());
+}
+
+#[cfg(test)]
+mod captured_primal_drift_gate {
+    use super::*;
+    use crate::f80::F80;
+
+    #[test]
+    fn reference_5371_dual_and_ceiling_actions() {
+        // Native double event at total 16: residual and bound violation.
+        assert!(primal_drift_excess(0.010148395773596355_f64, 0.002116363008820097_f64));
+        assert!(!primal_drift_excess(0.001_f64, 0.1_f64));
+        assert_eq!(primal_drift_action(2, 1e-6, false, true), (1e-6, false, false));
+        assert_eq!(primal_drift_action(3, 1e-6, false, true), (1e-6 * 10.0, true, false));
+        assert_eq!(primal_drift_action(3, 1e-3, false, true), (1e-3, false, true));
+        assert_eq!(primal_drift_action(3, 1e-3, false, false), (1e-3, false, false));
+        assert_eq!(primal_drift_action(3, 1e-3, true, true), (1e-3, false, false));
+        // A sub-double-ULP distinction must survive until the x87 comparison.
+        let one = F80::from_f64(1.0);
+        let epsilon = F80::from_f64(2.0_f64.powi(-60));
+        assert!(primal_drift_excess((one + epsilon) / F80::from_f64(100.0), one));
+    }
 }
