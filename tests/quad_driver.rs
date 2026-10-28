@@ -175,3 +175,12 @@ fn quad_restart_keeps_snapshot_bound_sides_and_shifts() {
     let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
     assert_eq!((result.status, result.iterations), (Status::NumericalFailure, 164));
 }
+
+#[test]
+fn shifted_x87_primal_recomputes_duals_in_place_after_a_failed_list_scan() {
+    // The x87 primal with cost shifts recomputes the duals without a factorization when its candidate list fails (s2950, scan at pass iteration 70:
+    // the stale list held a nonbasic variable of the wrong sign); all 283 quad calls agree with the reference.
+    let model = mps::parse(include_str!("fixtures/quad_s2950.mps")).unwrap();
+    let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
+    assert_eq!((result.status, result.iterations), (Status::Optimal, 268));
+}

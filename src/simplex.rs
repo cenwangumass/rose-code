@@ -3040,11 +3040,12 @@ impl<'a> Solver<'a> {
             && self.list_failed
             && self.repaired
             && self.excluded.is_some()
-            && self.handoff.is_some_and(|h| h.quad)
+            && self.handoff.is_some_and(|h| h.quad && !h.pert)
             && self.factor.num_updates() > 0
         {
             // With the dropped variable still out the failed scan is followed by the factorization before the duals are recomputed
             // (`price_admitting`; 5959 x87_dw scans 366 -> 367: `ctx+0x2c0` 7 -> 8 with no rescan record).
+            // Not with cost shifts in force (`h.pert`): there the duals are recomputed in place, `ctx+0x2c0` unchanged (s2950 x87_dw scans 17 -> 18, iteration 70).
             self.list_failed = false;
             return Ok(None);
         }
