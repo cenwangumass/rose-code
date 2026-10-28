@@ -1725,7 +1725,8 @@ pub fn status(t: &TermIn) -> (i32, u32) {
     let mut relgap = gap / ((t.q130 - t.off).abs() + 1.0);
     if t.q2a0 == 0 {
         let alt = gap / (100.0 * t.q130.abs() + 1.0);
-        if relgap <= alt {
+        // `maxsd xmm1, xmm2` (`0x2e30a2`): the second operand wins on equality and on a NaN.
+        if !(relgap > alt) {
             relgap = alt;
         }
     }
@@ -1743,7 +1744,7 @@ pub fn status(t: &TermIn) -> (i32, u32) {
         return (0xd, 2);
     }
     for v in [t.q1f8, t.q220, t.q228] {
-        if v.is_nan() || v.is_infinite() {
+        if v.is_nan() {
             return (0xd, 3);
         }
     }
