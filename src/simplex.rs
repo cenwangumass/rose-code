@@ -574,6 +574,21 @@ fn progress_uses_previous_infeasibility() {
 
 #[cfg(test)]
 #[test]
+fn standalone_pricing_accuracy_counts_stability() {
+    // Native randlp5959-release standalone_c178.LIM=1: iteration 1, 0 -> 1.
+    let model = crate::mps::parse(include_str!("../tests/fixtures/primal_5959.mps")).unwrap();
+    let mut opts = SolveOptions::release();
+    opts.max_iterations = 2;
+    crate::dual::C178.with(|c| c.set(7));
+    crate::solve(&model, None, &opts).unwrap();
+    assert_eq!(crate::dual::C178.with(|c| c.get()), 1);
+    opts.max_iterations = 0;
+    crate::solve(&model, None, &opts).unwrap();
+    assert_eq!(crate::dual::C178.with(|c| c.get()), 0);
+}
+
+#[cfg(test)]
+#[test]
 fn standalone_primal_initial_progress_snapshot() {
     let model = crate::mps::parse(include_str!("../tests/fixtures/primal_5959.mps")).unwrap();
     let mut opts = SolveOptions::release();
@@ -4863,6 +4878,7 @@ pub fn solve(
         // A standalone solve starts a new context; handoffs retain the dual's counters.
         crate::dual::reset_pert_sizes(opts.perturb);
         crate::dual::C35C.with(|c| c.set(1));
+        crate::dual::C178.with(|c| c.set(0));
         TOTAL_ITERS.with(|c| c.set(0.0));
         EARLIER_ITERS.with(|c| c.set(0));
         crate::dual::set_dual_tol(1e-6);
@@ -5626,9 +5642,8 @@ fn solve_primal(
         let price = s.price_admitting()?;
         if std::mem::take(&mut s.p0_accuracy) {
             s.accuracy += 1;
-            if s.handoff.is_some() {
-                crate::dual::C178.with(|c| c.set(c.get() + 1));
-            }
+            // The standalone pricing0 accuracy rejection also updates ctx+0x178.
+            crate::dual::C178.with(|c| c.set(c.get() + 1));
             s.work.trig();
             s.work.decided(s.work.w);
             if let Some(mi) = s.mirror.as_mut() {
