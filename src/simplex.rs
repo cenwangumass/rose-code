@@ -532,7 +532,7 @@ thread_local! {
 }
 
 #[cfg(test)]
-type QuadProgressRecord = (usize, f64, Option<f64>, Option<f64>, u32, u32, bool);
+type QuadProgressRecord = (usize, f64, f64, Option<f64>, Option<f64>, u32, u32, bool);
 
 #[cfg(test)]
 thread_local! {
@@ -610,12 +610,15 @@ fn standalone_primal_initial_progress_snapshot() {
 fn quad_progress_carried_objective_and_stall_exit() {
     let model = crate::mps::parse(include_str!("../tests/fixtures/fx_quad_obj_5371.mps")).unwrap();
     let mut opts = SolveOptions::dual_release();
-    opts.max_iterations = 5210;
+    // The handoff context starts after 92 iterations in earlier contexts.
+    // Its 51st progress check is at context iteration 5209, global clock 5301.
+    opts.max_iterations = 5302;
     QUAD_PROGRESS_TEST.with(|c| *c.borrow_mut() = Some(Vec::new()));
     crate::dual::PRIMAL_SUM_TEST.with(|c| *c.borrow_mut() = Some(Vec::new()));
     crate::dual::PRIMAL_SNAPSHOT_TEST.with(|c| *c.borrow_mut() = Some(Vec::new()));
     // This checks the first stall exit; later controller passes are a separate comparison.
-    let _result = crate::solve(&model, None, &opts);
+    let result = crate::solve(&model, None, &opts).unwrap();
+    assert!(result.iterations <= opts.max_iterations);
     let records = QUAD_PROGRESS_TEST.with(|c| c.borrow_mut().take().unwrap());
     let sums = crate::dual::PRIMAL_SUM_TEST.with(|c| c.borrow_mut().take().unwrap());
     let quad: Vec<_> = sums.iter().filter(|&&(q, _, total, _)| q && total == 92).copied().collect();
@@ -623,7 +626,7 @@ fn quad_progress_carried_objective_and_stall_exit() {
     assert!(sums.contains(&(false, 0, 0, 64.00961303710938)));
     let snapshots = crate::dual::PRIMAL_SNAPSHOT_TEST.with(|c| c.borrow_mut().take().unwrap());
     // The first x87 progress check replaces the prior dual snapshot (native
-    // mode-0 save at total iteration 109); all 51 checks save this basis.
+    // mode-0 save at context iteration 109, total 201); all 51 checks save this basis.
     assert!(snapshots.len() >= 51);
     for (basic, upper, quality) in &snapshots[..51] {
         assert_eq!(*basic, [23, 31, 32, 6, 1, 8, 5, 10, 21, 18, 16]);
@@ -631,8 +634,9 @@ fn quad_progress_carried_objective_and_stall_exit() {
         assert_eq!(*quality, 2);
     }
     assert!(records.len() >= 51);
-    for (i, &(it, base, old, new, calls, stalls, stalled)) in records[..51].iter().enumerate() {
+    for (i, &(it, base, total, old, new, calls, stalls, stalled)) in records[..51].iter().enumerate() {
         assert_eq!(it as f64 + base, 109.0 + 102.0 * i as f64);
+        assert_eq!(total, 201.0 + 102.0 * i as f64);
         let expected_old = if i == 0 { 221699549.95117602_f64 } else { 268371380.61310527_f64 };
         assert_eq!(old.unwrap().to_bits(), expected_old.to_bits());
         assert_eq!(new.unwrap().to_bits(), 268371380.61310527_f64.to_bits());
@@ -1858,7 +1862,7 @@ impl<'a> Solver<'a> {
         }
         #[cfg(test)]
         record_quad_progress((
-            self.iters_done, h.iters, old_obj, objective, self.stall_calls, self.stall_cnt, self.stalled,
+            self.iters_done, h.iters, TOTAL_ITERS.with(|c| c.get()), old_obj, objective, self.stall_calls, self.stall_cnt, self.stalled,
         ));
         if crate::dump::on("qprogress") {
             use crate::real::Real;
