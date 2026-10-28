@@ -2971,6 +2971,18 @@ impl<'a> Solver<'a> {
         self.recomputed = false;
         self.dump_xpricing(if self.admit_scan { "admit" } else { "scan" });
         let q = self.price();
+        if q.is_none()
+            && self.list_failed
+            && self.repaired
+            && self.excluded.is_some()
+            && self.handoff.is_some_and(|h| h.quad)
+            && self.factor.num_updates() > 0
+        {
+            // With the dropped variable still out the failed scan is followed by the factorization before the duals are recomputed
+            // (`price_admitting`; 5959 x87_dw scans 366 -> 367: `ctx+0x2c0` 7 -> 8 with no rescan record).
+            self.list_failed = false;
+            return Ok(None);
+        }
         if q.is_none() && self.list_failed {
             self.list_failed = false;
             self.recomputed = true;
