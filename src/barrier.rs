@@ -1810,19 +1810,23 @@ pub fn status(t: &TermIn) -> (i32, u32) {
     }
     let d1 = t.q160 + 1.0;
     let d2 = 1.0 + t.q170;
-    let m = |j: usize| (t.h50[j] / d1).max(t.h68[j] / d2);
+    // `maxsd`: the second operand wins on equality and NaN (`0x2e376d`, `0x2e37c5`).
+    let m = |j: usize| {
+        let (a, b) = (t.h50[j] / d1, t.h68[j] / d2);
+        if a > b { a } else { b }
+    };
     let late;
     if it < 11 {
         if it > 5 {
-            if m(iu) < 0.9 * m(iu - 5) && t.q1f0 <= 0.99 * t.h78[iu - 5] {
+            if m(iu) < 0.9 * m(iu - 5) && t.q1f0 < 0.99 * t.h78[iu - 5] {
                 return (1, 16);
             }
-            if m(iu) < 0.9 * m(iu - 1) && t.q1f0 <= 0.99 * t.h78[iu - 1] {
+            if m(iu) < 0.9 * m(iu - 1) && t.q1f0 < 0.99 * t.h78[iu - 1] {
                 return (1, 17);
             }
             late = t.if8 + 0x14 < it;
         } else if it > 1 {
-            if m(iu) < 0.9 * m(iu - 1) && t.q1f0 <= 0.99 * t.h78[iu - 1] {
+            if m(iu) < 0.9 * m(iu - 1) && t.q1f0 < 0.99 * t.h78[iu - 1] {
                 return (1, 18);
             }
             late = t.if8 + 0x14 < it;
@@ -1833,10 +1837,10 @@ pub fn status(t: &TermIn) -> (i32, u32) {
         if 1e-10 < t.q1f0 && t.q1f0 < t.h80[iu - 10] * 0.9 {
             return (1, 19);
         }
-        if m(iu) < 0.9 * m(iu - 5) && t.q1f0 <= 0.99 * t.h78[iu - 5] {
+        if m(iu) < 0.9 * m(iu - 5) && t.q1f0 < 0.99 * t.h78[iu - 5] {
             return (1, 20);
         }
-        if m(iu) < 0.9 * m(iu - 1) && t.q1f0 <= 0.99 * t.h78[iu - 1] {
+        if m(iu) < 0.9 * m(iu - 1) && t.q1f0 < 0.99 * t.h78[iu - 1] {
             return (1, 21);
         }
         late = t.if8 + 0x14 < it;
@@ -1858,7 +1862,7 @@ pub fn status(t: &TermIn) -> (i32, u32) {
             return (0xd, 25);
         }
     }
-    if (t.ncomp < 1.0 || 1e-16 <= t.q1f8) && (t.q5e0 != 0.0 || t.q5e8 != 0.0 || it <= t.if8 + 2) {
+    if !(t.ncomp > 0.0 && 1e-16 > t.q1f8) && (t.q5e0 != 0.0 || t.q5e8 != 0.0 || it <= t.if8 + 2) {
         return (1, 26);
     }
     (0xd, 27)
