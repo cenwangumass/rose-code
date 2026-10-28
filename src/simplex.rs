@@ -1782,7 +1782,7 @@ impl<'a> Solver<'a> {
     /// The cycle check at a requested factorization (`0x24684a..0x24694a` in `0x244cd0`): more than `m/5` iterations since the followed variable was first seen and more
     /// than 30 returns end the primal with status -1004 (seed 8179: 72 iterations alternating two entering variables); otherwise the followed variable is replaced once
     /// more than `2m` iterations have passed.
-    fn cycle_check(&mut self) {
+    fn cycle_check(&mut self, scheduled: bool) {
         let it = TOTAL_ITERS.with(|c| c.get());
         let m = self.p.m as f64;
         let d = it - self.cyc_start;
@@ -1793,9 +1793,20 @@ impl<'a> Solver<'a> {
             self.stalled = true;
             return;
         }
-        if self.cyc_count == 0 || self.cyc_var == -1 || d > 2.0 * m {
+        // A scheduled factorization (request 2 or 10) replaces the followed variable by the last entering one at once; the forced requests (4 to 8) leave it to the next iteration
+        // (`cyc_var == -2`, set by `cycle_note`). Verified against `primal_cycle` on 5959 (45 gates) and 8179.
+        if self.cyc_count == 0 && scheduled || self.cyc_var == -1 && scheduled {
             self.cyc_var = self.cyc_last;
             self.cyc_start = it;
+            self.cyc_period = 0;
+        } else if self.cyc_var == -1 || d > 2.0 * m {
+            self.cyc_var = if scheduled { self.cyc_last } else { -2 };
+            if scheduled {
+                self.cyc_start = it;
+            }
+            self.cyc_period = 0;
+        } else if self.cyc_count == 0 {
+            self.cyc_var = -2;
             self.cyc_period = 0;
         }
     }
@@ -5259,8 +5270,8 @@ fn solve_primal(
         stall_calls: 0,
         stall_cnt: 0,
         working_obj: handoff.and_then(|h| h.working_obj),
-        cyc_var: -2,
-        cyc_start: 0.0,
+        cyc_var: -1,
+        cyc_start: -1.0,
         cyc_period: 0,
         cyc_count: 0,
         cyc_last: -2,
@@ -5451,6 +5462,10 @@ fn solve_primal(
     }
     s.work.trig();
     s.work.decided(s.work.w);
+    if handoff.is_some_and(|h| h.quad) {
+        // The start factorization (request 1) passes the cycle gate too (`primal_cycle`, 8179 gate 28).
+        s.cycle_check(false);
+    }
     if !singular_work.is_empty() && s.mirror.is_some() {
         // The singular start basis: the driver factors it first (its cost enters the smoothed cost `ctx+0x158` and the factorization
         // count), then the repaired basis.
@@ -5565,7 +5580,7 @@ fn solve_primal(
             s.quad_switch_allowed = false;
             s.skip_forced_switch = false;
             if s.handoff.as_ref().is_some_and(|h| h.quad) {
-                s.cycle_check();
+                s.cycle_check(!forced);
             }
             if s.stalled {
                 PRIMAL_STALL.with(|c| c.set(true));
@@ -5972,6 +5987,9 @@ fn solve_primal(
                         s.skip_forced_switch = true;
                         s.refactor()?;
                         s.skip_forced_switch = false;
+                        if s.handoff.as_ref().is_some_and(|h| h.quad) {
+                            s.cycle_check(false);
+                        }
                         // The progress check can also end the primal during this
                         // no-candidate refactorization, before another scan.
                         if s.stalled {
