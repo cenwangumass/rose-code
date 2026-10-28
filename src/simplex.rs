@@ -524,6 +524,8 @@ thread_local! {
     pub(crate) static PRIMAL_SHIFT_END: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// Factorizations the primal of a dual handoff left out at its end (the Farkas pair, see `refactor_for_farkas`): the dual controller books them as made.
     pub(crate) static PRIMAL_FARKAS_SKIPPED: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// The pivot pair of the last Devex pivot of a standalone primal (`ctx+0x300`, `ctx+0x308`), which the x87 restart after the tolerance abort inherits.
+    pub(crate) static PRIMAL_RESTART_PAIR: std::cell::Cell<Option<(f64, f64)>> = const { std::cell::Cell::new(None) };
     pub(crate) static PRIMAL_TOL_ABORT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     pub(crate) static PRIMAL_DRIFT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The primal's factorization found the basis singular (status -1002, `0xf5921`): iterations and refactorizations of the primal, and its pivot threshold.
@@ -2706,9 +2708,8 @@ impl<'a> Solver<'a> {
             if tol < 1e-3 {
                 crate::dual::set_dual_tol(10.0 * tol);
                 crate::dual::set_resid_fails(0);
-            } else if self
-                .handoff
-                .is_some_and(|h| !h.quad && self.opts.automatic_quad)
+            } else if self.handoff.map_or(self.opts.faithful_positions, |h| !h.quad)
+                && self.opts.automatic_quad
             {
                 // Set status -1002 here; the residual routine still completes its check (0x1455ca..0x14562c).
                 PRIMAL_TOL_ABORT.with(|c| c.set(true));
@@ -4976,6 +4977,37 @@ pub fn solve(
                 };
                 iters += pit;
                 facs += pfac;
+                if PRIMAL_TOL_ABORT.with(|c| c.take()) {
+                    // The tolerance-ceiling exit (`0xcedb0`, gate `0xcee26`) restarts the primal from the crash basis in x87 mode.
+                    let c178 = crate::dual::C178.with(|c| c.get());
+                    let h = Handoff {
+                        stale: PRIMAL_RESTART_PAIR.with(|c| c.take()),
+                        working_obj: None,
+                        nref0: 0,
+                        thr: pthr,
+                        retries: 5,
+                        pert: false,
+                        pair_tol: 1e-6,
+                        quad: true,
+                        dual_level: 0,
+                        shifted_exit: false,
+                        iters: 0.0,
+                        pricing_iters: 0.0,
+                        snap: 0.0,
+                        c178,
+                        preserve_ratio: false,
+                        excl: None,
+                    };
+                    QUAD_PRIMALS.with(|c| c.set(c.get() + 1));
+                    // `ctx+0x468` stays as the standalone run left it: cleared once its Devex switch happened, so the phase 1 ratio test is the Harris one.
+                    QUAD_EEFA.with(|c| c.set(true));
+                    let mut qopts = opts.clone();
+                    qopts.max_iterations = opts.max_iterations.saturating_sub(iters);
+                    let mut r = solve_primal(model, None, &qopts, Some(h), None)?;
+                    r.iterations += iters;
+                    r.refactorizations += facs;
+                    return Ok(r);
+                }
                 let count = rs.map_or(0, |r| r.count);
                 rs = Some(PlainRestart {
                     count: count + 1,
@@ -7057,6 +7089,9 @@ fn solve_primal(
             // A structural entering variable's row value is the pivot element itself (as in the update of its `d`); a slack's is the row product.
             // The x87 primal also retains this pair (seed 6575, request 6 at iteration 19).
             s.stale = Some((alpha_rq, if q < n { alpha_rq } else { arq_x }));
+        } else {
+            // A standalone run does not check the pair, but the context keeps it for a restart in x87 (`PRIMAL_RESTART_PAIR`).
+            PRIMAL_RESTART_PAIR.with(|c| c.set(Some((alpha_rq, if q < n { alpha_rq } else { arq_x }))));
         }
         let mut norm_reset = false;
         let mut changed: Vec<usize> = Vec::new();
