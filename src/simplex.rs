@@ -1279,6 +1279,8 @@ struct Solver<'a> {
     repaired: bool,
     /// The scan right after the admission of the excluded variable (dump tag `admit`).
     admit_scan: bool,
+    /// The scan after a refactorization that follows a failed scan with the dropped variable out (not a scan of the reference's pricing routine hook).
+    retry_scan: bool,
     /// Restarts of a primal not started by the dual controller after singular factorizations (`ctx+0x184`, see `PlainRestart`).
     restarts: usize,
 }
@@ -2969,7 +2971,7 @@ impl<'a> Solver<'a> {
     fn price_faithful(&mut self) -> Result<Option<usize>, SolveError> {
         self.list_failed = false;
         self.recomputed = false;
-        self.dump_xpricing(if self.admit_scan { "admit" } else { "scan" });
+        self.dump_xpricing(if self.admit_scan { "admit" } else if self.retry_scan { "retry" } else { "scan" });
         let q = self.price();
         if q.is_none()
             && self.list_failed
@@ -3072,7 +3074,10 @@ impl<'a> Solver<'a> {
                         let r = self.refactor();
                         self.pre_restart = false;
                         r?;
-                        let retry = self.price_faithful()?;
+                        self.retry_scan = true;
+                        let retry = self.price_faithful();
+                        self.retry_scan = false;
+                        let retry = retry?;
                         if retry.is_some() {
                             return Ok(retry);
                         }
@@ -5369,6 +5374,7 @@ fn solve_primal(
         forced: false,
         repaired: kept_out,
         admit_scan: false,
+        retry_scan: false,
         restarts: rs.map_or(0, |r| r.count),
     };
     #[cfg(test)]
