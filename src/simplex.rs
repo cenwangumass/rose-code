@@ -858,6 +858,9 @@ pub(crate) fn build(model: &LpModel) -> Internal {
 /// count of still-unassigned equality rows is within the pass limit; a column takes the unassigned equality row with the
 /// largest `|a|` (first on ties) and marks all of its equality rows used. Recovered from the assignments of the reference on
 /// ADLITTLE, BLEND, SC50A and BORE3D (the set of crash columns matches on all four).
+/// The ratio test's pivot floor `ctx+0x398` (3e-8): the free-entering fallback (`0x144635..0x144715`) skips entries at or below it.
+const PRIMAL_FREE_PIVOT_FLOOR: f64 = 3e-8;
+
 const PLAIN_FAILED_SCAN: bool = true;
 
 pub fn crash_basis(model: &LpModel) -> Basis {
@@ -6352,6 +6355,18 @@ fn solve_primal(
                             PASS_REFS.with(|c| c.set(s.refactorizations + s.ref_base));
                             s.work.add(0x138532, 2.0 * (p.n + p.m) as f64, crate::work::CTX);
                         }
+                        if s.factor.num_updates() == 0
+                            && !s.cleanup
+                            && s.mirror.is_some()
+                            && (s.opts.pricing0 || s.handoff.is_some())
+                            && !infeasible
+                            && crate::scale::END_INF.with(|c| c.get()).is_none()
+                        {
+                            // The end test of `0xcff40` also runs when the scaled pass made no pivot (the free-shift witnesses): its unscaled dual infeasibility
+                            // decides the second pass.
+                            crate::scale::END_INF.with(|c| c.set(s.unscaled_infeasibilities()));
+                            ACC_THR_PASS.with(|c| c.set(s.acc_thr));
+                        }
                         break Status::Optimal;
                     }
                 }
@@ -6728,10 +6743,10 @@ fn solve_primal(
             // pivots it in on the entry of largest |alpha| (first on ties, strictly greater) among the basic variables that are not free
             // and above the pivot tolerance, the leaving variable going to its bound (fx_unb_free: the slack of c2 leaves, the ray is then
             // found for that slack entering).
-            let mut best = opts.pivot_tol;
+            let mut best = PRIMAL_FREE_PIVOT_FLOOR;
             for (k, &(i, a)) in entries.iter().enumerate() {
                 let j = s.basic[i];
-                if a.abs() > opts.pivot_tol
+                if a.abs() > PRIMAL_FREE_PIVOT_FLOOR
                     && a.abs() > best
                     && !(is_inf(p.lo[j]) && is_inf(p.up[j]))
                 {

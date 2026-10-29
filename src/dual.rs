@@ -835,6 +835,19 @@ pub(crate) fn set_x87_result(x: Vec<(f64, f64)>) {
     QUAD_RESULT.with(|c| c.set(true));
 }
 
+/// The read-out state of the last result (long-double solution and mark), so that a pass whose result is discarded can leave it as it was.
+pub(crate) fn quad_result_state() -> (bool, Option<Vec<(f64, f64)>>) {
+    (
+        QUAD_RESULT.with(|c| c.get()),
+        QUAD_XR.with(|c| c.borrow().clone()),
+    )
+}
+
+pub(crate) fn set_quad_result_state(st: (bool, Option<Vec<(f64, f64)>>)) {
+    QUAD_RESULT.with(|c| c.set(st.0));
+    QUAD_XR.with(|c| *c.borrow_mut() = st.1);
+}
+
 /// The objective of the unscaled solution of the dual's last result: `long double` accumulation when its final pass was the quad pass. Clears the mark.
 pub fn unscaled_objective(model: &crate::model::LpModel, x: &[f64], col: &[f64]) -> f64 {
     if QUAD_RESULT.with(|c| c.replace(false)) {

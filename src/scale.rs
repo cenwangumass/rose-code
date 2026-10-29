@@ -358,12 +358,19 @@ pub fn solve(
             PASS_RAN.with(|c| c.set(false));
             let mut r = crate::simplex::solve(&scaled, start, &inner);
             ORIG.with(|c| *c.borrow_mut() = None);
-            if opts.pricing0 {
+            let mut limited_pass: Option<(usize, Vec<_>)> = None;
+            if opts.pricing0 || END_INF.with(|c| c.get()).is_some() {
                 if let (Ok(r1), Some((pv, dv)), false) = (r.as_ref(), END_INF.with(|c| c.take()), PASS_RAN.with(|c| c.get())) {
                     if r1.status == crate::simplex::Status::Optimal && pv <= 1e-6 && dv >= 1e-6 {
-                        let second = SolveOptions { scaled: false, obj_scale: 1.0, ..inner.clone() };
-                        let basis = r1.basis.clone();
                         let n1 = r1.iterations;
+                        // The second pass runs under an iteration limit (`0xd0233`, mode `ctx`+`0x2514` = -1): total iterations `T` so far plus a fifth of
+                        // `max(T, cols / 3 + rows)`; the check after each iteration (`0x11f430`) ends the pass with status 7.
+                        let t = n1 as f64;
+                        let limit = t + 0.2 * t.max((model.num_cols() / 3 + model.num_rows()) as f64);
+                        let allowed = (1..).find(|&k| t + k as f64 >= limit).unwrap_or(1);
+                        let second = SolveOptions { scaled: false, obj_scale: 1.0, max_iterations: inner.max_iterations.min(allowed), ..inner.clone() };
+                        let basis = r1.basis.clone();
+                        let readout = crate::dual::quad_result_state();
                         crate::simplex::SECOND_PASS.with(|c| c.set(true));
                         let r2 = crate::simplex::solve(model, Some(&basis), &second);
                         crate::simplex::SECOND_PASS.with(|c| c.set(false));
@@ -371,7 +378,12 @@ pub fn solve(
                             r2.iterations += n1;
                             // The diagnostic stream keeps the pivots of the scaled pass.
                             r2.trace.splice(0..0, r1.trace.iter().cloned());
-                            if r2.status == crate::simplex::Status::Optimal {
+                            // Status 7 (the iteration limit): the driver restores the scaled problem and the basis saved before the pass (`0xcf8d0`, `0xcfa8e`); the pass's
+                            // pivot is undone but stays counted, and the dual pass that follows makes no pivot (free-shift witnesses): the result is the scaled pass's.
+                            if r2.status == crate::simplex::Status::IterationLimit && allowed < inner.max_iterations {
+                                limited_pass = Some((r2.iterations, std::mem::take(&mut r2.trace)));
+                                crate::dual::set_quad_result_state(readout);
+                            } else if r2.status == crate::simplex::Status::Optimal {
                                 let dopts = SolveOptions {
                                     method: crate::simplex::Method::Dual,
                                     record_trace: true,
@@ -389,10 +401,16 @@ pub fn solve(
                                     }
                                 }
                             }
-                            return Ok(r2);
+                            if limited_pass.is_none() {
+                                return Ok(r2);
+                            }
                         }
                     }
                 }
+            }
+            if let (Some((iterations, trace)), Ok(r1)) = (limited_pass, r.as_mut()) {
+                r1.iterations = iterations;
+                r1.trace = trace;
             }
             let r = r?;
             let mut out = sc.unscale(model, r);
