@@ -417,6 +417,16 @@ struct Dual<'a, R: Real = f64> {
     p60: f64,
     /// `P+0x58`: the entries the row products have visited since the pass (or the last weight reset) started (the row lengths of the nonzero rho entries).
     p58: f64,
+    /// The double driver's work counters `P+0x50` (the nonbasic row lengths of the nonzero rho entries) and `P+0x58` (the result counts of the pivot columns' two-vector
+    /// FTRANs, `0x120238`; m/2 for a dense result), both since the start or the last switch to the mode 3 (`0xf7f22`); the gate of the switch to the mode 2 (`0xf7a54`) compares them.
+    p50d: f64,
+    p58d: f64,
+    /// The mode 2 weight update's counters (`ctx+0x400`, `0x408`, `0x410`, `0x414`, `0xc2f8e`): the framework size, the sum of the accuracy ratios, their count,
+    /// and the number of times the size was cut.
+    dv_f: f64,
+    dv_g: f64,
+    dv_k: i32,
+    dv_c: i32,
     flags: Vec<u8>,
     list: Vec<usize>,
     thr: R,
@@ -3191,6 +3201,7 @@ impl<'a, R: Real> Dual<'a, R> {
         let (row, esi) = self.pivot_row(&rho, leave, above);
         self.row_product_work(&rho, row.len() - esi);
         self.p58 += rho.iter().map(|e| self.rrows[e.0].len()).sum::<usize>() as f64;
+        self.p50d += rho.iter().map(|e| self.rrows[e.0].len()).sum::<usize>() as f64;
         let rt = self.ratio_test(&row, esi, leave, above, xbr);
         if std::mem::take(&mut self.fresh_absorb) && !self.no_art_exit {
             if let Some(mut sn) = snap {
@@ -3373,7 +3384,7 @@ impl<'a, R: Real> Dual<'a, R> {
         let col_out = self.mirror.ftran(&rows_q, &vals_q);
         // Mode 3: the second vector is not rho but the combination of the columns of the row's entries that were basic when the weights restarted
         // (`0xc57d8`, `0x11f620`), and its squared norm is the weight of the pivot row.
-        let (rho_rows, rho_vals, w_row, vec_work, dense_route) = if self.pmode == 3 {
+        let (rho_rows, rho_vals, w_row, vec_work, dense_route) = if self.pmode >= 2 {
             self.framework_rhs(&row, leave, above)
         } else {
             (
@@ -3388,9 +3399,25 @@ impl<'a, R: Real> Dual<'a, R> {
         // Mode 3: the framework vector is a dense vector (count -1) once it has more than m/8 entries (SC50A calls 11, 14..; AFIRO call 12: 4 of m = 27;
         // 6 of 50 stay sparse); its L stage then runs dense.
         let dense_in = self.pmode == 3 && (dense_route || rho_rows.len() * 8 > m);
-        let tau_out = self
-            .mirror
-            .ftran_needed(&rho_rows, &rho_vals, &needed, dense_in);
+        // The mode 2 solves the pivot column alone (`0x11f620` calls the plain FTRAN `0x1205d0` unless the mode is 1 or 3); the two-vector FTRAN adds the result count
+        // of the column to the double's counter `P+0x58` (`0x120238`).
+        let tau_out = if self.pmode == 2 {
+            Vec::new()
+        } else {
+            let t = self
+                .mirror
+                .ftran_needed(&rho_rows, &rho_vals, &needed, dense_in);
+            let first = if self.mirror.last_dense() {
+                1 + col_out
+                    .iter()
+                    .filter(|e| e.0 != r && e.1.abs() > R::c(DROP_TOL))
+                    .count()
+            } else {
+                col_out.len()
+            };
+            self.p58d += (first + self.mirror.tau_fin.get()) as f64;
+            t
+        };
         if R::QUAD && crate::dump::on("qtau") {
             let v: Vec<(usize, R)> = rho_rows
                 .iter()
@@ -3407,12 +3434,18 @@ impl<'a, R: Real> Dual<'a, R> {
             // The two-vector FTRAN books the L stages of both vectors and then the U stage of the column at the factor's scale
             // (`0x129671`, call `0x120200`); the wrapper `0x11f620` books `4 nnz(column) + nnz(rho)` (`0x120114`).
             let (e1, u1) = self.mirror.work_parts;
-            let est = match self.mirror.joint_u(&needed) {
-                Some(j) => (e1 + self.mirror.tau_l.get()) + j,
-                None => ((e1 + self.mirror.tau_l.get()) + u1) + self.mirror.tau_u.get(),
-            };
-            self.work
-                .add_from(0x129671, 0x120200, est, crate::work::FAC);
+            if self.pmode == 2 {
+                // The plain FTRAN of the column alone (`0x1205d0` -> `0x120673`).
+                self.work
+                    .add_from(0x1219d6, 0x120673, e1 + u1, crate::work::FAC);
+            } else {
+                let est = match self.mirror.joint_u(&needed) {
+                    Some(j) => (e1 + self.mirror.tau_l.get()) + j,
+                    None => ((e1 + self.mirror.tau_l.get()) + u1) + self.mirror.tau_u.get(),
+                };
+                self.work
+                    .add_from(0x129671, 0x120200, est, crate::work::FAC);
+            }
             // A slack column (`ctx+0x2fc >= n`, `0x11f788`) is not copied from the matrix: its `4 nnz` term is absent.
             let copied = if q < self.n { rows_q.len() } else { 0 };
             self.work
@@ -4049,12 +4082,40 @@ impl<'a, R: Real> Dual<'a, R> {
     /// still on, more than m + 1000 iterations done and fewer than 100 m structurals, the weights restart at 1 and the mode becomes 3 ("simplex pricing
     /// changes from 1 to 3"). The pricing update formulas stay those of the steepest edge.
     fn pricing_switch(&mut self) {
-        if !self.switch_enabled || self.pmode != 1 || self.refactorizations % 3 != 0 {
+        if !self.switch_enabled || !matches!(self.pmode, 1 | 3) || self.refactorizations % 3 != 0 {
             return;
         }
         let m = self.m as f64;
-        if self.iters as f64 > m + 1000.0 && (self.n as f64) < 100.0 * m {
+        if self.pmode == 1 && self.iters as f64 > m + 1000.0 && (self.n as f64) < 100.0 * m {
             self.pmode = 3;
+            self.p50d = 0.0;
+            self.p58d = 0.0;
+            self.dflag = self.st.iter().map(|&t| t < 0).collect();
+            for w in self.w.iter_mut() {
+                *w = R::ONE;
+            }
+            return;
+        }
+        if R::QUAD {
+            return;
+        }
+        // The switch to the mode 2 (`0xf7a54..0xf7bb2`, not nested): enough row products since the start (`P+0x50 >= m/10 + 10`), at most 3 m iterations and
+        // n <= 3 m, and the result counts of the pivot columns' FTRANs (`P+0x58`) exceed `M P+0x50`: `M` = 1e100 below 15000 rows; from 15000 rows in the mode 1 it is 1e100 below m/4
+        // iterations, 4 from m/4 and 3 from m/3 iterations (the mode 3 always 3), plus 1 after a perturbation (`ctx+0x338 == 3`). The weights restart at 1.
+        if self.p50d < ((self.m / 10) + 10) as f64 || 3.0 * m < self.iters as f64 || 3.0 * m < self.n as f64 {
+            return;
+        }
+        let it = self.iters as f64;
+        let base = if self.m < 15000 {
+            1e100
+        } else if self.pmode == 1 && it < m / 3.0 {
+            if it >= m * 0.25 { 4.0 } else { 1e100 }
+        } else {
+            3.0
+        };
+        let mult = if self.m >= 15000 && self.pert == 3 && base < 1e50 { base + 1.0 } else { base };
+        if self.p58d > mult * self.p50d {
+            self.pmode = 2;
             self.dflag = self.st.iter().map(|&t| t < 0).collect();
             for w in self.w.iter_mut() {
                 *w = R::ONE;
@@ -4276,7 +4337,7 @@ impl<'a, R: Real> Dual<'a, R> {
             let alpha = self.pending_alpha.take().unwrap();
             if refactor {
                 // The weights of the pivot are updated before the factorization renumbers the positions; the basic solution is recomputed.
-                self.update_weights(pv);
+                self.update_weights(pv, false);
                 self.pivot_cols = Some(pv.col.len());
                 self.refactor(if schedule_due { "scheduled" } else { "request" })?;
             } else {
@@ -4437,8 +4498,10 @@ impl<'a, R: Real> Dual<'a, R> {
                 self.no_row();
             }
         } else if let Some(pv) = pv {
-            self.work
-                .add(0xc0410, 3.0 * pv.col.len() as f64, crate::work::CTX);
+            if self.pmode != 2 {
+                self.work
+                    .add(0xc0410, 3.0 * pv.col.len() as f64, crate::work::CTX);
+            }
             // With `ctx+0x2c8` set (huge infeasibilities: level != 0) the value-mode walk is the 8-per-entry loop `0xc09bd`.
             if self.value_mode && self.level != 0 {
                 self.work
@@ -4454,7 +4517,7 @@ impl<'a, R: Real> Dual<'a, R> {
     }
 
     /// x_B and DSE weight update (`0xc0050`, fast path), bit for bit as in the spec.
-    fn update_weights(&mut self, pv: &Pivot<R>) {
+    fn update_weights(&mut self, pv: &Pivot<R>, fast: bool) {
         let (r, alpha, w) = (pv.r, pv.alpha, pv.w);
         // The quad weight update works on the double-rounded rho norm and pivot (verified against the reference W bits, `0x225820` callers).
         let (alpha, w) = if R::QUAD {
@@ -4467,6 +4530,10 @@ impl<'a, R: Real> Dual<'a, R> {
                 "dtau",
                 serde_json::json!({"r": r, "alpha": alpha.to_f64(), "w": w.to_f64(), "col": crate::dump::sparse_r(&pv.col), "tau": pv.tau.iter().map(|v| v.to_f64()).collect::<Vec<_>>()}),
             );
+        }
+        if self.pmode == 2 {
+            self.devex_update(pv, fast);
+            return;
         }
         if w == R::ZERO {
             self.w[r] = R::c(W_EPS);
@@ -4491,8 +4558,64 @@ impl<'a, R: Real> Dual<'a, R> {
         }
     }
 
+    /// The mode 2 weight update (`0xc2f8e`, `0xbe7b0`): the weights of the entries of the pivot column grow to `(T / alpha^2) a_i^2` when that is larger, with the
+    /// framework counters `ctx+0x400..0x414`: the size is cut to a quarter when it exceeds 30 m, and the framework restarts (weights 1, flags of the nonbasic
+    /// variables) when the mean accuracy ratio of the leaving row's weight exceeds 5 or after ten cuts. No update when the row's squared norm `T` is zero.
+    fn devex_update(&mut self, pv: &Pivot<R>, fast: bool) {
+        let (r, alpha, t) = (pv.r, pv.alpha.to_f64(), pv.w.to_f64());
+        let m = self.m;
+        if self.dv_f > 30.0 * m as f64 {
+            self.dv_k = (self.dv_k as f64 * 0.25) as i32;
+            self.dv_f *= 0.25;
+            self.dv_g *= 0.25;
+            self.dv_c += 1;
+        }
+        if t == 0.0 {
+            return;
+        }
+        let wr = self.w[r].to_f64();
+        let g = if t > wr { t / wr + self.dv_g } else { self.dv_g + wr / t };
+        let k = self.dv_k + 1;
+        if g / k as f64 > 5.0 || self.dv_c >= 10 {
+            self.dv_k = 0;
+            self.dv_f = 0.0;
+            self.dv_g = 0.0;
+            self.dv_c = 0;
+            self.dflag = self.st.iter().map(|&t| t < 0).collect();
+            for w in self.w.iter_mut() {
+                *w = R::ONE;
+            }
+            if fast {
+                self.work
+                    .add(0xc34f5, (2 * m + self.n) as f64, crate::work::CTX);
+            }
+            return;
+        }
+        self.dv_k = k;
+        let mut f = (m / 50) as f64 + self.dv_f;
+        self.dv_g = g;
+        let a2 = alpha * alpha;
+        if t > a2 {
+            self.dv_f = f;
+            self.w[r] = R::c((t / alpha) / alpha);
+        }
+        f += pv.col.len() as f64;
+        self.dv_f = f;
+        if fast {
+            self.work
+                .add(0xc0410, 3.0 * pv.col.len() as f64, crate::work::CTX);
+        }
+        let factor = t / a2;
+        for &(i, cv) in &pv.col {
+            let v = cv.to_f64();
+            let x = (factor * v) * v;
+            let cur = self.w[i].to_f64();
+            self.w[i] = R::c(if x > cur { x } else { cur });
+        }
+    }
+
     fn update_primal_and_weights(&mut self, pv: &Pivot<R>) {
-        self.update_weights(pv);
+        self.update_weights(pv, true);
         let (r, alpha) = (pv.r, pv.alpha);
         let mut changed: Vec<usize> = Vec::new();
         let v = pv.leave;
@@ -5197,6 +5320,12 @@ fn solve_pass_callback<R: Real>(
         p70: Vec::new(),
         p60: 0.0,
         p58: 0.0,
+        p50d: 0.0,
+        p58d: 0.0,
+        dv_f: 0.0,
+        dv_g: 0.0,
+        dv_k: 0,
+        dv_c: 0,
         flags: vec![2; m],
         list: Vec::new(),
         thr: R::ZERO,
@@ -6501,6 +6630,12 @@ mod captured_bh305_ratio {
             p70: Vec::new(),
             p60: 0.0,
             p58: 0.0,
+            p50d: 0.0,
+            p58d: 0.0,
+            dv_f: 0.0,
+            dv_g: 0.0,
+            dv_k: 0,
+            dv_c: 0,
             flags: vec![2; m],
             list: Vec::new(),
             thr: 0.0,

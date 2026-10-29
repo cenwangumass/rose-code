@@ -72,6 +72,9 @@ pub struct RefStruct<R: Real = f64> {
     pub tau_l: std::cell::Cell<f64>,
     /// The U-stage estimate of the last `ftran_needed` (`0x123690`).
     pub tau_u: std::cell::Cell<f64>,
+    /// What the tau solve's U stage returns (`0x123690`, `0x1244df`): the number of nonzero tail columns, or the tail rows `m - i21` when it runs dense; the
+    /// two-vector FTRAN adds it to the first result's count (`0x12963d`).
+    pub tau_fin: std::cell::Cell<usize>,
     /// What the last `ftran` and `ftran_needed` leave for the joint U stages of the two-vector FTRAN (`joint_u`).
     f2: std::cell::RefCell<F2<R>>,
     /// Fill of the reference's pool for etas and the row-wise copy of U (`F+0x160`), and the capacity of each row of that copy.
@@ -563,6 +566,7 @@ impl<R: Real> RefStruct<R> {
             keep_dense: false,
             tau_l: std::cell::Cell::new(0.0),
             tau_u: std::cell::Cell::new(0.0),
+            tau_fin: std::cell::Cell::new(0),
             f2: std::cell::RefCell::new(F2::default()),
             scratch_peel: ((m as f64).powf(0.7) as usize)
                 .max(20)
@@ -1269,6 +1273,7 @@ impl<R: Real> RefStruct<R> {
             e = (d * 4.0) * nz + e;
             fin = nz;
         }
+        self.tau_fin.set(fin as usize);
         ((nf + nf) * self.h34 + e) + 4.0 * fin
     }
 
