@@ -27,3 +27,14 @@ fn controlled_dual_primal_end_refactors_a_fresh_factor_once() {
     let c = solve(&model, None, &SolveOptions::dual()).unwrap();
     assert_eq!((c.status, c.iterations), (Status::Optimal, 3));
 }
+
+#[test]
+fn quad_dual_reads_out_the_long_double_duals() {
+    // `fx_witness_dual_persistent_shift_71000` (dual-release, ill-conditioned basis, entries up to 4e6): the quad dual's `pi` is the long-double `y` of the reduced-cost
+    // recompute; the double BTRAN gave duals 0.035% off the reference (and a reduced-cost error of 2e5 in the independent check).
+    let model = mps::parse(include_str!("fixtures/fx_witness_dual_persistent_shift_71000.mps")).unwrap();
+    let r = solve(&model, None, &SolveOptions::dual_release()).unwrap();
+    assert_eq!((r.status, r.iterations), (Status::Optimal, 75));
+    let pi = [727987659993.3921, -435.33547769125465, -18199685.544660836, -243054.8584814422, 1213314820.2932222, 3253.7126029372016];
+    assert_eq!(r.dual, pi);
+}
