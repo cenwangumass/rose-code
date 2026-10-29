@@ -1235,6 +1235,10 @@ struct Solver<'a> {
     /// The final factorization of a solve that ended with right-hand-side shifts: the reference removes the shifts in a dual clean-up pass
     /// that factorizes the basis in ascending index order (`0xf6a00`), instead of refactorizing in pivot order.
     cleanup: bool,
+    /// The optimality factorization before the unscaled second primal pass: no spike discard is booked.
+    pass_next: bool,
+    /// Factorizations made before this solve by the first primal pass (the second pass continues the reference's count).
+    ref_base: usize,
     /// The pivot threshold `ctx+0x390` as the accuracy ladder of the x_B recomputes leaves it (`crate::dual::accuracy_threshold`); the primal's own factorizations keep 2^-7, the clean-up pass uses it.
     acc_thr: f64,
     /// The final clean-up factorization after dual pivots takes the basis head as the pivots left it (the reference updates the factor between the pivots).
@@ -1632,7 +1636,7 @@ impl<'a> Solver<'a> {
                     p0.window = (avg / 2).max(P0_WINDOW);
                 }
                 if let Some(old) = self.mirror.as_ref() {
-                    let est = if self.restart || SECOND_PASS.with(|c| c.get()) {
+                    let est = if self.restart || self.pass_next || SECOND_PASS.with(|c| c.get()) {
                         0.0
                     } else if self.cleanup || self.pre_restart {
                         old.discard_work_unused()
@@ -2084,7 +2088,7 @@ impl<'a> Solver<'a> {
     /// The reference's residual check (`0x145a36` in `0x145520`): after the duals are recomputed, when no basic variable is
     /// infeasible and the factorization count is 4 modulo 5, it books `(rows + 2 * sum(len + 1 over basic structurals)) * c` for the pass that forms their reduced costs.
     fn residual_check_work(&mut self) {
-        if self.mirror.is_none() || self.refactorizations % 5 != 4 || self.has_infeasible_basic() {
+        if self.mirror.is_none() || (self.refactorizations + self.ref_base) % 5 != 4 || self.has_infeasible_basic() {
             return;
         }
         let nnz: usize = self
@@ -3491,6 +3495,10 @@ impl<'a> Solver<'a> {
         sort_work.push((0x100404, 3.0 * nm as f64));
         for (site, est) in sort_work {
             self.work.add(site, est, crate::work::CTX);
+        }
+        if self.ref_base > 0 && self.iters_done == 0 {
+            // The second primal pass continues the reference's factorization count: its first scan runs the residual check after the sort.
+            self.residual_check_work();
         }
         let mut list: Vec<usize> = (0..nm).collect();
         list.sort_by(|&a, &b| keys[b].cmp(&keys[a]).then(b.cmp(&a)));
@@ -5040,6 +5048,8 @@ fn repair_basis_at(
 /// Solve starting from `start` (a primal feasible basis). `None` uses the all-slack basis with columns at their lower bounds.
 thread_local! {
     /// The unscaled continuation of the primal after the scaled optimum is running (`scale::solve`): its first factorization books no spike discard.
+    /// Factorization count of the scaled primal at its optimum: the reference's counter `ctx+0x2c0` goes on in the unscaled second pass.
+    pub static PASS_REFS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     pub static SECOND_PASS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The accuracy threshold `acc_thr` of the last scaled primal at its optimum, for the second pass's clean-up call.
     pub static ACC_THR_PASS: std::cell::Cell<f64> = const { std::cell::Cell::new(0.0078125) };
@@ -5447,6 +5457,8 @@ fn solve_primal(
         recomputed: false,
         rescan: false,
         cleanup: false,
+        pass_next: false,
+        ref_base: if SECOND_PASS.with(|c| c.get()) { PASS_REFS.with(|c| c.get()) } else { 0 },
         acc_thr: crate::lu_order::THRESHOLD,
         cleanup_keep_head: false,
         last_upd: None,
@@ -6123,6 +6135,13 @@ fn solve_primal(
                     // values can hide a bound violation just above the tolerance.
                     if s.factor.num_updates() > 0 {
                         s.cleanup = s.mirror.is_some() && !s.rhs_shift.is_empty();
+                        // When the unscaled second primal pass follows (below), the reference's last factorization of this one books no spike discard.
+                        s.pass_next = !s.cleanup
+                            && s.mirror.is_some()
+                            && s.opts.pricing0
+                            && !infeasible
+                            && !crate::scale::PASS_RAN.with(|c| c.get())
+                            && s.unscaled_infeasibilities().is_some_and(|(pv, dv)| pv <= 1e-6 && dv >= 1e-6);
                         s.work.trig();
                         if let Some(mi) = s.mirror.as_mut() {
                             mi.count_all_updates();
@@ -6246,6 +6265,15 @@ fn solve_primal(
                             }
                         }
                     } else {
+                        if s.pass_next {
+                            // The unscaled second primal pass follows: the reference's last scan sorts the candidate list once more and the driver's
+                            // restart (`0x1bbb20`) builds it over all variables (`0x138532`).
+                            if s.p0.is_some() {
+                                s.p0_rebuild();
+                            }
+                            PASS_REFS.with(|c| c.set(s.refactorizations + s.ref_base));
+                            s.work.add(0x138532, 2.0 * (p.n + p.m) as f64, crate::work::CTX);
+                        }
                         break Status::Optimal;
                     }
                 }
@@ -7641,7 +7669,7 @@ fn solve_primal(
 
     if status == Status::Optimal {
         // The solution is read from the factorization that was just built; its work was booked then.
-        s.work.mute = s.cleanup;
+        s.work.mute = s.cleanup || s.pass_next;
         s.recompute_primal();
         s.work.mute = false;
         s.recompute_dual()?;
