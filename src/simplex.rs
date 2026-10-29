@@ -6779,8 +6779,8 @@ fn solve_primal(
             continue;
         }
         if chosen.is_none() && step >= INF {
-            if !infeasible && s.handoff.is_some_and(|h| h.quad) && s.factor.num_updates() > 0 {
-                // The x87 no-row path requests a refactorization before its verdict.
+            if !infeasible && s.factor.num_updates() > 0 {
+                // The no-row path requests a refactorization (7) before its verdict (`0x144998`; witness_primal_r31_double4, fx_unbounded).
                 if let Some(mi) = s.mirror.as_mut() {
                     mi.count_all_updates();
                 }
