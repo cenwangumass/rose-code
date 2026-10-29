@@ -381,7 +381,7 @@ pub fn solve(
                                 let via = crate::dual::solve(model, Some(&r2.basis), &dopts);
                                 crate::dual::CLEANUP_PASS.with(|c| c.set(None));
                                 if let Ok(r3) = via {
-                                    if r3.iterations > 0 {
+                                    if r3.iterations > 0 || r3.status == crate::simplex::Status::Optimal {
                                         let mut r3 = r3;
                                         r3.iterations += r2.iterations;
                                         r3.trace.splice(0..0, r2.trace.iter().cloned());
