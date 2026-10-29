@@ -1873,7 +1873,7 @@ impl<'a> Solver<'a> {
         // The progress routine writes a fresh objective even on an infeasible
         // check. Its structural loop uses x87 basic values and double-rounded
         // products for nonbasic bounds (0x27e1d0..0x27e235, 0x27e79e).
-        let objective = self.working_obj.filter(|_| !h.pert).and_then(|_| {
+        let objective = Some(()).filter(|_| !h.pert).and_then(|_| {
             let xq = self.x_q.as_ref()?;
             let dq = self.dst_q.as_ref()?;
             use crate::f80::F80;
