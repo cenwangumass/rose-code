@@ -6192,6 +6192,8 @@ fn solve_primal(
                     }
                     // Before declaring optimality, rebuild the basic solution from a fresh factorization: drift in the updated
                     // values can hide a bound violation just above the tolerance.
+                    // The unscaled second pass ends without this refactorization: the dual clean-up that follows (`scale.rs`) starts from its own sorted one (`compare.py lu`,
+                    // witness_primal_small_bound_second: 5 factorizations, not 6).
                     if s.factor.num_updates() > 0 {
                         s.cleanup = s.mirror.is_some() && !s.rhs_shift.is_empty();
                         // When the unscaled second primal pass follows (below), the reference's last factorization of this one books no spike discard.
@@ -6201,15 +6203,17 @@ fn solve_primal(
                             && !infeasible
                             && !crate::scale::PASS_RAN.with(|c| c.get())
                             && s.unscaled_infeasibilities().is_some_and(|(pv, dv)| pv <= 1e-6 && dv >= 1e-6);
-                        s.work.trig();
-                        if let Some(mi) = s.mirror.as_mut() {
-                            mi.count_all_updates();
-                        }
-                        s.skip_forced_switch = true;
-                        s.refactor()?;
-                        s.skip_forced_switch = false;
-                        if s.handoff.as_ref().is_some_and(|h| h.quad) {
-                            s.cycle_check(false);
+                        if !SECOND_PASS.with(|c| c.get()) {
+                            s.work.trig();
+                            if let Some(mi) = s.mirror.as_mut() {
+                                mi.count_all_updates();
+                            }
+                            s.skip_forced_switch = true;
+                            s.refactor()?;
+                            s.skip_forced_switch = false;
+                            if s.handoff.as_ref().is_some_and(|h| h.quad) {
+                                s.cycle_check(false);
+                            }
                         }
                         // The progress check can also end the primal during this
                         // no-candidate refactorization, before another scan.
@@ -6303,8 +6307,9 @@ fn solve_primal(
                         }
                         // A fresh factor can reveal an improving reduced cost even
                         // when the preceding scan found no candidate.
-                        if s.has_infeasible_basic()
-                            || (0..s.p.n + s.p.m).any(|j| s.score(j).is_some())
+                        if !SECOND_PASS.with(|c| c.get())
+                            && (s.has_infeasible_basic()
+                                || (0..s.p.n + s.p.m).any(|j| s.score(j).is_some()))
                         {
                             continue;
                         }
