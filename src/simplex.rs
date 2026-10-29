@@ -7042,15 +7042,21 @@ fn solve_primal(
                 s.upd_work = mi.take_upd_work();
             }
             s.leave_prev = Some(leave);
+            let alpha_dense = s.mirror.as_ref().is_some_and(|mi| mi.last_dense());
             s.last_pivot = Some(LastPivot {
                 rows: {
+                    // A dense FTRAN result keeps its order when the pivot entry goes; a sparse list moves its last entry into the place.
                     let mut rows: Vec<usize> = ftran_out.iter().map(|e| e.0).collect();
                     if let Some(k) = rows.iter().position(|&i| i == r) {
-                        rows.swap_remove(k);
+                        if alpha_dense {
+                            rows.remove(k);
+                        } else {
+                            rows.swap_remove(k);
+                        }
                     }
                     rows
                 },
-                dense: s.mirror.as_ref().is_some_and(|mi| mi.last_dense()),
+                dense: alpha_dense,
                 q,
                 leave,
                 alpha_rq,
