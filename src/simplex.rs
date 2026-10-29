@@ -5777,8 +5777,9 @@ fn solve_primal(
         let last_all = s.last_pivot.take();
         // On the fresh factor of a scheduled refactorization the reference still checks the previous entering column against the new
         // duals (`0xfc18e..0xfd58b` stores the residual; `witness_primal_r2_fresh_low`: 1.52587890625e-5 at threshold 1/128 takes
-        // `0x1453c7 -> 0x145403`, the ordinary rejection). Only below threshold 0.5: the termination above it (`0x1453d2`) is unverified.
-        let fresh_check = if due && !forced && crate::lu_order::threshold() < 0.5 {
+        // `0x1453c7 -> 0x145403`, the ordinary rejection). At threshold >= 0.5 the same rejection is taken while `ctx+0x3f8` is 1 (every standalone
+        // solve; `witness_primal_r3_fresh_high`: threshold 0.9, residual 1.52587890625e-5, `0x1453d0 -> 0x145403`); the termination (`0x1453d2`) needs a nested MIP's 0.
+        let fresh_check = if due && !forced {
             last_all.as_ref().map(|lp| lp.q)
         } else {
             None
