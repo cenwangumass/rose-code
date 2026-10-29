@@ -1237,6 +1237,10 @@ struct Solver<'a> {
     cleanup: bool,
     /// The optimality factorization before the unscaled second primal pass: no spike discard is booked.
     pass_next: bool,
+    /// Set during the dual recompute of a factorization whose method decision switches to Devex.
+    will_switch: bool,
+    /// The factorization that follows a pricing0 accuracy rejection (`0x14509b`): the reference books no spike discard (`0xf461f`) there.
+    acc_refactor: bool,
     /// Factorizations made before this solve by the first primal pass (the second pass continues the reference's count).
     ref_base: usize,
     /// The pivot threshold `ctx+0x390` as the accuracy ladder of the x_B recomputes leaves it (`crate::dual::accuracy_threshold`); the primal's own factorizations keep 2^-7, the clean-up pass uses it.
@@ -1636,7 +1640,7 @@ impl<'a> Solver<'a> {
                     p0.window = (avg / 2).max(P0_WINDOW);
                 }
                 if let Some(old) = self.mirror.as_ref() {
-                    let est = if self.restart || self.pass_next || SECOND_PASS.with(|c| c.get()) {
+                    let est = if self.restart || std::mem::take(&mut self.acc_refactor) || self.pass_next || SECOND_PASS.with(|c| c.get()) {
                         0.0
                     } else if self.cleanup || self.pre_restart {
                         old.discard_work_unused()
@@ -1738,6 +1742,8 @@ impl<'a> Solver<'a> {
         }
         self.want_drift = false;
         self.check_primal_drift()?;
+        // The reference decides the method switch before the dual recompute of this factorization: a switch to Devex runs that recompute under the Devex caller.
+        self.will_switch = self.sw.active && !self.cleanup && self.mirror.is_some() && self.sw.clone().decide(&self.method_inputs(sw_avg));
         if self.cleanup {
             self.cleanup_work();
         } else {
@@ -1745,6 +1751,7 @@ impl<'a> Solver<'a> {
             self.dual_btran_work("full");
         }
         self.recompute_dual()?;
+        self.will_switch = false;
         if let Some(p0) = self.p0.as_mut() {
             p0.rebuild = true;
             p0.pending = None;
@@ -1959,9 +1966,9 @@ impl<'a> Solver<'a> {
     }
 
     /// The method decision after a factorization (`0x142500`): switches from `pricing0` to Devex pricing, restarting the weights and the list.
-    fn method_decision(&mut self, avg: usize) -> Result<(), SolveError> {
+    fn method_inputs(&self, avg: usize) -> crate::method::Inputs {
         let mi = self.mirror.as_ref().unwrap();
-        let inp = crate::method::Inputs {
+        crate::method::Inputs {
             rows: self.p.m,
             cols: self.p.n,
             avg,
@@ -1983,7 +1990,11 @@ impl<'a> Solver<'a> {
             } else {
                 !self.pre_restart && !self.skip_forced_switch
             },
-        };
+        }
+    }
+
+    fn method_decision(&mut self, avg: usize) -> Result<(), SolveError> {
+        let inp = self.method_inputs(avg);
         let before = self.sw.clone();
         let switch = self.sw.decide(&inp);
         if crate::dump::on("switch") {
@@ -2352,6 +2363,8 @@ impl<'a> Solver<'a> {
                 && self.sw.iters != self.sw.snap_iters
             {
                 // The reference switches before this restart's dual recompute.
+                0x109289
+            } else if site == "full" && self.will_switch {
                 0x109289
             } else {
                 0xfbca8
@@ -5458,6 +5471,8 @@ fn solve_primal(
         rescan: false,
         cleanup: false,
         pass_next: false,
+        will_switch: false,
+        acc_refactor: false,
         ref_base: if SECOND_PASS.with(|c| c.get()) { PASS_REFS.with(|c| c.get()) } else { 0 },
         acc_thr: crate::lu_order::THRESHOLD,
         cleanup_keep_head: false,
@@ -5895,6 +5910,7 @@ fn solve_primal(
             }
             crate::lu_order::raise_threshold(0.5);
             s.forced = true;
+            s.acc_refactor = true;
             continue;
         }
         if pending_tol_error {
