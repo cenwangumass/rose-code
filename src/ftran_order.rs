@@ -863,6 +863,9 @@ impl<R: Real> RefStruct<R> {
         if crate::dump::on("lstage") {
             self.lsnap.borrow_mut().0 = x.clone();
         }
+        // The sparse L stage drops a node whose value is at or below the tolerance from its list; an eta that makes it nonzero again appends it
+        // at the end (SCAGR7 iteration 173: `0x129aa0` start `[82, 125, 83]` leaves `[82, 49, 125]`).
+        order.retain(|&v| x[v].abs() > R::c(TOL));
         let mut have = vec![false; self.m];
         for &v in &order {
             have[v] = true;
