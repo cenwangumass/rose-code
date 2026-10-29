@@ -1,4 +1,4 @@
-//! `resolve_seq model.mps faithful|release|default [basic_cols] [rounds]`: the public reoptimization sequence of the reference runner
+//! `resolve_seq model.mps faithful|release|dual-release|default [basic_cols] [rounds]`: the public reoptimization sequence of the reference runner
 //! `tools/witness_primal_r2_unbuffered.c`. Start basis: structurals `0..basic_cols` basic and the rest at the lower bound (0 = cold start);
 //! solve with `c`, then with `-c`, `c`, ... each from the previous final basis. One `RESULT {json}` line per solve (stdout) after its
 //! trace rows; the dump kinds (`ROSE_DUMP`) carry the records of every solve in order.
@@ -9,6 +9,8 @@ fn main() {
     let mut model = mps::parse(&std::fs::read_to_string(&a[1]).unwrap()).unwrap();
     let opts = if a[2] == "release" {
         SolveOptions::release()
+    } else if a[2] == "dual-release" {
+        SolveOptions::dual_release()
     } else if a[2] == "faithful" {
         SolveOptions {
             faithful_weights: true,

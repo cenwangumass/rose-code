@@ -4464,7 +4464,12 @@ impl<'a, R: Real> Dual<'a, R> {
                 } else {
                     C35C.with(|c| c.get()) > 10
                 })
-                && self.tiny_infeasibility()
+                && (
+                    // The low arm (`0xc2025..0xc2044`) needs only a nonempty infeasible list (`[P+0x3c]`, `0xc1ffb`) in the value mode; the acceptance
+                    // test that follows it (threshold at least 0.5) is the tiny-infeasibility one (witness_dual_r3_residual_low_small).
+                    (!R::QUAD && self.value_mode && self.n_infeas > 0 && self.lu_thr < 0.5)
+                        || self.tiny_infeasibility()
+                )
             {
                 // At a low double LU threshold the recompute returns the pending request
                 // to the driver for another factorization before accepting infeasibilities.
