@@ -5774,7 +5774,16 @@ fn solve_primal(
         }
         // The reference's primal update of the last pivot (`0x105f20`, site `0x107b57`): a pass over the FTRAN result, which
         // also collects the phase 1 cost changes of the basic variables that changed feasibility class.
-        let last = s.last_pivot.take().filter(|_| !due);
+        let last_all = s.last_pivot.take();
+        // On the fresh factor of a scheduled refactorization the reference still checks the previous entering column against the new
+        // duals (`0xfc18e..0xfd58b` stores the residual; `witness_primal_r2_fresh_low`: 1.52587890625e-5 at threshold 1/128 takes
+        // `0x1453c7 -> 0x145403`, the ordinary rejection). Only below threshold 0.5: the termination above it (`0x1453d2`) is unverified.
+        let fresh_check = if due && !forced && crate::lu_order::threshold() < 0.5 {
+            last_all.as_ref().map(|lp| lp.q)
+        } else {
+            None
+        };
+        let last = last_all.filter(|_| !due);
         let mut dc: Vec<(usize, f64)> = Vec::new();
         // The entering variable alone changes class: the reference neither solves nor takes a row product for it (`0x107e14`).
         let mut q_only = false;
@@ -5925,7 +5934,11 @@ fn solve_primal(
         if let Some(p0) = s.p0.as_mut() {
             p0.tol = if infeasible { P0_DTOL_P1 } else { P0_DTOL };
         }
-        s.p0_check = last.as_ref().map(|lp| lp.q).filter(|&q| q != NONE);
+        s.p0_check = last
+            .as_ref()
+            .map(|lp| lp.q)
+            .or(fresh_check)
+            .filter(|&q| q != NONE);
         let price = s.price_admitting()?;
         if std::mem::take(&mut s.p0_accuracy) {
             s.accuracy += 1;
