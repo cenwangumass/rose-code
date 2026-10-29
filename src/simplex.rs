@@ -4207,7 +4207,32 @@ impl<'a> Solver<'a> {
                 let f = if j < n { 1.0 / col[j] } else { row[j - n] };
                 dual = dual.max(v * f);
             }
-            Some((primal, dual / self.opts.obj_scale))
+            let dual = dual / self.opts.obj_scale;
+            // The end test returns without a follow-up pass (`0xd0382`, `r14d == -1`) when its gate is open (violation above the tolerance or dual infeasibility
+            // of at least the tolerance) and the primal residual `+0xa0` exceeds ten tolerances (the dual residual `+0xc0` is not modelled).
+            if (primal > 1e-6 || dual >= 1e-6) && self.unscaled_primal_residual().is_some_and(|r| r > 10.0 * 1e-6) {
+                return None;
+            }
+            Some((primal, dual))
+        })
+    }
+
+    /// The reference's largest primal residual `|A x + s - b|` of the unscaled problem (`0xcff40`, `r9+0xa0`): the scaled row residual divided by the row factor.
+    fn unscaled_primal_residual(&self) -> Option<f64> {
+        crate::scale::ORIG.with(|c| {
+            let o = c.borrow();
+            let (_, _, row) = o.as_ref()?;
+            let p = self.p;
+            let mut res: Vec<f64> = p.rhs.iter().map(|v| -v).collect();
+            for j in 0..p.n + p.m {
+                let xj = if self.pos_of[j] == NONE { self.nonbasic_value(j) } else { self.x[j] };
+                if xj != 0.0 {
+                    for &(i, a) in &p.cols[j] {
+                        res[i] += a * xj;
+                    }
+                }
+            }
+            Some(res.iter().zip(row).fold(0.0f64, |m, (r, f)| m.max((r / f).abs())))
         })
     }
 

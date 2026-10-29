@@ -369,6 +369,8 @@ pub fn solve(
                         crate::simplex::SECOND_PASS.with(|c| c.set(false));
                         if let Ok(mut r2) = r2 {
                             r2.iterations += n1;
+                            // The diagnostic stream keeps the pivots of the scaled pass.
+                            r2.trace.splice(0..0, r1.trace.iter().cloned());
                             if r2.status == crate::simplex::Status::Optimal {
                                 let dopts = SolveOptions {
                                     method: crate::simplex::Method::Dual,
@@ -382,6 +384,7 @@ pub fn solve(
                                     if r3.iterations > 0 {
                                         let mut r3 = r3;
                                         r3.iterations += r2.iterations;
+                                        r3.trace.splice(0..0, r2.trace.iter().cloned());
                                         return Ok(r3);
                                     }
                                 }
