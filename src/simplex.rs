@@ -1632,7 +1632,7 @@ impl<'a> Solver<'a> {
                     p0.window = (avg / 2).max(P0_WINDOW);
                 }
                 if let Some(old) = self.mirror.as_ref() {
-                    let est = if self.restart {
+                    let est = if self.restart || SECOND_PASS.with(|c| c.get()) {
                         0.0
                     } else if self.cleanup || self.pre_restart {
                         old.discard_work_unused()
@@ -4159,20 +4159,32 @@ impl<'a> Solver<'a> {
         Ok(None)
     }
 
-    /// The largest bound violation of the basic variables in the unscaled problem (a structural is `C` times its scaled value, a slack `1/R` times), `None`
-    /// when the solve is not scaled.
-    fn unscaled_violation(&self) -> Option<f64> {
+    /// The end-of-primal test of the reference (`0xcff40`, `r9+0x90` and `r9+0xb0`) in the unscaled problem, `None` when the solve is not scaled:
+    /// the largest bound violation of the basic variables (a structural is `C` times its scaled value, a slack `1/R` times) and the largest
+    /// dual infeasibility of the nonbasic variables (a structural reduced cost is `1/C` times the scaled one, a slack `R` times, divided by the objective scale).
+    fn unscaled_infeasibilities(&self) -> Option<(f64, f64)> {
         crate::scale::ORIG.with(|c| {
             let o = c.borrow();
             let (_, col, row) = o.as_ref()?;
             let n = self.p.n;
-            let mut worst = 0.0f64;
+            let mut primal = 0.0f64;
             for &j in &self.basic {
                 let v = (self.p.lo[j] - self.x[j]).max(self.x[j] - self.p.up[j]).max(0.0);
                 let f = if j < n { col[j] } else { 1.0 / row[j - n] };
-                worst = worst.max(v * f);
+                primal = primal.max(v * f);
             }
-            Some(worst)
+            let mut dual = 0.0f64;
+            for j in 0..n + self.p.m {
+                if self.pos_of[j] != NONE || self.p.lo[j] == self.p.up[j] {
+                    continue;
+                }
+                let d = self.d[j];
+                let free = is_inf(self.p.lo[j]) && is_inf(self.p.up[j]);
+                let v = if free { d.abs() } else if self.at_upper[j] { d.max(0.0) } else { (-d).max(0.0) };
+                let f = if j < n { 1.0 / col[j] } else { row[j - n] };
+                dual = dual.max(v * f);
+            }
+            Some((primal, dual / self.opts.obj_scale))
         })
     }
 
@@ -5026,6 +5038,13 @@ fn repair_basis_at(
 }
 
 /// Solve starting from `start` (a primal feasible basis). `None` uses the all-slack basis with columns at their lower bounds.
+thread_local! {
+    /// The unscaled continuation of the primal after the scaled optimum is running (`scale::solve`): its first factorization books no spike discard.
+    pub static SECOND_PASS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The accuracy threshold `acc_thr` of the last scaled primal at its optimum, for the second pass's clean-up call.
+    pub static ACC_THR_PASS: std::cell::Cell<f64> = const { std::cell::Cell::new(0.0078125) };
+}
+
 pub fn solve(
     model: &LpModel,
     start: Option<&Basis>,
@@ -6122,17 +6141,21 @@ fn solve_primal(
                         }
                         // The reference's primal ends with the maximum bound violation of the basic variables in the unscaled problem (`0xcff40`, `r9+0x90`);
                         // above the feasibility tolerance (`rbp+0x2460`, 1e-6) the driver runs the dual loop on the unscaled model (`0x154d95`).
-                        let unscaled = if !s.cleanup && s.mirror.is_some() && s.opts.pricing0 && !infeasible {
-                            s.unscaled_violation().filter(|&v| v > 1e-6)
+                        let inf = if !s.cleanup && s.mirror.is_some() && s.opts.pricing0 && !infeasible {
+                            s.unscaled_infeasibilities()
                         } else {
                             None
                         };
+                        crate::scale::END_INF.with(|c| c.set(inf));
+                        ACC_THR_PASS.with(|c| c.set(s.acc_thr));
+                        let unscaled = inf.map(|e| e.0).filter(|&v| v > 1e-6);
                         if (s.cleanup && s.has_infeasible_basic()) || unscaled.is_some() {
                             // The dual clean-up pass; the primal phase 1 only when it finds no entering variable.
                             let b = Basis {
                                 basic: s.basic.clone(),
                                 at_upper: s.at_upper.clone(),
                             };
+                            crate::scale::PASS_RAN.with(|c| c.set(true));
                             let orig = if unscaled.is_some() { crate::scale::ORIG.with(|c| c.borrow().as_ref().map(|o| o.0.clone())) } else { None };
                             let dopts = SolveOptions {
                                 method: Method::Dual,
@@ -7778,4 +7801,15 @@ fn release_primal_runs_the_dual_on_the_unscaled_model_when_it_is_infeasible() {
     let r = crate::solve(&model, None, &SolveOptions::release()).unwrap();
     assert_eq!(r.status, Status::Optimal);
     assert_eq!(r.iterations, 6);
+}
+
+#[cfg(test)]
+#[test]
+fn release_primal_runs_an_unscaled_second_pass_when_the_optimum_is_dual_infeasible() {
+    // Seed 9422 (gen3): the scaled optimum is primal feasible but has unscaled dual infeasibility >= 1e-6; the reference's `0xcff40` starts a second
+    // primal pass on the unscaled problem (one more pivot), then the dual pass makes no pivot.
+    let model = crate::mps::parse(include_str!("../tests/fixtures/fx_pricing0_pass2_9422.mps")).unwrap();
+    let r = crate::solve(&model, None, &SolveOptions::release()).unwrap();
+    assert_eq!(r.status, Status::Optimal);
+    assert_eq!(r.iterations, 2);
 }

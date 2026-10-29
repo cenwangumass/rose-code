@@ -324,6 +324,13 @@ thread_local! {
     pub static ORIG: std::cell::RefCell<Option<(LpModel, Vec<f64>, Vec<f64>)>> = const { std::cell::RefCell::new(None) };
 }
 
+thread_local! {
+    /// The dual clean-up pass ran inside the scaled primal: the reference makes no unscaled second primal pass after it.
+    pub static PASS_RAN: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The unscaled (primal violation, dual infeasibility) of the scaled primal's optimum (`0xcff40`, `r9+0x90`, `r9+0xb0`).
+    pub static END_INF: std::cell::Cell<Option<(f64, f64)>> = const { std::cell::Cell::new(None) };
+}
+
 /// Solves the scaled model and returns the solution of `model`.
 pub fn solve(
     model: &LpModel,
@@ -347,8 +354,43 @@ pub fn solve(
             };
             crate::simplex::RAY_ENTER.with(|c| c.set(None));
             ORIG.with(|c| *c.borrow_mut() = Some((model.clone(), sc.col.clone(), sc.row.clone())));
-            let r = crate::simplex::solve(&scaled, start, &inner);
+            END_INF.with(|c| c.set(None));
+            PASS_RAN.with(|c| c.set(false));
+            let mut r = crate::simplex::solve(&scaled, start, &inner);
             ORIG.with(|c| *c.borrow_mut() = None);
+            if opts.pricing0 {
+                if let (Ok(r1), Some((pv, dv)), false) = (r.as_ref(), END_INF.with(|c| c.take()), PASS_RAN.with(|c| c.get())) {
+                    if r1.status == crate::simplex::Status::Optimal && pv <= 1e-6 && dv >= 1e-6 {
+                        let second = SolveOptions { scaled: false, obj_scale: 1.0, ..inner.clone() };
+                        let basis = r1.basis.clone();
+                        let n1 = r1.iterations;
+                        crate::simplex::SECOND_PASS.with(|c| c.set(true));
+                        let r2 = crate::simplex::solve(model, Some(&basis), &second);
+                        crate::simplex::SECOND_PASS.with(|c| c.set(false));
+                        if let Ok(mut r2) = r2 {
+                            r2.iterations += n1;
+                            if r2.status == crate::simplex::Status::Optimal {
+                                let dopts = SolveOptions {
+                                    method: crate::simplex::Method::Dual,
+                                    record_trace: true,
+                                    ..SolveOptions::default()
+                                };
+                                crate::dual::CLEANUP_PASS.with(|c| c.set(Some(crate::simplex::ACC_THR_PASS.with(|a| a.get()))));
+                                let via = crate::dual::solve(model, Some(&r2.basis), &dopts);
+                                crate::dual::CLEANUP_PASS.with(|c| c.set(None));
+                                if let Ok(r3) = via {
+                                    if r3.iterations > 0 {
+                                        let mut r3 = r3;
+                                        r3.iterations += r2.iterations;
+                                        return Ok(r3);
+                                    }
+                                }
+                            }
+                            return Ok(r2);
+                        }
+                    }
+                }
+            }
             let r = r?;
             let mut out = sc.unscale(model, r);
             if let (Some(ray), Some((q, n))) = (
