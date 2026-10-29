@@ -1,0 +1,30 @@
+NAME witness
+ROWS
+ N obj
+ G r0
+ E r4
+ G r5
+ E r7
+COLUMNS
+ x11 obj 10.0
+ x11 r0 2000000.0
+ x11 r5 -0.0002
+ x11 r7 4.0
+ x12 obj 0.0
+ x12 r4 40000.0
+ x12 r5 5.99995
+ x12 r7 2.0
+ x13 obj 0.0
+ x13 r4 -1020000.0
+ x13 r5 -3.0
+ x13 r7 -3000000.5
+ x19 obj 0.0
+ x19 r0 1000000.0
+ x19 r4 1040000.0000500164
+ x19 r5 6.0
+ x19 r7 3000001.0
+RHS
+BOUNDS
+ FR b x11
+ FR b x12
+ENDATA

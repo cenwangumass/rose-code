@@ -351,6 +351,8 @@ struct Dual<'a, R: Real = f64> {
     rrows: Vec<Vec<usize>>,
     /// The ratio test asked for a refactorization (request 5) instead of ending the dual: the iteration returns without a pivot.
     absorb_request: bool,
+    /// The candidates of a row on a fresh factor at a nonzero level cannot absorb the infeasibility (`0xcc1ca`: `ctx+0x290` = 1, no entering variable): the pass ends with status -1004 at the post-iteration pass.
+    fresh_absorb: bool,
     refactorizations: usize,
     /// The relative pivot threshold of the LU (`ctx+0x390`, 2^-7 at the start): raised after a recompute of x_B by `accuracy_threshold`, never lowered.
     lu_thr: f64,
@@ -2389,6 +2391,10 @@ impl<'a, R: Real> Dual<'a, R> {
         }
         if nn == 0 {
             self.work.add(0xc7c4f, 0.0, crate::work::CTX);
+            // An empty list at a nonzero level on a fresh factor, the infeasibility beyond the (artificial-bound) primal tolerance: `0xcc061` -> `0xcc1ca`.
+            if self.level != 0 && self.updates == 0 && R::c(-self.ptol()) > xmm10 {
+                self.fresh_absorb = true;
+            }
             return Ratio {
                 q: None,
                 flips: Vec::new(),
@@ -3186,6 +3192,20 @@ impl<'a, R: Real> Dual<'a, R> {
         self.row_product_work(&rho, row.len() - esi);
         self.p58 += rho.iter().map(|e| self.rrows[e.0].len()).sum::<usize>() as f64;
         let rt = self.ratio_test(&row, esi, leave, above, xbr);
+        if std::mem::take(&mut self.fresh_absorb) && !self.no_art_exit {
+            if let Some(mut sn) = snap {
+                sn["r"] = serde_json::json!(r);
+                sn["var"] = serde_json::json!(leave);
+                sn["rho"] = crate::dump::sparse_r(&rho);
+                sn["row"] = crate::dump::sparse_r(&row);
+                sn["q"] = serde_json::json!(-1);
+                *dump = Some(sn);
+            }
+            // `ctx+0x290` = 1: the post-iteration pass counts the variables at an artificial bound and, with `ctx+0x35c` != 0, ends the pass with status -1004.
+            self.art_exit = true;
+            self.dual_unbounded();
+            return Step::Mismatch;
+        }
         if std::mem::take(&mut self.absorb_request) {
             if let Some(mut sn) = snap {
                 sn["r"] = serde_json::json!(r);
@@ -5131,6 +5151,7 @@ fn solve_pass_callback<R: Real>(
         factor,
         rrows: vec![Vec::new(); m],
         absorb_request: false,
+        fresh_absorb: false,
         refactorizations: carry.fac + 1,
         lu_thr: carry_thr,
         big_pricing: false,
@@ -6434,6 +6455,7 @@ mod captured_bh305_ratio {
             factor,
             rrows: vec![Vec::new(); m],
             absorb_request: false,
+        fresh_absorb: false,
             refactorizations: 1,
             lu_thr: 0.0078125,
             big_pricing: false,
