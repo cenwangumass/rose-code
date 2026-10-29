@@ -4621,6 +4621,8 @@ thread_local! {
     /// The perturbation flag the quad pass inherits from the double pass (`ctx+0x338`).
     /// Out of a clean-up pass dual: (the dual ended with cost shifts, so its last factorization was the sorted primal clean-up one, the LU threshold at the end).
     pub static CLEANUP_OUT: std::cell::Cell<(bool, f64)> = const { std::cell::Cell::new((false, 0.0)) };
+    /// The third restart of a quad pass starts from the slack basis without a crash (the restart handler's `factor+0xc` = 1 store is the double handler's: `fx_witness_dual_c6007`, one crash in the whole run).
+    static NO_CRASH: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static SWITCH_PERT: std::cell::Cell<Option<u8>> = const { std::cell::Cell::new(None) };
     static SINGULAR: std::cell::Cell<Option<(usize, usize, f64, f64, usize, usize, bool, u32, usize)>> = const { std::cell::Cell::new(None) };
     static SINGULAR_BASIS: std::cell::RefCell<Option<Basis>> = const { std::cell::RefCell::new(None) };
@@ -4916,6 +4918,7 @@ fn solve_frame(
                 if fresh {
                     reset_pert_sizes(opts.perturb);
                     factor_crash = true;
+                    NO_CRASH.with(|c| c.set(quad));
                     restart_primal = failed_quad_dual && SNAP_PRIMAL.with(|c| c.get());
                 } else if context_iters > 0 && SNAP_QUALITY.with(|c| c.get() > 0) {
                     factor_crash = false;
@@ -5082,6 +5085,10 @@ fn solve_pass_callback<R: Real>(
             }
             b
         }
+        None if NO_CRASH.with(|c| c.take()) => Basis {
+            basic: (n..n + m).collect(),
+            at_upper: vec![false; n + m],
+        },
         None => {
             let (basic, upper) = dual_crash_basic(&p);
             crash_upper = Some(upper);

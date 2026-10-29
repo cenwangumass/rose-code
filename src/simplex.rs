@@ -1134,6 +1134,8 @@ struct Solver<'a> {
     rescan2: bool,
     /// The scan that found nothing has been repeated on freshly recomputed duals (`0x145520` then the pricing again, seed 2717).
     rescan3: bool,
+    /// The end test of a primal started by the dual controller found nothing on a fresh factor and refactorized once (`0x14522c..0x1452ff`, request 6).
+    fresh_end: bool,
     /// The x87 primal's tiny-pivot reject (status -7 of the reference, seed 6610): the entering variable whose pivot raised the threshold takes the pivot when it comes back.
     tiny7: Option<usize>,
     /// The drift test of the primal update (`ctx+0x380`, `ctx+0x170`): tolerance and count of excesses.
@@ -5397,6 +5399,7 @@ fn solve_primal(
         rej6: Vec::new(),
         rescan2: false,
         rescan3: false,
+        fresh_end: false,
         tiny7: None,
         drift_tol: if handoff.is_some() {
             crate::dual::primal_tol()
@@ -6119,6 +6122,21 @@ fn solve_primal(
                     // As above, in phase 2: the x87 primal with cost shifts in force ends with status -1004 at its first failed scan.
                     PRIMAL_SHIFT_END.with(|c| c.set(true));
                     break Status::Infeasible;
+                }
+                None if s.handoff.is_some_and(|h| !h.quad) && s.iters_done == 0 && (0..s.p.n + s.p.m).any(|j| s.at_upper[j] && is_inf(s.p.up[j]) && !s.basic.contains(&j)) && s.factor.num_updates() == 0 && !std::mem::replace(&mut s.fresh_end, true) => {
+                    // The end test without an entering variable (`0x14522c..0x1452ff`): with updates, or with `ctx+0x3f8` != 0 (1 in a primal started by the dual controller), the
+                    // primal requests a refactorization (6) before ending, even on a fresh factor (fx_witness_dual_cc1ca, dual-controlled: ctx+0x390 is already 0.5). The status
+                    // pass of the recompute puts nonbasic variables at an infinite upper bound back to the lower one, so the variable the dual left there is priced again.
+                    for j in 0..s.p.n + s.p.m {
+                        if s.at_upper[j] && is_inf(s.p.up[j]) && !s.basic.contains(&j) {
+                            s.at_upper[j] = false;
+                        }
+                    }
+                    s.work.trig();
+                    s.refactor()?;
+                    s.list.clear();
+                    s.level = 0;
+                    continue;
                 }
                 None => {
                     // The reference recomputes the duals once more when the scan finds nothing (`0x145520`, with the residual check).
