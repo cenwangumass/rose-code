@@ -3061,7 +3061,7 @@ impl<'a> Solver<'a> {
             && self.repaired
             && self.excluded.is_some()
             && self.handoff.is_some_and(|h| h.quad && !h.pert)
-            && self.factor.num_updates() > 0
+            && self.factor.num_updates() == 1
         {
             // With the dropped variable still out the failed scan is followed by the factorization before the duals are recomputed
             // (`price_admitting`; 5959 x87_dw scans 366 -> 367: `ctx+0x2c0` 7 -> 8 with no rescan record).
@@ -7856,4 +7856,15 @@ fn release_primal_runs_an_unscaled_second_pass_when_the_optimum_is_dual_infeasib
     let r = crate::solve(&model, None, &SolveOptions::release()).unwrap();
     assert_eq!(r.status, Status::Optimal);
     assert_eq!(r.iterations, 2);
+}
+
+#[cfg(test)]
+#[test]
+fn x87_failed_scan_with_two_updates_recomputes_the_duals_before_refactoring() {
+    // Quad cohort seed 3981 (dual, release): with the dropped variable out, a failed x87 scan after two updates recomputes the duals and scans again
+    // (`ctx+0x2c0` unchanged); after one update (seed 5959) the factorization comes first.
+    let model = crate::mps::parse(include_str!("../tests/fixtures/randlp3981.mps")).unwrap();
+    let r = crate::solve(&model, None, &SolveOptions::dual_release()).unwrap();
+    assert_eq!(r.status, Status::Optimal);
+    assert_eq!(r.iterations, 87);
 }
