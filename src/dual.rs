@@ -5904,6 +5904,10 @@ fn solve_pass_callback<R: Real>(
     let mut y: Vec<f64> = s.head.iter().map(|&j| p.cost[j]).collect();
     s.factor.btran(&mut y);
     let dtrue: Vec<f64> = s.true_d().iter().map(|v| v.to_f64()).collect();
+    if R::QUAD {
+        // The quad pass returns the multipliers of the same long double btran as the reduced costs (`true_d`), rounded once.
+        y = s.last_y.iter().map(|v| v.to_f64()).collect();
+    }
     let nm = model.num_cols();
     let xs: Vec<f64> = x[..nm].to_vec();
     let at_upper: Vec<bool> = s.st.iter().map(|&t| t == UB).collect();
