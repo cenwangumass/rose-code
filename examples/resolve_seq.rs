@@ -29,9 +29,16 @@ fn main() {
     } else {
         // Public VBasis 0 = basic, -1 = at lower; CBasis -1 = slack nonbasic at lower. The basis is the k structurals; the slacks
         // complete it only when k < m (never here: k == m).
-        assert_eq!(k, m);
+        // `HEAD=j,...` (as for the reference runner) lists the basic variables instead: structurals below n, then slacks by row.
+        let basic: Vec<usize> = match std::env::var("HEAD") {
+            Ok(h) => h.split(',').map(|t| t.parse().unwrap()).collect(),
+            Err(_) => {
+                assert_eq!(k, m);
+                (0..k).collect()
+            }
+        };
         Some(Basis {
-            basic: (0..k).collect(),
+            basic,
             at_upper: vec![false; n + m],
         })
     };
