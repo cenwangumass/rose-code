@@ -528,6 +528,8 @@ thread_local! {
     /// The x87 failed scan ended after perturbation (status -1004).
     pub(crate) static PRIMAL_SHIFT_END: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// Factorizations the primal of a dual handoff left out at its end (the Farkas pair, see `refactor_for_farkas`): the dual controller books them as made.
+    /// Factorizations the Farkas readout of the primal actually made (`refactor_for_farkas`): the dual controller does not book them.
+    pub(crate) static PRIMAL_FARKAS_MADE: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     pub(crate) static PRIMAL_FARKAS_SKIPPED: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     /// The pivot pair of the last Devex pivot of a standalone primal (`ctx+0x300`, `ctx+0x308`), which the x87 restart after the tolerance abort inherits.
     pub(crate) static PRIMAL_RESTART_PAIR: std::cell::Cell<Option<(f64, f64)>> = const { std::cell::Cell::new(None) };
@@ -1253,6 +1255,9 @@ struct Solver<'a> {
     will_switch: bool,
     /// The factorization that follows a pricing0 accuracy rejection (`0x14509b`): the reference books no spike discard (`0xf461f`) there.
     acc_refactor: bool,
+    /// The refactorization follows a failed pricing scan on a factor with updates (`want_refactor`): the update of the last pivot ran at the previous check and
+    /// cleared the pending spike (`0xf2e7d`), so the discard (`0xf461f`) books nothing.
+    scan_refactor: bool,
     /// Factorizations made before this solve by the first primal pass (the second pass continues the reference's count).
     ref_base: usize,
     /// The pivot threshold `ctx+0x390` as the accuracy ladder of the x_B recomputes leaves it (`crate::dual::accuracy_threshold`); the primal's own factorizations keep 2^-7, the clean-up pass uses it.
@@ -1657,9 +1662,10 @@ impl<'a> Solver<'a> {
                     p0.window = (avg / 2).max(P0_WINDOW);
                 }
                 if let Some(old) = self.mirror.as_ref() {
+                    let scan_refactor = std::mem::take(&mut self.scan_refactor);
                     let est = if self.restart || std::mem::take(&mut self.acc_refactor) || self.pass_next || SECOND_PASS.with(|c| c.get()) {
                         0.0
-                    } else if self.cleanup || self.pre_restart {
+                    } else if self.cleanup || self.pre_restart || scan_refactor {
                         old.discard_work_unused()
                     } else {
                         old.discard_work()
@@ -2846,7 +2852,7 @@ impl<'a> Solver<'a> {
         if crate::dump::on("dualtol") {
             crate::dump::emit(
                 "dualtol",
-                serde_json::json!({"src": "primal-cmp", "meas": meas, "tol": crate::dual::dual_tol(), "cnt": crate::dual::resid_fails(), "n": nref}),
+                serde_json::json!({"src": "primal-cmp", "meas": meas, "tol": crate::dual::dual_tol(), "cnt": crate::dual::resid_fails(), "n": nref, "sum": crate::dual::dual_infeas_sum()}),
             );
         }
         // The reference also compares against 1e-4 times the sum of dual
@@ -4021,6 +4027,13 @@ impl<'a> Solver<'a> {
     /// after the two iterations; `inf_itest2` release: calls 2 and 3, the first of them already run by the loop). One-ulp noise in the
     /// vector came from the BTRAN through the updated factor.
     fn refactor_for_farkas(&mut self) -> Result<(), SolveError> {
+        let before = self.refactorizations;
+        let res = self.refactor_for_farkas_inner();
+        PRIMAL_FARKAS_MADE.with(|c| c.set(c.get() + self.refactorizations - before));
+        res
+    }
+
+    fn refactor_for_farkas_inner(&mut self) -> Result<(), SolveError> {
         // In a primal started by the dual controller the failed scans already made the factorizations (the last scan ends on a fresh factor, `cf0 = 3`): the BTRAN reads
         // that factor (fx_midsing_1106: the reference's last two factorizations come from the scan's exits, none from the certificate).
         if self.handoff.is_some() && self.factor.num_updates() == 0 {
@@ -5584,6 +5597,7 @@ fn solve_primal(
         pass_next: false,
         will_switch: false,
         acc_refactor: false,
+        scan_refactor: false,
         ref_base: if SECOND_PASS.with(|c| c.get()) { PASS_REFS.with(|c| c.get()) } else { 0 },
         acc_thr: crate::lu_order::THRESHOLD,
         cleanup_keep_head: false,
@@ -6172,6 +6186,7 @@ fn solve_primal(
             match price {
                 Some(q) => q,
                 None if std::mem::take(&mut s.want_refactor) => {
+                    s.scan_refactor = true;
                     s.work.trig();
                     s.work.decided(s.work.w);
                     if let Some(mi) = s.mirror.as_mut() {

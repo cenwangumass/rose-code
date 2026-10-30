@@ -5674,9 +5674,11 @@ fn solve_pass_callback<R: Real>(
         }
     }
     let dt = s.true_d();
+    // The start pass runs the residual check of the post-refactor pass with the request 1 (`0xe5cda`; witness_primal_r31_double4: factorization count 9, residual 0.452).
+    s.request = 1;
+    s.dual_residual_check();
     s.work
         .add_from(0x12de50, 0xe53a7, s.mirror.work, crate::work::FAC);
-    s.request = 1;
     let level_work = s.set_level_work(false);
     s.work.add(0xe7000, level_work, crate::work::CTX);
     s.request = 0;
@@ -6163,6 +6165,7 @@ fn solve_pass_callback<R: Real>(
         crate::simplex::PRIMAL_TOL_ABORT.with(|c| c.set(false));
         crate::simplex::PRIMAL_START_SINGULAR.with(|c| c.set(false));
         crate::simplex::PRIMAL_FARKAS_SKIPPED.with(|c| c.set(0));
+        crate::simplex::PRIMAL_FARKAS_MADE.with(|c| c.set(0));
         crate::simplex::PRIMAL_REPAIRED.with(|c| c.set(false));
         crate::simplex::PRIMAL_SHIFT_END.with(|c| c.set(false));
         if !R::QUAD {
@@ -6779,9 +6782,10 @@ fn resume_primal_transfer<R: Real>(model: &LpModel, opts: &SolveOptions,
                         + if R::QUAD {
                             l.max(1)
                         } else {
-                            l.saturating_sub(
-                                2 - crate::simplex::PRIMAL_FARKAS_SKIPPED.with(|c| c.take()),
-                            )
+                            {
+                                crate::simplex::PRIMAL_FARKAS_SKIPPED.with(|c| c.take());
+                                l.saturating_sub(crate::simplex::PRIMAL_FARKAS_MADE.with(|c| c.take()))
+                            }
                         }
                 },
             };
