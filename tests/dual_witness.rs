@@ -48,3 +48,16 @@ fn mode_two_pricing_switch_reaches_the_reference_objective() {
     let r = solve(&mps::parse(&text).unwrap(), None, &SolveOptions::dual_release()).unwrap();
     assert_eq!((r.status, r.iterations, r.objective), (Status::Optimal, 11393, -19372.523117569304));
 }
+
+/// `witness_structural_r10_lower_cutoff` (dual-release, cold start): the multipliers are the reference btran's, not the plain factor solve's; the last two differ
+/// from the exact values by one ulp of the scaled 40000-sized intermediate (reference Pi = -4999.5, -1, 5001.499999999999, -0.9999999999990905).
+#[test]
+fn r10_final_multipliers_follow_the_reference_btran() {
+    let model = mps::parse(include_str!("fixtures/witness_structural_r10_lower_cutoff.mps")).unwrap();
+    let r = solve(&model, None, &SolveOptions::dual_release()).unwrap();
+    assert_eq!((r.status, r.iterations), (Status::Optimal, 3));
+    let want = [-4999.5, -1.0, 5001.499999999999, -0.9999999999990905f64];
+    for (g, w) in r.dual.iter().zip(want) {
+        assert_eq!(g.to_bits(), w.to_bits());
+    }
+}
