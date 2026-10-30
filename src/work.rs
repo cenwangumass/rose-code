@@ -130,6 +130,11 @@ impl Work {
         (self.w150, self.decided_once) = st;
     }
 
+    /// `w150` = the current `W`: the reference stamps it before the last attempt of a factorization whose growth check retried.
+    pub fn stamp_w150(&mut self) {
+        self.w150 = self.w;
+    }
+
     /// Records a check that decided to refactorize, at `W = w`.
     pub fn decided(&mut self, w: f64) {
         self.w150 = w;

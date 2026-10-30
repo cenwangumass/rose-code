@@ -1690,6 +1690,7 @@ impl<'a> Solver<'a> {
                     let nnz_a: usize = (0..self.p.n).map(|j| self.p.cols[j].len()).sum();
                     self.work.add(0xe84b9, 2.0 * nnz_a as f64, crate::work::CTX);
                 }
+                book_retried_attempts(&mut self.work);
                 self.work.factor_driver(&lu, crate::work::CTX);
                 for (site, est) in lu.into_iter().chain(mi.fresh_work()) {
                     self.work.add(site, est, crate::work::CTX);
@@ -5014,6 +5015,27 @@ fn growth_limit(scaled: bool, quad: bool) -> Option<f64> {
     (!quad).then_some(if scaled { 1e12 } else { 1e15 })
 }
 
+thread_local! {
+    /// The driver work of the growth-check attempts that were retried by the last `reference_order_for`, in order.
+    static RETRY_LU_WORK: std::cell::RefCell<Vec<Vec<(u32, f64)>>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Books the retried attempts' driver work (taken from `reference_order_for`) and stamps `w150` before the last attempt.
+fn book_retried_attempts(work: &mut crate::work::Work) {
+    let retried = RETRY_LU_WORK.with(|c| std::mem::take(&mut *c.borrow_mut()));
+    if retried.is_empty() {
+        return;
+    }
+    for lu in retried {
+        work.factor_driver(&lu, crate::work::CTX);
+        for (site, est) in lu {
+            work.add(site, est, crate::work::CTX);
+        }
+        work.factor_done();
+    }
+    work.stamp_w150();
+}
+
 /// The reference's factorization driver (`0xf351d..0xf3629`): after a factorization with every column pivoted, while the pivot threshold `ctx+0x390` is
 /// below 0.9 and max |diag| / min |diag| of the new factor exceeds `grow`, the threshold rises (0.5, then 0.9) and the same columns are factorized again
 /// (`witness_primal_r3_fresh_high`: the singular-looking start basis is factored at 1/128, 0.5, 0.9). The factorization number counts once.
@@ -5038,6 +5060,7 @@ fn reference_order_for(
             )
         })
         .collect();
+    RETRY_LU_WORK.with(|c| c.borrow_mut().clear());
     loop {
         crate::lu_order::set_factorization_number(fac_no);
         let st = crate::lu_order::factor_structure(p.m, &cols);
@@ -5059,6 +5082,9 @@ fn reference_order_for(
                             serde_json::json!({"cols": basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "primal": true, "thr": thr, "grown": mx / mn}),
                         );
                     }
+                    // A retried attempt books the driver's sites like any factorization (`witness_primal_r3_fresh_high`: three
+                    // attempts, 4 sites each); the cost stored in `ctx+0x158` is the attempt's own.
+                    RETRY_LU_WORK.with(|c| c.borrow_mut().push(st.work(&cols, mi.has_levels())));
                     crate::lu_order::set_threshold(if thr < 0.5 { 0.5 } else { 0.9 });
                     continue;
                 }
@@ -5704,6 +5730,7 @@ fn solve_primal(
         }
         s.work.factor_done();
     }
+    book_retried_attempts(&mut s.work);
     s.work.factor_driver(&lu_work, crate::work::CTX);
     for (site, est) in lu_work {
         s.work.add(site, est, crate::work::CTX);

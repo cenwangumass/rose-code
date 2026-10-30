@@ -156,6 +156,9 @@ thread_local! {
     /// The primal's start basis when its drift test ended it (status -1002): the restart takes it (`0xcedb0`, seed 2717).
     static DRIFT_START: std::cell::RefCell<Option<Basis>> = const { std::cell::RefCell::new(None) };
     static SNAP_C40: std::cell::Cell<f64> = const { std::cell::Cell::new(-100.0) };
+    /// The tolerance reset of the third restart (`0xcf29b`, once per restart) already happened in the primal run that the restart started first; the dual pass that
+    /// follows it must not reset again (witness_primal_r31_double4: the reference's dual pass after the primal runs at 0.005, not 1e-6).
+    static TOL_RESET_DONE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 /// The log timer of the primal (`ctx+0x40`): true once `total` is 100 past the last check, which it then sets (`(total / 100) * 100`, `0x27e1a1..0x27e1a9`).
@@ -834,6 +837,11 @@ thread_local! {
     /// The last dual pass ended with status 12 from its own pivot check (`0x21db9a`, double copy `0xc5a..`): the controller writes the status and the iteration count
     /// at `0x15637b` and skips the objective store of `0x153eba`, so the result keeps objective 0 (witness_primal_r31_double4; the `0x15553e` end stores `ctx+0x118`).
     static PASS_END12: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The double dual's x (scaled frame) at its last -1004 handoff to the primal: `ctx+0x118` keeps the objective of that x, and the controller's status-12 end
+    /// (the primal's own, `0x144e6f`) stores it as ObjVal (`fx_midsing_1031`: 197979259134.57623, not the 0.0 of the `0x15637b` path).
+    static DUAL_X_AT_HANDOFF: std::cell::RefCell<Option<Vec<f64>>> = const { std::cell::RefCell::new(None) };
+    /// The same x, kept for the unscaled read-out of a status-12 result.
+    static END12_X: std::cell::RefCell<Option<Vec<f64>>> = const { std::cell::RefCell::new(None) };
 }
 
 /// The objective read-out accumulates in the working precision of the final pass (`long double` in the quad pass: seed 2150, the double sum is one
@@ -871,6 +879,16 @@ pub fn unscaled_objective(model: &crate::model::LpModel, x: &[f64], col: &[f64])
     if PASS_END12.with(|c| c.get()) {
         QUAD_RESULT.with(|c| c.set(false));
         return 0.0;
+    }
+    if let Some(xs) = END12_X.with(|c| c.borrow_mut().take()) {
+        QUAD_RESULT.with(|c| c.set(false));
+        if xs.len() >= model.obj.len() {
+            let mut acc = 0.0f64;
+            for (j, c) in model.obj.iter().enumerate() {
+                acc += *c * (xs[j] * col[j]);
+            }
+            return acc + model.offset;
+        }
     }
     if QUAD_RESULT.with(|c| c.replace(false)) {
         use crate::f80::F80;
@@ -5107,6 +5125,7 @@ fn solve_frame(
                 set_dual_tol(DUAL_TOL0);
                 set_primal_tol(PRIMAL_TOL);
                 LARGE_XB.with(|c| c.set(false));
+                TOL_RESET_DONE.with(|c| c.set(fresh_pass::<f64>(carry.retries)));
             }
             let mut popts = pass_opts.clone();
             popts.method = crate::simplex::Method::Primal;
@@ -5233,6 +5252,7 @@ fn solve_frame(
                 // it before entering the common restart handler.
                 let next_retries = pass_retries + u32::from(!SINGULAR_TOL_ABORT.with(|c| c.get()));
                 let fresh = next_retries == 3;
+                TOL_RESET_DONE.with(|c| c.set(false));
                 if fresh {
                     reset_pert_sizes(opts.perturb);
                     factor_crash = true;
@@ -5350,7 +5370,9 @@ fn solve_pass_callback<R: Real>(
 ) -> Result<DriverOutcome, SolveError> {
     if fresh_pass::<R>(carry.retries) {
         // The fresh start of the third restart initialises the context again (`0xcf29b`): the tolerance goes back to the parameter, the counter stays.
-        set_dual_tol(DUAL_TOL0);
+        if !TOL_RESET_DONE.with(|c| c.replace(false)) {
+            set_dual_tol(DUAL_TOL0);
+        }
         set_primal_tol(PRIMAL_TOL);
         LARGE_XB.with(|c| c.set(false));
     }
@@ -6139,6 +6161,11 @@ fn solve_pass_callback<R: Real>(
         crate::simplex::PRIMAL_FARKAS_SKIPPED.with(|c| c.set(0));
         crate::simplex::PRIMAL_REPAIRED.with(|c| c.set(false));
         crate::simplex::PRIMAL_SHIFT_END.with(|c| c.set(false));
+        if !R::QUAD {
+            let nn = s.p.lo.len();
+            let xd: Vec<f64> = (0..nn).map(|j| if s.st[j] >= 0 { s.xb[s.st[j] as usize].to_f64() } else { s.nonbasic_value(j) }).collect();
+            DUAL_X_AT_HANDOFF.with(|c| *c.borrow_mut() = Some(xd));
+        }
         if R::QUAD {
             let nn = s.p.lo.len();
             let xr: Vec<(f64, f64)> = (0..nn).map(|j| {
@@ -6671,7 +6698,23 @@ fn resume_primal_transfer<R: Real>(model: &LpModel, opts: &SolveOptions,
         }
         if r.status == Status::NumericalFailure {
             // The primal's phase 1 ratio test finds no row on a fresh factor: the reference ends the solve with status 12 (fx_midsing_1031), the controller does not
-            // restart the dual.
+            // restart the dual. ObjVal is `ctx+0x118`, still the objective of the dual's x at its last handoff.
+            if !R::QUAD {
+                if let Some(xd) = DUAL_X_AT_HANDOFF.with(|c| c.borrow_mut().take()) {
+                    let nm = model.num_cols();
+                    if xd.len() >= model.obj.len() && nm == model.obj.len() {
+                        let mut acc = 0.0f64;
+                        for (c, v) in model.obj.iter().zip(&xd) {
+                            acc += *c * *v;
+                        }
+                        r.objective = acc + model.offset;
+                        if opts.scaled {
+                            END12_X.with(|c| *c.borrow_mut() = Some(xd));
+                        }
+                        PASS_END12.with(|c| c.set(false));
+                    }
+                }
+            }
             return Ok(r);
         }
         if status == Status::Infeasible
