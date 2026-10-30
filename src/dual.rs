@@ -5370,7 +5370,7 @@ fn solve_pass_callback<R: Real>(
             supplied = Some(b.basic.clone());
             // A singular basis loses the columns that get no pivot in the reference's LU order and takes the slacks of the uncovered rows instead.
             let mut probe = b.clone();
-            if (FROM_SWITCH.with(|c| c.get()) || (carry.after_pivot && carry.retries < 5))
+            if (FROM_SWITCH.with(|c| c.get()) || (has_restart_snapshot() && carry.retries < 5))
                 && crate::simplex::repair_basis(&p, &mut probe).is_some()
             {
                 // The basis the quad switch carries over is not a supplied one: when its quad factorization is singular (the double structure finds the same columns

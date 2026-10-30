@@ -1522,7 +1522,12 @@ impl<'a> Solver<'a> {
         crate::lu_order::Structure,
         Vec<(bool, Vec<usize>, Vec<f64>)>,
     ) {
-        reference_order_for(self.p, &self.basic, fac_no)
+        reference_order_for(self.p, &self.basic, fac_no, self.growth_limit(), "luin")
+    }
+
+    /// The growth check limit of the double driver (`0xf351d..0xf3629`), `None` for the x87 primal.
+    fn growth_limit(&self) -> Option<f64> {
+        growth_limit(self.opts.scaled, self.handoff.as_ref().is_some_and(|h| h.quad))
     }
 
     /// The factor of the current basis in extended precision (same column order as the double one), built with the gate state of the double build.
@@ -2013,7 +2018,7 @@ impl<'a> Solver<'a> {
             crate::dump::emit(
                 "switch",
                 serde_json::json!({"call": self.refactorizations - 1, "iters": before.iters, "degenerate": before.degenerate,
-                "snap_degenerate": before.snap_degenerate, "snap_iters": before.snap_iters, "avg": avg, "l_total": inp.l_total, "u_total": inp.u_total, "switch": switch, "mode": self.sw.mode}),
+                "snap_degenerate": before.snap_degenerate, "snap_iters": before.snap_iters, "avg": avg, "l_total": inp.l_total, "u_total": inp.u_total, "switch": switch, "mode": self.sw.mode, "thr": crate::lu_order::threshold()}),
             );
         }
         if switch {
@@ -5004,10 +5009,20 @@ fn ratio_test(
     }
 }
 
+/// The growth check limit of the double driver: 1e12 when the model is scaled (`ctx+0xe0`), else 1e15; none for the x87 primal.
+fn growth_limit(scaled: bool, quad: bool) -> Option<f64> {
+    (!quad).then_some(if scaled { 1e12 } else { 1e15 })
+}
+
+/// The reference's factorization driver (`0xf351d..0xf3629`): after a factorization with every column pivoted, while the pivot threshold `ctx+0x390` is
+/// below 0.9 and max |diag| / min |diag| of the new factor exceeds `grow`, the threshold rises (0.5, then 0.9) and the same columns are factorized again
+/// (`witness_primal_r3_fresh_high`: the singular-looking start basis is factored at 1/128, 0.5, 0.9). The factorization number counts once.
 fn reference_order_for(
     p: &Internal,
     basic: &[usize],
     fac_no: usize,
+    grow: Option<f64>,
+    tag: &str,
 ) -> (
     Vec<usize>,
     crate::lu_order::Structure,
@@ -5023,10 +5038,34 @@ fn reference_order_for(
             )
         })
         .collect();
-    crate::lu_order::set_factorization_number(fac_no);
-    let st = crate::lu_order::factor_structure(p.m, &cols);
-    let order = st.pivots.iter().map(|&(_, pos)| basic[pos]).collect();
-    (order, st, cols)
+    loop {
+        crate::lu_order::set_factorization_number(fac_no);
+        let st = crate::lu_order::factor_structure(p.m, &cols);
+        let order: Vec<usize> = st.pivots.iter().map(|&(_, pos)| basic[pos]).collect();
+        if let Some(limit) = grow {
+            let thr = crate::lu_order::threshold();
+            if order.len() == p.m && thr < 0.9 {
+                let mi = crate::ftran_order::RefStruct::<f64>::fresh(p.m, p.n, &st, &cols);
+                let (mx, mn) = mi
+                    .numerics()
+                    .0
+                    .iter()
+                    .fold((0.0f64, 1e100f64), |(a, b), v| (a.max(v.abs()), b.min(v.abs())));
+                if mx / mn > limit {
+                    // Each attempt is one of the reference's factorizations (`lu_in`); the caller records the last one.
+                    if crate::dump::on(tag) {
+                        crate::dump::emit(
+                            tag,
+                            serde_json::json!({"cols": basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "primal": true, "thr": thr, "grown": mx / mn}),
+                        );
+                    }
+                    crate::lu_order::set_threshold(if thr < 0.5 { 0.5 } else { 0.9 });
+                    continue;
+                }
+            }
+        }
+        return (order, st, cols);
+    }
 }
 
 /// The reference's repair of a singular supplied basis ("variables dropped from basis"): the columns that get no pivot in the
@@ -5335,7 +5374,7 @@ fn solve_primal(
         crate::lu_order::set_threshold(handoff.unwrap().thr);
         crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
         let gate = crate::lu_order::gate_get();
-        let (order, st, rows) = reference_order_for(&p, &basis.basic, 1);
+        let (order, st, rows) = reference_order_for(&p, &basis.basic, 1, growth_limit(opts.scaled, handoff.is_some_and(|h| h.quad)), "lustart");
         if crate::dump::on("lustart") {
             crate::dump::emit(
                 "lustart",
@@ -5408,7 +5447,7 @@ fn solve_primal(
             }
             crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
             let gate = crate::lu_order::gate_get();
-            let (order, st, rows) = reference_order_for(&p, &basis.basic, 1);
+            let (order, st, rows) = reference_order_for(&p, &basis.basic, 1, growth_limit(opts.scaled, handoff.is_some_and(|h| h.quad)), "lustart");
             if crate::dump::on("lustart") {
                 crate::dump::emit(
                     "lustart",
@@ -5609,7 +5648,7 @@ fn solve_primal(
             }
             crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
             let gate = crate::lu_order::gate_get();
-            let (order, st, rows) = s.reference_order(1);
+            let (order, st, rows) = reference_order_for(s.p, &s.basic, 1, s.growth_limit(), "lustart");
             if crate::dump::on("lustart") {
                 crate::dump::emit(
                     "lustart",
