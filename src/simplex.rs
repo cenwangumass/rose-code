@@ -74,6 +74,10 @@ pub struct SolveOptions {
     pub leave_plus: bool,
     /// The primal that continues a dual run in the release profile starts in method 2 with the dual's counters (`ctx+0x3ec` = 2 at its first step).
     pub sw_carry: Option<SwCarry>,
+    /// The public `DStart` of the dual (`reverse-engineer/PLAN.md`, "Public PStart/DStart start"): the row duals `y` in the frame of the supplied model (no scaling is
+    /// applied to it). The dual starts with `d_j = c_j - a_j^T y` for every variable, basic ones included, and the basic variables with `|d_j| > 1e-7` form the
+    /// forced-row stack. `PStart` has no effect on the dual. `None`: the cold start.
+    pub dstart: Option<Vec<f64>>,
 }
 
 /// The counters the dual leaves in the context for the primal that continues it (`ctx+0x2a0`, `0x330`, `0x334`, `0x2b0`, `0x2c0`, `0x338`, `0x340`).
@@ -119,6 +123,7 @@ impl Default for SolveOptions {
             barrier_tol: 1e-8,
             leave_plus: false,
             sw_carry: None,
+            dstart: None,
         }
     }
 }

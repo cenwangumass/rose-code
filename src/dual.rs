@@ -534,6 +534,13 @@ struct Dual<'a, R: Real = f64> {
     /// The model was scaled (`ctx+0xe0` non-null): the growth check of the factorization uses 1e12.
     scaled: bool,
     pcost: Vec<f64>,
+    /// The forced-row stack of the public `DStart` start (`ctx+0x530`, count `ctx+0x52c`): the basic variables with |d| > 1e-7 at the start, the last entry on top.
+    /// An empty stack is the reference's count -1 or 0.
+    forced: Vec<usize>,
+    /// The stack was filled (count > 0 at the start): `ctx+0x52c` is never 0 again, so the leaving variable's d is not clamped (`0xc5d85`).
+    forced_ever: bool,
+    /// The last pricing call popped a stale entry (a nonbasic variable or a basic one with d = 0): the iteration ends without a row.
+    forced_stale: bool,
 }
 
 /// The start basis of the dual path (setup `0xe7531`; assignments at `0xed2e8` and `0xeb69f`, `replay/gdb_dual_crash.py`). The equality rows (fixed slack)
@@ -824,6 +831,9 @@ thread_local! {
     /// The scaled long-double solution of a quad final pass as (high, low) double pairs, for the reference's objective read-out.
     static QUAD_XR: std::cell::RefCell<Option<Vec<(f64, f64)>>> = const { std::cell::RefCell::new(None) };
     static DUAL_XR_AT_HANDOFF: std::cell::RefCell<Option<Vec<(f64, f64)>>> = const { std::cell::RefCell::new(None) };
+    /// The last dual pass ended with status 12 from its own pivot check (`0x21db9a`, double copy `0xc5a..`): the controller writes the status and the iteration count
+    /// at `0x15637b` and skips the objective store of `0x153eba`, so the result keeps objective 0 (witness_primal_r31_double4; the `0x15553e` end stores `ctx+0x118`).
+    static PASS_END12: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 /// The objective read-out accumulates in the working precision of the final pass (`long double` in the quad pass: seed 2150, the double sum is one
@@ -858,6 +868,10 @@ pub(crate) fn set_quad_result_state(st: (bool, Option<Vec<(f64, f64)>>)) {
 
 /// The objective of the unscaled solution of the dual's last result: `long double` accumulation when its final pass was the quad pass. Clears the mark.
 pub fn unscaled_objective(model: &crate::model::LpModel, x: &[f64], col: &[f64]) -> f64 {
+    if PASS_END12.with(|c| c.get()) {
+        QUAD_RESULT.with(|c| c.set(false));
+        return 0.0;
+    }
     if QUAD_RESULT.with(|c| c.replace(false)) {
         use crate::f80::F80;
         if let Some(xr) = QUAD_XR.with(|c| c.borrow_mut().take()) {
@@ -1435,6 +1449,8 @@ impl<'a, R: Real> Dual<'a, R> {
 
     /// d recomputed from the costs after a factorization, in the reference frame.
     fn recompute_d(&mut self) {
+        // The d of the forced-row stack entries survive the recompute (`0xe53a7..0xe5400` save, `0xe57a8..` restore).
+        let saved: Vec<(usize, R)> = self.forced.iter().map(|&v| (v, self.d[v])).collect();
         let dt = self.true_d();
         self.dual_residual_check();
         self.work
@@ -1453,6 +1469,9 @@ impl<'a, R: Real> Dual<'a, R> {
             } else {
                 self.d[j] = R::ZERO;
             }
+        }
+        for (v, dv) in saved {
+            self.d[v] = dv;
         }
     }
 
@@ -1600,13 +1619,26 @@ impl<'a, R: Real> Dual<'a, R> {
     /// ascending row order, as the reference's row-wise product `0x136b00` does (rows with |y| <= 1e-13 are skipped).
     fn true_d(&mut self) -> Vec<R> {
         let p = self.p;
-        let inp: Vec<(usize, R)> = self
+        let mut inp: Vec<(usize, R)> = self
             .head
             .iter()
             .enumerate()
             .map(|(pos, &j)| (pos, R::c(self.cost[j]) + R::c(self.cost_lo[j])))
             .filter(|e| e.1 != R::ZERO)
             .collect();
+        if !self.forced.is_empty() {
+            // The forced-row stack (`0xe52c3..0xe537f`): the basic stack variables keep their d, so the right-hand side is c_B minus their d.
+            let mut rhs = vec![R::ZERO; p.m];
+            for &(pos, v) in &inp {
+                rhs[pos] = v;
+            }
+            for &v in &self.forced {
+                if self.st[v] >= 0 {
+                    rhs[self.st[v] as usize] = rhs[self.st[v] as usize] - self.d[v];
+                }
+            }
+            inp = rhs.into_iter().enumerate().filter(|e| e.1 != R::ZERO).collect();
+        }
         let out = self.mirror.btran(&inp, false, true);
         if crate::dump::on("dual") {
             crate::dump::emit(
@@ -1953,6 +1985,19 @@ impl<'a, R: Real> Dual<'a, R> {
 
     /// The leaving row (`0xccbc0`), `None` when no row is infeasible.
     fn price(&mut self) -> Option<usize> {
+        if let Some(&j) = self.forced.last() {
+            // The forced-row stack (`0xccbc0..0xccd1f`): the top entry is the leaving variable while it is basic with d != 0; a stale entry is popped, and the
+            // pop of the last one requests a refactorization (10).
+            if self.st[j] >= 0 && self.d[j] != R::ZERO {
+                return Some(self.st[j] as usize);
+            }
+            self.forced.pop();
+            self.forced_stale = true;
+            if self.forced.is_empty() {
+                self.request = 10;
+            }
+            return None;
+        }
         if !self.value_mode {
             loop {
                 while self.cursor < self.walk_len {
@@ -2736,6 +2781,87 @@ impl<'a, R: Real> Dual<'a, R> {
 
 impl<'a, R: Real> Dual<'a, R> {
     /// Choice of the entering variable among the Harris-filtered candidates (`0xc89b3`): the smallest `a / w`, `w` the column count of a structural, 0.5 of a slack.
+    /// The choice between the forced ratio `0xcc6a0` and the normal one (`0xc53a7..0xc54d3`): the normal ratio needs the leaving variable infeasible on the side its
+    /// d sign wants (d > 0: below its lower bound by more than the primal tolerance; d <= 0: above its upper bound by more); an infinite bound there, or no such
+    /// infeasibility, takes the forced one. (`ctx+0x198` != 0 also takes it; it is 0 in every capture.)
+    fn forced_ratio_chosen(&self, leave: usize, xbr: R) -> bool {
+        let tol = R::c(self.ptol());
+        if self.d[leave] > R::ZERO {
+            let lo = self.p.lo[leave];
+            -BIG >= lo || xbr >= R::c(lo) - tol
+        } else {
+            let up = self.p.up[leave];
+            up >= BIG || R::c(up) + tol >= xbr
+        }
+    }
+
+    /// The forced ratio test `0xcc6a0` on the pivot row (reference frame, entries > 0 qualify): a Harris pass with the bound |d_p| (candidates with
+    /// bound * alpha >= d_j; those above the pivot floor tighten the bound to (d_j + delta) / alpha, the others go to a small list), then the entry of the largest alpha with
+    /// d_j / alpha <= bound. `None`: the bound stays at |d_p|, the entering variable is p itself. The small candidates that the step would drive negative have their cost shifted by
+    /// (theta alpha - d_j) (1000 + draw % 200) / 1000 (`0xcc9b5`).
+    fn forced_ratio(&mut self, row: &[(usize, R)], esi: usize, leave: usize) -> Option<usize> {
+        let _ = leave;
+        let dp = self.d[leave].abs();
+        let delta = R::c(dual_tol());
+        let floor = R::c(PIVOT_FLOOR);
+        let mut bound = dp;
+        let (mut big, mut small): (Vec<usize>, Vec<usize>) = (Vec::new(), Vec::new());
+        for (i, &(j, v)) in row.iter().enumerate() {
+            let ok = if i < esi { self.st[j] < 0 } else { self.st[j] < 0 && self.st[j] >= UB };
+            if !(v > R::ZERO && ok) {
+                continue;
+            }
+            let dj = self.d[j];
+            if bound * v < dj {
+                continue;
+            }
+            if v > floor {
+                big.push(i);
+                let nb = (dj + delta) / v;
+                bound = if nb < bound { nb } else { bound };
+            } else {
+                small.push(i);
+            }
+        }
+        let (qe, theta) = if bound < dp {
+            let mut best = floor;
+            let mut q = None;
+            for &i in &big {
+                let (j, v) = row[i];
+                if bound >= self.d[j] / v && v > best {
+                    best = v;
+                    q = Some(i);
+                }
+            }
+            let qe = q?;
+            (Some(qe), self.d[row[qe].0] / row[qe].1)
+        } else {
+            (None, dp)
+        };
+        for &i in &small {
+            let (j, v) = row[i];
+            if theta > self.d[j] / v {
+                let rem = (self.rng_int() as i32) % 200;
+                let sh = (theta * v - self.d[j]) * R::c((rem + 1000) as f64) / R::c(1000.0);
+                if R::c(0.001) * delta > sh {
+                    self.raise_pert(1);
+                } else {
+                    self.raise_pert(2);
+                }
+                let s64 = sh.to_f64();
+                if self.st[j] == LB {
+                    self.cshift[j] += s64;
+                    self.cost[j] += s64;
+                } else {
+                    self.cshift[j] -= s64;
+                    self.cost[j] -= s64;
+                }
+                self.d[j] += sh;
+            }
+        }
+        qe
+    }
+
     fn select_entering(&self, row: &[(usize, R)], kept: &[usize], xm3: R) -> (usize, R) {
         let mut chosen = kept[0];
         let mut xm5 = R::ZERO;
@@ -3109,6 +3235,8 @@ enum Step<R> {
     NoRow,
     /// The row was rejected by the ratio test (pivot row too small); the pricing goes on with another row, no iteration is done.
     Reject,
+    /// A forced row of the DStart start was resolved without a basis change (`0xc660e`): the iteration counts, the request (10 after the last entry) follows.
+    Shifted,
     /// The pivot check rejected the pivot (row and column values disagree): no iteration; the refactorization in `request` (or the status) follows.
     Mismatch,
     /// The pivot check on a fresh factor ended the pass with status -1002: the controller restarts the dual (`0xc5b9a`).
@@ -3152,6 +3280,10 @@ impl<'a, R: Real> Dual<'a, R> {
         };
         self.work.trig();
         let mut row_sel = self.price();
+        if std::mem::take(&mut self.forced_stale) {
+            return Step::Reject;
+        }
+        let forced_mode = !self.forced.is_empty();
         // No row while rows were rejected before this driver call: they are released and the pricing runs again inside the same call (the loop of
         // `0xc4fe0`/`0x21cf50` around `0x2896a3` and `0xcd250`, quad seed 2081 call 19).
         while R::QUAD
@@ -3208,7 +3340,12 @@ impl<'a, R: Real> Dual<'a, R> {
         };
         let leave = self.head[r];
         let xbr = self.xb[r];
-        let above = xbr > R::c(p.up[leave]);
+        // With the forced-row stack filled the side comes from the sign of the leaving variable's d (`0xc516c`: d <= 0 leaves at the upper bound).
+        let above = if forced_mode {
+            self.d[leave] <= R::ZERO
+        } else {
+            xbr > R::c(p.up[leave])
+        };
         // Pivot-row BTRAN, drop of the small entries.
         let rho_full = self.mirror.btran(&[(r, R::ONE)], true, false);
         let rho: Vec<(usize, R)> = rho_full
@@ -3223,7 +3360,29 @@ impl<'a, R: Real> Dual<'a, R> {
         self.row_product_work(&rho, row.len() - esi);
         self.p58 += rho.iter().map(|e| self.rrows[e.0].len()).sum::<usize>() as f64;
         self.p50d += rho.iter().map(|e| self.rrows[e.0].len()).sum::<usize>() as f64;
-        let rt = self.ratio_test(&row, esi, leave, above, xbr);
+        let forced_route = forced_mode && self.forced_ratio_chosen(leave, xbr);
+        let rt = if forced_route {
+            match self.forced_ratio(&row, esi, leave) {
+                Some(qe) => Ratio { q: Some(qe), flips: Vec::new(), reject: None },
+                None => {
+                    // q = p (`0xc660e`): no basis change; every d of the row moves by -|d_p| times its entry, d_p becomes 0, the iteration counts.
+                    self.forced.pop();
+                    let last = self.forced.is_empty();
+                    let dp = self.d[leave].abs();
+                    for &(j, a) in &row {
+                        self.d[j] = self.d[j] + a * (-dp);
+                    }
+                    self.d[leave] = R::ZERO;
+                    self.iters += 1;
+                    if last {
+                        self.request = 10;
+                    }
+                    return Step::Shifted;
+                }
+            }
+        } else {
+            self.ratio_test(&row, esi, leave, above, xbr)
+        };
         if std::mem::take(&mut self.fresh_absorb) && !self.no_art_exit {
             if let Some(mut sn) = snap {
                 sn["r"] = serde_json::json!(r);
@@ -3304,7 +3463,7 @@ impl<'a, R: Real> Dual<'a, R> {
         // test on the whole row (a single candidate bypasses the tolerance of the selection; rnd1496 call 5).
         let rt = match rt.q {
             Some(qe)
-                if !was_retry && self.st[row[qe].0] != FREE && row[qe].1 > R::c(-PIVOT_FLOOR) =>
+                if !forced_route && !was_retry && self.st[row[qe].0] != FREE && row[qe].1 > R::c(-PIVOT_FLOOR) =>
             {
                 Ratio {
                     q: None,
@@ -3315,6 +3474,9 @@ impl<'a, R: Real> Dual<'a, R> {
             _ => rt,
         };
         if let Some(meas) = rt.reject {
+            if forced_mode {
+                self.forced.pop();
+            }
             if let Some(s) = rec.as_mut() {
                 s["q"] = serde_json::json!(-1);
                 s["reject"] = serde_json::json!(true);
@@ -3334,6 +3496,9 @@ impl<'a, R: Real> Dual<'a, R> {
             return Step::Reject;
         }
         let Some(qe) = rt.q else {
+            if forced_mode {
+                self.forced.pop();
+            }
             if let Some(s) = rec.as_mut() {
                 s["q"] = serde_json::json!(-1);
             }
@@ -3398,6 +3563,10 @@ impl<'a, R: Real> Dual<'a, R> {
             s["q"] = serde_json::json!(q);
             s["alpha_row"] = serde_json::json!(aq_row.to_f64());
             s["flips"] = serde_json::json!(flips);
+        }
+        if forced_mode {
+            // The pop of the forced-row stack (`0xc5738`) precedes the FTRAN and the pivot check.
+            self.forced.pop();
         }
         // The reference's two-vector FTRAN: the pivot column first, then tau = B^-1 rho at the column's positions only.
         let rows_q: Vec<usize> = p.fcols[q].iter().map(|&(i, _)| i).collect();
@@ -4383,7 +4552,7 @@ impl<'a, R: Real> Dual<'a, R> {
                     .add(0xe7000, 3.0 * row_cnt as f64, crate::work::CTX);
             }
             // The iteration clamps the leaving variable's stored d from below at -dual_tol before the step when the forced-row stack is empty (`0x21dd8e..0x21ddcd`, `fcomip`/`jbe`: d <= -tol gives d = -tol; the double iteration has the same `maxsd` at `0xc5d85..0xc5dab`; 6762 call 43: -1.7136e-6 -> -1e-6).
-            if self.d[pv.leave] <= R::c(-dual_tol()) {
+            if !self.forced_ever && self.d[pv.leave] <= R::c(-dual_tol()) {
                 self.d[pv.leave] = R::c(-dual_tol());
             }
             let old_leave = self.d[pv.leave];
@@ -5410,6 +5579,9 @@ fn solve_pass_callback<R: Real>(
         obj_scale: opts.obj_scale,
         scaled: opts.scaled,
         pcost: p.cost.clone(),
+        forced: Vec::new(),
+        forced_ever: false,
+        forced_stale: false,
     };
     // Initial statuses of the nonbasic variables: the dual-feasible bound (an infinite bound is the artificial one, value +-1e30).
     for j in 0..n + m {
@@ -5433,6 +5605,30 @@ fn solve_pass_callback<R: Real>(
         s.st[j] = FIXED;
     }
     s.init_pricing_type();
+    // The public DStart (`reverse-engineer/PLAN.md`): d = c - A^T y for every variable, basic ones included; the basic variables of the start basis with |d| > 1e-7
+    // form the forced-row stack (`0xeef09`, ascending), taken before the setup pivots of the free variables.
+    let dstart_d: Option<Vec<R>> = match &opts.dstart {
+        Some(y) if carry.retries == 0 && carry.iters == 0 && !R::QUAD && supplied.is_none() && y.len() == m => {
+            let mut d = vec![R::ZERO; n + m];
+            for j in 0..n + m {
+                let mut e: Vec<(usize, f64)> = p.fcols[j].clone();
+                e.sort_by_key(|x| x.0);
+                let mut acc = R::c(p.cost[j]);
+                for &(i, a) in &e {
+                    if R::c(y[i]).abs() > R::c(DROP_TOL) {
+                        acc -= R::c(y[i]) * R::c(a);
+                    }
+                }
+                d[j] = acc;
+            }
+            let mut stack: Vec<usize> = s.head.iter().copied().filter(|&j| d[j].abs() > R::c(1e-7)).collect();
+            stack.sort_unstable();
+            s.forced_ever = !stack.is_empty();
+            s.forced = stack;
+            Some(d)
+        }
+        _ => None,
+    };
     s.work.decided(s.work.w);
     s.factor_work(&stc, &rows, 0.0);
     let free_phase = (0..n).any(|j| s.st[j] == FREE);
@@ -5446,6 +5642,14 @@ fn solve_pass_callback<R: Real>(
     s.build_rrows();
     if let Some(rows) = crate::simplex::HANDOFF_ROWS.with(|c| c.borrow_mut().take()) {
         s.rrows = rows;
+    }
+    if let Some(dy) = &dstart_d {
+        // Basic variables keep their d (the forced rows read it); the recompute below takes y from c_B minus the d of the stack entries.
+        for j in 0..n + m {
+            if s.st[j] >= 0 {
+                s.d[j] = dy[j];
+            }
+        }
     }
     let dt = s.true_d();
     s.work
@@ -5689,6 +5893,13 @@ fn solve_pass_callback<R: Real>(
             Step::Mismatch => {
                 s.working_obj = None;
                 if s.status.is_none() {
+                    s.post(None, false)?;
+                }
+                s.driver_return();
+            }
+            Step::Shifted => {
+                s.working_obj = None;
+                if s.request != 0 && s.status.is_none() {
                     s.post(None, false)?;
                 }
                 s.driver_return();
@@ -6083,6 +6294,7 @@ fn solve_pass_callback<R: Real>(
     let xs: Vec<f64> = x[..nm].to_vec();
     let at_upper: Vec<bool> = s.st.iter().map(|&t| t == UB).collect();
     QUAD_XR.with(|c| *c.borrow_mut() = if R::QUAD { Some(xr) } else { None });
+    PASS_END12.with(|c| c.set(s.status == Some(Status::NumericalFailure)));
     Ok(DriverOutcome::Finished(SolveResult {
         status,
         objective: objective_in::<R>(model, &xs),
@@ -6751,6 +6963,9 @@ mod captured_bh305_ratio {
             obj_scale: 1.0,
             scaled: false,
             pcost: p.cost.clone(),
+            forced: Vec::new(),
+            forced_ever: false,
+            forced_stale: false,
         };
         s.d = d;
         s.level = input["lvl"].as_u64().unwrap() as usize;
