@@ -5863,6 +5863,10 @@ fn solve_pass_callback<R: Real>(
         let mut dump = None;
         let step = s.iteration(k, &mut dump);
         if let Some(mut rec) = dump {
+            if let Some(o) = rec.as_object_mut() {
+                // The dual feasibility tolerance `ctx+0x388` in force at this call.
+                o.insert("tol".to_string(), serde_json::json!(dual_tol()));
+            }
             if crate::dump::on("dsxl") {
                 let lean = ["k", "r", "var", "q", "flips"]
                     .iter()

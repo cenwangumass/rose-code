@@ -41,7 +41,7 @@ pub const KINDS: &[(&str, &str, &str)] = &[
     ("bsolve", "BSOLVE", "basic-solution FTRAN (after a factorization): L-stage result, x after the tail columns, final x, kinds, slots, diag"),
     ("switch", "SWITCH", "method decision after each refactorization (`0x142500`): the counters it reads, whether it switched to Devex pricing and the pivot threshold `ctx+0x390` in force (`thr`, as in LUIN/LUSTART; the growth-check retries of one factorization are one LUIN/LUSTART record each, `grown` = max/min |diag|)"),
     ("dcr", "DCR", "the dual start basis: the (column, row) assignments of the crash in order"),
-    ("dsx", "DSX", "each call of the dual iteration function: state at entry (head, x_B, d in the reference frame, W, status, flags, priorities, candidate list, threshold, mode, cursor) and the decision (row, leaving variable, entering variable, flips, pivot row, rho)"),
+    ("dsx", "DSX", "each call of the dual iteration function: state at entry (head, x_B, d in the reference frame, W, status, flags, priorities, candidate list, threshold, mode, cursor, tol = the tolerance `ctx+0x388`) and the decision (row, leaving variable, entering variable, flips, pivot row, rho)"),
     ("dsxl", "DSX", "lean variant of dsx for whole solves: per call only k, the leaving row r and variable, the entering variable q and the bound flips (`compare.py trace --lean`)"),
     ("dtau", "DTAU", "each dual pivot at the weight update: leaving position, alpha, w (rho norm), the pivot column without the pivot entry (position, value) and tau at the same positions"),
     ("p68", "P68", "each reset of the pricing weights (`0x132460`): the type, the U and L column structure (steps) and the weights P+0x68 by position"),

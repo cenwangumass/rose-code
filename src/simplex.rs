@@ -2993,7 +2993,10 @@ impl<'a> Solver<'a> {
         self.list.clear();
         let nm = self.p.n + self.p.m;
         let full_pass = nm as f64 + nm as f64;
-        if !self.rescan {
+        // The first scan after a factorization runs behind the reference's dual recompute and attractive count (`0x145520`, `ctx+0x2cc`): with no
+        // attractive variable it takes the end test without calling the scan (`0x144fa8`), so a scan that finds nothing is not booked.
+        let late = self.rescan || (self.mirror.is_some() && self.factor.num_updates() == 0);
+        if !late {
             self.work.add(0x105b2d, full_pass, crate::work::CTX);
         }
         for j in 0..nm {
@@ -3009,7 +3012,7 @@ impl<'a> Solver<'a> {
             }
         }
         let best = self.best_in_list();
-        if self.rescan && best.is_some() {
+        if late && best.is_some() {
             self.work.add(0x105b2d, full_pass, crate::work::CTX);
         }
         if !self.list.is_empty() {
@@ -6255,6 +6258,8 @@ fn solve_primal(
                 }
                 None if s.handoff.is_some_and(|h| !h.quad && !h.pert) && s.sw.active && s.sw.level != 0 && s.iters_done != 0 => {
                     // As in phase 1: the double primal's own bound perturbation in force (`ctx+0x338` != 0).
+                    s.dual_btran_work("none");
+                    s.recompute_dual()?;
                     PRIMAL_SHIFT_END.with(|c| c.set(true));
                     break Status::Infeasible;
                 }

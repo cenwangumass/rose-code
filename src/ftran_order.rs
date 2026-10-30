@@ -1306,7 +1306,12 @@ impl<R: Real> RefStruct<R> {
     /// FTRAN of the right-hand side after a factorization: the reference always runs the dense L solve there, whatever the
     /// density, which fixes the order of the floating-point updates.
     pub fn ftran_basic(&mut self, rows: &[usize], vals: &[R]) -> Vec<(usize, R)> {
-        self.ftran_with(rows, vals, true)
+        // The solve does not leave a spike for the update routine: the discard of the next refactorization (`0xf461f`) sees the last pivot column's
+        // spike, none on a fresh factor (`fx_cleanup_two`, two refactorizations without a pivot in between).
+        let saved = (self.spike.clone(), self.spike_used);
+        let out = self.ftran_with(rows, vals, true);
+        (self.spike, self.spike_used) = saved;
+        out
     }
 
     fn ftran_with(&mut self, rows: &[usize], vals: &[R], force_dense: bool) -> Vec<(usize, R)> {
