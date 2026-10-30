@@ -816,6 +816,7 @@ thread_local! {
     static QUAD_RESULT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The scaled long-double solution of a quad final pass as (high, low) double pairs, for the reference's objective read-out.
     static QUAD_XR: std::cell::RefCell<Option<Vec<(f64, f64)>>> = const { std::cell::RefCell::new(None) };
+    static DUAL_XR_AT_HANDOFF: std::cell::RefCell<Option<Vec<(f64, f64)>>> = const { std::cell::RefCell::new(None) };
 }
 
 /// The objective read-out accumulates in the working precision of the final pass (`long double` in the quad pass: seed 2150, the double sum is one
@@ -4762,6 +4763,9 @@ thread_local! {
     /// The third restart of a quad pass starts from the slack basis without a crash (the restart handler's `factor+0xc` = 1 store is the double handler's: `fx_witness_dual_c6007`, one crash in the whole run).
     static NO_CRASH: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static SWITCH_PERT: std::cell::Cell<Option<u8>> = const { std::cell::Cell::new(None) };
+    /// The stall counters the quad pass inherits from the double pass in the same context (`ctx+0x330`, `ctx+0x334`, and `ctx+0x2b0` relative to the new pass's iteration base):
+    /// the quad setup's stall test reads them (`fx_witness_dual_c6007`: 2, 0, 0 at iteration 2).
+    static SWITCH_STALL: std::cell::Cell<Option<(i64, i64, f64)>> = const { std::cell::Cell::new(None) };
     static SINGULAR: std::cell::Cell<Option<(usize, usize, f64, f64, usize, usize, bool, u32, usize)>> = const { std::cell::Cell::new(None) };
     static SINGULAR_BASIS: std::cell::RefCell<Option<Basis>> = const { std::cell::RefCell::new(None) };
 }
@@ -5539,18 +5543,24 @@ fn solve_pass_callback<R: Real>(
             rho_norm(&out)
         };
     }
+    if R::QUAD {
+        // The quad pass keeps the perturbation flag and the stall counters of the double pass (same context), so its setup stall test can perturb (`0x239085`, c6007 quad pass 1).
+        if let Some((a, b, c)) = SWITCH_STALL.with(|c| c.take()) {
+            s.stall = a;
+            s.stall_snap = b;
+            s.stall_it = c;
+        }
+        if let Some(pert) = SWITCH_PERT.with(|c| c.take()) {
+            s.pert = pert;
+        }
+    }
     s.stall_check(0);
     // The setup's post-refactor pass (`0xe6dcc`) sees the iterations of the free-column pivots.
     if !s.flip_select && 3.0 * s.iters as f64 > s.m as f64 {
         s.flip_select = true;
     }
-    if R::QUAD {
-        // The quad pass keeps the perturbation flag of the double pass but not its cost shifts: d is recomputed from the true costs (seed 2240: the shifted
-        // d of the double pass are 10^3..10^4 times the reference's at the first quad call, and so are the d of every quad refactorization).
-        if let Some(pert) = SWITCH_PERT.with(|c| c.take()) {
-            s.pert = pert;
-        }
-    }
+    // The quad pass keeps the perturbation flag of the double pass (taken above) but not its cost shifts: d is recomputed from the true costs (seed 2240: the shifted
+    // d of the double pass are 10^3..10^4 times the reference's at the first quad call, and so are the d of every quad refactorization).
     s.recompute_xb(0)?;
     s.prog_on = s.level == 0;
     s.prog_acc = 0.0;
@@ -5719,6 +5729,7 @@ fn solve_pass_callback<R: Real>(
                     )))
                 });
                 SWITCH_PERT.with(|c| c.set(Some(s.pert)));
+                SWITCH_STALL.with(|c| c.set(Some((s.stall, s.stall_snap, s.stall_it - s.iters as f64))));
                 SWITCH_BASIS.with(|c| {
                     *c.borrow_mut() = Some(Basis {
                         basic: s.head.clone(),
@@ -5910,6 +5921,15 @@ fn solve_pass_callback<R: Real>(
         crate::simplex::PRIMAL_FARKAS_SKIPPED.with(|c| c.set(0));
         crate::simplex::PRIMAL_REPAIRED.with(|c| c.set(false));
         crate::simplex::PRIMAL_SHIFT_END.with(|c| c.set(false));
+        if R::QUAD {
+            let nn = s.p.lo.len();
+            let xr: Vec<(f64, f64)> = (0..nn).map(|j| {
+                let v = if s.st[j] >= 0 { s.xb[s.st[j] as usize] } else { R::c(s.nonbasic_value(j)) };
+                let hi = v.to_f64();
+                (hi, (v - R::c(hi)).to_f64())
+            }).collect();
+            DUAL_XR_AT_HANDOFF.with(|c| *c.borrow_mut() = Some(xr));
+        }
         let transfer = PrimalTransfer {
             basis: b, opts: popts, status, trace, route: PrimalRoute::Restored,
             control_status: (!(R::QUAD && s.pert != 0 && !s.rejected_end && !s.art_exit)).then_some(-1004),
@@ -6461,6 +6481,12 @@ fn resume_primal_transfer<R: Real>(model: &LpModel, opts: &SolveOptions,
             })
         {
             C35C.with(|c| c.set(c.get() + 1));
+            // The -1004 return of the primal ends the solve with status 12 once the shared counter exceeds 20 (`0x15557d` -> `0x15553e`; witness_primal_r25_quad20).
+            if R::QUAD && C35C.with(|c| c.get() > 20) {
+                if let Some(xr) = DUAL_XR_AT_HANDOFF.with(|c| c.borrow_mut().take()) { set_x87_result(xr); }
+                r.status = Status::NumericalFailure;
+                return Ok(r);
+            }
             // The dual ended with cost shifts in force: the primal removes them and ends with status -1004 (its price scan finds nothing), and the
             // controller runs the dual again from the primal's basis (m5: one primal pivot, then the dual proves the infeasibility on the true costs).
             // Status -1004 switches methods without a restart (`0x155024`);
