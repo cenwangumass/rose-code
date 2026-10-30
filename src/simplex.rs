@@ -6012,6 +6012,12 @@ fn solve_primal(
                     farkas = Some(s.farkas_dual());
                     break Status::Infeasible;
                 }
+                None if s.handoff.is_some_and(|h| !h.quad && !h.pert) && s.sw.active && s.sw.level != 0 && s.iters_done != 0 => {
+                    // A failed scan with the primal's own perturbation in force (`ctx+0x338` != 0, `0x145a72..0x145a94`) clears it and ends the primal with status -1004,
+                    // request 9, before the failed-scan arm below; the controller reruns the dual (witness_primal_r31_double4).
+                    PRIMAL_SHIFT_END.with(|c| c.set(true));
+                    break Status::Infeasible;
+                }
                 None if s.handoff.map_or(PLAIN_FAILED_SCAN, |h| !h.pert)
                     && (!s.costfree || s.factor.num_updates() != 0 || s.p3c0 > 1e-9) =>
                 {
@@ -6162,6 +6168,11 @@ fn solve_primal(
                 None if s.handoff.is_some_and(|h| h.quad && h.pert) =>
                 {
                     // As above, in phase 2: the x87 primal with cost shifts in force ends with status -1004 at its first failed scan.
+                    PRIMAL_SHIFT_END.with(|c| c.set(true));
+                    break Status::Infeasible;
+                }
+                None if s.handoff.is_some_and(|h| !h.quad && !h.pert) && s.sw.active && s.sw.level != 0 && s.iters_done != 0 => {
+                    // As in phase 1: the double primal's own bound perturbation in force (`ctx+0x338` != 0).
                     PRIMAL_SHIFT_END.with(|c| c.set(true));
                     break Status::Infeasible;
                 }

@@ -4472,11 +4472,8 @@ impl<'a, R: Real> Dual<'a, R> {
             }
             if self.status.is_none()
                 && if R::QUAD { self.level == 0 } else { level_before == 0 }
-                && (req == 4 || if R::QUAD {
-                    crate::simplex::QUAD_PRIMALS.with(|c| c.get()) >= 10
-                } else {
-                    C35C.with(|c| c.get()) > 10
-                })
+                // Both recomputations read `ctx+0x35c` (`0x21a315..0x21a329` quad, `0xc1fe3` double).
+                && (req == 4 || C35C.with(|c| c.get()) > 10)
                 && (
                     // The low arm (`0xc2025..0xc2044`) needs only a nonempty infeasible list (`[P+0x3c]`, `0xc1ffb`) in the value mode; the acceptance
                     // test that follows it (threshold at least 0.5) is the tiny-infeasibility one (witness_dual_r3_residual_low_small).
@@ -5193,7 +5190,7 @@ fn solve_pass_callback<R: Real>(
             supplied = Some(b.basic.clone());
             // A singular basis loses the columns that get no pivot in the reference's LU order and takes the slacks of the uncovered rows instead.
             let mut probe = b.clone();
-            if (FROM_SWITCH.with(|c| c.get()) || (R::QUAD && carry.after_pivot && carry.retries < 5))
+            if (FROM_SWITCH.with(|c| c.get()) || (carry.after_pivot && carry.retries < 5))
                 && crate::simplex::repair_basis(&p, &mut probe).is_some()
             {
                 // The basis the quad switch carries over is not a supplied one: when its quad factorization is singular (the double structure finds the same columns
@@ -5206,7 +5203,7 @@ fn solve_pass_callback<R: Real>(
                 SINGULAR_BASIS.with(|c| *c.borrow_mut() = Some(b.clone()));
                 SINGULAR.with(|c| {
                     c.set(Some((
-                        0,
+                        if R::QUAD { 0 } else { carry.it_base },
                         carry.fac + 1,
                         carry.thr,
                         carry.avg_touch,
