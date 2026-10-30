@@ -177,6 +177,13 @@ pub(crate) fn reset_primal_snapshot() {
     PRIMAL_DRIFT_COUNT.with(|c| c.set(0));
 }
 
+/// The primal run of a double dual's artificial-bound exit (no `Handoff`) starts without clearing the controller's snapshot and its timer (`ctx+0x40`): the reference
+/// takes no snapshot in it and the restart after its singular start restores the dual's own (witness_primal_r31_double4).
+pub(crate) fn reset_primal_snapshot_keep() {
+    set_primal_tol(PRIMAL_TOL);
+    PRIMAL_DRIFT_COUNT.with(|c| c.set(0));
+}
+
 pub(crate) fn resid_fails() -> u32 {
     RESID_FAILS.with(|c| c.get())
 }
@@ -5943,9 +5950,8 @@ fn solve_pass_callback<R: Real>(
         return Ok(DriverOutcome::ToPrimal(transfer));
     }
     if status == Status::Unbounded && s.art_exit {
-        if R::QUAD && s.art_exit {
-            C35C.with(|c| c.set(c.get() + 1));
-        }
+        // The double dual's request-4 exit is a run that ends with -1004 too (`0xf8691`).
+        C35C.with(|c| c.set(c.get() + 1));
         // A request-4 artificial-bound exit returns -1004 to the controller, which runs the primal from this basis. Its completed status is final.
         let mut popts = opts.clone();
         popts.max_iterations = opts.max_iterations.saturating_sub(s.iters);
@@ -5998,6 +6004,9 @@ fn solve_pass_callback<R: Real>(
                     excl: if s.pert == 0 { s.repaired } else { None },
                 }))
             });
+        }
+        if !R::QUAD {
+            crate::simplex::PRIMAL_START_THR.with(|c| c.set(Some(s.lu_thr)));
         }
         crate::simplex::PRIMAL_SINGULAR.with(|c| c.set(None));
         crate::simplex::PRIMAL_START_SINGULAR.with(|c| c.set(false));
@@ -6098,11 +6107,12 @@ fn resume_artificial_transfer<R: Real>(model: &LpModel, opts: &SolveOptions,
     let PrimalTransfer { basis: from_dual, opts: popts, snapshot: s, route, .. } = transfer;
     let PrimalRoute::Artificial { start } = route else { unreachable!() };
         let PrimalOutcome { result, control } = dispatch_primal(model, &from_dual, &popts);
+        crate::simplex::PRIMAL_START_THR.with(|c| c.set(None));
         if crate::dump::on("callback") {
             crate::dump::emit("callback", serde_json::json!({"event":"primal_outcome", "result":if result.is_ok() { Some(0) } else { None }, "status":control.map(ControlTransfer::status), "error":result.is_err(), "total":crate::simplex::TOTAL_ITERS.with(|c| c.get())}));
         }
         let mut prres = match result {
-            Err(SolveError::SingularBasis) if R::QUAD && s.art_exit => {
+            Err(SolveError::SingularBasis) if s.art_exit => {
                 SINGULAR_FROM_PRIMAL.with(|c| c.set(true));
                 // A failed x87 handoff factorization returns -1002 to the
                 // controller, which restores the saved snapshot (seed 8825).
@@ -6518,7 +6528,19 @@ fn resume_primal_transfer<R: Real>(model: &LpModel, opts: &SolveOptions,
             };
             let mut retry_opts = opts.clone();
             retry_opts.max_iterations = opts.max_iterations.saturating_sub(carry2.iters);
-            let mut r2 = solve_pass::<R>(model, Some(&r.basis), &retry_opts, &carry2, false)?;
+            let mut r2 = match solve_pass::<R>(model, Some(&r.basis), &retry_opts, &carry2, false) {
+                // A singular end of the rerun reaches the controller loop; a record made by the primal holds only the iterations since the last dual start, so the earlier ones are added (`ctx+0x20`).
+                Err(SolveError::SingularBasis) => {
+                    SINGULAR.with(|c| {
+                        if let Some(mut t) = c.take() {
+                            if SINGULAR_FROM_PRIMAL.with(|c| c.get()) { t.0 += carry2.iters; }
+                            c.set(Some(t));
+                        }
+                    });
+                    return Err(SolveError::SingularBasis);
+                }
+                other => other?,
+            };
             r2.iterations += carry2.iters;
             return Ok(r2);
         }

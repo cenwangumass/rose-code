@@ -533,6 +533,8 @@ thread_local! {
     pub(crate) static PRIMAL_REPAIRED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The primal initial factor returned -1002 without a preceding primal -1004.
     pub(crate) static PRIMAL_START_SINGULAR: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The pivot threshold a double dual's artificial-bound exit leaves in `ctx+0x390` for the primal that follows (no `Handoff` then).
+    pub(crate) static PRIMAL_START_THR: std::cell::Cell<Option<f64>> = const { std::cell::Cell::new(None) };
     pub(crate) static PRIMAL_SINGULAR: std::cell::Cell<Option<(usize, usize, f64)>> = const { std::cell::Cell::new(None) };
     /// The entering variable and the structural count `n` of the scaled problem where the primal found its ray: the reference's ray moves that
     /// variable by one unit in the user's frame, so the scaling wrapper rescales by the column factor (structural) or the row factor (slack).
@@ -1607,7 +1609,7 @@ impl<'a> Solver<'a> {
             if crate::dump::on("luin") {
                 crate::dump::emit(
                     "luin",
-                    serde_json::json!({"n": self.refactorizations, "cols": self.basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "phase": st.phase}),
+                    serde_json::json!({"n": self.refactorizations, "cols": self.basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "phase": st.phase, "thr": crate::lu_order::threshold()}),
                 );
             }
             if order.len() < self.basic.len() {
@@ -5129,7 +5131,12 @@ pub fn solve(
         return crate::dual::solve(model, start, opts);
     }
     let handoff = HANDOFF.with(|c| c.take());
-    if handoff.is_none() {
+    if handoff.is_none() && PRIMAL_START_THR.with(|c| c.get()).is_some() {
+        // The primal of a double dual's artificial-bound exit runs in the controller's context: the counters, tolerances, snapshot and timer stay (witness_primal_r31_double4).
+        crate::dual::reset_primal_snapshot_keep();
+        EARLIER_ITERS.with(|c| c.set(0));
+        STALL_PREV.with(|c| c.set(0.0));
+    } else if handoff.is_none() {
         // A standalone solve starts a new context; handoffs retain the dual's counters.
         crate::dual::reset_pert_sizes(opts.perturb);
         crate::dual::C35C.with(|c| c.set(1));
@@ -5157,7 +5164,7 @@ pub fn solve(
         let switch = k <= 2 && h.iters != 0.0 && h.iters != h.snap && h.c178 > 0;
         QUAD_EEFA.with(|c| c.set(switch || (h.preserve_ratio && c.get())));
     }
-    if handoff.is_some() || !opts.faithful_positions {
+    if handoff.is_some() || !opts.faithful_positions || (PRIMAL_START_THR.with(|c| c.get()).is_some()) {
         return solve_primal(model, start, opts, handoff, None);
     }
     // fx_midsing_m5 controlled: six singular Farkas factorizations (each run replays iteration 0), the repair, then the run after the restored variable.
@@ -5327,7 +5334,7 @@ fn solve_primal(
         if crate::dump::on("lustart") {
             crate::dump::emit(
                 "lustart",
-                serde_json::json!({"cols": basis.basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "primal": true}),
+                serde_json::json!({"cols": basis.basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "primal": true, "thr": crate::lu_order::threshold()}),
             );
         }
         if order.len() < m {
@@ -5400,7 +5407,7 @@ fn solve_primal(
             if crate::dump::on("lustart") {
                 crate::dump::emit(
                     "lustart",
-                    serde_json::json!({"cols": basis.basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "primal": true}),
+                    serde_json::json!({"cols": basis.basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "primal": true, "thr": crate::lu_order::threshold()}),
                 );
             }
             if order.len() != m {
@@ -5586,10 +5593,14 @@ fn solve_primal(
             if let Some(gate) = repair_gate {
                 crate::lu_order::gate_set(gate);
             }
+            let start_thr = PRIMAL_START_THR.with(|c| c.take());
             if let Some(h) = &handoff {
                 crate::lu_order::set_threshold(h.thr);
             } else if let Some(r) = rs {
                 crate::lu_order::set_threshold(r.thr);
+            } else if let Some(t) = start_thr {
+                // The double dual's artificial-bound exit keeps its pivot threshold `ctx+0x390` for the primal that follows (witness_primal_r31_double4: 0.5).
+                crate::lu_order::set_threshold(t);
             }
             crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
             let gate = crate::lu_order::gate_get();
@@ -5597,7 +5608,7 @@ fn solve_primal(
             if crate::dump::on("lustart") {
                 crate::dump::emit(
                     "lustart",
-                    serde_json::json!({"cols": s.basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "primal": true}),
+                    serde_json::json!({"cols": s.basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "primal": true, "thr": crate::lu_order::threshold()}),
                 );
             }
             (gate, order, st, rows)
@@ -6246,7 +6257,7 @@ fn solve_primal(
                         // The progress check can also end the primal during this
                         // no-candidate refactorization, before another scan.
                         if s.stalled {
-                            PRIMAL_STALL.with(|c| c.set(true));
+                                        PRIMAL_STALL.with(|c| c.set(true));
                             break Status::Infeasible;
                         }
                         // The reference's primal ends with the maximum bound violation of the basic variables in the unscaled problem (`0xcff40`, `r9+0x90`);
@@ -6796,6 +6807,11 @@ fn solve_primal(
                     mi.count_all_updates();
                 }
                 s.refactor()?;
+                // The progress check of this factorization ends the primal at once (status -1004), before another scan.
+                if s.stalled {
+                    PRIMAL_STALL.with(|c| c.set(true));
+                    break Status::Infeasible;
+                }
                 continue;
             }
             if !infeasible
