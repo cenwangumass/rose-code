@@ -50,14 +50,11 @@ fn quad_dual_reads_out_the_long_double_duals() {
 }
 
 #[test]
-#[ignore = "15000 rows, about 20 s; reads the fixture from ../reverse-engineer"]
+#[ignore = "15000 rows, about 20 s"]
 fn mode_two_pricing_switch_reaches_the_reference_objective() {
     // `witness_dual_r2_mode_switch` (300 SC50A blocks): the reference switches the Devex mode 1 -> 2 at iteration 6011 (`0xf7bb2`, P50/P58 = 31999/97798) and ends
     // Optimal after 11393 iterations at -19372.523117569304; decisions agree on all 11395 pricing calls.
-    let text = std::fs::read_to_string(
-        "../reverse-engineer/corpus/fixtures/witness_dual_r2_mode_switch.mps",
-    )
-    .unwrap();
+    let text = std::fs::read_to_string("tests/fixtures/witness_dual_r2_mode_switch.mps").unwrap();
     let r = solve(
         &mps::parse(&text).unwrap(),
         None,
