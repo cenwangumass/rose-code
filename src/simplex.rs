@@ -1735,6 +1735,7 @@ impl<'a> Solver<'a> {
                 }
             }
         }
+        self.row_work_valid = true;
         self.list.clear();
     }
 
@@ -2226,6 +2227,7 @@ impl<'a> Solver<'a> {
                         }
                     }
                 }
+                self.row_work_valid = true;
             }
             if before.mode == 0 {
                 self.primal_full_work();
@@ -3497,6 +3499,7 @@ impl<'a> Solver<'a> {
                     }
                 }
             }
+            self.row_work_valid = true;
             self.work.restart();
             // The reference re-enters its driver, which rebuilds the basis in ascending column order and refactors.
             self.restart = true;
