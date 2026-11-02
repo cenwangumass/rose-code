@@ -4146,13 +4146,12 @@ impl<'a> Solver<'a> {
         // `0xfbe60` checks the previous entering column after updating y;
         // `0x14509b` rejects the scan before any failed-scan rebuild.
         if let Some(j) = self.p0_check.take().filter(|&j| self.pos_of[j] != NONE) {
-            let r = self.pos_of[j];
-            let sg = self.sig();
+            let c = self.sig_class(j);
             let cost = if self.costfree && self.p1_tol_on {
                 0.0
             } else {
                 self.p.cost[j]
-            } + PHASE1_M * f64::from(sg[r]);
+            } + PHASE1_M * f64::from(c);
             let y = &self.p0.as_ref().unwrap().y;
             let err = dot_lanes_from(&self.p.fcols[j], y, self.p.offs[j] & 1, cost).abs();
             if err > 3e-6 && err > 3e-6 * self.p0_scale {
@@ -4226,28 +4225,28 @@ const W_MIN: f64 = 1e-12;
 const NORM_RESET_TOL: f64 = 1e-10;
 
 impl<'a> Solver<'a> {
-    fn sig(&self) -> Vec<i8> {
+    /// Feasibility class of one variable, using the same bound-distance convention as `sig`.
+    fn sig_class(&self, j: usize) -> i8 {
         let (p, tol) = (self.p, self.opts.feasibility_tol);
-        self.basic
-            .iter()
-            .map(|&j| {
-                let (li, ui) = (is_inf(p.lo[j]), is_inf(p.up[j]));
-                if li && ui {
-                    return 0;
-                }
-                let d = self.dst[j];
-                if li {
-                    return if d < -tol { 1 } else { 0 };
-                }
-                if d < -tol {
-                    -1
-                } else if !ui && d - (p.up[j] - p.lo[j]) > tol {
-                    1
-                } else {
-                    0
-                }
-            })
-            .collect()
+        let (li, ui) = (is_inf(p.lo[j]), is_inf(p.up[j]));
+        if li && ui {
+            return 0;
+        }
+        let d = self.dst[j];
+        if li {
+            return if d < -tol { 1 } else { 0 };
+        }
+        if d < -tol {
+            -1
+        } else if !ui && d - (p.up[j] - p.lo[j]) > tol {
+            1
+        } else {
+            0
+        }
+    }
+
+    fn sig(&self) -> Vec<i8> {
+        self.basic.iter().map(|&j| self.sig_class(j)).collect()
     }
 
     /// The reference's two factorizations before the FarkasDual BTRAN: the clean one that the end of a solve takes when the factor has
@@ -4519,7 +4518,7 @@ impl<'a> Solver<'a> {
     }
 
     fn has_infeasible_basic(&self) -> bool {
-        self.sig().iter().any(|&c| c != 0)
+        self.basic.iter().any(|&j| self.sig_class(j) != 0)
     }
 
     /// Reduced costs of the reference's infeasible-start mode: true cost plus `PHASE1_M` times the cost vector
