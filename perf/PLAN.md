@@ -130,10 +130,10 @@ never commit with debug prints, never leave the tree with uncommitted half-work 
 These are leads to verify with a profile, not facts. Remove each from STATE.md's candidates once it is
 measured.
 
-- **The mode-switch witness** (`mode_switch.dual-r`, 15000 rows): about 20 s in rose against 0.4 s in
-  the reference. A ratio of 50 points at an algorithmic cost (something O(m) or O(n) per iteration that
-  the reference does incrementally, e.g. pricing over all rows, full weight or candidate rebuilds,
-  dense vectors cleared per iteration). Largest expected payoff.
+- **The mode-switch witness** (`mode_switch.dual-r`, 15000 rows): a large absolute-time run whose
+  original-library reference currently fails the available license. Work on it after reachable ratios.
+  Check per-iteration scans, repeated candidate/weight rebuilds and dense work on sparse data; use the
+  current profile and instruction count in STATE.md rather than the old, unusable reference timing.
 - **Large dual and primal runs** (DEGEN3, PEROLD, 80BAU3B, GREENBEA): pricing, ratio tests,
   FTRAN/BTRAN (`ftran_order.rs`), the LU update and refactorization (`lu*.rs`), the bound-flip and
   update loops in `dual.rs` / `simplex.rs`.

@@ -373,6 +373,7 @@ pub fn assemble_generic(
 /// One column of DGEMV('T') (`mkl_blas_avx2_xdgemv_t`): `y = fma(sum, alpha, y)`, `sum = (acc0 + acc1) + (acc2 + acc3)`, four lane accumulators.
 /// 8-blocks: `t = fma(x_l, a_l, x_{l+4} a_{l+4})` (the upper half is rounded first), `acc_l = t + acc_l`; a 4-block: variant 4 `acc_l = fma(x, a, acc_l)`,
 /// variants 2 and 1 `acc_l = x a + acc_l`; the last `L % 4` entries by masked fma on lanes `0..r`.
+#[inline(always)]
 fn dgemv_t_col(a: &[f64], x: &[f64], variant: u8, alpha: f64, y: f64) -> f64 {
     let l = a.len();
     let mut acc = [0.0f64; 4];
@@ -406,6 +407,7 @@ fn dgemv_t_col(a: &[f64], x: &[f64], variant: u8, alpha: f64, y: f64) -> f64 {
 }
 
 /// DGEMV('T', L, n, alpha, A, lda, x, 1, beta = 1, y, incy): column `j` of `A` against `x`; four columns at a time, then a pair, then one.
+#[inline(always)]
 fn dgemv_t(
     a: &[f64],
     lda: usize,
@@ -438,6 +440,7 @@ enum Kind {
 
 /// One element of DGEMM('T','N') beta = 1 in `dgemm_kernel_nocopy_TN_b1` (alpha = 1): 'S' one sequential fma chain; 'A' even and odd fma chains
 /// (`k - k % 2` entries) added, an odd last entry fma'd into the sum; 'N' as 'A' with rounded products. Then `c0 + s`.
+#[inline(always)]
 fn dgemm_tn_elem(kind: Kind, a: &[f64], b: &[f64], c0: f64) -> f64 {
     let k = a.len();
     if kind == Kind::S {
@@ -511,6 +514,7 @@ enum ColK {
 /// Accumulator of the 12-row-tile kernels (`dgemm_kernel_0`, `dtrsm_kernel_ll_0`): terms by `term(j)` for `j < k`, fma accumulation from 0.
 /// `Chain` one accumulator; `Par` accumulators of the even and the odd terms over the first `4 (k / 4)` terms, their sum, then the remaining terms
 /// fma'd into the sum; `Lane4` accumulators of the terms `j % 4`, `(a0 + a1) + (a2 + a3)`, then the tail fma'd into the sum.
+#[inline(always)]
 fn acc_terms(mode: Acc, k: usize, term: &dyn Fn(usize) -> (f64, f64)) -> f64 {
     let m4 = k - k % 4;
     let mut acc;
@@ -673,6 +677,35 @@ pub fn dgemm_t_n(
         sgemm_t_n(m, n, k, a, lda, b, ldb, c, ldc);
         return;
     }
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    if std::arch::is_x86_feature_detected!("fma")
+        // NaN payload priority can depend on the FMA instruction's operand encoding.
+        // Retain the portable instruction sequence for non-finite input arrays.
+        && a.iter().chain(b).chain(c.iter()).all(|x| x.is_finite())
+    {
+        // SAFETY: runtime detection includes the CPU/OS support needed by this backend.
+        unsafe {
+            dgemm_existing_fma(m, n, k, a, lda, b, ldb, c, ldc);
+        }
+        return;
+    }
+    dgemm_body(m, n, k, a, lda, b, ldb, c, ldc);
+}
+
+// Inline the unchanged scalar operation sequence into the feature-specific caller. This lowers
+// only existing `fma` operations to instructions; plain products and sums remain unfused.
+#[inline(always)]
+fn dgemm_body(
+    m: usize,
+    n: usize,
+    k: usize,
+    a: &[f64],
+    lda: usize,
+    b: &[f64],
+    ldb: usize,
+    c: &mut [f64],
+    ldc: usize,
+) {
     if m == 1 {
         dgemv_t(b, ldb, k, n, &a[..k], 1.0, c, ldc);
         return;
@@ -728,6 +761,22 @@ pub fn dgemm_t_n(
         }
         k0 += kk;
     }
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[target_feature(enable = "fma")]
+unsafe fn dgemm_existing_fma(
+    m: usize,
+    n: usize,
+    k: usize,
+    a: &[f64],
+    lda: usize,
+    b: &[f64],
+    ldb: usize,
+    c: &mut [f64],
+    ldc: usize,
+) {
+    dgemm_body(m, n, k, a, lda, b, ldb, c, ldc);
 }
 
 const TRSM_LL0_MIN: usize = 13; // m >= 13, except m % 4 == 0 && m <= 88 (dtrsm_left_ker): dtrsm_kernel_ll_0
@@ -2424,6 +2473,328 @@ mod tests {
     // `reverse-engineer/tools/make_chol_kernel_fixture.py`.
     fn fixture() -> Value {
         serde_json::from_str(include_str!("../tests/fixtures/chol-kernels.json")).unwrap()
+    }
+
+    fn previous_dgemv_t_col(a: &[f64], x: &[f64], variant: u8, alpha: f64, y: f64) -> f64 {
+        let l = a.len();
+        let mut acc = [0.0f64; 4];
+        let main = l - (l % 8);
+        let tail4 = (l % 8) & !3;
+        let r = l % 4;
+        let mut c = 0;
+        while c < main {
+            for k in 0..4 {
+                let t = fma(x[c + k], a[c + k], x[c + 4 + k] * a[c + 4 + k]);
+                acc[k] = t + acc[k];
+            }
+            c += 8;
+        }
+        let mut p = main;
+        if tail4 != 0 {
+            for k in 0..4 {
+                acc[k] = if variant == 4 {
+                    fma(x[p + k], a[p + k], acc[k])
+                } else {
+                    x[p + k] * a[p + k] + acc[k]
+                };
+            }
+            p += 4;
+        }
+        for k in 0..r {
+            acc[k] = fma(x[p + k], a[p + k], acc[k]);
+        }
+        let s = (acc[0] + acc[1]) + (acc[2] + acc[3]);
+        fma(s, alpha, y)
+    }
+
+    fn previous_dgemv_t(
+        a: &[f64],
+        lda: usize,
+        l: usize,
+        n: usize,
+        x: &[f64],
+        alpha: f64,
+        y: &mut [f64],
+        incy: usize,
+    ) {
+        let n4 = n - (n % 4);
+        for j in 0..n {
+            let var = if j < n4 {
+                4
+            } else if (n % 4) & 2 != 0 && j < n4 + 2 {
+                2
+            } else {
+                1
+            };
+            y[j * incy] =
+                previous_dgemv_t_col(&a[j * lda..j * lda + l], x, var, alpha, y[j * incy]);
+        }
+    }
+
+    fn previous_dgemm_tn_elem(kind: Kind, a: &[f64], b: &[f64], c0: f64) -> f64 {
+        let k = a.len();
+        if kind == Kind::S {
+            let mut s = 0.0;
+            for i in 0..k {
+                s = fma(a[i], b[i], s);
+            }
+            return c0 + 1.0 * s;
+        }
+        let (mut e, mut o) = (0.0, 0.0);
+        for i in 0..k - (k % 2) {
+            if i % 2 == 0 {
+                e = if kind == Kind::A {
+                    fma(a[i], b[i], e)
+                } else {
+                    e + a[i] * b[i]
+                };
+            } else {
+                o = if kind == Kind::A {
+                    fma(a[i], b[i], o)
+                } else {
+                    o + a[i] * b[i]
+                };
+            }
+        }
+        let mut s = e + o;
+        if k % 2 == 1 {
+            s = if kind == Kind::A {
+                fma(a[k - 1], b[k - 1], s)
+            } else {
+                s + a[k - 1] * b[k - 1]
+            };
+        }
+        c0 + 1.0 * s
+    }
+
+    fn previous_acc_terms(mode: Acc, k: usize, term: &dyn Fn(usize) -> (f64, f64)) -> f64 {
+        let m4 = k - k % 4;
+        let mut acc;
+        match mode {
+            Acc::Chain => {
+                acc = 0.0;
+                for j in 0..k {
+                    let (x, y) = term(j);
+                    acc = fma(x, y, acc);
+                }
+                return acc;
+            }
+            Acc::Par => {
+                let (mut e, mut o) = (0.0, 0.0);
+                for j in 0..m4 {
+                    let (x, y) = term(j);
+                    if j % 2 == 0 {
+                        e = fma(x, y, e);
+                    } else {
+                        o = fma(x, y, o);
+                    }
+                }
+                acc = e + o;
+            }
+            Acc::Lane4 => {
+                let mut a = [0.0f64; 4];
+                for j in 0..m4 {
+                    let (x, y) = term(j);
+                    a[j % 4] = fma(x, y, a[j % 4]);
+                }
+                acc = (a[0] + a[1]) + (a[2] + a[3]);
+            }
+        }
+        for j in m4..k {
+            let (x, y) = term(j);
+            acc = fma(x, y, acc);
+        }
+        acc
+    }
+
+    fn previous_dgemm_t_n(
+        m: usize,
+        n: usize,
+        k: usize,
+        a: &[f64],
+        lda: usize,
+        b: &[f64],
+        ldb: usize,
+        c: &mut [f64],
+        ldc: usize,
+    ) {
+        if SINGLE.with(|c| c.get()) {
+            sgemm_t_n(m, n, k, a, lda, b, ldb, c, ldc);
+            return;
+        }
+        if m == 1 {
+            previous_dgemv_t(b, ldb, k, n, &a[..k], 1.0, c, ldc);
+            return;
+        }
+        if n == 1 {
+            previous_dgemv_t(a, lda, k, m, &b[..k], 1.0, c, 1);
+            return;
+        }
+        if gemm_path2(m, n, k) {
+            for j in 0..n {
+                let ck = col_kernel(n, j);
+                for i in 0..m {
+                    let mode = tile_mode(k0_row_tile(m, i), ck);
+                    let (ar, br) = (&a[i * lda..i * lda + k], &b[j * ldb..j * ldb + k]);
+                    let s = previous_acc_terms(mode, k, &|t| (1.0 * ar[t], br[t]));
+                    c[j * ldc + i] = c[j * ldc + i] + s;
+                }
+            }
+            return;
+        }
+        // The nocopy driver (`0xa7be50`) cuts `k > 192` into calls of the kernel, each a `beta = 1` update of `C` (the dispatch above sees the whole `k`;
+        // the copy-based kernel takes `k` up to 240 in one call).
+        // The pieces: while more than 384 remain a block of 192; then up to 384 `ceil(r / 2)` and the rest; up to 192 one call (traced for k = 385, 400, 512, 700).
+        let mut ps = Vec::new();
+        let mut r = k;
+        while r > 384 {
+            ps.push(192);
+            r -= 192;
+        }
+        if r > 192 {
+            ps.push((r + 1) / 2);
+            r -= (r + 1) / 2;
+        }
+        if r > 0 {
+            ps.push(r);
+        }
+        let mut k0 = 0;
+        for &kk in &ps {
+            let mut j0 = 0;
+            for nb in nocopy_n_blocks(n) {
+                for j in 0..nb {
+                    for i in 0..m {
+                        let kind = gemm_kind(m, nb, i, j);
+                        c[(j0 + j) * ldc + i] = previous_dgemm_tn_elem(
+                            kind,
+                            &a[i * lda + k0..i * lda + k0 + kk],
+                            &b[(j0 + j) * ldb + k0..(j0 + j) * ldb + k0 + kk],
+                            c[(j0 + j) * ldc + i],
+                        );
+                    }
+                }
+                j0 += nb;
+            }
+            k0 += kk;
+        }
+    }
+
+    #[test]
+    fn dgemm_matches_previous() {
+        let check = |m, n, k, a: &[f64], lda, b: &[f64], ldb, c: &[f64], ldc| {
+            let mut want = c.to_vec();
+            let mut got = c.to_vec();
+            previous_dgemm_t_n(m, n, k, a, lda, b, ldb, &mut want, ldc);
+            dgemm_t_n(m, n, k, a, lda, b, ldb, &mut got, ldc);
+            assert_bits(&format!("previous dgemm {m}x{n}x{k}"), &want, &got);
+            let mut portable = c.to_vec();
+            dgemm_body(m, n, k, a, lda, b, ldb, &mut portable, ldc);
+            assert_bits(&format!("portable dgemm {m}x{n}x{k}"), &want, &portable);
+        };
+        for g in fixture()["gemm"].as_array().unwrap() {
+            let u = |k: &str| g[k].as_u64().unwrap() as usize;
+            check(
+                u("m"),
+                u("n"),
+                u("k"),
+                &floats(&g["A"]),
+                u("lda"),
+                &floats(&g["B"]),
+                u("ldb"),
+                &floats(&g["C"]),
+                u("ldc"),
+            );
+        }
+        for (m, n) in [(0, 0), (0, 2), (2, 0)] {
+            let old = std::panic::catch_unwind(|| {
+                previous_dgemm_t_n(m, n, 0, &[], 0, &[], 0, &mut [], 0)
+            });
+            let new = std::panic::catch_unwind(|| dgemm_t_n(m, n, 0, &[], 0, &[], 0, &mut [], 0));
+            assert_eq!(old.is_err(), new.is_err(), "empty {m}x{n}");
+        }
+        // Actual DGEMM wrapper-entry arrays in the cached AFIRO barrier-controlled solve.
+        let captured: Value =
+            serde_json::from_str(include_str!("../tests/fixtures/dgemm-captured.json")).unwrap();
+        for g in captured.as_array().unwrap() {
+            let u = |k: &str| g[k].as_u64().unwrap() as usize;
+            let v = |k: &str| -> Vec<f64> {
+                g[k].as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|s| f64::from_bits(u64::from_str_radix(s.as_str().unwrap(), 16).unwrap()))
+                    .collect()
+            };
+            check(
+                u("m"),
+                u("n"),
+                u("k"),
+                &v("A"),
+                u("lda"),
+                &v("B"),
+                u("ldb"),
+                &v("C"),
+                u("ldc"),
+            );
+        }
+        let shapes = [
+            (0, 1, 4),
+            (1, 0, 4),
+            (1, 1, 0),
+            (1, 1, 1),
+            (1, 5, 9),
+            (5, 1, 17),
+            (2, 2, 3),
+            (7, 4, 63),
+            (8, 6, 8),
+            (9, 3, 16),
+            (16, 7, 33),
+            (20, 8, 193),
+            (13, 13, 385),
+            (24, 11, 400),
+            (57, 56, 17),
+            (56, 57, 19),
+            (80, 80, 7),
+        ];
+        let mut seed = 0x927e_4821_ab36_d52fu64;
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        for class in 0..3 {
+            for (m, n, k) in shapes {
+                let (lda, ldb, ldc) = (k + 3, k + 5, m + 2);
+                let mut value = || {
+                    let bits = next();
+                    match class {
+                        0 => f64::from_bits(
+                            (bits & 0x800f_ffff_ffff_ffff) | ((990 + bits % 67) << 52),
+                        ),
+                        1 => match bits % 7 {
+                            0 => 0.0,
+                            1 => -0.0,
+                            2 => f64::from_bits(1),
+                            3 => -f64::MIN_POSITIVE,
+                            4 => f64::MAX,
+                            5 => -f64::MAX,
+                            _ => f64::from_bits(bits & 0xffef_ffff_ffff_ffff),
+                        },
+                        _ => match bits % 5 {
+                            0 => f64::INFINITY,
+                            1 => f64::NEG_INFINITY,
+                            2 => f64::from_bits(0x7ff8_0000_0000_0123),
+                            3 => f64::from_bits(0xfff8_0000_0000_0456),
+                            _ => 1.0,
+                        },
+                    }
+                };
+                let a: Vec<f64> = (0..m * lda).map(|_| value()).collect();
+                let b: Vec<f64> = (0..n * ldb).map(|_| value()).collect();
+                let c: Vec<f64> = (0..n * ldc).map(|_| value()).collect();
+                check(m, n, k, &a, lda, &b, ldb, &c, ldc);
+            }
+        }
     }
 
     #[test]
