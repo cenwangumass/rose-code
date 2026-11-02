@@ -76,7 +76,9 @@ def main():
         commands = list(training())
         train_env = os.environ.copy()
         train_env.pop('ROSE_DUMP', None)
-        train_env['LLVM_PROFILE_FILE'] = str(raw / '%m-%p.profraw')
+        # Keep rustc's validated online merge mode. Per-process files regressed
+        # barrier builds in a same-source controlled comparison.
+        train_env.pop('LLVM_PROFILE_FILE', None)
         with (artifacts / 'training.log').open('w') as log:
             for command in commands:
                 # Solver outcomes, including iteration limits and recovery failures,
