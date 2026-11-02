@@ -2,7 +2,6 @@
 //! four singleton phases followed by a bucketed Markowitz search on the remaining nucleus. Only the order is reproduced here.
 
 use crate::real::Real;
-use std::collections::HashSet;
 
 /// The relative pivot threshold at the start of a solve (`ctx+0x390` = 2^-7).
 pub const THRESHOLD: f64 = 0.0078125;
@@ -53,11 +52,15 @@ pub fn factor_structure_r<R: Real>(
 ) -> Structure<R> {
     let (mut seq, mut phase, ov, loff) = phases(m, cols);
     let nsing = seq.len();
-    let done_r: HashSet<usize> = seq.iter().map(|&(r, _)| r).collect();
-    let done_c: HashSet<usize> = seq.iter().map(|&(_, c)| c).collect();
+    let mut done_r = vec![false; m];
+    let mut done_c = vec![false; cols.len()];
+    for &(r, c) in &seq {
+        done_r[r] = true;
+        done_c[c] = true;
+    }
     let mut nuc: Vec<(usize, Vec<(usize, R)>)> = Vec::new();
     for (pos, (_, idx, val)) in cols.iter().enumerate() {
-        if done_c.contains(&pos) {
+        if done_c[pos] {
             continue;
         }
         let mut d: Vec<(usize, R)> = idx
@@ -65,7 +68,7 @@ pub fn factor_structure_r<R: Real>(
             .copied()
             .zip(val.iter().copied())
             // The reference's matrix leaves out entries below the absolute tolerance (fx_e2_r25: a scaled entry 2^-44 in a row of the nucleus changed its count).
-            .filter(|(i, v)| !done_r.contains(i) && v.abs() >= ABS_TOL)
+            .filter(|(i, v)| !done_r[*i] && v.abs() >= ABS_TOL)
             .map(|(i, v)| (i, R::c(v)))
             .collect();
         d.reverse();
@@ -77,12 +80,12 @@ pub fn factor_structure_r<R: Real>(
     let nuc_nnz = cols
         .iter()
         .enumerate()
-        .filter(|(pos, _)| !done_c.contains(pos))
+        .filter(|(pos, _)| !done_c[*pos])
         .map(|(_, (slack, rows, _))| {
             if *slack {
                 1
             } else {
-                rows.iter().filter(|r| !done_r.contains(r)).count()
+                rows.iter().filter(|r| !done_r[**r]).count()
             }
         })
         .sum();
@@ -597,8 +600,11 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
     let mut lvout: Vec<Vec<R>> = Vec::new();
     let mut pout: Vec<R> = Vec::new();
     let mut uout: Vec<Vec<(usize, R)>> = Vec::new();
-    let mut prows: HashSet<usize> = HashSet::new();
-    let mut pcols: HashSet<usize> = HashSet::new();
+    let mut prows = vec![false; m];
+    let mut pcols = vec![false; npos];
+    // Each temporary seen set gets a fresh generation without clearing or allocating per row/column.
+    let mut seen = vec![0usize; m.max(npos)];
+    let mut generation = 0usize;
     let mut remaining = ckeys.len();
     let n0 = remaining;
     // The reference's hand-off test (`0xd6736`): a nonzero estimate that starts at the nonzeros of the basis matrix and grows by
@@ -641,7 +647,7 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
             {
                 let exact: usize = ckeys
                     .iter()
-                    .filter(|c| !pcols.contains(c))
+                    .filter(|c| !pcols[**c])
                     .map(|&c| s.ccnt[c])
                     .sum();
                 z = exact as f64;
@@ -660,7 +666,7 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
                     for k in 0..s.rb.len() {
                         if k == 0 {
                             for &r in s.rst.iter().rev() {
-                                if !prows.contains(&r) && s.rcnt[r] == 1 && !rows.contains(&r) {
+                                if !prows[r] && s.rcnt[r] == 1 && !rows.contains(&r) {
                                     rows.push(r);
                                 }
                             }
@@ -672,7 +678,7 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
                     for k in 0..s.cb.len() {
                         if k == 0 {
                             for &c in s.cst.iter().rev() {
-                                if !pcols.contains(&c) && s.ccnt[c] == 1 && !cols_a.contains(&c) {
+                                if !pcols[c] && s.ccnt[c] == 1 && !cols_a.contains(&c) {
                                     cols_a.push(c);
                                 }
                             }
@@ -762,8 +768,8 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
         }
         out.push((pr, pc));
         remaining -= 1;
-        prows.insert(pr);
-        pcols.insert(pc);
+        prows[pr] = true;
+        pcols[pc] = true;
         s.clean_row(pr);
         s.clean_col(pc);
         let s_col: usize = s.colchain[pc]
@@ -826,7 +832,11 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
                 s.nodes[i].alive = false;
                 s.rcnt[r2] -= 1;
                 let lr = l.iter().find(|x| x.0 == r2).unwrap().1;
-                let mut seen: HashSet<usize> = HashSet::new();
+                generation = generation.wrapping_add(1);
+                if generation == 0 {
+                    seen.fill(0);
+                    generation = 1;
+                }
                 let chain = s.rowchain[r2].clone();
                 for mid in chain {
                     if !s.nodes[mid].alive || s.nodes[mid].c == pc {
@@ -834,7 +844,7 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
                     }
                     let c = s.nodes[mid].c;
                     if let Some(&(_, uc)) = u.iter().find(|x| x.0 == c) {
-                        seen.insert(c);
+                        seen[c] = generation;
                         s.nodes[mid].v -= lr * uc;
                         if s.nodes[mid].v.abs() < R::c(ABS_TOL) {
                             s.nodes[mid].alive = false;
@@ -844,7 +854,7 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
                     }
                 }
                 for &(c, uv) in &u {
-                    if seen.contains(&c) {
+                    if seen[c] == generation {
                         continue;
                     }
                     let val = -lr * uv;
@@ -876,7 +886,11 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
             }
             for &(c2, uc) in &u {
                 s.ccnt[c2] -= 1;
-                let mut seen: HashSet<usize> = HashSet::new();
+                generation = generation.wrapping_add(1);
+                if generation == 0 {
+                    seen.fill(0);
+                    generation = 1;
+                }
                 let chain = s.colchain[c2].clone();
                 for mid in chain {
                     if !s.nodes[mid].alive || s.nodes[mid].r == pr {
@@ -884,7 +898,7 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
                     }
                     let r = s.nodes[mid].r;
                     if let Some(&(_, lv)) = l.iter().find(|x| x.0 == r) {
-                        seen.insert(r);
+                        seen[r] = generation;
                         s.nodes[mid].v -= lv * uc;
                         if s.nodes[mid].v.abs() < R::c(ABS_TOL) {
                             s.nodes[mid].alive = false;
@@ -894,7 +908,7 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
                     }
                 }
                 for &(r, lv) in &l {
-                    if seen.contains(&r) {
+                    if seen[r] == generation {
                         continue;
                     }
                     let val = -lv * uc;
