@@ -35,7 +35,11 @@ grep -v '^\s*#' perf/bench.txt | grep -v '^\s*$' | while read -r id model args; 
     read -r med mn mx < <(python3 -c 'import json,sys; r=json.load(open(sys.argv[1]))["results"][0]; s=r["summary"]["time_wall_clock"] if "summary" in r else r; print(s["median"], s["min"], s["max"])' "$tmp/h.json")
     ins=""
     if [ $instr = 1 ]; then
-        ins=$(perf stat -x, -e instructions:u -- $cmd 2>&1 >/dev/null | awk -F, '/instructions/ {print $1}')
+        # Solver failures are benchmark outcomes too (hyperfine uses -i above).
+        # Validate the counter itself rather than perf's propagated solver exit code.
+        perf stat -x, -e instructions:u -- $cmd >/dev/null 2>"$tmp/stat" || true
+        ins=$(awk -F, '$3 == "instructions:u" {print $1}' "$tmp/stat")
+        [[ $ins =~ ^[0-9]+$ ]] || { cat "$tmp/stat" >&2; exit 1; }
     fi
     printf '%-26s %9.3f %9.3f %9.3f %s\n' "$id" "$med" "$mn" "$mx" "$ins"
 done
