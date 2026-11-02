@@ -19,6 +19,7 @@ fn large_file_equality_rhs_is_finite_in_barrier_form() {
     let unscaled = barrier::std_form(&model, &[0]).unwrap();
     assert_eq!(unscaled.b_file, vec![5e99]);
 }
+
 use rose::{mps, order};
 use serde_json::Value;
 

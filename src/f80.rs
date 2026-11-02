@@ -642,6 +642,7 @@ mod tests {
         // Set the same 64-bit precision and round-to-nearest mode as the
         // reference; restore the calling thread's control word on exit.
         struct ControlWord(u16);
+
         impl ControlWord {
             fn nearest_extended() -> Self {
                 let mut old = 0u16;
@@ -652,6 +653,7 @@ mod tests {
                 Self(old)
             }
         }
+
         impl Drop for ControlWord {
             fn drop(&mut self) {
                 unsafe {

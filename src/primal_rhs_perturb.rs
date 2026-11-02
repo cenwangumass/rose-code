@@ -135,6 +135,7 @@ pub(crate) fn repair_double(
 mod tests {
     use super::*;
     use serde_json::Value;
+
     fn run(data: &str) {
         let v: Value = serde_json::from_str(data).unwrap();
         let input = &v["PCIN"];
@@ -218,6 +219,7 @@ mod tests {
         );
         assert_eq!(offset.to_bits(), output["c130"].as_f64().unwrap().to_bits());
     }
+
     #[test]
     fn double_injected_native_capture() {
         let v: Value =
@@ -277,10 +279,12 @@ mod tests {
             input["c338"].as_i64().unwrap() + 2
         );
     }
+
     #[test]
     fn restored_5959() {
         run(include_str!("fixtures/primal_quad_perturb_capture.json"));
     }
+
     #[test]
     fn injected_branches() {
         run(include_str!("fixtures/primal_quad_perturb_injected.json"));

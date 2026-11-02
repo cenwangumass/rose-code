@@ -74,9 +74,11 @@ fn enter_dual_pert_size() -> (f64, i64) {
 pub(crate) fn enter_primal_pert_size() -> f64 {
     enter_pert_size(&PRIMAL_PERT_SIZE, true)
 }
+
 pub(crate) fn primal_pert_size() -> f64 {
     PRIMAL_PERT_SIZE.with(|c| c.get())
 }
+
 pub(crate) fn set_primal_pert_size(value: f64) {
     PRIMAL_PERT_SIZE.with(|c| c.set(value));
 }
@@ -90,11 +92,13 @@ struct CallbackController {
     primal_carry: f64,
     dual_carry: f64,
 }
+
 thread_local! {
     static CALLBACK: std::cell::Cell<CallbackController> = const { std::cell::Cell::new(CallbackController {
         selector: true, result: 0, skip: false, primal_carry: PRIMAL_TOL, dual_carry: DUAL_TOL0,
     }) };
 }
+
 fn callback_reset() {
     CALLBACK.with(|c| {
         c.set(CallbackController {
@@ -106,11 +110,13 @@ fn callback_reset() {
         })
     });
 }
+
 struct CallbackGuard {
     dual: bool,
     factor: f64,
     active: bool,
 }
+
 impl CallbackGuard {
     fn enter(dual: bool, opts: &SolveOptions) -> Self {
         let count = C35C.with(|c| c.get());
@@ -143,6 +149,7 @@ impl CallbackGuard {
             active: true,
         }
     }
+
     fn finish(&mut self) {
         if !self.active {
             return;
@@ -159,6 +166,7 @@ impl CallbackGuard {
         self.active = false;
     }
 }
+
 impl Drop for CallbackGuard {
     fn drop(&mut self) {
         self.finish();
@@ -5550,6 +5558,7 @@ struct HandoffSnapshot {
     stall_it: f64,
     art_exit: bool,
 }
+
 struct PrimalTransfer {
     basis: Basis,
     opts: SolveOptions,
@@ -5559,19 +5568,23 @@ struct PrimalTransfer {
     control_status: Option<i32>,
     route: PrimalRoute,
 }
+
 enum PrimalRoute {
     Restored,
     Artificial { start: Option<Basis> },
 }
+
 enum DriverOutcome {
     Finished(SolveResult),
     ToPrimal(PrimalTransfer),
 }
+
 #[derive(Clone, Copy)]
 enum ControlTransfer {
     MethodSwitch,
     Restart,
 }
+
 impl ControlTransfer {
     fn status(self) -> i32 {
         match self {
@@ -5580,10 +5593,12 @@ impl ControlTransfer {
         }
     }
 }
+
 struct PrimalOutcome {
     result: Result<SolveResult, SolveError>,
     control: Option<ControlTransfer>,
 }
+
 fn dispatch_primal(model: &LpModel, basis: &Basis, opts: &SolveOptions) -> PrimalOutcome {
     let result = primal_callback(model, Some(basis), opts);
     // These are the control routes represented by the current primal driver;
@@ -6890,6 +6905,7 @@ fn resume_artificial_transfer<R: Real>(
     }
     return Err(SolveError::SingularBasis);
 }
+
 // The callback has returned before this controller dispatch runs the primal.
 fn resume_primal_transfer<R: Real>(
     model: &LpModel,
