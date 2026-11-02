@@ -55,7 +55,9 @@ pub struct RefStruct<R: Real = f64> {
     mark: usize,
     a: Vec<Vec<usize>>,
     b: Vec<Vec<usize>>,
-    lcols: Vec<Vec<usize>>,
+    /// Immutable forward L columns, preserving coefficient and destination order.
+    lstart: Vec<usize>,
+    lentries: Vec<(usize, R)>,
     perm: Vec<usize>,
     /// Immutable inverse row permutation, initialized at the first BTRAN output.
     row_of: std::cell::OnceCell<Vec<usize>>,
@@ -68,7 +70,6 @@ pub struct RefStruct<R: Real = f64> {
     /// Reused counts for ordering dense lists of permutation slots.
     slot_counts: std::cell::RefCell<Vec<usize>>,
     etas: Vec<Eta<R>>,
-    lvals: Vec<Vec<R>>,
     /// Immutable L transpose, in ascending source-column order, shared by all BTRAN calls of this factor.
     lt: Vec<Vec<(usize, R)>>,
     /// Longest-path level of each L node, when the reference solves L level by level (`0x12a990`): only for `m >= 250`, a
@@ -199,10 +200,6 @@ const TOL: f64 = 1e-13;
 /// Dump helpers: the values as doubles.
 fn jv<R: Real>(v: &[R]) -> Vec<f64> {
     v.iter().map(|x| x.to_f64()).collect()
-}
-
-fn jn<R: Real>(v: &[Vec<R>]) -> Vec<Vec<f64>> {
-    v.iter().map(|x| jv(x)).collect()
 }
 
 fn ju<R: Real>(v: &[Vec<(usize, R)>]) -> Vec<Vec<(usize, f64)>> {
@@ -368,16 +365,18 @@ impl<R: Real> RefStruct<R> {
         for s in i21..m {
             kind[s] = -2;
         }
-        let lcols: Vec<Vec<usize>> = st
-            .l_rows
-            .iter()
-            .map(|rows| rows.iter().map(|&r| step[r]).collect())
-            .collect();
-        let lvals = st.l_vals.clone();
+        let mut lstart = Vec::with_capacity(m + 1);
+        let mut lentries = Vec::with_capacity(st.l_vals.iter().map(Vec::len).sum());
+        lstart.push(0);
+        for (rows, vals) in st.l_rows.iter().zip(&st.l_vals) {
+            lentries.extend(rows.iter().zip(vals).map(|(&r, &v)| (step[r], v)));
+            lstart.push(lentries.len());
+        }
+        let lcolumn = |v: usize| &lentries[lstart[v]..lstart[v + 1]];
         let mut lt = vec![Vec::new(); m];
         for v in 0..m {
-            for (k, &y) in lcols[v].iter().enumerate() {
-                lt[y].push((v, lvals[v][k]));
+            for &(y, a) in lcolumn(v) {
+                lt[y].push((v, a));
             }
         }
         // pivot-row values of the Markowitz steps, by column
@@ -418,7 +417,7 @@ impl<R: Real> RefStruct<R> {
             while k < lst.len() {
                 let v = lst[k];
                 k += 1;
-                for &y in &lcols[v] {
+                for &(y, _) in lcolumn(v) {
                     if y <= t && !reached[y] {
                         reached[y] = true;
                         lst.push(y);
@@ -439,7 +438,7 @@ impl<R: Real> RefStruct<R> {
                 if x == R::ZERO || x.abs() <= R::c(TOL) {
                     continue;
                 }
-                for (e, &y) in lcols[v].iter().enumerate() {
+                for (e, &(y, multiplier)) in lcolumn(v).iter().enumerate() {
                     if y > t {
                         continue;
                     }
@@ -447,7 +446,7 @@ impl<R: Real> RefStruct<R> {
                     // multiplier is the only form known for pair overrides and nucleus columns.
                     let a = st.l_raw[v][e];
                     let upd = if a.is_nan() {
-                        lvals[v][e] * x
+                        multiplier * x
                     } else {
                         (x * a) / st.diag[v]
                     };
@@ -533,7 +532,7 @@ impl<R: Real> RefStruct<R> {
         } else {
             1.5
         };
-        let nnz: usize = lcols.iter().map(|c| c.len()).sum();
+        let nnz: usize = lentries.len();
         let dthr = if nnz <= m {
             2
         } else {
@@ -550,14 +549,14 @@ impl<R: Real> RefStruct<R> {
         let mut lev_dense = false;
         let mut lev_built = false;
         let mut lev_dense_ft = false;
-        let nnz_tail: usize = lcols[nseq..].iter().map(|c| c.len()).sum();
+        let nnz_tail: usize = lentries.len() - lstart[nseq];
         let levels = {
             let d = m - nseq;
             let outer = d < 6 || 10 * d * d <= m || nnz_tail <= 10 * d;
             if m >= 250 {
                 let mut lev = vec![0usize; m];
                 for v in 0..m {
-                    for &y in &lcols[v] {
+                    for &(y, _) in lcolumn(v) {
                         lev[y] = lev[y].max(lev[v] + 1);
                     }
                 }
@@ -574,7 +573,7 @@ impl<R: Real> RefStruct<R> {
                 None
             }
         };
-        let nnz_l_tot: usize = lcols.iter().map(|c| c.len()).sum();
+        let nnz_l_tot: usize = lentries.len();
         let perm = step;
         let znz = (nnz + sa + sb + 2 * m) as f64;
         let mark0 = (i21..m)
@@ -707,7 +706,8 @@ impl<R: Real> RefStruct<R> {
             mark: mark0,
             a,
             b,
-            lcols,
+            lstart,
+            lentries,
             perm,
             row_of: Default::default(),
             dens: (h33 + h34) * (h33 + h34),
@@ -717,7 +717,6 @@ impl<R: Real> RefStruct<R> {
             at: (0..m).collect(),
             slot_counts: Default::default(),
             etas: Vec::new(),
-            lvals,
             lt,
             levels,
             lt_levels: Default::default(),
@@ -731,6 +730,15 @@ impl<R: Real> RefStruct<R> {
         }
     }
 
+    #[inline]
+    fn lcolumn(&self, v: usize) -> &[(usize, R)] {
+        &self.lentries[self.lstart[v]..self.lstart[v + 1]]
+    }
+
+    fn lcolumns(&self) -> impl Iterator<Item = &[(usize, R)]> {
+        self.lstart.windows(2).map(|s| &self.lentries[s[0]..s[1]])
+    }
+
     fn kahn(&self, start: &[usize]) -> Vec<usize> {
         let mut cnt = vec![0i32; self.m];
         let mut lst: Vec<usize> = start.to_vec();
@@ -742,7 +750,7 @@ impl<R: Real> RefStruct<R> {
         while i < lst.len() {
             let v = lst[i];
             i += 1;
-            for &x in &self.lcols[v] {
+            for &(x, _) in self.lcolumn(v) {
                 if cnt[x] == 0 {
                     lst.push(x);
                 }
@@ -760,7 +768,7 @@ impl<R: Real> RefStruct<R> {
         while i < q.len() {
             let v = q[i];
             i += 1;
-            for &x in &self.lcols[v] {
+            for &(x, _) in self.lcolumn(v) {
                 cnt[x] -= 1;
                 if cnt[x] == 0 {
                     q.push(x);
@@ -803,9 +811,9 @@ impl<R: Real> RefStruct<R> {
                 if xv.abs() <= R::c(TOL) {
                     continue;
                 }
-                e = self.lcols[v].len() as f64 * 2.0 + e;
-                for (e, &y) in self.lcols[v].iter().enumerate() {
-                    x[y] -= self.lvals[v][e] * xv;
+                e = self.lcolumn(v).len() as f64 * 2.0 + e;
+                for &(y, a) in self.lcolumn(v) {
+                    x[y] -= a * xv;
                 }
             }
             let count_l = (0..self.m).filter(|&v| x[v].abs() > R::c(TOL)).count();
@@ -835,13 +843,13 @@ impl<R: Real> RefStruct<R> {
                     let xv = x[v];
                     if xv.abs() >= R::c(TOL) {
                         out.push(v);
-                        for (e, &y) in self.lcols[v].iter().enumerate() {
+                        for &(y, a) in self.lcolumn(v) {
                             if !active[y] {
                                 active[y] = true;
                                 buckets[lev[y]].push(y);
                                 remaining += 1;
                             }
-                            x[y] -= self.lvals[v][e] * xv;
+                            x[y] -= a * xv;
                         }
                     } else {
                         x[v] = R::ZERO;
@@ -862,8 +870,8 @@ impl<R: Real> RefStruct<R> {
                     x[v] = R::ZERO;
                     continue;
                 }
-                for (e, &y) in self.lcols[v].iter().enumerate() {
-                    x[y] -= self.lvals[v][e] * xv;
+                for &(y, a) in self.lcolumn(v) {
+                    x[y] -= a * xv;
                 }
             }
             let count_l = q.iter().filter(|&&v| x[v].abs() > R::c(TOL)).count();
@@ -884,7 +892,7 @@ impl<R: Real> RefStruct<R> {
                     }
                 }
                 for &v in q.iter().filter(|&&v| v < loff && x[v].abs() > R::c(TOL)) {
-                    for &y in &self.lcols[v] {
+                    for &(y, _) in self.lcolumn(v) {
                         if y >= loff {
                             lo = lo.min(y);
                         }
@@ -895,7 +903,7 @@ impl<R: Real> RefStruct<R> {
                 let mut e2 = (m - lo) as f64 * 2.0 + e1;
                 for v in lo..m {
                     if x[v].abs() > R::c(TOL) {
-                        e2 += self.lcols[v].len() as f64 * 2.0;
+                        e2 += self.lcolumn(v).len() as f64 * 2.0;
                     }
                 }
                 e = e2 + e;
@@ -913,8 +921,265 @@ impl<R: Real> RefStruct<R> {
                     if xv.abs() <= R::c(TOL) {
                         continue;
                     }
-                    for (e, &y) in self.lcols[v].iter().enumerate() {
-                        x[y] -= self.lvals[v][e] * xv;
+                    for &(y, a) in self.lcolumn(v) {
+                        x[y] -= a * xv;
+                    }
+                }
+                // With etas the final result is dense; without them this fallback
+                // still returns the filtered ascending list, including its tolerance rule.
+                (
+                    if self.etas.is_empty() {
+                        (0..self.m).collect()
+                    } else {
+                        Vec::new()
+                    },
+                    count_l,
+                )
+            } else {
+                (q, count_l)
+            }
+        };
+        if crate::dump::on("lstage") {
+            self.lsnap.borrow_mut().0 = x.clone();
+        }
+        // The sparse L stage drops a node whose value is at or below the tolerance from its list; an eta that makes it nonzero again appends it
+        // at the end (SCAGR7 iteration 173: `0x129aa0` start `[82, 125, 83]` leaves `[82, 49, 125]`).
+        let output_dense = dense_l || (!self.etas.is_empty() && count_l * self.dthr > m);
+        let mut have = Vec::new();
+        if !output_dense {
+            order.retain(|&v| x[v].abs() > R::c(TOL));
+            have.resize(m, false);
+            for &v in &order {
+                have[v] = true;
+            }
+        }
+        // Gather each eta into one buffer; its logical peel is stored in eta.peel.
+        let mut eta_x: Vec<R> = Vec::new();
+        if !self.etas.is_empty() {
+            let netas = self.etas.len();
+            if dense_l || count_l * self.dthr > m {
+                e = self.sum_eta * 2.0 + e;
+            } else {
+                // Sparse eta pass: from the first eta that lists an input position; the list grows by the eta positions that
+                // become nonzero.
+                let mut inlist = vec![false; m];
+                let mut c0 = 0usize;
+                let mut first = netas;
+                for &v in &order {
+                    if x[v].abs() > R::c(TOL) && !inlist[v] {
+                        inlist[v] = true;
+                        c0 += 1;
+                        first = first.min(self.first_eta[v]);
+                    }
+                }
+                let mut xe = x.clone();
+                let mut ee = (netas - first) as f64 * 3.0;
+                for eta in &self.etas[first..] {
+                    ee = eta.ind.len() as f64 * 2.0 + ee;
+                    eta_x.clear();
+                    eta_x.extend(eta.ind.iter().map(|&j| xe[j]));
+                    let mut sv = dot(&eta_x, &eta.val, eta.peel);
+                    if sv.abs() <= R::c(TOL) {
+                        sv = R::ZERO;
+                    } else if !inlist[eta.idx] {
+                        inlist[eta.idx] = true;
+                        c0 += 1;
+                    }
+                    xe[eta.idx] = sv;
+                }
+                e = ee + 3.0 * c0 as f64 + e;
+            }
+        }
+        for eta in &self.etas {
+            eta_x.clear();
+            eta_x.extend(eta.ind.iter().map(|&j| x[j]));
+            let mut s = dot(&eta_x, &eta.val, eta.peel);
+            if s.abs() <= R::c(TOL) {
+                s = R::ZERO;
+            }
+            if !output_dense && !have[eta.idx] && s != R::ZERO {
+                order.push(eta.idx);
+                have[eta.idx] = true;
+            }
+            x[eta.idx] = s;
+        }
+        if crate::dump::on("lstage") {
+            self.lsnap.borrow_mut().1 = x.clone();
+        }
+        // A dense vector goes on as the raw array: the reference keeps the sub-tolerance residues of the L and eta stages.
+        if output_dense {
+            return (
+                (0..m)
+                    .filter(|&v| x[v] != R::ZERO)
+                    .map(|v| (v, x[v]))
+                    .collect(),
+                count_l,
+                e,
+            );
+        }
+        (
+            order
+                .into_iter()
+                .filter(|&v| x[v].abs() > R::c(TOL))
+                .map(|v| (v, x[v]))
+                .collect(),
+            count_l,
+            e,
+        )
+    }
+
+    #[cfg(test)]
+    fn frozen_lstage_num(
+        &self,
+        rows: &[usize],
+        vals: &[R],
+        force_dense: bool,
+    ) -> (Vec<(usize, R)>, usize, f64) {
+        let lcols: Vec<Vec<usize>> = self
+            .lcolumns()
+            .map(|c| c.iter().map(|e| e.0).collect())
+            .collect();
+        let lvals: Vec<Vec<R>> = self
+            .lcolumns()
+            .map(|c| c.iter().map(|e| e.1).collect())
+            .collect();
+        let m = self.m;
+        let mut e = 0.0f64;
+        let dense_l = rows.len() * self.dthr > self.m || force_dense || self.lev_dense_ft;
+        let mut x = vec![R::ZERO; self.m];
+        let mut start: Vec<usize> = if dense_l {
+            Vec::new()
+        } else {
+            Vec::with_capacity(rows.len())
+        };
+        for (&r, &v) in rows.iter().zip(vals) {
+            let s = self.perm[r];
+            x[s] += v;
+            if !dense_l {
+                start.push(s);
+            }
+        }
+        let (mut order, count_l) = if dense_l {
+            // Dense L solve (`0x12bd30`): every node in ascending order; the list handed on is the ascending scan.
+            e = m as f64 + rows.len() as f64 * 2.0 + e;
+            e = (m - self.loff) as f64 * 2.0 + self.n1 as f64 + self.n1 as f64 + e;
+            for v in 0..self.m {
+                let xv = x[v];
+                if xv.abs() <= R::c(TOL) {
+                    continue;
+                }
+                e = lcols[v].len() as f64 * 2.0 + e;
+                for (e, &y) in lcols[v].iter().enumerate() {
+                    x[y] -= lvals[v][e] * xv;
+                }
+            }
+            let count_l = (0..self.m).filter(|&v| x[v].abs() > R::c(TOL)).count();
+            (Vec::new(), count_l)
+        } else if let Some(lev) = &self.levels {
+            // Level-bucket L solve: nodes are taken level by level, each level in insertion order (inputs first, then the
+            // nodes reached from lower levels); values below the tolerance are dropped without propagating.
+            let maxlev = lev.iter().copied().max().unwrap_or(0);
+            let mut buckets: Vec<Vec<usize>> = vec![Vec::new(); maxlev + 1];
+            let mut active = vec![false; self.m];
+            let mut l = usize::MAX;
+            for &v in &start {
+                if !active[v] {
+                    active[v] = true;
+                    buckets[lev[v]].push(v);
+                    l = l.min(lev[v]);
+                }
+            }
+            let mut remaining: usize = buckets.iter().map(Vec::len).sum();
+            let mut out: Vec<usize> = Vec::new();
+            while remaining > 0 && l <= maxlev {
+                let mut i = 0;
+                while i < buckets[l].len() {
+                    let v = buckets[l][i];
+                    i += 1;
+                    remaining -= 1;
+                    let xv = x[v];
+                    if xv.abs() >= R::c(TOL) {
+                        out.push(v);
+                        for (e, &y) in lcols[v].iter().enumerate() {
+                            if !active[y] {
+                                active[y] = true;
+                                buckets[lev[y]].push(y);
+                                remaining += 1;
+                            }
+                            x[y] -= lvals[v][e] * xv;
+                        }
+                    } else {
+                        x[v] = R::ZERO;
+                    }
+                }
+                l += 1;
+            }
+            let n = out.len();
+            e = ((self.nnz_l + m + 2 * m) as f64 * 5.0 * n as f64) / (m + 1) as f64 + e;
+            (out, n)
+        } else {
+            let q = self.kahn(&start);
+            let x0 = x.clone();
+            for &v in &q {
+                let xv = x[v];
+                // The sparse L solve drops a node at or below the tolerance without keeping or propagating it.
+                if xv.abs() <= R::c(TOL) {
+                    x[v] = R::ZERO;
+                    continue;
+                }
+                for (e, &y) in lcols[v].iter().enumerate() {
+                    x[y] -= lvals[v][e] * xv;
+                }
+            }
+            let count_l = q.iter().filter(|&&v| x[v].abs() > R::c(TOL)).count();
+            let d = m - self.loff;
+            let nnz_tail = self.nnz_l_tail;
+            if !(d < 6 || 10 * d * d <= m || nnz_tail <= 10 * d) {
+                // Third strategy of `0x12a990`: the head columns (below `loff`) in Kahn order, then the tail by an ascending
+                // scan from the lowest tail index reached by an input or by a kept head node.
+                let loff = self.loff;
+                let head_cnt = q
+                    .iter()
+                    .filter(|&&v| v < loff && x[v].abs() > R::c(TOL))
+                    .count();
+                let mut lo = m;
+                for &v in &start {
+                    if v >= loff {
+                        lo = lo.min(v);
+                    }
+                }
+                for &v in q.iter().filter(|&&v| v < loff && x[v].abs() > R::c(TOL)) {
+                    for &y in &lcols[v] {
+                        if y >= loff {
+                            lo = lo.min(y);
+                        }
+                    }
+                }
+                let nnz_head = self.nnz_l - nnz_tail;
+                let e1 = (((nnz_head + 2 * d) as f64) * 7.0 * head_cnt as f64) / (loff + 1) as f64;
+                let mut e2 = (m - lo) as f64 * 2.0 + e1;
+                for v in lo..m {
+                    if x[v].abs() > R::c(TOL) {
+                        e2 += lcols[v].len() as f64 * 2.0;
+                    }
+                }
+                e = e2 + e;
+            } else {
+                e = (((self.nnz_l + m) as f64 + m as f64 + m as f64) * 7.0 * count_l as f64)
+                    / (m + 1) as f64
+                    + e;
+            }
+            if m >= 250 && count_l * self.dthr > m {
+                // The reference's result is then dense and equals an ascending scan (PILOT4 call 219); the switch condition is
+                // inferred from the data, not read from `0x12a990`.
+                x = x0;
+                for v in 0..self.m {
+                    let xv = x[v];
+                    if xv.abs() <= R::c(TOL) {
+                        continue;
+                    }
+                    for (e, &y) in lcols[v].iter().enumerate() {
+                        x[y] -= lvals[v][e] * xv;
                     }
                 }
                 // With etas the final result is dense; without them this fallback
@@ -1578,7 +1843,7 @@ impl<R: Real> RefStruct<R> {
         if bs {
             crate::dump::emit(
                 "bsolve",
-                serde_json::json!({"l": jv(&x_l), "tail_done": jv(&x_t), "x": jv(&x), "tail": tail, "kind": self.kind, "slot": self.slot, "diag": jv(&self.diag), "u_dense": u_dense, "uc": ju(&self.uc), "lcols": self.lcols, "lvals": jn(&self.lvals), "perm": self.perm, "rows": rows, "vals": jv(&vals)}),
+                serde_json::json!({"l": jv(&x_l), "tail_done": jv(&x_t), "x": jv(&x), "tail": tail, "kind": self.kind, "slot": self.slot, "diag": jv(&self.diag), "u_dense": u_dense, "uc": ju(&self.uc), "lcols": self.lcolumns().map(|c| c.iter().map(|e| e.0).collect::<Vec<_>>()).collect::<Vec<_>>(), "lvals": self.lcolumns().map(|c| c.iter().map(|e| e.1.to_f64()).collect::<Vec<_>>()).collect::<Vec<_>>(), "perm": self.perm, "rows": rows, "vals": jv(&vals)}),
             );
         }
         // A dense result (the reference's `-1` count) is scanned by position index; a sparse one comes in the U solve's order.
@@ -1715,7 +1980,7 @@ impl<R: Real> RefStruct<R> {
         if bs {
             crate::dump::emit(
                 "bsolve",
-                serde_json::json!({"l": jv(&x_l), "tail_done": jv(&x_t), "x": jv(&x), "tail": tail, "kind": self.kind, "slot": self.slot, "diag": jv(&self.diag), "u_dense": u_dense, "uc": ju(&self.uc), "lcols": self.lcols, "lvals": jn(&self.lvals), "perm": self.perm, "rows": rows, "vals": jv(&vals)}),
+                serde_json::json!({"l": jv(&x_l), "tail_done": jv(&x_t), "x": jv(&x), "tail": tail, "kind": self.kind, "slot": self.slot, "diag": jv(&self.diag), "u_dense": u_dense, "uc": ju(&self.uc), "lcols": self.lcolumns().map(|c| c.iter().map(|e| e.0).collect::<Vec<_>>()).collect::<Vec<_>>(), "lvals": self.lcolumns().map(|c| c.iter().map(|e| e.1.to_f64()).collect::<Vec<_>>()).collect::<Vec<_>>(), "perm": self.perm, "rows": rows, "vals": jv(&vals)}),
             );
         }
         // A dense result (the reference's `-1` count) is scanned by position index; a sparse one comes in the U solve's order.
@@ -1784,15 +2049,7 @@ impl<R: Real> RefStruct<R> {
     /// `(nucleus list length, first tail slot, dens)`; for diagnostics against the reference's `i3`, `i21` and `(hdr33+hdr34)^2`.
     /// The fresh factor's numerics for the `luout` dump: the diagonal and each position's L column `(position, value)`.
     pub fn numerics(&self) -> (&[R], Vec<Vec<(usize, R)>>) {
-        let l = (0..self.m)
-            .map(|v| {
-                self.lcols[v]
-                    .iter()
-                    .copied()
-                    .zip(self.lvals[v].iter().copied())
-                    .collect()
-            })
-            .collect();
+        let l = self.lcolumns().map(|c| c.to_vec()).collect();
         (&self.diag, l)
     }
 
@@ -2093,7 +2350,7 @@ impl<R: Real> RefStruct<R> {
                     let (lev, maxlev) = self.lt_levels.get_or_init(|| {
                         let mut lev = vec![0usize; m];
                         for v in (0..m).rev() {
-                            for &y in &self.lcols[v] {
+                            for &(y, _) in self.lcolumn(v) {
                                 lev[v] = lev[v].max(lev[y] + 1);
                             }
                         }
@@ -2322,9 +2579,9 @@ impl<R: Real> RefStruct<R> {
             if xv.abs() <= R::c(TOL) {
                 continue;
             }
-            e = self.lcols[v].len() as f64 * 2.0 + e;
-            for (k, &y) in self.lcols[v].iter().enumerate() {
-                x[y] -= self.lvals[v][k] * xv;
+            e = self.lcolumn(v).len() as f64 * 2.0 + e;
+            for &(y, a) in self.lcolumn(v) {
+                x[y] -= a * xv;
             }
         }
         if !self.etas.is_empty() {
@@ -3460,6 +3717,182 @@ mod dense_tail_tests {
 
     #[test]
     fn dense_tail_matches_frozen_ftran() {
+        cases::<f64>(|v| (v.to_bits(), 0));
+        cases::<crate::f80::F80>(|v| v.repr());
+    }
+}
+
+#[cfg(test)]
+mod forward_l_tests {
+    use super::*;
+
+    fn factor<R: Real>(m: usize) -> RefStruct<R> {
+        let size = m.max(1);
+        let cols: Vec<_> = (0..size).map(|i| (true, vec![i], vec![1.0])).collect();
+        let st = crate::lu_order::factor_structure_r::<R>(size, &cols);
+        let mut f = RefStruct::fresh(size, size, &st, &cols);
+        f.m = m;
+        f.loff = 0;
+        f.n1 = 0;
+        f.lev_dense_ft = false;
+        f.lstart.truncate(m + 1);
+        f
+    }
+
+    fn store<R: Real>(f: &mut RefStruct<R>, columns: Vec<Vec<(usize, R)>>) {
+        f.lstart.clear();
+        f.lentries.clear();
+        f.lstart.push(0);
+        for col in columns {
+            f.lentries.extend(col);
+            f.lstart.push(f.lentries.len());
+        }
+    }
+
+    fn check<R: Real>(
+        f: &RefStruct<R>,
+        r0: &[usize],
+        v0: &[R],
+        r1: &[usize],
+        v1: &[R],
+        bits: impl Fn(R) -> (u64, u16) + Copy,
+    ) {
+        let encode =
+            |v: Vec<(usize, R)>| v.into_iter().map(|(i, v)| (i, bits(v))).collect::<Vec<_>>();
+        for dense in [false, true] {
+            for (rows, vals) in [(r0, v0), (r1, v1)] {
+                let old = f.frozen_lstage_num(rows, vals, dense);
+                let new = f.lstage_num(rows, vals, dense);
+                assert_eq!(encode(old.0), encode(new.0));
+                assert_eq!(old.1, new.1);
+                assert_eq!(old.2.to_bits(), new.2.to_bits());
+            }
+        }
+    }
+
+    fn cases<R: Real>(bits: impl Fn(R) -> (u64, u16) + Copy) {
+        let mut seed = 0x564af2783u64;
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        let values = [
+            0.0,
+            -0.0,
+            1.0,
+            -1.0,
+            0.125,
+            -0.25,
+            TOL,
+            -TOL,
+            f64::from_bits(1),
+            -f64::MIN_POSITIVE,
+            1e-200,
+            1e200,
+            f64::MAX,
+            -f64::MAX,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::from_bits(0x7ff8_0000_0000_0123),
+        ];
+        for m in [0, 1, 2, 7, 31] {
+            for round in 0..32 {
+                let sample_len = if round < 16 { 8 } else { values.len() };
+                let mut f = factor::<R>(m);
+                for i in (1..m).rev() {
+                    f.perm.swap(i, next() as usize % (i + 1));
+                }
+                let mut columns = vec![Vec::new(); m];
+                for v in 0..m {
+                    for y in v + 1..m {
+                        if next() % 3 == 0 {
+                            columns[v].push((y, R::c(values[next() as usize % sample_len])));
+                        }
+                    }
+                }
+                store(&mut f, columns);
+                if m > 0 {
+                    for k in 0..round % 4 {
+                        let ind: Vec<_> = (0..m).filter(|_| next() % 2 == 0).collect();
+                        let val: Vec<_> = ind
+                            .iter()
+                            .map(|_| R::c(values[next() as usize % sample_len]))
+                            .collect();
+                        f.sum_eta += ind.len() as f64;
+                        f.etas.push(Eta {
+                            idx: next() as usize % m,
+                            ind,
+                            val,
+                            peel: k % 2,
+                        });
+                    }
+                }
+                let r0: Vec<_> = (0..m + round % (m + 1))
+                    .map(|_| next() as usize % m)
+                    .collect();
+                let r1: Vec<_> = (0..round % (2 * m + 1))
+                    .map(|_| next() as usize % m)
+                    .collect();
+                let v0: Vec<_> = r0
+                    .iter()
+                    .map(|_| R::c(values[next() as usize % sample_len]))
+                    .collect();
+                let v1: Vec<_> = r1
+                    .iter()
+                    .map(|_| R::c(values[next() as usize % sample_len]))
+                    .collect();
+                check(&f, &r0, &v0, &r1, &v1, bits);
+            }
+        }
+        let captured: serde_json::Value =
+            serde_json::from_str(include_str!("../tests/fixtures/ftran_l_captured.json")).unwrap();
+        for rec in captured.as_array().unwrap() {
+            let mut f = factor::<R>(rec["perm"].as_array().unwrap().len());
+            f.perm = serde_json::from_value(rec["perm"].clone()).unwrap();
+            let rows_l: Vec<Vec<usize>> = serde_json::from_value(rec["lcols"].clone()).unwrap();
+            let columns: Vec<Vec<(usize, R)>> = rows_l
+                .into_iter()
+                .zip(rec["lvals"].as_array().unwrap())
+                .map(|(rows, vals)| {
+                    rows.into_iter()
+                        .zip(vals.as_array().unwrap())
+                        .map(|(r, v)| (r, R::c(v.as_f64().unwrap())))
+                        .collect()
+                })
+                .collect();
+            store(&mut f, columns);
+            let rows: Vec<usize> = serde_json::from_value(rec["rows"].clone()).unwrap();
+            let vals: Vec<_> = rec["vals"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| R::c(v.as_f64().unwrap()))
+                .collect();
+            // SC50A dual-release BSOLVE arrays from the validated parent, capped at two iterations.
+            if !R::QUAD {
+                let mut raw = vec![0.0; f.m];
+                for (i, v) in f.frozen_lstage_num(&rows, &vals, true).0 {
+                    raw[i] = v.to_f64();
+                }
+                let captured: Vec<_> = rec["l"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.as_f64().unwrap().to_bits())
+                    .collect();
+                assert_eq!(
+                    raw.iter().map(|v| v.to_bits()).collect::<Vec<_>>(),
+                    captured
+                );
+            }
+            check(&f, &rows, &vals, &rows, &vals, bits);
+        }
+    }
+
+    #[test]
+    fn forward_columns_match_frozen_l() {
         cases::<f64>(|v| (v.to_bits(), 0));
         cases::<crate::f80::F80>(|v| v.repr());
     }
