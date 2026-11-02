@@ -1689,6 +1689,7 @@ impl<'a> Solver<'a> {
         Vec<usize>,
         crate::lu_order::Structure,
         Vec<(bool, Vec<usize>, Vec<f64>)>,
+        Option<crate::ftran_order::RefStruct>,
     ) {
         reference_order_for(self.p, &self.basic, fac_no, self.growth_limit(), "luin")
     }
@@ -1819,7 +1820,7 @@ impl<'a> Solver<'a> {
                 self.refactorizations + 1
             };
             let mut gate0 = crate::lu_order::gate_get();
-            let (mut order, mut st, mut rows) = self.reference_order(fac_no);
+            let (mut order, mut st, mut rows, mut growth_factor) = self.reference_order(fac_no);
             if order.len() < self.basic.len()
                 && self.handoff.map_or(self.restarts, |h| h.retries) >= 5
                 && !self.repaired
@@ -1834,7 +1835,7 @@ impl<'a> Solver<'a> {
                 }
                 self.repair_in_place(&st);
                 gate0 = crate::lu_order::gate_get();
-                (order, st, rows) = self.reference_order(fac_no);
+                (order, st, rows, growth_factor) = self.reference_order(fac_no);
             }
             if crate::dump::on("luin") {
                 crate::dump::emit(
@@ -1898,9 +1899,9 @@ impl<'a> Solver<'a> {
                     self.mirror_q = Some(rhs);
                     Mir::Q(main)
                 } else {
-                    Mir::D(crate::ftran_order::RefStruct::fresh(
-                        self.p.m, self.p.n, &st, &rows,
-                    ))
+                    Mir::D(growth_factor.unwrap_or_else(|| {
+                        crate::ftran_order::RefStruct::fresh(self.p.m, self.p.n, &st, &rows)
+                    }))
                 };
                 if crate::dump::on("luout") {
                     let (diag, l) = mi.numerics();
@@ -5426,6 +5427,7 @@ fn reference_order_for(
     Vec<usize>,
     crate::lu_order::Structure,
     Vec<(bool, Vec<usize>, Vec<f64>)>,
+    Option<crate::ftran_order::RefStruct>,
 ) {
     let cols: Vec<(bool, Vec<usize>, Vec<f64>)> = basic
         .iter()
@@ -5442,6 +5444,7 @@ fn reference_order_for(
         crate::lu_order::set_factorization_number(fac_no);
         let st = crate::lu_order::factor_structure(p.m, &cols);
         let order: Vec<usize> = st.pivots.iter().map(|&(_, pos)| basic[pos]).collect();
+        let mut growth_factor = None;
         if let Some(limit) = grow {
             let thr = crate::lu_order::threshold();
             if order.len() == p.m && thr < 0.9 {
@@ -5467,9 +5470,12 @@ fn reference_order_for(
                     crate::lu_order::set_threshold(if thr < 0.5 { 0.5 } else { 0.9 });
                     continue;
                 }
+                // fresh has no diagnostic or thread-local side effects. The accepted
+                // factor is identical to the one the caller would build for installation.
+                growth_factor = Some(mi);
             }
         }
-        return (order, st, cols);
+        return (order, st, cols, growth_factor);
     }
 }
 
@@ -5787,7 +5793,7 @@ fn solve_primal(
         crate::lu_order::set_threshold(handoff.unwrap().thr);
         crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
         let gate = crate::lu_order::gate_get();
-        let (order, st, rows) = reference_order_for(
+        let (order, st, rows, growth_factor) = reference_order_for(
             &p,
             &basis.basic,
             1,
@@ -5810,7 +5816,7 @@ fn solve_primal(
             PRIMAL_START_SINGULAR.with(|c| c.set(true));
             return Err(SolveError::SingularBasis);
         }
-        Some((gate, order, st, rows))
+        Some((gate, order, st, rows, growth_factor))
     } else {
         None
     };
@@ -5824,7 +5830,7 @@ fn solve_primal(
     let cols: Vec<Column> = initial_order
         .as_ref()
         .filter(|_| start_factor_in_reference_order)
-        .map(|(_, order, _, _)| order)
+        .map(|(_, order, _, _, _)| order)
         .unwrap_or(&basis.basic)
         .iter()
         .map(|&j| p.cols[j].clone())
@@ -5833,7 +5839,7 @@ fn solve_primal(
     // singularity test. Build the auxiliary factor with those same pivots:
     // its independent sparse ordering can create a much smaller pivot and
     // incorrectly reject a basis accepted by the reference.
-    let factor = if let Some((_, _, st, _)) = initial_order
+    let factor = if let Some((_, _, st, _, _)) = initial_order
         .as_ref()
         .filter(|_| start_factor_in_reference_order)
     {
@@ -5866,7 +5872,7 @@ fn solve_primal(
             }
             crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
             let gate = crate::lu_order::gate_get();
-            let (order, st, rows) = reference_order_for(
+            let (order, st, rows, growth_factor) = reference_order_for(
                 &p,
                 &basis.basic,
                 1,
@@ -5889,7 +5895,7 @@ fn solve_primal(
                 &st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(),
             )
             .map_err(|_| SolveError::SingularBasis)?;
-            initial_order = Some((gate, order, st, rows));
+            initial_order = Some((gate, order, st, rows, growth_factor));
             start_factor_in_reference_order = true;
             factor
         }
@@ -6058,7 +6064,7 @@ fn solve_primal(
     // The starting factorization's work, which the reference counts after its first refactorization check.
     let mut lu_work = Vec::new();
     if opts.faithful_ftran && opts.faithful_positions {
-        let (gate0, order, st, rows) = if let Some(initial) = initial_order {
+        let (gate0, order, st, rows, growth_factor) = if let Some(initial) = initial_order {
             initial
         } else {
             // A singular supplied-basis factorization is a pairing attempt,
@@ -6080,7 +6086,7 @@ fn solve_primal(
             }
             crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
             let gate = crate::lu_order::gate_get();
-            let (order, st, rows) =
+            let (order, st, rows, growth_factor) =
                 reference_order_for(s.p, &s.basic, 1, s.growth_limit(), "lustart");
             if crate::dump::on("lustart") {
                 crate::dump::emit(
@@ -6088,7 +6094,7 @@ fn solve_primal(
                     serde_json::json!({"cols": s.basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "primal": true, "thr": crate::lu_order::threshold()}),
                 );
             }
-            (gate, order, st, rows)
+            (gate, order, st, rows, growth_factor)
         };
         for (pos, &j) in order.iter().enumerate() {
             s.pos_of[j] = pos;
@@ -6099,9 +6105,9 @@ fn solve_primal(
             s.mirror_q = Some(rhs);
             s.mirror = Some(Mir::Q(main));
         } else {
-            s.mirror = Some(Mir::D(crate::ftran_order::RefStruct::fresh(
-                m, n, &st, &rows,
-            )));
+            s.mirror = Some(Mir::D(growth_factor.unwrap_or_else(|| {
+                crate::ftran_order::RefStruct::fresh(m, n, &st, &rows)
+            })));
         }
         let mi = s.mirror.as_ref().unwrap();
         lu_work = st.work(&rows, mi.has_levels());
