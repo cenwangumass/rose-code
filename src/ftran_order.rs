@@ -1028,6 +1028,117 @@ impl<R: Real> RefStruct<R> {
             || self.lev_dense_ft
             || (!self.etas.is_empty() && count_l * self.dthr > self.m);
         let tau_n = if tau_dense { None } else { Some(spike.len()) };
+        // The inline dense joint loop of two dense vectors (`0x128c56..0x129152`) tests the raw value before the quotient: a tail column whose
+        // raw value is at most the tolerance is zeroed even when the quotient exceeds it.
+        // The same holds for the joint routine `0x12c300` (column sparse, tau dense; PILOT.JA call 249): whenever tau does not take the single-vector U stage
+        // (`ok(n2)` of `joint_u` fails), the tail columns test the raw value as well.
+        let joint_dense = !tau_n.is_some_and(|n| {
+            self.nuc.len() + n < self.i21 || self.dens * (n as f64) < 2.0 * m as f64
+        });
+        let mut x = vec![R::ZERO; m];
+        let mut touched = vec![false; m];
+        let mut tail: Vec<usize> = Vec::new();
+        for &(p, v) in &spike {
+            x[p] = v;
+            touched[p] = true;
+            if !joint_dense && self.kind[p] == -2 {
+                tail.push(p);
+            }
+        }
+        if joint_dense {
+            // Extra zero columns are zeroed by the joint dense kernel. Reached
+            // columns keep the same descending slot order as the symbolic walk.
+            tail.extend((self.i21..m).rev().map(|s| self.at[s]));
+        } else {
+            let mut k = 0;
+            while k < tail.len() {
+                let c = tail[k];
+                k += 1;
+                for &j in &self.a[c] {
+                    if !touched[j] {
+                        touched[j] = true;
+                        tail.push(j);
+                    }
+                }
+            }
+            self.sort_slot_desc(&mut tail);
+        }
+        let mut tau_raw = vec![false; m];
+        // The U stage `0x123690` solves the tail in one of three loops: the heap walk and the sparse-row loop zero a quotient of at most the tolerance, the dense
+        // slot loop (`0x12403b`: `m <= h33^2 c` or `5 h33^2 t > m - i21`, see `tau_u_work`) stores the quotient and only skips its scatter (FIT2P call 14
+        // keeps a tail value of 4e-16 that enters the row dots of the nucleus positions). A dense input (`tau_dense`) zeroes it (FIT2P call 49), and so does the
+        // joint dense loop (`joint_dense`, fx_e2_r25 call 6: a tail quotient of -1.8e-14 is 0 in the reference).
+        let keep_tiny = !tau_dense && !joint_dense && self.tau_u_dense(&spike);
+        for &c in &tail {
+            tau_raw[c] = x[c].abs() > R::c(TOL);
+            let xc = x[c] / self.diag[c];
+            if joint_dense && !tau_raw[c] {
+                x[c] = R::ZERO;
+                continue;
+            }
+            if xc.abs() <= R::c(TOL) {
+                x[c] = if keep_tiny { xc } else { R::ZERO };
+                continue;
+            }
+            x[c] = xc;
+            for &(j, v) in &self.uc[c] {
+                if self.kind[j] == -2 {
+                    x[j] -= v * xc;
+                }
+            }
+        }
+        self.tau_u.set(self.tau_u_work(&spike, &x, needed.len()));
+        {
+            let mut f = self.f2.borrow_mut();
+            f.tau_n = tau_n;
+            f.x_tau = x.clone();
+            f.tau_raw = tau_raw;
+        }
+        let mut terms = self.tau_terms.borrow_mut();
+        let mut row = self.tau_row.borrow_mut();
+        needed
+            .iter()
+            .map(|&p| {
+                let v = match self.kind[p] {
+                    -2 => x[p],
+                    -1 => x[p] / self.diag[p],
+                    _ => {
+                        terms.clear();
+                        row.prepare(m, &self.ut[p]);
+                        terms.extend(
+                            self.rowl[p]
+                                .iter()
+                                .filter_map(|&c| row.get(c).map(|v| (v, x[c]))),
+                        );
+                        let dot = if R::QUAD {
+                            row_dot_q(x[p], &terms)
+                        } else {
+                            row_dot(x[p], &terms, self.row_par[p] as usize)
+                        };
+                        dot / self.diag[p]
+                    }
+                };
+                (p, v)
+            })
+            .collect()
+    }
+
+    #[cfg(test)]
+    fn frozen_ftran_needed(
+        &self,
+        rows: &[usize],
+        vals: &[R],
+        needed: &[usize],
+        dense_in: bool,
+    ) -> Vec<(usize, R)> {
+        let m = self.m;
+        let (spike, count_l, e_l) = self.lstage_num(rows, vals, dense_in);
+        self.tau_l.set(e_l);
+        let tau_dense = rows.len() * self.dthr > self.m
+            || dense_in
+            || self.lev_dense_ft
+            || (!self.etas.is_empty() && count_l * self.dthr > self.m);
+        let tau_n = if tau_dense { None } else { Some(spike.len()) };
         let mut x = vec![R::ZERO; m];
         let mut touched = vec![false; m];
         let mut tail: Vec<usize> = Vec::new();
@@ -3140,7 +3251,45 @@ mod transpose_tests {
 mod dense_tail_tests {
     use super::*;
 
+    fn check_needed<R: Real>(f: &RefStruct<R>, x: &[R], bits: impl Fn(R) -> (u64, u16)) {
+        let mut prepared = f.clone();
+        prepared.ut = vec![Vec::new(); f.m];
+        prepared.rowl = vec![Vec::new(); f.m];
+        for c in 0..f.m {
+            for &(j, v) in &f.uc[c] {
+                prepared.ut[j].push((c, v));
+            }
+            for &j in f.a[c].iter().chain(&f.b[c]) {
+                prepared.rowl[j].push(c);
+            }
+        }
+        let rows: Vec<_> = (0..x.len()).filter(|&i| x[i] != R::ZERO).collect();
+        let vals: Vec<_> = rows.iter().map(|&i| x[i]).collect();
+        let needed: Vec<_> = (0..f.m).rev().collect();
+        for dense in [false, true] {
+            let mut old = prepared.clone();
+            old.lev_dense_ft = dense;
+            let new = old.clone();
+            let expected = old.frozen_ftran_needed(&rows, &vals, &needed, dense);
+            let actual = new.ftran_needed(&rows, &vals, &needed, dense);
+            let encode =
+                |v: Vec<(usize, R)>| v.into_iter().map(|(i, v)| (i, bits(v))).collect::<Vec<_>>();
+            assert_eq!(encode(actual), encode(expected));
+            assert_eq!(new.tau_l.get().to_bits(), old.tau_l.get().to_bits());
+            assert_eq!(new.tau_u.get().to_bits(), old.tau_u.get().to_bits());
+            let a = new.f2.borrow();
+            let b = old.f2.borrow();
+            assert_eq!(a.tau_n, b.tau_n);
+            assert_eq!(a.tau_raw, b.tau_raw);
+            assert_eq!(
+                a.x_tau.iter().copied().map(&bits).collect::<Vec<_>>(),
+                b.x_tau.iter().copied().map(&bits).collect::<Vec<_>>()
+            );
+        }
+    }
+
     fn check<R: Real>(f: &RefStruct<R>, x: &[R], bits: impl Fn(R) -> (u64, u16)) {
+        check_needed(f, x, &bits);
         let rows: Vec<_> = (0..x.len()).filter(|&i| x[i] != R::ZERO).collect();
         let vals: Vec<_> = rows.iter().map(|&i| x[i]).collect();
         let mut old = f.clone();
