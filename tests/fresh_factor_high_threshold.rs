@@ -15,5 +15,8 @@ fn fresh_factor_high_threshold_rejection() {
         at_upper: vec![false; n + m],
     };
     let r = solve(&model, Some(&basis), &SolveOptions::release()).unwrap();
-    assert_eq!((r.status, r.iterations, r.objective.to_bits()), (Status::Optimal, 11, 0xc00a661bb72c889e));
+    assert_eq!(
+        (r.status, r.iterations, r.objective.to_bits()),
+        (Status::Optimal, 11, 0xc00a661bb72c889e)
+    );
 }

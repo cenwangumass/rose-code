@@ -8,12 +8,17 @@ fn bits(v: &[f64]) -> Vec<u64> {
 }
 
 fn floats(v: &serde_json::Value) -> Vec<f64> {
-    v.as_array().unwrap().iter().map(|x| x.as_f64().unwrap()).collect()
+    v.as_array()
+        .unwrap()
+        .iter()
+        .map(|x| x.as_f64().unwrap())
+        .collect()
 }
 
 #[test]
 fn dstart_runs_agree_with_the_reference() {
-    let reference: serde_json::Value = serde_json::from_str(include_str!("fixtures/dual_start_reference.json")).unwrap();
+    let reference: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/dual_start_reference.json")).unwrap();
     let mut checked = 0;
     for case in reference.as_array().unwrap() {
         let name = case["model"].as_str().unwrap();
@@ -24,17 +29,33 @@ fn dstart_runs_agree_with_the_reference() {
             other => panic!("{other}"),
         };
         let model = mps::parse(text).unwrap();
-        let mut o = if case["profile"] == "release" { SolveOptions::dual_release() } else { SolveOptions::dual() };
+        let mut o = if case["profile"] == "release" {
+            SolveOptions::dual_release()
+        } else {
+            SolveOptions::dual()
+        };
         let y = case["dstart"].as_f64().unwrap();
         o.dstart = Some(vec![y; model.num_rows()]);
         let r = solve(&model, None, &o).unwrap();
         let tag = format!("{name} DStart {y}");
         assert_eq!(r.status, Status::Optimal, "{tag}");
-        assert_eq!(r.iterations as u64, case["iters"].as_u64().unwrap(), "{tag}: iterations");
-        assert_eq!(r.objective.to_bits(), case["obj"].as_f64().unwrap().to_bits(), "{tag}: objective");
+        assert_eq!(
+            r.iterations as u64,
+            case["iters"].as_u64().unwrap(),
+            "{tag}: iterations"
+        );
+        assert_eq!(
+            r.objective.to_bits(),
+            case["obj"].as_f64().unwrap().to_bits(),
+            "{tag}: objective"
+        );
         assert_eq!(bits(&r.x), bits(&floats(&case["x"])), "{tag}: x");
         assert_eq!(bits(&r.dual), bits(&floats(&case["pi"])), "{tag}: pi");
-        assert_eq!(bits(&r.reduced_cost), bits(&floats(&case["rc"])), "{tag}: rc");
+        assert_eq!(
+            bits(&r.reduced_cost),
+            bits(&floats(&case["rc"])),
+            "{tag}: rc"
+        );
         checked += 1;
     }
     assert_eq!(checked, 12);

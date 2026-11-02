@@ -32,10 +32,20 @@ fn controlled_dual_primal_end_refactors_a_fresh_factor_once() {
 fn quad_dual_reads_out_the_long_double_duals() {
     // `fx_witness_dual_persistent_shift_71000` (dual-release, ill-conditioned basis, entries up to 4e6): the quad dual's `pi` is the long-double `y` of the reduced-cost
     // recompute; the double BTRAN gave duals 0.035% off the reference (and a reduced-cost error of 2e5 in the independent check).
-    let model = mps::parse(include_str!("fixtures/fx_witness_dual_persistent_shift_71000.mps")).unwrap();
+    let model = mps::parse(include_str!(
+        "fixtures/fx_witness_dual_persistent_shift_71000.mps"
+    ))
+    .unwrap();
     let r = solve(&model, None, &SolveOptions::dual_release()).unwrap();
     assert_eq!((r.status, r.iterations), (Status::Optimal, 75));
-    let pi = [727987659993.3921, -435.33547769125465, -18199685.544660836, -243054.8584814422, 1213314820.2932222, 3253.7126029372016];
+    let pi = [
+        727987659993.3921,
+        -435.33547769125465,
+        -18199685.544660836,
+        -243054.8584814422,
+        1213314820.2932222,
+        3253.7126029372016,
+    ];
     assert_eq!(r.dual, pi);
 }
 
@@ -44,16 +54,30 @@ fn quad_dual_reads_out_the_long_double_duals() {
 fn mode_two_pricing_switch_reaches_the_reference_objective() {
     // `witness_dual_r2_mode_switch` (300 SC50A blocks): the reference switches the Devex mode 1 -> 2 at iteration 6011 (`0xf7bb2`, P50/P58 = 31999/97798) and ends
     // Optimal after 11393 iterations at -19372.523117569304; decisions agree on all 11395 pricing calls.
-    let text = std::fs::read_to_string("../reverse-engineer/corpus/fixtures/witness_dual_r2_mode_switch.mps").unwrap();
-    let r = solve(&mps::parse(&text).unwrap(), None, &SolveOptions::dual_release()).unwrap();
-    assert_eq!((r.status, r.iterations, r.objective), (Status::Optimal, 11393, -19372.523117569304));
+    let text = std::fs::read_to_string(
+        "../reverse-engineer/corpus/fixtures/witness_dual_r2_mode_switch.mps",
+    )
+    .unwrap();
+    let r = solve(
+        &mps::parse(&text).unwrap(),
+        None,
+        &SolveOptions::dual_release(),
+    )
+    .unwrap();
+    assert_eq!(
+        (r.status, r.iterations, r.objective),
+        (Status::Optimal, 11393, -19372.523117569304)
+    );
 }
 
 /// `witness_structural_r10_lower_cutoff` (dual-release, cold start): the multipliers are the reference btran's, not the plain factor solve's; the last two differ
 /// from the exact values by one ulp of the scaled 40000-sized intermediate (reference Pi = -4999.5, -1, 5001.499999999999, -0.9999999999990905).
 #[test]
 fn r10_final_multipliers_follow_the_reference_btran() {
-    let model = mps::parse(include_str!("fixtures/witness_structural_r10_lower_cutoff.mps")).unwrap();
+    let model = mps::parse(include_str!(
+        "fixtures/witness_structural_r10_lower_cutoff.mps"
+    ))
+    .unwrap();
     let r = solve(&model, None, &SolveOptions::dual_release()).unwrap();
     assert_eq!((r.status, r.iterations), (Status::Optimal, 3));
     let want = [-4999.5, -1.0, 5001.499999999999, -0.9999999999990905f64];

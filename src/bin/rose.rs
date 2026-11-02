@@ -261,7 +261,11 @@ fn run_barrier(model: &rose::LpModel, opts: &SolveOptions, output: Option<String
     };
     let have_point = matches!(r.status, Status::Optimal);
     // Cutoff and stalled status 13 return the saved best iterate.
-    let have_vectors = have_point || (matches!(r.status, Status::Suboptimal | Status::Cutoff | Status::Interrupted) && r.objective.is_finite());
+    let have_vectors = have_point
+        || (matches!(
+            r.status,
+            Status::Suboptimal | Status::Cutoff | Status::Interrupted
+        ) && r.objective.is_finite());
     let rep = have_point.then(|| verify::check_optimal(model, &r));
     let structure = rose::order::structure(model, rose::order::DENSE_COL_MIN).ok();
     eprintln!(

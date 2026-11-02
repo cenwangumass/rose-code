@@ -569,7 +569,12 @@ fn record_quad_progress(record: QuadProgressRecord) {
 }
 
 /// The x87 progress predicate reads the saved sum before recomputing it.
-fn primal_progress_stalled(prev: f64, sum: f64, old_obj: Option<f64>, new_obj: Option<f64>) -> bool {
+fn primal_progress_stalled(
+    prev: f64,
+    sum: f64,
+    old_obj: Option<f64>,
+    new_obj: Option<f64>,
+) -> bool {
     if prev > 1e-7 {
         use crate::f80::F80;
         !(F80::from_f64(sum) - F80::from_f64(prev) < F80::from_f64(-1e-13))
@@ -586,10 +591,20 @@ fn primal_progress_stalled(prev: f64, sum: f64, old_obj: Option<f64>, new_obj: O
 fn progress_uses_previous_infeasibility() {
     // Native standalone 5959: the first x87 check sees this double-progress
     // sum and replaces it with zero; the counter stays at zero.
-    assert!(!primal_progress_stalled(2.034581090761116e16, 0.0, Some(0.0), Some(1.0)));
+    assert!(!primal_progress_stalled(
+        2.034581090761116e16,
+        0.0,
+        Some(0.0),
+        Some(1.0)
+    ));
     // Native 5371: the last dual recompute leaves zero, so this check uses
     // the objective. A positive fresh sum exercises the branch boundary.
-    assert!(primal_progress_stalled(0.0, 1.0, Some(221699549.95117602), Some(268371380.61310527)));
+    assert!(primal_progress_stalled(
+        0.0,
+        1.0,
+        Some(221699549.95117602),
+        Some(268371380.61310527)
+    ));
 }
 
 #[cfg(test)]
@@ -601,19 +616,47 @@ fn restored_x87_primal_selects_native_initial_mode() {
     let scaling = crate::scale::compute(&model);
     let scaled = scaling.apply(&model).unwrap();
     // Native x87_dw scan 165: the restored basis at the first outer scan.
-    let basis = Basis { basic: vec![17,19,22,3,12,11,6,1,10], at_upper: vec![false; 26] };
+    let basis = Basis {
+        basic: vec![17, 19, 22, 3, 12, 11, 6, 1, 10],
+        at_upper: vec![false; 26],
+    };
     let mut opts = SolveOptions::release();
     opts.pricing0 = false;
     opts.scaling = false;
     opts.scaled = true;
     opts.obj_scale = scaling.obj;
     opts.max_iterations = 0;
-    opts.sw_carry = Some(SwCarry { iters: 0.0, degenerate: 0, snap_degenerate: 0, snap_iters: 0.0, factorizations: 0, level: 0, pert: 0.0 });
+    opts.sw_carry = Some(SwCarry {
+        iters: 0.0,
+        degenerate: 0,
+        snap_degenerate: 0,
+        snap_iters: 0.0,
+        factorizations: 0,
+        level: 0,
+        pert: 0.0,
+    });
     for (c35c, c178, expected) in [(2, 4, 2), (3, 5, 1)] {
         crate::dual::C35C.with(|c| c.set(c35c));
         QUAD_EEFA.with(|c| c.set(false));
         QUAD_MODE_TEST.with(|c| c.set(None));
-        let handoff = Handoff { stale: None, working_obj: None, nref0: 0, thr: 0.5, retries: 5, pert: false, pair_tol: 1e-6, quad: true, dual_level: 0, shifted_exit: false, iters: 0.0, pricing_iters: 0.0, snap: 0.0, c178, preserve_ratio: false, excl: None };
+        let handoff = Handoff {
+            stale: None,
+            working_obj: None,
+            nref0: 0,
+            thr: 0.5,
+            retries: 5,
+            pert: false,
+            pair_tol: 1e-6,
+            quad: true,
+            dual_level: 0,
+            shifted_exit: false,
+            iters: 0.0,
+            pricing_iters: 0.0,
+            snap: 0.0,
+            c178,
+            preserve_ratio: false,
+            excl: None,
+        };
         solve_primal(&scaled, Some(&basis), &opts, Some(handoff), None).unwrap();
         assert_eq!(QUAD_MODE_TEST.with(|c| c.take()), Some(expected));
     }
@@ -668,8 +711,21 @@ fn quad_progress_carried_objective_and_stall_exit() {
     assert!(result.iterations <= opts.max_iterations);
     let records = QUAD_PROGRESS_TEST.with(|c| c.borrow_mut().take().unwrap());
     let sums = crate::dual::PRIMAL_SUM_TEST.with(|c| c.borrow_mut().take().unwrap());
-    let quad: Vec<_> = sums.iter().filter(|&&(q, _, total, _)| q && total == 92).copied().collect();
-    assert_eq!(quad, vec![(true, 0, 92, 64.00961303710938), (true, 3, 92, 10.569838163778261), (true, 8, 92, 22.89347143524323), (true, 13, 92, 3175.143282988146), (true, 15, 92, 0.0)]);
+    let quad: Vec<_> = sums
+        .iter()
+        .filter(|&&(q, _, total, _)| q && total == 92)
+        .copied()
+        .collect();
+    assert_eq!(
+        quad,
+        vec![
+            (true, 0, 92, 64.00961303710938),
+            (true, 3, 92, 10.569838163778261),
+            (true, 8, 92, 22.89347143524323),
+            (true, 13, 92, 3175.143282988146),
+            (true, 15, 92, 0.0)
+        ]
+    );
     assert!(sums.contains(&(false, 0, 0, 64.00961303710938)));
     let snapshots = crate::dual::PRIMAL_SNAPSHOT_TEST.with(|c| c.borrow_mut().take().unwrap());
     // The first x87 progress check replaces the prior dual snapshot (native
@@ -681,13 +737,22 @@ fn quad_progress_carried_objective_and_stall_exit() {
         assert_eq!(*quality, 2);
     }
     assert!(records.len() >= 51);
-    for (i, &(it, base, total, old, new, calls, stalls, stalled)) in records[..51].iter().enumerate() {
+    for (i, &(it, base, total, old, new, calls, stalls, stalled)) in
+        records[..51].iter().enumerate()
+    {
         assert_eq!(it as f64 + base, 109.0 + 102.0 * i as f64);
         assert_eq!(total, 201.0 + 102.0 * i as f64);
-        let expected_old = if i == 0 { 221699549.95117602_f64 } else { 268371380.61310527_f64 };
+        let expected_old = if i == 0 {
+            221699549.95117602_f64
+        } else {
+            268371380.61310527_f64
+        };
         assert_eq!(old.unwrap().to_bits(), expected_old.to_bits());
         assert_eq!(new.unwrap().to_bits(), 268371380.61310527_f64.to_bits());
-        assert_eq!((calls, stalls, stalled), ((i + 1) as u32, (i + 1) as u32, i == 50));
+        assert_eq!(
+            (calls, stalls, stalled),
+            ((i + 1) as u32, (i + 1) as u32, i == 50)
+        );
     }
 }
 
@@ -1537,7 +1602,10 @@ impl<'a> Solver<'a> {
 
     /// The growth check limit of the double driver (`0xf351d..0xf3629`), `None` for the x87 primal.
     fn growth_limit(&self) -> Option<f64> {
-        growth_limit(self.opts.scaled, self.handoff.as_ref().is_some_and(|h| h.quad))
+        growth_limit(
+            self.opts.scaled,
+            self.handoff.as_ref().is_some_and(|h| h.quad),
+        )
     }
 
     /// The factor of the current basis in extended precision (same column order as the double one), built with the gate state of the double build.
@@ -1668,7 +1736,11 @@ impl<'a> Solver<'a> {
                 }
                 if let Some(old) = self.mirror.as_ref() {
                     let scan_refactor = std::mem::take(&mut self.scan_refactor);
-                    let est = if self.restart || std::mem::take(&mut self.acc_refactor) || self.pass_next || SECOND_PASS.with(|c| c.get()) {
+                    let est = if self.restart
+                        || std::mem::take(&mut self.acc_refactor)
+                        || self.pass_next
+                        || SECOND_PASS.with(|c| c.get())
+                    {
                         0.0
                     } else if self.cleanup || self.pre_restart || scan_refactor {
                         old.discard_work_unused()
@@ -1772,7 +1844,10 @@ impl<'a> Solver<'a> {
         self.want_drift = false;
         self.check_primal_drift()?;
         // The reference decides the method switch before the dual recompute of this factorization: a switch to Devex runs that recompute under the Devex caller.
-        self.will_switch = self.sw.active && !self.cleanup && self.mirror.is_some() && self.sw.clone().decide(&self.method_inputs(sw_avg));
+        self.will_switch = self.sw.active
+            && !self.cleanup
+            && self.mirror.is_some()
+            && self.sw.clone().decide(&self.method_inputs(sw_avg));
         if self.cleanup {
             self.cleanup_work();
         } else {
@@ -1888,12 +1963,16 @@ impl<'a> Solver<'a> {
             }
         }
         crate::dual::primal_snapshot(
-            &self.basic, &self.at_upper, sum,
+            &self.basic,
+            &self.at_upper,
+            sum,
             self.handoff.map_or(self.restarts, |h| h.retries),
             self.excluded.is_some() || self.repaired,
         );
         let prev = STALL_PREV.with(|c| c.replace(sum));
-        let Some(h) = self.handoff.filter(|h| h.quad) else { return };
+        let Some(h) = self.handoff.filter(|h| h.quad) else {
+            return;
+        };
         // The progress routine writes a fresh objective even on an infeasible
         // check. Its structural loop uses x87 basic values and double-rounded
         // products for nonbasic bounds (0x27e1d0..0x27e235, 0x27e79e).
@@ -1929,11 +2008,21 @@ impl<'a> Solver<'a> {
         }
         #[cfg(test)]
         record_quad_progress((
-            self.iters_done, h.iters, TOTAL_ITERS.with(|c| c.get()), old_obj, objective, self.stall_calls, self.stall_cnt, self.stalled,
+            self.iters_done,
+            h.iters,
+            TOTAL_ITERS.with(|c| c.get()),
+            old_obj,
+            objective,
+            self.stall_calls,
+            self.stall_cnt,
+            self.stalled,
         ));
         if crate::dump::on("qprogress") {
             use crate::real::Real;
-            crate::dump::emit("qprogress", serde_json::json!({"it": self.iters_done, "it_base": h.iters, "total": TOTAL_ITERS.with(|c| c.get()), "old": old_obj, "new": objective, "sum": sum, "calls": self.stall_calls, "cnt": self.stall_cnt, "stalled":self.stalled, "head": self.basic, "xB": self.x_q.as_ref().map(|q| self.basic.iter().map(|&j| q[j].json()).collect::<Vec<_>>())}));
+            crate::dump::emit(
+                "qprogress",
+                serde_json::json!({"it": self.iters_done, "it_base": h.iters, "total": TOTAL_ITERS.with(|c| c.get()), "old": old_obj, "new": objective, "sum": sum, "calls": self.stall_calls, "cnt": self.stall_cnt, "stalled":self.stalled, "head": self.basic, "xB": self.x_q.as_ref().map(|q| self.basic.iter().map(|&j| q[j].json()).collect::<Vec<_>>())}),
+            );
         }
     }
 
@@ -2128,7 +2217,10 @@ impl<'a> Solver<'a> {
     /// The reference's residual check (`0x145a36` in `0x145520`): after the duals are recomputed, when no basic variable is
     /// infeasible and the factorization count is 4 modulo 5, it books `(rows + 2 * sum(len + 1 over basic structurals)) * c` for the pass that forms their reduced costs.
     fn residual_check_work(&mut self) {
-        if self.mirror.is_none() || (self.refactorizations + self.ref_base) % 5 != 4 || self.has_infeasible_basic() {
+        if self.mirror.is_none()
+            || (self.refactorizations + self.ref_base) % 5 != 4
+            || self.has_infeasible_basic()
+        {
             return;
         }
         let nnz: usize = self
@@ -2443,7 +2535,10 @@ impl<'a> Solver<'a> {
         let err = self.drift_err.take();
         if let Some(err) = err {
             if crate::dump::on("pdrift") {
-                crate::dump::emit("pdrift", serde_json::json!({"quad": self.handoff.as_ref().is_some_and(|h| h.quad), "it": self.iters_done, "it_base": self.handoff.map(|h| h.iters), "total": TOTAL_ITERS.with(|c| c.get()), "ref": self.refactorizations, "nref0": self.handoff.map(|h| h.nref0), "nref": self.refactorizations + self.handoff.map_or(0, |h| h.nref0), "swfac": self.sw.factorizations, "err": err.to_f64(), "err_ld": crate::real::Real::json(err), "tol": self.drift_tol, "cnt": crate::dual::PRIMAL_DRIFT_COUNT.with(|c| c.get())}));
+                crate::dump::emit(
+                    "pdrift",
+                    serde_json::json!({"quad": self.handoff.as_ref().is_some_and(|h| h.quad), "it": self.iters_done, "it_base": self.handoff.map(|h| h.iters), "total": TOTAL_ITERS.with(|c| c.get()), "ref": self.refactorizations, "nref0": self.handoff.map(|h| h.nref0), "nref": self.refactorizations + self.handoff.map_or(0, |h| h.nref0), "swfac": self.sw.factorizations, "err": err.to_f64(), "err_ld": crate::real::Real::json(err), "tol": self.drift_tol, "cnt": crate::dual::PRIMAL_DRIFT_COUNT.with(|c| c.get())}),
+                );
             }
             if err > F80::from_f64(self.drift_tol) {
                 crate::dual::PRIMAL_DRIFT_COUNT.with(|c| c.set(c.get() + 1));
@@ -2454,19 +2549,26 @@ impl<'a> Solver<'a> {
                 if !self.handoff.as_ref().is_some_and(|h| h.quad) && self.opts.automatic_quad {
                     if self.handoff.is_some() {
                         PRIMAL_DRIFT.with(|c| c.set(true));
-                        PRIMAL_SINGULAR.with(|c| c.set(Some((self.iters_done, self.refactorizations, crate::lu_order::threshold()))));
+                        PRIMAL_SINGULAR.with(|c| {
+                            c.set(Some((
+                                self.iters_done,
+                                self.refactorizations,
+                                crate::lu_order::threshold(),
+                            )))
+                        });
                     }
                     return Err(SolveError::SingularBasis);
                 }
             } else {
                 self.drift_tol *= 10.0;
                 crate::dual::PRIMAL_DRIFT_COUNT.with(|c| c.set(0));
-                if self.handoff.is_some() { crate::dual::set_primal_tol(self.drift_tol); }
+                if self.handoff.is_some() {
+                    crate::dual::set_primal_tol(self.drift_tol);
+                }
             }
         }
         Ok(())
     }
-
 
     /// The infeasible-basic repair of a restored quality-2 snapshot (`0x27d7b0`, called at the x87 basic-value recompute `0x25b7d1`; `primal_rhs_perturb::repair`): the basic
     /// variables beyond a bound by more than the tolerance are moved inside by a random fraction of the perturbation size, the move goes to the persistent right-hand side shift.
@@ -2476,13 +2578,21 @@ impl<'a> Solver<'a> {
         let tol = crate::dual::primal_tol();
         let size = crate::dual::primal_pert_size();
         let m = p.m;
-        let Some(mut dq) = self.dst_q.take() else { return };
-        let Some(mut xq) = self.x_q.take() else { return };
+        let Some(mut dq) = self.dst_q.take() else {
+            return;
+        };
+        let Some(mut xq) = self.x_q.take() else {
+            return;
+        };
         let mut types = vec![b'N'; m];
         let mut dist = vec![F80::ZERO; m];
         let mut x = vec![F80::ZERO; m];
         for (i, &j) in self.basic.iter().enumerate() {
-            let range = if is_inf(p.lo[j]) || is_inf(p.up[j]) { 1e30 } else { p.up[j] - p.lo[j] };
+            let range = if is_inf(p.lo[j]) || is_inf(p.up[j]) {
+                1e30
+            } else {
+                p.up[j] - p.lo[j]
+            };
             dist[i] = F80::from_f64(range);
             x[i] = dq[j];
             types[i] = if dq[j] < F80::from_f64(-tol) {
@@ -2493,17 +2603,34 @@ impl<'a> Solver<'a> {
                 b'N'
             };
         }
-        let mut rhs = if self.rhs_shift_q.is_empty() { vec![F80::ZERO; m] } else { self.rhs_shift_q.clone() };
+        let mut rhs = if self.rhs_shift_q.is_empty() {
+            vec![F80::ZERO; m]
+        } else {
+            self.rhs_shift_q.clone()
+        };
         let mut offset = self.x87_offset;
         let mut state = 0u64;
         crate::primal_rhs_perturb::repair(
-            &self.basic, &mut types, &mut x, &dist, &mut rhs, &p.cols, &p.cost, &mut offset, size, tol,
+            &self.basic,
+            &mut types,
+            &mut x,
+            &dist,
+            &mut rhs,
+            &p.cols,
+            &p.cost,
+            &mut offset,
+            size,
+            tol,
             || crate::dual::lcg_int(&mut state),
         );
         self.x87_offset = offset;
         for (i, &j) in self.basic.iter().enumerate() {
             dq[j] = x[i];
-            let v = if is_inf(p.lo[j]) { F80::from_f64(p.up[j]) - x[i] } else { F80::from_f64(p.lo[j]) + x[i] };
+            let v = if is_inf(p.lo[j]) {
+                F80::from_f64(p.up[j]) - x[i]
+            } else {
+                F80::from_f64(p.lo[j]) + x[i]
+            };
             xq[j] = v;
             self.x[j] = v.to_f64();
             self.dst[j] = x[i].to_f64();
@@ -2583,7 +2710,11 @@ impl<'a> Solver<'a> {
             use crate::real::Real;
             let mut r: Vec<F80> = p.rhs.iter().map(|&v| F80::c(v)).collect();
             for (i, (ri, sh)) in r.iter_mut().zip(&self.rhs_shift).enumerate() {
-                *ri += if self.rhs_shift_q.is_empty() { F80::c(*sh) } else { self.rhs_shift_q[i] };
+                *ri += if self.rhs_shift_q.is_empty() {
+                    F80::c(*sh)
+                } else {
+                    self.rhs_shift_q[i]
+                };
             }
             for j in 0..p.n + p.m {
                 if self.pos_of[j] == NONE {
@@ -2625,11 +2756,16 @@ impl<'a> Solver<'a> {
                 let mut residual = F80::ZERO;
                 for (&a, &b) in r.iter().zip(&product) {
                     let d = (a - b).abs();
-                    if d > residual { residual = d; }
+                    if d > residual {
+                        residual = d;
+                    }
                 }
                 self.drift_err = Some(residual);
                 if crate::dump::on("pdrift") {
-                    crate::dump::emit("pdrift", serde_json::json!({"kind": "operands", "it": self.iters_done, "it_base": self.handoff.map(|h| h.iters), "total": TOTAL_ITERS.with(|c| c.get()), "basic": self.basic, "rhs": r.iter().map(|v| v.json()).collect::<Vec<_>>(), "xb": xb.iter().map(|v| v.json()).collect::<Vec<_>>(), "product": product.iter().map(|v| v.json()).collect::<Vec<_>>() }));
+                    crate::dump::emit(
+                        "pdrift",
+                        serde_json::json!({"kind": "operands", "it": self.iters_done, "it_base": self.handoff.map(|h| h.iters), "total": TOTAL_ITERS.with(|c| c.get()), "basic": self.basic, "rhs": r.iter().map(|v| v.json()).collect::<Vec<_>>(), "xb": xb.iter().map(|v| v.json()).collect::<Vec<_>>(), "product": product.iter().map(|v| v.json()).collect::<Vec<_>>() }),
+                    );
                 }
             }
             self.x_q = Some(xq);
@@ -2821,7 +2957,9 @@ impl<'a> Solver<'a> {
             if tol < 1e-3 {
                 crate::dual::set_dual_tol(10.0 * tol);
                 crate::dual::set_resid_fails(0);
-            } else if self.handoff.map_or(self.opts.faithful_positions, |h| !h.quad)
+            } else if self
+                .handoff
+                .map_or(self.opts.faithful_positions, |h| !h.quad)
                 && self.opts.automatic_quad
             {
                 // Set status -1002 here; the residual routine still completes its check (0x1455ca..0x14562c).
@@ -2839,7 +2977,11 @@ impl<'a> Solver<'a> {
         // The periodic residual check reads the shared count, including the dual factors (seed 5959).
         let nref = self.refactorizations + self.handoff.map_or(0, |h| h.nref0);
         if !(nref % 5 == 4 || crate::dual::resid_fails() != 0) {
-            return if abort { Err(SolveError::SingularBasis) } else { Ok(()) };
+            return if abort {
+                Err(SolveError::SingularBasis)
+            } else {
+                Ok(())
+            };
         }
         let p = self.p;
         let mut meas = 0.0f64;
@@ -2866,7 +3008,11 @@ impl<'a> Solver<'a> {
         if meas > tol && meas > 1e-4 * crate::dual::dual_infeas_sum() {
             crate::dual::set_resid_fails(crate::dual::resid_fails() + 1);
         }
-        if abort { Err(SolveError::SingularBasis) } else { Ok(()) }
+        if abort {
+            Err(SolveError::SingularBasis)
+        } else {
+            Ok(())
+        }
     }
 
     fn is_fixed(&self, j: usize) -> bool {
@@ -3075,7 +3221,10 @@ impl<'a> Solver<'a> {
         // The x87 list check (`0x281777..0x2817fb`): after ten handoffs (`ctx+0x35c` > 10) and with no shift in force (`ctx+0x338` = 0), a measure `ctx+0x2e0` below
         // min(1e-4, 10 * `env+0x2470`) (times ten above twenty handoffs) resets the dual tolerance to `1e-10 + ctx+0x2e0` (the measure is 0 in 5959:
         // `c388_writers`, tolerance 0.01 -> 1e-10 at iteration 125 of the pass ending at 130).
-        if self.handoff.is_some_and(|h| h.quad && !h.pert) && self.rhs_shift_q.is_empty() && crate::dual::C35C.with(|c| c.get()) > 10 {
+        if self.handoff.is_some_and(|h| h.quad && !h.pert)
+            && self.rhs_shift_q.is_empty()
+            && crate::dual::C35C.with(|c| c.get()) > 10
+        {
             crate::dual::set_dual_tol(1e-10);
         }
         self.list_failed = false;
@@ -3417,7 +3566,6 @@ fn p0_key2(s: f64, div: Option<f64>) -> usize {
     };
     (if s < 0.0 { 0x41 + k } else { 0x23 - k }) as usize
 }
-
 
 /// Initial window of the `pricing0` scan: it ends at the first position more than this many past its start once a candidate was counted (`P+0x50`).
 const P0_WINDOW: usize = 10;
@@ -3943,7 +4091,8 @@ impl<'a> Solver<'a> {
                 if self.p1_tol_on {
                     self.p0_scale = self.p0_scale.max(PHASE1_M);
                 }
-                self.work.add(0x144173, 3.0 * self.p.m as f64, crate::work::CTX);
+                self.work
+                    .add(0x144173, 3.0 * self.p.m as f64, crate::work::CTX);
                 if err > 3e-6 * self.p0_scale {
                     self.p0_accuracy = true;
                     return None;
@@ -4229,7 +4378,9 @@ impl<'a> Solver<'a> {
             let n = self.p.n;
             let mut primal = 0.0f64;
             for &j in &self.basic {
-                let v = (self.p.lo[j] - self.x[j]).max(self.x[j] - self.p.up[j]).max(0.0);
+                let v = (self.p.lo[j] - self.x[j])
+                    .max(self.x[j] - self.p.up[j])
+                    .max(0.0);
                 let f = if j < n { col[j] } else { 1.0 / row[j - n] };
                 primal = primal.max(v * f);
             }
@@ -4240,7 +4391,13 @@ impl<'a> Solver<'a> {
                 }
                 let d = self.d[j];
                 let free = is_inf(self.p.lo[j]) && is_inf(self.p.up[j]);
-                let v = if free { d.abs() } else if self.at_upper[j] { d.max(0.0) } else { (-d).max(0.0) };
+                let v = if free {
+                    d.abs()
+                } else if self.at_upper[j] {
+                    d.max(0.0)
+                } else {
+                    (-d).max(0.0)
+                };
                 let f = if j < n { 1.0 / col[j] } else { row[j - n] };
                 dual = dual.max(v * f);
             }
@@ -4249,7 +4406,11 @@ impl<'a> Solver<'a> {
             // of at least the tolerance) and the primal residual `+0xa0` exceeds ten tolerances.
             // GUROBI: the same `0xd0382` loop-back also fires on the dual residual `+0xc0` (`|c - A^T y - d|`) above ten dual tolerances (`rbp+0x2470`); not
             // modelled, no witness (rose recomputes `d` from `y`, so it is about 0; seed 70258 in `evidence/witness-hunt-primal-70000.md`).
-            if (primal > 1e-6 || dual >= 1e-6) && self.unscaled_primal_residual().is_some_and(|r| r > 10.0 * 1e-6) {
+            if (primal > 1e-6 || dual >= 1e-6)
+                && self
+                    .unscaled_primal_residual()
+                    .is_some_and(|r| r > 10.0 * 1e-6)
+            {
                 return None;
             }
             Some((primal, dual))
@@ -4264,14 +4425,22 @@ impl<'a> Solver<'a> {
             let p = self.p;
             let mut res: Vec<f64> = p.rhs.iter().map(|v| -v).collect();
             for j in 0..p.n + p.m {
-                let xj = if self.pos_of[j] == NONE { self.nonbasic_value(j) } else { self.x[j] };
+                let xj = if self.pos_of[j] == NONE {
+                    self.nonbasic_value(j)
+                } else {
+                    self.x[j]
+                };
                 if xj != 0.0 {
                     for &(i, a) in &p.cols[j] {
                         res[i] += a * xj;
                     }
                 }
             }
-            Some(res.iter().zip(row).fold(0.0f64, |m, (r, f)| m.max((r / f).abs())))
+            Some(
+                res.iter()
+                    .zip(row)
+                    .fold(0.0f64, |m, (r, f)| m.max((r / f).abs())),
+            )
         })
     }
 
@@ -5100,7 +5269,9 @@ fn reference_order_for(
                     .numerics()
                     .0
                     .iter()
-                    .fold((0.0f64, 1e100f64), |(a, b), v| (a.max(v.abs()), b.min(v.abs())));
+                    .fold((0.0f64, 1e100f64), |(a, b), v| {
+                        (a.max(v.abs()), b.min(v.abs()))
+                    });
                 if mx / mn > limit {
                     // Each attempt is one of the reference's factorizations (`lu_in`); the caller records the last one.
                     if crate::dump::on(tag) {
@@ -5261,7 +5432,10 @@ pub fn solve(
         let switch = k <= 2 && h.iters != 0.0 && h.iters != h.snap && h.c178 > 0;
         QUAD_EEFA.with(|c| c.set(switch || (h.preserve_ratio && c.get())));
     }
-    if handoff.is_some() || !opts.faithful_positions || (PRIMAL_START_THR.with(|c| c.get()).is_some()) {
+    if handoff.is_some()
+        || !opts.faithful_positions
+        || (PRIMAL_START_THR.with(|c| c.get()).is_some())
+    {
         return solve_primal(model, start, opts, handoff, None);
     }
     // fx_midsing_m5 controlled: six singular Farkas factorizations (each run replays iteration 0), the repair, then the run after the restored variable.
@@ -5285,7 +5459,8 @@ pub fn solve(
                     QUAD_EEFA.with(|c| c.set(true));
                     QUAD_PRIMALS.with(|c| c.set(1));
                     let pair = PRIMAL_RESTART_PAIR.with(|c| c.take());
-                    let mut r = crate::dual::resume_standalone_controller(model, opts, iters, pthr, pair)?;
+                    let mut r =
+                        crate::dual::resume_standalone_controller(model, opts, iters, pthr, pair)?;
                     r.refactorizations += facs;
                     return Ok(r);
                 }
@@ -5304,7 +5479,8 @@ pub fn solve(
                         ..r
                     });
                     let mut retry_opts = pass_opts.clone();
-                    retry_opts.max_iterations = pass_opts.max_iterations.saturating_sub(r.iterations);
+                    retry_opts.max_iterations =
+                        pass_opts.max_iterations.saturating_sub(r.iterations);
                     let r2 = solve_primal(model, Some(&r.basis), &retry_opts, None, rs2)?;
                     let (it, fa) = (r.iterations, r.refactorizations);
                     r = r2;
@@ -5338,9 +5514,12 @@ fn solve_primal(
             b.validate(n, m).map_err(SolveError::InvalidBasis)?;
             // The reference gets a basis as variable statuses, so its incoming position order is the variable order.
             b.basic.sort_unstable();
-            if let Some(h) =
-                handoff.filter(|h| h.quad && h.retries < 5 && crate::dual::has_restart_snapshot() && !crate::dual::RESTORED_PRIMAL.with(|c| c.get()))
-            {
+            if let Some(h) = handoff.filter(|h| {
+                h.quad
+                    && h.retries < 5
+                    && crate::dual::has_restart_snapshot()
+                    && !crate::dual::RESTORED_PRIMAL.with(|c| c.get())
+            }) {
                 // Before the retry limit the x87 factor driver reports a
                 // singular handoff to the controller rather than repairing
                 // it in place (seed 8825, quad LU k13).
@@ -5427,7 +5606,13 @@ fn solve_primal(
         crate::lu_order::set_threshold(handoff.unwrap().thr);
         crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
         let gate = crate::lu_order::gate_get();
-        let (order, st, rows) = reference_order_for(&p, &basis.basic, 1, growth_limit(opts.scaled, handoff.is_some_and(|h| h.quad)), "lustart");
+        let (order, st, rows) = reference_order_for(
+            &p,
+            &basis.basic,
+            1,
+            growth_limit(opts.scaled, handoff.is_some_and(|h| h.quad)),
+            "lustart",
+        );
         if crate::dump::on("lustart") {
             crate::dump::emit(
                 "lustart",
@@ -5500,7 +5685,13 @@ fn solve_primal(
             }
             crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
             let gate = crate::lu_order::gate_get();
-            let (order, st, rows) = reference_order_for(&p, &basis.basic, 1, growth_limit(opts.scaled, handoff.is_some_and(|h| h.quad)), "lustart");
+            let (order, st, rows) = reference_order_for(
+                &p,
+                &basis.basic,
+                1,
+                growth_limit(opts.scaled, handoff.is_some_and(|h| h.quad)),
+                "lustart",
+            );
             if crate::dump::on("lustart") {
                 crate::dump::emit(
                     "lustart",
@@ -5609,7 +5800,11 @@ fn solve_primal(
         will_switch: false,
         acc_refactor: false,
         scan_refactor: false,
-        ref_base: if SECOND_PASS.with(|c| c.get()) { PASS_REFS.with(|c| c.get()) } else { 0 },
+        ref_base: if SECOND_PASS.with(|c| c.get()) {
+            PASS_REFS.with(|c| c.get())
+        } else {
+            0
+        },
         acc_thr: crate::lu_order::THRESHOLD,
         cleanup_keep_head: false,
         last_upd: None,
@@ -5702,7 +5897,8 @@ fn solve_primal(
             }
             crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
             let gate = crate::lu_order::gate_get();
-            let (order, st, rows) = reference_order_for(s.p, &s.basic, 1, s.growth_limit(), "lustart");
+            let (order, st, rows) =
+                reference_order_for(s.p, &s.basic, 1, s.growth_limit(), "lustart");
             if crate::dump::on("lustart") {
                 crate::dump::emit(
                     "lustart",
@@ -6125,7 +6321,11 @@ fn solve_primal(
                     farkas = Some(s.farkas_dual());
                     break Status::Infeasible;
                 }
-                None if s.handoff.is_some_and(|h| !h.quad && !h.pert) && s.sw.active && s.sw.level != 0 && s.iters_done != 0 => {
+                None if s.handoff.is_some_and(|h| !h.quad && !h.pert)
+                    && s.sw.active
+                    && s.sw.level != 0
+                    && s.iters_done != 0 =>
+                {
                     // A failed scan with the primal's own perturbation in force (`ctx+0x338` != 0, `0x145a72..0x145a94`) clears it and ends the primal with status -1004,
                     // request 9, before the failed-scan arm below; the controller reruns the dual (witness_primal_r31_double4).
                     // GUROBI: with `ctx+0x35c > 10` and `ctx+0x338 == 1` the high-handoff test (`0x145a7d`, `0x145a5c..0x145dbf`) first scans the rhs shifts against
@@ -6281,20 +6481,29 @@ fn solve_primal(
                     s.forced = true;
                     continue;
                 }
-                None if s.handoff.is_some_and(|h| h.quad && h.pert) =>
-                {
+                None if s.handoff.is_some_and(|h| h.quad && h.pert) => {
                     // As above, in phase 2: the x87 primal with cost shifts in force ends with status -1004 at its first failed scan.
                     PRIMAL_SHIFT_END.with(|c| c.set(true));
                     break Status::Infeasible;
                 }
-                None if s.handoff.is_some_and(|h| !h.quad && !h.pert) && s.sw.active && s.sw.level != 0 && s.iters_done != 0 => {
+                None if s.handoff.is_some_and(|h| !h.quad && !h.pert)
+                    && s.sw.active
+                    && s.sw.level != 0
+                    && s.iters_done != 0 =>
+                {
                     // As in phase 1: the double primal's own bound perturbation in force (`ctx+0x338` != 0).
                     s.dual_btran_work("none");
                     s.recompute_dual()?;
                     PRIMAL_SHIFT_END.with(|c| c.set(true));
                     break Status::Infeasible;
                 }
-                None if s.handoff.is_some_and(|h| !h.quad) && s.iters_done == 0 && (0..s.p.n + s.p.m).any(|j| s.at_upper[j] && is_inf(s.p.up[j]) && !s.basic.contains(&j)) && s.factor.num_updates() == 0 && !std::mem::replace(&mut s.fresh_end, true) => {
+                None if s.handoff.is_some_and(|h| !h.quad)
+                    && s.iters_done == 0
+                    && (0..s.p.n + s.p.m)
+                        .any(|j| s.at_upper[j] && is_inf(s.p.up[j]) && !s.basic.contains(&j))
+                    && s.factor.num_updates() == 0
+                    && !std::mem::replace(&mut s.fresh_end, true) =>
+                {
                     // The end test without an entering variable (`0x14522c..0x1452ff`): with updates, or with `ctx+0x3f8` != 0 (1 in a primal started by the dual controller), the
                     // primal requests a refactorization (6) before ending, even on a fresh factor (fx_witness_dual_cc1ca, dual-controlled: ctx+0x390 is already 0.5). The status
                     // pass of the recompute puts nonbasic variables at an infinite upper bound back to the lower one, so the variable the dual left there is priced again.
@@ -6350,7 +6559,8 @@ fn solve_primal(
                             && s.opts.pricing0
                             && !infeasible
                             && !crate::scale::PASS_RAN.with(|c| c.get())
-                            && s.unscaled_infeasibilities().is_some_and(|(pv, dv)| pv <= 1e-6 && dv >= 1e-6);
+                            && s.unscaled_infeasibilities()
+                                .is_some_and(|(pv, dv)| pv <= 1e-6 && dv >= 1e-6);
                         if !SECOND_PASS.with(|c| c.get()) {
                             s.work.trig();
                             if let Some(mi) = s.mirror.as_mut() {
@@ -6366,16 +6576,17 @@ fn solve_primal(
                         // The progress check can also end the primal during this
                         // no-candidate refactorization, before another scan.
                         if s.stalled {
-                                        PRIMAL_STALL.with(|c| c.set(true));
+                            PRIMAL_STALL.with(|c| c.set(true));
                             break Status::Infeasible;
                         }
                         // The reference's primal ends with the maximum bound violation of the basic variables in the unscaled problem (`0xcff40`, `r9+0x90`);
                         // above the feasibility tolerance (`rbp+0x2460`, 1e-6) the driver runs the dual loop on the unscaled model (`0x154d95`).
-                        let inf = if !s.cleanup && s.mirror.is_some() && s.opts.pricing0 && !infeasible {
-                            s.unscaled_infeasibilities()
-                        } else {
-                            None
-                        };
+                        let inf =
+                            if !s.cleanup && s.mirror.is_some() && s.opts.pricing0 && !infeasible {
+                                s.unscaled_infeasibilities()
+                            } else {
+                                None
+                            };
                         crate::scale::END_INF.with(|c| c.set(inf));
                         ACC_THR_PASS.with(|c| c.set(s.acc_thr));
                         let unscaled = inf.map(|e| e.0).filter(|&v| v > 1e-6);
@@ -6386,16 +6597,29 @@ fn solve_primal(
                                 at_upper: s.at_upper.clone(),
                             };
                             crate::scale::PASS_RAN.with(|c| c.set(true));
-                            let orig = if unscaled.is_some() { crate::scale::ORIG.with(|c| c.borrow().as_ref().map(|o| o.0.clone())) } else { None };
+                            let orig = if unscaled.is_some() {
+                                crate::scale::ORIG
+                                    .with(|c| c.borrow().as_ref().map(|o| o.0.clone()))
+                            } else {
+                                None
+                            };
                             let dopts = SolveOptions {
                                 method: Method::Dual,
                                 scaled: opts.scaled && orig.is_none(),
-                                obj_scale: if orig.is_some() { SolveOptions::default().obj_scale } else { opts.obj_scale },
+                                obj_scale: if orig.is_some() {
+                                    SolveOptions::default().obj_scale
+                                } else {
+                                    opts.obj_scale
+                                },
                                 record_trace: true,
                                 ..SolveOptions::default()
                             };
                             crate::dual::CLEANUP_PASS.with(|c| c.set(Some(s.acc_thr)));
-                            let via = crate::dual::solve(orig.as_ref().unwrap_or(model), Some(&b), &dopts);
+                            let via = crate::dual::solve(
+                                orig.as_ref().unwrap_or(model),
+                                Some(&b),
+                                &dopts,
+                            );
                             crate::dual::CLEANUP_PASS.with(|c| c.set(None));
                             let via = via.ok().filter(|r| {
                                 matches!(r.status, Status::Optimal | Status::Infeasible)
@@ -6484,7 +6708,8 @@ fn solve_primal(
                                 s.p0_rebuild();
                             }
                             PASS_REFS.with(|c| c.set(s.refactorizations + s.ref_base));
-                            s.work.add(0x138532, 2.0 * (p.n + p.m) as f64, crate::work::CTX);
+                            s.work
+                                .add(0x138532, 2.0 * (p.n + p.m) as f64, crate::work::CTX);
                         }
                         if s.factor.num_updates() == 0
                             && !s.cleanup
@@ -6837,7 +7062,10 @@ fn solve_primal(
         // The empty strict rescan requests a fresh factor after 16 updates
         // (0xeff6d..0xeff92). No pivot or iteration is booked.
         if empty_retry
-            && s.mirror.as_ref().map_or(s.factor.num_updates(), |mi| mi.updates()) > 16
+            && s.mirror
+                .as_ref()
+                .map_or(s.factor.num_updates(), |mi| mi.updates())
+                > 16
         {
             // The driver checks and records work before the requested factorization,
             // even though this ratio call did not complete an iteration.
@@ -7527,7 +7755,8 @@ fn solve_primal(
             s.stale = Some((alpha_rq, if q < n { alpha_rq } else { arq_x }));
         } else {
             // A standalone run does not check the pair, but the context keeps it for a restart in x87 (`PRIMAL_RESTART_PAIR`).
-            PRIMAL_RESTART_PAIR.with(|c| c.set(Some((alpha_rq, if q < n { alpha_rq } else { arq_x }))));
+            PRIMAL_RESTART_PAIR
+                .with(|c| c.set(Some((alpha_rq, if q < n { alpha_rq } else { arq_x }))));
         }
         let mut norm_reset = false;
         let mut changed: Vec<usize> = Vec::new();
@@ -7983,8 +8212,18 @@ mod tests {
         let free = |_| false;
         let mut passes = Vec::new();
         let mut empty_retry = false;
-        let result = ratio_test(1e-6, 1e-9, INF, &entries, &down, &up,
-                                &col_count, &free, &mut passes, &mut empty_retry);
+        let result = ratio_test(
+            1e-6,
+            1e-9,
+            INF,
+            &entries,
+            &down,
+            &up,
+            &col_count,
+            &free,
+            &mut passes,
+            &mut empty_retry,
+        );
         assert_eq!(result, (Some(1), 100.0, 0.01));
         assert!(empty_retry);
         assert_eq!(passes.len(), 2);
@@ -8060,7 +8299,8 @@ mod tests {
 fn release_primal_runs_the_dual_on_the_unscaled_model_when_it_is_infeasible() {
     // Seed 9010 (gen3): the final basis violates a bound by 1.544967130528395e-4 in the unscaled problem (-3.77e-8 scaled); the reference's `0xcff40`
     // measures it, sets the driver flag and the dual loop makes one pivot (3 pricing calls) on the unscaled model.
-    let model = crate::mps::parse(include_str!("../tests/fixtures/fx_pricing0_order_9010.mps")).unwrap();
+    let model =
+        crate::mps::parse(include_str!("../tests/fixtures/fx_pricing0_order_9010.mps")).unwrap();
     let r = crate::solve(&model, None, &SolveOptions::release()).unwrap();
     assert_eq!(r.status, Status::Optimal);
     assert_eq!(r.iterations, 6);
@@ -8071,7 +8311,8 @@ fn release_primal_runs_the_dual_on_the_unscaled_model_when_it_is_infeasible() {
 fn release_primal_runs_an_unscaled_second_pass_when_the_optimum_is_dual_infeasible() {
     // Seed 9422 (gen3): the scaled optimum is primal feasible but has unscaled dual infeasibility >= 1e-6; the reference's `0xcff40` starts a second
     // primal pass on the unscaled problem (one more pivot), then the dual pass makes no pivot.
-    let model = crate::mps::parse(include_str!("../tests/fixtures/fx_pricing0_pass2_9422.mps")).unwrap();
+    let model =
+        crate::mps::parse(include_str!("../tests/fixtures/fx_pricing0_pass2_9422.mps")).unwrap();
     let r = crate::solve(&model, None, &SolveOptions::release()).unwrap();
     assert_eq!(r.status, Status::Optimal);
     assert_eq!(r.iterations, 2);

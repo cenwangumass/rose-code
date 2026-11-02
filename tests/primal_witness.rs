@@ -17,7 +17,9 @@ fn residual_above_ten_tolerances_ends_the_primal_without_a_follow_up_pass() {
 fn small_unscaled_violation_runs_the_second_primal_pass() {
     // `witness_primal_small_bound_second`: unscaled violation 9.9e-7 with the gate open and a small residual; the reference runs the unscaled second primal pass and
     // ends Optimal after 9 iterations.
-    let (s, n, obj) = release(include_str!("fixtures/witness_primal_small_bound_second.mps"));
+    let (s, n, obj) = release(include_str!(
+        "fixtures/witness_primal_small_bound_second.mps"
+    ));
     assert_eq!((s, n, obj), (Status::Optimal, 9, 414273.1355091953));
 }
 

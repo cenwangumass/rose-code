@@ -4,7 +4,10 @@ use rose::{mps, solve, verify, SolveOptions, Status};
 fn quad_restart_resumes_primal_after_snapshot_and_fresh_crash() {
     let model = mps::parse(include_str!("fixtures/fx_quad_obj_5371.mps")).unwrap();
     let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
-    assert_eq!((result.status, result.iterations), (Status::Infeasible, 5319));
+    assert_eq!(
+        (result.status, result.iterations),
+        (Status::Infeasible, 5319)
+    );
 }
 
 #[test]
@@ -30,8 +33,16 @@ fn quad_primal_repeated_repairs_resume_dual() {
 #[test]
 fn x87_tiny_pivot_retries_the_active_pricing_bucket() {
     for (text, status, iterations) in [
-        (include_str!("fixtures/quad_6230.mps"), Status::Infeasible, 40),
-        (include_str!("fixtures/quad_4564.mps"), Status::Infeasible, 117),
+        (
+            include_str!("fixtures/quad_6230.mps"),
+            Status::Infeasible,
+            40,
+        ),
+        (
+            include_str!("fixtures/quad_4564.mps"),
+            Status::Infeasible,
+            117,
+        ),
     ] {
         let model = mps::parse(text).unwrap();
         let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
@@ -43,7 +54,11 @@ fn x87_tiny_pivot_retries_the_active_pricing_bucket() {
 fn shifted_primal_handoff_continues_from_its_basis_with_a_snapshot() {
     for (input, status, iterations) in [
         (include_str!("fixtures/quad_4918.mps"), Status::Optimal, 182),
-        (include_str!("fixtures/quad_5147.mps"), Status::Infeasible, 194),
+        (
+            include_str!("fixtures/quad_5147.mps"),
+            Status::Infeasible,
+            194,
+        ),
     ] {
         let model = mps::parse(input).unwrap();
         let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
@@ -55,7 +70,10 @@ fn shifted_primal_handoff_continues_from_its_basis_with_a_snapshot() {
 fn quad_residual_uses_extended_precision() {
     let model = mps::parse(include_str!("fixtures/quad_7374.mps")).unwrap();
     let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
-    assert_eq!((result.status, result.iterations), (Status::NumericalFailure, 79));
+    assert_eq!(
+        (result.status, result.iterations),
+        (Status::NumericalFailure, 79)
+    );
 }
 
 #[test]
@@ -152,7 +170,10 @@ fn x87_pure_penalty_rescans_updated_duals_before_ending() {
 fn shifted_quad_retry_selects_pricing_from_handoff_count() {
     let model = mps::parse(include_str!("fixtures/quad_3196.mps")).unwrap();
     let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
-    assert_eq!((result.status, result.iterations), (Status::Infeasible, 142));
+    assert_eq!(
+        (result.status, result.iterations),
+        (Status::Infeasible, 142)
+    );
 }
 
 #[test]
@@ -166,14 +187,20 @@ fn x87_primal_basic_values_keep_update_precision() {
 fn x87_repaired_farkas_factor_resumes_pricing() {
     let model = mps::parse(include_str!("fixtures/quad_4250.mps")).unwrap();
     let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
-    assert_eq!((result.status, result.iterations), (Status::Infeasible, 123));
+    assert_eq!(
+        (result.status, result.iterations),
+        (Status::Infeasible, 123)
+    );
 }
 
 #[test]
 fn quad_restart_keeps_snapshot_bound_sides_and_shifts() {
     let model = mps::parse(include_str!("fixtures/quad_8631.mps")).unwrap();
     let result = solve(&model, None, &SolveOptions::dual_release()).unwrap();
-    assert_eq!((result.status, result.iterations), (Status::NumericalFailure, 164));
+    assert_eq!(
+        (result.status, result.iterations),
+        (Status::NumericalFailure, 164)
+    );
 }
 
 #[test]

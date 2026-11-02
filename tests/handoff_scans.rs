@@ -207,14 +207,30 @@ fn dual_handoff_returns_before_controller_dispatches_primal() {
         .args(["--exact", "optimal_handoff_child", "--nocapture"])
         .env("ROSE_E2_TEST", "r03125")
         .env("ROSE_DUMP", "callback")
-        .output().unwrap();
+        .output()
+        .unwrap();
     assert!(output.status.success());
     let stderr = String::from_utf8(output.stderr).unwrap();
-    let events: Vec<serde_json::Value> = stderr.lines()
+    let events: Vec<serde_json::Value> = stderr
+        .lines()
         .filter_map(|line| line.strip_prefix("CALLBACK "))
-        .map(|line| serde_json::from_str(line).unwrap()).collect();
-    let labels: Vec<_> = events.iter().map(|event| event["event"].as_str().unwrap()).collect();
-    assert_eq!(labels, ["enter", "exit", "transfer", "enter", "exit", "primal_outcome"]);
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    let labels: Vec<_> = events
+        .iter()
+        .map(|event| event["event"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        labels,
+        [
+            "enter",
+            "exit",
+            "transfer",
+            "enter",
+            "exit",
+            "primal_outcome"
+        ]
+    );
     assert_eq!(events[2]["status"], -1004);
     assert_eq!(events[2]["selector"], 0);
     assert_eq!(events[3]["selector"], 0);
@@ -238,13 +254,19 @@ fn artificial_handoff_returns_before_primal_entry() {
         .args(["--exact", "artificial_handoff_child", "--nocapture"])
         .env("ROSE_ARTIFICIAL_TEST", "1")
         .env("ROSE_DUMP", "callback")
-        .output().unwrap();
+        .output()
+        .unwrap();
     assert!(output.status.success());
     let stderr = String::from_utf8(output.stderr).unwrap();
-    let events: Vec<serde_json::Value> = stderr.lines()
+    let events: Vec<serde_json::Value> = stderr
+        .lines()
         .filter_map(|line| line.strip_prefix("CALLBACK "))
-        .map(|line| serde_json::from_str(line).unwrap()).collect();
-    let i = events.iter().position(|event| event["route"] == "artificial").unwrap();
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    let i = events
+        .iter()
+        .position(|event| event["route"] == "artificial")
+        .unwrap();
     assert_eq!(events[i - 1]["event"], "exit");
     assert_eq!(events[i - 1]["selector"], 1);
     assert_eq!(events[i]["status"], -1004);

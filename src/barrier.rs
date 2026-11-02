@@ -1813,7 +1813,11 @@ pub fn status(t: &TermIn) -> (i32, u32) {
     // `maxsd`: the second operand wins on equality and NaN (`0x2e376d`, `0x2e37c5`).
     let m = |j: usize| {
         let (a, b) = (t.h50[j] / d1, t.h68[j] / d2);
-        if a > b { a } else { b }
+        if a > b {
+            a
+        } else {
+            b
+        }
     };
     let late;
     if it < 11 {
@@ -3736,7 +3740,10 @@ pub fn solve_method(
     })
 }
 
-fn method_readout(barrier_status: BarrierStatus, point_objective: f64) -> (crate::simplex::Status, f64) {
+fn method_readout(
+    barrier_status: BarrierStatus,
+    point_objective: f64,
+) -> (crate::simplex::Status, f64) {
     use crate::simplex::Status;
     let status = match barrier_status {
         BarrierStatus::Optimal => Status::Optimal,

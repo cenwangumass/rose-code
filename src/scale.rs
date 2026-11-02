@@ -360,15 +360,25 @@ pub fn solve(
             ORIG.with(|c| *c.borrow_mut() = None);
             let mut limited_pass: Option<(usize, Vec<_>)> = None;
             if opts.pricing0 || END_INF.with(|c| c.get()).is_some() {
-                if let (Ok(r1), Some((pv, dv)), false) = (r.as_ref(), END_INF.with(|c| c.take()), PASS_RAN.with(|c| c.get())) {
+                if let (Ok(r1), Some((pv, dv)), false) = (
+                    r.as_ref(),
+                    END_INF.with(|c| c.take()),
+                    PASS_RAN.with(|c| c.get()),
+                ) {
                     if r1.status == crate::simplex::Status::Optimal && pv <= 1e-6 && dv >= 1e-6 {
                         let n1 = r1.iterations;
                         // The second pass runs under an iteration limit (`0xd0233`, mode `ctx`+`0x2514` = -1): total iterations `T` so far plus a fifth of
                         // `max(T, cols / 3 + rows)`; the check after each iteration (`0x11f430`) ends the pass with status 7.
                         let t = n1 as f64;
-                        let limit = t + 0.2 * t.max((model.num_cols() / 3 + model.num_rows()) as f64);
+                        let limit =
+                            t + 0.2 * t.max((model.num_cols() / 3 + model.num_rows()) as f64);
                         let allowed = (1..).find(|&k| t + k as f64 >= limit).unwrap_or(1);
-                        let second = SolveOptions { scaled: false, obj_scale: 1.0, max_iterations: inner.max_iterations.min(allowed), ..inner.clone() };
+                        let second = SolveOptions {
+                            scaled: false,
+                            obj_scale: 1.0,
+                            max_iterations: inner.max_iterations.min(allowed),
+                            ..inner.clone()
+                        };
                         let basis = r1.basis.clone();
                         let readout = crate::dual::quad_result_state();
                         crate::simplex::SECOND_PASS.with(|c| c.set(true));
@@ -380,7 +390,9 @@ pub fn solve(
                             r2.trace.splice(0..0, r1.trace.iter().cloned());
                             // Status 7 (the iteration limit): the driver restores the scaled problem and the basis saved before the pass (`0xcf8d0`, `0xcfa8e`); the pass's
                             // pivot is undone but stays counted, and the dual pass that follows makes no pivot (free-shift witnesses): the result is the scaled pass's.
-                            if r2.status == crate::simplex::Status::IterationLimit && allowed < inner.max_iterations {
+                            if r2.status == crate::simplex::Status::IterationLimit
+                                && allowed < inner.max_iterations
+                            {
                                 limited_pass = Some((r2.iterations, std::mem::take(&mut r2.trace)));
                                 crate::dual::set_quad_result_state(readout);
                             } else if r2.status == crate::simplex::Status::Optimal {
@@ -389,11 +401,15 @@ pub fn solve(
                                     record_trace: true,
                                     ..SolveOptions::default()
                                 };
-                                crate::dual::CLEANUP_PASS.with(|c| c.set(Some(crate::simplex::ACC_THR_PASS.with(|a| a.get()))));
+                                crate::dual::CLEANUP_PASS.with(|c| {
+                                    c.set(Some(crate::simplex::ACC_THR_PASS.with(|a| a.get())))
+                                });
                                 let via = crate::dual::solve(model, Some(&r2.basis), &dopts);
                                 crate::dual::CLEANUP_PASS.with(|c| c.set(None));
                                 if let Ok(r3) = via {
-                                    if r3.iterations > 0 || r3.status == crate::simplex::Status::Optimal {
+                                    if r3.iterations > 0
+                                        || r3.status == crate::simplex::Status::Optimal
+                                    {
                                         let mut r3 = r3;
                                         r3.iterations += r2.iterations;
                                         r3.trace.splice(0..0, r2.trace.iter().cloned());
