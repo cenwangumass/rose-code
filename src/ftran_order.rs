@@ -1909,12 +1909,14 @@ impl<R: Real> RefStruct<R> {
         if self.bt_dense {
             // The dense result keeps the sub-tolerance entries the L^T pass left in place.
             // and lists them by ascending row.
-            return (0..m)
-                .filter_map(|r| {
-                    let i = self.perm[r];
-                    (x[i] != R::ZERO).then(|| (r, x[i]))
-                })
-                .collect();
+            let mut out = Vec::with_capacity(m);
+            for r in 0..m {
+                let i = self.perm[r];
+                if x[i] != R::ZERO {
+                    out.push((r, x[i]));
+                }
+            }
+            return out;
         }
         res.into_iter()
             .filter(|&i| x[i] != R::ZERO)
