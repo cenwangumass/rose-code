@@ -780,14 +780,20 @@ impl<R: Real> RefStruct<R> {
     ) -> (Vec<(usize, R)>, usize, f64) {
         let m = self.m;
         let mut e = 0.0f64;
+        let dense_l = rows.len() * self.dthr > self.m || force_dense || self.lev_dense_ft;
         let mut x = vec![R::ZERO; self.m];
-        let mut start: Vec<usize> = Vec::with_capacity(rows.len());
+        let mut start: Vec<usize> = if dense_l {
+            Vec::new()
+        } else {
+            Vec::with_capacity(rows.len())
+        };
         for (&r, &v) in rows.iter().zip(vals) {
             let s = self.perm[r];
             x[s] += v;
-            start.push(s);
+            if !dense_l {
+                start.push(s);
+            }
         }
-        let dense_l = rows.len() * self.dthr > self.m || force_dense || self.lev_dense_ft;
         let (mut order, count_l) = if dense_l {
             // Dense L solve (`0x12bd30`): every node in ascending order; the list handed on is the ascending scan.
             e = m as f64 + rows.len() as f64 * 2.0 + e;
@@ -803,7 +809,7 @@ impl<R: Real> RefStruct<R> {
                 }
             }
             let count_l = (0..self.m).filter(|&v| x[v].abs() > R::c(TOL)).count();
-            ((0..self.m).collect(), count_l)
+            (Vec::new(), count_l)
         } else if let Some(lev) = &self.levels {
             // Level-bucket L solve: nodes are taken level by level, each level in insertion order (inputs first, then the
             // nodes reached from lower levels); values below the tolerance are dropped without propagating.
@@ -911,7 +917,16 @@ impl<R: Real> RefStruct<R> {
                         x[y] -= self.lvals[v][e] * xv;
                     }
                 }
-                ((0..self.m).collect(), count_l)
+                // With etas the final result is dense; without them this fallback
+                // still returns the filtered ascending list, including its tolerance rule.
+                (
+                    if self.etas.is_empty() {
+                        (0..self.m).collect()
+                    } else {
+                        Vec::new()
+                    },
+                    count_l,
+                )
             } else {
                 (q, count_l)
             }
@@ -921,10 +936,14 @@ impl<R: Real> RefStruct<R> {
         }
         // The sparse L stage drops a node whose value is at or below the tolerance from its list; an eta that makes it nonzero again appends it
         // at the end (SCAGR7 iteration 173: `0x129aa0` start `[82, 125, 83]` leaves `[82, 49, 125]`).
-        order.retain(|&v| x[v].abs() > R::c(TOL));
-        let mut have = vec![false; self.m];
-        for &v in &order {
-            have[v] = true;
+        let output_dense = dense_l || (!self.etas.is_empty() && count_l * self.dthr > m);
+        let mut have = Vec::new();
+        if !output_dense {
+            order.retain(|&v| x[v].abs() > R::c(TOL));
+            have.resize(m, false);
+            for &v in &order {
+                have[v] = true;
+            }
         }
         // Gather each eta into one buffer; its logical peel is stored in eta.peel.
         let mut eta_x: Vec<R> = Vec::new();
@@ -970,7 +989,7 @@ impl<R: Real> RefStruct<R> {
             if s.abs() <= R::c(TOL) {
                 s = R::ZERO;
             }
-            if !have[eta.idx] && s != R::ZERO {
+            if !output_dense && !have[eta.idx] && s != R::ZERO {
                 order.push(eta.idx);
                 have[eta.idx] = true;
             }
@@ -980,7 +999,7 @@ impl<R: Real> RefStruct<R> {
             self.lsnap.borrow_mut().1 = x.clone();
         }
         // A dense vector goes on as the raw array: the reference keeps the sub-tolerance residues of the L and eta stages.
-        if dense_l || (!self.etas.is_empty() && count_l * self.dthr > m) {
+        if output_dense {
             return (
                 (0..m)
                     .filter(|&v| x[v] != R::ZERO)
