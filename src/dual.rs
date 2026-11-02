@@ -1512,8 +1512,8 @@ impl<'a, R: Real> Dual<'a, R> {
         }
         let quality = if dual_infeas_sum() > 0.0 { 1 } else { 2 };
         // The dual snapshot (`0xd40b0`) skips a dropped variable and keeps a
-        // previous snapshot of higher quality. The forced-row stack gate
-        // remains unmodelled (no witness in the release profile).
+        // previous snapshot of higher quality.
+        // GUROBI: `0xd40b0` also skips the save while the forced-row stack (`ctx+0x52c`) holds rows; not modelled, no witness (none in the release profile).
         if self.snapshot_excluded
             || self.repaired.is_some()
             || SNAP_QUALITY.with(|c| quality < c.get())
@@ -2336,6 +2336,7 @@ impl<'a, R: Real> Dual<'a, R> {
     }
 
     /// The bound-flipping Harris ratio test (`0xc74a0`, `ctx+0x468 != 0`), `specs/dual-simplex.md`.
+    // GUROBI: with `ctx+0x468 == 0` the reference takes `0xc6900` instead; not modelled, no witness (never hit by `replay/gdb_dual_branchhits.py`).
     fn ratio_test(
         &mut self,
         row: &[(usize, R)],
@@ -2726,6 +2727,8 @@ impl<'a, R: Real> Dual<'a, R> {
                 }
                 let mut dj = self.d[j];
                 if -delta > dj {
+                    // GUROBI: both arms (the cost shift `0xcb0be`, the free-variable zeroing `0xc8739`) follow the disassembly; no witness (never hit by
+                    // `replay/gdb_dual_branchhits.py`, PLAN-dual.md "Unexercised in-scope branches").
                     if self.st[j] == LB || self.st[j] == UB {
                         // The cost shift of `0xcb0be` (the formulas of `shift_cost`): the entry's d becomes positive and joins the list.
                         self.shift_cost(j);
@@ -2801,7 +2804,8 @@ impl<'a, R: Real> Dual<'a, R> {
     /// Choice of the entering variable among the Harris-filtered candidates (`0xc89b3`): the smallest `a / w`, `w` the column count of a structural, 0.5 of a slack.
     /// The choice between the forced ratio `0xcc6a0` and the normal one (`0xc53a7..0xc54d3`): the normal ratio needs the leaving variable infeasible on the side its
     /// d sign wants (d > 0: below its lower bound by more than the primal tolerance; d <= 0: above its upper bound by more); an infinite bound there, or no such
-    /// infeasibility, takes the forced one. (`ctx+0x198` != 0 also takes it; it is 0 in every capture.)
+    /// infeasibility, takes the forced one.
+    // GUROBI: `ctx+0x198 != 0` also takes the forced ratio (`0xc53a7..0xc54d3`); not modelled, no witness (0 in every capture).
     fn forced_ratio_chosen(&self, leave: usize, xbr: R) -> bool {
         let tol = R::c(self.ptol());
         if self.d[leave] > R::ZERO {
@@ -2856,6 +2860,7 @@ impl<'a, R: Real> Dual<'a, R> {
         } else {
             (None, dp)
         };
+        // GUROBI: the small-candidate shift loop `0xcc9b5` follows the disassembly; no witness (STATE.md, "Known unmodelled edges").
         for &i in &small {
             let (j, v) = row[i];
             if theta > self.d[j] / v {
@@ -3492,6 +3497,8 @@ impl<'a, R: Real> Dual<'a, R> {
             _ => rt,
         };
         if let Some(meas) = rt.reject {
+            // GUROBI: the pop of the forced-row stack at the ratio-reject returns (`0xc67a1`; here and at the no-entering return below) follows the
+            // disassembly; no witness (STATE.md, "Known unmodelled edges").
             if forced_mode {
                 self.forced.pop();
             }
@@ -3538,6 +3545,7 @@ impl<'a, R: Real> Dual<'a, R> {
         let flips: Vec<usize> = rt.flips.iter().map(|&e| row[e].0).collect();
         // The objective progress flag `ctx+0x110` (`0x21cf50` at `0x31dc95`, `0xc56f0` in the double code): cleared by a pivot below 1e-6, a leaving
         // infeasibility above 1e8, or when the gain accumulated since the recompute (times `ctx+0xf8`, 1e-13) exceeds 100 times the dual tolerance.
+        // GUROBI: the reference has a loop raising `ctx+0xf8` from 1e-13; rose keeps 1e-13, no witness (PLAN-dual.md, "Remaining extended-precision rules").
         let obj_increment = {
             let infeas = if above {
                 R::c(p.up[leave]) - xbr
@@ -3695,7 +3703,7 @@ impl<'a, R: Real> Dual<'a, R> {
             // stable: below 0.5 the pivot threshold becomes 0.5 and the basis is refactorized (request 6); after a restart (`ctx+0x184` != 0) below 0.9 it becomes 0.9
             // (and the retry counter grows). Past that, in the value mode: a factor with updates is refactorized, a fresh one ends the pass with status -1002 (restart,
             // counter + 1) up to five times and later accepts a pivot of agreeing sign or ends with status 12. With `Quad` at its default (-1, the release profile) and `ctx+0x28` = 0 a fresh
-            // factor ends with status -1005 instead (`0xc5f43`, "Switch to quad due to numerics": the controller reruns the dual in quad precision, `0xcec20`), which is not modelled.
+            // factor ends with status -1005 instead (`0xc5f43`, "Switch to quad due to numerics": the controller reruns the dual in quad precision, `0xcec20`; `Step::SwitchQuad` below).
             // The list-walk mode is handled in the branch below.
             if self.lu_thr < 0.5 {
                 self.lu_thr = 0.5;
@@ -4290,6 +4298,8 @@ impl<'a, R: Real> Dual<'a, R> {
     /// still on, more than m + 1000 iterations done and fewer than 100 m structurals, the weights restart at 1 and the mode becomes 3 ("simplex pricing
     /// changes from 1 to 3"). The pricing update formulas stay those of the steepest edge.
     fn pricing_switch(&mut self) {
+        // GUROBI: in mode 2 the reference can switch to mode 3 (`0xf7780..0xf7a21`: iterations > 3m, or `ctx+0x35c` > 2 with `ctx+0x178` > 0); rose
+        // leaves mode 2 unchanged, no witness (`specs/dual-simplex.md`, pricing modes).
         if !self.switch_enabled || !matches!(self.pmode, 1 | 3) || self.refactorizations % 3 != 0 {
             return;
         }
@@ -4310,6 +4320,8 @@ impl<'a, R: Real> Dual<'a, R> {
         // The switch to the mode 2 (`0xf7a54..0xf7bb2`, not nested): enough row products since the start (`P+0x50 >= m/10 + 10`), at most 3 m iterations and
         // n <= 3 m, and the result counts of the pivot columns' FTRANs (`P+0x58`) exceed `M P+0x50`: `M` = 1e100 below 15000 rows; from 15000 rows in the mode 1 it is 1e100 below m/4
         // iterations, 4 from m/4 and 3 from m/3 iterations (the mode 3 always 3), plus 1 after a perturbation (`ctx+0x338 == 3`). The weights restart at 1.
+        // GUROBI: the nested case (`ctx+0xb8` != 0) and the `ctx+0x3f0` condition of `0xf7a54..0xf7bb2` are read but not modelled; no witness (only the
+        // standalone `witness_dual_r2_mode_switch` reaches the switch).
         if self.p50d < ((self.m / 10) + 10) as f64 || 3.0 * m < self.iters as f64 || 3.0 * m < self.n as f64 {
             return;
         }
@@ -4672,6 +4684,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 && (
                     // The low arm (`0xc2025..0xc2044`) needs only a nonempty infeasible list (`[P+0x3c]`, `0xc1ffb`) in the value mode; the acceptance
                     // test that follows it (threshold at least 0.5) is the tiny-infeasibility one (witness_dual_r3_residual_low_small).
+                    // GUROBI: the low arm in the list-walk mode is not modelled (rose keeps the tiny-infeasibility test there); no witness, no reference data.
                     (!R::QUAD && self.value_mode && self.n_infeas > 0 && self.lu_thr < 0.5)
                         || self.tiny_infeasibility()
                 )
@@ -4704,6 +4717,8 @@ impl<'a, R: Real> Dual<'a, R> {
             self.finish_drift_status()?;
             // The recompute pass `0xbf5b0` (called from `0xf6d0f`) runs the no-leaving-row handler itself when the pricing is in the list-walk mode
             // (`P+0x40 == 0`) and the list is empty (`P+0x3c == 0`, `0xbffbe`): no pricing call follows (RECIPE call 46).
+            // GUROBI: the second identical check `0xc000e` (the `ctx+0x290 == 1` path) is not modelled; its witness `witness_dual_norow` (public DStart)
+            // agrees in result without it (`tests/dual_start.rs`), so the branch itself is not compared.
             if !self.value_mode && self.list.is_empty() && self.status.is_none() {
                 self.no_row();
             }
@@ -4786,6 +4801,8 @@ impl<'a, R: Real> Dual<'a, R> {
         let wr = self.w[r].to_f64();
         let g = if t > wr { t / wr + self.dv_g } else { self.dv_g + wr / t };
         let k = self.dv_k + 1;
+        // GUROBI: the framework restart branch (`0xc2f8e`, `0xbe7b0`) follows the disassembly; no witness (not known to fire on `witness_dual_r2_mode_switch`),
+        // nor for the nested case (`ctx+0xb8` != 0), which is not modelled.
         if g / k as f64 > 5.0 || self.dv_c >= 10 {
             self.dv_k = 0;
             self.dv_f = 0.0;
@@ -5155,6 +5172,7 @@ fn solve_frame(
             let pr = primal_callback(model, restart_basis.as_ref(), &popts);
             RESTORED_PRIMAL.with(|c| c.set(false));
             match pr {
+                // GUROBI: the reference installs the quad dual's x on this `PRIMAL_STALL` route; rose does not, no witness (STATE.md, "Known unmodelled edges").
                 Ok(r) if crate::simplex::PRIMAL_STALL.with(|c| c.take())
                     || crate::simplex::PRIMAL_SHIFT_END.with(|c| c.take()) => {
                     C35C.with(|c| c.set(c.get() + 1));
@@ -5236,6 +5254,8 @@ fn solve_frame(
                 };
                 // The restart handler (`0xcedb0`) switches to quad when iterations were made (`ctx+0x20 + ctx+0x2a0`), with `Quad` at its default (-1, the release
                 // profile) and `ctx+0x28` still 0 (the checks of `0x2c8d0` and `ctx+0x188` hold in a pure dual run).
+                // GUROBI: the other switch conditions of `0x2c8d0` (`ctx+0x188/0x380/0x388`, `env+0x2728 < 2`) are assumed to hold; no witness
+                // (PLAN-dual.md, "Remaining extended-precision rules").
                 if crate::dump::on("dcr") {
                     crate::dump::emit(
                         "dcr",
@@ -5629,6 +5649,8 @@ fn solve_pass_callback<R: Real>(
     s.init_pricing_type();
     // The public DStart (`reverse-engineer/PLAN.md`): d = c - A^T y for every variable, basic ones included; the basic variables of the start basis with |d| > 1e-7
     // form the forced-row stack (`0xeef09`, ascending), taken before the setup pivots of the free variables.
+    // GUROBI: witnessed only in the first double pass with one y value for every row (`tests/dual_start.rs`: forced1, norow, AFIRO); DStart in the
+    // scaled frame, max-sense models, non-uniform or mixed-sign y, and DStart in quad and restart passes have no witness (STATE.md, "Known unmodelled edges").
     let dstart_d: Option<Vec<R>> = match &opts.dstart {
         Some(y) if carry.retries == 0 && carry.iters == 0 && !R::QUAD && supplied.is_none() && y.len() == m => {
             let mut d = vec![R::ZERO; n + m];
@@ -6004,6 +6026,8 @@ fn solve_pass_callback<R: Real>(
                         continue;
                     }
                 } else {
+                    // GUROBI: the reference's combined status `INF_OR_UNBD` (4) is never produced; no witness (none in the dual searches,
+                    // `evidence/witness-dual-search.md` item 14).
                     status = Status::Infeasible;
                     farkas = Some(y);
                     break;
@@ -6104,6 +6128,8 @@ fn solve_pass_callback<R: Real>(
             // method 0 to 1 when the dual made iterations since its snapshot.
             let increments = !(s.pert != 0 && !s.rejected_end && !s.art_exit) && !(s.retries >= 5 && dropped.is_some() && s.pert == 0 && carry.after_pivot);
             let c35c_at_start = C35C.with(|c| c.get()) + i32::from(increments);
+            // GUROBI: the decision's `ctx+0x178 <= 0` cost comparison and `ctx+0x4d8` are not modelled; no witness (PLAN-dual.md, "Remaining
+            // extended-precision rules").
             let fires = C178.with(|c| c.get()) > 0 && s.stall_it != s.iters as f64;
             popts.pricing0 = c35c_at_start == 1 && !fires;
         }
@@ -6390,6 +6416,7 @@ fn resume_artificial_transfer<R: Real>(model: &LpModel, opts: &SolveOptions,
         // A progress exit after an artificial-bound handoff resumes dual from
         // the primal basis and increments the shared -1004 counter.
         let primal_stalled = R::QUAD && crate::simplex::PRIMAL_STALL.with(|c| c.take());
+        // GUROBI: the reference installs the quad dual's x on the `primal_stalled` routes; rose does not, no witness (STATE.md, "Known unmodelled edges").
         if primal_stalled {
             C35C.with(|c| c.set(c.get() + 1));
             // The controller ends a -1004 cycle at status 12 once the
@@ -6681,6 +6708,7 @@ fn resume_primal_transfer<R: Real>(model: &LpModel, opts: &SolveOptions,
             r2.iterations += carry2.iters;
             return Ok(r2);
         }
+        // GUROBI: the reference installs the quad dual's x on this `PRIMAL_STALL` route; rose does not, no witness (STATE.md, "Known unmodelled edges").
         if R::QUAD && crate::simplex::PRIMAL_STALL.with(|c| c.take()) {
             C35C.with(|c| c.set(c.get() + 1));
             // The x87 primal ended on its progress check (status -1004): the controller runs the quad dual again from the primal's basis, and the primal after it.
@@ -6715,6 +6743,8 @@ fn resume_primal_transfer<R: Real>(model: &LpModel, opts: &SolveOptions,
                             acc += *c * *v;
                         }
                         r.objective = acc + model.offset;
+                        // GUROBI: the scaled-model path of this primal-ended status-12 objective (`0x144e6f`, read out in `unscaled_objective`) is
+                        // unverified; no witness (STATE.md, "Known unmodelled edges").
                         if opts.scaled {
                             END12_X.with(|c| *c.borrow_mut() = Some(xd));
                         }

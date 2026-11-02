@@ -488,6 +488,8 @@ pub(crate) struct Handoff {
     pub thr: f64,
     pub retries: usize,
     /// The dual ended with cost shifts in force: the primal's failed scan ends with status -1004 (the dual runs again), not the cost-free fallback.
+    // GUROBI: the reference tests the counter `ctx+0x338` (0, 1 or 2; the high-handoff test `0x145a7d` reads `== 1`), which this flag stands for as
+    // zero/nonzero; no witness tells the values apart (only 0 and 2 seen at a handoff).
     pub pert: bool,
     /// The relative tolerance of the pivot-pair check (`ctx+0x3a0`): the parameter default 3e-6, 1e-7 once the controller has restored a dropped variable.
     pub pair_tol: f64,
@@ -875,6 +877,9 @@ const PLAIN_FAILED_SCAN: bool = true;
 pub fn crash_basis(model: &LpModel) -> Basis {
     let p = build(model);
     let (n, m) = (p.n, p.m);
+    // GUROBI: `0x1387d0` also has the large-model branch `0x139cc9` (`[env+0x2518] == 2`, or the `0x13d021` test on `array[ctx+0x3dc]` behind the dead
+    // auto gate `0x138add..0x138aef`), the parameter-gated row-activity block `0x13a215..0x13a4c5` and the blocks behind `[[ctx+0x4b8]+0x238]+0x14 == 3`
+    // (`0x13d090`); not modelled, no witness (no corpus model enters them, `replay/gdb_crash_branches.py`; `PLAN-primal.md`, "Not planned").
     let file_cols: Vec<Column> = (0..n)
         .map(|j| {
             if j < model.num_cols() {
@@ -4241,7 +4246,9 @@ impl<'a> Solver<'a> {
             }
             let dual = dual / self.opts.obj_scale;
             // The end test returns without a follow-up pass (`0xd0382`, `r14d == -1`) when its gate is open (violation above the tolerance or dual infeasibility
-            // of at least the tolerance) and the primal residual `+0xa0` exceeds ten tolerances (the dual residual `+0xc0` is not modelled).
+            // of at least the tolerance) and the primal residual `+0xa0` exceeds ten tolerances.
+            // GUROBI: the same `0xd0382` loop-back also fires on the dual residual `+0xc0` (`|c - A^T y - d|`) above ten dual tolerances (`rbp+0x2470`); not
+            // modelled, no witness (rose recomputes `d` from `y`, so it is about 0; seed 70258 in `evidence/witness-hunt-primal-70000.md`).
             if (primal > 1e-6 || dual >= 1e-6) && self.unscaled_primal_residual().is_some_and(|r| r > 10.0 * 1e-6) {
                 return None;
             }
@@ -5028,6 +5035,8 @@ fn ratio_test(
 
 /// The growth check limit of the double driver: 1e12 when the model is scaled (`ctx+0xe0`), else 1e15; none for the x87 primal.
 fn growth_limit(scaled: bool, quad: bool) -> Option<f64> {
+    // GUROBI: whether and how the x87 primal's factorization driver escalates the threshold after a clean factor is not read or modelled (`None` here);
+    // no witness reaches it.
     (!quad).then_some(if scaled { 1e12 } else { 1e15 })
 }
 
@@ -5042,6 +5051,8 @@ fn book_retried_attempts(work: &mut crate::work::Work) {
     if retried.is_empty() {
         return;
     }
+    // GUROBI: each retried attempt is smoothed into `ctx+0x158` as its own factorization; the reference's smoothing across the attempts of one
+    // `0xf351d..0xf3629` escalation is not confirmed, no witness (the attempts cost the same in the escalation witnesses).
     for lu in retried {
         work.factor_driver(&lu, crate::work::CTX);
         for (site, est) in lu {
@@ -6044,6 +6055,9 @@ fn solve_primal(
             .filter(|&q| q != NONE);
         let price = s.price_admitting()?;
         if std::mem::take(&mut s.p0_accuracy) {
+            // GUROBI: the failure arm `0x14536d..0x145479` first terminates: -1002 when `ctx+0x188 > 2` and (`ctx+0x3ec != 0` or residual > 1e12); on a fresh
+            // factor at threshold >= 0.5 with guard `ctx+0x3f8` 0 (`0x1453ae..0x1453d2`), -1002 or status 12 (`ctx+0x28`, `env+0x241c`). Not modelled, no
+            // witness (guard 0 only in a nested MIP, never with a failure: `evidence/witness-config-round2-coupled.md`, `primal-pricing0-accuracy-boundary.md`).
             s.accuracy += 1;
             // The standalone pricing0 accuracy rejection also updates ctx+0x178.
             crate::dual::C178.with(|c| c.set(c.get() + 1));
@@ -6114,6 +6128,8 @@ fn solve_primal(
                 None if s.handoff.is_some_and(|h| !h.quad && !h.pert) && s.sw.active && s.sw.level != 0 && s.iters_done != 0 => {
                     // A failed scan with the primal's own perturbation in force (`ctx+0x338` != 0, `0x145a72..0x145a94`) clears it and ends the primal with status -1004,
                     // request 9, before the failed-scan arm below; the controller reruns the dual (witness_primal_r31_double4).
+                    // GUROBI: with `ctx+0x35c > 10` and `ctx+0x338 == 1` the high-handoff test (`0x145a7d`, `0x145a5c..0x145dbf`) first scans the rhs shifts against
+                    // 1e-10 (counts 11..20) or 1e-9 and, when none exceeds it, zeroes them and goes on unshifted; not modelled (also phase 2 below), no natural witness.
                     PRIMAL_SHIFT_END.with(|c| c.set(true));
                     break Status::Infeasible;
                 }
@@ -6282,6 +6298,8 @@ fn solve_primal(
                     // The end test without an entering variable (`0x14522c..0x1452ff`): with updates, or with `ctx+0x3f8` != 0 (1 in a primal started by the dual controller), the
                     // primal requests a refactorization (6) before ending, even on a fresh factor (fx_witness_dual_cc1ca, dual-controlled: ctx+0x390 is already 0.5). The status
                     // pass of the recompute puts nonbasic variables at an infinite upper bound back to the lower one, so the variable the dual left there is priced again.
+                    // GUROBI: the reference's general rule (updates or `ctx+0x3f8` != 0 at `0x14522c..0x1452ff`) is not modelled; this gate is the narrowest that keeps the
+                    // corpus, and what decides the reference's choice is not read (witnesses only fx_witness_dual_cc1ca and fx_ladder_smallpivot, dual-controlled).
                     for j in 0..s.p.n + s.p.m {
                         if s.at_upper[j] && is_inf(s.p.up[j]) && !s.basic.contains(&j) {
                             s.at_upper[j] = false;

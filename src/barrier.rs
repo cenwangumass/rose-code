@@ -2471,6 +2471,8 @@ fn term_input(
         p2460: 1e-6,
         p2bbc: o.max_iter,
         p2c10: 0,
+        // GUROBI: `0x2e3666..0x2e3676` returns 11 (`0x2e3938`) when the work estimate `Q+0x5b0` exceeds `P+0x2938` (`GURO_PAR_VTIMESOFTLIMIT`); rose's
+        // input is always false; no witness (natural default reachability unproved, only in a nested MIP child; `specs/barrier-solve.md`).
         time_up: false,
         h50: h.h50.clone(),
         h68: h.h68.clone(),
@@ -3170,6 +3172,8 @@ pub fn run<S: NormalSolver>(
                 Some(sv) => (sv.state, sv.it),
                 None => (save_iterate(&st, tau, it).state, it),
             };
+            // GUROBI: a cutoff (6) after iterations restores the saved iterate and reads out `Q+0x1e8` (`0x2e0a2b..0x2e0a86`); no witness of a natural
+            // later cutoff (only the initial exit and a forced AFIRO exit, `specs/barrier-solve.md`, "Default cutoff termination").
             let objective = if code == 6 {
                 best_dual
             } else {
@@ -3318,6 +3322,8 @@ pub fn run<S: NormalSolver>(
         }
         // Corrector loop (`0x2e20e3..0x2e2276`): the direction so far starts as the predictor and becomes the combined direction after each selection.
         if !release && !early {
+            // GUROBI: `0x2e20b5` sets `Q+0x298 = max(BarCorrectors, 1)` (`P+0x2bb8`); BarCorrectors above 1 in the controlled profile is not modelled; no
+            // witness (`plans/PLAN-barrier.md`, "Open leads").
             q298 = 1; // `0x2e20b5`: `Q+0x298 = max(BarCorrectors, 1)`
         }
         let ntry = solver.ntry(
@@ -3522,6 +3528,8 @@ pub fn run<S: NormalSolver>(
             && relgap > 1e-4;
         // Type B restart floor `Q+0x30` (`0x2e2983`): `max(1000, 10 Q+0x38)`.
         let mut q30r = (q38 * 10.0).max(1000.0);
+        // GUROBI: restart A and the homogeneous algorithm after it need `P+0x2bc0 == -1`; BarHomogeneous other than the default is not modelled; no
+        // witness (`plans/PLAN-barrier.md`, "Open leads"; `specs/barrier-solve.md`).
         if !restart && !q2c {
             // Restart A (`0x2e2aa1`, once; reached whenever B does not fire): |x| or |y| of the updated iterate huge (1e15 times the data norms), or from
             // iteration 10 on above 1e8 times them while the primal (dual) residual history did not fall. The starting point's floor stays 0.

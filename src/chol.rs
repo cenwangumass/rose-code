@@ -2053,6 +2053,8 @@ impl CholSolver {
     }
 
     /// `SYM+0x178 == 1` (`0x2f1720`): free columns remain, or the smallest pivot ratio is below `1e-10` (dense columns and scaling are not modelled).
+    // GUROBI: `0x2f1720` selects refinement mode 2 (`0x317fc0`) when `Q+0x288` (NumericFocus `P+0x2718 >= 2` or `P+0x2c34 != 0`) or `Q+0x24` is
+    // non-zero; not modelled; no witness in the two profiles (`specs/barrier-solve.md`, "Refinement mode").
     fn refining(&self, f: &StdForm) -> bool {
         (0..f.n2).any(|j| f.flags[j] == 0)
             || !f.dense.is_empty()

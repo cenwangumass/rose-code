@@ -2583,6 +2583,9 @@ impl<R: Real> RefStruct<R> {
                 );
             }
             if !bare || !held {
+                // GUROBI: a bare `old >= 0` replacement whose `r` no tail column's B list holds (`!held`) is never reached; `0xf15c0` has no code that
+                // removes a bare `r` from the nucleus list (count `[rbx+0xec]` decremented only at `0xf1eb7`, `0xf2a7f`), so the reference likely keeps it;
+                // no witness (`specs/lu-factor.md`, "Bare replacement"; dump kind `bare`, all held).
                 self.drop_nuc(r);
                 if bare {
                     self.kind[r] = -1;
@@ -2655,6 +2658,8 @@ impl<R: Real> RefStruct<R> {
         }
         let _ = &mut tail_rebuild;
         // A row whose only entry was the old column leaves the singleton list when its position is within the reference's limit.
+        // GUROBI: the reference removes the row-single nucleus column from the old tail column's lists only if `slot[y] <= [rsp+0x168]` (`0xf1ea5`);
+        // rose removes it unconditionally above; no witness of the gated-off case (1693 corpus drops, `specs/lu-factor.md`, "latent gate").
         for y in single_rows {
             if xlim >= self.slot[y] as i64 {
                 self.upd_work.push((0xf1f37, 3.0, crate::work::CTX));

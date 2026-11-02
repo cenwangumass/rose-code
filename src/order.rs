@@ -1465,6 +1465,8 @@ pub fn structure(
 }
 
 /// [`structure`] with `BarOrder = -1` (`auto`: the release profile) or `0`.
+// GUROBI: the manager `0x31da80` reads BarOrder from `P+0x2bc4`; values other than -1, 0 and 1 (1 = always run the extra orderings) are not
+// modelled; no witness (`plans/PLAN-barrier.md`, "Open leads").
 pub fn structure_order(
     m: &LpModel,
     dense_min: usize,
@@ -1531,6 +1533,8 @@ pub fn structure_order(
                             best = c;
                         }
                     }
+                    // GUROBI: the round loop also checks the `0x80(rsp)` budget at `0x31e47a`, not modelled (it never fires with `1e100`); no witness
+                    // (`plans/PLAN-barrier.md`, "Open leads").
                     if budget <= 0.0 || total / budget > 0.05 {
                         break;
                     }
