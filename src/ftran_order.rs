@@ -32,6 +32,8 @@ pub struct RefStruct<R: Real = f64> {
     at: Vec<usize>,
     etas: Vec<Eta<R>>,
     lvals: Vec<Vec<R>>,
+    /// Immutable L transpose, in ascending source-column order, shared by all BTRAN calls of this factor.
+    lt: Vec<Vec<(usize, R)>>,
     /// Longest-path level of each L node, when the reference solves L level by level (`0x12a990`): only for `m >= 250`, a
     /// small level count (`< m/10`) and a short Markowitz L part. Otherwise the L solve is the Kahn FIFO.
     levels: Option<Vec<usize>>,
@@ -323,6 +325,12 @@ impl<R: Real> RefStruct<R> {
             .map(|rows| rows.iter().map(|&r| step[r]).collect())
             .collect();
         let lvals = st.l_vals.clone();
+        let mut lt = vec![Vec::new(); m];
+        for v in 0..m {
+            for (k, &y) in lcols[v].iter().enumerate() {
+                lt[y].push((v, lvals[v][k]));
+            }
+        }
         // pivot-row values of the Markowitz steps, by column
         let mut mk: Vec<Vec<(usize, R)>> = vec![Vec::new(); m];
         for s in nseq..m {
@@ -672,6 +680,7 @@ impl<R: Real> RefStruct<R> {
             at: (0..m).collect(),
             etas: Vec::new(),
             lvals,
+            lt,
             levels,
             lev_built,
             diag: st.diag.clone(),
@@ -1692,12 +1701,7 @@ impl<R: Real> RefStruct<R> {
             }
         }
         // L^T: row i of L pushes into the earlier nodes.
-        let mut lt: Vec<Vec<(usize, R)>> = vec![Vec::new(); m];
-        for v in 0..m {
-            for (k, &y) in self.lcols[v].iter().enumerate() {
-                lt[y].push((v, self.lvals[v][k]));
-            }
-        }
+        let lt = &self.lt;
         let mut res: Vec<usize> = Vec::new();
         let sparse_l = match &list {
             Some(l) => l.len() * self.dthr <= m && !self.lev_dense,
