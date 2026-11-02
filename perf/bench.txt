@@ -1,0 +1,34 @@
+# Performance benchmark set of perf/PLAN.md: run id, model, `rose solve` arguments (run from rose/, no dumps).
+# Fixed: changing it invalidates every number in perf/STATE.md. The `ref` column of STATE.md comes from
+# ../reverse-engineer/runs/MODEL-PROFILE.json, field result.runtime (PROFILE: controlled, release, dual-controlled,
+# dual-release, barrier-release, barrier-controlled, pdhg-release); `-` when there is no such file.
+#
+# smoke: small runs, quick sanity of the harness
+degen2.primal-c       tests/fixtures/degen2.mps   --method primal --profile controlled
+degen2.dual-r         tests/fixtures/degen2.mps   --method dual --profile release
+# primal
+degen3.primal-c       tests/fixtures/degen3.mps   --method primal --profile controlled
+degen3.primal-r       tests/fixtures/degen3.mps   --method primal --profile release
+perold.primal-c       tests/fixtures/perold.mps   --method primal --profile controlled
+pilot4.primal-r       tests/fixtures/pilot4.mps   --method primal --profile release
+80bau3b.primal-c      tests/fixtures/80bau3b.mps  --method primal --profile controlled
+primal_5959.primal-r  tests/fixtures/primal_5959.mps --method primal --profile release
+# dual (double)
+degen3.dual-c         tests/fixtures/degen3.mps   --method dual --profile controlled
+degen3.dual-r         tests/fixtures/degen3.mps   --method dual --profile release
+perold.dual-r         tests/fixtures/perold.mps   --method dual --profile release
+80bau3b.dual-r        tests/fixtures/80bau3b.mps  --method dual --profile release
+greenbea.dual-c       tests/fixtures/greenbea.mps --method dual --profile controlled
+greenbea.dual-r       tests/fixtures/greenbea.mps --method dual --profile release
+mode_switch.dual-r    tests/fixtures/witness_dual_r2_mode_switch.mps --method dual --profile release
+# dual with the quad (x87 long double, crate::f80) passes
+primal_5959.dual-r    tests/fixtures/primal_5959.mps --method dual --profile release
+quad_2717.dual-r      tests/fixtures/quad_2717.mps --method dual --profile release
+fx_quad_obj_5371.dual-r tests/fixtures/fx_quad_obj_5371.mps --method dual --profile release
+# barrier
+degen3.barrier-r      tests/fixtures/degen3.mps   --method barrier --barrier-profile release
+80bau3b.barrier-r     tests/fixtures/80bau3b.mps  --method barrier --barrier-profile release
+greenbea.barrier-r    tests/fixtures/greenbea.mps --method barrier --barrier-profile release
+# PDHG
+80bau3b.pdhg          tests/fixtures/80bau3b.mps  --method pdhg
+greenbea.pdhg         tests/fixtures/greenbea.mps --method pdhg --pdhg-iter-limit 20000

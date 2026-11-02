@@ -1,0 +1,135 @@
+# Performance plan
+
+Make rose faster without changing any number it computes. Rose agrees with the reference (Gurobi 13.0.3)
+bit for bit on the parity corpus; every speedup must keep that agreement exactly. This file is the
+standing plan and the working loop. The current numbers, hotspots and the ideas already tried are in
+[STATE.md](STATE.md); read it first in every session, and keep it current (rules at the end).
+
+## The invariant
+
+A change is acceptable only if `target/release/rose-parity check --tier full` passes: every dump
+record, every result vector, every status and exit code of all 987 corpus runs equals the frozen
+baseline. No exceptions, no "within a ULP", no re-recording.
+
+- Never edit `parity/baseline/` or re-record it; never pass `--ignore` to make a check pass. If you add a
+  dump kind or a corpus run, record only the new runs, and only with the frozen binary:
+  `rose-parity record --only NEWID --bin target/parity-baseline/rose` (for a new dump kind, check with
+  `--ignore NEWTAG` instead; do not add dump kinds as part of an optimization).
+- The dump records are part of the behaviour. A data-structure change that alters a record that only
+  describes rose's own layout (pool fill, capacities, slots) still fails the gate: those records mirror
+  the reference's layout. Keep the records, compute them some other way if needed.
+- The work counter (`crate::work`, WORK records) decides when to refactorize. A faster loop must book
+  exactly the same estimates (same sites, same values, same order). When the estimate is counted inside
+  a loop you want to shorten or skip, first move the count into a separate function of the inputs that
+  reproduces it, check, then speed up the loop.
+- Floating point: keep every operation and its order. No reassociation, no `mul_add`/FMA, no
+  `target-cpu` or fast-math flags, no `f64::powi` (use `real::pow2` or products), no change of a sum's
+  order (including SIMD lane order: `Real` documents that the double kernels add in vector lanes and the
+  x87 ones one term after the other; keep each kernel's existing order). Do not swap libm calls for
+  approximations. Do not move the toolchain pin.
+- No threads, no nondeterminism (hash map iteration, time, addresses) in anything that reaches a
+  decision or a record.
+
+## Tools
+
+- `cargo build --release`: the binaries (`target/release/rose`, `target/release/rose-parity`).
+- `cargo build --profile profiling`: the same code with line tables (`target/profiling/rose`), for perf.
+  It produces the same bits as release.
+- `target/release/rose-parity check [--tier full] [--only ID,..]`: the gate. Fast tier (940 runs) takes
+  seconds, full (987) under a minute. On a difference it prints the first differing record and field.
+- `perf/bench.sh [--only ID,..] [--runs N] [--instr] [--bin PATH]`: times the runs of
+  [bench.txt](bench.txt) with hyperfine (median of N after a warm-up); `--instr` adds user-space
+  instruction counts (`perf stat`), which have far less noise than wall time.
+- `perf record -g --call-graph dwarf -o /tmp/X.data target/profiling/rose solve MODEL ARGS --output /dev/null`
+  then `perf report -i /tmp/X.data --no-children --percent-limit 1 --stdio` (flat hotspots) and
+  `perf report ... --children` (inclusive). `perf annotate` for a hot function. Bound the run: pick a
+  bench run, or add `--max-iterations N`. `perf stat -e instructions:u,cycles:u,cache-misses:u,branch-misses:u`
+  for a quick picture.
+- `cargo test --release` (about 35 s): the reference-derived tests. Run before each commit.
+- Format with `RUSTFMT=~/.local/bin/rustfmt-custom cargo fmt -- --config blank_line_between_items=true`
+  (never plain `cargo fmt`). Version control is `jj`, run from `rose/`.
+
+## Measuring
+
+- Times are wall-clock medians from `perf/bench.sh` on the release build, no dumps. Measure the
+  baseline and the candidate in the same session, back to back (`--bin` lets you time a saved copy of the
+  previous binary, e.g. `cp target/release/rose /tmp/rose-before` before rebuilding).
+- Accept a gain only if it is larger than the run's min-max spread and the instruction count (`--instr`)
+  moves the same way. For a change below 3 % on its target, require the instruction count to drop.
+- A change must not slow any other bench run by more than the noise. Run the whole bench set before
+  committing; time only the affected runs while iterating.
+- Keep each measurement bounded: the slowest bench runs take tens of seconds; use `--only` and
+  `--runs 3` while iterating. Run anything expected to take more than a few minutes in the background.
+
+## The loop
+
+Repeat until STATE.md's candidate list is empty and the latest profiles show no item above 5 % that
+has not been tried:
+
+1. **Pick a target.** Take the bench run with the largest rose/reference time ratio or largest absolute
+   time that has an untried hotspot in STATE.md; if the hotspot list is stale (older than the last
+   landed change touching that path) re-profile that run first and rewrite its hotspot entry.
+2. **Understand it.** Read the hot function and its callers. Find out why it is slow: repeated full
+   scans where the reference keeps lists, allocation per iteration, dense loops over sparse data,
+   recomputation of invariant values, F80 software arithmetic in a loop that only needs a few values,
+   string/JSON work on the hot path when no dump is selected, bounds checks in tight loops, cache-hostile
+   layout. Write the hypothesis into STATE.md "In progress" (one line).
+3. **Protect it.** If the change rewrites a numeric kernel, first copy the current version into a
+   `#[cfg(test)]` module next to it and add a differential test: old against new, bit for bit
+   (`to_bits()`), on random inputs (include zeros, signed zeros, tiny and huge magnitudes, empty and
+   one-element cases, the F80 type where the kernel is generic) and on inputs taken from a dump of a
+   real run. If the change only restructures control flow or memory, the parity gate is the test.
+4. **Change one thing.** Keep the diff to one idea. No drive-by refactors in the same change.
+5. **Check.** `cargo build --release`, `rose-parity check` (fast); fix or revert on any difference.
+   The first differing record tells you where behaviour moved; do not guess around it.
+6. **Measure** as above. If the gain is not real, revert (`jj restore` / `jj abandon`) and record the idea
+   under "Tried, no gain" with the measured number.
+7. **Commit.** `rose-parity check --tier full`, `cargo test --release`, format, then one jj commit per
+   optimization. Message: what changed and why it is faster, the bench numbers before/after for the
+   affected runs, and "parity: full tier 987/987". Start the next change on a new empty commit (`jj new`).
+8. **Update STATE.md** (rewrite the affected lines, do not append a log).
+
+If a change fails the gate and the cause is not found within a few attempts, revert it, record the idea
+under "Tried, breaks parity" with the first differing record, and move on. Never commit a failing gate,
+never commit with debug prints, never leave the tree with uncommitted half-work at the end of a session
+(either commit a passing change or restore).
+
+## Where to look first
+
+These are leads to verify with a profile, not facts. Remove each from STATE.md's candidates once it is
+measured.
+
+- **The mode-switch witness** (`mode_switch.dual-r`, 15000 rows): about 20 s in rose against 0.4 s in
+  the reference. A ratio of 50 points at an algorithmic cost (something O(m) or O(n) per iteration that
+  the reference does incrementally, e.g. pricing over all rows, full weight or candidate rebuilds,
+  dense vectors cleared per iteration). Largest expected payoff.
+- **Large dual and primal runs** (DEGEN3, PEROLD, 80BAU3B, GREENBEA): pricing, ratio tests,
+  FTRAN/BTRAN (`ftran_order.rs`), the LU update and refactorization (`lu*.rs`), the bound-flip and
+  update loops in `dual.rs` / `simplex.rs`.
+- **The quad passes** (`quad_2717`, `fx_quad_obj_5371`, `primal_5959.dual-r`): `crate::f80` is a
+  software x87 extended-precision type; its add/mul/div are in every quad kernel. Look for a faster
+  exact implementation of the same rounding (the F80 tests and `../reverse-engineer/evidence/f80-subnormal-reference.json`
+  define it), and for F80 work that runs where its results are not used.
+- **Dump overhead with no dump selected**: about 70 `dump::on("kind")` sites in `dual.rs` and
+  `simplex.rs`. Each call scans the selected kinds by string; check whether any of them sits in a
+  per-iteration or per-element loop, and whether any record is built before the `on` test.
+- **Allocation**: `Vec` creation per iteration or per FTRAN/BTRAN call; reuse buffers held in the solver
+  state (clear only the touched entries).
+- **Barrier** (`chol.rs`, `barrier.rs`, `sgemm32.rs`) and **PDHG** (`pdhg.rs`): profile after the simplex
+  work; their dense kernels have a fixed summation order (blocked, lane order) that must be kept.
+
+## Out of scope
+
+- Any change of results, iteration counts, statuses or dump records; parameters or defaults.
+- Algorithmic improvements beyond the reference (better pricing, presolve, other orderings): they
+  change behaviour.
+- Multi-threading, GPU, unsafe SIMD that changes the lane order.
+- Debug-build speed; FIT2P (minutes; profile it only with `--max-iterations`).
+
+## STATE.md rules
+
+STATE.md holds only the current state: the commit the numbers belong to, the bench table (baseline,
+current, reference), the current hotspots per bench run, the candidate list, the idea in progress, and
+the ideas tried and rejected (one line each with the measured reason, so they are not retried). It is not
+a log: rewrite lines in place, delete what is settled (a landed change leaves STATE.md through the
+updated numbers and hotspots; its history is in `jj log`). Keep it short enough to read in one go.

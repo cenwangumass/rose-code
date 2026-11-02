@@ -48,3 +48,8 @@ and copy its `rose` there (`check` itself needs only the digests).
   with a full parity check. `tests/libm_pins.rs` pins the system libm's results: when it fails, run the
   full parity check before trusting the build.
 - Profile with `cargo build --profile profiling` (release code with line tables).
+
+## Performance work
+
+The plan and working loop are in `perf/PLAN.md`, the current numbers and tried ideas in `perf/STATE.md`
+(read it first; rewrite it in place, no log). Benchmarks: `perf/bench.sh` over `perf/bench.txt`.
