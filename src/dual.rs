@@ -7737,7 +7737,7 @@ mod captured_primal_drift_gate {
         );
         // A sub-double-ULP distinction must survive until the x87 comparison.
         let one = F80::from_f64(1.0);
-        let epsilon = F80::from_f64(2.0_f64.powi(-60));
+        let epsilon = F80::from_f64(crate::real::pow2(-60));
         assert!(primal_drift_excess(
             (one + epsilon) / F80::from_f64(100.0),
             one

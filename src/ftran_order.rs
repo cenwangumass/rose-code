@@ -508,7 +508,10 @@ impl<R: Real> RefStruct<R> {
         let dthr = if nnz <= m {
             2
         } else {
-            let t = 5.0 * ((nnz as f64 / m as f64) + 1.0).powi(2);
+            let t = {
+                let q = (nnz as f64 / m as f64) + 1.0;
+                5.0 * (q * q)
+            };
             if (m as f64) > t {
                 t as usize
             } else {
@@ -1512,7 +1515,10 @@ impl<R: Real> RefStruct<R> {
         if self.upd < c46c {
             return false;
         }
-        let d6 = (self.znz - 1.5 * m).powi(2);
+        let d6 = {
+            let q = self.znz - 1.5 * m;
+            q * q
+        };
         let d7 = (4.0 * m * m * c46c as f64).min(d6);
         (1.5 * self.sum_alpha + 2.0 * self.sum_eta) * m - d7 > 0.0
     }

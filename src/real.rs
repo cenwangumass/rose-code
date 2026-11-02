@@ -142,3 +142,33 @@ impl Real for F80 {
         serde_json::json!([format!("{m:#x}"), format!("{se:#x}")])
     }
 }
+
+/// `2^k`, exact for every `k` with a representable result (`-1074 ..= 1023`): built from its bit pattern, so the value does not depend on how
+/// the compiler lowers a power (`f64::powi` is an LLVM intrinsic that is not correctly rounded and is lowered differently by context).
+pub fn pow2(k: i32) -> f64 {
+    assert!((-1074..=1023).contains(&k), "2^{k} is not representable");
+    if k >= -1022 {
+        f64::from_bits(((k + 1023) as u64) << 52)
+    } else {
+        f64::from_bits(1u64 << (k + 1074))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::pow2;
+
+    #[test]
+    fn pow2_is_exact() {
+        let mut v = 1.0f64;
+        for k in 0..=1023 {
+            assert_eq!(pow2(k).to_bits(), v.to_bits(), "2^{k}");
+            v *= 2.0;
+        }
+        let mut v = 1.0f64;
+        for k in 0..=1074 {
+            assert_eq!(pow2(-k).to_bits(), v.to_bits(), "2^-{k}");
+            v /= 2.0;
+        }
+    }
+}

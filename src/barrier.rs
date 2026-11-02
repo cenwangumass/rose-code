@@ -794,7 +794,7 @@ impl Ext {
 
 fn ldexp(v: f64, e: i32) -> f64 {
     let h = e / 2;
-    v * 2f64.powi(h) * 2f64.powi(e - h)
+    v * crate::real::pow2(h) * crate::real::pow2(e - h)
 }
 
 /// `0x35adf0`: Kahan summation in extended precision of the extended products `a_i b_i`:
@@ -3786,14 +3786,14 @@ mod tests {
     fn ext_rounds_to_64_bits() {
         // 1 + 2^-64 is a tie in 64 bits and rounds to even (1); 1 + 3 * 2^-64 rounds up to 1 + 2^-62.
         let one = Ext::from_f64(1.0);
-        let t = Ext::from_f64(2f64.powi(-64));
+        let t = Ext::from_f64(crate::real::pow2(-64));
         assert_eq!(one.add(t).to_f64(), 1.0);
-        let e = one.add(Ext::from_f64(3.0 * 2f64.powi(-64)));
-        assert_eq!(e.sub(one).to_f64(), 2f64.powi(-62));
+        let e = one.add(Ext::from_f64(3.0 * crate::real::pow2(-64)));
+        assert_eq!(e.sub(one).to_f64(), crate::real::pow2(-62));
         // Product of two doubles is exact in 106 bits and rounded once to 64.
-        let a = 1.0 + 2f64.powi(-52);
+        let a = 1.0 + crate::real::pow2(-52);
         let p = Ext::mul_f64(a, a);
-        assert_eq!(p.sub(Ext::from_f64(1.0)).to_f64(), 2f64.powi(-51));
+        assert_eq!(p.sub(Ext::from_f64(1.0)).to_f64(), crate::real::pow2(-51));
         // Cancellation is exact.
         assert_eq!(Ext::from_f64(3.5).sub(Ext::from_f64(3.5)).to_f64(), 0.0);
         assert_eq!(Ext::from_f64(-2.0).add(Ext::from_f64(0.75)).to_f64(), -1.25);

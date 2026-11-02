@@ -5085,7 +5085,7 @@ fn thr(k: usize) -> f64 {
     if k == 0 {
         0.0
     } else {
-        2f64.powi(k as i32 - 20)
+        crate::real::pow2(k as i32 - 20)
     }
 }
 

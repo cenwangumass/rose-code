@@ -455,7 +455,7 @@ fn objective_factor(c: &[f64]) -> f64 {
         return 1.0;
     }
     let v = if x4 > 1000.0 { 1000.0 } else { x4 };
-    2f64.powi(v.log2().floor() as i32)
+    crate::real::pow2(v.log2().floor() as i32)
 }
 
 /// The scaled model the iteration runs on.
