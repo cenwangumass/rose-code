@@ -2869,14 +2869,21 @@ impl<R: Real> RefStruct<R> {
             if let Some(x) = conv {
                 convslot = Some(self.slot[x]);
                 // Only a column some tail column refers to joins the nucleus list; the others become singletons.
-                let held = (0..m).any(|k| self.kind[k] == -2 && self.a[k].contains(&x));
+                let mut refs: Vec<usize> = self.rowl[x]
+                    .iter()
+                    .copied()
+                    .filter(|&k| self.kind[k] == -2 && self.a[k].contains(&x))
+                    .collect();
+                refs.sort_unstable();
+                refs.dedup();
+                let held = !refs.is_empty();
                 if held {
                     self.kind[x] = self.nuc.len() as i64;
                     self.nuc.push(x);
                 } else {
                     self.kind[x] = -1;
                 }
-                for k in 0..m {
+                for k in refs {
                     if self.kind[k] == -2 && self.a[k].contains(&x) {
                         // The last entry of A fills the hole, and the demoted column takes the slot A gives up (the front of B).
                         let p = self.a[k].iter().position(|&y| y == x).unwrap();
