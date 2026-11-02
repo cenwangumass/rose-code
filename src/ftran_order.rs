@@ -11,6 +11,38 @@ use crate::lu_order::Structure;
 use crate::real::Real;
 use std::collections::BinaryHeap;
 
+/// Direct numeric row lookup for tau dots. Stamps retain the first duplicate without clearing per row.
+#[derive(Clone, Default)]
+struct TauRow<R> {
+    values: Vec<R>,
+    stamps: Vec<usize>,
+    epoch: usize,
+}
+
+impl<R: Real> TauRow<R> {
+    fn prepare(&mut self, m: usize, row: &[(usize, R)]) {
+        if self.values.len() != m {
+            self.values.resize(m, R::ZERO);
+            self.stamps.resize(m, 0);
+        }
+        self.epoch = self.epoch.wrapping_add(1);
+        if self.epoch == 0 {
+            self.stamps.fill(0);
+            self.epoch = 1;
+        }
+        for &(c, v) in row {
+            if self.stamps[c] != self.epoch {
+                self.stamps[c] = self.epoch;
+                self.values[c] = v;
+            }
+        }
+    }
+
+    fn get(&self, c: usize) -> Option<R> {
+        (self.stamps[c] == self.epoch).then(|| self.values[c])
+    }
+}
+
 #[derive(Clone)]
 pub struct RefStruct<R: Real = f64> {
     m: usize,
@@ -84,6 +116,8 @@ pub struct RefStruct<R: Real = f64> {
     f2: std::cell::RefCell<F2<R>>,
     /// Scratch terms of the second-vector nucleus row dot; keep capacity across rows and solves.
     tau_terms: std::cell::RefCell<Vec<(R, R)>>,
+    /// Reusable direct view of one numeric U row; its values are read in virtual rowl order.
+    tau_row: std::cell::RefCell<TauRow<R>>,
     /// Fill of the reference's pool for etas and the row-wise copy of U (`F+0x160`), and the capacity of each row of that copy.
     /// Only the parity of `fill` matters: it decides the alignment of the next eta's value array.
     fill: usize,
@@ -593,6 +627,7 @@ impl<R: Real> RefStruct<R> {
             tau_fin: std::cell::Cell::new(0),
             f2: std::cell::RefCell::new(F2::default()),
             tau_terms: Default::default(),
+            tau_row: Default::default(),
             scratch_peel: ((m as f64).powf(0.7) as usize)
                 .max(20)
                 .wrapping_add(ncols + 1)
@@ -1060,6 +1095,7 @@ impl<R: Real> RefStruct<R> {
             f.tau_raw = tau_raw;
         }
         let mut terms = self.tau_terms.borrow_mut();
+        let mut row = self.tau_row.borrow_mut();
         needed
             .iter()
             .map(|&p| {
@@ -1068,9 +1104,12 @@ impl<R: Real> RefStruct<R> {
                     -1 => x[p] / self.diag[p],
                     _ => {
                         terms.clear();
-                        terms.extend(self.rowl[p].iter().filter_map(|&c| {
-                            self.uc[c].iter().find(|e| e.0 == p).map(|e| (e.1, x[c]))
-                        }));
+                        row.prepare(m, &self.ut[p]);
+                        terms.extend(
+                            self.rowl[p]
+                                .iter()
+                                .filter_map(|&c| row.get(c).map(|v| (v, x[c]))),
+                        );
                         let dot = if R::QUAD {
                             row_dot_q(x[p], &terms)
                         } else {
@@ -2899,6 +2938,18 @@ mod transpose_tests {
                         .map(|row| row.iter().map(|&(k, v)| (k, bits(v))).collect())
                         .collect();
                 assert_eq!(actual, expected);
+                let mut lookup = TauRow::<R>::default();
+                for row in 0..m {
+                    // Exercise epoch wrap as well as ordinary reuse across different and empty rows.
+                    if row == m / 2 {
+                        lookup.epoch = usize::MAX;
+                    }
+                    lookup.prepare(m, &f.ut[row]);
+                    for c in 0..m {
+                        let expected = f.uc[c].iter().find(|e| e.0 == row).map(|e| bits(e.1));
+                        assert_eq!(lookup.get(c).map(&bits), expected);
+                    }
+                }
             }
         }
     }
