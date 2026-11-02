@@ -3192,7 +3192,9 @@ impl<R: Real> RefStruct<R> {
             }
         }
         if old >= 0 {
-            let held = (0..m).any(|x| x != r && self.kind[x] == -2 && self.b[x].contains(&r));
+            let held = self.rowl[r]
+                .iter()
+                .any(|&x| x != r && self.kind[x] == -2 && self.b[x].contains(&r));
             if bare && crate::dump::on("bare") {
                 let tail = (0..m).filter(|&x| self.kind[x] == -2).count();
                 crate::dump::emit(
@@ -3214,16 +3216,12 @@ impl<R: Real> RefStruct<R> {
             self.a[r].clear();
             self.replace_u_column(r, Vec::new());
             self.kind[r] = -1;
-            let mut refd = vec![false; m];
-            for k in 0..m {
-                if self.kind[k] == -2 {
-                    for &y in &self.b[k] {
-                        refd[y] = true;
-                    }
-                }
-            }
             for x in old_b {
-                if !refd[x] && self.kind[x] >= 0 {
+                if self.kind[x] >= 0
+                    && !self.rowl[x]
+                        .iter()
+                        .any(|&k| self.kind[k] == -2 && self.b[k].contains(&x))
+                {
                     self.drop_nuc(x);
                     self.kind[x] = -1;
                 }

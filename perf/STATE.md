@@ -4,7 +4,7 @@ Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (histo
 
 ## Numbers
 
-Baseline solver: `8b645007` (same solver as `vlsokskq`). Current solver: `ntmqvzol` (flat immutable forward L columns, PGO with rustc-default online profile merging).
+Baseline solver: `8b645007` (same solver as `vlsokskq`). Current solver: `yxpknytr` (row-indexed B-reference checks, PGO with rustc-default online profile merging).
 Parity: full tier 987/987; release tests pass. Three timed runs after one warm-up, hyperfine 2.0.0; instruction counts are millions from perf stat.
 
 `baseline wall` is the fixed initial process-wall median. `paired base wall` is the fresh baseline-binary median from alternating baseline/last-landed/candidate checks on one CPU (CPU 0 unless stated otherwise); it resolves host drift without changing the fixed baseline. `current wall` and `solve` use the new harness; **current/ref uses solve-only time**, `diagnostics.seconds`, against original Gurobi Runtime.
@@ -12,46 +12,46 @@ Parity: full tier 987/987; release tests pass. Three timed runs after one warm-u
 Reference provenance: original-library cached records `../reverse-engineer/runs/{degen2,degen3,perold,pilot4}-{profile}.json` for the ten previously valid cells. New three-run medians use `/tmp/rose-perf-reference/{primal_5959.primal-r,primal_5959.dual-r,quad_2717.dual-r,fx_quad_obj_5371.dual-r}.{1,2,3}.json`; summary `/tmp/rose-perf-reference/summary.json`. All original-library records identify Ryzen 9 5900X and library SHA256 `8e87fca221fdffc922331c8619426031b3e72dfd419446422f88af0cb0e98f9c`.
 `-` refs are unreachable: original Gurobi rejects 80BAU3B, GREENBEA and mode-switch with license error 10010 (scratch `ID.error.json`, including direct 80BAU3B primal/dual attempts). The old 80BAU3B primal/dual refs used the patched library and have been removed; the old prose mode-switch time is unusable.
 
-Regression checks: all 23 runs paired against the preceding validated PGO CLI on CPU 2, alternating pair order. Only 80BAU3B primal-controlled flags a timing regression, crossing host speed bands; three alternating CPU-4 follow-ups all improve (the first stable pair 0.697635 -> 0.684858 s, beyond 0.004701/0.003717 s spreads). No repeatable regression remains. Table uses median follow-up medians for that row and full-sweep values elsewhere. Raw `target/perf-lflat-{full,followup}-{before,after}.txt`.
-Acceptance: immutable forward L destinations/coefficients share one flat buffer with column offsets, removing per-column allocations and repeated row/value metadata loads. DEGEN2 dual-release full-sweep solve 0.033519 -> 0.032636 s (-2.63%), beyond 0.000511/0.000538 s spreads; instructions 252.880 -> 248.906M (-1.57%). DEGEN3 primal-controlled 0.526960 -> 0.520494 s (-1.23%), beyond 0.002296/0.003250 s spreads; instructions 4576.114 -> 4540.444M (-0.78%). Earlier DEGEN2 timing pairs were within spread, while two comparable DEGEN3 CPU-4 pairs improve about 1% and 1.9%; do not credit their host-band shifts. SC50A instructions fall about 2%, with timing within spread. Scatter/graph order, scalar operations, work estimates and diagnostic arrays are preserved. Frozen f64/F80 random/extreme/captured SC50A L-stage differential tests and captured-output checks pass.
-Build: `python3 -B perf/build_pgo.py`; compiler/flags/training manifest in `target/perf-pgo/build.json`, profile SHA256 `2e2c6be46175e24a5fd8b034596b2be5e43ac510d80e94205d929cbd5d9107b0`. Build `/tmp/rose-lflat-build.txt`; full parity 987/987 `/tmp/rose-lflat-full-parity.txt`; release tests with the same PGO flags `/tmp/rose-lflat-tests.txt`. Training retains rustc's default shared online merging; the frozen parity baseline is unchanged.
+Regression checks: all 23 runs paired against the preceding validated PGO CLI on CPU 2, alternating pair order. PEROLD primal-controlled and quad_2717 timing flags do not repeat in three alternating CPU-4 follow-ups. GREENBEA PDHG crosses host speed bands in one follow-up; the final comparable pair is 1.499856 -> 1.501655 s, within 0.017724/0.009387 s spreads, with effectively unchanged instructions. No repeatable regression remains. Table uses median follow-up medians for those three rows and full-sweep values elsewhere. Raw `target/perf-brow-{full,followup}-{before,after}.txt`.
+Acceptance: B-reference checks use the maintained row index as candidates, retaining the tail-kind and actual B-membership filters. This removes full-tail scans and the temporary reference bitmap without maintaining new counts. PEROLD dual-release full-sweep solve 0.135409 -> 0.132474 s (-2.17%), beyond 0.000307/0.000416 s spreads; instructions 1223.260 -> 1214.834M (-0.69%). Three initial alternating pairs improve 1.1–1.6% beyond their individual spreads (`target/perf-brow-target-{before,after}.txt`). ADLITTLE instructions fall about 0.25%, with timing within spread. Mode-switch instructions fall 20.167 -> 18.926B (-6.16%); its timing pair crosses speed bands and is not credited. Numeric operations, decisions, virtual layout and work records are unchanged.
+Build: `python3 -B perf/build_pgo.py`; compiler/flags/training manifest in `target/perf-pgo/build.json`, profile SHA256 `17bdd4182d4ca72bfa20f1dcb820f417fb63493c6ae4beb65685cd16c83e4951`. Build `/tmp/rose-brow-build.txt`; full parity 987/987 `/tmp/rose-brow-full-parity.txt`; release tests with the same PGO flags `/tmp/rose-brow-tests.txt`. Training retains rustc's default shared online merging; the frozen parity baseline is unchanged.
 
 | run | ref solve | baseline wall | paired base wall | current wall | solve | current/ref | instr |
 |---|---|---|---|---|---|---|---|
-| degen2.primal-c | 0.012711 | 0.182 | 0.042 | 0.042 | 0.039210 | 3.08 | 316.1 |
-| degen2.dual-r | 0.009653 | 0.125 | 0.036 | 0.036 | 0.032636 | 3.38 | 248.9 |
-| degen3.primal-c | 0.163137 | 3.237 | 0.535 | 0.529 | 0.520494 | 3.19 | 4540.4 |
-| degen3.primal-r | 0.193685 | 3.872 | 0.626 | 0.622 | 0.613547 | 3.17 | 5228.3 |
-| perold.primal-c | 0.160994 | 2.430 | 0.554 | 0.549 | 0.544218 | 3.38 | 4999.7 |
-| pilot4.primal-r | 0.015787 | 0.253 | 0.060 | 0.060 | 0.056138 | 3.56 | 565.7 |
-| 80bau3b.primal-c | - | 1.618 | 1.085 | 1.005 | 0.986909 | - | 7797.1 |
-| primal_5959.primal-r | 0.067884 | 0.563 | 0.296 | 0.287 | 0.284207 | 4.19 | 2049.7 |
-| degen3.dual-c | 0.082843 | 1.002 | 0.448 | 0.415 | 0.404539 | 4.88 | 2267.9 |
-| degen3.dual-r | 0.082947 | 1.008 | 0.463 | 0.453 | 0.440214 | 5.31 | 2277.3 |
-| perold.dual-r | 0.038532 | 0.355 | 0.267 | 0.290 | 0.281387 | 7.30 | 1222.9 |
-| 80bau3b.dual-r | - | 1.103 | 0.593 | 0.661 | 0.634465 | - | 3589.9 |
-| greenbea.dual-c | - | 2.870 | 1.234 | 1.164 | 1.147790 | - | 6416.3 |
-| greenbea.dual-r | - | 3.598 | 1.209 | 1.164 | 1.147022 | - | 6377.9 |
-| mode_switch.dual-r | - | 25.815 | 3.152 | 2.066 | 2.035891 | - | 20166.1 |
-| primal_5959.dual-r | 0.098192 | 1.300 | 0.252 | 0.245 | 0.243376 | 2.48 | 2826.2 |
-| quad_2717.dual-r | 0.092814 | 1.130 | 0.282 | 0.281 | 0.278606 | 3.00 | 2890.0 |
-| fx_quad_obj_5371.dual-r | 0.038077 | 0.334 | 0.099 | 0.097 | 0.094802 | 2.49 | 1066.0 |
-| degen3.barrier-r | 0.075214 | 0.608 | 0.295 | 0.296 | 0.255906 | 3.40 | 3436.3 |
-| 80bau3b.barrier-r | - | 0.379 | 0.241 | 0.242 | 0.220117 | - | 2966.0 |
-| greenbea.barrier-r | - | 1.569 | 0.874 | 0.875 | 0.843480 | - | 11115.3 |
-| 80bau3b.pdhg | - | 4.552 | 5.311 | 4.954 | 4.936772 | - | 74949.1 |
-| greenbea.pdhg | - | 2.801 | 2.175 | 2.255 | 2.240297 | - | 31954.6 |
+| degen2.primal-c | 0.012711 | 0.182 | 0.066 | 0.065 | 0.061053 | 4.80 | 313.7 |
+| degen2.dual-r | 0.009653 | 0.125 | 0.055 | 0.054 | 0.048808 | 5.06 | 246.7 |
+| degen3.primal-c | 0.163137 | 3.237 | 0.844 | 0.837 | 0.824009 | 5.05 | 4471.0 |
+| degen3.primal-r | 0.193685 | 3.872 | 0.978 | 0.963 | 0.950602 | 4.91 | 5113.9 |
+| perold.primal-c | 0.160994 | 2.430 | 0.837 | 0.832 | 0.825686 | 5.13 | 4976.8 |
+| pilot4.primal-r | 0.015787 | 0.253 | 0.127 | 0.126 | 0.118465 | 7.50 | 563.2 |
+| 80bau3b.primal-c | - | 1.618 | 1.514 | 1.091 | 1.071422 | - | 7763.8 |
+| primal_5959.primal-r | 0.067884 | 0.563 | 0.295 | 0.299 | 0.295743 | 4.36 | 2046.6 |
+| degen3.dual-c | 0.082843 | 1.002 | 0.465 | 0.282 | 0.272476 | 3.29 | 2229.7 |
+| degen3.dual-r | 0.082947 | 1.008 | 0.289 | 0.281 | 0.272818 | 3.29 | 2239.0 |
+| perold.dual-r | 0.038532 | 0.355 | 0.139 | 0.136 | 0.132474 | 3.44 | 1214.8 |
+| 80bau3b.dual-r | - | 1.103 | 0.395 | 0.379 | 0.365460 | - | 3526.6 |
+| greenbea.dual-c | - | 2.870 | 0.770 | 0.756 | 0.744441 | - | 6326.1 |
+| greenbea.dual-r | - | 3.598 | 0.760 | 0.744 | 0.732765 | - | 6279.5 |
+| mode_switch.dual-r | - | 25.815 | 2.132 | 2.790 | 2.743533 | - | 18925.7 |
+| primal_5959.dual-r | 0.098192 | 1.300 | 0.401 | 0.404 | 0.400810 | 4.08 | 2822.3 |
+| quad_2717.dual-r | 0.092814 | 1.130 | 0.443 | 0.441 | 0.438037 | 4.72 | 2885.4 |
+| fx_quad_obj_5371.dual-r | 0.038077 | 0.334 | 0.158 | 0.138 | 0.135170 | 3.55 | 1064.6 |
+| degen3.barrier-r | 0.075214 | 0.608 | 0.439 | 0.434 | 0.374404 | 4.98 | 3434.9 |
+| 80bau3b.barrier-r | - | 0.379 | 0.357 | 0.359 | 0.325952 | - | 2966.1 |
+| greenbea.barrier-r | - | 1.569 | 1.312 | 1.343 | 1.296272 | - | 11115.8 |
+| 80bau3b.pdhg | - | 4.552 | 3.449 | 5.744 | 5.717176 | - | 74947.8 |
+| greenbea.pdhg | - | 2.801 | 1.520 | 2.256 | 2.241245 | - | 31955.0 |
 
 ## Hotspots
 
-Profiles below predate the flat forward-L change or earlier changes; use the current profile-use flag and reprofile before selecting another change.
+Profiles below predate the row-indexed B-reference checks or earlier changes; use the current profile-use flag and reprofile before selecting another change.
 
 Per profiled bench run: the commit it was taken at and the top self-time functions (percent), at most
 five lines each. Re-profile a run when a landed change touched its hot path.
 
 - degen2.dual-r, `onqvqskr` (stale after flat forward L; PGO frame-pointer build, full parity 987/987; forty solves capped at 2000 iterations, all optimal in 634 iterations and 16 refactorizations; `target/perf-degen2dual-pgo.data`): FTRAN 8.42%, iteration 8.15%, L stage 6.76%, update 6.07%, BTRAN 4.60% self. FTRAN 15.05%, needed-vector FTRAN 13.79%, L stage 11.96%, refactorization 20.64% inclusive. Dense L output collection is another 2.93% self. Annotation `target/perf-degen2dual-pgo-lstage.txt` samples dense traversal and coefficient indexing; the dense two-vector L trial is rejected below. The flat forward-L layout removes repeated per-coefficient row/value metadata loads; reprofile before selecting the remaining scatter, output collection or iteration work.
 - degen2.primal-c, `rtyoxnwx` (stale after phase-one class reuse; frame-pointer build passes full 987/987 parity; forty solves capped at 2000 iterations, `target/perf-degen2c-next.data`): BTRAN 9.80%, primal control 7.95%, FTRAN 7.22%, update 4.98%, LU nucleus 4.26% self. Refactorization is 24.70%, FTRAN 13.22%, BTRAN 10.22% inclusive. All forty optimal in 531 iterations, 16 refactorizations. Signature construction is 1.26% and sig_class 1.11% self; repeated phase-one classification within the stable update window is now shared. Bounds-check removal and direct growth-diagonal access were measured and rejected below. Reprofile before choosing remaining BTRAN or refactor work.
-- perold.dual-r, `muxlvwxk` (stale after row-indexed demotion; frame-pointer build passes full 987/987 parity; ten solves capped at 1300 iterations, `target/perf-perold-next6.data`): iteration 8.91%, FTRAN 7.39%, L stage 6.52%, update 6.08%, BTRAN 5.57% self. Refactorization is 24.54%, FTRAN 13.33%, ftran_needed 12.68%, L stage 10.31%, update 8.48% inclusive. All ten optimal in 1273 iterations, 27 refactorizations. Update annotation `target/perf-perold-next6-update.txt`; spike deduplication uses repeated linear membership searches. Prior rejected trials remain below.
+- perold.dual-r, `ntmqvzol` (stale after row-indexed B checks; PGO frame-pointer build, full parity 987/987; ten solves capped at 1300 iterations, all optimal in 1273 iterations and 27 refactorizations; `target/perf-perold-flat.data`): iteration 10.47%, FTRAN 7.66%, update 6.19%, BTRAN 5.64%, L stage 5.31% self. Refactorization 24.22%, FTRAN 13.92%, needed-vector FTRAN 11.47% inclusive. Update annotation `target/perf-perold-flat-update.txt`; row-indexed B checks remove the remaining full-tail B-reference scans; reprofile before choosing more iteration, update or refactorization work. Prior rejected trials remain below.
 - perold.primal-c, `wvqvkoyp` (stale after PGO collection-mode correction; PGO frame-pointer build passes full 987/987 parity; three solves capped at 3500 iterations, `target/perf-peroldc-pgo.data`): primal control 16.89%, BTRAN 9.75%, LU nucleus 4.81%, FTRAN 4.78%, score 4.48% self. Refactorization is 23.52%, BTRAN 9.99%, FTRAN 9.12%, row-product work 1.91% inclusive. All three optimal in 3399 iterations, 90 refactorizations. Score repeatedly checks immutable free-variable bounds; prior row-product and solve trials remain below.
 - degen3.primal-c, `oytzqrpy` (stale after growth-factor reuse; frame-pointer build passes full 987/987 parity; three solves capped at 10000 iterations, `target/perf-degen3c-next.data`): primal control 8.91%, BTRAN 8.09%, FTRAN 6.51%, LU nucleus 5.82%, fresh factor 5.25% self. Refactorization is 31.03%, reference_order_for 19.77%, BTRAN 11.48%, FTRAN 10.88% inclusive; dense BTRAN output compaction is another 2.58% self. All three optimal in 2492 iterations, 49 refactorizations. The accepted growth-check factor now carries through to installation; reprofile before choosing remaining reference-order or BTRAN work.
 - degen3.primal-r, `votqkmtm` (stale after PGO; ThinLTO frame-pointer build passes full 987/987 parity; three solves capped at 5300 iterations, `target/perf-degen3r-thin.data`): BTRAN 10.62%, FTRAN 10.16%, update 6.43%, primal control 5.46%, factor_structure 4.37% self. Refactorization is 24.75%, FTRAN 18.32%, BTRAN 11.12% inclusive. All three optimal in 5165 iterations, 66 refactorizations. Signature construction is 2.60% self and repeatedly recomputes immutable bound flags and widths. Prior output/solve micro-optimization trials remain below.
@@ -74,7 +74,7 @@ None.
 Ordered by current/ref; reprofile any changed path before choosing a change. Ratios use the current
 sweep's solve medians; paired old/new times determine whether a change gains or regresses.
 
-- perold.dual-r (7.30x), degen3.dual-r (5.31x), degen3.dual-c (4.88x), primal_5959.primal-r (4.19x), pilot4.primal-r (3.56x): work in this order; reprofile changed paths first. Host speed bands can reorder these snapshot ratios.
+- pilot4.primal-r (7.50x), perold.primal-c (5.13x), degen2.dual-r (5.06x), degen3.primal-c (5.05x), degen3.barrier-r (4.98x): work in this order; reprofile changed paths first. Host speed bands can reorder these snapshot ratios.
 - Unapplied primal free-variable flag cache: full parity/tests pass and local PEROLD pairs improve, but its barrier comparison was confounded by per-process PGO collection versus the baseline's online merge. Source performance remains unestablished; retest with consistent collection (`target/perf-scorefree-*`).
 - Unapplied primal row-product prefilter: skip dropped precomputed products before eligibility checks, preserving order and NaNs. Full parity/tests pass; local PEROLD instructions -1.4% with stable pair improvements. Its full-sweep comparison also used inconsistent PGO collection, so retain it as an unverified source lead (`target/perf-rowprefilter-*`, candidate copy `/tmp/rose-rowprefilter-candidate.rs`).
 - DEGEN3 dual: tau row-value lookup and immutable BTRAN metadata are settled. Reprofile before inspecting remaining iteration control, updates and scratch allocation.
