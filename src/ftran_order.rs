@@ -1042,7 +1042,7 @@ impl<R: Real> RefStruct<R> {
                 }
             }
         }
-        tail.sort_unstable_by_key(|&p| std::cmp::Reverse(self.slot[p]));
+        self.sort_slot_desc(&mut tail);
         let mut tau_raw = vec![false; m];
         // The inline dense joint loop of two dense vectors (`0x128c56..0x129152`) tests the raw value before the quotient: a tail column whose
         // raw value is at most the tolerance is zeroed even when the quotient exceeds it.
@@ -1392,7 +1392,7 @@ impl<R: Real> RefStruct<R> {
                 }
             }
         }
-        tail.sort_unstable_by_key(|&p| std::cmp::Reverse(self.slot[p]));
+        self.sort_slot_desc(&mut tail);
         // The dense U routine (`0x121ef0`) tests the raw value first; the sparse one (`0x1223e0`, at `0x12297b`) only the quotient.
         let u_dense = !R::LANES
             || rows.len() * self.dthr > m
@@ -2187,6 +2187,18 @@ impl<R: Real> RefStruct<R> {
         }
     }
 
+    /// Descending slot order without repeatedly reading indirect keys during comparisons. `slot` and `at` are inverse
+    /// permutations, so sorting slots and mapping back also preserves repeated positions exactly.
+    fn sort_slot_desc(&self, positions: &mut [usize]) {
+        for p in positions.iter_mut() {
+            *p = self.slot[*p];
+        }
+        positions.sort_unstable_by(|a, b| b.cmp(a));
+        for p in positions {
+            *p = self.at[*p];
+        }
+    }
+
     /// Order of the nonzero positions of the solution, given the L-stage list.
     pub fn uorder(&self, inp: &[usize], x: &[R]) -> Vec<usize> {
         let m = self.m;
@@ -2216,8 +2228,7 @@ impl<R: Real> RefStruct<R> {
             .collect();
         let i3 = self.nuc.len();
         let d2 = self.dens;
-        let by_slot_desc =
-            |v: &mut Vec<usize>| v.sort_unstable_by_key(|&x| std::cmp::Reverse(self.slot[x]));
+        let by_slot_desc = |v: &mut Vec<usize>| self.sort_slot_desc(v);
         let nuc_sorted = |set: Vec<usize>| {
             let mut v = set;
             v.sort_unstable_by_key(|&x| self.kind[x]);
