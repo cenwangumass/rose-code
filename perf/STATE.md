@@ -82,6 +82,8 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 
 ## Tried, no gain
 
+- Avoid materializing the dense FTRAN tail-index vector: direct slice traversal through a shared solve closure passes frozen f64/F80 random/extreme/captured-input tests and fast parity 940/940, but DEGEN3 primal-release instructions rise 1.29% and solve 0.648145 -> 0.656844 s exceeds both 0.001714/0.002821 s spreads. A single chained iterator passes fast parity but still adds 0.25% instructions and has no timing gain (1.019540 -> 1.024090 s within spread). Both reverted (`target/perf-tailview{,2}-target-{before,after}.txt`).
+
 - Cache primal signature bound flags/widths (analysis idea 8): fast parity 940/940 passes. Interleaved `(kind,width)` cache reduces DEGEN3 primal-release instructions 1.76%, but three alternating CPU-2 pairs give median solve medians 1.005068 -> 1.001979 s within 0.042525/0.061157 s aggregate spreads. Split byte flags/width arrays reduce instructions 2.54%, but confirmation medians 1.003885 -> 1.313467 s show no gain and cross speed bands. Both reverted (`target/perf-sigbounds{,2}-{target,confirm}-{before,after}.txt`).
 
 - Skip auxiliary pivot selection and row-count setup when numeric LU receives prescribed rows (analysis idea 7), retaining max-magnitude/floor and supplied-pivot zero checks: fast parity 940/940 passes, PILOT4 instructions -0.11%, DEGEN2 primal -0.22%. Three alternating CPU-2 PILOT4 pairs give median solve medians 0.089099 -> 0.090044 s with no gain (aggregate spreads 0.007874/0.006202 s). Reverted (`target/perf-forcedpivot-{target,confirm}-{before,after}.txt`).
