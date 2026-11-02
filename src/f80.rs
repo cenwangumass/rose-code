@@ -419,12 +419,26 @@ impl Mul for F80 {
         if self.m == 0 || o.m == 0 {
             return F80 { neg, ..F80::ZERO };
         }
-        F80::pack(
-            neg,
-            (self.m as u128) * (o.m as u128),
-            self.e + o.e - 126,
-            false,
-        )
+        let product = (self.m as u128) * (o.m as u128);
+        // Nonzero finite significands are normalized: their product has 127 or 128 bits.
+        let top = product >> 127 != 0;
+        let mut e = self.e + o.e + i32::from(top);
+        // The general packer rounds directly to subnormal precision and handles overflow at the boundary.
+        if e < E_MIN || e >= E_MAX {
+            return F80::pack(neg, product, self.e + o.e - 126, false);
+        }
+        let (mut hi, lo) = if top {
+            ((product >> 64) as u64, product as u64)
+        } else {
+            ((product >> 63) as u64, (product as u64) << 1)
+        };
+        let half = 1u64 << 63;
+        if lo > half || (lo == half && hi & 1 != 0) {
+            let (rounded, carry) = hi.overflowing_add(1);
+            hi = if carry { 1 << 63 } else { rounded };
+            e += i32::from(carry);
+        }
+        F80 { neg, e, m: hi }
     }
 }
 
@@ -542,6 +556,94 @@ impl Default for F80 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Frozen multiply before the normal-product specialization; keep the general pack path as the oracle.
+    fn previous_mul(a: F80, o: F80) -> F80 {
+        let neg = a.neg != o.neg;
+        if a.is_nan() || o.is_nan() {
+            return F80::NAN;
+        }
+        if a.is_infinite() || o.is_infinite() {
+            if a.m == 0 || o.m == 0 {
+                return F80::NAN;
+            }
+            return F80 {
+                neg,
+                e: E_INF,
+                m: 1 << 63,
+            };
+        }
+        if a.m == 0 || o.m == 0 {
+            return F80 { neg, ..F80::ZERO };
+        }
+        F80::pack(neg, (a.m as u128) * (o.m as u128), a.e + o.e - 126, false)
+    }
+
+    #[test]
+    fn multiply_matches_previous() {
+        let mut values = vec![
+            F80::ZERO,
+            -F80::ZERO,
+            F80::ONE,
+            F80::INFINITY,
+            -F80::INFINITY,
+            F80::NAN,
+        ];
+        for se in [0, 1, 2, 0x3ffe, 0x3fff, 0x4000, 0x7ffd, 0x7ffe] {
+            for m in [
+                1,
+                0x7fff_ffff_ffff_ffff,
+                0x8000_0000_0000_0000,
+                0x8000_0000_0000_0001,
+                0xffff_ffff_ffff_ffff,
+            ] {
+                for sign in [0, 0x8000] {
+                    values.push(F80::from_repr(m, se | sign));
+                }
+            }
+        }
+        // First QTAU column from fx_quad_obj_5371.dual-r, ROSE_DUMP=qtau, max-iterations=5400.
+        for (m, se) in [
+            (0xf424_0000_0000_0000, 0xbffe),
+            (0xb71b_0000_0000_0000, 0xbffd),
+            (0xea60_0000_0000_0000, 0x3ff7),
+            (0x8000_0000_0000_0000, 0xbff1),
+            (0x8000_0000_0000_0000, 0x3ffe),
+            (0x9c40_0000_0000_0000, 0xbff6),
+            (0xf424_0000_0000_0000, 0x3ffe),
+            (0x8000_0000_0000_0000, 0xbfeb),
+            (0xc000_0000_0000_0000, 0x3ffe),
+            (0x8000_0000_0000_0000, 0x3ffd),
+        ] {
+            values.push(F80::from_repr(m, se));
+        }
+        let check = |a: F80, b: F80| {
+            assert_eq!(
+                (a * b).repr(),
+                previous_mul(a, b).repr(),
+                "{:?} * {:?}",
+                a.repr(),
+                b.repr()
+            )
+        };
+        for &a in &values {
+            for &b in &values {
+                check(a, b);
+            }
+        }
+        let mut seed = 0xe5a1_d839_1208_759bu64;
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        for _ in 0..100_000 {
+            let a = F80::from_repr(next(), next() as u16);
+            let b = F80::from_repr(next(), next() as u16);
+            check(a, b);
+        }
+    }
 
     #[test]
     fn roundtrips_doubles() {
