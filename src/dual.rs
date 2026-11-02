@@ -2303,8 +2303,13 @@ impl<'a, R: Real> Dual<'a, R> {
     // ------------------------------------------------------------------ iteration
 
     /// The row product (`0x134d90`): the pivot row `rho^T A_N` over the nonbasic columns (and the leaving slack), in the reference frame.
-    /// Returns the entries `(variable, value)` with the structurals first, and their count.
-    fn pivot_row(&self, rho: &[(usize, R)], leave: usize, above: bool) -> (Vec<(usize, R)>, usize) {
+    /// Returns entries `(variable, value)` with structurals first, the structural result count, and the occurrence/distinct-column counts before filtering.
+    fn pivot_row(
+        &self,
+        rho: &[(usize, R)],
+        leave: usize,
+        above: bool,
+    ) -> (Vec<(usize, R)>, usize, usize, usize) {
         let (n, m) = (self.n, self.m);
         let p = self.p;
         // The row product runs over the rows of `rho` unless their entries (`0x134aa0` counts them) outnumber the structurals n by 1.8 (`0xc5355`, `ctx+0x68`);
@@ -2332,6 +2337,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 }
             }
         }
+        let distinct = order.len();
         // Entries that cancelled to (nearly) nothing are dropped (the smallest captured entry is 1.04e-13).
         // A single entry in rho takes the scaled-copy path of `0x134d90` (`0x1360ac`), which has no tolerance test for a scale of 1 or more (fx_e2_r25 call 1: entries of 6e-14 stay).
         // The copy keeps its entries only for a scale of magnitude 1 or more; below 1 the same tolerance filter as the general path follows (`0x136629`: `|scale| < 1.0`; seed 50165 call 5: rho -5e-5, a product of 1.25e-17 is dropped).
@@ -2354,7 +2360,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 (j, acc[j] * R::c(s * sdir))
             })
             .collect();
-        (out, nst)
+        (out, nst, est, distinct)
     }
 
     /// The second FTRAN vector of the pricing mode 3 (`0xc57d8..0xc58c4`, `0x11faf9..0x11fcd0`): the entries of the pivot row whose variable was basic when the
@@ -2428,19 +2434,8 @@ impl<'a, R: Real> Dual<'a, R> {
     }
 
     /// Work of the row product (`0x134d90`, site `0x135e92`, same estimate as the primal path's `row_product_work`).
-    fn row_product_work(&mut self, rho: &[(usize, R)], nslack: usize) {
-        let p5: usize = rho.iter().map(|e| self.rrows[e.0].len()).sum();
-        let (n, m) = (self.n, self.m);
-        let mut seen = vec![false; n + m];
-        let mut d = 0usize;
-        for &(i, _) in rho {
-            for &(j, _) in &self.rrows[i] {
-                if !seen[j] {
-                    seen[j] = true;
-                    d += 1;
-                }
-            }
-        }
+    fn row_product_work(&mut self, rho: &[(usize, R)], nslack: usize, p5: usize, d: usize) {
+        let n = self.n;
         let nr = rho.len() as f64;
         let est = if rho.len() == 1 {
             if rho[0].1.abs() < R::ONE {
@@ -3512,10 +3507,10 @@ impl<'a, R: Real> Dual<'a, R> {
         self.p60 = rho.len() as f64;
         self.work
             .add_from(0x13174d, 0xc51dd, self.mirror.work, crate::work::FAC);
-        let (row, esi) = self.pivot_row(&rho, leave, above);
-        self.row_product_work(&rho, row.len() - esi);
-        self.p58 += rho.iter().map(|e| self.rrows[e.0].len()).sum::<usize>() as f64;
-        self.p50d += rho.iter().map(|e| self.rrows[e.0].len()).sum::<usize>() as f64;
+        let (row, esi, occurrences, distinct) = self.pivot_row(&rho, leave, above);
+        self.row_product_work(&rho, row.len() - esi, occurrences, distinct);
+        self.p58 += occurrences as f64;
+        self.p50d += occurrences as f64;
         let forced_route = forced_mode && self.forced_ratio_chosen(leave, xbr);
         let rt = if forced_route {
             match self.forced_ratio(&row, esi, leave) {
