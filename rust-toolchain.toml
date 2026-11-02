@@ -1,0 +1,6 @@
+# Pinned so that a compiler update cannot change rose's floating-point results unnoticed (intrinsic lowering, std math wrappers).
+# Before moving the pin, run `rose-parity check --tier full` with the new toolchain.
+[toolchain]
+channel = "1.98.1"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

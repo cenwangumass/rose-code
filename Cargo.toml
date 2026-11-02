@@ -6,3 +6,9 @@ description = "Standalone primal and dual simplex LP solver built from recovered
 
 [dependencies]
 serde_json = { version = "1", features = ["float_roundtrip"] }
+
+# `cargo build --profile profiling`: the release code with line tables for perf / flamegraphs. Debug info does not change the generated
+# code; `rose-parity check --bin target/profiling/rose` confirms it.
+[profile.profiling]
+inherits = "release"
+debug = "line-tables-only"
