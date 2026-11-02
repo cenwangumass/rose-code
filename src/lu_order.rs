@@ -39,6 +39,8 @@ pub struct Structure<R = f64> {
     pub dense_n: usize,
     /// Rows of the factored matrix (the pivot count is smaller for a singular basis).
     pub m: usize,
+    /// The structural pass emits at most one gate record; retain it when a fresh factor is copied.
+    pair_gate_record: Option<PairGateRecord>,
 }
 
 pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Structure {
@@ -50,7 +52,7 @@ pub fn factor_structure_r<R: Real>(
     m: usize,
     cols: &[(bool, Vec<usize>, Vec<f64>)],
 ) -> Structure<R> {
-    let (mut seq, mut phase, ov, loff) = phases(m, cols);
+    let (mut seq, mut phase, ov, loff, pair_gate_record) = phases(m, cols);
     let nsing = seq.len();
     let mut done_r = vec![false; m];
     let mut done_c = vec![false; cols.len()];
@@ -152,10 +154,18 @@ pub fn factor_structure_r<R: Real>(
         pair_urow,
         dense_n: DENSE_N.with(|c| c.get()),
         m,
+        pair_gate_record,
     }
 }
 
 impl<R: Real> Structure<R> {
+    /// Repeat the records of an identical structure build without repeating its numeric work.
+    pub fn repeat_dumps(&self) {
+        if let Some(record) = self.pair_gate_record {
+            record.emit();
+        }
+    }
+
     /// The factorization's increments of the reference's work counter (`0xd4190`, `crate::work`) as `(site, estimate)`, given
     /// the factored columns and whether the L solve levels are built (`crate::ftran_order`).
     pub fn work(&self, cols: &[(bool, Vec<usize>, Vec<f64>)], levels: bool) -> Vec<(u32, f64)> {
@@ -241,6 +251,7 @@ fn phases<R: Real>(
     Vec<u8>,
     crate::lu_pairs::Overrides<R>,
     usize,
+    Option<PairGateRecord>,
 ) {
     let n = cols.len();
     let mut rc = vec![0usize; m];
@@ -352,14 +363,15 @@ fn phases<R: Real>(
     }
     let mut ov = crate::lu_pairs::Overrides::<R>::default();
     let loff = seq.len();
-    if pair_gate(m - seq.len()) && std::env::var_os("ROSE_NO_PAIRS").is_none() {
+    let pair_gate_record = pair_gate(m - seq.len());
+    if pair_gate_record.is_some() && std::env::var_os("ROSE_NO_PAIRS").is_none() {
         let before = seq.len();
         ov = crate::lu_pairs::run(
             m, cols, &mut seq, &mut phase, &row_done3, &col_done3, &row_done, &col_done,
         );
         pair_gate_end(seq.len() - before);
     }
-    (seq, phase, ov, loff)
+    (seq, phase, ov, loff, pair_gate_record)
 }
 
 struct Node<R> {
@@ -511,24 +523,46 @@ pub fn set_factorization_number(n: usize) {
 
 const GATE_ALWAYS: i64 = 2_000_000_000;
 
+#[derive(Clone, Copy)]
+struct PairGateRecord {
+    remaining: usize,
+    att: i64,
+    gate: i64,
+    fac_no: i64,
+}
+
+impl PairGateRecord {
+    fn emit(self) {
+        if crate::dump::on("pairgate") {
+            crate::dump::emit(
+                "pairgate",
+                serde_json::json!({"rem": self.remaining, "att": self.att, "gate": self.gate, "c2c0": self.fac_no}),
+            );
+        }
+    }
+}
+
 /// The doubleton pass gate (`0xe08f0..0xe0990`): at least 4 rows remain and the gate word is `>= 2e9`, or `>= 0` with at least 50 rows remaining.
 /// A run counts as an attempt.
-fn pair_gate(remaining: usize) -> bool {
+fn pair_gate(remaining: usize) -> Option<PairGateRecord> {
     let (att, gate) = PAIR_GATE.with(|c| c.get());
     let run = remaining >= 4
         && remaining - 4 <= 0x1dcd64fc
         && gate >= 0
         && (gate >= GATE_ALWAYS || remaining >= 50);
     if run {
-        if crate::dump::on("pairgate") {
-            crate::dump::emit(
-                "pairgate",
-                serde_json::json!({"rem": remaining, "att": att, "gate": gate, "c2c0": FAC_NO.with(|c| c.get())}),
-            );
-        }
+        let record = PairGateRecord {
+            remaining,
+            att,
+            gate,
+            fac_no: FAC_NO.with(|c| c.get()),
+        };
+        record.emit();
         PAIR_GATE.with(|c| c.set((att + 1, gate)));
+        Some(record)
+    } else {
+        None
     }
-    run
 }
 
 /// End of a pass that did `steps` pivots (`0xe277e`): a productive pass (>= 20 steps) raises the gate word; from the 21st factorization on the word

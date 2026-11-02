@@ -11,6 +11,7 @@ use crate::lu_order::Structure;
 use crate::real::Real;
 use std::collections::BinaryHeap;
 
+#[derive(Clone)]
 pub struct RefStruct<R: Real = f64> {
     m: usize,
     /// The pivot-row BTRAN of this position ran since the last update: the reference then finds the row-eta solve cached (`F+0x1d8`, `0xf193e`).
@@ -117,6 +118,7 @@ pub struct RefStruct<R: Real = f64> {
 
 /// The inputs of the joint U stages of the two-vector FTRAN: for the pivot column and for tau, the count of the L-stage list (`None`: dense, count -1)
 /// and the solved values (the tail entries are the values after the tail solve); for the column also the positions of the L-stage list.
+#[derive(Clone)]
 struct F2<R> {
     col_n: Option<usize>,
     col_in: Vec<usize>,
@@ -140,6 +142,7 @@ impl<R> Default for F2<R> {
     }
 }
 
+#[derive(Clone)]
 struct Eta<R> {
     idx: usize,
     ind: Vec<usize>,

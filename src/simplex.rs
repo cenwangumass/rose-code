@@ -1608,19 +1608,39 @@ impl<'a> Solver<'a> {
         )
     }
 
-    /// The factor of the current basis in extended precision (same column order as the double one), built with the gate state of the double build.
-    fn quad_mirror(
+    /// Independent extended-precision twins of the current basis, built with the double build's gate state.
+    fn quad_mirrors(
         &self,
         gate0: (i64, i64),
         fac_no: usize,
         rows: &[(bool, Vec<usize>, Vec<f64>)],
-    ) -> crate::ftran_order::RefStruct<crate::f80::F80> {
-        let g1 = crate::lu_order::gate_get();
-        crate::lu_order::gate_set(gate0);
-        crate::lu_order::set_factorization_number(fac_no);
-        let stq = crate::lu_order::factor_structure_r::<crate::f80::F80>(self.p.m, rows);
-        crate::lu_order::gate_set(g1);
-        crate::ftran_order::RefStruct::fresh(self.p.m, self.p.n, &stq, rows)
+    ) -> (
+        crate::ftran_order::RefStruct<crate::f80::F80>,
+        crate::ftran_order::RefStruct<crate::f80::F80>,
+    ) {
+        let build = || {
+            let g1 = crate::lu_order::gate_get();
+            crate::lu_order::gate_set(gate0);
+            crate::lu_order::set_factorization_number(fac_no);
+            let stq = crate::lu_order::factor_structure_r::<crate::f80::F80>(self.p.m, rows);
+            crate::lu_order::gate_set(g1);
+            stq
+        };
+        let stq = build();
+        let first = crate::ftran_order::RefStruct::fresh(self.p.m, self.p.n, &stq, rows);
+        // These diagnostics describe the numeric build itself. Preserve their original two builds.
+        let second = if ["ROSE_GATE_LOG", "ROSE_DENSE_INFO", "ROSE_DENSE_DUMP"]
+            .iter()
+            .any(|name| std::env::var_os(name).is_some())
+        {
+            crate::ftran_order::RefStruct::fresh(self.p.m, self.p.n, &build(), rows)
+        } else {
+            // Each old build restored the same pair gate. The other thread-local outputs are identical;
+            // only its PGATE record needs repeating. All vectors and interior cells are deep-cloned.
+            stq.repeat_dumps();
+            first.clone()
+        };
+        (first, second)
     }
 
     /// The in-place repair of a singular basis (see `refactor`): `st` is the failed factorization's structure.
@@ -1752,8 +1772,9 @@ impl<'a> Solver<'a> {
                     }
                 }
                 let mi = if self.handoff.is_some_and(|h| h.quad) {
-                    self.mirror_q = Some(self.quad_mirror(gate0, fac_no, &rows));
-                    Mir::Q(self.quad_mirror(gate0, fac_no, &rows))
+                    let (rhs, main) = self.quad_mirrors(gate0, fac_no, &rows);
+                    self.mirror_q = Some(rhs);
+                    Mir::Q(main)
                 } else {
                     Mir::D(crate::ftran_order::RefStruct::fresh(
                         self.p.m, self.p.n, &st, &rows,
@@ -5912,8 +5933,9 @@ fn solve_primal(
         }
         s.basic = order;
         if handoff.is_some_and(|h| h.quad) {
-            s.mirror_q = Some(s.quad_mirror(gate0, 1, &rows));
-            s.mirror = Some(Mir::Q(s.quad_mirror(gate0, 1, &rows)));
+            let (rhs, main) = s.quad_mirrors(gate0, 1, &rows);
+            s.mirror_q = Some(rhs);
+            s.mirror = Some(Mir::Q(main));
         } else {
             s.mirror = Some(Mir::D(crate::ftran_order::RefStruct::fresh(
                 m, n, &st, &rows,

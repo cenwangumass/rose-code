@@ -12,12 +12,11 @@ below. Work on the run with the largest ratio first.
 
 - **Like with like.** `ref` is Gurobi's `Runtime` (solve only, single thread, same host: AMD Ryzen 9
   5900X). Compare it with rose's solve time, `diagnostics.seconds` in the result JSON (median over the
-  timed runs), not with the process wall time of `bench.sh`, which adds start-up and MPS parsing. First
-  task of the next session: give `perf/bench.sh` a solve-time column (read `diagnostics.seconds` from an
-  `--output` file per run) and fill STATE.md's `current/ref` from it.
-- **Fill the missing `ref` cells** (GREENBEA, the quad runs, `primal_5959`, barrier and PDHG runs, the
-  mode-switch witness). Run them with `../reverse-engineer/tools/ref_run.py` (see its docstring; the
-  profile names match bench.txt's: `release`, `dual-release`, `barrier-release`, `pdhg-release`, ...)
+  timed runs), not with the process wall time of `bench.sh`, which adds start-up and MPS parsing. The
+  harness reports both wall and solve times; STATE.md uses solve time for `current/ref`.
+- **Missing `ref` cells:** STATE.md records which original-library runtimes are reachable and which
+  fail the available license. If more become reachable, run them with
+  `../reverse-engineer/tools/ref_run.py` (see its docstring; the profile names match bench.txt's: `release`, `dual-release`, `barrier-release`, `pdhg-release`, ...)
   through gurobipy with the unpatched library, three times, and take the median `Runtime`. Records made by
   `build/native_run` or the patched library have no usable runtime. Write the medians into STATE.md and
   note the run files used; do not overwrite existing files in `../reverse-engineer/runs/` (write the new
@@ -61,11 +60,14 @@ baseline. No exceptions, no "within a ULP", no re-recording.
 - `perf/bench.sh [--only ID,..] [--runs N] [--instr] [--bin PATH]`: times the runs of
   [bench.txt](bench.txt) with hyperfine (median of N after a warm-up); `--instr` adds user-space
   instruction counts (`perf stat`), which have far less noise than wall time.
-- `perf record -g --call-graph dwarf -o /tmp/X.data target/profiling/rose solve MODEL ARGS --output /dev/null`
-  then `perf report -i /tmp/X.data --no-children --percent-limit 1 --stdio` (flat hotspots) and
-  `perf report ... --children` (inclusive). `perf annotate` for a hot function. Bound the run: pick a
-  bench run, or add `--max-iterations N`. `perf stat -e instructions:u,cycles:u,cache-misses:u,branch-misses:u`
-  for a quick picture.
+- For reliable inclusive profiles, build with `RUSTFLAGS='-C force-frame-pointers=yes' cargo build
+  --profile profiling`, then parity-check that binary with `--tier full --bin target/profiling/rose`.
+  Capture with `perf record -F 1999 -g --call-graph fp -o target/X.data -- target/profiling/rose solve
+  MODEL ARGS --output /dev/null`. Use `perf report -i target/X.data --no-inline --children
+  --call-graph none --stdio` for inclusive shares, `--no-children` for self time. The default inline
+  expansion duplicates frames here; DWARF unwinding also loses callers. Use `perf annotate` for hot
+  functions. Bound the run with a bench model or `--max-iterations N`. `perf stat -e
+  instructions:u,cycles:u,cache-misses:u,branch-misses:u` gives a quick counter picture.
 - `cargo test --release` (about 35 s): the reference-derived tests. Run before each commit.
 - Format with `RUSTFMT=~/.local/bin/rustfmt-custom cargo fmt -- --config blank_line_between_items=true`
   (never plain `cargo fmt`). Version control is `jj`, run from `rose/`.
