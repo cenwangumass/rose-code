@@ -434,8 +434,8 @@ struct Dual<'a, R: Real = f64> {
     w: Vec<R>,
     mirror: RefStruct<R>,
     factor: Factor,
-    /// Row-wise copy of the nonbasic, non-fixed structurals in the reference's storage order.
-    rrows: Vec<Vec<usize>>,
+    /// Row-wise copy of the nonbasic, non-fixed structurals in the reference's storage order, with their immutable first-match coefficients.
+    rrows: Vec<Vec<(usize, f64)>>,
     /// The ratio test asked for a refactorization (request 5) instead of ending the dual: the iteration returns without a pivot.
     absorb_request: bool,
     /// The candidates of a row on a fresh factor at a nonzero level cannot absorb the infeasibility (`0xcc1ca`: `ctx+0x290` = 1, no entering variable): the pass ends with status -1004 at the post-iteration pass.
@@ -1363,7 +1363,8 @@ impl<'a, R: Real> Dual<'a, R> {
         for j in 0..self.n {
             if self.st[j] < 0 && self.st[j] != FIXED && self.p.lo[j] != self.p.up[j] {
                 for &(i, _) in &self.p.cols[j] {
-                    self.rrows[i].push(j);
+                    let a = self.p.cols[j].iter().find(|e| e.0 == i).unwrap().1;
+                    self.rrows[i].push((j, a));
                 }
             }
         }
@@ -2314,8 +2315,7 @@ impl<'a, R: Real> Dual<'a, R> {
         let mut order: Vec<usize> = Vec::new();
         let sparse = rho.len() == 1 || !((n as f64) < 1.8 * est as f64);
         for &(i, rv) in rho {
-            for &j in &self.rrows[i] {
-                let a = p.cols[j].iter().find(|e| e.0 == i).map_or(0.0, |e| e.1);
+            for &(j, a) in &self.rrows[i] {
                 acc[j] = acc[j] + rv * R::c(a);
                 if !touched[j] {
                     touched[j] = true;
@@ -2434,7 +2434,7 @@ impl<'a, R: Real> Dual<'a, R> {
         let mut seen = vec![false; n + m];
         let mut d = 0usize;
         for &(i, _) in rho {
-            for &j in &self.rrows[i] {
+            for &(j, _) in &self.rrows[i] {
                 if !seen[j] {
                     seen[j] = true;
                     d += 1;
@@ -4027,9 +4027,13 @@ impl<'a, R: Real> Dual<'a, R> {
         let leave_in = leave < n && p.lo[leave] != p.up[leave];
         if q < n {
             for &(i, _) in &p.cols[q] {
-                if let Some(kk) = self.rrows[i].iter().position(|&j| j == q) {
-                    if leave_in && p.cols[leave].iter().any(|e| e.0 == i) {
-                        self.rrows[i][kk] = leave;
+                if let Some(kk) = self.rrows[i].iter().position(|&(j, _)| j == q) {
+                    if let Some(a) = leave_in
+                        .then(|| p.cols[leave].iter().find(|e| e.0 == i))
+                        .flatten()
+                        .map(|e| e.1)
+                    {
+                        self.rrows[i][kk] = (leave, a);
                     } else {
                         self.rrows[i].swap_remove(kk);
                     }
@@ -4038,8 +4042,9 @@ impl<'a, R: Real> Dual<'a, R> {
         }
         if leave_in {
             for &(i, _) in &p.cols[leave] {
-                if !self.rrows[i].contains(&leave) {
-                    self.rrows[i].push(leave);
+                if !self.rrows[i].iter().any(|&(j, _)| j == leave) {
+                    let a = p.cols[leave].iter().find(|e| e.0 == i).unwrap().1;
+                    self.rrows[i].push((leave, a));
                 }
             }
         }
@@ -5963,7 +5968,18 @@ fn solve_pass_callback<R: Real>(
     }
     s.build_rrows();
     if let Some(rows) = crate::simplex::HANDOFF_ROWS.with(|c| c.borrow_mut().take()) {
-        s.rrows = rows;
+        s.rrows = rows
+            .into_iter()
+            .enumerate()
+            .map(|(i, row)| {
+                row.into_iter()
+                    .map(|j| {
+                        let a = p.cols[j].iter().find(|e| e.0 == i).map_or(0.0, |e| e.1);
+                        (j, a)
+                    })
+                    .collect()
+            })
+            .collect();
     }
     if let Some(dy) = &dstart_d {
         // Basic variables keep their d (the forced rows read it); the recompute below takes y from c_B minus the d of the stack entries.
