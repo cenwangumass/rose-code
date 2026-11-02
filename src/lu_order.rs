@@ -390,6 +390,9 @@ struct Nucleus<R> {
     rcnt: Vec<usize>,
     cb: Vec<Vec<usize>>,
     rb: Vec<Vec<usize>>,
+    /// Upper bounds on occupied count buckets; search tightens them after scanning.
+    cmax: usize,
+    rmax: usize,
     cst: Vec<usize>,
     rst: Vec<usize>,
 }
@@ -401,6 +404,7 @@ impl<R: Real> Nucleus<R> {
             self.cst.push(c);
         } else if k > 0 {
             self.cb[k as usize].insert(0, c);
+            self.cmax = self.cmax.max(k as usize);
         }
     }
 
@@ -410,6 +414,7 @@ impl<R: Real> Nucleus<R> {
             self.rst.push(r);
         } else if k > 0 {
             self.rb[k as usize].insert(0, r);
+            self.rmax = self.rmax.max(k as usize);
         }
     }
 
@@ -594,6 +599,8 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
         rcnt: vec![0; m],
         cb: vec![Vec::new(); m.max(npos) + 2],
         rb: vec![Vec::new(); m.max(npos) + 2],
+        cmax: 0,
+        rmax: 0,
         cst: Vec::new(),
         rst: Vec::new(),
     };
@@ -976,13 +983,11 @@ fn search<R: Real>(s: &mut Nucleus<R>, remaining: usize) -> Option<(usize, f64)>
     let mut k = u74.min(u69);
     // The loop bound (double `0xd6a77`, quad `0x229a3c..0x229a6d`): max(4, k / 2) examined lists, at most the number of columns left (seeds 2448, 2324; bh50093: three left).
     let limit = ((k as f64 * 0.5) as usize).max(4).min(remaining);
-    let maxk =
-        s.cb.iter()
-            .rposition(|v| !v.is_empty())
-            .into_iter()
-            .chain(s.rb.iter().rposition(|v| !v.is_empty()))
-            .max()
-            .unwrap();
+    let cmax = s.cb[..=s.cmax].iter().rposition(|v| !v.is_empty());
+    let rmax = s.rb[..=s.rmax].iter().rposition(|v| !v.is_empty());
+    s.cmax = cmax.unwrap_or(0);
+    s.rmax = rmax.unwrap_or(0);
+    let maxk = cmax.into_iter().chain(rmax).max().unwrap();
     let mut best: Option<usize> = None;
     let mut bcost = f64::INFINITY;
     let mut bratio = R::ZERO;
