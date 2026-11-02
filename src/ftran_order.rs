@@ -2677,17 +2677,20 @@ impl<R: Real> RefStruct<R> {
         // the spike's only tail entry (FIT2P call 2263: column 175, the reference creates the row eta of the leaving column).
         let keep = (old != -2 && av.is_empty() && conv.is_none()) || (old == -2 && !moved);
         // Row r of U: the tail columns that reference r (`0xf2a51`), unless the column stays in its slot or the empty spike skips the row solve.
-        let refs = (0..m)
-            .filter(|&x| {
-                x != r && self.kind[x] == -2 && (self.a[x].contains(&r) || self.b[x].contains(&r))
-            })
-            .count();
+        // The maintained row list avoids scanning unrelated columns. Restore the old scan's ascending order and uniqueness.
+        let mut refcols = self.rowl[r].clone();
+        refcols.sort_unstable();
+        refcols.dedup();
+        refcols.retain(|&x| {
+            x != r && self.kind[x] == -2 && (self.a[x].contains(&r) || self.b[x].contains(&r))
+        });
+        let refs = refcols.len();
         if refs > 0 && !sp.is_empty() && !(keep && !moved) {
             self.upd_work
                 .push((0xf2a51, 3.0 * refs as f64, crate::work::CTX));
         }
         let mut elim: Vec<usize> = Vec::new();
-        for k in 0..m {
+        for k in refcols {
             if k == r || self.kind[k] != -2 {
                 continue;
             }
