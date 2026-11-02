@@ -657,10 +657,6 @@ impl<R: Real> RefStruct<R> {
                 }
                 let mut rl = vec![Vec::new(); m];
                 let mut stamp = vec![usize::MAX; m];
-                let all_pos: Vec<usize> = (0..m)
-                    .filter(|&c| pos_of_col[c] != usize::MAX)
-                    .map(|c| pos_of_col[c])
-                    .collect();
                 for y in 0..m {
                     if member[y].is_empty() {
                         continue;
@@ -668,7 +664,17 @@ impl<R: Real> RefStruct<R> {
                     let order: Vec<usize> = if let Some(u) = st.pair_urow.get(&y) {
                         u.iter().map(|&c| pos_of_col[c]).collect()
                     } else if st.u_rows[y].is_empty() {
-                        all_pos.clone()
+                        // Filtering all basis columns in index order is equivalent to sorting just this row's members by
+                        // column. Keep only the positions represented by pos_of_col, and emit each position once.
+                        let mut row: Vec<usize> = member[y]
+                            .iter()
+                            .copied()
+                            .filter(|&t| pos_of_col[st.pivots[t].1] == t)
+                            .collect();
+                        row.sort_unstable_by_key(|&t| st.pivots[t].1);
+                        row.dedup();
+                        rl[y] = row;
+                        continue;
                     } else {
                         st.u_rows[y].iter().map(|&(c, _)| pos_of_col[c]).collect()
                     };
