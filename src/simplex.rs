@@ -1202,6 +1202,29 @@ fn flip_to_upper(p: &Internal, b: &mut Basis) {
     }
 }
 
+/// A fresh compact quad factor, before either owner mutates it. The solver's matrix and dimensions are immutable.
+struct QuadFactorCache {
+    rows: Vec<(bool, Vec<usize>, Vec<f64>)>,
+    threshold: u64,
+    factor: crate::ftran_order::RefStruct<crate::f80::F80>,
+}
+
+impl QuadFactorCache {
+    fn matches(&self, rows: &[(bool, Vec<usize>, Vec<f64>)], threshold: u64) -> bool {
+        self.threshold == threshold
+            && self.rows.len() == rows.len()
+            && self.rows.iter().zip(rows).all(|(a, b)| {
+                a.0 == b.0
+                    && a.1 == b.1
+                    && a.2.len() == b.2.len()
+                    && a.2
+                        .iter()
+                        .zip(&b.2)
+                        .all(|(x, y)| x.to_bits() == y.to_bits())
+            })
+    }
+}
+
 struct Solver<'a> {
     p: &'a Internal,
     opts: &'a SolveOptions,
@@ -1299,6 +1322,8 @@ struct Solver<'a> {
     mirror: Option<Mir>,
     /// The same factor in extended precision, kept after a quad pass (`Handoff::quad`): the basic solution is read from it.
     mirror_q: Option<crate::ftran_order::RefStruct<crate::f80::F80>>,
+    /// Two fresh factors for repeated compact bases, keyed by exact ordered input columns and threshold.
+    quad_cache: Vec<QuadFactorCache>,
     /// Full precision solution at the last fresh x87 basic-solution recomputation.
     x_q: Option<Vec<crate::f80::F80>>,
     /// Maintained basic distances in the x87 primal, indexed by variable.
@@ -1610,7 +1635,7 @@ impl<'a> Solver<'a> {
 
     /// Independent extended-precision twins of the current basis, built with the double build's gate state.
     fn quad_mirrors(
-        &self,
+        &mut self,
         gate0: (i64, i64),
         fac_no: usize,
         rows: &[(bool, Vec<usize>, Vec<f64>)],
@@ -1618,6 +1643,27 @@ impl<'a> Solver<'a> {
         crate::ftran_order::RefStruct<crate::f80::F80>,
         crate::ftran_order::RefStruct<crate::f80::F80>,
     ) {
+        let diagnostic = ["ROSE_GATE_LOG", "ROSE_DENSE_INFO", "ROSE_DENSE_DUMP"]
+            .iter()
+            .any(|name| std::env::var_os(name).is_some());
+        // Below 50 rows there is no dense nucleus and, unless the gate is forced on, no pair pass.
+        // Such a build emits no PGATE record and changes no gate state. Two entries bound retained
+        // storage to compact factors while covering alternating repeated bases.
+        let cacheable = self.p.m < 50 && gate0.1 < 2_000_000_000 && !diagnostic;
+        let threshold = crate::lu_order::threshold().to_bits();
+        if cacheable {
+            if let Some(entry) = self
+                .quad_cache
+                .iter()
+                .find(|entry| entry.matches(rows, threshold))
+            {
+                // The preceding double build already left DENSE_N = 0; retain the current factor number.
+                crate::lu_order::set_factorization_number(fac_no);
+                let first = entry.factor.clone();
+                let second = first.clone();
+                return (first, second);
+            }
+        }
         let build = || {
             let g1 = crate::lu_order::gate_get();
             crate::lu_order::gate_set(gate0);
@@ -1629,10 +1675,7 @@ impl<'a> Solver<'a> {
         let stq = build();
         let first = crate::ftran_order::RefStruct::fresh(self.p.m, self.p.n, &stq, rows);
         // These diagnostics describe the numeric build itself. Preserve their original two builds.
-        let second = if ["ROSE_GATE_LOG", "ROSE_DENSE_INFO", "ROSE_DENSE_DUMP"]
-            .iter()
-            .any(|name| std::env::var_os(name).is_some())
-        {
+        let second = if diagnostic {
             crate::ftran_order::RefStruct::fresh(self.p.m, self.p.n, &build(), rows)
         } else {
             // Each old build restored the same pair gate. The other thread-local outputs are identical;
@@ -1640,6 +1683,16 @@ impl<'a> Solver<'a> {
             stq.repeat_dumps();
             first.clone()
         };
+        if cacheable {
+            if self.quad_cache.len() == 2 {
+                self.quad_cache.remove(0);
+            }
+            self.quad_cache.push(QuadFactorCache {
+                rows: rows.to_vec(),
+                threshold,
+                factor: first.clone(),
+            });
+        }
         (first, second)
     }
 
@@ -5808,6 +5861,7 @@ fn solve_primal(
         shifted: false,
         mirror: None,
         mirror_q: None,
+        quad_cache: Vec::new(),
         x_q: None,
         dst_q: None,
         work: start_work,
