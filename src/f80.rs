@@ -112,19 +112,27 @@ impl F80 {
         let mut e = exp + 127;
         // Round once at the destination's precision. Subnormals have fewer
         // significand bits; rounding first to 64 bits would double-round.
-        let shift = 64 + (E_MIN - e).max(0);
-        let (mut hi, round_up) = if shift < 128 {
-            let hi = (mant >> shift) as u64;
-            let rem = mant & ((1u128 << shift) - 1);
-            let half = 1u128 << (shift - 1);
+        let (mut hi, round_up) = if e >= E_MIN {
+            // Normal destinations always drop exactly 64 bits of the normalized significand.
+            let hi = (mant >> 64) as u64;
+            let rem = mant as u64;
+            let half = 1u64 << 63;
             (hi, rem > half || (rem == half && (sticky || hi & 1 != 0)))
-        } else if shift == 128 {
-            (
-                0,
-                mant > (1u128 << 127) || (mant == (1u128 << 127) && sticky),
-            )
         } else {
-            (0, false)
+            let shift = 64 + (E_MIN - e);
+            if shift < 128 {
+                let hi = (mant >> shift) as u64;
+                let rem = mant & ((1u128 << shift) - 1);
+                let half = 1u128 << (shift - 1);
+                (hi, rem > half || (rem == half && (sticky || hi & 1 != 0)))
+            } else if shift == 128 {
+                (
+                    0,
+                    mant > (1u128 << 127) || (mant == (1u128 << 127) && sticky),
+                )
+            } else {
+                (0, false)
+            }
         };
         if round_up {
             let (h, carry) = hi.overflowing_add(1);
@@ -557,6 +565,60 @@ impl Default for F80 {
 mod tests {
     use super::*;
 
+    fn previous_pack(neg: bool, mant: u128, exp: i32, sticky: bool) -> F80 {
+        if mant == 0 {
+            return F80 { neg, ..F80::ZERO };
+        }
+        let lz = mant.leading_zeros() as i32;
+        let mant = mant << lz;
+        let exp = exp - lz;
+        let mut e = exp + 127;
+        // Round once at the destination's precision. Subnormals have fewer
+        // significand bits; rounding first to 64 bits would double-round.
+        let shift = 64 + (E_MIN - e).max(0);
+        let (mut hi, round_up) = if shift < 128 {
+            let hi = (mant >> shift) as u64;
+            let rem = mant & ((1u128 << shift) - 1);
+            let half = 1u128 << (shift - 1);
+            (hi, rem > half || (rem == half && (sticky || hi & 1 != 0)))
+        } else if shift == 128 {
+            (
+                0,
+                mant > (1u128 << 127) || (mant == (1u128 << 127) && sticky),
+            )
+        } else {
+            (0, false)
+        };
+        if round_up {
+            let (h, carry) = hi.overflowing_add(1);
+            if carry {
+                hi = 1 << 63;
+                e += 1;
+            } else {
+                hi = h;
+            }
+        }
+        if e > E_MAX {
+            return F80 {
+                neg,
+                e: E_INF,
+                m: 1 << 63,
+            };
+        }
+        if hi == 0 {
+            return F80 { neg, ..F80::ZERO };
+        }
+        if e < E_MIN {
+            let lz = hi.leading_zeros() as i32;
+            return F80 {
+                neg,
+                e: E_MIN - lz,
+                m: hi << lz,
+            };
+        }
+        F80 { neg, e, m: hi }
+    }
+
     // Frozen multiply before the normal-product specialization; keep the general pack path as the oracle.
     fn previous_mul(a: F80, o: F80) -> F80 {
         let neg = a.neg != o.neg;
@@ -576,7 +638,79 @@ mod tests {
         if a.m == 0 || o.m == 0 {
             return F80 { neg, ..F80::ZERO };
         }
-        F80::pack(neg, (a.m as u128) * (o.m as u128), a.e + o.e - 126, false)
+        previous_pack(neg, (a.m as u128) * (o.m as u128), a.e + o.e - 126, false)
+    }
+
+    #[test]
+    fn pack_matches_previous() {
+        let check = |neg, mant, exp, sticky| {
+            assert_eq!(
+                F80::pack(neg, mant, exp, sticky).repr(),
+                previous_pack(neg, mant, exp, sticky).repr(),
+                "{neg} {mant:x} {exp} {sticky}"
+            );
+        };
+        for mant in [
+            0,
+            1,
+            2,
+            1 << 63,
+            1 << 64,
+            (1 << 127) - 1,
+            1 << 127,
+            (1 << 127) + (1 << 63) - 1,
+            (1 << 127) + (1 << 63),
+            (1 << 127) + (1 << 63) + 1,
+            u128::MAX,
+        ] {
+            for exp in [
+                E_MIN - 255,
+                E_MIN - 192,
+                E_MIN - 128,
+                E_MIN - 127,
+                E_MIN - 126,
+                E_MIN - 64,
+                -127,
+                -126,
+                0,
+                E_MAX - 128,
+                E_MAX - 127,
+                E_MAX - 126,
+                E_MAX,
+                E_MAX + 128,
+            ] {
+                for neg in [false, true] {
+                    for sticky in [false, true] {
+                        check(neg, mant, exp, sticky);
+                    }
+                }
+            }
+        }
+        // Column values from the first fx_quad_obj_5371 QTAU dump, in the add/pack significand scale.
+        for (mant, se) in [
+            (0xf424_0000_0000_0000, 0xbffe),
+            (0xb71b_0000_0000_0000, 0xbffd),
+            (0xea60_0000_0000_0000, 0x3ff7),
+            (0x8000_0000_0000_0000, 0xbff1),
+            (0x9c40_0000_0000_0000, 0xbff6),
+            (0xc000_0000_0000_0000, 0x3ffe),
+        ] {
+            let v = F80::from_repr(mant, se);
+            check(v.neg, (v.m as u128) << 63, v.e - 126, false);
+        }
+        let mut seed = 0x198d_ac52_6214_be9du64;
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        for _ in 0..100_000 {
+            let mant = (((next() as u128) << 64) | next() as u128) >> (next() & 127);
+            let exp = (next() % 66_001) as i32 - 33_000;
+            let flags = next();
+            check(flags & 1 != 0, mant, exp, flags & 2 != 0);
+        }
     }
 
     #[test]
