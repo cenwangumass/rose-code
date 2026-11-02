@@ -6284,12 +6284,15 @@ fn solve_primal(
             None
         };
         let last = last_all.filter(|_| !due);
+        // These dual/list updates leave the basis, distances and bounds unchanged,
+        // so reuse a computed signature until p1_prev is saved below.
+        let mut phase_classes = None;
         let mut dc: Vec<(usize, f64)> = Vec::new();
         // The entering variable alone changes class: the reference neither solves nor takes a row product for it (`0x107e14`).
         let mut q_only = false;
         if let Some(lp) = &last {
             if phase1 {
-                let cls = s.sig();
+                let cls = phase_classes.get_or_insert_with(|| s.sig());
                 for &i in &lp.rows {
                     let (j, c) = s.p1_prev[i];
                     if j == s.basic[i] && cls[i] != c {
@@ -6339,7 +6342,7 @@ fn solve_primal(
                 } else {
                     // Without the mirror: re-score the columns whose `d` moved.
                     let old_d = s.d.clone();
-                    let cls = s.sig();
+                    let cls = phase_classes.get_or_insert_with(|| s.sig());
                     let cost_changed = s
                         .p1_prev
                         .iter()
@@ -6357,7 +6360,7 @@ fn solve_primal(
                 if !was && s.mirror.is_some() && !due {
                     // Phase 1 entered from phase 2 without a refactorization: the reference adds the penalties of the infeasible basics to the phase 2 duals
                     // in place (a BTRAN of the cost changes, like the cost-change pass inside phase 1), `P+0x18` unchanged (seed 2717, fx_ladder_386).
-                    let cls = s.sig();
+                    let cls = phase_classes.get_or_insert_with(|| s.sig());
                     let dc2: Vec<(usize, f64)> = cls
                         .iter()
                         .enumerate()
@@ -6375,7 +6378,12 @@ fn solve_primal(
                 s.list.clear();
                 s.level = 0;
             }
-            s.p1_prev = s.basic.iter().zip(s.sig()).map(|(&j, c)| (j, c)).collect();
+            s.p1_prev = s
+                .basic
+                .iter()
+                .zip(phase_classes.take().unwrap_or_else(|| s.sig()))
+                .map(|(&j, c)| (j, c))
+                .collect();
         } else if phase1 {
             // Back in a feasible region: continue with the true costs (weights and framework are kept).
             phase1 = false;
