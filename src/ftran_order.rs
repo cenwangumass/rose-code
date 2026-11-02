@@ -926,6 +926,8 @@ impl<R: Real> RefStruct<R> {
         for &v in &order {
             have[v] = true;
         }
+        // Gather each eta into one buffer; its logical peel is stored in eta.peel.
+        let mut eta_x: Vec<R> = Vec::new();
         if !self.etas.is_empty() {
             let netas = self.etas.len();
             if dense_l || count_l * self.dthr > m {
@@ -947,8 +949,9 @@ impl<R: Real> RefStruct<R> {
                 let mut ee = (netas - first) as f64 * 3.0;
                 for eta in &self.etas[first..] {
                     ee = eta.ind.len() as f64 * 2.0 + ee;
-                    let xs: Vec<R> = eta.ind.iter().map(|&j| xe[j]).collect();
-                    let mut sv = dot(&xs, &eta.val, eta.peel);
+                    eta_x.clear();
+                    eta_x.extend(eta.ind.iter().map(|&j| xe[j]));
+                    let mut sv = dot(&eta_x, &eta.val, eta.peel);
                     if sv.abs() <= R::c(TOL) {
                         sv = R::ZERO;
                     } else if !inlist[eta.idx] {
@@ -961,8 +964,9 @@ impl<R: Real> RefStruct<R> {
             }
         }
         for eta in &self.etas {
-            let xs: Vec<R> = eta.ind.iter().map(|&j| x[j]).collect();
-            let mut s = dot(&xs, &eta.val, eta.peel);
+            eta_x.clear();
+            eta_x.extend(eta.ind.iter().map(|&j| x[j]));
+            let mut s = dot(&eta_x, &eta.val, eta.peel);
             if s.abs() <= R::c(TOL) {
                 s = R::ZERO;
             }
