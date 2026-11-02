@@ -41,6 +41,8 @@ pub struct RefStruct<R: Real = f64> {
     diag: Vec<R>,
     /// Numeric U entries of each tail column `(position, value)`.
     uc: Vec<Vec<(usize, R)>>,
+    /// Numeric U transpose, ordered by column, including duplicate entries in column order.
+    ut: Vec<Vec<(usize, R)>>,
     /// Spike of the most recent solve: the L stage and eta result `(position, value)` in list order.
     spike: Vec<(usize, R)>,
     /// Whether the column replacement has used the spike since the last FTRAN.
@@ -560,6 +562,12 @@ impl<R: Real> RefStruct<R> {
             .rev()
             .find(|&t| kind[t] == -2 && a[t].is_empty() && b[t].is_empty())
             .unwrap_or(i21.min(m - 1));
+        let mut ut = vec![Vec::new(); m];
+        for (c, col) in uc.iter().enumerate() {
+            for &(row, v) in col {
+                ut[row].push((c, v));
+            }
+        }
         RefStruct {
             upd: 0,
             sum_alpha: 0.0,
@@ -685,6 +693,7 @@ impl<R: Real> RefStruct<R> {
             lev_built,
             diag: st.diag.clone(),
             uc,
+            ut,
             spike: Vec::new(),
             spike_used: false,
             lsnap: Default::default(),
@@ -1538,12 +1547,7 @@ impl<R: Real> RefStruct<R> {
     /// test unless the first position's U^T row is empty. `dense_in` passes the input as a dense vector (count `-1`).
     pub fn btran(&mut self, inp: &[(usize, R)], direct: bool, dense_in: bool) -> Vec<(usize, R)> {
         let m = self.m;
-        let mut ut: Vec<Vec<(usize, R)>> = vec![Vec::new(); m];
-        for c in 0..m {
-            for &(j, v) in &self.uc[c] {
-                ut[j].push((c, v));
-            }
-        }
+        let ut = &self.ut;
         let mut x = vec![R::ZERO; m];
         let mut e = 0.0f64;
         let cnt = inp.len();
@@ -2322,29 +2326,8 @@ impl<R: Real> RefStruct<R> {
     fn eliminate(&self, r: usize) -> (Vec<(usize, R)>, usize) {
         let m = self.m;
         let d0 = self.diag[r];
-        // Row-wise copy of the tail columns' U entries (CSR), each row in ascending column order.
-        let mut rstart = vec![0usize; m + 1];
-        for k in 0..m {
-            if self.kind[k] == -2 {
-                for &(row, _) in &self.uc[k] {
-                    rstart[row + 1] += 1;
-                }
-            }
-        }
-        for i in 0..m {
-            rstart[i + 1] += rstart[i];
-        }
-        let mut rfill = rstart.clone();
-        let mut rent = vec![(0usize, R::ZERO); rstart[m]];
-        for k in 0..m {
-            if self.kind[k] == -2 {
-                for &(row, v) in &self.uc[k] {
-                    rent[rfill[row]] = (k, v);
-                    rfill[row] += 1;
-                }
-            }
-        }
-        let rows = |i: usize| &rent[rstart[i]..rstart[i + 1]];
+        // Tail entries of the maintained transpose, in the same ascending column order as the CSR rebuild.
+        let rows = |i: usize| self.ut[i].iter().filter(|&&(k, _)| self.kind[k] == -2);
         let mut w = vec![R::ZERO; m];
         let mut seen = vec![false; m];
         let mut heap: std::collections::BinaryHeap<std::cmp::Reverse<(usize, usize)>> =
@@ -2401,8 +2384,20 @@ impl<R: Real> RefStruct<R> {
         dense += 2.0 * (m - minslot) as f64;
         // The solve returns at once, booking nothing, when row `r` of the row-wise copy is empty.
         self.dense_est
-            .set(if rows(r).is_empty() { 0.0 } else { dense });
+            .set(if rows(r).next().is_none() { 0.0 } else { dense });
         (eta, visited)
+    }
+
+    /// Replace a numeric U column and update its ordered row copy without doing any arithmetic.
+    fn replace_u_column(&mut self, c: usize, col: Vec<(usize, R)>) {
+        let old = std::mem::replace(&mut self.uc[c], col);
+        for &(row, _) in &old {
+            self.ut[row].retain(|e| e.0 != c);
+        }
+        for &(row, v) in &self.uc[c] {
+            let pos = self.ut[row].partition_point(|e| e.0 <= c);
+            self.ut[row].insert(pos, (c, v));
+        }
     }
 
     /// Replace the column at position `r` by the entering column of the last `ftran`.
@@ -2604,7 +2599,7 @@ impl<R: Real> RefStruct<R> {
         } else if old == -2 {
             let old_b = std::mem::take(&mut self.b[r]);
             self.a[r].clear();
-            self.uc[r].clear();
+            self.replace_u_column(r, Vec::new());
             self.kind[r] = -1;
             let mut refd = vec![false; m];
             for k in 0..m {
@@ -2738,6 +2733,7 @@ impl<R: Real> RefStruct<R> {
                         remove_last_fill(&mut self.b[k], r);
                     }
                     self.uc[k].retain(|e| e.0 != r);
+                    self.ut[r].retain(|e| e.0 != k);
                     elim.push(k);
                     // A column left without entries raises the mark to its slot (`0xf29d5`).
                     if self.a[k].is_empty() && self.b[k].is_empty() {
@@ -2825,7 +2821,7 @@ impl<R: Real> RefStruct<R> {
             );
         }
         self.diag[r] = newdiag;
-        self.uc[r] = self.spike.iter().copied().filter(|e| e.0 != r).collect();
+        self.replace_u_column(r, self.spike.iter().copied().filter(|e| e.0 != r).collect());
         self.a[r] = av;
         let mut bb = bv;
         bb.reverse();
@@ -2850,5 +2846,59 @@ fn remove_front_fill(v: &mut Vec<usize>, r: usize) {
 fn remove_last_fill(v: &mut Vec<usize>, r: usize) {
     if let Some(p) = v.iter().position(|&y| y == r) {
         v.swap_remove(p);
+    }
+}
+
+#[cfg(test)]
+mod transpose_tests {
+    use super::*;
+
+    fn replacements<R: Real>(bits: impl Fn(R) -> (u64, u16)) {
+        let mut seed = 0x519de38a7u64;
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        for m in [1, 7, 31] {
+            let cols: Vec<_> = (0..m).map(|i| (true, vec![i], vec![1.0])).collect();
+            let st = crate::lu_order::factor_structure_r::<R>(m, &cols);
+            let mut f = RefStruct::fresh(m, m, &st, &cols);
+            for round in 0..128 {
+                let c = next() as usize % m;
+                let mut col = Vec::new();
+                for i in 0..(round % (2 * m + 1)) {
+                    let row = next() as usize % m;
+                    let value = match i % 7 {
+                        0 => 0.0,
+                        1 => -0.0,
+                        2 => f64::from_bits(1),
+                        3 => f64::MAX,
+                        _ => f64::from_bits(next() & 0xffef_ffff_ffff_ffff),
+                    };
+                    col.push((row, R::c(value)));
+                }
+                f.replace_u_column(c, col);
+                // Rebuild from columns independently, checking duplicate ordering and every stored bit.
+                let mut expected = vec![Vec::new(); m];
+                for (k, col) in f.uc.iter().enumerate() {
+                    for &(row, v) in col {
+                        expected[row].push((k, bits(v)));
+                    }
+                }
+                let actual: Vec<Vec<_>> =
+                    f.ut.iter()
+                        .map(|row| row.iter().map(|&(k, v)| (k, bits(v))).collect())
+                        .collect();
+                assert_eq!(actual, expected);
+            }
+        }
+    }
+
+    #[test]
+    fn ordered_u_transpose_replacements() {
+        replacements::<f64>(|v| (v.to_bits(), 0));
+        replacements::<crate::f80::F80>(|v| v.repr());
     }
 }
