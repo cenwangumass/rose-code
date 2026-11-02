@@ -57,6 +57,8 @@ pub struct RefStruct<R: Real = f64> {
     b: Vec<Vec<usize>>,
     lcols: Vec<Vec<usize>>,
     perm: Vec<usize>,
+    /// Immutable inverse row permutation, initialized at the first BTRAN output.
+    row_of: std::cell::OnceCell<Vec<usize>>,
     dens: f64,
     dense_est: std::cell::Cell<f64>,
     /// Density threshold fixed at factorization time (`f104` in the notes): 2, or `5 (nnzL/m + 1)^2` capped at `m`.
@@ -70,6 +72,8 @@ pub struct RefStruct<R: Real = f64> {
     /// Longest-path level of each L node, when the reference solves L level by level (`0x12a990`): only for `m >= 250`, a
     /// small level count (`< m/10`) and a short Markowitz L part. Otherwise the L solve is the Kahn FIFO.
     levels: Option<Vec<usize>>,
+    /// Immutable transpose-graph levels and maximum, initialized when a BTRAN first uses level buckets.
+    lt_levels: std::cell::OnceCell<(Vec<usize>, usize)>,
     lev_built: bool,
     diag: Vec<R>,
     /// Numeric U entries of each tail column `(position, value)`.
@@ -97,6 +101,8 @@ pub struct RefStruct<R: Real = f64> {
     n1: usize,
     loff: usize,
     nnz_l: usize,
+    /// Nonzeros in the immutable L tail starting at loff.
+    nnz_l_tail: usize,
     first_eta: Vec<usize>,
     /// Estimate of the most recent `ftran` (`0x120740`) or `btran` (`0x12de60`), before the factor object's scale 1.3.
     pub work: f64,
@@ -570,9 +576,9 @@ impl<R: Real> RefStruct<R> {
         let mut lev_dense = false;
         let mut lev_built = false;
         let mut lev_dense_ft = false;
+        let nnz_tail: usize = lcols[nseq..].iter().map(|c| c.len()).sum();
         let levels = {
             let d = m - nseq;
-            let nnz_tail: usize = lcols[nseq..].iter().map(|c| c.len()).sum();
             let outer = d < 6 || 10 * d * d <= m || nnz_tail <= 10 * d;
             if m >= 250 {
                 let mut lev = vec![0usize; m];
@@ -617,6 +623,7 @@ impl<R: Real> RefStruct<R> {
             n1: st.phase.iter().filter(|&&p| p == 1).count(),
             loff: nseq,
             nnz_l: nnz_l_tot,
+            nnz_l_tail: nnz_tail,
             first_eta: vec![usize::MAX; m],
             work: 0.0,
             work_parts: (0.0, 0.0),
@@ -722,6 +729,7 @@ impl<R: Real> RefStruct<R> {
             b,
             lcols,
             perm,
+            row_of: Default::default(),
             dens: (h33 + h34) * (h33 + h34),
             dense_est: std::cell::Cell::new(0.0),
             dthr,
@@ -731,6 +739,7 @@ impl<R: Real> RefStruct<R> {
             lvals,
             lt,
             levels,
+            lt_levels: Default::default(),
             lev_built,
             diag: st.diag.clone(),
             uc,
@@ -872,7 +881,7 @@ impl<R: Real> RefStruct<R> {
             }
             let count_l = q.iter().filter(|&&v| x[v].abs() > R::c(TOL)).count();
             let d = m - self.loff;
-            let nnz_tail: usize = self.lcols[self.loff..].iter().map(|c| c.len()).sum();
+            let nnz_tail = self.nnz_l_tail;
             if !(d < 6 || 10 * d * d <= m || nnz_tail <= 10 * d) {
                 // Third strategy of `0x12a990`: the head columns (below `loff`) in Kahn order, then the tail by an ascending
                 // scan from the lowest tail index reached by an input or by a kept head node.
@@ -1760,7 +1769,7 @@ impl<R: Real> RefStruct<R> {
             let cnt = l.len();
             let (n1, nseq) = (self.n1, self.loff);
             let d = m - nseq;
-            let nnz_tail: usize = self.lcols[nseq..].iter().map(|c| c.len()).sum();
+            let nnz_tail = self.nnz_l_tail;
             let mut hi = 0usize;
             if d >= 6 && m < 10 * d * d && n1 < 2 * d && 10 * d < nnz_tail && cnt > 0 {
                 hi = l.iter().filter(|&&i| i >= nseq).count();
@@ -1821,13 +1830,17 @@ impl<R: Real> RefStruct<R> {
                 let mut seen = vec![false; m];
                 if self.levels.is_some() {
                     // Level buckets of the transposed graph: a node comes after the nodes whose rows it appears in.
-                    let mut lev = vec![0usize; m];
-                    for v in (0..m).rev() {
-                        for &y in &self.lcols[v] {
-                            lev[v] = lev[v].max(lev[y] + 1);
+                    let (lev, maxlev) = self.lt_levels.get_or_init(|| {
+                        let mut lev = vec![0usize; m];
+                        for v in (0..m).rev() {
+                            for &y in &self.lcols[v] {
+                                lev[v] = lev[v].max(lev[y] + 1);
+                            }
                         }
-                    }
-                    let maxlev = lev.iter().copied().max().unwrap_or(0);
+                        let maxlev = lev.iter().copied().max().unwrap_or(0);
+                        (lev, maxlev)
+                    });
+                    let maxlev = *maxlev;
                     let mut buckets: Vec<Vec<usize>> = vec![Vec::new(); maxlev + 1];
                     let mut lo = usize::MAX;
                     for &i in l {
@@ -1906,10 +1919,13 @@ impl<R: Real> RefStruct<R> {
             }
         }
         self.work = e;
-        let mut row_of = vec![0usize; m];
-        for (r, &v) in self.perm.iter().enumerate() {
-            row_of[v] = r;
-        }
+        let row_of = self.row_of.get_or_init(|| {
+            let mut row_of = vec![0usize; m];
+            for (r, &v) in self.perm.iter().enumerate() {
+                row_of[v] = r;
+            }
+            row_of
+        });
         if self.bt_dense {
             // The dense result keeps the sub-tolerance entries the L^T pass left in place.
             // and lists them by ascending row.
