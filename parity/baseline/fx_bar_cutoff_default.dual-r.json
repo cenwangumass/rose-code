@@ -1,0 +1,76 @@
+{
+  "args": [
+    "--method",
+    "dual",
+    "--profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "fx_bar_cutoff_default.dual-r",
+  "model": "tests/fixtures/fx_bar_cutoff_default.mps",
+  "ms": 4,
+  "order": {
+    "chunks": [
+      "b4f3131c439a0e76"
+    ],
+    "n": 31
+  },
+  "records": 31,
+  "result": "1d407b2ab28ad7d3",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "734eb656f891d24f"
+      ],
+      "n": 1
+    },
+    "BTY": {
+      "chunks": [
+        "c514a7a6462966a3"
+      ],
+      "n": 2
+    },
+    "CALLBACK": {
+      "chunks": [
+        "235cdc8aa953d255"
+      ],
+      "n": 2
+    },
+    "DACC": {
+      "chunks": [
+        "5e6ba8346adc7f33"
+      ],
+      "n": 1
+    },
+    "DCR": {
+      "chunks": [
+        "2ff194c09c6ff5ed"
+      ],
+      "n": 2
+    },
+    "DSX": {
+      "chunks": [
+        "ee966bcb2bcfb419"
+      ],
+      "n": 1
+    },
+    "LUSTART": {
+      "chunks": [
+        "cd0977d5df9f1d95"
+      ],
+      "n": 1
+    },
+    "SCALE": {
+      "chunks": [
+        "f2bf9956e03db413"
+      ],
+      "n": 1
+    },
+    "WORK": {
+      "chunks": [
+        "99f9b58555dcb8e7"
+      ],
+      "n": 20
+    }
+  }
+}

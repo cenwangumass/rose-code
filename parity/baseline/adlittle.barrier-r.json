@@ -1,0 +1,64 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "adlittle.barrier-r",
+  "model": "tests/fixtures/adlittle.mps",
+  "ms": 34,
+  "order": {
+    "chunks": [
+      "897cd2202bc528ce"
+    ],
+    "n": 386
+  },
+  "records": 386,
+  "result": "0b186ea4fcb73825",
+  "tags": {
+    "AD": {
+      "chunks": [
+        "8b07c9998adc5958"
+      ],
+      "n": 12
+    },
+    "BARRIER": {
+      "chunks": [
+        "9a06441e893fc190"
+      ],
+      "n": 14
+    },
+    "BEST": {
+      "chunks": [
+        "004c2fd912eb1603"
+      ],
+      "n": 14
+    },
+    "FOUT": {
+      "chunks": [
+        "0504650cf11b1e4b"
+      ],
+      "n": 65
+    },
+    "FSN": {
+      "chunks": [
+        "dbf8eca74469ae09"
+      ],
+      "n": 65
+    },
+    "RSOLVE": {
+      "chunks": [
+        "58b39022a9a3384b"
+      ],
+      "n": 36
+    },
+    "STG": {
+      "chunks": [
+        "37c531efa8bb2ff3"
+      ],
+      "n": 180
+    }
+  }
+}

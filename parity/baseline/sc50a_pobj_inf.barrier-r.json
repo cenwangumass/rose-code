@@ -1,0 +1,64 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "sc50a_pobj_inf.barrier-r",
+  "model": "tests/fixtures/sc50a_pobj_inf.mps",
+  "ms": 17,
+  "order": {
+    "chunks": [
+      "5a68da8c7a1f2de8"
+    ],
+    "n": 255
+  },
+  "records": 255,
+  "result": "037831755250faca",
+  "tags": {
+    "AD": {
+      "chunks": [
+        "3a7b5921832e1510"
+      ],
+      "n": 7
+    },
+    "BARRIER": {
+      "chunks": [
+        "edaacf0ca126b280"
+      ],
+      "n": 9
+    },
+    "BEST": {
+      "chunks": [
+        "127d1b072dd2bf82"
+      ],
+      "n": 9
+    },
+    "FOUT": {
+      "chunks": [
+        "32683feda224181c"
+      ],
+      "n": 40
+    },
+    "FSN": {
+      "chunks": [
+        "434f0ff3b287481d"
+      ],
+      "n": 40
+    },
+    "RSOLVE": {
+      "chunks": [
+        "f65d94b905cdead1"
+      ],
+      "n": 25
+    },
+    "STG": {
+      "chunks": [
+        "2c12ea306dd55432"
+      ],
+      "n": 125
+    }
+  }
+}

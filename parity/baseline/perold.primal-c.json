@@ -1,0 +1,445 @@
+{
+  "args": [
+    "--method",
+    "primal",
+    "--profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "perold.primal-c",
+  "model": "tests/fixtures/perold.mps",
+  "ms": 23722,
+  "order": {
+    "chunks": [
+      "0a8b37a5733b30f7",
+      "b6d07330767b5711",
+      "c852ab45b4f7b262",
+      "b38d5c3f9cb8b851",
+      "1ebaa23a49a60a94",
+      "bfaa0a018e1e1d1f",
+      "81fb3205aaa37224",
+      "6853881b4f7ff263",
+      "a2a14f3339a1904e",
+      "502dd991c34e3eed",
+      "52c1b844b2950766",
+      "0d7ea07c523c96c6",
+      "20f6f2da294c1717",
+      "f6bfae8dc781ffee",
+      "9704d56acb6aec38",
+      "00aa6f50f86e39ad",
+      "7f8b0e3973b65940",
+      "d211c81bac23e8a3",
+      "5897f90a0a553013",
+      "2541136306f09eef",
+      "b527f591c4025b39",
+      "23605c79d3117342",
+      "d8457783cc25c0d7",
+      "e8cc740a4335b586",
+      "804dbce6a7ed2010",
+      "b056ee85642e7ba0",
+      "0023ba6ee141d8a6",
+      "d801249e5036dd91",
+      "83ca30a248b5559b",
+      "082c580611e14ea3",
+      "dc8c94bdeb85b133",
+      "70efbaadd147e7e0",
+      "586838525c5d17a0",
+      "413998e365ded480",
+      "f3bd1eaec9b8e703",
+      "13362999df58bc4a",
+      "e0d8de09ab0654c1",
+      "e7d10675a2716f36",
+      "1cc991b3206f53f0",
+      "031bf142b10ad84e",
+      "da5e5894649000af",
+      "d0bf5a5610dd8ffc",
+      "81b953add665d351",
+      "0fdd7dad426d7d15",
+      "49436e8ffd8afd81",
+      "f537b40fc739ed49",
+      "6d39f167095338b4",
+      "8cb1c8af7cc01a02",
+      "ef8c075bc513990f",
+      "36e90ff699fd8de8",
+      "cc2b920076ce998c",
+      "0108972e20a03ebd",
+      "16cce638de3595ec",
+      "9033d8cfde175202",
+      "78ab282ac03473d9",
+      "fa314372f6c63689",
+      "def4cd479a23b4cd",
+      "fbc7d3e3222297bc",
+      "6f2bec6b17e285ef",
+      "b82b7767aa782e8e",
+      "63322fadf97caa67",
+      "e4ba7c712a0308c3",
+      "5a0a5769cf604ca4",
+      "d730f8dc3a83547d",
+      "3c564235357fa093",
+      "8855fe1fea3caf45",
+      "63f386d3ae553e40",
+      "bebef9976d172d8a",
+      "1a6c6ec801f4b6f4",
+      "c50999e4fe331e1f",
+      "eb476e621b2bc834",
+      "d2d24b60e92d2dac",
+      "cc59a95a53f046c8",
+      "24fb3f3a852a7402",
+      "0a5f4de779a841cb",
+      "aee6349d14c33fc9",
+      "7221d243280f8316",
+      "da7390e412bb8136",
+      "50b90ec016a77a42",
+      "b47192003dc94659",
+      "6266a36c37b269a5",
+      "c3ce7cedce021483",
+      "8fb5d5eed8a58812",
+      "7fbb30a24fcda8f8",
+      "63ab3c1842d0ad6e",
+      "fefa6977e63d5d66",
+      "889fc726de13f9e3",
+      "b477b1a2856dbc3d",
+      "9fac8bb141d897f1",
+      "1050add01b0e2f47",
+      "b0bbd9e959a6f9bd",
+      "089668e24b56fabd",
+      "47c1e4a67983ae97",
+      "31fc3c22545efbae",
+      "d1ad4e13c3ed1495",
+      "c4b6822b319ee0d9",
+      "851eea579a3c23e0",
+      "4472f5862915350a",
+      "85e5ddae87c52ef4",
+      "43bef9d92d465cb3",
+      "fea98df6a71e53c3",
+      "283f3e6a241af57f",
+      "0966fc63ebe7dff9",
+      "8d7325e76f510c61",
+      "1e27bb1fc9f9bd3f",
+      "406aa724e2c2aa8c",
+      "5cd3e6dd588e8152",
+      "c047f04e3ccd66c5",
+      "ca783360e19ca316",
+      "5b64cc1efe548ff3",
+      "fcffc7d417d2b64a",
+      "0f970dc2f0464488",
+      "585266f8bf29da34",
+      "fe23050608807ebc",
+      "f2b6692248006c64",
+      "c44404330a334475",
+      "e682f14f49cf9e49",
+      "d24119b5ff8e42b6",
+      "2cf7bdbcba586a43",
+      "e21ba8646fb9d822",
+      "969313c3e88dabbd",
+      "3277ef482a86dabd",
+      "fe23ab45336daf0d",
+      "671c1b7a4a216ae3",
+      "093cfcabbd0e5937",
+      "f211a6d7dc67cb71",
+      "6aa4338e1ba714a3",
+      "95c8f114bb4b8405",
+      "79e363472c78f250",
+      "f5471b89afa4c74d",
+      "22f94aa5f5409d38",
+      "182db30ab7a55080",
+      "995b826abfbde58a",
+      "78a5ccd7b933ea43",
+      "9ef0c01d419bd9fd",
+      "3a53bf9bc6833d28",
+      "7445ca09e861c614",
+      "25f9f71d15bac29e"
+    ],
+    "n": 140918
+  },
+  "records": 140918,
+  "result": "1043a97f0951e336",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "4fdfd8553dac9f36"
+      ],
+      "n": 91
+    },
+    "BTC": {
+      "chunks": [
+        "a88352e1dedd8964"
+      ],
+      "n": 925
+    },
+    "BTR": {
+      "chunks": [
+        "d9a96178267a302a",
+        "d2dd82dd2c27b1e3",
+        "e325b858cf503a7c",
+        "884131da71664ed0"
+      ],
+      "n": 3322
+    },
+    "BTT": {
+      "chunks": [
+        "7ab4752f22ad2d34",
+        "d054f276ae4a1928",
+        "4022c58871865d14",
+        "cef736706bf5d412"
+      ],
+      "n": 3301
+    },
+    "BTY": {
+      "chunks": [
+        "ade269eb7c0ae8bf"
+      ],
+      "n": 259
+    },
+    "CORD": {
+      "chunks": [
+        "c2670ff242837328"
+      ],
+      "n": 925
+    },
+    "DTOL": {
+      "chunks": [
+        "f3e7bf256fd2a352"
+      ],
+      "n": 33
+    },
+    "ENT": {
+      "chunks": [
+        "1d15ab1f73363941",
+        "7b1af40724e5676b",
+        "388d339f98f5664c"
+      ],
+      "n": 2536
+    },
+    "ENT2": {
+      "chunks": [
+        "c7513011b5f059fa"
+      ],
+      "n": 863
+    },
+    "ENTOUT": {
+      "chunks": [
+        "ab47397c62cceace",
+        "b37412bf9c7351f4",
+        "6a87c4456ad602eb",
+        "ae25cb334fd99f22"
+      ],
+      "n": 3399
+    },
+    "FILLP": {
+      "chunks": [
+        "72ba0524f7991f6c",
+        "2ad35817886b4d62",
+        "4ed698b72d05598b",
+        "b5fa5c54f621d73e"
+      ],
+      "n": 3322
+    },
+    "FSTRUCT": {
+      "chunks": [
+        "4bf6bbd5bf979f48",
+        "ea75695fe532ffb9",
+        "2409cfd8f1e88656",
+        "392a35165ccf883f"
+      ],
+      "n": 3322
+    },
+    "FTR": {
+      "chunks": [
+        "12823714d316341c",
+        "5760ca6e4b1da80a",
+        "0ab13c16b2084a2d",
+        "79b8e7bcdbdea7ae"
+      ],
+      "n": 3399
+    },
+    "LST": {
+      "chunks": [
+        "cc2dba035bbcc2aa",
+        "0c62b2195a6db783",
+        "b1d15a66ae1bf3ea",
+        "79ccc594a0bfc76b"
+      ],
+      "n": 3399
+    },
+    "LUIN": {
+      "chunks": [
+        "6948a582f276ff38"
+      ],
+      "n": 89
+    },
+    "LUOUT": {
+      "chunks": [
+        "0dca6a9810f6685f"
+      ],
+      "n": 89
+    },
+    "LUSTART": {
+      "chunks": [
+        "d7cab7645873009d"
+      ],
+      "n": 1
+    },
+    "ORD": {
+      "chunks": [
+        "2a61326373efdbfa",
+        "e75f1e832d22ef4c",
+        "83af930690b62913",
+        "47a75363f3783867"
+      ],
+      "n": 3322
+    },
+    "PDRIFT": {
+      "chunks": [
+        "e2908b3cab17a4f3"
+      ],
+      "n": 18
+    },
+    "PGATE": {
+      "chunks": [
+        "44e8b16b1a19b20c"
+      ],
+      "n": 88
+    },
+    "PHDR": {
+      "chunks": [
+        "f0f4c53abd565797"
+      ],
+      "n": 1
+    },
+    "PLIST": {
+      "chunks": [
+        "4b92ab3631306a67",
+        "c3c2aca3dc0da5c1",
+        "8b7bea1ceb6be5b3",
+        "dcce053534381841"
+      ],
+      "n": 3567
+    },
+    "STARTBASIS": {
+      "chunks": [
+        "70263b64a1e52122"
+      ],
+      "n": 1
+    },
+    "USTG": {
+      "chunks": [
+        "76cf061168898509",
+        "fc366587ca83b8d8",
+        "a3194cdc6e8a5e8b",
+        "6100f534c5e7ed94"
+      ],
+      "n": 3399
+    },
+    "WORK": {
+      "chunks": [
+        "395b2402fd3fd485",
+        "a2c1541428d450ad",
+        "7bf06a0437af3095",
+        "6f919dfb27e4176a",
+        "8113b495e46d7837",
+        "5847f3137b86b5a0",
+        "7a83f60a008d89f3",
+        "357f860c88df1b11",
+        "f254054d94315b40",
+        "6f0195ec221d6925",
+        "0006b35d205b5295",
+        "9e1ed594cd602352",
+        "2a6fd17b8bc4278a",
+        "83bd8a6ba7f0adcf",
+        "c36106bd510f2c8d",
+        "af062b95a1ff58b9",
+        "0e0655fbb9ca227d",
+        "a8870dcf86937a36",
+        "41fab0bf08d825a2",
+        "af48614b8f4240f9",
+        "6e8a6bdee0ad024b",
+        "c2a4f8bd01a4fbba",
+        "5439beed5f2fde4e",
+        "5fbe179531834a26",
+        "0d1c85843b9d37eb",
+        "04fd7d4a45b27135",
+        "2474882e6c268093",
+        "19ee973b5e2292ae",
+        "7ea61ad73163788d",
+        "08dca3a0955bc6a1",
+        "4a425fcf25af02cf",
+        "4d3ff9e23373a076",
+        "65cb1d634ebf9e91",
+        "a1aa147609678596",
+        "8a8ea0c6627d0692",
+        "38776cdf3fb4c132",
+        "ebde0437f7292ee7",
+        "fd8ed2ed7d11ec64",
+        "367bb621b755d791",
+        "fd3e9d22775ed140",
+        "1b76fcc3238ae5f0",
+        "e1ad1f062e5a5ff4",
+        "cdd8dd1de310c512",
+        "910cf30391a854e0",
+        "783275b46e5e6419",
+        "14dfb582f6aacb9d",
+        "135501c49f27198a",
+        "f3c895924a84597c",
+        "d27550bbbb1ae570",
+        "2382eae362930333",
+        "4edd434b26fd78d4",
+        "bb6e4f74c4632a80",
+        "a01db15bb4ddd963",
+        "dbc3f42eb9c0e072",
+        "8c281cf1455b4f25",
+        "4d4793d9dd3592b6",
+        "f64bb27dd1f6b2ed",
+        "45a31fefb62b9107",
+        "48253feac6566982",
+        "aadc7774fb954507",
+        "9611e86fb63121dd",
+        "dfabe6ddbcec2f88",
+        "197a48e56692e322",
+        "77a176254e6f5501",
+        "3f2c98beef03917f",
+        "e910a981a5e286f0",
+        "8ee8cd51c0e5465e",
+        "df4ec1d77bc16aa0",
+        "a2f2c25cc657b9f0",
+        "a06ecc967a7fc2a7",
+        "0491f3ac2c33e4dd",
+        "1a8f1e9f082d00f5",
+        "f0d41845eb9ad6a0",
+        "979de1f77a8185a5",
+        "3b738d1e2d975c61",
+        "497454c6ad748a6a",
+        "e4969e5218ef57c6",
+        "9269ccdd7b6ca19f",
+        "f8ae36d07a6cf80c",
+        "175f09828a9448c9",
+        "6afaec35c202265e",
+        "7957f36ce2055492",
+        "59a562b709b9ef7f",
+        "a704347321aa9f14",
+        "4de853e40fd40b7a",
+        "82f8a285dc4621c6",
+        "d3ff867a1ebbdae8",
+        "6415fcff93b3ed3a",
+        "6f9e01ca65b8d779",
+        "dfd9ca8c851129b0",
+        "e705e1d6f1e8d61e",
+        "99dd88b98a024883",
+        "26009fe931c2b92f",
+        "04f7e4041a134d81",
+        "412c719662a04a2a",
+        "b331d15cabf8c4a8",
+        "3e058a45f46f2045",
+        "54fd61e1154d9967",
+        "7e0362e90550fd59"
+      ],
+      "n": 101156
+    },
+    "XB": {
+      "chunks": [
+        "44296f68eb6d0fed"
+      ],
+      "n": 91
+    }
+  }
+}

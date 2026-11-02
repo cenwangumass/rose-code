@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "fx_neardep.pdhg",
+  "model": "tests/fixtures/fx_neardep.mps",
+  "ms": 5,
+  "order": {
+    "chunks": [
+      "a99e904ff0cffe7a"
+    ],
+    "n": 4
+  },
+  "records": 4,
+  "result": "9ee47c298936e48e",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "fa058efa1bbd4b5b"
+      ],
+      "n": 4
+    }
+  }
+}

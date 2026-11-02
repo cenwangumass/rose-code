@@ -1,0 +1,28 @@
+{
+  "args": [
+    "--method",
+    "pdhg",
+    "--pdhg-iter-limit",
+    "20000"
+  ],
+  "exit": 3,
+  "id": "fx_midsing_1106.pdhg",
+  "model": "tests/fixtures/fx_midsing_1106.mps",
+  "ms": 59,
+  "order": {
+    "chunks": [
+      "3cd0dee991dac614"
+    ],
+    "n": 200
+  },
+  "records": 200,
+  "result": "c24026b3efdb4ef7",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "815fd2b1fc45766e"
+      ],
+      "n": 200
+    }
+  }
+}

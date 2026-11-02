@@ -1,0 +1,64 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "fx_cleanup_four.barrier-r",
+  "model": "tests/fixtures/fx_cleanup_four.mps",
+  "ms": 7,
+  "order": {
+    "chunks": [
+      "66b7aa1581c9f44d"
+    ],
+    "n": 266
+  },
+  "records": 266,
+  "result": "9c92c929673177a1",
+  "tags": {
+    "AD": {
+      "chunks": [
+        "58eb802da616888b"
+      ],
+      "n": 10
+    },
+    "BARRIER": {
+      "chunks": [
+        "763cf8085877a941"
+      ],
+      "n": 12
+    },
+    "BEST": {
+      "chunks": [
+        "6e064abd49369ff4"
+      ],
+      "n": 12
+    },
+    "FOUT": {
+      "chunks": [
+        "ea193dd3b2c81ac6"
+      ],
+      "n": 11
+    },
+    "FSN": {
+      "chunks": [
+        "6df7c7331c8511c3"
+      ],
+      "n": 11
+    },
+    "RSOLVE": {
+      "chunks": [
+        "28e7f07a758712ac"
+      ],
+      "n": 35
+    },
+    "STG": {
+      "chunks": [
+        "0be79338c8a9b844"
+      ],
+      "n": 175
+    }
+  }
+}

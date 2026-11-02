@@ -1,0 +1,58 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "fx_warm.barrier-c",
+  "model": "tests/fixtures/fx_warm.mps",
+  "ms": 5,
+  "order": {
+    "chunks": [
+      "a1a5176eadd3aa9e"
+    ],
+    "n": 82
+  },
+  "records": 82,
+  "result": "e6c888f6824afdb9",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "a6a21553e312c6e1"
+      ],
+      "n": 6
+    },
+    "BEST": {
+      "chunks": [
+        "37e7af3791e0596f"
+      ],
+      "n": 6
+    },
+    "FOUT": {
+      "chunks": [
+        "822410447a33f26e"
+      ],
+      "n": 5
+    },
+    "FSN": {
+      "chunks": [
+        "5058088b9f4bd397"
+      ],
+      "n": 5
+    },
+    "RSOLVE": {
+      "chunks": [
+        "9488320c4ba4d1d7"
+      ],
+      "n": 10
+    },
+    "STG": {
+      "chunks": [
+        "d534c1f93ba19bc1"
+      ],
+      "n": 50
+    }
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "perold.barrier-r",
+  "model": "tests/fixtures/perold.mps",
+  "ms": 2926,
+  "order": {
+    "chunks": [
+      "966ac3d1b9376bbe",
+      "8c6d769969b0c43d",
+      "07516a4a0c67151c",
+      "5e99e655c6594705",
+      "8c750d35ab476ea1",
+      "8bf71481a4bf3ce6",
+      "599b5b27118e159e",
+      "ce3b5cf7fa69d7bb",
+      "ce35d86f55a9466b",
+      "d954f6529db0992b",
+      "26fe0b4b91ff418c",
+      "0590b6cd386173d7",
+      "b8561f35eaa729b0",
+      "f9c8791a96968cdd",
+      "4e17f2eb303736c9",
+      "7c19e5991a64eb6d",
+      "e6711b1365ed6af3",
+      "468184e719b8c7ff",
+      "1006384794991e17",
+      "aa09d658254c45f8",
+      "522c3c470c3b3b4d",
+      "5fbfef1408e519df",
+      "e73f0e61dd73609f",
+      "bba067d5d43dbfb1",
+      "8990982adab5e9b1",
+      "1d4db7ff7dc1e1ca",
+      "fdcac3e0b810be09"
+    ],
+    "n": 27100
+  },
+  "records": 27100,
+  "result": "d9ba77a4caca512c",
+  "tags": {
+    "AD": {
+      "chunks": [
+        "8282ce46dd7a4d82"
+      ],
+      "n": 130
+    },
+    "BARRIER": {
+      "chunks": [
+        "b7886d8c00101041"
+      ],
+      "n": 132
+    },
+    "BEST": {
+      "chunks": [
+        "5da713359752fe41"
+      ],
+      "n": 132
+    },
+    "FOUT": {
+      "chunks": [
+        "bb129c6d97107cf9",
+        "db33b00c4c8e9c08",
+        "3223810ceb0a9271",
+        "02f452dc20887a21",
+        "56b3d4336053e17c",
+        "6fad7f05700cef72",
+        "e6b84a3145545d4f",
+        "972a0dfaaa8bc208",
+        "4126ddf420739a66",
+        "fd6231ba39f276c8",
+        "eea2ba4e09e003b4",
+        "909ad65159f7d2d2"
+      ],
+      "n": 12183
+    },
+    "FSN": {
+      "chunks": [
+        "8be5cf65ccea50e4",
+        "d1b00507baa5c033",
+        "7171686b1c41066d",
+        "8f0e87ec8b0d96fb",
+        "87875c4f7e27c5dd",
+        "6ac49a7dfb3a61bd",
+        "25729a8d0e7bf415",
+        "357f2945be1ef247",
+        "c68296a4f4226ee1",
+        "763c12943fe7e1b0",
+        "46bf01cf9786c09e",
+        "9759f67b217d5552"
+      ],
+      "n": 12183
+    },
+    "RSOLVE": {
+      "chunks": [
+        "c00264dff1841c30"
+      ],
+      "n": 390
+    },
+    "STG": {
+      "chunks": [
+        "f6d50f39f877ed78",
+        "3360355b6eb0e845"
+      ],
+      "n": 1950
+    }
+  }
+}

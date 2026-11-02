@@ -1,0 +1,64 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "release"
+  ],
+  "exit": 3,
+  "id": "fx_bar_stall57.barrier-r",
+  "model": "tests/fixtures/fx_bar_stall57.mps",
+  "ms": 14,
+  "order": {
+    "chunks": [
+      "dcda0ceb847b2d63"
+    ],
+    "n": 784
+  },
+  "records": 784,
+  "result": "9a31fd52837e9604",
+  "tags": {
+    "AD": {
+      "chunks": [
+        "6b74f0f22cd9d773"
+      ],
+      "n": 26
+    },
+    "BARRIER": {
+      "chunks": [
+        "563482117ef7298b"
+      ],
+      "n": 28
+    },
+    "BEST": {
+      "chunks": [
+        "343fc508618dfc66"
+      ],
+      "n": 28
+    },
+    "FOUT": {
+      "chunks": [
+        "1162163f8519dc74"
+      ],
+      "n": 27
+    },
+    "FSN": {
+      "chunks": [
+        "95bca0a60cf907e9"
+      ],
+      "n": 27
+    },
+    "RSOLVE": {
+      "chunks": [
+        "061ce935e7b45850"
+      ],
+      "n": 108
+    },
+    "STG": {
+      "chunks": [
+        "67c371e5c01ab68f"
+      ],
+      "n": 540
+    }
+  }
+}

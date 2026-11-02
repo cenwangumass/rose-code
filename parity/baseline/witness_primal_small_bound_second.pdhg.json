@@ -1,0 +1,28 @@
+{
+  "args": [
+    "--method",
+    "pdhg",
+    "--pdhg-iter-limit",
+    "20000"
+  ],
+  "exit": 3,
+  "id": "witness_primal_small_bound_second.pdhg",
+  "model": "tests/fixtures/witness_primal_small_bound_second.mps",
+  "ms": 38,
+  "order": {
+    "chunks": [
+      "3cd0dee991dac614"
+    ],
+    "n": 200
+  },
+  "records": 200,
+  "result": "058d4a03789309dd",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "389a44ea7353cdf9"
+      ],
+      "n": 200
+    }
+  }
+}

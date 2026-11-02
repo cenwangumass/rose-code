@@ -1,0 +1,64 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "release"
+  ],
+  "exit": 3,
+  "id": "inf_galenet.barrier-r",
+  "model": "tests/fixtures/inf_galenet.mps",
+  "ms": 9,
+  "order": {
+    "chunks": [
+      "2f3fd505155d2b47"
+    ],
+    "n": 320
+  },
+  "records": 320,
+  "result": "9d69b72d9e2bbc41",
+  "tags": {
+    "AD": {
+      "chunks": [
+        "b62903f1fe997d4c"
+      ],
+      "n": 10
+    },
+    "BARRIER": {
+      "chunks": [
+        "6b1c75a0780adcf0"
+      ],
+      "n": 12
+    },
+    "BEST": {
+      "chunks": [
+        "f3dc4a2840546ccc"
+      ],
+      "n": 12
+    },
+    "FOUT": {
+      "chunks": [
+        "0233ff388466c854"
+      ],
+      "n": 11
+    },
+    "FSN": {
+      "chunks": [
+        "bd68803ebbdeef23"
+      ],
+      "n": 11
+    },
+    "RSOLVE": {
+      "chunks": [
+        "fae6de743a130bca"
+      ],
+      "n": 44
+    },
+    "STG": {
+      "chunks": [
+        "8126fffab7cdb337"
+      ],
+      "n": 220
+    }
+  }
+}

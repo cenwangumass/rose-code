@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "fx_sing_pairgate.pdhg",
+  "model": "tests/fixtures/fx_sing_pairgate.mps",
+  "ms": 3,
+  "order": {
+    "chunks": [
+      "2ad4b8ff40a87dee"
+    ],
+    "n": 3
+  },
+  "records": 3,
+  "result": "db444d57a1e90eb2",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "852b8c6f6242467a"
+      ],
+      "n": 3
+    }
+  }
+}

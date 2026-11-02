@@ -1,0 +1,19 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "release"
+  ],
+  "exit": 1,
+  "id": "pdhg_e22.barrier-r",
+  "model": "tests/fixtures/pdhg_e22.mps",
+  "ms": 2,
+  "order": {
+    "chunks": [],
+    "n": 0
+  },
+  "records": 0,
+  "result": "none",
+  "tags": {}
+}

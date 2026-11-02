@@ -1,0 +1,58 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "fx_ladder_386.barrier-c",
+  "model": "tests/fixtures/fx_ladder_386.mps",
+  "ms": 40,
+  "order": {
+    "chunks": [
+      "26d69ebbb4bfca99"
+    ],
+    "n": 686
+  },
+  "records": 686,
+  "result": "17dcc9241efde9dc",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "b43559010a1378ba"
+      ],
+      "n": 43
+    },
+    "BEST": {
+      "chunks": [
+        "d044059d50ed139b"
+      ],
+      "n": 43
+    },
+    "FOUT": {
+      "chunks": [
+        "4d2578b714b75d4b"
+      ],
+      "n": 42
+    },
+    "FSN": {
+      "chunks": [
+        "4d7bc1187a00b683"
+      ],
+      "n": 42
+    },
+    "RSOLVE": {
+      "chunks": [
+        "cb9df3027ed41078"
+      ],
+      "n": 86
+    },
+    "STG": {
+      "chunks": [
+        "d13e6065edf1f898"
+      ],
+      "n": 430
+    }
+  }
+}

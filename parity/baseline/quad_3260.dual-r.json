@@ -1,0 +1,243 @@
+{
+  "args": [
+    "--method",
+    "dual",
+    "--profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "quad_3260.dual-r",
+  "model": "tests/fixtures/quad_3260.mps",
+  "ms": 86,
+  "order": {
+    "chunks": [
+      "f4e19fc21e4e7e5c",
+      "a80eb0a8af13f095",
+      "8b0b717d4952ac50",
+      "bd74936975e9c2f6"
+    ],
+    "n": 3503
+  },
+  "records": 3503,
+  "result": "4dbe02b8ae8ea769",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "c13ac4edfedf10a5"
+      ],
+      "n": 33
+    },
+    "BTC": {
+      "chunks": [
+        "862e7aef8562c793"
+      ],
+      "n": 2
+    },
+    "BTR": {
+      "chunks": [
+        "b61fd12f1152d376"
+      ],
+      "n": 2
+    },
+    "BTT": {
+      "chunks": [
+        "387ab7d53f0da564"
+      ],
+      "n": 1
+    },
+    "BTY": {
+      "chunks": [
+        "ccaa5282eb1441ed"
+      ],
+      "n": 38
+    },
+    "CALLBACK": {
+      "chunks": [
+        "94ee8afd5a38646e"
+      ],
+      "n": 30
+    },
+    "CORD": {
+      "chunks": [
+        "f7fe82c628f0e8d4"
+      ],
+      "n": 2
+    },
+    "DACC": {
+      "chunks": [
+        "913f7a9de7e9621d"
+      ],
+      "n": 22
+    },
+    "DCR": {
+      "chunks": [
+        "bcc8fadc89acf370"
+      ],
+      "n": 7
+    },
+    "DSX": {
+      "chunks": [
+        "9a85160fe4b93a4d"
+      ],
+      "n": 103
+    },
+    "DTAU": {
+      "chunks": [
+        "7fc39afa617eea9c"
+      ],
+      "n": 91
+    },
+    "DTOL": {
+      "chunks": [
+        "3d368d8f624e94d6"
+      ],
+      "n": 5
+    },
+    "ENT": {
+      "chunks": [
+        "46556050957e69ee"
+      ],
+      "n": 5
+    },
+    "ENTOUT": {
+      "chunks": [
+        "9a02ff18a46e622a"
+      ],
+      "n": 5
+    },
+    "FACCTX": {
+      "chunks": [
+        "861167a076e4fc38"
+      ],
+      "n": 18
+    },
+    "FILLP": {
+      "chunks": [
+        "d6e07d1bae9e04ac"
+      ],
+      "n": 83
+    },
+    "FSTRUCT": {
+      "chunks": [
+        "c36bea168fe4bd9d"
+      ],
+      "n": 83
+    },
+    "FTR": {
+      "chunks": [
+        "53e5d74412a14e06"
+      ],
+      "n": 5
+    },
+    "LST": {
+      "chunks": [
+        "ae598d182d359b3b"
+      ],
+      "n": 5
+    },
+    "LUIN": {
+      "chunks": [
+        "d85e22f9136e654e"
+      ],
+      "n": 22
+    },
+    "LUOUT": {
+      "chunks": [
+        "4c683e7f1bb00aec"
+      ],
+      "n": 14
+    },
+    "LUSTART": {
+      "chunks": [
+        "990fba824532eeb1"
+      ],
+      "n": 12
+    },
+    "ORD": {
+      "chunks": [
+        "ef41c607602b5f65"
+      ],
+      "n": 2
+    },
+    "P0": {
+      "chunks": [
+        "f6fab81e4eba990b"
+      ],
+      "n": 12
+    },
+    "PDRIFT": {
+      "chunks": [
+        "83ddcbdf93ea4a43"
+      ],
+      "n": 2
+    },
+    "PHDR": {
+      "chunks": [
+        "0c491039bcb7011d"
+      ],
+      "n": 3
+    },
+    "PLIST": {
+      "chunks": [
+        "ea616257edf4b59e"
+      ],
+      "n": 9
+    },
+    "QOBJ": {
+      "chunks": [
+        "6d68a7f70e430a24"
+      ],
+      "n": 98
+    },
+    "QTAU": {
+      "chunks": [
+        "beb64c2607261c38"
+      ],
+      "n": 83
+    },
+    "SCALE": {
+      "chunks": [
+        "692c15eb63f6c92f"
+      ],
+      "n": 1
+    },
+    "STARTBASIS": {
+      "chunks": [
+        "dd0d44112c43e683"
+      ],
+      "n": 3
+    },
+    "SWITCH": {
+      "chunks": [
+        "a46f503d64422134"
+      ],
+      "n": 4
+    },
+    "USTG": {
+      "chunks": [
+        "545e95df83114ebd"
+      ],
+      "n": 5
+    },
+    "WORK": {
+      "chunks": [
+        "3161316b0afe244b",
+        "0fc9610d073a1789",
+        "6b6eb3c3212dd767"
+      ],
+      "n": 2683
+    },
+    "XMOVE": {
+      "chunks": [
+        "e9a48dc9c4076224"
+      ],
+      "n": 5
+    },
+    "XPR": {
+      "chunks": [
+        "1b0896bf98b28b80"
+      ],
+      "n": 5
+    }
+  }
+}

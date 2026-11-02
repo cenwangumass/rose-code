@@ -1,0 +1,64 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "release"
+  ],
+  "exit": 3,
+  "id": "fx_witness_dual_cc1ca.barrier-r",
+  "model": "tests/fixtures/fx_witness_dual_cc1ca.mps",
+  "ms": 6,
+  "order": {
+    "chunks": [
+      "cd0e3f8149fc6214"
+    ],
+    "n": 262
+  },
+  "records": 262,
+  "result": "c86ee690b1b9aca2",
+  "tags": {
+    "AD": {
+      "chunks": [
+        "6980c9540deb09f0"
+      ],
+      "n": 8
+    },
+    "BARRIER": {
+      "chunks": [
+        "baab95448e87fa82"
+      ],
+      "n": 10
+    },
+    "BEST": {
+      "chunks": [
+        "b7db651109134777"
+      ],
+      "n": 10
+    },
+    "FOUT": {
+      "chunks": [
+        "abfc547f0b5c1775"
+      ],
+      "n": 9
+    },
+    "FSN": {
+      "chunks": [
+        "0a3691f09bbba272"
+      ],
+      "n": 9
+    },
+    "RSOLVE": {
+      "chunks": [
+        "e610a6468b71be4b"
+      ],
+      "n": 36
+    },
+    "STG": {
+      "chunks": [
+        "406828c754b94c46"
+      ],
+      "n": 180
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "witness_primal_residual_loop.pdhg",
+  "model": "tests/fixtures/witness_primal_residual_loop.mps",
+  "ms": 2211,
+  "order": {
+    "chunks": [
+      "a771af0cae5be822",
+      "31df4f0333265ea9",
+      "c2d3c6b6f19e1180",
+      "c775a50e6baeceb1",
+      "7a51b58181cd989b",
+      "de0ddcf96204cf12",
+      "21a85a6a14170307",
+      "4b4b1f3db3d18283",
+      "1dbcdd7376d8bbb0",
+      "8a3c2a08bf66fc00",
+      "409da748d44e80d2",
+      "1353d07a65fee204",
+      "1b91b33ff4eade75",
+      "07e46088d602be9c",
+      "4a60b946bd5d6a94",
+      "219f8e264cbe5371",
+      "214e602ca5251336",
+      "279c151f5f103882",
+      "b3cfc28ab96bda51",
+      "500184fa8ae9694f"
+    ],
+    "n": 19805
+  },
+  "records": 19805,
+  "result": "899bf4b37e3fe425",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "e9b17921509ad60e",
+        "cca0d3eeab77b554",
+        "7d50190c56001aa0",
+        "fdd824be59aba5b8",
+        "c55da68fbf8c4b99",
+        "2a8384181a0fd4b4",
+        "0cd16689be5ac3e5",
+        "40d7ff7a51da94ac",
+        "119d7773cd450218",
+        "997618c1dcc8bdc3",
+        "fb8065fb52ac0d3e",
+        "eec0b3235be3c05e",
+        "a41ac2fb9eec4858",
+        "e685db88ba21a142",
+        "b52adc642d5a9392",
+        "73a9cebe302e18a3",
+        "a806ac22d3b29d26",
+        "2e0ac4393c4845d5",
+        "3bc52d436dce4d4a",
+        "094e3579bef534cb"
+      ],
+      "n": 19805
+    }
+  }
+}

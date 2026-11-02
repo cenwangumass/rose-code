@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "witness_primal_accuracy_low.pdhg",
+  "model": "tests/fixtures/witness_primal_accuracy_low.mps",
+  "ms": 7,
+  "order": {
+    "chunks": [
+      "1147edea549c1474"
+    ],
+    "n": 46
+  },
+  "records": 46,
+  "result": "de0a2d63f25a00ac",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "e85888c110ba93f1"
+      ],
+      "n": 46
+    }
+  }
+}

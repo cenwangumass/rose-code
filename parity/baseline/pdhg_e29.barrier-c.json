@@ -1,0 +1,58 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 3,
+  "id": "pdhg_e29.barrier-c",
+  "model": "tests/fixtures/pdhg_e29.mps",
+  "ms": 2,
+  "order": {
+    "chunks": [
+      "d63a348822118b2e"
+    ],
+    "n": 18
+  },
+  "records": 18,
+  "result": "d7eb59825f2658e2",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "684525f15f747b5f"
+      ],
+      "n": 2
+    },
+    "BEST": {
+      "chunks": [
+        "e179a3b71a8d29ad"
+      ],
+      "n": 2
+    },
+    "FOUT": {
+      "chunks": [
+        "e48f54c4fa3ba225"
+      ],
+      "n": 1
+    },
+    "FSN": {
+      "chunks": [
+        "327721a86e1c1cc4"
+      ],
+      "n": 1
+    },
+    "RSOLVE": {
+      "chunks": [
+        "ed17bc4a78f6c22d"
+      ],
+      "n": 2
+    },
+    "STG": {
+      "chunks": [
+        "daf8a3a2dde0bc79"
+      ],
+      "n": 10
+    }
+  }
+}

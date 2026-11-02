@@ -1,0 +1,28 @@
+{
+  "args": [
+    "--method",
+    "pdhg",
+    "--pdhg-iter-limit",
+    "20000"
+  ],
+  "exit": 3,
+  "id": "fx_dual_free_ray_122.pdhg",
+  "model": "tests/fixtures/fx_dual_free_ray_122.mps",
+  "ms": 17,
+  "order": {
+    "chunks": [
+      "3cd0dee991dac614"
+    ],
+    "n": 200
+  },
+  "records": 200,
+  "result": "f2c5bdd0b6059d60",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "8a26bd354219a5e8"
+      ],
+      "n": 200
+    }
+  }
+}

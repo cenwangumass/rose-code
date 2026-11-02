@@ -67,3 +67,8 @@ Presolve, crossover, mixed-integer, quadratic and conic models are out of scope.
     cargo test --release
 
 Fast (about 10 s on a quiet machine); the large reference traces are `#[ignore]`d (`cargo test --release -- --ignored`).
+
+    target/release/rose-parity check [--tier full]
+
+Self-parity gate: every dump record and result of the runs in `parity/corpus.txt` must equal the frozen baseline's
+(`parity/baseline/`). Run it after any change meant to keep the numbers; see `AGENTS.md`.

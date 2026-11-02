@@ -1,0 +1,160 @@
+{
+  "args": [
+    "--method",
+    "dual",
+    "--profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "degen2.dual-r",
+  "model": "tests/fixtures/degen2.mps",
+  "ms": 732,
+  "order": {
+    "chunks": [
+      "0d283697f3cf46ed",
+      "cbaa6e99777a8bfc",
+      "a663a8c2e17c9b3a",
+      "58a26d78a1e4fca2",
+      "21d5fb08571b8bad",
+      "4942bb38446d3579",
+      "0bc2e008691a547f",
+      "c8279b571c15af63",
+      "fdeeb8b3d0387aa0",
+      "d96323ba4ddb0a44",
+      "66ea1f1d9959a938",
+      "67d764bac59e538f",
+      "9f6193b88ad20d51",
+      "0bef62f2030a6753",
+      "b4973ec51a79fb99",
+      "6deb364895b5915b",
+      "5c28f9270e3a387a"
+    ],
+    "n": 17201
+  },
+  "records": 17201,
+  "result": "2d9a502d890ca8fb",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "41717b218fbdfe67"
+      ],
+      "n": 19
+    },
+    "BTY": {
+      "chunks": [
+        "700f822b6cb870e2"
+      ],
+      "n": 17
+    },
+    "CALLBACK": {
+      "chunks": [
+        "e12cf230093f9dd5"
+      ],
+      "n": 2
+    },
+    "DACC": {
+      "chunks": [
+        "9942d1deacf75f05"
+      ],
+      "n": 16
+    },
+    "DCR": {
+      "chunks": [
+        "dc41df29e15ba74a"
+      ],
+      "n": 8
+    },
+    "DSX": {
+      "chunks": [
+        "a5523d10f5219310"
+      ],
+      "n": 637
+    },
+    "DTAU": {
+      "chunks": [
+        "1edddbfbe6932a9b"
+      ],
+      "n": 634
+    },
+    "DTOL": {
+      "chunks": [
+        "efa73906109cdc50"
+      ],
+      "n": 5
+    },
+    "FACCTX": {
+      "chunks": [
+        "e5d576be79cef28d"
+      ],
+      "n": 15
+    },
+    "FILLP": {
+      "chunks": [
+        "ac51a21a67813f66"
+      ],
+      "n": 621
+    },
+    "FSTRUCT": {
+      "chunks": [
+        "885252b67f8152ca"
+      ],
+      "n": 621
+    },
+    "LUIN": {
+      "chunks": [
+        "74df20017af64768"
+      ],
+      "n": 15
+    },
+    "LUOUT": {
+      "chunks": [
+        "1ee0316a13a77129"
+      ],
+      "n": 15
+    },
+    "LUSTART": {
+      "chunks": [
+        "6b5d77b605fcdfab"
+      ],
+      "n": 1
+    },
+    "P68": {
+      "chunks": [
+        "336d2607015fd92c"
+      ],
+      "n": 16
+    },
+    "PGATE": {
+      "chunks": [
+        "e08d07a3c401f1c1"
+      ],
+      "n": 8
+    },
+    "SCALE": {
+      "chunks": [
+        "42da364344c99c9f"
+      ],
+      "n": 1
+    },
+    "WORK": {
+      "chunks": [
+        "9d88deef8f807e95",
+        "706a1377e0e7abe9",
+        "a70504ca0e0f76fa",
+        "4f718c6d23427bb8",
+        "fa4e187a089c17cc",
+        "3721cdbd6670b41a",
+        "5908e64dad93131a",
+        "b0752a71a4cd703d",
+        "89bd55128bb1b26d",
+        "ccb5b923ca5caf60",
+        "6b76522411cc0780",
+        "cad62f3bd3d4b304",
+        "6cd80a577c26952e",
+        "e4137a8935095e14",
+        "48bb162828972a86"
+      ],
+      "n": 14550
+    }
+  }
+}

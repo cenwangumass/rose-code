@@ -1,0 +1,59 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 3,
+  "id": "randlp50289.barrier-c",
+  "model": "tests/fixtures/randlp50289.mps",
+  "ms": 28,
+  "order": {
+    "chunks": [
+      "221a2a8bfe5e8bab",
+      "98770c2a0c47cc87"
+    ],
+    "n": 1266
+  },
+  "records": 1266,
+  "result": "cc0f1d7cbba7dc35",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "5c9238457cc633a4"
+      ],
+      "n": 59
+    },
+    "BEST": {
+      "chunks": [
+        "3930102e8fcaf6de"
+      ],
+      "n": 59
+    },
+    "FOUT": {
+      "chunks": [
+        "f4df36755e3d8e5e"
+      ],
+      "n": 58
+    },
+    "FSN": {
+      "chunks": [
+        "abd7dcd5f4291e7f"
+      ],
+      "n": 58
+    },
+    "RSOLVE": {
+      "chunks": [
+        "65231e550af6f14d"
+      ],
+      "n": 172
+    },
+    "STG": {
+      "chunks": [
+        "3b06f17fa109ec54"
+      ],
+      "n": 860
+    }
+  }
+}

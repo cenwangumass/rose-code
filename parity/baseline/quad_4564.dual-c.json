@@ -1,0 +1,124 @@
+{
+  "args": [
+    "--method",
+    "dual",
+    "--profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "quad_4564.dual-c",
+  "model": "tests/fixtures/quad_4564.mps",
+  "ms": 46,
+  "order": {
+    "chunks": [
+      "d146c006b2ae54d6",
+      "61790ef4b249463e",
+      "3c9b9553df5b69b2",
+      "48a272a0ff2bf876"
+    ],
+    "n": 3998
+  },
+  "records": 3998,
+  "result": "90cb86dd4985568a",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "d618c3f67b82d742"
+      ],
+      "n": 30
+    },
+    "BTY": {
+      "chunks": [
+        "d19e095482745a08"
+      ],
+      "n": 31
+    },
+    "CALLBACK": {
+      "chunks": [
+        "5c5fba2c4f68e1f8"
+      ],
+      "n": 14
+    },
+    "DACC": {
+      "chunks": [
+        "2766b56befb0f70d"
+      ],
+      "n": 30
+    },
+    "DCR": {
+      "chunks": [
+        "b7f4d28f7418d6e2"
+      ],
+      "n": 10
+    },
+    "DSX": {
+      "chunks": [
+        "1500c22309ea6c55"
+      ],
+      "n": 179
+    },
+    "DTAU": {
+      "chunks": [
+        "31e24209d3f915c3"
+      ],
+      "n": 103
+    },
+    "DTOL": {
+      "chunks": [
+        "e0c8b87ec6f7bb78"
+      ],
+      "n": 13
+    },
+    "FACCTX": {
+      "chunks": [
+        "4c3527faf68f9f32"
+      ],
+      "n": 23
+    },
+    "FILLP": {
+      "chunks": [
+        "3dd07e1b5c491936"
+      ],
+      "n": 94
+    },
+    "FSTRUCT": {
+      "chunks": [
+        "d56ff80a555a7329"
+      ],
+      "n": 94
+    },
+    "LUIN": {
+      "chunks": [
+        "68ac66a3b99325b7"
+      ],
+      "n": 25
+    },
+    "LUOUT": {
+      "chunks": [
+        "076b00feb356d332"
+      ],
+      "n": 25
+    },
+    "LUSTART": {
+      "chunks": [
+        "b080fcf54571e251"
+      ],
+      "n": 7
+    },
+    "PDRIFT": {
+      "chunks": [
+        "5b3b27bed21c9c7a"
+      ],
+      "n": 13
+    },
+    "WORK": {
+      "chunks": [
+        "5975bdac6c4c1804",
+        "e5f7cf98d2778e6e",
+        "0ef86980b9ab4de8",
+        "0381fcddf6d21660"
+      ],
+      "n": 3307
+    }
+  }
+}

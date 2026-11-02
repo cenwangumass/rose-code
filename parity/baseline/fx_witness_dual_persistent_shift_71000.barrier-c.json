@@ -1,0 +1,65 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 3,
+  "id": "fx_witness_dual_persistent_shift_71000.barrier-c",
+  "model": "tests/fixtures/fx_witness_dual_persistent_shift_71000.mps",
+  "ms": 67,
+  "order": {
+    "chunks": [
+      "1ea48b579dfec5ab",
+      "672481a7be3dfd78",
+      "c6b459dab3853a0a",
+      "21608ff9505eef66",
+      "774bdf672ec65f35"
+    ],
+    "n": 5102
+  },
+  "records": 5102,
+  "result": "2cea12090f469506",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "a81ad2e3b92a888d"
+      ],
+      "n": 223
+    },
+    "BEST": {
+      "chunks": [
+        "50fedd77015717d7"
+      ],
+      "n": 223
+    },
+    "FOUT": {
+      "chunks": [
+        "bc2528850edfbd5a"
+      ],
+      "n": 222
+    },
+    "FSN": {
+      "chunks": [
+        "cf83c75740c9b607"
+      ],
+      "n": 222
+    },
+    "RSOLVE": {
+      "chunks": [
+        "231a0fba37c95aa2"
+      ],
+      "n": 702
+    },
+    "STG": {
+      "chunks": [
+        "33a56be561fbafda",
+        "0c9c8b17eae02120",
+        "699a41cdd1cbe4f9",
+        "80c3706661cc2d29"
+      ],
+      "n": 3510
+    }
+  }
+}

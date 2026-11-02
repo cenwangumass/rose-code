@@ -1,0 +1,58 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "fx_sing_pairgate.barrier-c",
+  "model": "tests/fixtures/fx_sing_pairgate.mps",
+  "ms": 7,
+  "order": {
+    "chunks": [
+      "b7a592d8388b9a0e"
+    ],
+    "n": 102
+  },
+  "records": 102,
+  "result": "8ff84109b2ed366f",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "f0b8be0c78a64431"
+      ],
+      "n": 6
+    },
+    "BEST": {
+      "chunks": [
+        "7960a252476360b4"
+      ],
+      "n": 6
+    },
+    "FOUT": {
+      "chunks": [
+        "2702f87852939889"
+      ],
+      "n": 15
+    },
+    "FSN": {
+      "chunks": [
+        "8a520c940c7e3f78"
+      ],
+      "n": 15
+    },
+    "RSOLVE": {
+      "chunks": [
+        "f0fb1d447a2ee11e"
+      ],
+      "n": 10
+    },
+    "STG": {
+      "chunks": [
+        "eeed343249febae6"
+      ],
+      "n": 50
+    }
+  }
+}

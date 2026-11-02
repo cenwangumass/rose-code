@@ -1,0 +1,65 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "boeing2.barrier-r",
+  "model": "tests/fixtures/boeing2.mps",
+  "ms": 81,
+  "order": {
+    "chunks": [
+      "29de306a067174f5",
+      "332c303df191ad80"
+    ],
+    "n": 1426
+  },
+  "records": 1426,
+  "result": "683e0de2999ef780",
+  "tags": {
+    "AD": {
+      "chunks": [
+        "d7c3996226220f0a"
+      ],
+      "n": 14
+    },
+    "BARRIER": {
+      "chunks": [
+        "54dae9257fbf97a5"
+      ],
+      "n": 16
+    },
+    "BEST": {
+      "chunks": [
+        "d35cb74612663a3e"
+      ],
+      "n": 16
+    },
+    "FOUT": {
+      "chunks": [
+        "9c52d25cd9e1da90"
+      ],
+      "n": 555
+    },
+    "FSN": {
+      "chunks": [
+        "58854156e2e5c199"
+      ],
+      "n": 555
+    },
+    "RSOLVE": {
+      "chunks": [
+        "9747f418ad26320a"
+      ],
+      "n": 45
+    },
+    "STG": {
+      "chunks": [
+        "29dd366c4456a4f7"
+      ],
+      "n": 225
+    }
+  }
+}

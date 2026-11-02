@@ -1,0 +1,69 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "degen2.barrier-r",
+  "model": "tests/fixtures/degen2.mps",
+  "ms": 244,
+  "order": {
+    "chunks": [
+      "84849692b5a10c42",
+      "450e6d3976e39e1a",
+      "d243b2b1f6ca2ccd",
+      "5f5a326344152f51"
+    ],
+    "n": 3374
+  },
+  "records": 3374,
+  "result": "f1c317ee2431497a",
+  "tags": {
+    "AD": {
+      "chunks": [
+        "200c4bc669526b0d"
+      ],
+      "n": 12
+    },
+    "BARRIER": {
+      "chunks": [
+        "43445f1f03814d0f"
+      ],
+      "n": 14
+    },
+    "BEST": {
+      "chunks": [
+        "6774f4c208320587"
+      ],
+      "n": 14
+    },
+    "FOUT": {
+      "chunks": [
+        "9ae39b4192bd2c90",
+        "4649b57818a323bf"
+      ],
+      "n": 1547
+    },
+    "FSN": {
+      "chunks": [
+        "8fad4e596fc7a22f",
+        "ac43c7677e9ef78d"
+      ],
+      "n": 1547
+    },
+    "RSOLVE": {
+      "chunks": [
+        "38550a535d716bca"
+      ],
+      "n": 40
+    },
+    "STG": {
+      "chunks": [
+        "57d79dd09d27c660"
+      ],
+      "n": 200
+    }
+  }
+}

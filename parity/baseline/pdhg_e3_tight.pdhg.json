@@ -1,0 +1,28 @@
+{
+  "args": [
+    "--method",
+    "pdhg",
+    "--pdhg-iter-limit",
+    "20000"
+  ],
+  "exit": 3,
+  "id": "pdhg_e3_tight.pdhg",
+  "model": "tests/fixtures/pdhg_e3_tight.mps",
+  "ms": 9,
+  "order": {
+    "chunks": [
+      "4bc26bc4c8a04d17"
+    ],
+    "n": 150
+  },
+  "records": 150,
+  "result": "68ff894abc9ba15b",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "e28fbc2b92378915"
+      ],
+      "n": 150
+    }
+  }
+}

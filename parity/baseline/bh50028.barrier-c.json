@@ -1,0 +1,60 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 3,
+  "id": "bh50028.barrier-c",
+  "model": "tests/fixtures/bh50028.mps",
+  "ms": 26,
+  "order": {
+    "chunks": [
+      "82178093e65ebb4e",
+      "05224ecdec1bde1c"
+    ],
+    "n": 1578
+  },
+  "records": 1578,
+  "result": "c1163507e5bec170",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "87f235d3eccb2167"
+      ],
+      "n": 68
+    },
+    "BEST": {
+      "chunks": [
+        "dd59d0ea09f5d940"
+      ],
+      "n": 68
+    },
+    "FOUT": {
+      "chunks": [
+        "5c319c1f9e11e5ea"
+      ],
+      "n": 67
+    },
+    "FSN": {
+      "chunks": [
+        "5b22839859a923f3"
+      ],
+      "n": 67
+    },
+    "RSOLVE": {
+      "chunks": [
+        "87c28cf4cbc768bd"
+      ],
+      "n": 218
+    },
+    "STG": {
+      "chunks": [
+        "08fb9b2f7b03e8a5",
+        "5376f185bba308ae"
+      ],
+      "n": 1090
+    }
+  }
+}

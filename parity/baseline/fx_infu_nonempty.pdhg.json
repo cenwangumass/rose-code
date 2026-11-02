@@ -1,0 +1,28 @@
+{
+  "args": [
+    "--method",
+    "pdhg",
+    "--pdhg-iter-limit",
+    "20000"
+  ],
+  "exit": 3,
+  "id": "fx_infu_nonempty.pdhg",
+  "model": "tests/fixtures/fx_infu_nonempty.mps",
+  "ms": 8,
+  "order": {
+    "chunks": [
+      "3cd0dee991dac614"
+    ],
+    "n": 200
+  },
+  "records": 200,
+  "result": "8d0f366ed6134b10",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "068c294f92580db5"
+      ],
+      "n": 200
+    }
+  }
+}

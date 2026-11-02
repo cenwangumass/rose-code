@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "sc50a_pobj_inf.pdhg",
+  "model": "tests/fixtures/sc50a_pobj_inf.mps",
+  "ms": 7,
+  "order": {
+    "chunks": [
+      "e3a8dfe3de797990"
+    ],
+    "n": 14
+  },
+  "records": 14,
+  "result": "fef62f6983d8fcc1",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "fecfd47f62b4eada"
+      ],
+      "n": 14
+    }
+  }
+}

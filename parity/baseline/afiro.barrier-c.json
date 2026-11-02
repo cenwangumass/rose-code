@@ -1,0 +1,58 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "afiro.barrier-c",
+  "model": "tests/fixtures/afiro.mps",
+  "ms": 10,
+  "order": {
+    "chunks": [
+      "d4d8666ff2fd20a0"
+    ],
+    "n": 182
+  },
+  "records": 182,
+  "result": "cf59f8ccd50d5537",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "1c435cabc0c045c9"
+      ],
+      "n": 10
+    },
+    "BEST": {
+      "chunks": [
+        "634c5db9e57f7c83"
+      ],
+      "n": 10
+    },
+    "FOUT": {
+      "chunks": [
+        "3b2af11597aa39e0"
+      ],
+      "n": 27
+    },
+    "FSN": {
+      "chunks": [
+        "aa0975882112d8db"
+      ],
+      "n": 27
+    },
+    "RSOLVE": {
+      "chunks": [
+        "7487d6526292e621"
+      ],
+      "n": 18
+    },
+    "STG": {
+      "chunks": [
+        "83b856a21c0777eb"
+      ],
+      "n": 90
+    }
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "fx_badscale.barrier-c",
+  "model": "tests/fixtures/fx_badscale.mps",
+  "ms": 7,
+  "order": {
+    "chunks": [
+      "5829870f8a1c9152"
+    ],
+    "n": 130
+  },
+  "records": 130,
+  "result": "3f462791043758fb",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "76285a09ae9b2a25"
+      ],
+      "n": 9
+    },
+    "BEST": {
+      "chunks": [
+        "c5e4b52adf4917d5"
+      ],
+      "n": 9
+    },
+    "FOUT": {
+      "chunks": [
+        "8829609ed57ee5a0"
+      ],
+      "n": 8
+    },
+    "FSN": {
+      "chunks": [
+        "72b42ee6a3f35229"
+      ],
+      "n": 8
+    },
+    "RSOLVE": {
+      "chunks": [
+        "e2bcb1a824365e9e"
+      ],
+      "n": 16
+    },
+    "STG": {
+      "chunks": [
+        "2972e1288cf24555"
+      ],
+      "n": 80
+    }
+  }
+}

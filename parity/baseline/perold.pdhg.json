@@ -1,0 +1,28 @@
+{
+  "args": [
+    "--method",
+    "pdhg",
+    "--pdhg-iter-limit",
+    "20000"
+  ],
+  "exit": 3,
+  "id": "perold.pdhg",
+  "model": "tests/fixtures/perold.mps",
+  "ms": 1031,
+  "order": {
+    "chunks": [
+      "4cdf2dc42709f5ed"
+    ],
+    "n": 192
+  },
+  "records": 192,
+  "result": "61b80f2f64bfd90b",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "2e7f2525ad89659a"
+      ],
+      "n": 192
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "boeing2.pdhg",
+  "model": "tests/fixtures/boeing2.mps",
+  "ms": 77,
+  "order": {
+    "chunks": [
+      "ba4454b0a90d4089"
+    ],
+    "n": 55
+  },
+  "records": 55,
+  "result": "289c1d9810927d24",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "1b33abad7569d157"
+      ],
+      "n": 55
+    }
+  }
+}

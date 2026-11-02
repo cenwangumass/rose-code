@@ -1,0 +1,142 @@
+{
+  "args": [
+    "--method",
+    "primal",
+    "--profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "fx_bar_stall113.primal-r",
+  "model": "tests/fixtures/fx_bar_stall113.mps",
+  "ms": 5,
+  "order": {
+    "chunks": [
+      "796144d2dde78ae2"
+    ],
+    "n": 195
+  },
+  "records": 195,
+  "result": "61c4574718c8ed75",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "712366ff7ee20bfb"
+      ],
+      "n": 3
+    },
+    "BTY": {
+      "chunks": [
+        "7ba89e93298fca64"
+      ],
+      "n": 10
+    },
+    "ENT": {
+      "chunks": [
+        "08b1410c6ea80464"
+      ],
+      "n": 3
+    },
+    "ENTOUT": {
+      "chunks": [
+        "93b64d9d90029ab1"
+      ],
+      "n": 3
+    },
+    "FILLP": {
+      "chunks": [
+        "c6d35423cb149456"
+      ],
+      "n": 3
+    },
+    "FSTRUCT": {
+      "chunks": [
+        "24431747faf61f68"
+      ],
+      "n": 3
+    },
+    "FTR": {
+      "chunks": [
+        "8b83eb96f58386f8"
+      ],
+      "n": 3
+    },
+    "LST": {
+      "chunks": [
+        "87e87dc0b0e9a5a0"
+      ],
+      "n": 3
+    },
+    "LUIN": {
+      "chunks": [
+        "011aedffcfb4d3e0"
+      ],
+      "n": 2
+    },
+    "LUOUT": {
+      "chunks": [
+        "816bc9667b9bef0a"
+      ],
+      "n": 2
+    },
+    "LUSTART": {
+      "chunks": [
+        "9fc53966aaadab09"
+      ],
+      "n": 1
+    },
+    "P0": {
+      "chunks": [
+        "e62f7179d3858fc1"
+      ],
+      "n": 14
+    },
+    "PHDR": {
+      "chunks": [
+        "e370f9267745dc0b"
+      ],
+      "n": 1
+    },
+    "PLIST": {
+      "chunks": [
+        "5b7236526d79f640"
+      ],
+      "n": 5
+    },
+    "SCALE": {
+      "chunks": [
+        "4cb1b8bcdffef4ea"
+      ],
+      "n": 1
+    },
+    "STARTBASIS": {
+      "chunks": [
+        "0e0eb5adcafaf50f"
+      ],
+      "n": 1
+    },
+    "SWITCH": {
+      "chunks": [
+        "3e1c5c7bd3d2f60f"
+      ],
+      "n": 2
+    },
+    "USTG": {
+      "chunks": [
+        "695f59bf5fbe8780"
+      ],
+      "n": 3
+    },
+    "WORK": {
+      "chunks": [
+        "491db2017375e134"
+      ],
+      "n": 129
+    },
+    "XB": {
+      "chunks": [
+        "a2bf0382b2107b23"
+      ],
+      "n": 3
+    }
+  }
+}

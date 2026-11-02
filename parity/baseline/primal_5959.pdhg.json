@@ -1,0 +1,28 @@
+{
+  "args": [
+    "--method",
+    "pdhg",
+    "--pdhg-iter-limit",
+    "20000"
+  ],
+  "exit": 3,
+  "id": "primal_5959.pdhg",
+  "model": "tests/fixtures/primal_5959.mps",
+  "ms": 32,
+  "order": {
+    "chunks": [
+      "3cd0dee991dac614"
+    ],
+    "n": 200
+  },
+  "records": 200,
+  "result": "fac1411b085f0edf",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "ea2b596e0e205ed8"
+      ],
+      "n": 200
+    }
+  }
+}

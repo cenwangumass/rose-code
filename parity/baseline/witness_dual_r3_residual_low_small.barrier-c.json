@@ -1,0 +1,58 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "witness_dual_r3_residual_low_small.barrier-c",
+  "model": "tests/fixtures/witness_dual_r3_residual_low_small.mps",
+  "ms": 6,
+  "order": {
+    "chunks": [
+      "af8a209c1a917a1f"
+    ],
+    "n": 162
+  },
+  "records": 162,
+  "result": "bddbb1898457dcfc",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "53a9ada4bea2e504"
+      ],
+      "n": 9
+    },
+    "BEST": {
+      "chunks": [
+        "398e255057e9e5ab"
+      ],
+      "n": 9
+    },
+    "FOUT": {
+      "chunks": [
+        "652203d16c30ed93"
+      ],
+      "n": 24
+    },
+    "FSN": {
+      "chunks": [
+        "f8b137c47c713b02"
+      ],
+      "n": 24
+    },
+    "RSOLVE": {
+      "chunks": [
+        "edf986c2b8375ed7"
+      ],
+      "n": 16
+    },
+    "STG": {
+      "chunks": [
+        "277f1574bfcb1526"
+      ],
+      "n": 80
+    }
+  }
+}

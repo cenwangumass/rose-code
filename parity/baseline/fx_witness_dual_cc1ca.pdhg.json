@@ -1,0 +1,28 @@
+{
+  "args": [
+    "--method",
+    "pdhg",
+    "--pdhg-iter-limit",
+    "20000"
+  ],
+  "exit": 3,
+  "id": "fx_witness_dual_cc1ca.pdhg",
+  "model": "tests/fixtures/fx_witness_dual_cc1ca.mps",
+  "ms": 10,
+  "order": {
+    "chunks": [
+      "3cd0dee991dac614"
+    ],
+    "n": 200
+  },
+  "records": 200,
+  "result": "777c3dc91aa7590e",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "b313260520b53196"
+      ],
+      "n": 200
+    }
+  }
+}

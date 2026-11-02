@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "fx_bar_max.pdhg",
+  "model": "tests/fixtures/fx_bar_max.mps",
+  "ms": 3,
+  "order": {
+    "chunks": [
+      "3b0ac379a698c654"
+    ],
+    "n": 6
+  },
+  "records": 6,
+  "result": "e7cda3a23714121b",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "f45c57aadcc00842"
+      ],
+      "n": 6
+    }
+  }
+}

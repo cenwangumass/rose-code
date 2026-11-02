@@ -1,0 +1,172 @@
+{
+  "args": [
+    "--method",
+    "primal",
+    "--profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "witness_primal_e2_0625.primal-r",
+  "model": "tests/fixtures/witness_primal_e2_0625.mps",
+  "ms": 14,
+  "order": {
+    "chunks": [
+      "02056525bc7a9244"
+    ],
+    "n": 956
+  },
+  "records": 956,
+  "result": "6a594a7eee5fb1df",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "2f50736ed0272bb7"
+      ],
+      "n": 6
+    },
+    "BTR": {
+      "chunks": [
+        "ac56b445146625dd"
+      ],
+      "n": 7
+    },
+    "BTT": {
+      "chunks": [
+        "95db8b9bc57dce1d"
+      ],
+      "n": 7
+    },
+    "BTY": {
+      "chunks": [
+        "2298d18085175ff4"
+      ],
+      "n": 22
+    },
+    "DTOL": {
+      "chunks": [
+        "08f3df1e077eb8c8"
+      ],
+      "n": 6
+    },
+    "ENT": {
+      "chunks": [
+        "08d1d8034508339b"
+      ],
+      "n": 15
+    },
+    "ENT2": {
+      "chunks": [
+        "187f61a4bf2c37ae"
+      ],
+      "n": 8
+    },
+    "ENTOUT": {
+      "chunks": [
+        "633603347caf4bc0"
+      ],
+      "n": 23
+    },
+    "FILLP": {
+      "chunks": [
+        "a6b75bd804d1c95a"
+      ],
+      "n": 23
+    },
+    "FSTRUCT": {
+      "chunks": [
+        "4b71ff367e1eaae9"
+      ],
+      "n": 23
+    },
+    "FTR": {
+      "chunks": [
+        "2f44e9d9ea0c00cc"
+      ],
+      "n": 23
+    },
+    "LST": {
+      "chunks": [
+        "287ec767b680d6b7"
+      ],
+      "n": 23
+    },
+    "LUIN": {
+      "chunks": [
+        "efcd6f98932bdf2c"
+      ],
+      "n": 4
+    },
+    "LUOUT": {
+      "chunks": [
+        "aff0922596240a2e"
+      ],
+      "n": 4
+    },
+    "LUSTART": {
+      "chunks": [
+        "e787cb16b43820e6"
+      ],
+      "n": 1
+    },
+    "ORD": {
+      "chunks": [
+        "72e42e1abf9e49ea"
+      ],
+      "n": 7
+    },
+    "P0": {
+      "chunks": [
+        "ebaad0c673744ea6"
+      ],
+      "n": 40
+    },
+    "PHDR": {
+      "chunks": [
+        "8d40db35d17a88c0"
+      ],
+      "n": 1
+    },
+    "PLIST": {
+      "chunks": [
+        "7aea1014c4e79663"
+      ],
+      "n": 24
+    },
+    "SCALE": {
+      "chunks": [
+        "f31581d93c2d8047"
+      ],
+      "n": 1
+    },
+    "STARTBASIS": {
+      "chunks": [
+        "a43c8198b4ed9596"
+      ],
+      "n": 1
+    },
+    "SWITCH": {
+      "chunks": [
+        "717a678f1568fe90"
+      ],
+      "n": 4
+    },
+    "USTG": {
+      "chunks": [
+        "e113e83e384d861e"
+      ],
+      "n": 23
+    },
+    "WORK": {
+      "chunks": [
+        "059e130fba2dd6e9"
+      ],
+      "n": 654
+    },
+    "XB": {
+      "chunks": [
+        "440f08308d73462c"
+      ],
+      "n": 6
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "witness_dual_norow.barrier-r",
+  "model": "tests/fixtures/witness_dual_norow.mps",
+  "ms": 5,
+  "order": {
+    "chunks": [
+      "fc823ee230ecfb1a"
+    ],
+    "n": 127
+  },
+  "records": 127,
+  "result": "d2df993238ea181e",
+  "tags": {
+    "AD": {
+      "chunks": [
+        "7c4983315532cc5b"
+      ],
+      "n": 5
+    },
+    "BARRIER": {
+      "chunks": [
+        "43f53c9cfdd47184"
+      ],
+      "n": 7
+    },
+    "BEST": {
+      "chunks": [
+        "f0987166fa039d52"
+      ],
+      "n": 7
+    },
+    "FOUT": {
+      "chunks": [
+        "b140256a23486740"
+      ],
+      "n": 6
+    },
+    "FSN": {
+      "chunks": [
+        "a894d713f492342e"
+      ],
+      "n": 6
+    },
+    "RSOLVE": {
+      "chunks": [
+        "928a6b8775d82753"
+      ],
+      "n": 16
+    },
+    "STG": {
+      "chunks": [
+        "9b5f4e44f6badc22"
+      ],
+      "n": 80
+    }
+  }
+}

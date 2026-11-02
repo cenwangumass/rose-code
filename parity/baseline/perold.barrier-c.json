@@ -1,0 +1,98 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "perold.barrier-c",
+  "model": "tests/fixtures/perold.mps",
+  "ms": 2286,
+  "order": {
+    "chunks": [
+      "8fc34e4bb064be37",
+      "9e25b1f48ee7fae9",
+      "d2b3e7d44758bb6d",
+      "b32eeb0bf79aa0f3",
+      "ed947d5ea93a3483",
+      "3010410c7744c213",
+      "d2f6d0a8790ac811",
+      "31f420e3459209f0",
+      "b9a9ac8fb8aec936",
+      "61bbffaa497f42b7",
+      "6e4d0c8172a0da0b",
+      "eecd6b64740cfdc9",
+      "92123cd9622b901b",
+      "66ffa1e1fd815ff9",
+      "fc86147d7f608ebd",
+      "3ab9dea7492993b8",
+      "f730a19d9d358814",
+      "aeaf0c86af08e4ee",
+      "f405d30032930bd6",
+      "216ebd5dda49f17f",
+      "96e515c5a9276939",
+      "a44d52319a2a853a"
+    ],
+    "n": 21802
+  },
+  "records": 21802,
+  "result": "c2d196e81392f0c7",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "e55b87fb69cb46d1"
+      ],
+      "n": 110
+    },
+    "BEST": {
+      "chunks": [
+        "207b22d86b362c04"
+      ],
+      "n": 110
+    },
+    "FOUT": {
+      "chunks": [
+        "1217a7a43dafc063",
+        "e71f7aa7831c184b",
+        "de24160836388a5c",
+        "0fea221611347101",
+        "08b20cff2a5bdab5",
+        "f5009af490031c8d",
+        "93deeb90486b5e7d",
+        "d46e590903dc58c9",
+        "581fcb62c1e928a8",
+        "1cfa93e8d3ce82f5"
+      ],
+      "n": 10137
+    },
+    "FSN": {
+      "chunks": [
+        "8be5cf65ccea50e4",
+        "d1b00507baa5c033",
+        "7171686b1c41066d",
+        "8f0e87ec8b0d96fb",
+        "87875c4f7e27c5dd",
+        "6ac49a7dfb3a61bd",
+        "25729a8d0e7bf415",
+        "357f2945be1ef247",
+        "c68296a4f4226ee1",
+        "c1c1caeff02467c2"
+      ],
+      "n": 10137
+    },
+    "RSOLVE": {
+      "chunks": [
+        "646e9a1160b5abc3"
+      ],
+      "n": 218
+    },
+    "STG": {
+      "chunks": [
+        "68dad11dce8e21df",
+        "7aa8cfa10459bf49"
+      ],
+      "n": 1090
+    }
+  }
+}

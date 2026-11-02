@@ -1,0 +1,118 @@
+{
+  "args": [
+    "--method",
+    "primal",
+    "--profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "fx_dual_free_ray_122.primal-r",
+  "model": "tests/fixtures/fx_dual_free_ray_122.mps",
+  "ms": 3,
+  "order": {
+    "chunks": [
+      "c76f51cfbc05d8a2"
+    ],
+    "n": 36
+  },
+  "records": 36,
+  "result": "2c445642ee9d1b08",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "b27bb02664a176f2"
+      ],
+      "n": 1
+    },
+    "BTY": {
+      "chunks": [
+        "47fe5947fd3520fe"
+      ],
+      "n": 1
+    },
+    "DTOL": {
+      "chunks": [
+        "400a15ca3c2fa9e2"
+      ],
+      "n": 1
+    },
+    "ENT2": {
+      "chunks": [
+        "7fb89efb26853407"
+      ],
+      "n": 1
+    },
+    "ENTOUT": {
+      "chunks": [
+        "299aa97b700c8c59"
+      ],
+      "n": 1
+    },
+    "FTR": {
+      "chunks": [
+        "3f40dbc74eb030aa"
+      ],
+      "n": 1
+    },
+    "LST": {
+      "chunks": [
+        "ba2908cc76fde20c"
+      ],
+      "n": 1
+    },
+    "LUSTART": {
+      "chunks": [
+        "cfb70e5fd1754660"
+      ],
+      "n": 1
+    },
+    "P0": {
+      "chunks": [
+        "0823cc6fa73b3d19"
+      ],
+      "n": 2
+    },
+    "PHDR": {
+      "chunks": [
+        "2c90e2b44df12c9d"
+      ],
+      "n": 1
+    },
+    "PLIST": {
+      "chunks": [
+        "351698e8b4742976"
+      ],
+      "n": 1
+    },
+    "SCALE": {
+      "chunks": [
+        "10e37b470af9910e"
+      ],
+      "n": 1
+    },
+    "STARTBASIS": {
+      "chunks": [
+        "73a1e4781e3cfbf6"
+      ],
+      "n": 1
+    },
+    "USTG": {
+      "chunks": [
+        "09cd6681ca39db59"
+      ],
+      "n": 1
+    },
+    "WORK": {
+      "chunks": [
+        "f44eaa91f60202d0"
+      ],
+      "n": 20
+    },
+    "XB": {
+      "chunks": [
+        "9eeb2e068f7e0d7b"
+      ],
+      "n": 1
+    }
+  }
+}

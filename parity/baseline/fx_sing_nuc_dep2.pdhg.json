@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "fx_sing_nuc_dep2.pdhg",
+  "model": "tests/fixtures/fx_sing_nuc_dep2.mps",
+  "ms": 2,
+  "order": {
+    "chunks": [
+      "2ad4b8ff40a87dee"
+    ],
+    "n": 3
+  },
+  "records": 3,
+  "result": "0b03f1e3fe84e321",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "aeff8e44b794179f"
+      ],
+      "n": 3
+    }
+  }
+}

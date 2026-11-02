@@ -1,0 +1,58 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "fx_sing_dup_slack3.barrier-c",
+  "model": "tests/fixtures/fx_sing_dup_slack3.mps",
+  "ms": 3,
+  "order": {
+    "chunks": [
+      "22cc57a659ee3f03"
+    ],
+    "n": 92
+  },
+  "records": 92,
+  "result": "4acb09241b27bd46",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "99ed60ff5e165440"
+      ],
+      "n": 6
+    },
+    "BEST": {
+      "chunks": [
+        "6270dce7187ab291"
+      ],
+      "n": 6
+    },
+    "FOUT": {
+      "chunks": [
+        "21135d73ac7518d1"
+      ],
+      "n": 10
+    },
+    "FSN": {
+      "chunks": [
+        "1e0586c94cafdd1e"
+      ],
+      "n": 10
+    },
+    "RSOLVE": {
+      "chunks": [
+        "7c16377074276438"
+      ],
+      "n": 10
+    },
+    "STG": {
+      "chunks": [
+        "f5f25423f9993ca2"
+      ],
+      "n": 50
+    }
+  }
+}

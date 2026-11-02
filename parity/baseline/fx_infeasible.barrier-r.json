@@ -1,0 +1,64 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "release"
+  ],
+  "exit": 3,
+  "id": "fx_infeasible.barrier-r",
+  "model": "tests/fixtures/fx_infeasible.mps",
+  "ms": 4,
+  "order": {
+    "chunks": [
+      "2eb1e22c253d6021"
+    ],
+    "n": 249
+  },
+  "records": 249,
+  "result": "86afe172891ade8a",
+  "tags": {
+    "AD": {
+      "chunks": [
+        "7cd67b9a9c9f51de"
+      ],
+      "n": 9
+    },
+    "BARRIER": {
+      "chunks": [
+        "d24388429e962382"
+      ],
+      "n": 11
+    },
+    "BEST": {
+      "chunks": [
+        "07444ac39b26fb8f"
+      ],
+      "n": 11
+    },
+    "FOUT": {
+      "chunks": [
+        "9b0a7c9761f5cd0c"
+      ],
+      "n": 10
+    },
+    "FSN": {
+      "chunks": [
+        "3f040ffc38bb23b3"
+      ],
+      "n": 10
+    },
+    "RSOLVE": {
+      "chunks": [
+        "2562f0c6ecc07852"
+      ],
+      "n": 33
+    },
+    "STG": {
+      "chunks": [
+        "cf5d84832068fe8b"
+      ],
+      "n": 165
+    }
+  }
+}

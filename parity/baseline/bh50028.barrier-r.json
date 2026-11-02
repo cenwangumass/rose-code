@@ -1,0 +1,64 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "bh50028.barrier-r",
+  "model": "tests/fixtures/bh50028.mps",
+  "ms": 18,
+  "order": {
+    "chunks": [
+      "3fcffd5b6c0478a1"
+    ],
+    "n": 828
+  },
+  "records": 828,
+  "result": "fa31a8e1234e2358",
+  "tags": {
+    "AD": {
+      "chunks": [
+        "04e46f4bbac438b7"
+      ],
+      "n": 24
+    },
+    "BARRIER": {
+      "chunks": [
+        "1aa8ed98d746d8ed"
+      ],
+      "n": 26
+    },
+    "BEST": {
+      "chunks": [
+        "e17321379d14195f"
+      ],
+      "n": 26
+    },
+    "FOUT": {
+      "chunks": [
+        "81137ae5aae70741"
+      ],
+      "n": 25
+    },
+    "FSN": {
+      "chunks": [
+        "ac59f42896def158"
+      ],
+      "n": 25
+    },
+    "RSOLVE": {
+      "chunks": [
+        "b5979d50d75367db"
+      ],
+      "n": 117
+    },
+    "STG": {
+      "chunks": [
+        "adbc0c691e0ffe91"
+      ],
+      "n": 585
+    }
+  }
+}

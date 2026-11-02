@@ -1,0 +1,60 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 3,
+  "id": "fx_midsing_1106.barrier-c",
+  "model": "tests/fixtures/fx_midsing_1106.mps",
+  "ms": 43,
+  "order": {
+    "chunks": [
+      "ab66842c23fdebd5",
+      "043adb28571578c7"
+    ],
+    "n": 1582
+  },
+  "records": 1582,
+  "result": "e93f35cdb613d1df",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "fb4412e696861e6d"
+      ],
+      "n": 63
+    },
+    "BEST": {
+      "chunks": [
+        "c60a32ae441af379"
+      ],
+      "n": 63
+    },
+    "FOUT": {
+      "chunks": [
+        "7771bf77f5cc56cd"
+      ],
+      "n": 62
+    },
+    "FSN": {
+      "chunks": [
+        "307b405700ce932f"
+      ],
+      "n": 62
+    },
+    "RSOLVE": {
+      "chunks": [
+        "b6d99c1057a96845"
+      ],
+      "n": 222
+    },
+    "STG": {
+      "chunks": [
+        "cd8cdd3e1662803c",
+        "07cc182fe4e9a6d9"
+      ],
+      "n": 1110
+    }
+  }
+}

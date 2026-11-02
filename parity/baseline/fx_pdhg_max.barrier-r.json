@@ -1,0 +1,64 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "fx_pdhg_max.barrier-r",
+  "model": "tests/fixtures/fx_pdhg_max.mps",
+  "ms": 4,
+  "order": {
+    "chunks": [
+      "67cde1732f1adffa"
+    ],
+    "n": 127
+  },
+  "records": 127,
+  "result": "92232ff4177fc1ce",
+  "tags": {
+    "AD": {
+      "chunks": [
+        "e36255cbfe9791a0"
+      ],
+      "n": 5
+    },
+    "BARRIER": {
+      "chunks": [
+        "3c990690bc07bf78"
+      ],
+      "n": 7
+    },
+    "BEST": {
+      "chunks": [
+        "31c2a11d3257707c"
+      ],
+      "n": 7
+    },
+    "FOUT": {
+      "chunks": [
+        "b1deb97945538047"
+      ],
+      "n": 6
+    },
+    "FSN": {
+      "chunks": [
+        "2734d56d216f1d40"
+      ],
+      "n": 6
+    },
+    "RSOLVE": {
+      "chunks": [
+        "b71b9d8590f59959"
+      ],
+      "n": 16
+    },
+    "STG": {
+      "chunks": [
+        "bf76c17a2a781c31"
+      ],
+      "n": 80
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "witness_dual_norow.pdhg",
+  "model": "tests/fixtures/witness_dual_norow.mps",
+  "ms": 3,
+  "order": {
+    "chunks": [
+      "2a1ce4e47992fc1b"
+    ],
+    "n": 1
+  },
+  "records": 1,
+  "result": "c9bc068e962dce5d",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "6efe505d5e36cb53"
+      ],
+      "n": 1
+    }
+  }
+}

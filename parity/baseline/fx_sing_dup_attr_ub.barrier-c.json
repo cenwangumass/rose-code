@@ -1,0 +1,58 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "fx_sing_dup_attr_ub.barrier-c",
+  "model": "tests/fixtures/fx_sing_dup_attr_ub.mps",
+  "ms": 2,
+  "order": {
+    "chunks": [
+      "ada9359f64074ebc"
+    ],
+    "n": 98
+  },
+  "records": 98,
+  "result": "03e6f8333cfa6ba5",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "02e1c487d03fa044"
+      ],
+      "n": 7
+    },
+    "BEST": {
+      "chunks": [
+        "3162d70bcf01aa5e"
+      ],
+      "n": 7
+    },
+    "FOUT": {
+      "chunks": [
+        "ac162b0ecf97c9a7"
+      ],
+      "n": 6
+    },
+    "FSN": {
+      "chunks": [
+        "c8198c1b199f1332"
+      ],
+      "n": 6
+    },
+    "RSOLVE": {
+      "chunks": [
+        "34602d86a27da72e"
+      ],
+      "n": 12
+    },
+    "STG": {
+      "chunks": [
+        "bed0dcde33eefdfa"
+      ],
+      "n": 60
+    }
+  }
+}

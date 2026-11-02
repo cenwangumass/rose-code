@@ -1,0 +1,46 @@
+{
+  "args": [
+    "--method",
+    "dual",
+    "--profile",
+    "release"
+  ],
+  "exit": 1,
+  "id": "fx_ladder_386.dual-r",
+  "model": "tests/fixtures/fx_ladder_386.mps",
+  "ms": 4,
+  "order": {
+    "chunks": [
+      "a8b07a729fdf29a9"
+    ],
+    "n": 15
+  },
+  "records": 15,
+  "result": "none",
+  "tags": {
+    "CALLBACK": {
+      "chunks": [
+        "235cdc8aa953d255"
+      ],
+      "n": 2
+    },
+    "DCR": {
+      "chunks": [
+        "67e31e0536ee900d"
+      ],
+      "n": 9
+    },
+    "LUSTART": {
+      "chunks": [
+        "b2dfdb38dd3e9a44"
+      ],
+      "n": 3
+    },
+    "SCALE": {
+      "chunks": [
+        "a9d606cf48586e02"
+      ],
+      "n": 1
+    }
+  }
+}

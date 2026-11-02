@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "fx_sing_dense4n.pdhg",
+  "model": "tests/fixtures/fx_sing_dense4n.mps",
+  "ms": 4,
+  "order": {
+    "chunks": [
+      "a99e904ff0cffe7a"
+    ],
+    "n": 4
+  },
+  "records": 4,
+  "result": "2569165d86885ade",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "4044df2801f009fc"
+      ],
+      "n": 4
+    }
+  }
+}

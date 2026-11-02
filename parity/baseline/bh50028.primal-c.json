@@ -1,0 +1,160 @@
+{
+  "args": [
+    "--method",
+    "primal",
+    "--profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "bh50028.primal-c",
+  "model": "tests/fixtures/bh50028.mps",
+  "ms": 5,
+  "order": {
+    "chunks": [
+      "3428d27d92637f09"
+    ],
+    "n": 426
+  },
+  "records": 426,
+  "result": "3140bab00c4cfd7b",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "e86f28fc22736b17"
+      ],
+      "n": 6
+    },
+    "BTC": {
+      "chunks": [
+        "ae5883e346b22488"
+      ],
+      "n": 1
+    },
+    "BTR": {
+      "chunks": [
+        "364c7d308dbe705e"
+      ],
+      "n": 10
+    },
+    "BTT": {
+      "chunks": [
+        "f22ba5e9daa089ae"
+      ],
+      "n": 10
+    },
+    "BTY": {
+      "chunks": [
+        "439e590478425851"
+      ],
+      "n": 7
+    },
+    "CORD": {
+      "chunks": [
+        "b0fec9d9896593d2"
+      ],
+      "n": 1
+    },
+    "ENT": {
+      "chunks": [
+        "daf8a0a7aaaef391"
+      ],
+      "n": 10
+    },
+    "ENTOUT": {
+      "chunks": [
+        "643a7d33c0fa7bb0"
+      ],
+      "n": 10
+    },
+    "FILLP": {
+      "chunks": [
+        "1ac7c1a80b5fb115"
+      ],
+      "n": 10
+    },
+    "FSTRUCT": {
+      "chunks": [
+        "7e246caabf1a2fbb"
+      ],
+      "n": 10
+    },
+    "FTR": {
+      "chunks": [
+        "b9eb2ca223ec127f"
+      ],
+      "n": 10
+    },
+    "LST": {
+      "chunks": [
+        "97306868a1169b9f"
+      ],
+      "n": 10
+    },
+    "LUIN": {
+      "chunks": [
+        "35693003a1106133"
+      ],
+      "n": 5
+    },
+    "LUOUT": {
+      "chunks": [
+        "0e83c1631fed6c1b"
+      ],
+      "n": 5
+    },
+    "LUSTART": {
+      "chunks": [
+        "95e3804d942b9027"
+      ],
+      "n": 1
+    },
+    "ORD": {
+      "chunks": [
+        "58be8654ef6e86af"
+      ],
+      "n": 10
+    },
+    "PDRIFT": {
+      "chunks": [
+        "6b3c3149c781e748"
+      ],
+      "n": 1
+    },
+    "PHDR": {
+      "chunks": [
+        "c5ab74a85807dec9"
+      ],
+      "n": 1
+    },
+    "PLIST": {
+      "chunks": [
+        "265aace77f1eb812"
+      ],
+      "n": 14
+    },
+    "STARTBASIS": {
+      "chunks": [
+        "5ba0271a40e3a3de"
+      ],
+      "n": 1
+    },
+    "USTG": {
+      "chunks": [
+        "388bb18046bb8e7f"
+      ],
+      "n": 10
+    },
+    "WORK": {
+      "chunks": [
+        "68d60eb67deecfae"
+      ],
+      "n": 277
+    },
+    "XB": {
+      "chunks": [
+        "ba3ee2cacd59b437"
+      ],
+      "n": 6
+    }
+  }
+}

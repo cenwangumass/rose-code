@@ -1,0 +1,28 @@
+{
+  "args": [
+    "--method",
+    "pdhg",
+    "--pdhg-iter-limit",
+    "20000"
+  ],
+  "exit": 3,
+  "id": "pilot4.pdhg",
+  "model": "tests/fixtures/pilot4.mps",
+  "ms": 770,
+  "order": {
+    "chunks": [
+      "04ec2d707076ff88"
+    ],
+    "n": 184
+  },
+  "records": 184,
+  "result": "45b286ad23cc7c5d",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "451d3e12ea26d2e9"
+      ],
+      "n": 184
+    }
+  }
+}

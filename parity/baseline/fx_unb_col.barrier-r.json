@@ -1,0 +1,66 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "release"
+  ],
+  "exit": 3,
+  "id": "fx_unb_col.barrier-r",
+  "model": "tests/fixtures/fx_unb_col.mps",
+  "ms": 14,
+  "order": {
+    "chunks": [
+      "4b256c28a276290c",
+      "c273b7629f9a3335"
+    ],
+    "n": 1942
+  },
+  "records": 1942,
+  "result": "d273a4234a2670be",
+  "tags": {
+    "AD": {
+      "chunks": [
+        "07848b454ed0cec1"
+      ],
+      "n": 92
+    },
+    "BARRIER": {
+      "chunks": [
+        "38184637a8d6f8a9"
+      ],
+      "n": 94
+    },
+    "BEST": {
+      "chunks": [
+        "b25a65495ee86d6f"
+      ],
+      "n": 94
+    },
+    "FOUT": {
+      "chunks": [
+        "8f8a9cfaaa49b9ba"
+      ],
+      "n": 93
+    },
+    "FSN": {
+      "chunks": [
+        "e4afa9ead3e4bf68"
+      ],
+      "n": 93
+    },
+    "RSOLVE": {
+      "chunks": [
+        "a5e63dd94f159181"
+      ],
+      "n": 246
+    },
+    "STG": {
+      "chunks": [
+        "7981f50580719a4f",
+        "944255154258c73a"
+      ],
+      "n": 1230
+    }
+  }
+}

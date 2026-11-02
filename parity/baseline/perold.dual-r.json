@@ -1,0 +1,239 @@
+{
+  "args": [
+    "--method",
+    "dual",
+    "--profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "perold.dual-r",
+  "model": "tests/fixtures/perold.mps",
+  "ms": 3641,
+  "order": {
+    "chunks": [
+      "494b3f1dbe259b58",
+      "79776eecddc49ceb",
+      "b2fd19c6fc5879be",
+      "3633a275035b497b",
+      "1b55390cd0192688",
+      "d6e61e28ccc1e479",
+      "8af2436bf0b42e75",
+      "13383c6f776a3ddc",
+      "b51a2437d2ddc3e2",
+      "5d7c66ce5c2c4ec7",
+      "74e8d13cc6e03a08",
+      "32e8d0192542252a",
+      "913be88562df03f2",
+      "18113a7b8e2851f7",
+      "9e117cd16ad9e97b",
+      "ea4d1aa7a8d2c307",
+      "2e62eb5a2fd4e561",
+      "c11dd6ce824c3bd9",
+      "7ebe9f5d3db9a709",
+      "e7efcdddbfa12f23",
+      "bd33079ab24f46bd",
+      "1a5bcf4dbed39b08",
+      "022429dbb2d26dfd",
+      "99000034901fa395",
+      "ab8d51b7b931395e",
+      "43b0f0dfe2423026",
+      "30f9d7b02f2a9031",
+      "2c2e1e99a7e6e60a",
+      "96320b10455367e3",
+      "176837c032fde36b",
+      "0dac559b63e3e6fb",
+      "66f9e784aa6848b0",
+      "595929d90a4fc4a0",
+      "7d561e21f319e9b4",
+      "a8046bec33250030",
+      "db44b4fa420b8ce5",
+      "42f9399808cb90a2",
+      "60c76bced45a84e2"
+    ],
+    "n": 38336
+  },
+  "records": 38336,
+  "result": "f7fec225e4fc187b",
+  "tags": {
+    "BARE": {
+      "chunks": [
+        "15e510a935085c44"
+      ],
+      "n": 15
+    },
+    "BSOLVE": {
+      "chunks": [
+        "04f17c47c577e2d5"
+      ],
+      "n": 25
+    },
+    "BTY": {
+      "chunks": [
+        "488baf9ff0b5b98a"
+      ],
+      "n": 24
+    },
+    "CALLBACK": {
+      "chunks": [
+        "45cc0a31152027d8"
+      ],
+      "n": 6
+    },
+    "DACC": {
+      "chunks": [
+        "94ba290c1b85c5c2"
+      ],
+      "n": 23
+    },
+    "DCR": {
+      "chunks": [
+        "1f37cc7774d837d7"
+      ],
+      "n": 389
+    },
+    "DSX": {
+      "chunks": [
+        "4b1d3af53c67bf19",
+        "4f6cd9757bdfe9cf"
+      ],
+      "n": 1188
+    },
+    "DTAU": {
+      "chunks": [
+        "ece11f06924b1812",
+        "67f9ff86e045b585"
+      ],
+      "n": 1185
+    },
+    "DTOL": {
+      "chunks": [
+        "9584e0bc9f4421b4"
+      ],
+      "n": 9
+    },
+    "FACCTX": {
+      "chunks": [
+        "381b4296e9792659"
+      ],
+      "n": 25
+    },
+    "FILLP": {
+      "chunks": [
+        "8eeaa9bcbc4beed6",
+        "9745a69629e7cd1b"
+      ],
+      "n": 1251
+    },
+    "FSTRUCT": {
+      "chunks": [
+        "dc70d5ae7d3c74a4",
+        "779b15e197612e58"
+      ],
+      "n": 1251
+    },
+    "LUIN": {
+      "chunks": [
+        "1aea04c76760b96a"
+      ],
+      "n": 25
+    },
+    "LUOUT": {
+      "chunks": [
+        "03549740782ebd68"
+      ],
+      "n": 25
+    },
+    "LUSTART": {
+      "chunks": [
+        "a1d492da83b7e6fc"
+      ],
+      "n": 2
+    },
+    "P68": {
+      "chunks": [
+        "116af111708e16a3"
+      ],
+      "n": 25
+    },
+    "PGATE": {
+      "chunks": [
+        "db8243dd3594c359"
+      ],
+      "n": 20
+    },
+    "PHDR": {
+      "chunks": [
+        "035dfeeea949f470"
+      ],
+      "n": 1
+    },
+    "PLIST": {
+      "chunks": [
+        "371df2cb08670643"
+      ],
+      "n": 1
+    },
+    "SCALE": {
+      "chunks": [
+        "74821d74a2b9acfe"
+      ],
+      "n": 1
+    },
+    "STARTBASIS": {
+      "chunks": [
+        "9321c93f9b275f9c"
+      ],
+      "n": 1
+    },
+    "SWITCH": {
+      "chunks": [
+        "56d11da263520b75"
+      ],
+      "n": 1
+    },
+    "WORK": {
+      "chunks": [
+        "60c1ba8f5456f5d4",
+        "504f5f5ca52ecb3a",
+        "63075afdc253fad8",
+        "6a41bfcbd991901f",
+        "b689759dd2e10b8c",
+        "503baaea1e641f9e",
+        "fd8031ee18c91ca7",
+        "bb0a79ca8e7a2820",
+        "7651626e46b244dd",
+        "0ac708970079afe1",
+        "1f2515b529ba9d00",
+        "8a2380dfebdd0a84",
+        "99762d73fa63bfc9",
+        "d8be1db93928a57a",
+        "f3527e48acd6a285",
+        "33090cd58b990210",
+        "4786ad915b8867c0",
+        "cb33a65c4a0191e7",
+        "2fe8800b3990e916",
+        "4d3a37030be92c03",
+        "4f77f4b025adfda9",
+        "1c48eaf3194ace94",
+        "9fe7ffd1cbf73641",
+        "bec6e32321646544",
+        "0585947ec13a63ad",
+        "8da9bc78f7dfe5c0",
+        "67ce4a26fbbab3a3",
+        "c5a14970fd38b522",
+        "46e72df4b438f75d",
+        "feda05175ef962cf",
+        "bd76abd573c0f2b2",
+        "42c6886f6dd5ee34",
+        "c3526c11989e5a56"
+      ],
+      "n": 32841
+    },
+    "XB": {
+      "chunks": [
+        "936ee3055b4c3338"
+      ],
+      "n": 2
+    }
+  }
+}

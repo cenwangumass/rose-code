@@ -1,0 +1,118 @@
+{
+  "args": [
+    "--method",
+    "dual",
+    "--profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "fx_bar_nrow.dual-r",
+  "model": "tests/fixtures/fx_bar_nrow.mps",
+  "ms": 6,
+  "order": {
+    "chunks": [
+      "e32046adec967fff"
+    ],
+    "n": 125
+  },
+  "records": 125,
+  "result": "8eaf0f92c7051d81",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "12a9709c379b722a"
+      ],
+      "n": 4
+    },
+    "BTY": {
+      "chunks": [
+        "1643171d8535eae2"
+      ],
+      "n": 4
+    },
+    "CALLBACK": {
+      "chunks": [
+        "376da1bf6fbe892e"
+      ],
+      "n": 2
+    },
+    "DACC": {
+      "chunks": [
+        "04add074c8e8de5d"
+      ],
+      "n": 3
+    },
+    "DCR": {
+      "chunks": [
+        "2a262f9a817e2427"
+      ],
+      "n": 2
+    },
+    "DSX": {
+      "chunks": [
+        "05ed994061aec1e3"
+      ],
+      "n": 5
+    },
+    "DTAU": {
+      "chunks": [
+        "8045811e93e1ef89"
+      ],
+      "n": 2
+    },
+    "DTOL": {
+      "chunks": [
+        "f796f428f966e8ce"
+      ],
+      "n": 2
+    },
+    "FACCTX": {
+      "chunks": [
+        "4cfddae40c29cee8"
+      ],
+      "n": 2
+    },
+    "FILLP": {
+      "chunks": [
+        "f1a5c14cfb95b78c"
+      ],
+      "n": 2
+    },
+    "FSTRUCT": {
+      "chunks": [
+        "8602f1712a300e5e"
+      ],
+      "n": 2
+    },
+    "LUIN": {
+      "chunks": [
+        "f8d414aeaaa2a8f1"
+      ],
+      "n": 2
+    },
+    "LUOUT": {
+      "chunks": [
+        "e4e4d6e4cece828c"
+      ],
+      "n": 2
+    },
+    "LUSTART": {
+      "chunks": [
+        "203ccc3d48af49e5"
+      ],
+      "n": 1
+    },
+    "SCALE": {
+      "chunks": [
+        "56bbba70d1d562a0"
+      ],
+      "n": 1
+    },
+    "WORK": {
+      "chunks": [
+        "8e947136811bc96b"
+      ],
+      "n": 89
+    }
+  }
+}

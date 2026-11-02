@@ -1,0 +1,28 @@
+{
+  "args": [
+    "--method",
+    "pdhg",
+    "--pdhg-iter-limit",
+    "20000"
+  ],
+  "exit": 3,
+  "id": "fx_ladder_386.pdhg",
+  "model": "tests/fixtures/fx_ladder_386.mps",
+  "ms": 58,
+  "order": {
+    "chunks": [
+      "5e457de46fc3a75d"
+    ],
+    "n": 185
+  },
+  "records": 185,
+  "result": "67b099b267d6fbfb",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "99f12d4b387b8e89"
+      ],
+      "n": 185
+    }
+  }
+}

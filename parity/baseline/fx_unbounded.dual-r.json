@@ -1,0 +1,76 @@
+{
+  "args": [
+    "--method",
+    "dual",
+    "--profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "fx_unbounded.dual-r",
+  "model": "tests/fixtures/fx_unbounded.mps",
+  "ms": 3,
+  "order": {
+    "chunks": [
+      "f4afa33a119b88a2"
+    ],
+    "n": 35
+  },
+  "records": 35,
+  "result": "7499f3d531f9b981",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "3f4b0eac21fb4692"
+      ],
+      "n": 2
+    },
+    "BTY": {
+      "chunks": [
+        "c514a7a6462966a3"
+      ],
+      "n": 2
+    },
+    "CALLBACK": {
+      "chunks": [
+        "235cdc8aa953d255"
+      ],
+      "n": 2
+    },
+    "DACC": {
+      "chunks": [
+        "cb16144a8e3e26d5"
+      ],
+      "n": 2
+    },
+    "DCR": {
+      "chunks": [
+        "527a34854e651325"
+      ],
+      "n": 2
+    },
+    "DSX": {
+      "chunks": [
+        "ee966bcb2bcfb419"
+      ],
+      "n": 1
+    },
+    "LUSTART": {
+      "chunks": [
+        "5aa9a5e8e4ef3ec4"
+      ],
+      "n": 1
+    },
+    "SCALE": {
+      "chunks": [
+        "3c52eb71eb4a7551"
+      ],
+      "n": 1
+    },
+    "WORK": {
+      "chunks": [
+        "71f5dedfc1934294"
+      ],
+      "n": 22
+    }
+  }
+}

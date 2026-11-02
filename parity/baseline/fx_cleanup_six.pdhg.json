@@ -1,0 +1,30 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "fx_cleanup_six.pdhg",
+  "model": "tests/fixtures/fx_cleanup_six.mps",
+  "ms": 312,
+  "order": {
+    "chunks": [
+      "a771af0cae5be822",
+      "31df4f0333265ea9",
+      "7e45432922477047"
+    ],
+    "n": 2187
+  },
+  "records": 2187,
+  "result": "514809f8a2d96929",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "cd13536ffa8ceaa5",
+        "d9703ed4e5e6edd8",
+        "68d5c6602febe34c"
+      ],
+      "n": 2187
+    }
+  }
+}

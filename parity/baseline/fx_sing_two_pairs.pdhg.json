@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "fx_sing_two_pairs.pdhg",
+  "model": "tests/fixtures/fx_sing_two_pairs.mps",
+  "ms": 3,
+  "order": {
+    "chunks": [
+      "a99e904ff0cffe7a"
+    ],
+    "n": 4
+  },
+  "records": 4,
+  "result": "bbd07b2ca27ce9e7",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "ce7d858d95f3ccae"
+      ],
+      "n": 4
+    }
+  }
+}

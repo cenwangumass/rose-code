@@ -1,0 +1,70 @@
+{
+  "args": [
+    "--method",
+    "dual",
+    "--profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "fx_bar_ubhsd.dual-c",
+  "model": "tests/fixtures/fx_bar_ubhsd.mps",
+  "ms": 3,
+  "order": {
+    "chunks": [
+      "6f15f9092561b574"
+    ],
+    "n": 36
+  },
+  "records": 36,
+  "result": "da2bb487a3768b95",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "3ce2e07656b13531"
+      ],
+      "n": 2
+    },
+    "BTY": {
+      "chunks": [
+        "486844d290f3344d"
+      ],
+      "n": 2
+    },
+    "CALLBACK": {
+      "chunks": [
+        "235cdc8aa953d255"
+      ],
+      "n": 2
+    },
+    "DACC": {
+      "chunks": [
+        "7d36757edfc6f1fa"
+      ],
+      "n": 2
+    },
+    "DCR": {
+      "chunks": [
+        "c4f8fa1144832596"
+      ],
+      "n": 3
+    },
+    "DSX": {
+      "chunks": [
+        "ee966bcb2bcfb419"
+      ],
+      "n": 1
+    },
+    "LUSTART": {
+      "chunks": [
+        "a0a7139aaf6e0917"
+      ],
+      "n": 1
+    },
+    "WORK": {
+      "chunks": [
+        "c11809d4147314e8"
+      ],
+      "n": 23
+    }
+  }
+}

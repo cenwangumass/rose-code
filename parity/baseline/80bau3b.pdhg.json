@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "80bau3b.pdhg",
+  "model": "tests/fixtures/80bau3b.mps",
+  "ms": 8865,
+  "order": {
+    "chunks": [
+      "5ed0ea5703b0afe3"
+    ],
+    "n": 405
+  },
+  "records": 405,
+  "result": "3fb23ce4dde6a00f",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "bd178d764245bf20"
+      ],
+      "n": 405
+    }
+  }
+}

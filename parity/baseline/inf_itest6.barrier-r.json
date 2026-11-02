@@ -1,0 +1,64 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "release"
+  ],
+  "exit": 3,
+  "id": "inf_itest6.barrier-r",
+  "model": "tests/fixtures/inf_itest6.mps",
+  "ms": 12,
+  "order": {
+    "chunks": [
+      "2dc7f460e565a044"
+    ],
+    "n": 937
+  },
+  "records": 937,
+  "result": "ab511c83104fc462",
+  "tags": {
+    "AD": {
+      "chunks": [
+        "8951da262f3fb683"
+      ],
+      "n": 29
+    },
+    "BARRIER": {
+      "chunks": [
+        "904d9d50bf802dfb"
+      ],
+      "n": 31
+    },
+    "BEST": {
+      "chunks": [
+        "790f9c80774f9544"
+      ],
+      "n": 31
+    },
+    "FOUT": {
+      "chunks": [
+        "09201edcbc493fd6"
+      ],
+      "n": 90
+    },
+    "FSN": {
+      "chunks": [
+        "b064a2c41eaca22d"
+      ],
+      "n": 90
+    },
+    "RSOLVE": {
+      "chunks": [
+        "02a2e0c84b345892"
+      ],
+      "n": 111
+    },
+    "STG": {
+      "chunks": [
+        "d594a5f55ef6efb2"
+      ],
+      "n": 555
+    }
+  }
+}

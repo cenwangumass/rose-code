@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "fx_sing_zero_col2.pdhg",
+  "model": "tests/fixtures/fx_sing_zero_col2.mps",
+  "ms": 2,
+  "order": {
+    "chunks": [
+      "19289f8a7c30ddcf"
+    ],
+    "n": 2
+  },
+  "records": 2,
+  "result": "2e006844267d5b62",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "dc477233f570a1dc"
+      ],
+      "n": 2
+    }
+  }
+}

@@ -1,0 +1,146 @@
+{
+  "args": [
+    "--method",
+    "dual",
+    "--profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "quad_s2950.dual-c",
+  "model": "tests/fixtures/quad_s2950.mps",
+  "ms": 38,
+  "order": {
+    "chunks": [
+      "ffda6d74eb815f46",
+      "a706174a8eb63980",
+      "b52bd51cd796d0fa"
+    ],
+    "n": 2739
+  },
+  "records": 2739,
+  "result": "0a61b7086b1fb3d8",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "d3b4ff72a643c176"
+      ],
+      "n": 28
+    },
+    "BTY": {
+      "chunks": [
+        "2600c28af182abfd"
+      ],
+      "n": 27
+    },
+    "CALLBACK": {
+      "chunks": [
+        "14276890812ceb39"
+      ],
+      "n": 16
+    },
+    "DACC": {
+      "chunks": [
+        "864416e8ef71b40a"
+      ],
+      "n": 26
+    },
+    "DCR": {
+      "chunks": [
+        "fb7ec3cabfc3dfbe"
+      ],
+      "n": 9
+    },
+    "DSX": {
+      "chunks": [
+        "e3e4d53ab92d5570"
+      ],
+      "n": 112
+    },
+    "DTAU": {
+      "chunks": [
+        "3274d81c8fd5306d"
+      ],
+      "n": 73
+    },
+    "DTOL": {
+      "chunks": [
+        "7ffad2f9a9010d62"
+      ],
+      "n": 11
+    },
+    "FACCTX": {
+      "chunks": [
+        "9db9771b4eb93211"
+      ],
+      "n": 20
+    },
+    "FILLP": {
+      "chunks": [
+        "4976eec66573133c"
+      ],
+      "n": 60
+    },
+    "FSTRUCT": {
+      "chunks": [
+        "e8df47800b406fe0"
+      ],
+      "n": 60
+    },
+    "LUIN": {
+      "chunks": [
+        "bbd70c050776da4e"
+      ],
+      "n": 20
+    },
+    "LUOUT": {
+      "chunks": [
+        "cfa780bc307bd7a3"
+      ],
+      "n": 20
+    },
+    "LUSTART": {
+      "chunks": [
+        "60b074e062f6ba69"
+      ],
+      "n": 7
+    },
+    "PDRIFT": {
+      "chunks": [
+        "5abe964062a6ff20"
+      ],
+      "n": 7
+    },
+    "PHDR": {
+      "chunks": [
+        "9b9801714dbcaff3"
+      ],
+      "n": 1
+    },
+    "PLIST": {
+      "chunks": [
+        "82c980bb53d17dc9"
+      ],
+      "n": 1
+    },
+    "STARTBASIS": {
+      "chunks": [
+        "04b4e034b6d93ffe"
+      ],
+      "n": 1
+    },
+    "WORK": {
+      "chunks": [
+        "92de5e49eaa8e723",
+        "5c5b4c3e15c1ad67",
+        "4aa4985c10f912a5"
+      ],
+      "n": 2238
+    },
+    "XB": {
+      "chunks": [
+        "c621a2981b4b03f4"
+      ],
+      "n": 2
+    }
+  }
+}

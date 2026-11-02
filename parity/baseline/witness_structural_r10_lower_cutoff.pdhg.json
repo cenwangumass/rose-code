@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "witness_structural_r10_lower_cutoff.pdhg",
+  "model": "tests/fixtures/witness_structural_r10_lower_cutoff.mps",
+  "ms": 4,
+  "order": {
+    "chunks": [
+      "9b3b41b60e4a1672"
+    ],
+    "n": 7
+  },
+  "records": 7,
+  "result": "9043b943c288ba94",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "ce1db183fae7722e"
+      ],
+      "n": 7
+    }
+  }
+}

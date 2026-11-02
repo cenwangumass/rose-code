@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "fx_sing_dup3_attr.pdhg",
+  "model": "tests/fixtures/fx_sing_dup3_attr.mps",
+  "ms": 2,
+  "order": {
+    "chunks": [
+      "a99e904ff0cffe7a"
+    ],
+    "n": 4
+  },
+  "records": 4,
+  "result": "ee5024bc9f311d2c",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "5128dccf0a982c70"
+      ],
+      "n": 4
+    }
+  }
+}

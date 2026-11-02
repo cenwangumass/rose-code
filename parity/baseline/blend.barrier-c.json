@@ -1,0 +1,58 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "blend.barrier-c",
+  "model": "tests/fixtures/blend.mps",
+  "ms": 18,
+  "order": {
+    "chunks": [
+      "9de9ead08b37fb21"
+    ],
+    "n": 332
+  },
+  "records": 332,
+  "result": "339a1756f02b2d27",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "70991639cb88ef58"
+      ],
+      "n": 12
+    },
+    "BEST": {
+      "chunks": [
+        "7db0d7544d456e44"
+      ],
+      "n": 12
+    },
+    "FOUT": {
+      "chunks": [
+        "5146b81a297b057b"
+      ],
+      "n": 88
+    },
+    "FSN": {
+      "chunks": [
+        "255938dd6df9c56f"
+      ],
+      "n": 88
+    },
+    "RSOLVE": {
+      "chunks": [
+        "145494738ac66076"
+      ],
+      "n": 22
+    },
+    "STG": {
+      "chunks": [
+        "fa1dc5fb5b14f7cb"
+      ],
+      "n": 110
+    }
+  }
+}

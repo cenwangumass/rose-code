@@ -1,0 +1,28 @@
+{
+  "args": [
+    "--method",
+    "pdhg",
+    "--pdhg-iter-limit",
+    "20000"
+  ],
+  "exit": 3,
+  "id": "fx_cleanup_infeasible.pdhg",
+  "model": "tests/fixtures/fx_cleanup_infeasible.mps",
+  "ms": 38,
+  "order": {
+    "chunks": [
+      "3cd0dee991dac614"
+    ],
+    "n": 200
+  },
+  "records": 200,
+  "result": "cd0dad83a5746cc3",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "1450b6d6f2548252"
+      ],
+      "n": 200
+    }
+  }
+}

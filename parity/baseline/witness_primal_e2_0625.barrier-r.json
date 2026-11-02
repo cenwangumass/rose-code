@@ -1,0 +1,64 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "witness_primal_e2_0625.barrier-r",
+  "model": "tests/fixtures/witness_primal_e2_0625.mps",
+  "ms": 15,
+  "order": {
+    "chunks": [
+      "695083421f9db132"
+    ],
+    "n": 524
+  },
+  "records": 524,
+  "result": "8fa8c0654948514d",
+  "tags": {
+    "AD": {
+      "chunks": [
+        "4d008b289ba49232"
+      ],
+      "n": 22
+    },
+    "BARRIER": {
+      "chunks": [
+        "33ad7da8d151aed2"
+      ],
+      "n": 24
+    },
+    "BEST": {
+      "chunks": [
+        "c504e9dd7cc0d439"
+      ],
+      "n": 24
+    },
+    "FOUT": {
+      "chunks": [
+        "159e5fb444d4c9d1"
+      ],
+      "n": 23
+    },
+    "FSN": {
+      "chunks": [
+        "3cc4f775718d80d9"
+      ],
+      "n": 23
+    },
+    "RSOLVE": {
+      "chunks": [
+        "0b9b4ca36fd586ee"
+      ],
+      "n": 68
+    },
+    "STG": {
+      "chunks": [
+        "68ed0656794ef431"
+      ],
+      "n": 340
+    }
+  }
+}

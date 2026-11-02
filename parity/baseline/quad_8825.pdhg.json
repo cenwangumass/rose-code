@@ -1,0 +1,28 @@
+{
+  "args": [
+    "--method",
+    "pdhg",
+    "--pdhg-iter-limit",
+    "20000"
+  ],
+  "exit": 3,
+  "id": "quad_8825.pdhg",
+  "model": "tests/fixtures/quad_8825.mps",
+  "ms": 39,
+  "order": {
+    "chunks": [
+      "3cd0dee991dac614"
+    ],
+    "n": 200
+  },
+  "records": 200,
+  "result": "4a196ec6601e49f1",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "5a2548d1c443aa66"
+      ],
+      "n": 200
+    }
+  }
+}

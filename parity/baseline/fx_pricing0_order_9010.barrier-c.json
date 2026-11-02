@@ -1,0 +1,58 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "fx_pricing0_order_9010.barrier-c",
+  "model": "tests/fixtures/fx_pricing0_order_9010.mps",
+  "ms": 5,
+  "order": {
+    "chunks": [
+      "a27767f9974e1880"
+    ],
+    "n": 146
+  },
+  "records": 146,
+  "result": "3a7a7fc0118967f3",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "b04dc2e95e2cb900"
+      ],
+      "n": 10
+    },
+    "BEST": {
+      "chunks": [
+        "543fda887add202e"
+      ],
+      "n": 10
+    },
+    "FOUT": {
+      "chunks": [
+        "5b2268ce2cf51707"
+      ],
+      "n": 9
+    },
+    "FSN": {
+      "chunks": [
+        "42fb356d3d110fa3"
+      ],
+      "n": 9
+    },
+    "RSOLVE": {
+      "chunks": [
+        "8d980b2732dd88f4"
+      ],
+      "n": 18
+    },
+    "STG": {
+      "chunks": [
+        "9893aa36dddf3e49"
+      ],
+      "n": 90
+    }
+  }
+}

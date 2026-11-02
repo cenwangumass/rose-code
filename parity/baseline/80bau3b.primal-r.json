@@ -1,0 +1,203 @@
+{
+  "args": [
+    "--method",
+    "primal",
+    "--profile",
+    "release",
+    "--max-iterations",
+    "1000"
+  ],
+  "exit": 3,
+  "id": "80bau3b.primal-r",
+  "model": "tests/fixtures/80bau3b.mps",
+  "ms": 7118,
+  "order": {
+    "chunks": [
+      "07bb3c09de75fb49",
+      "dd1dd861f707bcd6",
+      "972542b171cc265a",
+      "8812de397ee8c94d",
+      "5a59c9c8bef8f905",
+      "bc82c8f3251cce55",
+      "b9e71366f82a7a78",
+      "a68027dbff5a83fa",
+      "3a4b3a7281ada55a",
+      "ae16a0c3020cc280",
+      "4d42116ab5701dbf",
+      "8f4d1369a940ad6d",
+      "8b87cbd196ab9a94",
+      "29d215637ad812df",
+      "543c2009dfe26a2d",
+      "8d92d4e4744d3ed8",
+      "1e88de6927691ee4",
+      "10feba2c0afdead9",
+      "5e1967aae8f72588",
+      "fec507db9df98042",
+      "747a97d0974461d0",
+      "0d1078f3a2bb695a",
+      "a582985868eecd10",
+      "9563dd71e1980bd6",
+      "79de0e1152a07078",
+      "08f0ec916c68dced",
+      "d8603a4a309b8211",
+      "213b1124220af780",
+      "da1896cd56efa946",
+      "a96772fb328474a2",
+      "166bbe2fe92d915e",
+      "e2188e71f7f2589a",
+      "214c7d101b2af111",
+      "e0c7ddb33b7b035a",
+      "47cf0779b2fec834"
+    ],
+    "n": 35143
+  },
+  "records": 35143,
+  "result": "baa369b7896942d0",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "060f7b455dd52715"
+      ],
+      "n": 2
+    },
+    "BTY": {
+      "chunks": [
+        "ae88d26ee46afe96"
+      ],
+      "n": 696
+    },
+    "ENT": {
+      "chunks": [
+        "bd06c86d02ed84e1"
+      ],
+      "n": 1000
+    },
+    "ENTOUT": {
+      "chunks": [
+        "2507279ca705a5ea"
+      ],
+      "n": 1000
+    },
+    "FILLP": {
+      "chunks": [
+        "737820569d6869d0"
+      ],
+      "n": 696
+    },
+    "FSTRUCT": {
+      "chunks": [
+        "8daad96294cf6b02"
+      ],
+      "n": 696
+    },
+    "FTR": {
+      "chunks": [
+        "9f9091a26fb882c6"
+      ],
+      "n": 1000
+    },
+    "LST": {
+      "chunks": [
+        "aff95af71b598f20"
+      ],
+      "n": 1000
+    },
+    "LUIN": {
+      "chunks": [
+        "62d8b7bd69f0a23a"
+      ],
+      "n": 3
+    },
+    "LUOUT": {
+      "chunks": [
+        "06e11f05f10040f3"
+      ],
+      "n": 3
+    },
+    "LUSTART": {
+      "chunks": [
+        "be757ad3feb7c7b4"
+      ],
+      "n": 1
+    },
+    "P0": {
+      "chunks": [
+        "8a3e5f3c7537b5ed",
+        "9707cdafb7bb878c"
+      ],
+      "n": 2000
+    },
+    "PHDR": {
+      "chunks": [
+        "1daf4084aaf31f2c"
+      ],
+      "n": 1
+    },
+    "PLIST": {
+      "chunks": [
+        "294403317c22fa18"
+      ],
+      "n": 1000
+    },
+    "SCALE": {
+      "chunks": [
+        "4e04bf5304af1391"
+      ],
+      "n": 1
+    },
+    "STARTBASIS": {
+      "chunks": [
+        "1fa6b74d5f13b187"
+      ],
+      "n": 1
+    },
+    "SWITCH": {
+      "chunks": [
+        "2956d1748bce8d08"
+      ],
+      "n": 3
+    },
+    "USTG": {
+      "chunks": [
+        "50e00fa5919a18e0"
+      ],
+      "n": 1000
+    },
+    "WORK": {
+      "chunks": [
+        "50d8af49cb871e90",
+        "80aee910978bc40c",
+        "5d467df6fc38e33c",
+        "8ec0ea92274ceae5",
+        "b67e1eb99f79f0b3",
+        "783895ec24e91290",
+        "ea213351a70f3e0b",
+        "2b2657f9dc7b2f40",
+        "1c098169a72204f9",
+        "806008f15e9ea6cb",
+        "1621b948ec4922c1",
+        "46233b57425df614",
+        "2ed8455a0353514d",
+        "b38ed32b80642639",
+        "5e3040aef1cc3ab8",
+        "55a9edf7984cb408",
+        "ee0b8669f3a02fb8",
+        "3cce20ce02aa1c5b",
+        "948604d73e88d587",
+        "0347632a954e92c6",
+        "f3e0bd9cf61e9a30",
+        "bab7ede19eb44c5f",
+        "e5060b501f45ac6b",
+        "082da1d9d47fe7ad",
+        "fd8dcb27d762fb48"
+      ],
+      "n": 25038
+    },
+    "XB": {
+      "chunks": [
+        "f0a0f0dcb431ce66"
+      ],
+      "n": 2
+    }
+  }
+}

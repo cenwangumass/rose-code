@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "pdhg_e22.pdhg",
+  "model": "tests/fixtures/pdhg_e22.mps",
+  "ms": 4,
+  "order": {
+    "chunks": [
+      "2ad4b8ff40a87dee"
+    ],
+    "n": 3
+  },
+  "records": 3,
+  "result": "db32744a22576f3f",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "2a7d9811878a3620"
+      ],
+      "n": 3
+    }
+  }
+}

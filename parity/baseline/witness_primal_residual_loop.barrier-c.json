@@ -1,0 +1,73 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 3,
+  "id": "witness_primal_residual_loop.barrier-c",
+  "model": "tests/fixtures/witness_primal_residual_loop.mps",
+  "ms": 128,
+  "order": {
+    "chunks": [
+      "cc7db340f5cc937a",
+      "7edebd7bc0bd0b4c",
+      "6e53e84c97a95aba",
+      "c8b3429035ca74e0",
+      "0ba5eb067971e521",
+      "06f3dc03fa6a74ca",
+      "e585273b62bc70d6",
+      "a569ced2af9820c9",
+      "e542ab9849270dd5"
+    ],
+    "n": 8892
+  },
+  "records": 8892,
+  "result": "e7db94c7d0b0b1ed",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "b3d487b89dc9028c"
+      ],
+      "n": 218
+    },
+    "BEST": {
+      "chunks": [
+        "f05d51837480d194"
+      ],
+      "n": 218
+    },
+    "FOUT": {
+      "chunks": [
+        "c1b37a80ebdae621"
+      ],
+      "n": 217
+    },
+    "FSN": {
+      "chunks": [
+        "e1c8dd4de5036f9e"
+      ],
+      "n": 217
+    },
+    "RSOLVE": {
+      "chunks": [
+        "d577715d2f9fa94b",
+        "b368e70265227c65"
+      ],
+      "n": 1337
+    },
+    "STG": {
+      "chunks": [
+        "1ac5c0ea8dff7e28",
+        "5a3ee98c4ed3940f",
+        "5757a1830891b49f",
+        "81fc5c8c1258e696",
+        "05c7da613df3178d",
+        "8dc8930654d7503e",
+        "512b5dd4b399e865"
+      ],
+      "n": 6685
+    }
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 3,
+  "id": "primal_5959.barrier-c",
+  "model": "tests/fixtures/primal_5959.mps",
+  "ms": 65,
+  "order": {
+    "chunks": [
+      "ad55518d870c7821",
+      "ffc4dc4fe256914e",
+      "b0cc3a6d0260fb7f",
+      "c09a985deb2e8529"
+    ],
+    "n": 4042
+  },
+  "records": 4042,
+  "result": "6fd9c527c7d151fd",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "f72c9e9c52171cf7"
+      ],
+      "n": 144
+    },
+    "BEST": {
+      "chunks": [
+        "00c68e2f3a899de6"
+      ],
+      "n": 144
+    },
+    "FOUT": {
+      "chunks": [
+        "a2da5a7f81b7467c"
+      ],
+      "n": 143
+    },
+    "FSN": {
+      "chunks": [
+        "f6d32df0e113e47b"
+      ],
+      "n": 143
+    },
+    "RSOLVE": {
+      "chunks": [
+        "4e52586874c9cc51"
+      ],
+      "n": 578
+    },
+    "STG": {
+      "chunks": [
+        "1806785da310b7a6",
+        "de68674ac4729a17",
+        "77fca5c47169bd86"
+      ],
+      "n": 2890
+    }
+  }
+}

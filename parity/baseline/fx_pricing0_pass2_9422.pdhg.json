@@ -1,0 +1,32 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "fx_pricing0_pass2_9422.pdhg",
+  "model": "tests/fixtures/fx_pricing0_pass2_9422.mps",
+  "ms": 254,
+  "order": {
+    "chunks": [
+      "a771af0cae5be822",
+      "31df4f0333265ea9",
+      "c2d3c6b6f19e1180",
+      "79f9216a64cd9ccd"
+    ],
+    "n": 3868
+  },
+  "records": 3868,
+  "result": "f9373fd1663cbe4b",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "73bb906c10f65b81",
+        "752666ae5bca083a",
+        "87a3c8302bd809b1",
+        "c33519fb64bf3676"
+      ],
+      "n": 3868
+    }
+  }
+}

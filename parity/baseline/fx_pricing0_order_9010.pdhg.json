@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "fx_pricing0_order_9010.pdhg",
+  "model": "tests/fixtures/fx_pricing0_order_9010.mps",
+  "ms": 19,
+  "order": {
+    "chunks": [
+      "bf1eacd330b18274"
+    ],
+    "n": 164
+  },
+  "records": 164,
+  "result": "cfdcb50ba0ae8f62",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "fcf3e175b64e0c86"
+      ],
+      "n": 164
+    }
+  }
+}

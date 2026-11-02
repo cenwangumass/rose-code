@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "afiro.pdhg",
+  "model": "tests/fixtures/afiro.mps",
+  "ms": 6,
+  "order": {
+    "chunks": [
+      "84144f8091d6f017"
+    ],
+    "n": 5
+  },
+  "records": 5,
+  "result": "6df5b6410a62e998",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "bfdd9e4357a66807"
+      ],
+      "n": 5
+    }
+  }
+}

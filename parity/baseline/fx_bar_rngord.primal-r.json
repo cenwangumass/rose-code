@@ -1,0 +1,154 @@
+{
+  "args": [
+    "--method",
+    "primal",
+    "--profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "fx_bar_rngord.primal-r",
+  "model": "tests/fixtures/fx_bar_rngord.mps",
+  "ms": 5,
+  "order": {
+    "chunks": [
+      "e5f62925227f3f93"
+    ],
+    "n": 128
+  },
+  "records": 128,
+  "result": "3e727896ec7e94bb",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "fbf08325bfe60a6b"
+      ],
+      "n": 3
+    },
+    "BTY": {
+      "chunks": [
+        "82996ef210f7c276"
+      ],
+      "n": 6
+    },
+    "DTOL": {
+      "chunks": [
+        "395fde19fa3cf893"
+      ],
+      "n": 2
+    },
+    "ENT": {
+      "chunks": [
+        "6b58758a745d55b6"
+      ],
+      "n": 2
+    },
+    "ENT2": {
+      "chunks": [
+        "5285a280b2b1af57"
+      ],
+      "n": 1
+    },
+    "ENTOUT": {
+      "chunks": [
+        "9a599498dc624ad7"
+      ],
+      "n": 3
+    },
+    "FILLP": {
+      "chunks": [
+        "e0cc1f0643d1f710"
+      ],
+      "n": 3
+    },
+    "FSTRUCT": {
+      "chunks": [
+        "1caa08f9cfa2dd88"
+      ],
+      "n": 3
+    },
+    "FTR": {
+      "chunks": [
+        "0f87720bb14a0375"
+      ],
+      "n": 3
+    },
+    "LST": {
+      "chunks": [
+        "751426a054b2389d"
+      ],
+      "n": 3
+    },
+    "LUIN": {
+      "chunks": [
+        "eb5fd5775dd09c96"
+      ],
+      "n": 1
+    },
+    "LUOUT": {
+      "chunks": [
+        "7372f5c729591039"
+      ],
+      "n": 1
+    },
+    "LUSTART": {
+      "chunks": [
+        "520d4c37198a399a"
+      ],
+      "n": 1
+    },
+    "P0": {
+      "chunks": [
+        "36cfe3f46044e1fa"
+      ],
+      "n": 10
+    },
+    "PHDR": {
+      "chunks": [
+        "5886e1f392c2432d"
+      ],
+      "n": 1
+    },
+    "PLIST": {
+      "chunks": [
+        "b00ac0c439ec98e0"
+      ],
+      "n": 4
+    },
+    "SCALE": {
+      "chunks": [
+        "6b1eb341fbf09bf0"
+      ],
+      "n": 1
+    },
+    "STARTBASIS": {
+      "chunks": [
+        "95910a980c3c5321"
+      ],
+      "n": 1
+    },
+    "SWITCH": {
+      "chunks": [
+        "5fa1efde22c16c94"
+      ],
+      "n": 1
+    },
+    "USTG": {
+      "chunks": [
+        "f34f3207f8bbc976"
+      ],
+      "n": 3
+    },
+    "WORK": {
+      "chunks": [
+        "f2a87d34e5e2e241"
+      ],
+      "n": 72
+    },
+    "XB": {
+      "chunks": [
+        "7e78fc0c32f30174"
+      ],
+      "n": 3
+    }
+  }
+}

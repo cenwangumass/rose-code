@@ -1,0 +1,136 @@
+{
+  "args": [
+    "--method",
+    "dual",
+    "--profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "fx_cleanup_six.dual-c",
+  "model": "tests/fixtures/fx_cleanup_six.mps",
+  "ms": 6,
+  "order": {
+    "chunks": [
+      "0ac04f01f86dc61e"
+    ],
+    "n": 541
+  },
+  "records": 541,
+  "result": "a584841861c00c06",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "e2c505ee219d7afd"
+      ],
+      "n": 6
+    },
+    "BTY": {
+      "chunks": [
+        "d94765fdc6ec69db"
+      ],
+      "n": 5
+    },
+    "CALLBACK": {
+      "chunks": [
+        "21200c43a48e8c19"
+      ],
+      "n": 6
+    },
+    "DACC": {
+      "chunks": [
+        "900a3cfa48508cd2"
+      ],
+      "n": 4
+    },
+    "DCR": {
+      "chunks": [
+        "2f7bee5e4edf36a1"
+      ],
+      "n": 2
+    },
+    "DSX": {
+      "chunks": [
+        "4135ed35fc364463"
+      ],
+      "n": 19
+    },
+    "DTAU": {
+      "chunks": [
+        "1002a7c5040ad223"
+      ],
+      "n": 16
+    },
+    "DTOL": {
+      "chunks": [
+        "f3fb3d882d1bf400"
+      ],
+      "n": 3
+    },
+    "FACCTX": {
+      "chunks": [
+        "d53bf85136cb2f46"
+      ],
+      "n": 3
+    },
+    "FILLP": {
+      "chunks": [
+        "b381ca8530428fc7"
+      ],
+      "n": 14
+    },
+    "FSTRUCT": {
+      "chunks": [
+        "21db6b78971fdd59"
+      ],
+      "n": 14
+    },
+    "LUIN": {
+      "chunks": [
+        "7d49c91391c0ccd3"
+      ],
+      "n": 3
+    },
+    "LUOUT": {
+      "chunks": [
+        "d631bf1b954b2018"
+      ],
+      "n": 3
+    },
+    "LUSTART": {
+      "chunks": [
+        "be6bd78291f03510"
+      ],
+      "n": 2
+    },
+    "PHDR": {
+      "chunks": [
+        "2fec8387efb0768e"
+      ],
+      "n": 1
+    },
+    "PLIST": {
+      "chunks": [
+        "d0137ce269f620bd"
+      ],
+      "n": 1
+    },
+    "STARTBASIS": {
+      "chunks": [
+        "86fc59437b9aeb0a"
+      ],
+      "n": 1
+    },
+    "WORK": {
+      "chunks": [
+        "73f0ed33b672581a"
+      ],
+      "n": 436
+    },
+    "XB": {
+      "chunks": [
+        "8d89812a38143511"
+      ],
+      "n": 2
+    }
+  }
+}

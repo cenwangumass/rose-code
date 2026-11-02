@@ -1,0 +1,112 @@
+{
+  "args": [
+    "--method",
+    "dual",
+    "--profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "fx_sing_slack_dup.dual-r",
+  "model": "tests/fixtures/fx_sing_slack_dup.mps",
+  "ms": 4,
+  "order": {
+    "chunks": [
+      "d92d070d46d70992"
+    ],
+    "n": 70
+  },
+  "records": 70,
+  "result": "d1d07f0131d31259",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "b22c9feba3f413b7"
+      ],
+      "n": 2
+    },
+    "BTY": {
+      "chunks": [
+        "c7521b573a7cffd7"
+      ],
+      "n": 3
+    },
+    "CALLBACK": {
+      "chunks": [
+        "7eebf5cf60b1e3ba"
+      ],
+      "n": 2
+    },
+    "DACC": {
+      "chunks": [
+        "c96007cc77b7741f"
+      ],
+      "n": 2
+    },
+    "DCR": {
+      "chunks": [
+        "61ad2abca51b121c"
+      ],
+      "n": 2
+    },
+    "DSX": {
+      "chunks": [
+        "a40dccca554e5c16"
+      ],
+      "n": 2
+    },
+    "DTAU": {
+      "chunks": [
+        "fe22f18aa062f952"
+      ],
+      "n": 2
+    },
+    "FACCTX": {
+      "chunks": [
+        "46fe2f887787076f"
+      ],
+      "n": 1
+    },
+    "FILLP": {
+      "chunks": [
+        "e9da5f54bf45c517"
+      ],
+      "n": 1
+    },
+    "FSTRUCT": {
+      "chunks": [
+        "3a188808cd57d37c"
+      ],
+      "n": 1
+    },
+    "LUIN": {
+      "chunks": [
+        "69b920e30102af2a"
+      ],
+      "n": 1
+    },
+    "LUOUT": {
+      "chunks": [
+        "055fa42ddf3faf8d"
+      ],
+      "n": 1
+    },
+    "LUSTART": {
+      "chunks": [
+        "aba5aa4fe3b89ed3"
+      ],
+      "n": 1
+    },
+    "SCALE": {
+      "chunks": [
+        "d1fcb2bf297aaf38"
+      ],
+      "n": 1
+    },
+    "WORK": {
+      "chunks": [
+        "bc3399ad6208b5ef"
+      ],
+      "n": 48
+    }
+  }
+}

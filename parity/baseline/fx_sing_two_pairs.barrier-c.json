@@ -1,0 +1,58 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "fx_sing_two_pairs.barrier-c",
+  "model": "tests/fixtures/fx_sing_two_pairs.mps",
+  "ms": 3,
+  "order": {
+    "chunks": [
+      "22cc57a659ee3f03"
+    ],
+    "n": 92
+  },
+  "records": 92,
+  "result": "555620860048f6d1",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "34c2a5c2850208f7"
+      ],
+      "n": 6
+    },
+    "BEST": {
+      "chunks": [
+        "898859526600b08c"
+      ],
+      "n": 6
+    },
+    "FOUT": {
+      "chunks": [
+        "27c7785ae27e4fb6"
+      ],
+      "n": 10
+    },
+    "FSN": {
+      "chunks": [
+        "967beee238de30fe"
+      ],
+      "n": 10
+    },
+    "RSOLVE": {
+      "chunks": [
+        "e93ba5a4991d63b5"
+      ],
+      "n": 10
+    },
+    "STG": {
+      "chunks": [
+        "7956680087889ab6"
+      ],
+      "n": 50
+    }
+  }
+}

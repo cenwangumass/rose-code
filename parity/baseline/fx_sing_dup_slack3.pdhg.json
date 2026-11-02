@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "fx_sing_dup_slack3.pdhg",
+  "model": "tests/fixtures/fx_sing_dup_slack3.mps",
+  "ms": 3,
+  "order": {
+    "chunks": [
+      "19289f8a7c30ddcf"
+    ],
+    "n": 2
+  },
+  "records": 2,
+  "result": "b935fb430bd74e55",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "d911d0a3e50c1c91"
+      ],
+      "n": 2
+    }
+  }
+}

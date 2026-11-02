@@ -1,0 +1,58 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "witness_dual_r4_free_shift.barrier-c",
+  "model": "tests/fixtures/witness_dual_r4_free_shift.mps",
+  "ms": 5,
+  "order": {
+    "chunks": [
+      "fe8a5b6baf080764"
+    ],
+    "n": 100
+  },
+  "records": 100,
+  "result": "51aef6666334788d",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "facc87e291bbaec5"
+      ],
+      "n": 6
+    },
+    "BEST": {
+      "chunks": [
+        "7ba24687fbe0832a"
+      ],
+      "n": 6
+    },
+    "FOUT": {
+      "chunks": [
+        "71ec5ebe913863cc"
+      ],
+      "n": 5
+    },
+    "FSN": {
+      "chunks": [
+        "0ff97777f7962d75"
+      ],
+      "n": 5
+    },
+    "RSOLVE": {
+      "chunks": [
+        "7eef2989b0384d1a"
+      ],
+      "n": 13
+    },
+    "STG": {
+      "chunks": [
+        "fdb17125735c26cf"
+      ],
+      "n": 65
+    }
+  }
+}

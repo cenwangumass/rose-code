@@ -1,0 +1,58 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "fx_sing_dense4n.barrier-c",
+  "model": "tests/fixtures/fx_sing_dense4n.mps",
+  "ms": 3,
+  "order": {
+    "chunks": [
+      "a1a5176eadd3aa9e"
+    ],
+    "n": 82
+  },
+  "records": 82,
+  "result": "d782ff721e688ef0",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "ab96be460dd91f84"
+      ],
+      "n": 6
+    },
+    "BEST": {
+      "chunks": [
+        "79c01bd2245040de"
+      ],
+      "n": 6
+    },
+    "FOUT": {
+      "chunks": [
+        "d7e7a67bc32e44e8"
+      ],
+      "n": 5
+    },
+    "FSN": {
+      "chunks": [
+        "8775f209c07c401d"
+      ],
+      "n": 5
+    },
+    "RSOLVE": {
+      "chunks": [
+        "acf92638da808afd"
+      ],
+      "n": 10
+    },
+    "STG": {
+      "chunks": [
+        "5821a906862fce7c"
+      ],
+      "n": 50
+    }
+  }
+}

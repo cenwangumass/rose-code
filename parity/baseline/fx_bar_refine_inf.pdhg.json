@@ -1,0 +1,28 @@
+{
+  "args": [
+    "--method",
+    "pdhg",
+    "--pdhg-iter-limit",
+    "20000"
+  ],
+  "exit": 3,
+  "id": "fx_bar_refine_inf.pdhg",
+  "model": "tests/fixtures/fx_bar_refine_inf.mps",
+  "ms": 39,
+  "order": {
+    "chunks": [
+      "3cd0dee991dac614"
+    ],
+    "n": 200
+  },
+  "records": 200,
+  "result": "872a4183e15dc276",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "19dc41b807ba2702"
+      ],
+      "n": 200
+    }
+  }
+}

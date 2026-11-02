@@ -1,0 +1,59 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 3,
+  "id": "quad_4250.barrier-c",
+  "model": "tests/fixtures/quad_4250.mps",
+  "ms": 30,
+  "order": {
+    "chunks": [
+      "d40d6240882811ba",
+      "318be21acdb97041"
+    ],
+    "n": 1170
+  },
+  "records": 1170,
+  "result": "b1305b0b5dc9d0b9",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "50c43e1c9987ce2b"
+      ],
+      "n": 62
+    },
+    "BEST": {
+      "chunks": [
+        "4607de83c348fef1"
+      ],
+      "n": 62
+    },
+    "FOUT": {
+      "chunks": [
+        "8c79ec3570bd97af"
+      ],
+      "n": 61
+    },
+    "FSN": {
+      "chunks": [
+        "577a0e63d34d3642"
+      ],
+      "n": 61
+    },
+    "RSOLVE": {
+      "chunks": [
+        "af4e4003afbe5b98"
+      ],
+      "n": 154
+    },
+    "STG": {
+      "chunks": [
+        "65d2cd8953df84a3"
+      ],
+      "n": 770
+    }
+  }
+}

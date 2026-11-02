@@ -1,0 +1,66 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "bore3d.barrier-r",
+  "model": "tests/fixtures/bore3d.mps",
+  "ms": 101,
+  "order": {
+    "chunks": [
+      "25862db14e4de1ef",
+      "b405958f04e1cfb9",
+      "445308ba02827060"
+    ],
+    "n": 2114
+  },
+  "records": 2114,
+  "result": "574c619291dac7a4",
+  "tags": {
+    "AD": {
+      "chunks": [
+        "0463bbf7e16ee904"
+      ],
+      "n": 16
+    },
+    "BARRIER": {
+      "chunks": [
+        "2525366f6d1728e5"
+      ],
+      "n": 18
+    },
+    "BEST": {
+      "chunks": [
+        "8effa794609d3974"
+      ],
+      "n": 18
+    },
+    "FOUT": {
+      "chunks": [
+        "831dbc31a2a74e77"
+      ],
+      "n": 884
+    },
+    "FSN": {
+      "chunks": [
+        "44d0805203972cec"
+      ],
+      "n": 884
+    },
+    "RSOLVE": {
+      "chunks": [
+        "ad75fbb3ea5e756a"
+      ],
+      "n": 49
+    },
+    "STG": {
+      "chunks": [
+        "9a9dc6383609ef13"
+      ],
+      "n": 245
+    }
+  }
+}

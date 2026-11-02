@@ -1,0 +1,88 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "pilot4.barrier-r",
+  "model": "tests/fixtures/pilot4.mps",
+  "ms": 1273,
+  "order": {
+    "chunks": [
+      "1bff21de2acf2b18",
+      "9d2cd3e77fd57966",
+      "13fb8aca36ba9f0c",
+      "2e0f6483579c827a",
+      "cf0bc74ec2147d71",
+      "576b13991647f128",
+      "9ec881e74718b207",
+      "d11759bf30c5f203",
+      "cef299fb50e15f89",
+      "579adb9be3528c9b",
+      "ebd4157d60519a80",
+      "3b119053af4afa8f",
+      "1a001294f57ba424",
+      "50ae37f73384b13f"
+    ],
+    "n": 13611
+  },
+  "records": 13611,
+  "result": "3b169f78d41d6e75",
+  "tags": {
+    "AD": {
+      "chunks": [
+        "ffddbe46221957ba"
+      ],
+      "n": 85
+    },
+    "BARRIER": {
+      "chunks": [
+        "77c096ab498384d1"
+      ],
+      "n": 87
+    },
+    "BEST": {
+      "chunks": [
+        "13c92a3cc2bd7ee6"
+      ],
+      "n": 87
+    },
+    "FOUT": {
+      "chunks": [
+        "52e4be90e9a4ef23",
+        "633e454f64e85c08",
+        "c5500546f9e1f49e",
+        "ccc97775838c7742",
+        "4b55fe21addab75b",
+        "ad77ef37a9e0b7f1"
+      ],
+      "n": 5848
+    },
+    "FSN": {
+      "chunks": [
+        "4fb76e5340a72e38",
+        "a19687a006a9d8e7",
+        "523f0d5d2d9d6eb9",
+        "71ab28850ca1346a",
+        "f3ca8480a2ab2d96",
+        "74c8717edb58442b"
+      ],
+      "n": 5848
+    },
+    "RSOLVE": {
+      "chunks": [
+        "45785b7594589d07"
+      ],
+      "n": 276
+    },
+    "STG": {
+      "chunks": [
+        "4c2c678211470a65",
+        "00c686527975088e"
+      ],
+      "n": 1380
+    }
+  }
+}

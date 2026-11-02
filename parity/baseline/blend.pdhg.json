@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "blend.pdhg",
+  "model": "tests/fixtures/blend.mps",
+  "ms": 17,
+  "order": {
+    "chunks": [
+      "83b4ceb2bf41a193"
+    ],
+    "n": 16
+  },
+  "records": 16,
+  "result": "45b45ea16e57e1bb",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "8c13cfdd984045a5"
+      ],
+      "n": 16
+    }
+  }
+}

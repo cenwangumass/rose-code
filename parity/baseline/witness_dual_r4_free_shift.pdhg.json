@@ -1,0 +1,28 @@
+{
+  "args": [
+    "--method",
+    "pdhg",
+    "--pdhg-iter-limit",
+    "20000"
+  ],
+  "exit": 3,
+  "id": "witness_dual_r4_free_shift.pdhg",
+  "model": "tests/fixtures/witness_dual_r4_free_shift.mps",
+  "ms": 10,
+  "order": {
+    "chunks": [
+      "3cd0dee991dac614"
+    ],
+    "n": 200
+  },
+  "records": 200,
+  "result": "11b76b717be5e4f0",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "50ea55cecee5e2cb"
+      ],
+      "n": 200
+    }
+  }
+}

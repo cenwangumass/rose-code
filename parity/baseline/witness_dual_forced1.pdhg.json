@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "witness_dual_forced1.pdhg",
+  "model": "tests/fixtures/witness_dual_forced1.mps",
+  "ms": 5,
+  "order": {
+    "chunks": [
+      "19289f8a7c30ddcf"
+    ],
+    "n": 2
+  },
+  "records": 2,
+  "result": "5b9af3dcb9601b3f",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "48c7ecde72f9f25e"
+      ],
+      "n": 2
+    }
+  }
+}

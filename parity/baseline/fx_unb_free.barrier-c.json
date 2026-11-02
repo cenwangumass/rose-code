@@ -1,0 +1,58 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 3,
+  "id": "fx_unb_free.barrier-c",
+  "model": "tests/fixtures/fx_unb_free.mps",
+  "ms": 4,
+  "order": {
+    "chunks": [
+      "e27d4eee83e5e11d"
+    ],
+    "n": 482
+  },
+  "records": 482,
+  "result": "99351ba06087d8c4",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "78fd813fcfc07909"
+      ],
+      "n": 19
+    },
+    "BEST": {
+      "chunks": [
+        "d215e3653e9a0848"
+      ],
+      "n": 19
+    },
+    "FOUT": {
+      "chunks": [
+        "a2f34f539c5e149e"
+      ],
+      "n": 18
+    },
+    "FSN": {
+      "chunks": [
+        "3b547f6bdf86d426"
+      ],
+      "n": 18
+    },
+    "RSOLVE": {
+      "chunks": [
+        "ba40ad2878d6cd33"
+      ],
+      "n": 68
+    },
+    "STG": {
+      "chunks": [
+        "2d84efb5a6f32487"
+      ],
+      "n": 340
+    }
+  }
+}

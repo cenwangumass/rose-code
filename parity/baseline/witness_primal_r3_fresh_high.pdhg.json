@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "witness_primal_r3_fresh_high.pdhg",
+  "model": "tests/fixtures/witness_primal_r3_fresh_high.mps",
+  "ms": 7,
+  "order": {
+    "chunks": [
+      "a99e904ff0cffe7a"
+    ],
+    "n": 4
+  },
+  "records": 4,
+  "result": "75b34a20625e8865",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "706cb65637ff930e"
+      ],
+      "n": 4
+    }
+  }
+}

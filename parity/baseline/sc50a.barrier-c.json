@@ -1,0 +1,58 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "sc50a.barrier-c",
+  "model": "tests/fixtures/sc50a.mps",
+  "ms": 18,
+  "order": {
+    "chunks": [
+      "2e83e797709a09f2"
+    ],
+    "n": 218
+  },
+  "records": 218,
+  "result": "604ed7b2c077c247",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "a1e8d12443e950cb"
+      ],
+      "n": 10
+    },
+    "BEST": {
+      "chunks": [
+        "c0c4e5245dd6234a"
+      ],
+      "n": 10
+    },
+    "FOUT": {
+      "chunks": [
+        "e4f12640bcdf66a3"
+      ],
+      "n": 45
+    },
+    "FSN": {
+      "chunks": [
+        "9fb55c686e5d28f2"
+      ],
+      "n": 45
+    },
+    "RSOLVE": {
+      "chunks": [
+        "c220022b03abc7d1"
+      ],
+      "n": 18
+    },
+    "STG": {
+      "chunks": [
+        "14f6ffbf9ace2e5a"
+      ],
+      "n": 90
+    }
+  }
+}

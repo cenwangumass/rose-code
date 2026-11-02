@@ -1,0 +1,28 @@
+{
+  "args": [
+    "--method",
+    "pdhg",
+    "--pdhg-iter-limit",
+    "20000"
+  ],
+  "exit": 3,
+  "id": "fx_unbounded_p1.pdhg",
+  "model": "tests/fixtures/fx_unbounded_p1.mps",
+  "ms": 9,
+  "order": {
+    "chunks": [
+      "3cd0dee991dac614"
+    ],
+    "n": 200
+  },
+  "records": 200,
+  "result": "d4b4ca9f83a51a9e",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "1fbf155e25052763"
+      ],
+      "n": 200
+    }
+  }
+}

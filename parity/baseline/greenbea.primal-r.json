@@ -1,0 +1,225 @@
+{
+  "args": [
+    "--method",
+    "primal",
+    "--profile",
+    "release",
+    "--max-iterations",
+    "1000"
+  ],
+  "exit": 3,
+  "id": "greenbea.primal-r",
+  "model": "tests/fixtures/greenbea.mps",
+  "ms": 9323,
+  "order": {
+    "chunks": [
+      "07bb3c09de75fb49",
+      "dd1dd861f707bcd6",
+      "972542b171cc265a",
+      "ab920276b31c7335",
+      "5be33e1172d17a46",
+      "d9d59a92c0fa02c1",
+      "2c5a188452908a34",
+      "94217e586f985b76",
+      "584d636754a30e48",
+      "39ea52d09d42ed5a",
+      "57f3815eed149dbb",
+      "3acde73b885d6b03",
+      "276f2825b573012a",
+      "a1c9e339d00d4079",
+      "ee89c971591ff448",
+      "90de0a25df75d699",
+      "cc6788ba741ab7e2",
+      "8ae0b19eb39fec25",
+      "43c7313abae3f0de",
+      "fec507db9df98042",
+      "e36bddadeb449f73",
+      "ec4e9ff82ca96e9b",
+      "3659c544544134cf",
+      "9885ca02d225fe23",
+      "287385233a2b36a2",
+      "f5b1faab862973f2",
+      "44b86b76ddadd9a8",
+      "292fee52e860abde",
+      "ec5ff9552707d965",
+      "beb731ab12a3a320",
+      "387bb1ac771506a9",
+      "5f904dd9051a2dba",
+      "07df5026855dcf55",
+      "5e8a389dedd543e1",
+      "8403b8b0aa465973",
+      "4e77a94516c49a20",
+      "06ac511517c94c95",
+      "9e48ed2f7bf369fc",
+      "08475b2d612b0a8d",
+      "8e8b65a75a19cf8e"
+    ],
+    "n": 40827
+  },
+  "records": 40827,
+  "result": "a67bd990b1446178",
+  "tags": {
+    "BARE": {
+      "chunks": [
+        "92a69246aab45506"
+      ],
+      "n": 17
+    },
+    "BSOLVE": {
+      "chunks": [
+        "910200e5100bdb76"
+      ],
+      "n": 5
+    },
+    "BTY": {
+      "chunks": [
+        "6f76b857fbfa0018"
+      ],
+      "n": 995
+    },
+    "ENT": {
+      "chunks": [
+        "18d8e53d779b6349"
+      ],
+      "n": 1000
+    },
+    "ENTOUT": {
+      "chunks": [
+        "80040ab7b4fcf190"
+      ],
+      "n": 1000
+    },
+    "FILLP": {
+      "chunks": [
+        "b873c34340f0ad83"
+      ],
+      "n": 992
+    },
+    "FSTRUCT": {
+      "chunks": [
+        "cbfa4ed7ba0a65a9"
+      ],
+      "n": 992
+    },
+    "FTR": {
+      "chunks": [
+        "7470d4cfbd80dda5"
+      ],
+      "n": 1000
+    },
+    "LST": {
+      "chunks": [
+        "670a4664f8cdc788"
+      ],
+      "n": 1000
+    },
+    "LUIN": {
+      "chunks": [
+        "a447c53caf2cde6c"
+      ],
+      "n": 4
+    },
+    "LUOUT": {
+      "chunks": [
+        "ce1a5638a755add5"
+      ],
+      "n": 4
+    },
+    "LUSTART": {
+      "chunks": [
+        "9d57fe7a45c5758c"
+      ],
+      "n": 1
+    },
+    "P0": {
+      "chunks": [
+        "e0e7ef47de759156",
+        "22a4b85a049f9e71"
+      ],
+      "n": 2000
+    },
+    "PGATE": {
+      "chunks": [
+        "30fe91f1b8c013ca"
+      ],
+      "n": 4
+    },
+    "PHDR": {
+      "chunks": [
+        "64478a025b23f972"
+      ],
+      "n": 1
+    },
+    "PLIST": {
+      "chunks": [
+        "b0da09fbf848e9c5"
+      ],
+      "n": 1000
+    },
+    "SCALE": {
+      "chunks": [
+        "7ab2af5da23c2ca9"
+      ],
+      "n": 1
+    },
+    "STARTBASIS": {
+      "chunks": [
+        "b376626600daa98b"
+      ],
+      "n": 1
+    },
+    "SWITCH": {
+      "chunks": [
+        "688bf9af21ba0d78"
+      ],
+      "n": 4
+    },
+    "USTG": {
+      "chunks": [
+        "68b219d443ee284d"
+      ],
+      "n": 1000
+    },
+    "WORK": {
+      "chunks": [
+        "b6bab0e5d52b15b0",
+        "7f8d1e6006a7828c",
+        "b4304fdcbcb51309",
+        "a4d338b4a51cc064",
+        "f622d8429a2fbf21",
+        "06e95e822bccd382",
+        "8106b75afdc114db",
+        "3431b72aa8fe87bf",
+        "0bb8a6d5a9c90d08",
+        "0f22a283257a96bd",
+        "e7b61273b2e664d2",
+        "76e77041a493a089",
+        "91b7c8dfd35fb0e2",
+        "3a0c598d6303c4b2",
+        "a0bfb1cf3226b19e",
+        "8322b245d096776e",
+        "6c3730633b680b69",
+        "6b7a4d7e29172097",
+        "b6947609185bb679",
+        "9533c39b2735033e",
+        "5798e36dc2123568",
+        "0bf50060e43eaa3b",
+        "5138861aebe132bd",
+        "a7f8d72c85fa6c64",
+        "8af13859038f9bcb",
+        "91d1cad6559de1df",
+        "9b8ab3c9025efbee",
+        "614507e5d77a0bef",
+        "a4991867c0fe5854",
+        "684bee21e992695c"
+      ],
+      "n": 29801
+    },
+    "XB": {
+      "chunks": [
+        "5ea74cb4a6515d29"
+      ],
+      "n": 5
+    }
+  }
+}

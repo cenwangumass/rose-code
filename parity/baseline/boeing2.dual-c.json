@@ -1,0 +1,148 @@
+{
+  "args": [
+    "--method",
+    "dual",
+    "--profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "boeing2.dual-c",
+  "model": "tests/fixtures/boeing2.mps",
+  "ms": 78,
+  "order": {
+    "chunks": [
+      "ee7381053e35b78a",
+      "9035c1a89d87b0f5",
+      "e21ad2ac7f1e4ceb",
+      "edf9a61b581753b3"
+    ],
+    "n": 3806
+  },
+  "records": 3806,
+  "result": "52ad216cfb36f681",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "7fd2ba47f42f5039"
+      ],
+      "n": 14
+    },
+    "BTY": {
+      "chunks": [
+        "7f7e527255b64eee"
+      ],
+      "n": 10
+    },
+    "CALLBACK": {
+      "chunks": [
+        "3abe8c84cca6159d"
+      ],
+      "n": 6
+    },
+    "DACC": {
+      "chunks": [
+        "b6163a2c3aa1e6bf"
+      ],
+      "n": 9
+    },
+    "DCR": {
+      "chunks": [
+        "a3e020b11b030f77"
+      ],
+      "n": 25
+    },
+    "DSX": {
+      "chunks": [
+        "a9a088f3836724a4"
+      ],
+      "n": 143
+    },
+    "DTAU": {
+      "chunks": [
+        "7050cea86a1c7194"
+      ],
+      "n": 140
+    },
+    "DTOL": {
+      "chunks": [
+        "e3bee63cd8f8eca4"
+      ],
+      "n": 5
+    },
+    "FACCTX": {
+      "chunks": [
+        "251272e6c8b05f24"
+      ],
+      "n": 8
+    },
+    "FILLP": {
+      "chunks": [
+        "22d2984d7f5d61cc"
+      ],
+      "n": 134
+    },
+    "FSTRUCT": {
+      "chunks": [
+        "0d8e57c01e3dfca9"
+      ],
+      "n": 134
+    },
+    "LUIN": {
+      "chunks": [
+        "f45052ba635600b4"
+      ],
+      "n": 8
+    },
+    "LUOUT": {
+      "chunks": [
+        "aec8f0022df44327"
+      ],
+      "n": 8
+    },
+    "LUSTART": {
+      "chunks": [
+        "1cf1833bde566a3f"
+      ],
+      "n": 2
+    },
+    "P68": {
+      "chunks": [
+        "f79d9fbef7bb6430"
+      ],
+      "n": 9
+    },
+    "PHDR": {
+      "chunks": [
+        "686220be1485d442"
+      ],
+      "n": 1
+    },
+    "PLIST": {
+      "chunks": [
+        "218c34131b406187"
+      ],
+      "n": 1
+    },
+    "STARTBASIS": {
+      "chunks": [
+        "f056d233957a4d36"
+      ],
+      "n": 1
+    },
+    "WORK": {
+      "chunks": [
+        "84d0ce09df24a78d",
+        "26d09615ba84d1b9",
+        "a081dd289b378209",
+        "0a3bb80fdc04b74f"
+      ],
+      "n": 3146
+    },
+    "XB": {
+      "chunks": [
+        "33f964eb73994ade"
+      ],
+      "n": 2
+    }
+  }
+}

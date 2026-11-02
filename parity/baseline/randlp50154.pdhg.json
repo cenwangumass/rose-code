@@ -1,0 +1,28 @@
+{
+  "args": [
+    "--method",
+    "pdhg",
+    "--pdhg-iter-limit",
+    "20000"
+  ],
+  "exit": 3,
+  "id": "randlp50154.pdhg",
+  "model": "tests/fixtures/randlp50154.mps",
+  "ms": 47,
+  "order": {
+    "chunks": [
+      "3cd0dee991dac614"
+    ],
+    "n": 200
+  },
+  "records": 200,
+  "result": "54568fd183641e82",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "39c285c22c9c6a92"
+      ],
+      "n": 200
+    }
+  }
+}

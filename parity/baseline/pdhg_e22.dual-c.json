@@ -1,0 +1,106 @@
+{
+  "args": [
+    "--method",
+    "dual",
+    "--profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "pdhg_e22.dual-c",
+  "model": "tests/fixtures/pdhg_e22.mps",
+  "ms": 3,
+  "order": {
+    "chunks": [
+      "cd692d9e994e9d60"
+    ],
+    "n": 86
+  },
+  "records": 86,
+  "result": "d199be5ffc1d7b08",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "8d4a7012d1d1c26e"
+      ],
+      "n": 2
+    },
+    "BTY": {
+      "chunks": [
+        "fbc0b5f9acbc8072"
+      ],
+      "n": 3
+    },
+    "CALLBACK": {
+      "chunks": [
+        "376da1bf6fbe892e"
+      ],
+      "n": 2
+    },
+    "DACC": {
+      "chunks": [
+        "9ea38d0f6143f015"
+      ],
+      "n": 2
+    },
+    "DCR": {
+      "chunks": [
+        "874e275e096fd99f"
+      ],
+      "n": 2
+    },
+    "DSX": {
+      "chunks": [
+        "3ebd77055ddd42e3"
+      ],
+      "n": 3
+    },
+    "DTAU": {
+      "chunks": [
+        "420dceeaede3795b"
+      ],
+      "n": 2
+    },
+    "FACCTX": {
+      "chunks": [
+        "62fb51a09bde2f47"
+      ],
+      "n": 1
+    },
+    "FILLP": {
+      "chunks": [
+        "843552d706ddadb8"
+      ],
+      "n": 1
+    },
+    "FSTRUCT": {
+      "chunks": [
+        "ac9213a8aff2cbf6"
+      ],
+      "n": 1
+    },
+    "LUIN": {
+      "chunks": [
+        "4c7a71eddf55c1ae"
+      ],
+      "n": 1
+    },
+    "LUOUT": {
+      "chunks": [
+        "c4eb5c6ffa866af1"
+      ],
+      "n": 1
+    },
+    "LUSTART": {
+      "chunks": [
+        "74a6d9d70334f8ad"
+      ],
+      "n": 1
+    },
+    "WORK": {
+      "chunks": [
+        "9aa7ff491c0a869f"
+      ],
+      "n": 64
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "release"
+  ],
+  "exit": 3,
+  "id": "witness_dual_r4_free_shift.barrier-r",
+  "model": "tests/fixtures/witness_dual_r4_free_shift.mps",
+  "ms": 6,
+  "order": {
+    "chunks": [
+      "f23d510f8fb126a3"
+    ],
+    "n": 255
+  },
+  "records": 255,
+  "result": "7af1cfbfa5886617",
+  "tags": {
+    "AD": {
+      "chunks": [
+        "817f15120f63792f"
+      ],
+      "n": 9
+    },
+    "BARRIER": {
+      "chunks": [
+        "2c2812c1eca3b487"
+      ],
+      "n": 11
+    },
+    "BEST": {
+      "chunks": [
+        "20a98ad35e5cc33a"
+      ],
+      "n": 11
+    },
+    "FOUT": {
+      "chunks": [
+        "7991a324699c5d22"
+      ],
+      "n": 10
+    },
+    "FSN": {
+      "chunks": [
+        "6371860f5de70561"
+      ],
+      "n": 10
+    },
+    "RSOLVE": {
+      "chunks": [
+        "5b52240128674b45"
+      ],
+      "n": 34
+    },
+    "STG": {
+      "chunks": [
+        "474de0f71c9498e4"
+      ],
+      "n": 170
+    }
+  }
+}

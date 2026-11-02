@@ -1,0 +1,125 @@
+{
+  "args": [
+    "--method",
+    "dual",
+    "--profile",
+    "controlled"
+  ],
+  "exit": 3,
+  "id": "quad_4250.dual-c",
+  "model": "tests/fixtures/quad_4250.mps",
+  "ms": 36,
+  "order": {
+    "chunks": [
+      "e285aceefa5080e8",
+      "cda01e1e92f17417",
+      "1369b6b33f07a7fe",
+      "0ca9c8da32bbe5c0",
+      "fe914ff68d82edb2"
+    ],
+    "n": 4133
+  },
+  "records": 4133,
+  "result": "6e44b1122d5e5b77",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "44c455d162202c1a"
+      ],
+      "n": 37
+    },
+    "BTY": {
+      "chunks": [
+        "757c60a4bb171d68"
+      ],
+      "n": 38
+    },
+    "CALLBACK": {
+      "chunks": [
+        "7a432b149f3facbc"
+      ],
+      "n": 14
+    },
+    "DACC": {
+      "chunks": [
+        "bbf383516aebe33d"
+      ],
+      "n": 37
+    },
+    "DCR": {
+      "chunks": [
+        "aa9729a32e7db7c3"
+      ],
+      "n": 10
+    },
+    "DSX": {
+      "chunks": [
+        "8bbf3bcfc01e51db"
+      ],
+      "n": 149
+    },
+    "DTAU": {
+      "chunks": [
+        "2b1c998e6da6b28d"
+      ],
+      "n": 122
+    },
+    "DTOL": {
+      "chunks": [
+        "f395c59a2d698342"
+      ],
+      "n": 11
+    },
+    "FACCTX": {
+      "chunks": [
+        "d551b0eac726d99f"
+      ],
+      "n": 30
+    },
+    "FILLP": {
+      "chunks": [
+        "cd1e416354ea8804"
+      ],
+      "n": 96
+    },
+    "FSTRUCT": {
+      "chunks": [
+        "865bc65dc0c0314e"
+      ],
+      "n": 96
+    },
+    "LUIN": {
+      "chunks": [
+        "4d23bae988d9b195"
+      ],
+      "n": 31
+    },
+    "LUOUT": {
+      "chunks": [
+        "1ad813a037b1cba7"
+      ],
+      "n": 31
+    },
+    "LUSTART": {
+      "chunks": [
+        "325bd87417322a91"
+      ],
+      "n": 7
+    },
+    "PDRIFT": {
+      "chunks": [
+        "a71ad9fae97258e1"
+      ],
+      "n": 11
+    },
+    "WORK": {
+      "chunks": [
+        "26a06670b68d14c0",
+        "2552206852e2621b",
+        "4f75414f55d0ffac",
+        "3d65f6e69ca680ac"
+      ],
+      "n": 3413
+    }
+  }
+}

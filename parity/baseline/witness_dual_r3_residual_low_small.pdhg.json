@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "witness_dual_r3_residual_low_small.pdhg",
+  "model": "tests/fixtures/witness_dual_r3_residual_low_small.mps",
+  "ms": 3,
+  "order": {
+    "chunks": [
+      "a99e904ff0cffe7a"
+    ],
+    "n": 4
+  },
+  "records": 4,
+  "result": "ccb274b1cc7f4d09",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "063c0ab8642fef93"
+      ],
+      "n": 4
+    }
+  }
+}

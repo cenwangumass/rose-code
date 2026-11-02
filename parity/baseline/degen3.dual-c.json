@@ -1,0 +1,251 @@
+{
+  "args": [
+    "--method",
+    "dual",
+    "--profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "degen3.dual-c",
+  "model": "tests/fixtures/degen3.mps",
+  "ms": 8241,
+  "order": {
+    "chunks": [
+      "75795b5dc6b60803",
+      "414f7614c341c279",
+      "b53b99f8ba06a40d",
+      "f32ee8f8bebd8272",
+      "fa11f3fd4e13cc4f",
+      "e13e49e3c722f60f",
+      "ab07f8887556d500",
+      "8b6512241f85b509",
+      "fdc12d297fbb6f25",
+      "655c64d7934e8792",
+      "45725ec6629783b3",
+      "23b811d29f841387",
+      "d629bf0bd4dde7f3",
+      "3c9f2e9ed5e4f527",
+      "9b8e8d640053e904",
+      "95e2e62270c1fef0",
+      "1451ab5bb351ba50",
+      "73f26ac00e986489",
+      "cce0d4211b06fd0d",
+      "ac190e088a9694e1",
+      "b28f9e22bb43675d",
+      "4dfe5289ffd5d89d",
+      "e63cff59f8c76b00",
+      "28916241d1710390",
+      "22e1813ad09af2b4",
+      "ceed6830ac654e3b",
+      "55b46ab8fb974a86",
+      "fc462cc3482a6d88",
+      "14da47fe7cb0af70",
+      "eee906cd5db98bff",
+      "b1f2b7e7e043ad08",
+      "8178593a0aea9723",
+      "3bbc2df71865cef4",
+      "b67b9d9cd687dc59",
+      "3d668cabd0f86f60",
+      "b87bac7e4a094107",
+      "c94e62db82efaad1",
+      "ec0f7d62b9fc828a",
+      "2b93f06f817de4fd",
+      "b81af6f3cce73f83",
+      "2d06daf763b12219",
+      "1162a9b87b4c9beb",
+      "68a526fdd6c1ff44",
+      "ec463448635b19ee",
+      "03048ea7e3ed04c8",
+      "b9620d7f6dcb280e",
+      "573cb1bc2ab61375",
+      "330ae5e77600e3cd",
+      "220b42039b41b3a1",
+      "8e5c24f7e4552eab",
+      "3f0eb009949e2fcc",
+      "b0d8e58c29082826",
+      "71532273c9d55dd6",
+      "99f19dff18efb7b0",
+      "7b0ae4a5a1dc17c4",
+      "27b3b54d10f87417",
+      "dcd36ffdb7ef9e50",
+      "8cd4573d9f17722c",
+      "137774e16e6d8410",
+      "fd0cc5170038d0a8",
+      "39fc0a0744e1e45a",
+      "47b9150cc120da04",
+      "3f96118c1a6686a0",
+      "09754bc8b2900c90",
+      "5318a7d21610ffd1"
+    ],
+    "n": 65661
+  },
+  "records": 65661,
+  "result": "4b22a49eb3057897",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "8b0baa6bd70d372b"
+      ],
+      "n": 29
+    },
+    "BTY": {
+      "chunks": [
+        "cabe5ccd91c1fbd4"
+      ],
+      "n": 25
+    },
+    "CALLBACK": {
+      "chunks": [
+        "2a66d819d7c9ba1b"
+      ],
+      "n": 2
+    },
+    "DACC": {
+      "chunks": [
+        "a0083d07d7dbd364"
+      ],
+      "n": 24
+    },
+    "DCR": {
+      "chunks": [
+        "ec03b1be3b215853"
+      ],
+      "n": 81
+    },
+    "DSX": {
+      "chunks": [
+        "843e2a528b055dfb",
+        "321643ef34f0c47a",
+        "bf477058ef4d1d51"
+      ],
+      "n": 2215
+    },
+    "DTAU": {
+      "chunks": [
+        "9dd37df9796c66f5",
+        "8f7b73bae9b7cd61",
+        "4534d2a6d41347d7"
+      ],
+      "n": 2212
+    },
+    "DTOL": {
+      "chunks": [
+        "8833acf9b98ecbd7"
+      ],
+      "n": 6
+    },
+    "FACCTX": {
+      "chunks": [
+        "b43a41edfe4efe09"
+      ],
+      "n": 23
+    },
+    "FILLP": {
+      "chunks": [
+        "68bc2ecee0046d3a",
+        "4ac3b71c8ce77f5b",
+        "d3087a2f5a206488"
+      ],
+      "n": 2191
+    },
+    "FSTRUCT": {
+      "chunks": [
+        "6fa44b694643bc2b",
+        "ec850c9369973bcd",
+        "4a14bcdca77456d6"
+      ],
+      "n": 2191
+    },
+    "LUIN": {
+      "chunks": [
+        "62e4af9b553679e5"
+      ],
+      "n": 23
+    },
+    "LUOUT": {
+      "chunks": [
+        "a9490099827f89c2"
+      ],
+      "n": 23
+    },
+    "LUSTART": {
+      "chunks": [
+        "df130f98f68101d7"
+      ],
+      "n": 1
+    },
+    "P68": {
+      "chunks": [
+        "e2a2f730d695d510"
+      ],
+      "n": 24
+    },
+    "PGATE": {
+      "chunks": [
+        "bb1958fc5a607da9"
+      ],
+      "n": 16
+    },
+    "WORK": {
+      "chunks": [
+        "2bb3fc03fe7702fe",
+        "3b251d22ff17da31",
+        "bb2f4586757d4d4c",
+        "6f76d54e5654ae29",
+        "ae04cbf04a5f3acd",
+        "a223cb5c8308139f",
+        "8fa97591fe0c1f87",
+        "29278c012568e224",
+        "b3b0cb5dd2f40dfd",
+        "4176127f5e8e5183",
+        "01e3cac282beb1af",
+        "98f1d7d74e6bab48",
+        "69b006fce956a4bc",
+        "47ab4fe72234b294",
+        "54445c9a56b54ff3",
+        "56fb125efd8e8279",
+        "c82f82ce61a8c0ff",
+        "243c491ec86ee0e1",
+        "2dfd1c74b55b4a39",
+        "fb086100c5eb732e",
+        "2eacf7597c47023f",
+        "d394186866554d41",
+        "ebb68669de891361",
+        "11e7712932aa2217",
+        "35314de63fd9f7cf",
+        "ef0cf872be836b0c",
+        "fae55da114160526",
+        "d05d9f4cd51dd6d9",
+        "a9f0bebb42305de0",
+        "e61ebfdba888ceba",
+        "c6bac77fcee0a9b0",
+        "1584532b01ad9c97",
+        "3edd043b230ae863",
+        "f53a6968b0a07cd1",
+        "91a9f4264ed0af4e",
+        "ef3fd93383010615",
+        "48cd2e00d91f0cb6",
+        "38e868e6db22c392",
+        "5561aaf006591457",
+        "ee4322198c1b02b2",
+        "5721f2f847875d54",
+        "71978e34c8045078",
+        "af9addf80e83d840",
+        "a79ca2d701f6e3df",
+        "719c186b693748b4",
+        "551df6fbfdc76d27",
+        "254dd1cdae0bacdb",
+        "32cad44d53942d23",
+        "bdd563f42721d161",
+        "771eb9ee18826a0d",
+        "2bc74f05d078901c",
+        "719aaba09220e731",
+        "791b8006f4842ad6",
+        "115b2d7c90f62794",
+        "1a94a2bb5d8471c2",
+        "f9d769458ca9aaa4"
+      ],
+      "n": 56575
+    }
+  }
+}

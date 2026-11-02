@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "fx_tied.pdhg",
+  "model": "tests/fixtures/fx_tied.mps",
+  "ms": 4,
+  "order": {
+    "chunks": [
+      "2a1ce4e47992fc1b"
+    ],
+    "n": 1
+  },
+  "records": 1,
+  "result": "ac4cba9a853c6519",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "c69cc8cec507ba21"
+      ],
+      "n": 1
+    }
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "witness_structural_r10_lower_cutoff.barrier-c",
+  "model": "tests/fixtures/witness_structural_r10_lower_cutoff.mps",
+  "ms": 3,
+  "order": {
+    "chunks": [
+      "ada9359f64074ebc"
+    ],
+    "n": 98
+  },
+  "records": 98,
+  "result": "4a4d80987779a1d2",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "6b3655870c49fec6"
+      ],
+      "n": 7
+    },
+    "BEST": {
+      "chunks": [
+        "1d26add6d6a9df21"
+      ],
+      "n": 7
+    },
+    "FOUT": {
+      "chunks": [
+        "55f9217d3c48d096"
+      ],
+      "n": 6
+    },
+    "FSN": {
+      "chunks": [
+        "60e8793a821079f4"
+      ],
+      "n": 6
+    },
+    "RSOLVE": {
+      "chunks": [
+        "45501be05d41b250"
+      ],
+      "n": 12
+    },
+    "STG": {
+      "chunks": [
+        "c89cc8baf7485301"
+      ],
+      "n": 60
+    }
+  }
+}

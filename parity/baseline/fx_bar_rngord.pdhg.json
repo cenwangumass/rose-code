@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "fx_bar_rngord.pdhg",
+  "model": "tests/fixtures/fx_bar_rngord.mps",
+  "ms": 2,
+  "order": {
+    "chunks": [
+      "12feb76b73abf85f"
+    ],
+    "n": 12
+  },
+  "records": 12,
+  "result": "2134a20855e1b54b",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "a311ad38d480bc90"
+      ],
+      "n": 12
+    }
+  }
+}

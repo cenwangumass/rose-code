@@ -1,0 +1,88 @@
+{
+  "args": [
+    "--method",
+    "primal",
+    "--profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "pdhg_e29.primal-r",
+  "model": "tests/fixtures/pdhg_e29.mps",
+  "ms": 3,
+  "order": {
+    "chunks": [
+      "d2cea7f10fb08d8a"
+    ],
+    "n": 39
+  },
+  "records": 39,
+  "result": "fa3bae5553e95a07",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "5bdb9217027ad541"
+      ],
+      "n": 2
+    },
+    "BTY": {
+      "chunks": [
+        "b40961a619735e4e"
+      ],
+      "n": 2
+    },
+    "DTOL": {
+      "chunks": [
+        "d0d51511323a134f"
+      ],
+      "n": 2
+    },
+    "LUSTART": {
+      "chunks": [
+        "f26caf7f0e3a172d"
+      ],
+      "n": 1
+    },
+    "P0": {
+      "chunks": [
+        "096e4ab080d16783"
+      ],
+      "n": 2
+    },
+    "PHDR": {
+      "chunks": [
+        "794928240332e203"
+      ],
+      "n": 1
+    },
+    "PLIST": {
+      "chunks": [
+        "056f9b6218ccb7c1"
+      ],
+      "n": 1
+    },
+    "SCALE": {
+      "chunks": [
+        "d1fcb2bf297aaf38"
+      ],
+      "n": 1
+    },
+    "STARTBASIS": {
+      "chunks": [
+        "c26f15e50ece2f37"
+      ],
+      "n": 1
+    },
+    "WORK": {
+      "chunks": [
+        "ce1a28d06579f5e8"
+      ],
+      "n": 24
+    },
+    "XB": {
+      "chunks": [
+        "15cf56100cf195c9"
+      ],
+      "n": 2
+    }
+  }
+}

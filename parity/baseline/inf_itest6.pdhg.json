@@ -1,0 +1,28 @@
+{
+  "args": [
+    "--method",
+    "pdhg",
+    "--pdhg-iter-limit",
+    "20000"
+  ],
+  "exit": 3,
+  "id": "inf_itest6.pdhg",
+  "model": "tests/fixtures/inf_itest6.mps",
+  "ms": 17,
+  "order": {
+    "chunks": [
+      "3cd0dee991dac614"
+    ],
+    "n": 200
+  },
+  "records": 200,
+  "result": "79060315db1b0ff8",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "8293ea5c64e3e745"
+      ],
+      "n": 200
+    }
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "degen3.barrier-c",
+  "model": "tests/fixtures/degen3.mps",
+  "ms": 2081,
+  "order": {
+    "chunks": [
+      "31b6321352c22944",
+      "5ecd97f6b2253753",
+      "6b35c252603e83f4",
+      "fd3c40b0e5a5f6a8",
+      "de2e5a11008dcadf",
+      "511d4ee4144b4bec",
+      "b52fc7a96b54c1ce",
+      "235899387342ce79",
+      "e440ee4c60c2bc07",
+      "555dd3f8d2fb0164",
+      "cde3ce971904e122",
+      "49883656f82e6dfc",
+      "30268d23b92d017d",
+      "674d07bc4bea207b",
+      "d2f1562318bf5db4",
+      "45d8f285ffb35794",
+      "ee8f7a05ed971b0d",
+      "2b6b876af9e9b6f7"
+    ],
+    "n": 17442
+  },
+  "records": 17442,
+  "result": "c8bb34705a96c333",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "3dbcc6685cc8daa7"
+      ],
+      "n": 21
+    },
+    "BEST": {
+      "chunks": [
+        "462ff193436ae667"
+      ],
+      "n": 21
+    },
+    "FOUT": {
+      "chunks": [
+        "33303d9524e2d000",
+        "ab1051b94270bc20",
+        "576fb53575a5721c",
+        "3690f0f4ae0b7092",
+        "cbbb16c45d037d01",
+        "e4acfa80c7352e69",
+        "2a49d915f9669585",
+        "968325948ec9f117",
+        "3383de106ebdf8f7"
+      ],
+      "n": 8580
+    },
+    "FSN": {
+      "chunks": [
+        "fbc473e130145c0d",
+        "2ea6a97417a4e074",
+        "e6b493c1d0566081",
+        "98e70dc8d48baa70",
+        "f563a8879cd47792",
+        "9fc3bff78328f8fb",
+        "982d5ddb2677b3b2",
+        "036a813aa9fa607c",
+        "1abb793fad3daf0f"
+      ],
+      "n": 8580
+    },
+    "RSOLVE": {
+      "chunks": [
+        "132dfe07fe594c46"
+      ],
+      "n": 40
+    },
+    "STG": {
+      "chunks": [
+        "b7e78441de3ec492"
+      ],
+      "n": 200
+    }
+  }
+}

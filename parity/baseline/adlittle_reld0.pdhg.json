@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "adlittle_reld0.pdhg",
+  "model": "tests/fixtures/adlittle_reld0.mps",
+  "ms": 49,
+  "order": {
+    "chunks": [
+      "8977bbabc5ae178f"
+    ],
+    "n": 84
+  },
+  "records": 84,
+  "result": "00f8b02340f2977a",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "8e6b6cbc56931714"
+      ],
+      "n": 84
+    }
+  }
+}

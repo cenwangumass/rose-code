@@ -1,0 +1,130 @@
+{
+  "args": [
+    "--method",
+    "dual",
+    "--profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "fx_witness_dual_c6007.dual-r",
+  "model": "tests/fixtures/fx_witness_dual_c6007.mps",
+  "ms": 11,
+  "order": {
+    "chunks": [
+      "5da9b7584414dd32"
+    ],
+    "n": 774
+  },
+  "records": 774,
+  "result": "88b0c566acd4f20a",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "18d2e2cadfe41800"
+      ],
+      "n": 16
+    },
+    "BTY": {
+      "chunks": [
+        "514f6e2904a16caf"
+      ],
+      "n": 17
+    },
+    "CALLBACK": {
+      "chunks": [
+        "2bf07882b07a2a5a"
+      ],
+      "n": 14
+    },
+    "DACC": {
+      "chunks": [
+        "a2659b0730f4e19a"
+      ],
+      "n": 16
+    },
+    "DCR": {
+      "chunks": [
+        "831265610911053b"
+      ],
+      "n": 9
+    },
+    "DSX": {
+      "chunks": [
+        "2811ba5627cb15df"
+      ],
+      "n": 32
+    },
+    "DTAU": {
+      "chunks": [
+        "09056638b3599224"
+      ],
+      "n": 14
+    },
+    "DTOL": {
+      "chunks": [
+        "b1c0beda765955ce"
+      ],
+      "n": 2
+    },
+    "FACCTX": {
+      "chunks": [
+        "bd6d19e361db9bb1"
+      ],
+      "n": 9
+    },
+    "FILLP": {
+      "chunks": [
+        "75d4628929e62b4d"
+      ],
+      "n": 8
+    },
+    "FSTRUCT": {
+      "chunks": [
+        "302c85f9ac49ec85"
+      ],
+      "n": 8
+    },
+    "LUIN": {
+      "chunks": [
+        "a0774e8b3026ce59"
+      ],
+      "n": 9
+    },
+    "LUOUT": {
+      "chunks": [
+        "00c93596c0f10674"
+      ],
+      "n": 9
+    },
+    "LUSTART": {
+      "chunks": [
+        "81952263407d1159"
+      ],
+      "n": 7
+    },
+    "QOBJ": {
+      "chunks": [
+        "dd28b317859fca36"
+      ],
+      "n": 25
+    },
+    "QTAU": {
+      "chunks": [
+        "23cd5ef2bbd128ea"
+      ],
+      "n": 25
+    },
+    "SCALE": {
+      "chunks": [
+        "2d7dfce30f7816bd"
+      ],
+      "n": 1
+    },
+    "WORK": {
+      "chunks": [
+        "9b74a234c109a3ef"
+      ],
+      "n": 553
+    }
+  }
+}

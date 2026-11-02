@@ -1,0 +1,70 @@
+{
+  "args": [
+    "--method",
+    "dual",
+    "--profile",
+    "controlled"
+  ],
+  "exit": 0,
+  "id": "pdhg_e29.dual-c",
+  "model": "tests/fixtures/pdhg_e29.mps",
+  "ms": 2,
+  "order": {
+    "chunks": [
+      "b703969ab463bed1"
+    ],
+    "n": 31
+  },
+  "records": 31,
+  "result": "fa3bae5553e95a07",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "a8cfb65fae6830b3"
+      ],
+      "n": 1
+    },
+    "BTY": {
+      "chunks": [
+        "c514a7a6462966a3"
+      ],
+      "n": 2
+    },
+    "CALLBACK": {
+      "chunks": [
+        "235cdc8aa953d255"
+      ],
+      "n": 2
+    },
+    "DACC": {
+      "chunks": [
+        "838d70bc6fec9810"
+      ],
+      "n": 1
+    },
+    "DCR": {
+      "chunks": [
+        "0137c39ea3dc1312"
+      ],
+      "n": 2
+    },
+    "DSX": {
+      "chunks": [
+        "ee966bcb2bcfb419"
+      ],
+      "n": 1
+    },
+    "LUSTART": {
+      "chunks": [
+        "aba5aa4fe3b89ed3"
+      ],
+      "n": 1
+    },
+    "WORK": {
+      "chunks": [
+        "03ddfd3bd821c0c4"
+      ],
+      "n": 21
+    }
+  }
+}

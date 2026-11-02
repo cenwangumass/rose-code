@@ -1,0 +1,28 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "bore3d.pdhg",
+  "model": "tests/fixtures/bore3d.mps",
+  "ms": 2012,
+  "order": {
+    "chunks": [
+      "a771af0cae5be822",
+      "6dd936ed8454cd32"
+    ],
+    "n": 1471
+  },
+  "records": 1471,
+  "result": "757e8726eb822ff9",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "447d97750fbcdd9b",
+        "3d617cd1e0972997"
+      ],
+      "n": 1471
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "fx_singular.pdhg",
+  "model": "tests/fixtures/fx_singular.mps",
+  "ms": 3,
+  "order": {
+    "chunks": [
+      "a99e904ff0cffe7a"
+    ],
+    "n": 4
+  },
+  "records": 4,
+  "result": "51c9209ce9e7b190",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "cd6a402dee7ca4d5"
+      ],
+      "n": 4
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "fx_sing_dup_n2m3.pdhg",
+  "model": "tests/fixtures/fx_sing_dup_n2m3.mps",
+  "ms": 3,
+  "order": {
+    "chunks": [
+      "a99e904ff0cffe7a"
+    ],
+    "n": 4
+  },
+  "records": 4,
+  "result": "75ee9972d0d1b70b",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "27f4164f025092d3"
+      ],
+      "n": 4
+    }
+  }
+}

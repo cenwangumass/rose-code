@@ -1,0 +1,26 @@
+{
+  "args": [
+    "--method",
+    "pdhg"
+  ],
+  "exit": 0,
+  "id": "degen2.pdhg",
+  "model": "tests/fixtures/degen2.mps",
+  "ms": 166,
+  "order": {
+    "chunks": [
+      "b88a1a4fbbd1b92f"
+    ],
+    "n": 49
+  },
+  "records": 49,
+  "result": "e7a2c254e6dbaa65",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "69e81d5ccce8cedf"
+      ],
+      "n": 49
+    }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "args": [
+    "--method",
+    "barrier",
+    "--barrier-profile",
+    "controlled"
+  ],
+  "exit": 3,
+  "id": "fx_pricing0_pass2_9422.barrier-c",
+  "model": "tests/fixtures/fx_pricing0_pass2_9422.mps",
+  "ms": 79,
+  "order": {
+    "chunks": [
+      "bea05679b3b25e02",
+      "afabfe1dd6d9f5d3",
+      "c1499359a95695ca",
+      "f5a2de9ed67e22f7",
+      "295f7a35dcb0167f"
+    ],
+    "n": 4912
+  },
+  "records": 4912,
+  "result": "d4c0d15d439e35c9",
+  "tags": {
+    "BARRIER": {
+      "chunks": [
+        "d0ace2a7b3434a4c"
+      ],
+      "n": 222
+    },
+    "BEST": {
+      "chunks": [
+        "9a348c29578ddaea"
+      ],
+      "n": 222
+    },
+    "FOUT": {
+      "chunks": [
+        "0f0bfa71d2ff844e"
+      ],
+      "n": 221
+    },
+    "FSN": {
+      "chunks": [
+        "d431a73095969b0c"
+      ],
+      "n": 221
+    },
+    "RSOLVE": {
+      "chunks": [
+        "247694253f451559"
+      ],
+      "n": 671
+    },
+    "STG": {
+      "chunks": [
+        "c21d2c1d4e430c60",
+        "94f2e8d5ab00fe86",
+        "bdf6acff8bab2911",
+        "eae92527e9d5af10"
+      ],
+      "n": 3355
+    }
+  }
+}

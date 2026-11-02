@@ -1,0 +1,130 @@
+{
+  "args": [
+    "--method",
+    "dual",
+    "--profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "bh50000.dual-r",
+  "model": "tests/fixtures/bh50000.mps",
+  "ms": 8,
+  "order": {
+    "chunks": [
+      "51ed7eaac195ec90"
+    ],
+    "n": 551
+  },
+  "records": 551,
+  "result": "ece322a1f0c07a2b",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "80cffeb16966955a"
+      ],
+      "n": 5
+    },
+    "BTY": {
+      "chunks": [
+        "a02b305b088f312f"
+      ],
+      "n": 6
+    },
+    "CALLBACK": {
+      "chunks": [
+        "aeaa967b7ebee1a1"
+      ],
+      "n": 4
+    },
+    "DACC": {
+      "chunks": [
+        "f821842e905922b6"
+      ],
+      "n": 5
+    },
+    "DCR": {
+      "chunks": [
+        "8d4304fec38962f6"
+      ],
+      "n": 3
+    },
+    "DSX": {
+      "chunks": [
+        "16be9647c32fd92c"
+      ],
+      "n": 24
+    },
+    "DTAU": {
+      "chunks": [
+        "effe8103f0b4523a"
+      ],
+      "n": 13
+    },
+    "DTOL": {
+      "chunks": [
+        "15398884b8a163ec"
+      ],
+      "n": 2
+    },
+    "FACCTX": {
+      "chunks": [
+        "b614583a1aa3b3de"
+      ],
+      "n": 3
+    },
+    "FILLP": {
+      "chunks": [
+        "2c1f5caf695460d3"
+      ],
+      "n": 11
+    },
+    "FSTRUCT": {
+      "chunks": [
+        "59938c5ae1fee093"
+      ],
+      "n": 11
+    },
+    "LUIN": {
+      "chunks": [
+        "f2d4289aec507d06"
+      ],
+      "n": 5
+    },
+    "LUOUT": {
+      "chunks": [
+        "d15972b2b69768be"
+      ],
+      "n": 5
+    },
+    "LUSTART": {
+      "chunks": [
+        "2fbbcf9055ea636b"
+      ],
+      "n": 2
+    },
+    "QOBJ": {
+      "chunks": [
+        "c81900072632d751"
+      ],
+      "n": 4
+    },
+    "QTAU": {
+      "chunks": [
+        "f0df3a29f65c051f"
+      ],
+      "n": 2
+    },
+    "SCALE": {
+      "chunks": [
+        "2a9f615a02685739"
+      ],
+      "n": 1
+    },
+    "WORK": {
+      "chunks": [
+        "c545cf2d0f0844e6"
+      ],
+      "n": 445
+    }
+  }
+}

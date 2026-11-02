@@ -1,0 +1,28 @@
+{
+  "args": [
+    "--method",
+    "pdhg",
+    "--pdhg-iter-limit",
+    "20000"
+  ],
+  "exit": 3,
+  "id": "fx_unb_col.pdhg",
+  "model": "tests/fixtures/fx_unb_col.mps",
+  "ms": 8,
+  "order": {
+    "chunks": [
+      "3cd0dee991dac614"
+    ],
+    "n": 200
+  },
+  "records": 200,
+  "result": "15b168ee7d5d0687",
+  "tags": {
+    "PDHG": {
+      "chunks": [
+        "3c3343b53112c4e5"
+      ],
+      "n": 200
+    }
+  }
+}

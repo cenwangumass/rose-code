@@ -1,0 +1,167 @@
+{
+  "args": [
+    "--method",
+    "primal",
+    "--profile",
+    "release"
+  ],
+  "exit": 0,
+  "id": "bore3d.primal-r",
+  "model": "tests/fixtures/bore3d.mps",
+  "ms": 158,
+  "order": {
+    "chunks": [
+      "847945201ecd181e",
+      "88669e8da32fd74f",
+      "724193b8771083b4",
+      "ce3e4f0120df77dc",
+      "9aa67eea5242a00b"
+    ],
+    "n": 4920
+  },
+  "records": 4920,
+  "result": "cbab81643d777c81",
+  "tags": {
+    "BSOLVE": {
+      "chunks": [
+        "1b7b587f46639ee2"
+      ],
+      "n": 9
+    },
+    "BTY": {
+      "chunks": [
+        "ffea7eac29d8585a"
+      ],
+      "n": 114
+    },
+    "DTOL": {
+      "chunks": [
+        "b47aa571acce8336"
+      ],
+      "n": 4
+    },
+    "ENT": {
+      "chunks": [
+        "e0cd0982299f661f"
+      ],
+      "n": 56
+    },
+    "ENT2": {
+      "chunks": [
+        "5a6350def90a0088"
+      ],
+      "n": 45
+    },
+    "ENTOUT": {
+      "chunks": [
+        "5635b3e944c3798f"
+      ],
+      "n": 101
+    },
+    "FILLP": {
+      "chunks": [
+        "bd6616ed2d59269a"
+      ],
+      "n": 101
+    },
+    "FSTRUCT": {
+      "chunks": [
+        "82895623bc31b198"
+      ],
+      "n": 101
+    },
+    "FTR": {
+      "chunks": [
+        "12513913149504e9"
+      ],
+      "n": 101
+    },
+    "LST": {
+      "chunks": [
+        "47272706d890753b"
+      ],
+      "n": 101
+    },
+    "LUIN": {
+      "chunks": [
+        "938faf981846e789"
+      ],
+      "n": 7
+    },
+    "LUOUT": {
+      "chunks": [
+        "fa54e13d3c4d249c"
+      ],
+      "n": 7
+    },
+    "LUSTART": {
+      "chunks": [
+        "85da0870cf144975"
+      ],
+      "n": 1
+    },
+    "P0": {
+      "chunks": [
+        "46235a3679a357cf"
+      ],
+      "n": 224
+    },
+    "PGATE": {
+      "chunks": [
+        "af4bc67f3dd846ab"
+      ],
+      "n": 1
+    },
+    "PHDR": {
+      "chunks": [
+        "7338d51f528ee284"
+      ],
+      "n": 1
+    },
+    "PLIST": {
+      "chunks": [
+        "02c5bda86cdec83d"
+      ],
+      "n": 102
+    },
+    "SCALE": {
+      "chunks": [
+        "a86c3488881a6c09"
+      ],
+      "n": 1
+    },
+    "STARTBASIS": {
+      "chunks": [
+        "00f4662e0c8e15e1"
+      ],
+      "n": 1
+    },
+    "SWITCH": {
+      "chunks": [
+        "7994f9374fbd2cff"
+      ],
+      "n": 7
+    },
+    "USTG": {
+      "chunks": [
+        "b4ae9e5b91978395"
+      ],
+      "n": 101
+    },
+    "WORK": {
+      "chunks": [
+        "ceb7ee87cd255c26",
+        "6c461171737efe9d",
+        "87ea749e06f3a641",
+        "9422d7fdea0746e6"
+      ],
+      "n": 3725
+    },
+    "XB": {
+      "chunks": [
+        "248f70ee159b61a9"
+      ],
+      "n": 9
+    }
+  }
+}
