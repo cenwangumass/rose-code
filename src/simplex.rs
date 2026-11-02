@@ -1322,7 +1322,7 @@ struct Solver<'a> {
     mirror: Option<Mir>,
     /// The same factor in extended precision, kept after a quad pass (`Handoff::quad`): the basic solution is read from it.
     mirror_q: Option<crate::ftran_order::RefStruct<crate::f80::F80>>,
-    /// Two fresh factors for repeated compact bases, keyed by exact ordered input columns and threshold.
+    /// Four fresh factors for repeated compact bases, keyed by exact ordered input columns and threshold.
     quad_cache: Vec<QuadFactorCache>,
     /// Full precision solution at the last fresh x87 basic-solution recomputation.
     x_q: Option<Vec<crate::f80::F80>>,
@@ -1647,8 +1647,8 @@ impl<'a> Solver<'a> {
             .iter()
             .any(|name| std::env::var_os(name).is_some());
         // Below 50 rows there is no dense nucleus and, unless the gate is forced on, no pair pass.
-        // Such a build emits no PGATE record and changes no gate state. Two entries bound retained
-        // storage to compact factors while covering alternating repeated bases.
+        // Such a build emits no PGATE record and changes no gate state. Four entries bound retained
+        // storage to compact factors while covering short cycles of repeated bases.
         let cacheable = self.p.m < 50 && gate0.1 < 2_000_000_000 && !diagnostic;
         let threshold = crate::lu_order::threshold().to_bits();
         if cacheable {
@@ -1684,7 +1684,7 @@ impl<'a> Solver<'a> {
             first.clone()
         };
         if cacheable {
-            if self.quad_cache.len() == 2 {
+            if self.quad_cache.len() == 4 {
                 self.quad_cache.remove(0);
             }
             self.quad_cache.push(QuadFactorCache {
