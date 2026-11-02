@@ -81,6 +81,8 @@ pub struct RefStruct<R: Real = f64> {
     pub tau_fin: std::cell::Cell<usize>,
     /// What the last `ftran` and `ftran_needed` leave for the joint U stages of the two-vector FTRAN (`joint_u`).
     f2: std::cell::RefCell<F2<R>>,
+    /// Scratch terms of the second-vector nucleus row dot; keep capacity across rows and solves.
+    tau_terms: std::cell::RefCell<Vec<(R, R)>>,
     /// Fill of the reference's pool for etas and the row-wise copy of U (`F+0x160`), and the capacity of each row of that copy.
     /// Only the parity of `fill` matters: it decides the alignment of the next eta's value array.
     fill: usize,
@@ -587,6 +589,7 @@ impl<R: Real> RefStruct<R> {
             tau_u: std::cell::Cell::new(0.0),
             tau_fin: std::cell::Cell::new(0),
             f2: std::cell::RefCell::new(F2::default()),
+            tau_terms: Default::default(),
             scratch_peel: ((m as f64).powf(0.7) as usize)
                 .max(20)
                 .wrapping_add(ncols + 1)
@@ -1053,6 +1056,7 @@ impl<R: Real> RefStruct<R> {
             f.x_tau = x.clone();
             f.tau_raw = tau_raw;
         }
+        let mut terms = self.tau_terms.borrow_mut();
         needed
             .iter()
             .map(|&p| {
@@ -1060,12 +1064,10 @@ impl<R: Real> RefStruct<R> {
                     -2 => x[p],
                     -1 => x[p] / self.diag[p],
                     _ => {
-                        let terms: Vec<(R, R)> = self.rowl[p]
-                            .iter()
-                            .filter_map(|&c| {
-                                self.uc[c].iter().find(|e| e.0 == p).map(|e| (e.1, x[c]))
-                            })
-                            .collect();
+                        terms.clear();
+                        terms.extend(self.rowl[p].iter().filter_map(|&c| {
+                            self.uc[c].iter().find(|e| e.0 == p).map(|e| (e.1, x[c]))
+                        }));
                         let dot = if R::QUAD {
                             row_dot_q(x[p], &terms)
                         } else {
