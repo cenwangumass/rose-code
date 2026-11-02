@@ -82,6 +82,8 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 
 ## Tried, no gain
 
+- Combine FTRAN touched/emitted markers into one three-state byte array: frozen f64/F80 random/extreme/captured-input tests and fast parity 940/940 pass. DEGEN3 primal-release solve 0.651511 -> 0.646340 s improves 0.79% beyond 0.004325/0.004931 s spreads, but instructions rise 0.17% (DEGEN2 primal +0.08%), failing the below-3% instruction-reduction acceptance rule. Reverted (`target/perf-ftmarks-target-{before,after}.txt`). FTRAN annotation `target/perf-degen3r-thin-ftran.txt` identifies output marker checks, scatter indexing and divisions as remaining costs.
+
 - Avoid materializing the dense FTRAN tail-index vector: direct slice traversal through a shared solve closure passes frozen f64/F80 random/extreme/captured-input tests and fast parity 940/940, but DEGEN3 primal-release instructions rise 1.29% and solve 0.648145 -> 0.656844 s exceeds both 0.001714/0.002821 s spreads. A single chained iterator passes fast parity but still adds 0.25% instructions and has no timing gain (1.019540 -> 1.024090 s within spread). Both reverted (`target/perf-tailview{,2}-target-{before,after}.txt`).
 
 - Cache primal signature bound flags/widths (analysis idea 8): fast parity 940/940 passes. Interleaved `(kind,width)` cache reduces DEGEN3 primal-release instructions 1.76%, but three alternating CPU-2 pairs give median solve medians 1.005068 -> 1.001979 s within 0.042525/0.061157 s aggregate spreads. Split byte flags/width arrays reduce instructions 2.54%, but confirmation medians 1.003885 -> 1.313467 s show no gain and cross speed bands. Both reverted (`target/perf-sigbounds{,2}-{target,confirm}-{before,after}.txt`).
