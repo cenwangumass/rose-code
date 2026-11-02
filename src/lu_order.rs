@@ -382,14 +382,83 @@ struct Node<R> {
     alive: bool,
 }
 
+/// Circular lists preserve bucket order while allowing constant-time membership updates.
+struct Buckets {
+    heads: Vec<usize>,
+    next: Vec<usize>,
+    prev: Vec<usize>,
+    owner: Vec<usize>,
+}
+
+impl Buckets {
+    fn new(n: usize) -> Self {
+        Self {
+            heads: vec![usize::MAX; n],
+            next: vec![usize::MAX; n],
+            prev: vec![usize::MAX; n],
+            owner: vec![usize::MAX; n],
+        }
+    }
+
+    fn insert(&mut self, k: usize, x: usize) {
+        debug_assert_eq!(self.owner[x], usize::MAX);
+        let h = self.heads[k];
+        if h == usize::MAX {
+            self.next[x] = x;
+            self.prev[x] = x;
+        } else {
+            let tail = self.prev[h];
+            self.next[tail] = x;
+            self.prev[x] = tail;
+            self.next[x] = h;
+            self.prev[h] = x;
+        }
+        self.heads[k] = x;
+        self.owner[x] = k;
+    }
+
+    fn remove(&mut self, k: usize, x: usize) {
+        if self.owner[x] != k {
+            return;
+        }
+        let next = self.next[x];
+        if next == x {
+            self.heads[k] = usize::MAX;
+        } else {
+            self.next[self.prev[x]] = next;
+            self.prev[next] = self.prev[x];
+            if self.heads[k] == x {
+                self.heads[k] = next;
+            }
+        }
+        self.owner[x] = usize::MAX;
+    }
+
+    fn list(&self, k: usize) -> Vec<usize> {
+        let h = self.heads[k];
+        let mut out = Vec::new();
+        if h != usize::MAX {
+            let mut x = h;
+            loop {
+                out.push(x);
+                x = self.next[x];
+                if x == h {
+                    break;
+                }
+            }
+        }
+        out
+    }
+}
+
 struct Nucleus<R> {
     nodes: Vec<Node<R>>,
     colchain: Vec<Vec<usize>>,
     rowchain: Vec<Vec<usize>>,
     ccnt: Vec<usize>,
     rcnt: Vec<usize>,
-    cb: Vec<Vec<usize>>,
-    rb: Vec<Vec<usize>>,
+    cb: Buckets,
+    rb: Buckets,
     /// Upper bounds on occupied count buckets; search tightens them after scanning.
     cmax: usize,
     rmax: usize,
@@ -403,7 +472,7 @@ impl<R: Real> Nucleus<R> {
         if k == 0 {
             self.cst.push(c);
         } else if k > 0 {
-            self.cb[k as usize].insert(0, c);
+            self.cb.insert(k as usize, c);
             self.cmax = self.cmax.max(k as usize);
         }
     }
@@ -413,7 +482,7 @@ impl<R: Real> Nucleus<R> {
         if k == 0 {
             self.rst.push(r);
         } else if k > 0 {
-            self.rb[k as usize].insert(0, r);
+            self.rb.insert(k as usize, r);
             self.rmax = self.rmax.max(k as usize);
         }
     }
@@ -421,18 +490,14 @@ impl<R: Real> Nucleus<R> {
     fn cdel(&mut self, c: usize) {
         if self.ccnt[c] >= 2 {
             let k = self.ccnt[c] - 1;
-            if let Some(p) = self.cb[k].iter().position(|&x| x == c) {
-                self.cb[k].remove(p);
-            }
+            self.cb.remove(k, c);
         }
     }
 
     fn rdel(&mut self, r: usize) {
         if self.rcnt[r] >= 2 {
             let k = self.rcnt[r] - 1;
-            if let Some(p) = self.rb[k].iter().position(|&x| x == r) {
-                self.rb[k].remove(p);
-            }
+            self.rb.remove(k, r);
         }
     }
 
@@ -597,8 +662,8 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
         rowchain: vec![Vec::new(); m],
         ccnt: vec![0; npos],
         rcnt: vec![0; m],
-        cb: vec![Vec::new(); m.max(npos) + 2],
-        rb: vec![Vec::new(); m.max(npos) + 2],
+        cb: Buckets::new(m.max(npos) + 2),
+        rb: Buckets::new(m.max(npos) + 2),
         cmax: 0,
         rmax: 0,
         cst: Vec::new(),
@@ -705,7 +770,7 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
                     // Hand the active matrix to the dense LU: rows by index, columns in ascending bucket order. (Rows in bucket order
                     // reproduce the reference's pivots but not the parity of its vectorised dot products.)
                     let mut rows: Vec<usize> = Vec::new();
-                    for k in 0..s.rb.len() {
+                    for k in 0..s.rb.heads.len() {
                         if k == 0 {
                             for &r in s.rst.iter().rev() {
                                 if !prows[r] && s.rcnt[r] == 1 && !rows.contains(&r) {
@@ -713,11 +778,11 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
                                 }
                             }
                         } else {
-                            rows.extend(s.rb[k].iter().copied());
+                            rows.extend(s.rb.list(k));
                         }
                     }
                     let mut cols_a: Vec<usize> = Vec::new();
-                    for k in 0..s.cb.len() {
+                    for k in 0..s.cb.heads.len() {
                         if k == 0 {
                             for &c in s.cst.iter().rev() {
                                 if !pcols[c] && s.ccnt[c] == 1 && !cols_a.contains(&c) {
@@ -725,7 +790,7 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
                                 }
                             }
                         } else {
-                            cols_a.extend(s.cb[k].iter().copied());
+                            cols_a.extend(s.cb.list(k));
                         }
                     }
                     rows.sort_unstable();
@@ -972,7 +1037,7 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
 /// and the search's work factor: the candidates examined times the cost bound of the last bucket.
 fn search<R: Real>(s: &mut Nucleus<R>, remaining: usize) -> Option<(usize, f64)> {
     let thr = THR.with(|c| c.get());
-    let first = |b: &Vec<Vec<usize>>| b.iter().position(|v| !v.is_empty());
+    let first = |b: &Buckets| b.heads.iter().position(|&v| v != usize::MAX);
     let cmin = first(&s.cb);
     let rmin = first(&s.rb);
     if cmin.is_none() && rmin.is_none() {
@@ -983,8 +1048,8 @@ fn search<R: Real>(s: &mut Nucleus<R>, remaining: usize) -> Option<(usize, f64)>
     let mut k = u74.min(u69);
     // The loop bound (double `0xd6a77`, quad `0x229a3c..0x229a6d`): max(4, k / 2) examined lists, at most the number of columns left (seeds 2448, 2324; bh50093: three left).
     let limit = ((k as f64 * 0.5) as usize).max(4).min(remaining);
-    let cmax = s.cb[..=s.cmax].iter().rposition(|v| !v.is_empty());
-    let rmax = s.rb[..=s.rmax].iter().rposition(|v| !v.is_empty());
+    let cmax = s.cb.heads[..=s.cmax].iter().rposition(|&v| v != usize::MAX);
+    let rmax = s.rb.heads[..=s.rmax].iter().rposition(|&v| v != usize::MAX);
     s.cmax = cmax.unwrap_or(0);
     s.rmax = rmax.unwrap_or(0);
     let maxk = cmax.into_iter().chain(rmax).max().unwrap();
@@ -1002,23 +1067,17 @@ fn search<R: Real>(s: &mut Nucleus<R>, remaining: usize) -> Option<(usize, f64)>
         };
         last_bound = bound;
         for col in [true, false] {
-            let lst: Vec<usize> = if col {
-                s.cb[k].clone()
-            } else {
-                s.rb[k].clone()
-            };
-            if !lst.is_empty() {
-                let l = lst.len();
-                let mut last: Option<usize> = None;
-                let mut i = 0;
-                while i < l {
-                    let x = lst[i];
+            let head = if col { s.cb.heads[k] } else { s.rb.heads[k] };
+            if head != usize::MAX {
+                let mut last: usize;
+                let mut x = head;
+                loop {
                     if col {
                         s.clean_col(x);
                     } else {
                         s.clean_row(x);
                     }
-                    last = Some(i);
+                    last = x;
                     let ch: Vec<usize> = if col {
                         s.colchain[x].clone()
                     } else {
@@ -1053,17 +1112,20 @@ fn search<R: Real>(s: &mut Nucleus<R>, remaining: usize) -> Option<(usize, f64)>
                             break;
                         }
                     }
-                    i += 1;
+                    x = if col { s.cb.next[x] } else { s.rb.next[x] };
+                    if x == head {
+                        break;
+                    }
                 }
-                if let (Some(li), true, Some(b)) = (last, done, best) {
+                if let (true, Some(b)) = (done, best) {
+                    let li = last;
                     let owner = if col { s.nodes[b].c } else { s.nodes[b].r };
-                    let nh = if owner == lst[li] { li } else { (li + 1) % l };
-                    let rotated: Vec<usize> =
-                        lst[nh..].iter().chain(lst[..nh].iter()).copied().collect();
+                    let next = if col { s.cb.next[li] } else { s.rb.next[li] };
+                    let nh = if owner == li { li } else { next };
                     if col {
-                        s.cb[k] = rotated;
+                        s.cb.heads[k] = nh;
                     } else {
-                        s.rb[k] = rotated;
+                        s.rb.heads[k] = nh;
                     }
                 }
             }
@@ -1228,4 +1290,46 @@ fn dense_lu<R: Real>(a: &mut [Vec<R>], base: usize) -> Vec<usize> {
         }
     }
     perm
+}
+
+#[cfg(test)]
+mod bucket_tests {
+    use super::Buckets;
+
+    #[test]
+    fn circular_buckets_preserve_vector_order() {
+        let n = 37;
+        let mut buckets = Buckets::new(n);
+        let mut old = vec![Vec::new(); n];
+        let mut owner: Vec<Option<usize>> = vec![None; n];
+        let mut seed = 0x371829abdu64;
+        for step in 0..10000 {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            let x = seed as usize % n;
+            let k = (seed >> 16) as usize % n;
+            if step % 3 == 0 {
+                if let Some(i) = owner[x] {
+                    let pos = old[i].iter().position(|&v| v == x).unwrap();
+                    old[i].remove(pos);
+                    buckets.remove(i, x);
+                    owner[x] = None;
+                    // Missing-member deletion must be harmless.
+                    buckets.remove(i, x);
+                }
+            } else if owner[x].is_none() {
+                old[k].insert(0, x);
+                buckets.insert(k, x);
+                owner[x] = Some(k);
+            } else if !old[k].is_empty() {
+                let offset = x % old[k].len();
+                old[k].rotate_left(offset);
+                buckets.heads[k] = old[k][0];
+            }
+            for (i, expected) in old.iter().enumerate() {
+                assert_eq!(buckets.list(i), *expected);
+            }
+        }
+    }
 }
