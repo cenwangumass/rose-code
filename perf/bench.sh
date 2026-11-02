@@ -32,7 +32,7 @@ grep -v '^\s*#' perf/bench.txt | grep -v '^\s*$' | while read -r id model args; 
     fi
     cmd="$bin solve $model $args --output /dev/null"
     hyperfine -N -w 1 -r "$runs" -i --style none --export-json "$tmp/h.json" "$cmd" > /dev/null 2>&1
-    read -r med mn mx < <(python3 -c 'import json,sys; r=json.load(open(sys.argv[1]))["results"][0]; print(r["median"], r["min"], r["max"])' "$tmp/h.json")
+    read -r med mn mx < <(python3 -c 'import json,sys; r=json.load(open(sys.argv[1]))["results"][0]; s=r["summary"]["time_wall_clock"] if "summary" in r else r; print(s["median"], s["min"], s["max"])' "$tmp/h.json")
     ins=""
     if [ $instr = 1 ]; then
         ins=$(perf stat -x, -e instructions:u -- $cmd 2>&1 >/dev/null | awk -F, '/instructions/ {print $1}')
