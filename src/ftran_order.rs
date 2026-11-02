@@ -1380,6 +1380,151 @@ impl<R: Real> RefStruct<R> {
         for &(p, v) in &spike {
             x[p] = v;
         }
+        // The dense U routine (`0x121ef0`) tests the raw value first; the sparse one (`0x1223e0`, at `0x12297b`) only the quotient.
+        let u_dense = !R::LANES
+            || rows.len() * self.dthr > m
+            || (!self.etas.is_empty() && count_l * self.dthr > m)
+            || !(self.nuc.len() + spike.len() < self.i21
+                || self.dens * (spike.len() as f64) < 2.0 * m as f64)
+            || self.lev_dense_ft;
+        let bs = force_dense && crate::dump::on("bsolve");
+        let mut touched = vec![false; m];
+        let mut tail: Vec<usize> = Vec::new();
+        for &(p, _) in &spike {
+            touched[p] = true;
+        }
+        if u_dense && !bs {
+            // Unreached columns contain zero and the dense kernel skips them before division.
+            // Slot order preserves the arithmetic order of every reached column.
+            tail.extend((self.i21..m).rev().map(|s| self.at[s]));
+        } else {
+            for &(p, _) in &spike {
+                if self.kind[p] == -2 {
+                    tail.push(p);
+                }
+            }
+            let mut k = 0;
+            while k < tail.len() {
+                let c = tail[k];
+                k += 1;
+                for &j in &self.a[c] {
+                    if !touched[j] {
+                        touched[j] = true;
+                        tail.push(j);
+                    }
+                }
+            }
+            self.sort_slot_desc(&mut tail);
+        }
+        let x_l = if bs { x.clone() } else { Vec::new() };
+        for &c in &tail {
+            let mut xc = x[c];
+            if u_dense && xc.abs() <= R::c(TOL) {
+                x[c] = R::ZERO;
+                continue;
+            }
+            xc /= self.diag[c];
+            if xc.abs() <= R::c(TOL) {
+                x[c] = R::ZERO;
+                continue;
+            }
+            x[c] = xc;
+            for &(j, v) in &self.uc[c] {
+                x[j] -= v * xc;
+                touched[j] = true;
+            }
+        }
+        let x_t = if bs { x.clone() } else { Vec::new() };
+        for p in 0..m {
+            if touched[p] && self.kind[p] != -2 {
+                let v = x[p] / self.diag[p];
+                x[p] = if (u_dense && x[p].abs() <= R::c(TOL)) || v.abs() <= R::c(TOL) {
+                    R::ZERO
+                } else {
+                    v
+                };
+            }
+        }
+        if bs {
+            crate::dump::emit(
+                "bsolve",
+                serde_json::json!({"l": jv(&x_l), "tail_done": jv(&x_t), "x": jv(&x), "tail": tail, "kind": self.kind, "slot": self.slot, "diag": jv(&self.diag), "u_dense": u_dense, "uc": ju(&self.uc), "lcols": self.lcols, "lvals": jn(&self.lvals), "perm": self.perm, "rows": rows, "vals": jv(&vals)}),
+            );
+        }
+        // A dense result (the reference's `-1` count) is scanned by position index; a sparse one comes in the U solve's order.
+        let dense = rows.len() * self.dthr > m
+            || self.lev_dense_ft
+            || (!self.etas.is_empty() && count_l * self.dthr > m)
+            || !(self.nuc.len() + spike.len() < self.i21
+                || self.dens * (spike.len() as f64) < 2.0 * m as f64);
+        let inp: Vec<usize> = spike.iter().map(|e| e.0).collect();
+        let vec_dense = rows.len() * self.dthr > m
+            || self.lev_dense_ft
+            || (!self.etas.is_empty() && count_l * self.dthr > m);
+        let u_est = self.u_work(
+            &inp,
+            &x,
+            !dense,
+            if vec_dense { None } else { Some(spike.len()) },
+        );
+        *self.f2.borrow_mut() = F2 {
+            col_n: if vec_dense { None } else { Some(spike.len()) },
+            col_in: inp.clone(),
+            x_col: x.clone(),
+            ..F2::<R>::default()
+        };
+        self.work = u_est + e_l;
+        self.work_parts = (e_l, u_est);
+        self.last_dense = dense;
+        self.last_ordered = dense || u_dense;
+        let ord = if dense || u_dense {
+            (0..m).collect()
+        } else {
+            self.uorder(&inp, &x)
+        };
+        let mut out: Vec<(usize, R)> = Vec::new();
+        let mut done = vec![false; m];
+        for &p in &ord {
+            if !done[p] {
+                done[p] = true;
+                if x[p] != R::ZERO {
+                    out.push((p, x[p]));
+                }
+            }
+        }
+        for p in 0..m {
+            if touched[p] && !done[p] && x[p] != R::ZERO {
+                out.push((p, x[p]));
+            }
+        }
+        // The column replacement receives the spike in ascending order after a dense solve (the reference scans the dense vector),
+        // and in L-stage order after a sparse one.
+        let mut spike = spike;
+        // Only a dense L-stage result is scanned by position; a sparse one keeps the L-stage order.
+        if vec_dense {
+            spike.sort_unstable_by_key(|e| e.0);
+        }
+        // The column replacement does not receive the residues.
+        spike.retain(|e| e.1.abs() > R::c(TOL));
+        self.spike = spike;
+        self.spike_used = false;
+        self.last_alpha = out.len();
+        out
+    }
+
+    #[cfg(test)]
+    fn frozen_ftran_with(
+        &mut self,
+        rows: &[usize],
+        vals: &[R],
+        force_dense: bool,
+    ) -> Vec<(usize, R)> {
+        let m = self.m;
+        let (spike, count_l, e_l) = self.lstage_num(rows, vals, force_dense);
+        let mut x = vec![R::ZERO; m];
+        for &(p, v) in &spike {
+            x[p] = v;
+        }
         let mut touched = vec![false; m];
         let mut tail: Vec<usize> = Vec::new();
         for &(p, _) in &spike {
@@ -2988,5 +3133,159 @@ mod transpose_tests {
     fn ordered_u_transpose_replacements() {
         replacements::<f64>(|v| (v.to_bits(), 0));
         replacements::<crate::f80::F80>(|v| v.repr());
+    }
+}
+
+#[cfg(test)]
+mod dense_tail_tests {
+    use super::*;
+
+    fn check<R: Real>(f: &RefStruct<R>, x: &[R], bits: impl Fn(R) -> (u64, u16)) {
+        let rows: Vec<_> = (0..x.len()).filter(|&i| x[i] != R::ZERO).collect();
+        let vals: Vec<_> = rows.iter().map(|&i| x[i]).collect();
+        let mut old = f.clone();
+        let mut new = f.clone();
+        let expected = old.frozen_ftran_with(&rows, &vals, false);
+        let actual = new.ftran_with(&rows, &vals, false);
+        let encode =
+            |v: Vec<(usize, R)>| v.into_iter().map(|(i, v)| (i, bits(v))).collect::<Vec<_>>();
+        assert_eq!(encode(actual), encode(expected));
+        assert_eq!(new.work.to_bits(), old.work.to_bits());
+        assert_eq!(encode(new.spike), encode(old.spike));
+        assert_eq!(new.last_alpha, old.last_alpha);
+        assert_eq!(new.last_dense, old.last_dense);
+        assert_eq!(new.last_ordered, old.last_ordered);
+        let a = new.f2.borrow();
+        let b = old.f2.borrow();
+        assert_eq!(
+            a.x_col.iter().copied().map(&bits).collect::<Vec<_>>(),
+            b.x_col.iter().copied().map(&bits).collect::<Vec<_>>()
+        );
+    }
+
+    fn identity<R: Real>(m: usize) -> RefStruct<R> {
+        let cols: Vec<_> = (0..m).map(|i| (true, vec![i], vec![1.0])).collect();
+        let st = crate::lu_order::factor_structure_r::<R>(m, &cols);
+        let mut f = RefStruct::fresh(m, m, &st, &cols);
+        f.lev_dense_ft = true;
+        f
+    }
+
+    fn cases<R: Real>(bits: impl Fn(R) -> (u64, u16) + Copy) {
+        let mut seed = 0xdef8514302u64;
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        let values = [
+            0.0,
+            -0.0,
+            f64::from_bits(1),
+            -f64::from_bits(1),
+            1e-200,
+            -1e-200,
+            1e200,
+            -1e200,
+            1.0,
+            -1.0,
+            TOL,
+            -TOL,
+        ];
+        // Empty tails, singleton factors, arbitrary slot permutations and cancellation-heavy scatters.
+        for m in [1, 2, 7, 33] {
+            for round in 0..128 {
+                let mut f = identity::<R>(m);
+                let i21 = round % (m + 1);
+                f.i21 = i21;
+                for i in (1..m).rev() {
+                    let j = next() as usize % (i + 1);
+                    f.at.swap(i, j);
+                }
+                for t in 0..m {
+                    let p = f.at[t];
+                    f.slot[p] = t;
+                    f.kind[p] = if t >= i21 { -2 } else { -1 };
+                }
+                for t in i21..m {
+                    let c = f.at[t];
+                    f.diag[c] = R::c(values[4 + next() as usize % 6]);
+                    for u in 0..t {
+                        if next() % 3 == 0 {
+                            let j = f.at[u];
+                            f.uc[c].push((j, R::c(values[next() as usize % values.len()])));
+                            if u >= i21 {
+                                f.a[c].push(j);
+                            }
+                        }
+                    }
+                }
+                let x: Vec<_> = (0..m)
+                    .map(|_| R::c(values[next() as usize % values.len()]))
+                    .collect();
+                check(&f, &x, bits);
+                check(&f, &vec![R::ZERO; m], bits);
+            }
+        }
+        // SC50A dual-release dense U inputs captured from the parent binary's BSOLVE dump.
+        let records: serde_json::Value =
+            serde_json::from_str(include_str!("../tests/fixtures/ftran_dense_tail.json")).unwrap();
+        for v in records.as_array().unwrap() {
+            let numbers = |key: &str| {
+                v[key]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|x| R::c(x.as_f64().unwrap()))
+                    .collect::<Vec<_>>()
+            };
+            let x = numbers("l");
+            let m = x.len();
+            let mut f = identity::<R>(m);
+            f.diag = numbers("diag");
+            f.kind = serde_json::from_value(v["kind"].clone()).unwrap();
+            f.slot = serde_json::from_value(v["slot"].clone()).unwrap();
+            f.nuc = (0..m).filter(|&p| f.kind[p] >= 0).collect();
+            f.nuc.sort_unstable_by_key(|&p| f.kind[p]);
+            f.i21 = (0..m)
+                .filter(|&p| f.kind[p] == -2)
+                .map(|p| f.slot[p])
+                .min()
+                .unwrap_or(m);
+            for p in 0..m {
+                f.at[f.slot[p]] = p;
+            }
+            for c in 0..m {
+                f.uc[c] = v["uc"][c]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|e| {
+                        (
+                            e[0].as_u64().unwrap() as usize,
+                            R::c(e[1].as_f64().unwrap()),
+                        )
+                    })
+                    .collect();
+                f.a[c] = f.uc[c]
+                    .iter()
+                    .filter(|e| f.kind[e.0] == -2)
+                    .map(|e| e.0)
+                    .collect();
+                f.b[c] = f.uc[c]
+                    .iter()
+                    .filter(|e| f.kind[e.0] >= 0)
+                    .map(|e| e.0)
+                    .collect();
+            }
+            check(&f, &x, bits);
+        }
+    }
+
+    #[test]
+    fn dense_tail_matches_frozen_ftran() {
+        cases::<f64>(|v| (v.to_bits(), 0));
+        cases::<crate::f80::F80>(|v| v.repr());
     }
 }
