@@ -4,7 +4,7 @@ Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (histo
 
 ## Numbers
 
-Baseline solver: `8b645007` (same solver as `vlsokskq`). Current solver: `ozmqzstm` (scan dense FTRAN tail slots directly instead of traversing and sorting their reachability graph).
+Baseline solver: `8b645007` (same solver as `vlsokskq`). Current solver: `lyvknlkq` (cache double structures for repeated compact quad bases).
 Parity: full tier 987/987; release tests pass. Three timed runs after one warm-up, hyperfine 2.0.0; instruction counts are millions from perf stat.
 
 `baseline wall` is the fixed initial process-wall median. `paired base wall` is the fresh baseline-binary median from alternating baseline/last-landed/candidate checks on one CPU (CPU 0 unless stated otherwise); it resolves host drift without changing the fixed baseline. `current wall` and `solve` use the new harness; **current/ref uses solve-only time**, `diagnostics.seconds`, against original Gurobi Runtime.
@@ -12,34 +12,34 @@ Parity: full tier 987/987; release tests pass. Three timed runs after one warm-u
 Reference provenance: original-library cached records `../reverse-engineer/runs/{degen2,degen3,perold,pilot4}-{profile}.json` for the ten previously valid cells. New three-run medians use `/tmp/rose-perf-reference/{primal_5959.primal-r,primal_5959.dual-r,quad_2717.dual-r,fx_quad_obj_5371.dual-r}.{1,2,3}.json`; summary `/tmp/rose-perf-reference/summary.json`. All original-library records identify Ryzen 9 5900X and library SHA256 `8e87fca221fdffc922331c8619426031b3e72dfd419446422f88af0cb0e98f9c`.
 `-` refs are unreachable: original Gurobi rejects 80BAU3B, GREENBEA and mode-switch with license error 10010 (scratch `ID.error.json`, including direct 80BAU3B primal/dual attempts). The old 80BAU3B primal/dual refs used the patched library and have been removed; the old prose mode-switch time is unusable.
 
-Regression checks: all 23 runs paired against the preceding solver on CPU 4, with pair order alternating by run. Small 80BAU3B primal, dual and barrier timing increases resolve in three alternating CPU-2 follow-up pairs: primal 0.779180 -> 0.774966 s, dual 0.414370 -> 0.414740 s (spreads 0.000370/0.003029 s), barrier 0.347213 -> 0.343376 s (spreads 0.100888/0.103218 s); instructions are essentially unchanged. No unresolved paired or fixed-baseline regressions. Raw data `target/perf-denseu-full-{before,after}.txt` and `target/perf-denseu-followup-{before,after}.txt`. Host speed varies substantially; use immediate pairs and spreads.
-Acceptance: the full CPU-4 sweep gives PEROLD dual-release solve 0.167336 -> 0.162066 s (-3.2%; spreads 0.000729/0.000454 s), instructions 1506.6 -> 1471.1M (-2.4%). Both DEGEN3 dual profiles improve 2.6% beyond both spreads, instructions -1.4%. The earlier alternating CPU-4 target check gives PEROLD 0.166434 -> 0.161201 s (-3.1%; spreads 0.000377/0.000972 s), instructions -2.3% (`target/perf-denseu-recheck-{before,after}.txt`). Dense FTRAN selects tail columns by descending slot scan; zero columns skip before division, preserving every reached column's arithmetic order. Sparse and BSOLVE dump calls retain their original traversal. Frozen old-kernel comparisons cover random/extreme f64/F80 inputs and two captured SC50A dense U inputs; full parity 987/987 and release tests pass.
+Regression checks: all 23 runs paired against the preceding solver on CPU 4, with pair order alternating by run. PEROLD primal and 80BAU3B dual timing flags resolve in three alternating CPU-2 follow-up pairs: PEROLD 0.618536 -> 0.620356 s (spreads 0.007964/0.220829 s), 80BAU3B 0.626253 -> 0.629776 s (spreads 0.063617/0.052109 s); instructions are essentially unchanged. No unresolved paired or fixed-baseline regressions. Raw data `target/perf-ordercache-full-{before,after}.txt` and `target/perf-ordercache-followup-{before,after}.txt`. Host speed varies substantially, including PDHG's candidate solve range 4.436758..10.209806 s with flat instructions; use immediate pairs and spreads.
+Acceptance: the full CPU-4 sweep gives primal_5959 primal-release solve 0.267740 -> 0.223160 s (-16.7%; spreads 0.007032/0.005733 s), instructions 2602.0 -> 2279.8M (-12.4%). Quad_2717 improves 0.388606 -> 0.353692 s (-9.0%; spreads 0.014019/0.004919 s), instructions -6.1%; fx_quad_obj_5371 improves 0.140024 -> 0.117381 s (-16.2%; spreads 0.003262/0.000816 s), instructions -12.0%. Alternating CPU-2 primal_5959 dual pairs give 0.580534 -> 0.499313 s (-14.0%; spreads 0.014382/0.039131 s), instructions -12.9%. Four cached double structures are keyed by ordered immutable basis columns and exact threshold; only compact quad bases with no pair pass, dense fallback, growth retry or build diagnostics can hit. Factorization metadata, dumps, numeric factors and WORK estimates remain unchanged; full parity 987/987 and release tests pass.
 
 | run | ref solve | baseline wall | paired base wall | current wall | solve | current/ref | instr |
 |---|---|---|---|---|---|---|---|
-| degen2.primal-c | 0.012711 | 0.182 | - | 0.074 | 0.068910 | 5.42 | 368.4 |
-| degen2.dual-r | 0.009653 | 0.125 | - | 0.064 | 0.059755 | 6.19 | 295.6 |
-| degen3.primal-c | 0.163137 | 3.237 | - | 0.965 | 0.951856 | 5.83 | 5437.7 |
-| degen3.primal-r | 0.193685 | 3.872 | - | 1.116 | 1.101747 | 5.69 | 6159.0 |
-| perold.primal-c | 0.160994 | 2.430 | - | 0.969 | 0.961641 | 5.97 | 5807.8 |
-| pilot4.primal-r | 0.015787 | 0.253 | - | 0.103 | 0.097315 | 6.16 | 634.5 |
-| 80bau3b.primal-c | - | 1.618 | - | 0.790 | 0.774966 | - | 8172.3 |
-| primal_5959.primal-r | 0.067884 | 0.563 | 0.938 | 0.529 | 0.523001 | 7.70 | 2602.1 |
-| degen3.dual-c | 0.082843 | 1.002 | - | 0.342 | 0.332225 | 4.01 | 2780.6 |
-| degen3.dual-r | 0.082947 | 1.008 | 1.007 | 0.343 | 0.333528 | 4.02 | 2790.6 |
-| perold.dual-r | 0.038532 | 0.355 | 0.360 | 0.167 | 0.162066 | 4.21 | 1471.1 |
-| 80bau3b.dual-r | - | 1.103 | 1.688 | 0.430 | 0.414740 | - | 3895.5 |
-| greenbea.dual-c | - | 2.870 | 2.363 | 0.950 | 0.936546 | - | 8254.1 |
-| greenbea.dual-r | - | 3.598 | 3.592 | 0.946 | 0.932186 | - | 8186.3 |
-| mode_switch.dual-r | - | 25.815 | - | 5.432 | 5.381228 | - | 44101.6 |
-| primal_5959.dual-r | 0.098192 | 1.300 | - | 0.630 | 0.626678 | 6.38 | 3637.4 |
-| quad_2717.dual-r | 0.092814 | 1.130 | - | 0.673 | 0.669121 | 7.21 | 3380.1 |
-| fx_quad_obj_5371.dual-r | 0.038077 | 0.334 | 0.514 | 0.141 | 0.138398 | 3.63 | 1381.0 |
-| degen3.barrier-r | 0.075214 | 0.608 | 0.856 | 0.317 | 0.275707 | 3.67 | 3778.5 |
-| 80bau3b.barrier-r | - | 0.379 | 0.546 | 0.377 | 0.343376 | - | 3426.1 |
-| greenbea.barrier-r | - | 1.569 | 2.493 | 1.006 | 0.973240 | - | 13029.3 |
-| 80bau3b.pdhg | - | 4.552 | 6.526 | 4.689 | 4.674295 | - | 92390.8 |
-| greenbea.pdhg | - | 2.801 | - | 2.735 | 2.719033 | - | 37740.6 |
+| degen2.primal-c | 0.012711 | 0.182 | - | 0.072 | 0.067643 | 5.32 | 368.4 |
+| degen2.dual-r | 0.009653 | 0.125 | - | 0.064 | 0.058623 | 6.07 | 295.6 |
+| degen3.primal-c | 0.163137 | 3.237 | - | 0.926 | 0.913488 | 5.60 | 5436.9 |
+| degen3.primal-r | 0.193685 | 3.872 | - | 1.103 | 1.089031 | 5.62 | 6159.1 |
+| perold.primal-c | 0.160994 | 2.430 | - | 0.625 | 0.620356 | 3.85 | 5807.5 |
+| pilot4.primal-r | 0.015787 | 0.253 | - | 0.104 | 0.098601 | 6.25 | 634.6 |
+| 80bau3b.primal-c | - | 1.618 | - | 0.787 | 0.772261 | - | 8173.6 |
+| primal_5959.primal-r | 0.067884 | 0.563 | 0.938 | 0.225 | 0.223160 | 3.29 | 2279.8 |
+| degen3.dual-c | 0.082843 | 1.002 | - | 0.341 | 0.331138 | 4.00 | 2780.5 |
+| degen3.dual-r | 0.082947 | 1.008 | 1.007 | 0.342 | 0.332626 | 4.01 | 2790.6 |
+| perold.dual-r | 0.038532 | 0.355 | 0.360 | 0.166 | 0.161035 | 4.18 | 1471.4 |
+| 80bau3b.dual-r | - | 1.103 | 1.688 | 0.652 | 0.629776 | - | 3895.1 |
+| greenbea.dual-c | - | 2.870 | 2.363 | 0.946 | 0.933387 | - | 8253.6 |
+| greenbea.dual-r | - | 3.598 | 3.592 | 1.441 | 1.421469 | - | 8187.1 |
+| mode_switch.dual-r | - | 25.815 | - | 5.533 | 5.480655 | - | 44102.6 |
+| primal_5959.dual-r | 0.098192 | 1.300 | - | 0.502 | 0.499313 | 5.09 | 3167.4 |
+| quad_2717.dual-r | 0.092814 | 1.130 | - | 0.356 | 0.353692 | 3.81 | 3176.5 |
+| fx_quad_obj_5371.dual-r | 0.038077 | 0.334 | 0.514 | 0.119 | 0.117381 | 3.08 | 1215.7 |
+| degen3.barrier-r | 0.075214 | 0.608 | 0.856 | 0.317 | 0.276308 | 3.67 | 3780.1 |
+| 80bau3b.barrier-r | - | 0.379 | 0.546 | 0.272 | 0.248247 | - | 3425.6 |
+| greenbea.barrier-r | - | 1.569 | 2.493 | 1.006 | 0.972859 | - | 13028.7 |
+| 80bau3b.pdhg | - | 4.552 | 6.526 | 6.398 | 6.379990 | - | 92389.9 |
+| greenbea.pdhg | - | 2.801 | - | 2.094 | 2.070444 | - | 37740.7 |
 
 ## Hotspots
 
@@ -55,7 +55,7 @@ five lines each. Re-profile a run when a landed change touched its hot path.
 - degen3.barrier-r, `munmovyt` (stale after kernel dispatch; frame-pointer build passes full parity; three solves capped at 100 iterations, `target/perf-barrier-degen3-valid.data`): FMA dispatch 26.46%, DGEMM 24.62%, existing hardware FMA implementation 14.77%, numeric_factor 7.40%, DTRSM 4.36% self. DGEMM 49.04%, numeric factor 81.45% inclusive; all three solves optimal in 14 iterations. The per-product FMA wrapper is an indirect call plus frame/return overhead (annotated `target/perf-barrier-fma-annotate.txt`); per-call dispatch now removes that per-product overhead without adding fused operations. BORE3D is a cheap witness (16 barrier iterations, 12 ms).
 - primal_5959.dual-r, `tplnupps` (stale after factor reuse; frame-pointer build passes full parity; three solves capped at 16000 iterations, `target/perf-dual5959-full.data`): F80 add_signed 7.50%, primal control 5.70%, F80 multiply 4.54%, F80 nucleus 3.88%, double nucleus 3.74% self. All three reach numerical_failure, 15688 iterations, 7842 refactorizations. Refactorization is 51.10% inclusive, quad mirrors 21.69% before factor reuse. LUIN capture `target/perf-dual5959-luin.log` has 7822 records and 40 input-head/threshold combinations; two-entry LRU estimate 99.3% hits. Wide-shift arithmetic rewrites are rejected below. The earlier 11000-iteration capture stopped early and is not the full-run profile.
 - pilot4.primal-r, `oqoyqxpq` (stale after on-demand elimination WORK counts; frame-pointer build passes full 987/987 parity; twenty solves capped at 700 iterations, `target/perf-pilot-next2.data`): update 9.97%, FTRAN 7.80%, primal control 7.77%, fresh factor 6.78%, BTRAN 5.55% self. malloc/free total 3.30% self. All twenty optimal in 690 iterations, 16 refactorizations. Update annotation (`target/perf-pilot-next2-update.txt`) puts about 30% of update self samples in the full elimination WORK row-count rebuild, now replaced by on-demand transpose scans. Reprofile before choosing the remaining update work.
-- primal_5959.primal-r, `kyyvxyql` (stale after twin reuse; frame-pointer build passes full 987/987 parity; three bounded solves at 1999 Hz, `target/perf-fp-primal5959.data`, report with `--no-inline`): primal control 6.32%, F80 nucleus 5.46%, fresh F80 factor 5.09%, F80 add_signed 6.67% self. Refactor 53.53%, quad mirrors 28.88% inclusive before twin reuse. Log verifies numerical_failure, 10780 iterations, 5381 refactorizations; original reference status 12, 10780 iterations, refactor count unavailable. Default inline expansion duplicates frames; use PLAN.md's validated frame-pointer workflow for caller attribution.
+- primal_5959.primal-r, `ozmqzstm` (stale after compact double-structure caching; frame-pointer build passes full 987/987 parity; five solves capped at 11000 iterations, `target/perf-primal5959-next.data`): primal control 9.81%, F80 add 8.85%, F80 multiply 4.39%, double LU nucleus 4.31%, set_d_from_y 3.92% self; malloc/free total 7.16%. Refactorization is 38.43%, reference_order_for 13.60%, double factor_structure 12.13% inclusive. All five numerical_failure in 10780 iterations, 5381 refactorizations, matching the original status and iteration count. Both extended factors and double structures are now cached for compact repeated bases. Reprofile before choosing remaining refactorization, F80 arithmetic or set_d_from_y work.
 - fx_quad_obj_5371.dual-r, `kyyvxyql` (stale after twin reuse; profiling build, three solves at 1999 Hz, `target/perf-members-fx.data`): F80 add_signed 8.06%, F80 nucleus 5.81%, multiply 5.74%, fresh F80 factor 5.17%, pack 3.83% self cycles. Solve remains infeasible, 5319 iterations, 5 refactorizations.
 - degen3.dual-r, `rxqrkvwm` (stale after eta gather-buffer reuse; frame-pointer build passes full 987/987 parity; five solves capped at 2300 iterations, `target/perf-dual3-rest.data`): L stage 9.24%, FTRAN 8.62%, ftran_needed 7.61%, iteration 7.02%, BTRAN 5.83% self. ftran_needed is 21.69%, L stage 13.85%, FTRAN 15.30%, refactorization 23.59% inclusive. All five optimal in 2212 iterations, 24 refactorizations. Dense L-stage output compaction is another 2.52% self; reserving it failed the timing gate below. Eta gathers now reuse one buffer per call. Reprofile before choosing more L-stage numeric scatter or output conversion work (`target/perf-dual3-rest-lstage-annotate.txt`).
 - mode_switch.dual-r, `xzuktkmx` (stale after F80/LU changes; reprofile before choosing it): update 22.21%, LU nucleus 15.90%, BTRAN 13.33%, fresh-factor row-list filtering 7.67%, factor_structure 3.36% self cycles. Full solve: 11393 iterations, 17 refactorizations.
@@ -69,9 +69,9 @@ None.
 Ordered by current/ref; reprofile any changed path before choosing a change. Ratios use the current
 sweep's solve medians; paired old/new times determine whether a change gains or regresses.
 
-- primal_5959.primal-r (7.70x), quad_2717.dual-r (7.21x), primal_5959.dual-r (6.38x), degen2.dual-r (6.19x), pilot4.primal-r (6.16x): work in this order. Reprofile changed paths before choosing a change; the reachable simplex profiles are stale after dense FTRAN tail scanning. Host speed bands can reorder these snapshot ratios.
+- pilot4.primal-r (6.25x), degen2.dual-r (6.07x), degen3.primal-r (5.62x), degen3.primal-c (5.60x), degen2.primal-c (5.32x): work in this order. Reprofile changed paths before choosing a change. Host speed bands can reorder these snapshot ratios.
 - DEGEN3 dual: tau row-value lookup and immutable BTRAN metadata are settled. Reprofile before inspecting remaining iteration control, updates and scratch allocation.
-- Other reachable runs follow their table ratios. Quad twins share construction and four compact repeated factors are cached; row-capacity growth already uses the numeric U transpose.
+- Other reachable runs follow their table ratios. Quad twins share construction and four compact repeated factors and double structures are cached; row-capacity growth already uses the numeric U transpose.
 - Quad_2717: ranked extended row products now use native x87 arithmetic with a software fallback. Reprofile before inspecting remaining F80 arithmetic and set_d_from_y; the old call shares no longer describe the current solver. Cost-change work performs required reduced-cost updates; the factor-cache working set is settled.
 - Barrier: profile again before choosing more work. DGEMM now dispatches existing fused operations once per call; other BLAS-like kernels still use their original scalar dispatch and accumulation order. A smaller remaining DGEMM gap may involve independent outputs and data reuse, which must preserve every per-output reduction order.
 - Runs without reachable references, after the reachable ratios: mode-switch update (22.21%) still scans A/B lists for other memberships; BTRAN (13.33% before metadata caching) allocates scratch; LU nucleus (15.90%); fresh-factor row-list filtering (7.67%). These old profiles are stale; annotate again before choosing a change.

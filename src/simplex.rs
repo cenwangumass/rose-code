@@ -1291,6 +1291,14 @@ impl QuadFactorCache {
     }
 }
 
+/// Double structure of a compact quad basis, keyed by its ordered immutable columns.
+struct OrderCache {
+    basic: Vec<usize>,
+    threshold: u64,
+    rows: Vec<(bool, Vec<usize>, Vec<f64>)>,
+    structure: crate::lu_order::Structure,
+}
+
 struct Solver<'a> {
     p: &'a Internal,
     opts: &'a SolveOptions,
@@ -1392,6 +1400,8 @@ struct Solver<'a> {
     mirror_q: Option<crate::ftran_order::RefStruct<crate::f80::F80>>,
     /// Four fresh factors for repeated compact bases, keyed by exact ordered input columns and threshold.
     quad_cache: Vec<QuadFactorCache>,
+    /// Four double structures for the same compact repeated quad bases.
+    order_cache: Vec<OrderCache>,
     /// Full precision solution at the last fresh x87 basic-solution recomputation.
     x_q: Option<Vec<crate::f80::F80>>,
     /// Maintained basic distances in the x87 primal, indexed by variable.
@@ -1683,7 +1693,7 @@ impl<'a> Solver<'a> {
     /// Basis positions after a refactorization: the order of the reference LU's pivot steps (`crate::lu_order`, recovered in
     /// `reverse-engineer/specs/lu-factor.md`), applied to the basis in its previous position order.
     fn reference_order(
-        &self,
+        &mut self,
         fac_no: usize,
     ) -> (
         Vec<usize>,
@@ -1691,7 +1701,50 @@ impl<'a> Solver<'a> {
         Vec<(bool, Vec<usize>, Vec<f64>)>,
         Option<crate::ftran_order::RefStruct>,
     ) {
-        reference_order_for(self.p, &self.basic, fac_no, self.growth_limit(), "luin")
+        // Under 50 rows neither the pair pass nor a dense nucleus can run. With
+        // no growth check, the immutable columns and threshold determine the structure.
+        let cacheable = self.p.m < 50
+            && self.handoff.is_some_and(|h| h.quad)
+            && crate::lu_order::gate_get().1 < 2_000_000_000
+            && !["ROSE_GATE_LOG", "ROSE_DENSE_INFO", "ROSE_DENSE_DUMP"]
+                .iter()
+                .any(|name| std::env::var_os(name).is_some());
+        let threshold = crate::lu_order::threshold().to_bits();
+        if cacheable {
+            if let Some(entry) = self
+                .order_cache
+                .iter()
+                .find(|entry| entry.threshold == threshold && entry.basic == self.basic)
+            {
+                RETRY_LU_WORK.with(|c| c.borrow_mut().clear());
+                crate::lu_order::set_factorization_number(fac_no);
+                crate::lu_order::DENSE_N.with(|c| c.set(0));
+                return (
+                    entry
+                        .structure
+                        .pivots
+                        .iter()
+                        .map(|&(_, pos)| self.basic[pos])
+                        .collect(),
+                    entry.structure.clone(),
+                    entry.rows.clone(),
+                    None,
+                );
+            }
+        }
+        let result = reference_order_for(self.p, &self.basic, fac_no, self.growth_limit(), "luin");
+        if cacheable && result.0.len() == self.p.m {
+            if self.order_cache.len() == 4 {
+                self.order_cache.remove(0);
+            }
+            self.order_cache.push(OrderCache {
+                basic: self.basic.clone(),
+                threshold,
+                rows: result.2.clone(),
+                structure: result.1.clone(),
+            });
+        }
+        result
     }
 
     /// The growth check limit of the double driver (`0xf351d..0xf3629`), `None` for the x87 primal.
@@ -5976,6 +6029,7 @@ fn solve_primal(
         mirror: None,
         mirror_q: None,
         quad_cache: Vec::new(),
+        order_cache: Vec::new(),
         x_q: None,
         dst_q: None,
         work: start_work,

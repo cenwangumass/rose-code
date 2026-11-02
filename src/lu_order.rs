@@ -14,6 +14,7 @@ pub fn pivot_order(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Vec<(usiz
 
 /// The pivot sequence together with what the sparse FTRAN model needs (`crate::ftran_order`): the singleton phase of each step
 /// (1..=4, 0 for the Markowitz nucleus) and the L column of each step as row indices in chain order.
+#[derive(Clone)]
 pub struct Structure<R = f64> {
     pub pivots: Vec<(usize, usize)>,
     pub phase: Vec<u8>,
