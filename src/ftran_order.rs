@@ -2796,27 +2796,26 @@ impl<R: Real> RefStruct<R> {
             self.fill += k;
         }
         if k > 0 {
-            let mut cnt = vec![0usize; m];
-            for c in (0..m).filter(|&c| c != r && self.kind[c] == -2) {
-                for &(row, _) in &self.uc[c] {
-                    cnt[row] += 1;
-                }
-            }
             // A row that already holds an entry of the old column takes the new entry in place.
             // The rows are visited in the spike's order with the leaving column replaced by the last entry (`sp`).
             for &row in sp.iter().filter(|&&y| y != r && !old_rows.contains(&y)) {
-                if cnt[row] >= self.row_cap[row] {
+                // The transpose includes duplicates in the same multiplicity as the column scan.
+                let count = self.ut[row]
+                    .iter()
+                    .filter(|&&(c, _)| c != r && self.kind[c] == -2)
+                    .count();
+                if count >= self.row_cap[row] {
                     // The growth is capped by the updates left before the refactorization (`0xf2cd1`: `F+0x188 - F+0x18c`).
                     let left = (self
                         .upd_limit
                         .unwrap_or(((m as f64).powf(0.7) as usize).max(20))
                         + 1)
                     .saturating_sub(self.upd);
-                    let extra = (cnt[row] / 2).max(4).min(left);
-                    fp_rows.push((row, cnt[row], self.row_cap[row], extra));
+                    let extra = (count / 2).max(4).min(left);
+                    fp_rows.push((row, count, self.row_cap[row], extra));
                     self.row_par[row] = (self.fill % 2) as u8;
-                    self.fill += cnt[row] + extra;
-                    self.row_cap[row] = cnt[row] + extra;
+                    self.fill += count + extra;
+                    self.row_cap[row] = count + extra;
                 }
             }
         }
