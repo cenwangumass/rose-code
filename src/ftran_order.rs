@@ -65,6 +65,8 @@ pub struct RefStruct<R: Real = f64> {
     dthr: usize,
     slot: Vec<usize>,
     at: Vec<usize>,
+    /// Reused counts for ordering dense lists of permutation slots.
+    slot_counts: std::cell::RefCell<Vec<usize>>,
     etas: Vec<Eta<R>>,
     lvals: Vec<Vec<R>>,
     /// Immutable L transpose, in ascending source-column order, shared by all BTRAN calls of this factor.
@@ -713,6 +715,7 @@ impl<R: Real> RefStruct<R> {
             dthr,
             slot: (0..m).collect(),
             at: (0..m).collect(),
+            slot_counts: Default::default(),
             etas: Vec::new(),
             lvals,
             lt,
@@ -2190,6 +2193,22 @@ impl<R: Real> RefStruct<R> {
     /// Descending slot order without repeatedly reading indirect keys during comparisons. `slot` and `at` are inverse
     /// permutations, so sorting slots and mapping back also preserves repeated positions exactly.
     fn sort_slot_desc(&self, positions: &mut [usize]) {
+        if positions.len() >= 64 && positions.len() > self.m / 8 {
+            let mut counts = self.slot_counts.borrow_mut();
+            counts.resize(self.m, 0);
+            counts.fill(0);
+            for &p in positions.iter() {
+                counts[self.slot[p]] += 1;
+            }
+            let mut i = 0;
+            for slot in (0..self.m).rev() {
+                for _ in 0..counts[slot] {
+                    positions[i] = self.at[slot];
+                    i += 1;
+                }
+            }
+            return;
+        }
         for p in positions.iter_mut() {
             *p = self.slot[*p];
         }
