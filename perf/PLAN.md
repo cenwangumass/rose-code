@@ -5,6 +5,27 @@ bit for bit on the parity corpus; every speedup must keep that agreement exactly
 standing plan and the working loop. The current numbers, hotspots and the ideas already tried are in
 [STATE.md](STATE.md); read it first in every session, and keep it current (rules at the end).
 
+## Goal
+
+Rose at least as fast as the reference: `current/ref` ≤ 1.0 on every bench run, under the invariant
+below. Work on the run with the largest ratio first.
+
+- **Like with like.** `ref` is Gurobi's `Runtime` (solve only, single thread, same host: AMD Ryzen 9
+  5900X). Compare it with rose's solve time, `diagnostics.seconds` in the result JSON (median over the
+  timed runs), not with the process wall time of `bench.sh`, which adds start-up and MPS parsing. First
+  task of the next session: give `perf/bench.sh` a solve-time column (read `diagnostics.seconds` from an
+  `--output` file per run) and fill STATE.md's `current/ref` from it.
+- **Fill the missing `ref` cells** (GREENBEA, the quad runs, `primal_5959`, barrier and PDHG runs, the
+  mode-switch witness). Run them with `../reverse-engineer/tools/ref_run.py` (see its docstring; the
+  profile names match bench.txt's: `release`, `dual-release`, `barrier-release`, `pdhg-release`, ...)
+  through gurobipy with the unpatched library, three times, and take the median `Runtime`. Records made by
+  `build/native_run` or the patched library have no usable runtime. Write the medians into STATE.md and
+  note the run files used; do not overwrite existing files in `../reverse-engineer/runs/` (write the new
+  ones to a scratch directory).
+- **Done** when every bench run with a `ref` has `current/ref` ≤ 1.0, or the remaining gap of a run is
+  documented in STATE.md as needing something the invariant forbids (name the rule and the measured
+  share of the time it accounts for). A run without a reachable reference time does not block the goal.
+
 ## The invariant
 
 A change is acceptable only if `target/release/rose-parity check --tier full` passes: every dump
@@ -58,17 +79,25 @@ baseline. No exceptions, no "within a ULP", no re-recording.
   moves the same way. For a change below 3 % on its target, require the instruction count to drop.
 - A change must not slow any other bench run by more than the noise. Run the whole bench set before
   committing; time only the affected runs while iterating.
+- Regressions against the baseline column: a run whose `current` is slower than `baseline` by more than
+  its spread must be resolved before the next change lands. Rerun it paired (baseline binary and current
+  binary alternately, same CPU, `taskset -c N`), with instruction counts. If it is real, find the landed
+  change that caused it (time the intermediate commits) and fix or revert that change; if it is noise,
+  replace the table entry with the paired numbers. Keep unresolved regressions at the top of STATE.md's
+  candidates.
 - Keep each measurement bounded: the slowest bench runs take tens of seconds; use `--only` and
   `--runs 3` while iterating. Run anything expected to take more than a few minutes in the background.
 
 ## The loop
 
-Repeat until STATE.md's candidate list is empty and the latest profiles show no item above 5 % that
-has not been tried:
+Repeat until the goal above is met. Running out of candidates does not end the work: re-profile the run
+with the largest ratio and look one level deeper (inclusive time of the callers, `perf annotate` of the
+hot loops, cache and branch misses) before declaring a gap forbidden by the invariant.
 
-1. **Pick a target.** Take the bench run with the largest rose/reference time ratio or largest absolute
-   time that has an untried hotspot in STATE.md; if the hotspot list is stale (older than the last
-   landed change touching that path) re-profile that run first and rewrite its hotspot entry.
+1. **Pick a target.** Unresolved regressions first. Then the bench run with the largest `current/ref`
+   ratio (runs without a `ref`: by absolute time, after the ones with a ratio); if its hotspot list is
+   stale (older than the last landed change touching that path), re-profile it first and rewrite its
+   hotspot entry.
 2. **Understand it.** Read the hot function and its callers. Find out why it is slow: repeated full
    scans where the reference keeps lists, allocation per iteration, dense loops over sparse data,
    recomputation of invariant values, F80 software arithmetic in a loop that only needs a few values,

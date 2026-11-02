@@ -48,13 +48,18 @@ five lines each. Re-profile a run when a landed change touched its hot path.
 
 ## In progress
 
-(none)
+- mode_switch.dual-r: enumerate leaving-row references from sorted, deduplicated rowl[r] instead of scanning every column twice; keep all per-column work estimates and their order.
 
 ## Candidates
 
 Ordered by expected payoff; one line each, with the bench run it targets. Start from PLAN.md "Where to
 look first" and replace these with measured items after the first profiles.
 
+- Unresolved regressions against the baseline (PLAN.md "Measuring"; resolve before the next change
+  lands): fx_quad_obj_5371.dual-r 0.334 -> 0.726 s, primal_5959.primal-r 0.563 -> 0.841 s,
+  degen3.barrier-r 0.608 -> 0.857 s. Pair-rerun with instruction counts; bisect the landed commits if real.
+- Goal setup (PLAN.md "Goal"): solve-time column in `perf/bench.sh`, missing `ref` cells via
+  `ref_run.py`, then `current/ref` from solve times.
 - mode_switch.dual-r: factor update (30.10%) still scans full A/B lists for membership, references and row-capacity accounting; annotate the loops before choosing a change.
 - mode_switch.dual-r: BTRAN (12.49%) still allocates dense scratch vectors and recomputes L levels; annotate before choosing a change.
 - mode_switch.dual-r: LU nucleus (15.98%); profile its loops before choosing a change.
