@@ -1297,6 +1297,8 @@ struct Solver<'a> {
     /// The reference's row-wise copy of the nonbasic structurals, in its storage order: a column that enters the basis is
     /// removed by moving the row's last entry into its place, a column that leaves is appended.
     rrows: Vec<Vec<usize>>,
+    /// Row lengths can supply work counts until a basis transition bypasses their maintenance.
+    row_work_valid: bool,
     /// The last `price` call scanned a non-empty list and found nothing.
     list_failed: bool,
     /// The mirror's penalised dual multipliers `y` by row, from the last `dual_btran_work` (they carry the reference's rounding).
@@ -3136,16 +3138,12 @@ impl<'a> Solver<'a> {
         out
     }
 
-    /// Work of the reference's pivot-row product (`0x134d90`) for the row combination `rho` (`reverse-engineer/specs/primal-simplex.md`,
-    /// "Work counter"): its rows hold the nonbasic structural columns that are not fixed, where `q` already counts as basic and
-    /// `leave` as nonbasic.
-    fn row_product_work(&mut self, rho: &[f64], q: usize, leave: usize, caller: u32) {
-        let (n, m) = (self.p.n, self.p.m);
-        let nz: Vec<usize> = (0..m).filter(|&i| rho[i] != 0.0).collect();
-        let nnz_a: usize = self.p.cols[..n].iter().map(Vec::len).sum();
-        let mut seen = vec![false; n];
+    /// Full scan used when the work estimate needs distinct columns or the maintained row lengths are unavailable.
+    #[inline(never)]
+    fn row_product_counts(&self, nz: &[usize], q: usize, leave: usize) -> (usize, usize) {
+        let mut seen = vec![false; self.p.n];
         let (mut p5, mut d) = (0usize, 0usize);
-        for &i in &nz {
+        for &i in nz {
             for &j in &self.rows[i] {
                 if ((self.pos_of[j] == NONE && j != q) || j == leave)
                     && self.p.lo[j] != self.p.up[j]
@@ -3159,6 +3157,46 @@ impl<'a> Solver<'a> {
                 }
             }
         }
+        (p5, d)
+    }
+
+    /// Work of the reference's pivot-row product (`0x134d90`) for the row combination `rho` (`reverse-engineer/specs/primal-simplex.md`,
+    /// "Work counter"): its rows hold the nonbasic structural columns that are not fixed, where `q` already counts as basic and
+    /// `leave` as nonbasic.
+    fn row_product_work(&mut self, rho: &[f64], q: usize, leave: usize, caller: u32) {
+        let (n, m) = (self.p.n, self.p.m);
+        let nz: Vec<usize> = (0..m).filter(|&i| rho[i] != 0.0).collect();
+        let nnz_a: usize = self.p.cols[..n].iter().map(Vec::len).sum();
+        let dense = nz.len() != 1 && m * n <= nz.len() * 3 * nnz_a;
+        let (mut p5, mut d) = (0usize, 0usize);
+        if dense && self.p0.is_none() && self.row_work_valid && self.excluded.is_none() {
+            // The maintained row copy already excludes basic, fixed and rejected columns. In the dense estimate only the
+            // occurrence count is consumed, so sum its row lengths and account for the proposed basis change.
+            p5 = nz.iter().map(|&i| self.rrows[i].len()).sum();
+            if q < n
+                && q != leave
+                && self.pos_of[q] == NONE
+                && !self.is_fixed(q)
+                && self.excluded != Some(q)
+            {
+                p5 -= self.p.cols[q]
+                    .iter()
+                    .filter(|&&(i, _)| rho[i] != 0.0)
+                    .count();
+            }
+            if leave < n
+                && self.pos_of[leave] != NONE
+                && !self.is_fixed(leave)
+                && self.excluded != Some(leave)
+            {
+                p5 += self.p.cols[leave]
+                    .iter()
+                    .filter(|&&(i, _)| rho[i] != 0.0)
+                    .count();
+            }
+        } else {
+            (p5, d) = self.row_product_counts(&nz, q, leave);
+        }
         let nr = nz.len() as f64;
         let est = if nz.len() == 1 {
             // A multiplier below one in magnitude goes through the filtering loop, one more pass over the row.
@@ -3167,7 +3205,7 @@ impl<'a> Solver<'a> {
             } else {
                 10.5 + 4.0 * p5 as f64
             }
-        } else if m * n <= nz.len() * 3 * nnz_a {
+        } else if dense {
             8.5 * nr + 2.0 * p5 as f64 + 2.5 * n as f64
         } else {
             11.5 * nr + 3.5 * p5 as f64 + 3.0 * d as f64
@@ -4431,6 +4469,7 @@ impl<'a> Solver<'a> {
             if let Some(h) = head.iter().position(|&v| v == leave) {
                 head[h] = q;
             }
+            self.row_work_valid = false;
             self.basic[r] = q;
             self.pos_of[q] = r;
             self.pos_of[leave] = NONE;
@@ -5845,6 +5884,7 @@ fn solve_primal(
         leave_prev: None,
         rows: Vec::new(),
         rrows: Vec::new(),
+        row_work_valid: true,
         list_failed: false,
         y_ref: None,
         y_rank: Vec::new(),
@@ -6711,6 +6751,7 @@ fn solve_primal(
                                 }
                                 iterations += k;
                                 if k > 0 || r2.status == Status::Infeasible {
+                                    s.row_work_valid = false;
                                     s.basic = head;
                                     s.pos_of.iter_mut().for_each(|v| *v = NONE);
                                     for (pos, &j) in s.basic.iter().enumerate() {
@@ -7507,6 +7548,7 @@ fn solve_primal(
                     bk.append(1, leave);
                 }
             }
+            s.row_work_valid = false;
             s.basic[r] = q;
             s.pos_of[q] = r;
             s.factor.update(r, alpha);
