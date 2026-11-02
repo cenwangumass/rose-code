@@ -53,6 +53,14 @@ baseline. No exceptions, no "within a ULP", no re-recording.
 ## Tools
 
 - `cargo build --release`: the binaries (`target/release/rose`, `target/release/rose-parity`).
+- `python3 perf/build_pgo.py --check --test`: opt-in PGO release CLI, trained on 39 bounded small-model
+  runs across all methods and recovery exits. Uses the pinned compiler and matching `llvm-profdata`;
+  override the latter with `LLVM_PROFDATA`. Generated profiles, training log and exact build flags stay
+  in `target/perf-pgo/`; no training data is committed. The current performance table uses this build.
+  Ordinary Cargo builds remain the ThinLTO baseline and can overwrite the optimized CLI; rebuild with
+  the script before comparing PGO candidates. Save the preceding binary before rebuilding as usual.
+  The script uses controlled Rust flags for both stages; it does not inherit `RUSTFLAGS`.
+
 - `cargo build --profile profiling`: the same code with line tables (`target/profiling/rose`), for perf.
   It produces the same bits as release.
 - `target/release/rose-parity check [--tier full] [--only ID,..]`: the gate. Fast tier (940 runs) takes
@@ -60,6 +68,9 @@ baseline. No exceptions, no "within a ULP", no re-recording.
 - `perf/bench.sh [--only ID,..] [--runs N] [--instr] [--bin PATH]`: times the runs of
   [bench.txt](bench.txt) with hyperfine (median of N after a warm-up); `--instr` adds user-space
   instruction counts (`perf stat`), which have far less noise than wall time.
+- For profiling a PGO candidate, include the `rustflags` recorded in `target/perf-pgo/build.json` in
+  addition to the frame-pointer flag below, then parity-check that profiling binary. Without the saved
+  profile-use flag the profiling build describes the ordinary ThinLTO baseline.
 - For reliable inclusive profiles, build with `RUSTFLAGS='-C force-frame-pointers=yes' cargo build
   --profile profiling`, then parity-check that binary with `--tier full --bin target/profiling/rose`.
   Capture with `perf record -F 1999 -g --call-graph fp -o target/X.data -- target/profiling/rose solve
