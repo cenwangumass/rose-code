@@ -390,7 +390,7 @@ impl<R: Real> RefStruct<R> {
         let mut uc: Vec<Vec<(usize, R)>> = vec![Vec::new(); m];
         let (mut sa, mut sb) = (0usize, 0usize);
         let mut xv = vec![R::ZERO; m];
-        let mut cnt = vec![0i32; m];
+        let mut reached = vec![false; m];
         let mut epos = vec![usize::MAX; m];
         let mut changed = vec![false; m];
         for t in i21..m {
@@ -404,54 +404,28 @@ impl<R: Real> RefStruct<R> {
                     start.push(s);
                 }
             }
-            let mut lst = start.clone();
-            for &v in &lst {
-                cnt[v] += 1;
+            // Only the reached set is needed: the numeric solve below visits it in ascending order.
+            let mut lst = Vec::new();
+            for &v in &start {
+                if !reached[v] {
+                    reached[v] = true;
+                    lst.push(v);
+                }
             }
             let mut k = 0;
             while k < lst.len() {
                 let v = lst[k];
                 k += 1;
                 for &y in &lcols[v] {
-                    if y > t {
-                        continue;
-                    }
-                    if cnt[y] == 0 {
+                    if y <= t && !reached[y] {
+                        reached[y] = true;
                         lst.push(y);
                     }
-                    cnt[y] += 1;
                 }
             }
-            let mut q: Vec<usize> = Vec::new();
-            for &v in &lst[..start.len()] {
-                cnt[v] -= 1;
-                if cnt[v] == 0 {
-                    q.push(v);
-                }
-            }
-            let mut k = 0;
-            while k < q.len() {
-                let v = q[k];
-                k += 1;
-                for &y in &lcols[v] {
-                    if y > t {
-                        continue;
-                    }
-                    cnt[y] -= 1;
-                    if cnt[y] == 0 {
-                        q.push(y);
-                    }
-                }
-            }
-            // The numeric solve visits the steps in ascending order, not in the Kahn order of the symbolic pass: the sums that
-            // cancel to rounding noise then fall on the reference's side of the tolerance (PILOT.JA factor 45, column 925: the
-            // entries at 870 and 876 are 2.6e-13 and 3.4e-13 in the Kahn order and dropped in the reference).
-            let mut q = q;
-            q.sort_unstable();
-            // The numeric solve visits the steps in ascending order, not in the Kahn order of the symbolic pass: sums that cancel
-            // to rounding noise then fall on the reference's side of the tolerance (PILOT.JA factor 45, column 925: the entries at
-            // 870 and 876 are 2.6e-13 and 3.4e-13 in the Kahn order and absent in the reference).
-            let mut q = q;
+            // The numeric solve visits the steps in ascending order, not graph-discovery order: sums that cancel to rounding
+            // noise then fall on the reference's side of the tolerance (PILOT.JA factor 45, column 925).
+            let mut q = lst.clone();
             q.sort_unstable();
             for &v in &q {
                 if v >= t {
@@ -490,9 +464,7 @@ impl<R: Real> RefStruct<R> {
                 }
             }
             let mut ents: Vec<(usize, R)> = Vec::new();
-            let mut touched: Vec<usize> = lst.clone();
-            touched.sort_unstable();
-            touched.dedup();
+            let touched = q;
             for &v in &touched {
                 if v < t
                     && (xv[v].abs() > R::c(TOL)
@@ -524,7 +496,7 @@ impl<R: Real> RefStruct<R> {
             });
             for &v in &lst {
                 xv[v] = R::ZERO;
-                cnt[v] = 0;
+                reached[v] = false;
             }
             for &v in &touched {
                 changed[v] = false;
