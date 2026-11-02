@@ -2406,19 +2406,19 @@ impl<R: Real> RefStruct<R> {
         }
         let mut eta = Vec::new();
         // The reference's solve (`0x131760`) books 2 per entry of the row-wise copy of every accepted position, `r` first.
-        let mut rcount = vec![0usize; m];
-        let mut stamp = vec![usize::MAX; m];
-        for x in 0..m {
-            if self.kind[x] == -2 {
-                for &y in self.a[x].iter().chain(&self.b[x]) {
-                    if stamp[y] != x {
-                        stamp[y] = x;
-                        rcount[y] += 1;
-                    }
+        // Count only the rows reached by the solve. The transpose is sorted by column,
+        // so adjacent duplicates count once, just as in the full column/stamp rebuild.
+        let rlen = |y: usize| {
+            let mut prev = usize::MAX;
+            let mut count = 0;
+            for &(c, _) in &self.ut[y] {
+                if c != prev && self.kind[c] == -2 {
+                    count += 1;
                 }
+                prev = c;
             }
-        }
-        let rlen = |y: usize| rcount[y];
+            count
+        };
         // Only positions in the tail (slot >= i21) are visited in the heap phase of the solve that books; the earlier ones are
         // handled in the list phase.
         let mut visited = if self.slot[r] >= self.i21 { rlen(r) } else { 0 };
@@ -2436,9 +2436,10 @@ impl<R: Real> RefStruct<R> {
                 continue;
             }
             eta.push((k, c));
-            dense += 2.0 * rlen(k) as f64;
+            let len = rlen(k);
+            dense += 2.0 * len as f64;
             if self.slot[k] >= self.i21 {
-                visited += rlen(k);
+                visited += len;
             }
             for &(l, v) in rows(k) {
                 w[l] += c * v;
