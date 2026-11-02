@@ -824,6 +824,10 @@ impl Internal {
             .map(|i| (rank[i], i))
             .collect();
         order.sort_unstable();
+        #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+        if let Some(acc) = self.rank_products_q_native(v, &order) {
+            return acc;
+        }
         let mut acc = vec![crate::f80::F80::ZERO; self.n + self.m];
         for &(_, i) in &order {
             let vi = v[i];
@@ -832,6 +836,68 @@ impl Internal {
             }
         }
         acc
+    }
+
+    /// Use the same extended multiply and add, with an 80-bit store after each operation.
+    /// The software path also works when the caller selected another x87 control mode.
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    fn rank_products_q_native(
+        &self,
+        v: &[crate::f80::F80],
+        order: &[(usize, usize)],
+    ) -> Option<Vec<crate::f80::F80>> {
+        use std::arch::asm;
+        let mut cw = 0u16;
+        // SAFETY: fnstcw writes exactly two bytes and does not change the control word.
+        unsafe {
+            asm!("fnstcw [{cw}]", cw = in(reg) &mut cw, options(nostack, preserves_flags));
+        }
+        // All exceptions masked, round to nearest, 64-bit significand precision.
+        if cw & 0x0f3f != 0x033f {
+            return None;
+        }
+        let mut acc = vec![[0u8; 16]; self.n + self.m];
+        let mut product = [0u8; 16];
+        for &(_, i) in order {
+            let (m, se) = v[i].repr();
+            let mut vi = [0u8; 16];
+            vi[..8].copy_from_slice(&m.to_le_bytes());
+            vi[8..10].copy_from_slice(&se.to_le_bytes());
+            for (j, a) in &self.rwise[i] {
+                let out = &mut acc[*j];
+                // SAFETY: inputs are valid f64/80-bit encodings. Each pointer covers
+                // its load/store, the x87 stack balances, and both used registers are
+                // clobbered. The stores preserve multiply then add rounding separately.
+                unsafe {
+                    asm!(
+                        "fld qword ptr [{a}]",
+                        "fld tbyte ptr [{v}]",
+                        "fmulp st(1), st",
+                        "fstp tbyte ptr [{product}]",
+                        "fld tbyte ptr [{out}]",
+                        "fld tbyte ptr [{product}]",
+                        "faddp st(1), st",
+                        "fstp tbyte ptr [{out}]",
+                        a = in(reg) a,
+                        v = in(reg) vi.as_ptr(),
+                        product = in(reg) product.as_mut_ptr(),
+                        out = in(reg) out.as_mut_ptr(),
+                        out("st(0)") _, out("st(1)") _,
+                        options(nostack, preserves_flags),
+                    );
+                }
+            }
+        }
+        Some(
+            acc.into_iter()
+                .map(|b| {
+                    crate::f80::F80::from_repr(
+                        u64::from_le_bytes(b[..8].try_into().unwrap()),
+                        u16::from_le_bytes(b[8..10].try_into().unwrap()),
+                    )
+                })
+                .collect(),
+        )
     }
 
     fn rank_products(&self, v: &[f64], rank: &[usize]) -> Vec<f64> {
@@ -8447,4 +8513,227 @@ fn x87_failed_scan_with_two_updates_recomputes_the_duals_before_refactoring() {
     let r = crate::solve(&model, None, &SolveOptions::dual_release()).unwrap();
     assert_eq!(r.status, Status::Optimal);
     assert_eq!(r.iterations, 87);
+}
+
+#[cfg(test)]
+mod rank_product_tests {
+    use super::*;
+    use crate::f80::F80;
+
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    struct ControlWord(u16);
+
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    impl ControlWord {
+        fn new(cw: u16) -> Self {
+            let mut old = 0u16;
+            unsafe {
+                std::arch::asm!("fnstcw [{old}]", "fldcw [{cw}]",
+                old = in(reg) &mut old, cw = in(reg) &cw, options(nostack));
+            }
+            Self(old)
+        }
+    }
+
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    impl Drop for ControlWord {
+        fn drop(&mut self) {
+            unsafe {
+                std::arch::asm!("fldcw [{cw}]", cw = in(reg) &self.0, options(nostack));
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    fn extended_rank_control_modes() {
+        let model = crate::mps::parse(include_str!("../tests/fixtures/quad_2717.mps")).unwrap();
+        let p = build(&model);
+        let v = vec![F80::ONE; p.m];
+        let rank: Vec<_> = (0..p.m).collect();
+        let order: Vec<_> = (0..p.m).map(|i| (i, i)).collect();
+        {
+            let _cw = ControlWord::new(0x037f);
+            assert!(p.rank_products_q_native(&v, &order).is_some());
+            check(&p, &v, &rank);
+        }
+        for cw in [0x027f, 0x077f, 0x0b7f, 0x0f7f] {
+            let _cw = ControlWord::new(cw);
+            assert!(p.rank_products_q_native(&v, &order).is_none());
+            check(&p, &v, &rank);
+        }
+    }
+
+    // Frozen software implementation before native extended products (ussxlpst).
+    fn frozen(p: &Internal, v: &[crate::f80::F80], rank: &[usize]) -> Vec<crate::f80::F80> {
+        use crate::real::Real;
+        let mut order: Vec<(usize, usize)> = (0..p.m)
+            .filter(|&i| rank[i] != usize::MAX)
+            .map(|i| (rank[i], i))
+            .collect();
+        order.sort_unstable();
+        let mut acc = vec![crate::f80::F80::ZERO; p.n + p.m];
+        for &(_, i) in &order {
+            let vi = v[i];
+            for &(j, a) in &p.rwise[i] {
+                acc[j] = acc[j] + crate::f80::F80::c(a) * vi;
+            }
+        }
+        acc
+    }
+
+    fn check(p: &Internal, v: &[F80], rank: &[usize]) {
+        let old = frozen(p, v, rank);
+        let new = p.rank_products_q(v, rank);
+        assert_eq!(
+            old.iter().map(|v| v.repr()).collect::<Vec<_>>(),
+            new.iter().map(|v| v.repr()).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn extended_rank_products_match_frozen() {
+        #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+        let _cw = ControlWord::new(0x037f);
+
+        let model = crate::mps::parse(include_str!("../tests/fixtures/quad_2717.mps")).unwrap();
+        let scaled = crate::scale::compute(&model).apply(&model).unwrap();
+        let mut p = build(&scaled);
+        // ROSE_DUMP=rho, quad_2717 dual-release, local iterations 2204..2206.
+        // The dump stores rounded BTRAN values; retain them as real-run inputs.
+        let captured: &[&[(usize, f64)]] = &[
+            &[
+                (0, 1102819.630584076),
+                (1, 26834.915545501935),
+                (2, 70932122.96241887),
+                (3, -3564.599518819679),
+                (5, -111393843.5254295),
+                (6, 66636349.70174359),
+            ],
+            &[
+                (0, 45531153.877305694),
+                (1, 1107909.7933173783),
+                (2, 2928512801.078258),
+                (3, -147168.5166833592),
+                (5, -4599020628.472732),
+                (6, 2751156950.7383137),
+            ],
+            &[
+                (0, 1102819.630584076),
+                (1, 26834.915545501935),
+                (2, 70932122.96241887),
+                (3, -3564.599518819679),
+                (5, -111393843.5254295),
+                (6, 66636349.70174359),
+            ],
+        ];
+        for row in captured {
+            let mut v = vec![F80::ZERO; p.m];
+            let mut rank = vec![usize::MAX; p.m];
+            for (k, &(i, x)) in row.iter().enumerate() {
+                v[i] = F80::from_f64(x);
+                rank[i] = k;
+            }
+            check(&p, &v, &rank);
+        }
+        // Exercise rounding before the add at gradual-underflow and overflow
+        // boundaries, including exact cancellation and empty/single-entry kernels.
+        for (m, se) in [
+            (1, 0),
+            (2, 0),
+            (3, 0),
+            (u64::MAX >> 1, 0),
+            (1 << 63, 1),
+            ((1 << 63) + 1, 1),
+            (u64::MAX, 0x7ffe),
+        ] {
+            let v = vec![F80::from_repr(m, se); p.m];
+            let mut rank = vec![usize::MAX; p.m];
+            rank[0] = 0;
+            p.rwise = vec![Vec::new(); p.m];
+            check(&p, &v, &rank);
+            p.rwise[0].push((0, 0.5));
+            check(&p, &v, &rank);
+            let coefficients = [
+                0.0,
+                -0.0,
+                0.5,
+                -0.5,
+                0.5 + f64::EPSILON,
+                1.0,
+                -1.0,
+                f64::from_bits(1),
+                f64::MAX,
+            ];
+            p.rwise[0] = coefficients
+                .iter()
+                .enumerate()
+                .map(|(j, &a)| (j, a))
+                .collect();
+            check(&p, &v, &rank);
+            rank[1] = 1;
+            p.rwise[1] = coefficients
+                .iter()
+                .enumerate()
+                .map(|(j, &a)| (j, -a))
+                .collect();
+            check(&p, &v, &rank);
+        }
+        let mut seed = 0x58c4_0dfa_17u64;
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        for round in 0..1000 {
+            // Empty, one-entry and duplicate column entries, including extreme doubles.
+            p.rwise = vec![Vec::new(); p.m];
+            for j in 0..p.n + p.m {
+                for k in 0..round % 17 {
+                    let i = next() as usize % p.m;
+                    let a = match k % 7 {
+                        0 => 0.0,
+                        1 => -0.0,
+                        2 => f64::from_bits(1),
+                        3 => f64::MAX,
+                        _ => f64::from_bits(next()),
+                    };
+                    p.rwise[i].push((j, a));
+                }
+            }
+            let v: Vec<_> = (0..p.m)
+                .map(|i| {
+                    if round % 19 == 0 {
+                        match i % 6 {
+                            0 => F80::ZERO,
+                            1 => F80::from_f64(-0.0),
+                            2 => F80::from_repr(1, 0),
+                            3 => F80::from_repr(u64::MAX, 0x7ffe),
+                            4 => F80::INFINITY,
+                            _ => F80::NAN,
+                        }
+                    } else {
+                        let m = next() | (1 << 63);
+                        let se = if round % 2 == 0 {
+                            (0x3f80 + next() % 256) as u16
+                        } else {
+                            (next() % 0x7fff) as u16
+                        };
+                        F80::from_repr(m, se | ((next() & 1) as u16) << 15)
+                    }
+                })
+                .collect();
+            let rank: Vec<_> = (0..p.m)
+                .map(|i| {
+                    if round % 11 == 0 || next() % 3 == 0 {
+                        usize::MAX
+                    } else {
+                        (next() as usize + i) % p.m
+                    }
+                })
+                .collect();
+            check(&p, &v, &rank);
+        }
+    }
 }
