@@ -55,7 +55,7 @@ five lines each. Re-profile a run when a landed change touched its hot path.
 Ordered by expected payoff; one line each, with the bench run it targets. Start from PLAN.md "Where to
 look first" and replace these with measured items after the first profiles.
 
-- mode_switch.dual-r: factor update (24.28%) repeatedly scans full row/column lists; inspect allocations and scans first.
+- mode_switch.dual-r: factor update (24.28%); eliminate rebuilds numeric U rows in CSR on every update (two full U scans). Investigate a reusable row index with exact column order and invalidation; the row-count-only shortcut is rejected below.
 - mode_switch.dual-r: BTRAN (17.31%) still rebuilds the U transpose each call (U changes at each pivot); investigate reuse with invalidation.
 - mode_switch.dual-r: LU nucleus (9.94%); profile its loops before choosing a change.
 - quad runs: cost of `crate::f80` arithmetic in the quad kernels.
@@ -64,7 +64,7 @@ look first" and replace these with measured items after the first profiles.
 
 ## Tried, no gain
 
-(idea, bench run, measured result)
+- Read eliminate work counts directly from maintained rowl lengths instead of rebuilding counts: parity full 987/987 and release tests pass, but mode_switch.dual-r 22.849 -> 21.851 s is smaller than the old 1.849 s spread (instructions 146886.1 -> 140945.4M, -4.0%). Alternating DEGEN2 primal 0.092/0.090 then 0.091/0.091 s; dual 0.068/0.067 s, marginal against spread. Reverted.
 
 ## Tried, breaks parity
 
