@@ -1300,6 +1300,8 @@ struct OrderCache {
 }
 
 struct Solver<'a> {
+    /// Bounds are immutable throughout this primal solve.
+    fixed: Vec<bool>,
     p: &'a Internal,
     opts: &'a SolveOptions,
     /// Variable dropped last from a singular supplied basis: not priced until the basis is primal feasible.
@@ -3214,7 +3216,7 @@ impl<'a> Solver<'a> {
     }
 
     fn is_fixed(&self, j: usize) -> bool {
-        self.p.lo[j] == self.p.up[j]
+        self.fixed[j]
     }
 
     /// Order in which the reference stores the pivot-row entries: with a sparse `rho`, structurals in first-touch
@@ -5955,6 +5957,7 @@ fn solve_primal(
         Err(_) => return Err(SolveError::SingularBasis),
     };
     let mut s = Solver {
+        fixed: p.lo.iter().zip(&p.up).map(|(lo, up)| lo == up).collect(),
         p: &p,
         opts,
         excluded,
