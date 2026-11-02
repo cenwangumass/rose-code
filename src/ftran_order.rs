@@ -1892,7 +1892,6 @@ impl<R: Real> RefStruct<R> {
                 let v = x[i];
                 if v.abs() > R::c(TOL) {
                     e = lt[i].len() as f64 * 2.0 + e;
-                    res.push(i);
                     for &(j, lv) in &lt[i] {
                         x[j] -= lv * v;
                     }
