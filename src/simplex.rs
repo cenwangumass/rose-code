@@ -8170,7 +8170,6 @@ fn solve_primal(
             };
             (crate::f80::F80::from_f64(a_rq.to_f64()), wq_q)
         });
-        let col_off = &p.offs;
         let rho_rank: Option<Vec<usize>> = rho_ref.as_ref().map(|rr| {
             let mut rank = vec![usize::MAX; m];
             for (k, &(i, _)) in rr.iter().enumerate() {
@@ -8240,111 +8239,38 @@ fn solve_primal(
                 .with(|c| c.set(Some((alpha_rq, if q < n { alpha_rq } else { arq_x }))));
         }
         let devex_cross = tau_q.as_deref().map(DevexCrossTerms::new);
-        let mut norm_reset = false;
-        let mut changed: Vec<usize> = Vec::new();
-        let mut rowvals: Vec<(usize, f64)> = Vec::new();
-        for j in 0..n + m {
-            if j >= n && j != q && j != leave && s.pos_of[j] != NONE && s.mirror.is_some() {
-                let arj = match prods.as_ref() {
-                    Some(pr) => pr[j],
-                    None => dot(&p.cols[j], &rho),
-                };
-                if arj.abs() > ROW_DROP_TOL {
-                    if !s.is_fixed(j) {
-                        if !prods_q.as_ref().is_some_and(|pq| dsub(&mut s, j, pq[j])) {
-                            s.d[j] -= theta_d * arj;
-                        }
-                    }
-                    // Mode 2 gives the basic slack's noise product the weight update too, which puts it into the reference framework
-                    // (`w > 0`), GREENBEA iteration 6094: a product below the update tolerance leaves `w = 1`.
-                    if m2 {
-                        s.w[j] = s.w[j].max(((wq / alpha_rq) / alpha_rq) * arj * arj + 1.0);
-                    }
-                    // The reference keeps a basic slack's rounding-noise row product in the pivot row like any entry.
-                    changed.push(j);
-                    rowvals.push((j, arj));
-                }
-                continue;
-            }
-            if s.pos_of[j] != NONE || j == q || s.excluded == Some(j) {
-                // The dropped variable is outside the reference's row copy: its d and weight are not updated (fx_midsing_1496 pricing call 19).
-                continue;
-            }
-            let arj = match prods.as_ref() {
-                Some(pr) => pr[j],
-                None => dot(&p.cols[j], &rho),
-            };
-            // The reference's row product keeps the entries above its drop tolerance (`0x134d90`).
-            if arj.abs() <= ROW_DROP_TOL {
-                continue;
-            }
-            // The Devex update has its own, larger drop tolerance (`0x103d0d`); d and the list keep the row product's.
-            if m2 {
-                // Mode 2 (`0x104c2d`): `w_j = max(w_j, wq / alpha^2 * arj^2 + 1)`, no cross term.
-                if arj.abs() > WEIGHT_DROP_TOL {
-                    if let (Some((a_rq, wq_q)), Some(pq)) = (qw, prods_q.as_ref()) {
-                        // 0x257f98 and 0x25809d keep the divisions and row update in x87 precision.
-                        use crate::real::Real;
-                        let nw = ((wq_q / a_rq) / a_rq) * pq[j] * pq[j] + crate::f80::F80::ONE;
-                        if s.wf.len() != s.w.len() {
-                            s.wf = vec![crate::f80::F80::ZERO; s.w.len()];
-                        }
-                        let old = if s.wf[j].to_f64() == s.w[j] {
-                            s.wf[j]
-                        } else {
-                            crate::f80::F80::c(s.w[j])
-                        };
-                        if nw > old {
-                            s.wf[j] = nw;
-                            s.w[j] = nw.to_f64();
-                        }
-                    } else {
-                        s.w[j] = s.w[j].max(((wq / alpha_rq) / alpha_rq) * arj * arj + 1.0);
-                    }
-                }
-            } else if arj.abs() > WEIGHT_DROP_TOL {
-                if let (Some((a_rq, wq_q)), Some(cross), Some(pq)) =
-                    (qw, devex_cross.as_ref(), prods_q.as_ref())
-                {
-                    use crate::real::Real;
-                    let ratio = pq[j] / a_rq;
-                    let vj = cross.dot(&p.fcols[j]);
-                    if s.wf.len() != s.w.len() {
-                        s.wf = vec![crate::f80::F80::ZERO; s.w.len()];
-                    }
-                    let old = if s.wf[j].to_f64() == s.w[j] {
-                        s.wf[j]
-                    } else {
-                        crate::f80::F80::c(s.w[j])
-                    };
-                    let nw = ratio * (wq_q * ratio - crate::f80::F80::c(2.0) * vj) + old;
-                    s.wf[j] = nw;
-                    s.w[j] = nw.to_f64();
-                } else {
-                    let ratio = arj / alpha_rq;
-                    let vj = dot_lanes(&p.fcols[j], &u, col_off[j] & 1);
-                    s.w[j] = ratio * ((wq * ratio - vj) - vj) + s.w[j];
-                }
-                // A fixed structural never resets the framework (PILOT.JA iteration 3856: the fixed EMROP06 went to -3e4); a fixed
-                // slack does (PEROLD iteration 1626, PILOTNOV iteration 1026).
-                if opts.faithful_weights && s.w[j] < NORM_RESET_TOL && !(j < n && s.is_fixed(j)) {
-                    norm_reset = true;
-                }
-                let floor = if opts.faithful_weights { W_MIN } else { 1.0 };
-                s.w[j] = s.w[j].max(floor);
-            }
-            if !s.is_fixed(j) {
-                // The reference sums the row product in the order of the BTRAN output list.
-                if !prods_q.as_ref().is_some_and(|pq| dsub(&mut s, j, pq[j])) {
-                    s.d[j] -= theta_d * arj;
-                }
-            }
-            // The variable dropped from a singular start basis is not in the reference's row copy, so not in its pivot row.
-            if s.excluded != Some(j) {
-                changed.push(j);
-                rowvals.push((j, arj));
-            }
-        }
+        let input = PrimalRowInput {
+            p: &p,
+            q,
+            leave,
+            m2,
+            has_mirror: s.mirror.is_some(),
+            faithful_weights: opts.faithful_weights,
+            prods: prods.as_deref(),
+            prods_q: prods_q.as_deref(),
+            rho: &rho,
+            u: &u,
+            qw,
+            cross: devex_cross.as_ref(),
+            theta_d,
+            alpha_rq,
+            wq,
+            theta_dq,
+        };
+        let state = PrimalRowState {
+            w: &mut s.w,
+            d: &mut s.d,
+            wf: &mut s.wf,
+            df: &mut s.df,
+            pos_of: &s.pos_of,
+            fixed: &s.fixed,
+            excluded: s.excluded,
+        };
+        let (mut norm_reset, mut changed, mut rowvals) = if qw.is_none() && prods_q.is_none() {
+            primal_row_update::<false>(state, &input)
+        } else {
+            primal_row_update::<true>(state, &input)
+        };
         // The penalty leaves `d` of the leaving variable after the list update, which scores it with the penalty still in.
         let mut leave_penalty = 0.0;
         if s.mirror.is_some() && phase1 {
@@ -9354,6 +9280,627 @@ mod devex_dot_tests {
             let kernel = DevexCrossTerms::new(&tau);
             assert_eq!(kernel.packed.is_some(), cw == 0x037f);
             assert_eq!(kernel.dot(&col).repr(), frozen(&col, &tau).repr());
+        }
+    }
+}
+
+/// Arrays touched by the primal row update, borrowed separately from controller state.
+struct PrimalRowState<'a> {
+    w: &'a mut [f64],
+    d: &'a mut [f64],
+    wf: &'a mut Vec<crate::f80::F80>,
+    df: &'a mut [crate::f80::F80],
+    pos_of: &'a [usize],
+    fixed: &'a [bool],
+    excluded: Option<usize>,
+}
+
+#[derive(Clone, Copy)]
+struct PrimalRowInput<'a> {
+    p: &'a Internal,
+    q: usize,
+    leave: usize,
+    m2: bool,
+    has_mirror: bool,
+    faithful_weights: bool,
+    prods: Option<&'a [f64]>,
+    prods_q: Option<&'a [crate::f80::F80]>,
+    rho: &'a [f64],
+    u: &'a [f64],
+    qw: Option<(crate::f80::F80, crate::f80::F80)>,
+    cross: Option<&'a DevexCrossTerms<'a>>,
+    theta_d: f64,
+    alpha_rq: f64,
+    wq: f64,
+    theta_dq: Option<crate::f80::F80>,
+}
+
+#[cfg(test)]
+fn frozen_primal_row_update(
+    mut s: PrimalRowState<'_>,
+    arg: &PrimalRowInput<'_>,
+) -> (bool, Vec<usize>, Vec<(usize, f64)>) {
+    let PrimalRowInput {
+        p,
+        q,
+        leave,
+        m2,
+        has_mirror,
+        faithful_weights,
+        prods,
+        prods_q,
+        rho,
+        u,
+        qw,
+        cross: devex_cross,
+        theta_d,
+        alpha_rq,
+        wq,
+        theta_dq,
+    } = *arg;
+    let (n, m) = (p.n, p.m);
+    let col_off = &p.offs;
+    let dval = |s: &PrimalRowState<'_>, j: usize| -> crate::f80::F80 {
+        if s.df[j].to_f64() == s.d[j] {
+            s.df[j]
+        } else {
+            crate::f80::F80::from_f64(s.d[j])
+        }
+    };
+    let dsub = |s: &mut PrimalRowState<'_>, j: usize, prod: crate::f80::F80| {
+        if let Some(th) = theta_dq {
+            let nd = dval(s, j) - th * prod;
+            s.df[j] = nd;
+            s.d[j] = nd.to_f64();
+            true
+        } else {
+            false
+        }
+    };
+    let mut norm_reset = false;
+    let mut changed: Vec<usize> = Vec::new();
+    let mut rowvals: Vec<(usize, f64)> = Vec::new();
+    for j in 0..n + m {
+        if j >= n && j != q && j != leave && s.pos_of[j] != NONE && has_mirror {
+            let arj = match prods.as_ref() {
+                Some(pr) => pr[j],
+                None => dot(&p.cols[j], &rho),
+            };
+            if arj.abs() > ROW_DROP_TOL {
+                if !s.fixed[j] {
+                    if !prods_q.as_ref().is_some_and(|pq| dsub(&mut s, j, pq[j])) {
+                        s.d[j] -= theta_d * arj;
+                    }
+                }
+                // Mode 2 gives the basic slack's noise product the weight update too, which puts it into the reference framework
+                // (`w > 0`), GREENBEA iteration 6094: a product below the update tolerance leaves `w = 1`.
+                if m2 {
+                    s.w[j] = s.w[j].max(((wq / alpha_rq) / alpha_rq) * arj * arj + 1.0);
+                }
+                // The reference keeps a basic slack's rounding-noise row product in the pivot row like any entry.
+                changed.push(j);
+                rowvals.push((j, arj));
+            }
+            continue;
+        }
+        if s.pos_of[j] != NONE || j == q || s.excluded == Some(j) {
+            // The dropped variable is outside the reference's row copy: its d and weight are not updated (fx_midsing_1496 pricing call 19).
+            continue;
+        }
+        let arj = match prods.as_ref() {
+            Some(pr) => pr[j],
+            None => dot(&p.cols[j], &rho),
+        };
+        // The reference's row product keeps the entries above its drop tolerance (`0x134d90`).
+        if arj.abs() <= ROW_DROP_TOL {
+            continue;
+        }
+        // The Devex update has its own, larger drop tolerance (`0x103d0d`); d and the list keep the row product's.
+        if m2 {
+            // Mode 2 (`0x104c2d`): `w_j = max(w_j, wq / alpha^2 * arj^2 + 1)`, no cross term.
+            if arj.abs() > WEIGHT_DROP_TOL {
+                if let (Some((a_rq, wq_q)), Some(pq)) = (qw, prods_q.as_ref()) {
+                    // 0x257f98 and 0x25809d keep the divisions and row update in x87 precision.
+                    use crate::real::Real;
+                    let nw = ((wq_q / a_rq) / a_rq) * pq[j] * pq[j] + crate::f80::F80::ONE;
+                    if s.wf.len() != s.w.len() {
+                        *s.wf = vec![crate::f80::F80::ZERO; s.w.len()];
+                    }
+                    let old = if s.wf[j].to_f64() == s.w[j] {
+                        s.wf[j]
+                    } else {
+                        crate::f80::F80::c(s.w[j])
+                    };
+                    if nw > old {
+                        s.wf[j] = nw;
+                        s.w[j] = nw.to_f64();
+                    }
+                } else {
+                    s.w[j] = s.w[j].max(((wq / alpha_rq) / alpha_rq) * arj * arj + 1.0);
+                }
+            }
+        } else if arj.abs() > WEIGHT_DROP_TOL {
+            if let (Some((a_rq, wq_q)), Some(cross), Some(pq)) =
+                (qw, devex_cross.as_ref(), prods_q.as_ref())
+            {
+                use crate::real::Real;
+                let ratio = pq[j] / a_rq;
+                let vj = cross.dot(&p.fcols[j]);
+                if s.wf.len() != s.w.len() {
+                    *s.wf = vec![crate::f80::F80::ZERO; s.w.len()];
+                }
+                let old = if s.wf[j].to_f64() == s.w[j] {
+                    s.wf[j]
+                } else {
+                    crate::f80::F80::c(s.w[j])
+                };
+                let nw = ratio * (wq_q * ratio - crate::f80::F80::c(2.0) * vj) + old;
+                s.wf[j] = nw;
+                s.w[j] = nw.to_f64();
+            } else {
+                let ratio = arj / alpha_rq;
+                let vj = dot_lanes(&p.fcols[j], &u, col_off[j] & 1);
+                s.w[j] = ratio * ((wq * ratio - vj) - vj) + s.w[j];
+            }
+            // A fixed structural never resets the framework (PILOT.JA iteration 3856: the fixed EMROP06 went to -3e4); a fixed
+            // slack does (PEROLD iteration 1626, PILOTNOV iteration 1026).
+            if faithful_weights && s.w[j] < NORM_RESET_TOL && !(j < n && s.fixed[j]) {
+                norm_reset = true;
+            }
+            let floor = if faithful_weights { W_MIN } else { 1.0 };
+            s.w[j] = s.w[j].max(floor);
+        }
+        if !s.fixed[j] {
+            // The reference sums the row product in the order of the BTRAN output list.
+            if !prods_q.as_ref().is_some_and(|pq| dsub(&mut s, j, pq[j])) {
+                s.d[j] -= theta_d * arj;
+            }
+        }
+        // The variable dropped from a singular start basis is not in the reference's row copy, so not in its pivot row.
+        if s.excluded != Some(j) {
+            changed.push(j);
+            rowvals.push((j, arj));
+        }
+    }
+    (norm_reset, changed, rowvals)
+}
+
+// The double entry requires absent qw and prods_q. The caller dispatches once;
+// the mixed entry retains all recovery and extended-twin presence combinations.
+#[inline(never)]
+fn primal_row_update<const QUAD: bool>(
+    mut s: PrimalRowState<'_>,
+    arg: &PrimalRowInput<'_>,
+) -> (bool, Vec<usize>, Vec<(usize, f64)>) {
+    let PrimalRowInput {
+        p,
+        q,
+        leave,
+        m2,
+        has_mirror,
+        faithful_weights,
+        prods,
+        prods_q,
+        rho,
+        u,
+        qw,
+        cross: devex_cross,
+        theta_d,
+        alpha_rq,
+        wq,
+        theta_dq,
+    } = *arg;
+    // The double entry has no extended state. Keep the mixed entry for every
+    // other presence combination, including partial recovery contexts.
+    let (qw, prods_q, devex_cross, theta_dq) = if QUAD {
+        (qw, prods_q, devex_cross, theta_dq)
+    } else {
+        (None, None, None, None)
+    };
+    let (n, m) = (p.n, p.m);
+    let col_off = &p.offs;
+    let dval = |s: &PrimalRowState<'_>, j: usize| -> crate::f80::F80 {
+        if s.df[j].to_f64() == s.d[j] {
+            s.df[j]
+        } else {
+            crate::f80::F80::from_f64(s.d[j])
+        }
+    };
+    let dsub = |s: &mut PrimalRowState<'_>, j: usize, prod: crate::f80::F80| {
+        if let Some(th) = theta_dq {
+            let nd = dval(s, j) - th * prod;
+            s.df[j] = nd;
+            s.d[j] = nd.to_f64();
+            true
+        } else {
+            false
+        }
+    };
+    let mut norm_reset = false;
+    let mut changed: Vec<usize> = Vec::new();
+    let mut rowvals: Vec<(usize, f64)> = Vec::new();
+    for j in 0..n + m {
+        if j >= n && j != q && j != leave && s.pos_of[j] != NONE && has_mirror {
+            let arj = match prods.as_ref() {
+                Some(pr) => pr[j],
+                None => dot(&p.cols[j], &rho),
+            };
+            if arj.abs() > ROW_DROP_TOL {
+                if !s.fixed[j] {
+                    if !prods_q.as_ref().is_some_and(|pq| dsub(&mut s, j, pq[j])) {
+                        s.d[j] -= theta_d * arj;
+                    }
+                }
+                // Mode 2 gives the basic slack's noise product the weight update too, which puts it into the reference framework
+                // (`w > 0`), GREENBEA iteration 6094: a product below the update tolerance leaves `w = 1`.
+                if m2 {
+                    s.w[j] = s.w[j].max(((wq / alpha_rq) / alpha_rq) * arj * arj + 1.0);
+                }
+                // The reference keeps a basic slack's rounding-noise row product in the pivot row like any entry.
+                changed.push(j);
+                rowvals.push((j, arj));
+            }
+            continue;
+        }
+        if s.pos_of[j] != NONE || j == q || s.excluded == Some(j) {
+            // The dropped variable is outside the reference's row copy: its d and weight are not updated (fx_midsing_1496 pricing call 19).
+            continue;
+        }
+        let arj = match prods.as_ref() {
+            Some(pr) => pr[j],
+            None => dot(&p.cols[j], &rho),
+        };
+        // The reference's row product keeps the entries above its drop tolerance (`0x134d90`).
+        if arj.abs() <= ROW_DROP_TOL {
+            continue;
+        }
+        // The Devex update has its own, larger drop tolerance (`0x103d0d`); d and the list keep the row product's.
+        if m2 {
+            // Mode 2 (`0x104c2d`): `w_j = max(w_j, wq / alpha^2 * arj^2 + 1)`, no cross term.
+            if arj.abs() > WEIGHT_DROP_TOL {
+                if let (Some((a_rq, wq_q)), Some(pq)) = (qw, prods_q.as_ref()) {
+                    // 0x257f98 and 0x25809d keep the divisions and row update in x87 precision.
+                    use crate::real::Real;
+                    let nw = ((wq_q / a_rq) / a_rq) * pq[j] * pq[j] + crate::f80::F80::ONE;
+                    if s.wf.len() != s.w.len() {
+                        *s.wf = vec![crate::f80::F80::ZERO; s.w.len()];
+                    }
+                    let old = if s.wf[j].to_f64() == s.w[j] {
+                        s.wf[j]
+                    } else {
+                        crate::f80::F80::c(s.w[j])
+                    };
+                    if nw > old {
+                        s.wf[j] = nw;
+                        s.w[j] = nw.to_f64();
+                    }
+                } else {
+                    s.w[j] = s.w[j].max(((wq / alpha_rq) / alpha_rq) * arj * arj + 1.0);
+                }
+            }
+        } else if arj.abs() > WEIGHT_DROP_TOL {
+            if let (Some((a_rq, wq_q)), Some(cross), Some(pq)) =
+                (qw, devex_cross.as_ref(), prods_q.as_ref())
+            {
+                use crate::real::Real;
+                let ratio = pq[j] / a_rq;
+                let vj = cross.dot(&p.fcols[j]);
+                if s.wf.len() != s.w.len() {
+                    *s.wf = vec![crate::f80::F80::ZERO; s.w.len()];
+                }
+                let old = if s.wf[j].to_f64() == s.w[j] {
+                    s.wf[j]
+                } else {
+                    crate::f80::F80::c(s.w[j])
+                };
+                let nw = ratio * (wq_q * ratio - crate::f80::F80::c(2.0) * vj) + old;
+                s.wf[j] = nw;
+                s.w[j] = nw.to_f64();
+            } else {
+                let ratio = arj / alpha_rq;
+                let vj = dot_lanes(&p.fcols[j], &u, col_off[j] & 1);
+                s.w[j] = ratio * ((wq * ratio - vj) - vj) + s.w[j];
+            }
+            // A fixed structural never resets the framework (PILOT.JA iteration 3856: the fixed EMROP06 went to -3e4); a fixed
+            // slack does (PEROLD iteration 1626, PILOTNOV iteration 1026).
+            if faithful_weights && s.w[j] < NORM_RESET_TOL && !(j < n && s.fixed[j]) {
+                norm_reset = true;
+            }
+            let floor = if faithful_weights { W_MIN } else { 1.0 };
+            s.w[j] = s.w[j].max(floor);
+        }
+        if !s.fixed[j] {
+            // The reference sums the row product in the order of the BTRAN output list.
+            if !prods_q.as_ref().is_some_and(|pq| dsub(&mut s, j, pq[j])) {
+                s.d[j] -= theta_d * arj;
+            }
+        }
+        // The variable dropped from a singular start basis is not in the reference's row copy, so not in its pivot row.
+        if s.excluded != Some(j) {
+            changed.push(j);
+            rowvals.push((j, arj));
+        }
+    }
+    (norm_reset, changed, rowvals)
+}
+
+#[cfg(test)]
+mod primal_row_update_tests {
+    use super::*;
+    use crate::f80::F80;
+
+    #[derive(Clone)]
+    struct Buffers {
+        w: Vec<f64>,
+        d: Vec<f64>,
+        wf: Vec<F80>,
+        df: Vec<F80>,
+    }
+
+    fn view<'a>(
+        b: &'a mut Buffers,
+        pos_of: &'a [usize],
+        fixed: &'a [bool],
+        excluded: Option<usize>,
+    ) -> PrimalRowState<'a> {
+        PrimalRowState {
+            w: &mut b.w,
+            d: &mut b.d,
+            wf: &mut b.wf,
+            df: &mut b.df,
+            pos_of,
+            fixed,
+            excluded,
+        }
+    }
+
+    fn check(
+        b: &Buffers,
+        pos: &[usize],
+        fixed: &[bool],
+        excluded: Option<usize>,
+        arg: &PrimalRowInput<'_>,
+    ) {
+        let (mut old, mut new) = (b.clone(), b.clone());
+        let expected = frozen_primal_row_update(view(&mut old, pos, fixed, excluded), arg);
+        let got = if arg.qw.is_none() && arg.prods_q.is_none() {
+            primal_row_update::<false>(view(&mut new, pos, fixed, excluded), arg)
+        } else {
+            primal_row_update::<true>(view(&mut new, pos, fixed, excluded), arg)
+        };
+        let bits = |v: &[f64]| v.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
+        assert_eq!(bits(&old.w), bits(&new.w), "weights");
+        assert_eq!(bits(&old.d), bits(&new.d), "reduced costs");
+        assert_eq!(
+            old.wf.iter().map(|x| x.repr()).collect::<Vec<_>>(),
+            new.wf.iter().map(|x| x.repr()).collect::<Vec<_>>(),
+            "weight twins"
+        );
+        assert_eq!(
+            old.df.iter().map(|x| x.repr()).collect::<Vec<_>>(),
+            new.df.iter().map(|x| x.repr()).collect::<Vec<_>>(),
+            "cost twins"
+        );
+        assert_eq!(expected.0, got.0, "norm reset");
+        assert_eq!(expected.1, got.1, "changed order");
+        assert_eq!(
+            expected
+                .2
+                .iter()
+                .map(|&(i, v)| (i, v.to_bits()))
+                .collect::<Vec<_>>(),
+            got.2
+                .iter()
+                .map(|&(i, v)| (i, v.to_bits()))
+                .collect::<Vec<_>>(),
+            "row value order"
+        );
+    }
+
+    #[test]
+    fn whole_row_update_matches_frozen() {
+        let model = crate::mps::parse(include_str!("../tests/fixtures/afiro.mps")).unwrap();
+        let scaled = crate::scale::compute(&model).apply(&model).unwrap();
+        let mut p = build(&scaled);
+        let cap: serde_json::Value =
+            serde_json::from_str(include_str!("../tests/fixtures/primal_row_update.json")).unwrap();
+        let w: Vec<_> = cap["pricing"]["w"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_f64().unwrap())
+            .collect();
+        let d: Vec<_> = cap["pricing"]["d"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x.as_f64().unwrap())
+            .collect();
+        let mut pos = vec![NONE; p.n + p.m];
+        for (i, j) in cap["pricing"]["basic"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .enumerate()
+        {
+            pos[j.as_u64().unwrap() as usize] = i;
+        }
+        let fixed: Vec<_> = p.lo.iter().zip(&p.up).map(|(a, b)| a == b).collect();
+        let mut rho = vec![0.0; p.m];
+        let mut u = rho.clone();
+        for e in cap["rho"].as_array().unwrap() {
+            rho[e[0].as_u64().unwrap() as usize] = e[1].as_f64().unwrap();
+        }
+        for e in cap["tau"].as_array().unwrap() {
+            u[e[0].as_u64().unwrap() as usize] = e[1].as_f64().unwrap();
+        }
+        let b = Buffers {
+            wf: w.iter().copied().map(F80::from_f64).collect(),
+            df: d.iter().copied().map(F80::from_f64).collect(),
+            w,
+            d,
+        };
+        let q = pos.iter().position(|&i| i == NONE).unwrap();
+        let leave = pos.iter().position(|&i| i != NONE).unwrap();
+        for m2 in [false, true] {
+            let arg = PrimalRowInput {
+                p: &p,
+                q,
+                leave,
+                m2,
+                has_mirror: true,
+                faithful_weights: true,
+                prods: None,
+                prods_q: None,
+                rho: &rho,
+                u: &u,
+                qw: None,
+                cross: None,
+                theta_d: b.d[q] / 0.5,
+                alpha_rq: 0.5,
+                wq: b.w[q],
+                theta_dq: None,
+            };
+            check(&b, &pos, &fixed, None, &arg);
+        }
+        let values = [
+            0.0,
+            -0.0,
+            1.0,
+            -1.0,
+            1e-10,
+            1e-12,
+            1e-6,
+            0.125,
+            -0.25,
+            f64::from_bits(1),
+            -f64::MIN_POSITIVE,
+            1e-200,
+            -1e200,
+            f64::MAX,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::from_bits(0x7ff8000000000123),
+            f64::from_bits(0xfff8000000000456),
+        ];
+        let mut seed = 0x8a12cf792u64;
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        for (n, m) in [(0, 0), (0, 1), (1, 0), (1, 1), (3, 2), (8, 7)] {
+            p.n = n;
+            p.m = m;
+            let nm = n + m;
+            for round in 0..64 {
+                p.cols = (0..nm)
+                    .map(|_| {
+                        if m == 0 {
+                            Vec::new()
+                        } else {
+                            (0..next() % 11)
+                                .map(|_| {
+                                    (next() as usize % m, values[next() as usize % values.len()])
+                                })
+                                .collect()
+                        }
+                    })
+                    .collect();
+                p.fcols = p.cols.clone();
+                p.offs = vec![0];
+                for c in &p.fcols {
+                    p.offs.push(p.offs.last().unwrap() + c.len());
+                }
+                let pos: Vec<_> = (0..nm)
+                    .map(|_| {
+                        if next() % 2 == 0 {
+                            NONE
+                        } else {
+                            next() as usize % m.max(1)
+                        }
+                    })
+                    .collect();
+                let fixed: Vec<_> = (0..nm).map(|_| next() % 3 == 0).collect();
+                let w: Vec<_> = (0..nm)
+                    .map(|_| values[next() as usize % values.len()])
+                    .collect();
+                let d: Vec<_> = (0..nm)
+                    .map(|_| values[next() as usize % values.len()])
+                    .collect();
+                let native = |x: f64| {
+                    if round % 3 == 0 {
+                        F80::from_repr(0x8000000000000001, 0x3fff)
+                    } else if round % 3 == 1 {
+                        F80::from_repr(1, 0)
+                    } else {
+                        F80::from_f64(x)
+                    }
+                };
+                let b = Buffers {
+                    wf: if round % 2 == 0 {
+                        Vec::new()
+                    } else {
+                        w.iter().copied().map(native).collect()
+                    },
+                    df: d.iter().copied().map(native).collect(),
+                    w,
+                    d,
+                };
+                let rho: Vec<_> = (0..m)
+                    .map(|_| values[next() as usize % values.len()])
+                    .collect();
+                let u: Vec<_> = (0..m)
+                    .map(|_| values[next() as usize % values.len()])
+                    .collect();
+                let tau: Vec<_> = u.iter().copied().map(native).collect();
+                let cross = DevexCrossTerms::new(&tau);
+                let prods: Vec<_> = (0..nm)
+                    .map(|_| values[next() as usize % values.len()])
+                    .collect();
+                let pq: Vec<_> = prods.iter().copied().map(native).collect();
+                let q = if nm == 0 { NONE } else { next() as usize % nm };
+                let leave = if nm == 0 { NONE } else { next() as usize % nm };
+                let excluded = if nm > 0 && round % 2 == 0 {
+                    Some(next() as usize % nm)
+                } else {
+                    None
+                };
+                for backend in 0..4 {
+                    let qw = if backend & 1 != 0 {
+                        Some((
+                            native(values[round % values.len()]),
+                            native(values[(round + 1) % values.len()]),
+                        ))
+                    } else {
+                        None
+                    };
+                    let arg = PrimalRowInput {
+                        p: &p,
+                        q,
+                        leave,
+                        m2: round & 1 != 0,
+                        has_mirror: round & 2 != 0,
+                        faithful_weights: round & 4 != 0,
+                        prods: if round & 8 != 0 { Some(&prods) } else { None },
+                        prods_q: if backend & 2 != 0 { Some(&pq) } else { None },
+                        rho: &rho,
+                        u: &u,
+                        qw,
+                        cross: Some(&cross),
+                        theta_d: values[round % values.len()],
+                        alpha_rq: values[(round + 1) % values.len()],
+                        wq: values[(round + 2) % values.len()],
+                        theta_dq: if backend == 3 {
+                            Some(native(values[(round + 3) % values.len()]))
+                        } else {
+                            None
+                        },
+                    };
+                    check(&b, &pos, &fixed, excluded, &arg);
+                }
+            }
         }
     }
 }
