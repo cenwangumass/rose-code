@@ -99,9 +99,44 @@ Barrier child-range/row-map planning saves 0.77% DEGEN3 instructions but timing
 confirmation is inconclusive (recorded below); it is not landed. Planned assembly
 ranges and local sparse indices also fail the performance screen. Rectangular
 block schedules and dense-column maps remain untested, but neither isolated
-planning prototype establishes a material removable share. Refresh remaining
-extended-BTRAN attribution before selecting a whole native kernel. Borrowed
-factor inputs and immutable factor sharing remain unproven.
+planning prototype establishes a material removable share. Current extended-BTRAN
+self instruction screen and isolated dense-L-transpose x87 probe are recorded
+below. The finite-input native probe is about 3.1x faster including conversions;
+next establish branch coverage and a complete exceptional-value fallback before
+solver integration. Borrowed factor inputs and immutable factor sharing remain
+unproven.
+
+## Extended BTRAN feasibility
+
+Accepted CLI hash remains `e28b651026b477f0e5741e881efce27d640e2bf3f330f85a4f76b0e53c8804fc`.
+Current CPU-4 instruction self profiles use eight fx_quad_obj_5371 solves capped
+at 5500 and sixteen quad_2717 solves capped at 17000. Every result has expected
+status, iterations and refactorizations (infeasible/5319/5 and optimal/16010/3022).
+Extended BTRAN is 7.01%/11.39% of batch instruction samples respectively, distinct
+from the older inclusive cycle shares. There are 3539/8686 samples at periods
+2M/4M; both have zero throttle/lost records. Python launcher/startup remain in
+the denominator; represented-instruction audits and dense-branch coverage are
+not yet established. Profiles do not attribute out-of-line arithmetic to callers.
+Runner/manifests/results, reports, audit and BTRAN annotation are in
+`target/perf-btran-native/`.
+
+`cargo run --release --example btran_native_probe` screens the complete dense
+L-transpose arithmetic pass, preserving multiply/store/subtract rounding and
+including input/output and per-coefficient representation conversions. Its 168
+bitwise differential cases cover captured SC50A L coefficients, finite random
+F80 low bits, empty/singleton vectors, signed zeros, subnormal/min-normal
+coefficients, and multiple transpose shapes. Four alternating CPU-4 timing pairs
+on this mixed batch give software 0.0932–0.0960 s versus native 0.0293–0.0309 s,
+roughly 3.1x. These are isolated kernel times, not solver speedups or a prediction
+for complete BTRAN. Raw `probe-cpu4.log`, `probe-expanded.log`, and binary hashes
+in `audit.json`; ordinary release probe build leaves the accepted CLI untouched.
+
+The probe is deliberately outside solver dispatch. It requires the expected x87
+control word and has no fallback for nonfinite inputs/intermediates. Integration
+requires proving branch coverage and amortization on actual dense calls, checking
+exceptional results and control-word behavior, preserving each WORK addition,
+independent complete-BTRAN differential tests, full parity and paired solver
+benchmarks. Subnormal correctness cases here do not establish their performance.
 
 ## Candidates
 
