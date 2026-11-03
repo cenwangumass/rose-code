@@ -489,6 +489,18 @@ fn dgemm_s2(a0: &[f64], a1: &[f64], b: &[f64]) -> [f64; 2] {
     [s0, s1]
 }
 
+fn dgemm_s4(a0: &[f64], a1: &[f64], a2: &[f64], a3: &[f64], b: &[f64]) -> [f64; 4] {
+    let (mut s0, mut s1, mut s2, mut s3) = (0.0, 0.0, 0.0, 0.0);
+    for t in 0..a0.len() {
+        let y = b[t];
+        s0 = fma(a0[t], y, s0);
+        s1 = fma(a1[t], y, s1);
+        s2 = fma(a2[t], y, s2);
+        s3 = fma(a3[t], y, s3);
+    }
+    [s0, s1, s2, s3]
+}
+
 /// Tile kernel of element (row `i`, column `j`) of an `m x n` product: rows in blocks of 8 (a last block of <= 4 rows is a 4-row block, 5..7 rows a
 /// masked 8-row block), columns in blocks of 6 with a remainder of `n % 6`; remainder 1 or 2: 'N'; 3: 'A'; otherwise 8-row blocks 'S', 4-row 'A'.
 fn gemm_kind(m: usize, n: usize, i: usize, j: usize) -> Kind {
@@ -764,6 +776,109 @@ fn dgemm_body<const GROUP_S: bool>(
                     let mut i = 0;
                     while i < m {
                         let kind = gemm_kind(m, nb, i, j);
+                        if kind == Kind::S && i + 4 <= m && gemm_kind(m, nb, i + 3, j) == Kind::S {
+                            let ar = |row: usize| &a[row * lda + k0..row * lda + k0 + kk];
+                            let sums = dgemm_s4(ar(i), ar(i + 1), ar(i + 2), ar(i + 3), br);
+                            for t in 0..4 {
+                                let ci = (j0 + j) * ldc + i + t;
+                                c[ci] = c[ci] + 1.0 * sums[t];
+                            }
+                            i += 4;
+                        } else if kind == Kind::S
+                            && i + 2 <= m
+                            && gemm_kind(m, nb, i + 1, j) == Kind::S
+                        {
+                            let ar = |row: usize| &a[row * lda + k0..row * lda + k0 + kk];
+                            let sums = dgemm_s2(ar(i), ar(i + 1), br);
+                            for t in 0..2 {
+                                let ci = (j0 + j) * ldc + i + t;
+                                c[ci] = c[ci] + 1.0 * sums[t];
+                            }
+                            i += 2;
+                        } else {
+                            let ci = (j0 + j) * ldc + i;
+                            c[ci] =
+                                dgemm_tn_elem(kind, &a[i * lda + k0..i * lda + k0 + kk], br, c[ci]);
+                            i += 1;
+                        }
+                    }
+                } else {
+                    for i in 0..m {
+                        let kind = gemm_kind(m, nb, i, j);
+                        c[(j0 + j) * ldc + i] = dgemm_tn_elem(
+                            kind,
+                            &a[i * lda + k0..i * lda + k0 + kk],
+                            &b[(j0 + j) * ldb + k0..(j0 + j) * ldb + k0 + kk],
+                            c[(j0 + j) * ldc + i],
+                        );
+                    }
+                }
+            }
+            j0 += nb;
+        }
+        k0 += kk;
+    }
+}
+
+#[cfg(test)]
+#[inline(always)]
+fn frozen_grouped_dgemm_body<const GROUP_S: bool>(
+    m: usize,
+    n: usize,
+    k: usize,
+    a: &[f64],
+    lda: usize,
+    b: &[f64],
+    ldb: usize,
+    c: &mut [f64],
+    ldc: usize,
+) {
+    if m == 1 {
+        dgemv_t(b, ldb, k, n, &a[..k], 1.0, c, ldc);
+        return;
+    }
+    if n == 1 {
+        dgemv_t(a, lda, k, m, &b[..k], 1.0, c, 1);
+        return;
+    }
+    if gemm_path2(m, n, k) {
+        for j in 0..n {
+            let ck = col_kernel(n, j);
+            for i in 0..m {
+                let mode = tile_mode(k0_row_tile(m, i), ck);
+                let (ar, br) = (&a[i * lda..i * lda + k], &b[j * ldb..j * ldb + k]);
+                let s = acc_terms(mode, k, &|t| (1.0 * ar[t], br[t]));
+                c[j * ldc + i] = c[j * ldc + i] + s;
+            }
+        }
+        return;
+    }
+    // The nocopy driver (`0xa7be50`) cuts `k > 192` into calls of the kernel, each a `beta = 1` update of `C` (the dispatch above sees the whole `k`;
+    // the copy-based kernel takes `k` up to 240 in one call).
+    // The pieces: while more than 384 remain a block of 192; then up to 384 `ceil(r / 2)` and the rest; up to 192 one call (traced for k = 385, 400, 512, 700).
+    let mut ps = Vec::new();
+    let mut r = k;
+    while r > 384 {
+        ps.push(192);
+        r -= 192;
+    }
+    if r > 192 {
+        ps.push((r + 1) / 2);
+        r -= (r + 1) / 2;
+    }
+    if r > 0 {
+        ps.push(r);
+    }
+    let mut k0 = 0;
+    for &kk in &ps {
+        let mut j0 = 0;
+        for nb in nocopy_n_blocks(n) {
+            for j in 0..nb {
+                if GROUP_S {
+                    let br = &b[(j0 + j) * ldb + k0..(j0 + j) * ldb + k0 + kk];
+                    let mut i = 0;
+                    while i < m {
+                        let kind = gemm_kind(m, nb, i, j);
                         if kind == Kind::S && i + 2 <= m && gemm_kind(m, nb, i + 1, j) == Kind::S {
                             let ar = |row: usize| &a[row * lda + k0..row * lda + k0 + kk];
                             let sums = dgemm_s2(ar(i), ar(i + 1), br);
@@ -811,6 +926,22 @@ unsafe fn dgemm_existing_fma(
     ldc: usize,
 ) {
     dgemm_body::<true>(m, n, k, a, lda, b, ldb, c, ldc);
+}
+
+#[cfg(all(test, any(target_arch = "x86", target_arch = "x86_64")))]
+#[target_feature(enable = "fma")]
+unsafe fn frozen_grouped_dgemm(
+    m: usize,
+    n: usize,
+    k: usize,
+    a: &[f64],
+    lda: usize,
+    b: &[f64],
+    ldb: usize,
+    c: &mut [f64],
+    ldc: usize,
+) {
+    frozen_grouped_dgemm_body::<true>(m, n, k, a, lda, b, ldb, c, ldc);
 }
 
 const TRSM_LL0_MIN: usize = 13; // m >= 13, except m % 4 == 0 && m <= 88 (dtrsm_left_ker): dtrsm_kernel_ll_0
@@ -2743,6 +2874,18 @@ mod tests {
             previous_dgemm_t_n(m, n, k, a, lda, b, ldb, &mut want, ldc);
             dgemm_t_n(m, n, k, a, lda, b, ldb, &mut got, ldc);
             assert_bits(&format!("previous dgemm {m}x{n}x{k}"), &want, &got);
+            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+            if std::arch::is_x86_feature_detected!("fma")
+                && a.iter().chain(b).chain(c).all(|v| v.is_finite())
+            {
+                let mut grouped = c.to_vec();
+                // SAFETY: runtime feature detection above; lengths mirror the tested call.
+                unsafe {
+                    frozen_grouped_dgemm(m, n, k, a, lda, b, ldb, &mut grouped, ldc);
+                }
+                assert_bits("frozen two-output grouped kernel", &grouped, &got);
+            }
+
             let mut portable = c.to_vec();
             dgemm_body::<false>(m, n, k, a, lda, b, ldb, &mut portable, ldc);
             assert_bits(&format!("portable dgemm {m}x{n}x{k}"), &want, &portable);
