@@ -91,6 +91,19 @@ This rules out transfer plus a separate signed-zero normalization pass; it does
 not establish that removing the ordered spike or fusing compaction is safe or
 profitable. Evidence and exact candidate artifacts are linked in STATE.md.
 
+A shared-column ownership prototype lazily split immutable model columns once,
+then selected Rc row/value slices for each basis and shared them with factor-cache
+entries. Generic dereferenceable input views left LU/pair/fresh numerical kernels
+unchanged and made one pair-pass defensive row clone shallow. All 76 library
+release tests and fast parity 940/940 passed; the fresh PGO build passed fast
+parity as well. Small no-dump results matched completely except seconds. On
+PILOT4 primal, PEROLD dual and Quad_2717, instructions fell only 0.07/0.32/0.25%.
+Three alternating five-run pairs established no repeatable timing gain; large
+third-pair improvements crossed host speed bands. The prototype was rejected,
+and the accepted source/CLI/build metadata restored. This tests immutable split
+input ownership only; it does not establish the cost of numerical producer
+reuse or immutable factor-data sharing. Exact evidence is in STATE.md.
+
 ## Remaining proof obligations
 
 Before a factor ownership prototype, separate column-copy and immutable-factor
