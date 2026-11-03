@@ -1,1 +1,4 @@
 /target
+
+# Python benchmark tools
+__pycache__/

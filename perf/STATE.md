@@ -205,6 +205,31 @@ after recording, not simultaneously with the sample batches. Represented-event
 coverage was not established, so sample totals do not support absolute costs.
 The accepted release CLI hash is restored and unchanged.
 
+### Randomized timing control
+
+`perf/paired.py` implements the session review's bounded randomized AB/BA screen
+with interleaved same-binary AA controls. It freezes the schedule/decision rule
+before warm-up, retains every raw result and sample, checks complete result/exit
+identity outside the solve timer, and refuses to overwrite evidence. A positive
+screen is not a full acceptance gate; independent confirmation and all correctness
+and regression checks remain necessary. Rules are in PLAN.md and the tool's help.
+
+On PILOT4 primal-release (CPU 4, cap 800, 32 pairs of each kind, seed 137), the saved
+prefix-count candidate versus accepted binary has median -1.42%, conservative 95%
+paired-median interval [-2.41%, +1.23%], 20/32 improving pairs (sign p .108), and
+AA interval [-1.37%, +2.27%]. This is inconclusive under the predeclared rule; it
+reinforces the original decision not to land the candidate. No samples were removed.
+The accepted binary compared with itself (seed 271) reports +0.11%, interval
+[-0.07%, +0.38%], and correctly fails the gain screen. Four deterministic rule
+checks cover zero effect, a stable gain, an execution-order confound and biased
+AA controls. Neither timing session modified solver sources or the accepted CLI.
+
+Exact commands, schedules, hashes, complete result objects and decisions:
+`target/perf-paired-nnz-pilot4-137.json` and its `.raw/` directory;
+`target/perf-paired-controls/{identical-271.json,identical-271.raw/,statistics.json}`.
+The prefix-count candidate remains archived and unaccepted. These screens establish
+no new solver speedup or reference timing ratio.
+
 ## Candidates
 
 Ordered by current/ref; reprofile any changed path before choosing a change. Ratios use the current

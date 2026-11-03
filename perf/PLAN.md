@@ -92,6 +92,15 @@ baseline. No exceptions, no "within a ULP", no re-recording.
   caller ancestry. Audit lost/throttled samples and represented instructions against direct counters.
   Keep wrapper result parsing/validation outside the measured process, and separate solver samples
   from wrapper samples.
+- `python3 perf/paired.py --before BASE --after CANDIDATE --run ID --pairs 32 --seed N
+  --cpu C --max-iterations CAP --output target/NAME.json`: bounded randomized AB/BA
+  solve-time screening with interleaved same-binary AA controls. The schedule, binary
+  hashes and decision rule are saved before warm-up. Complete result objects and exit
+  codes must agree; raw outputs and every timing sample are retained. Existing output
+  paths are refused. A positive screen requires sign p <= .01, unbiased AA controls,
+  at least 0.5% median improvement, a conservative 95% paired-median bound beyond
+  the AA uncertainty, and improvement in both execution orders. It is a screening
+  tool, not a replacement for parity, independent confirmation or the full benchmark.
 - `cargo test --release` (about 35 s): the reference-derived tests. Run before each commit.
 - Format with `RUSTFMT=~/.local/bin/rustfmt-custom cargo fmt -- --config blank_line_between_items=true`
   (never plain `cargo fmt`). Version control is `jj`, run from `rose/`.
@@ -101,8 +110,16 @@ baseline. No exceptions, no "within a ULP", no re-recording.
 - Times are wall-clock medians from `perf/bench.sh` on the release build, no dumps. Measure the
   baseline and the candidate in the same session, back to back (`--bin` lets you time a saved copy of the
   previous binary, e.g. `cp target/release/rose /tmp/rose-before` before rebuilding).
-- Accept a gain only if it is larger than the run's min-max spread and the instruction count (`--instr`)
-  moves the same way. For a change below 3 % on its target, require the instruction count to drop.
+- For grouped hyperfine comparisons, require a gain larger than the run's min-max
+  spread and supporting instruction counts. When host shifts make this inconclusive,
+  use the randomized paired screen above with predeclared seeds, bounds and sample
+  counts. Require two independent positive screens before treating a small gain as
+  established; retain every failed/inconclusive screen too. Stop an inconclusive
+  session instead of extending it until it passes. An AA control showing bias or
+  uncertainty comparable to the proposed gain makes the session inconclusive.
+  For a change below 3% on its target, require the instruction count to drop.
+  Full parity, release tests, complete no-dump result validation and the full paired
+  benchmark remain required; resolve any unrelated regression before accepting.
 - A change must not slow any other bench run by more than the noise. Run the whole bench set before
   committing; time only the affected runs while iterating.
 - Regressions against the baseline column: a run whose `current` is slower than `baseline` by more than
