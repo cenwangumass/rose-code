@@ -43,10 +43,45 @@ and adjacent result files. These short runs take under a second together, but th
 18%/12% min–max spans relative to median cannot resolve a small speedup. They do
 not refresh factor self-cost attribution or establish reference equality.
 
+## Current instruction screen
+
+The accepted CLI was sampled directly (no frame pointers), CPU 4, 128 independent
+CLI solves per batch, same dual/release/cap-300 arguments as above. Each result
+was checked for expected status, iteration count, refactorization count and exit
+code. ADLITTLE used instruction period 200,000 (3544 samples); DEGEN2 used
+1,000,000 (8673 samples). Both reports show zero lost samples. These are batch
+self-sample fractions, including Python launcher, parsing and process startup;
+they are not solve-only percentages or inclusive costs. Throttle-event and
+represented-instruction audits remain necessary for quantitative cost bounds.
+
+| Self symbol | ADLITTLE batch | DEGEN2 batch |
+|---|---:|---:|
+| fresh | 1.27% | 1.40% |
+| auxiliary Factor::factor | 1.13% | 2.76% |
+| factor_structure_r | 0.68% | 2.06% |
+| ftran_with | 2.06% | 7.83% |
+| lstage_num | 1.69% | 5.40% |
+
+Nucleus is separately 2.03% on ADLITTLE. Allocator ancestry is not resolved by
+these self profiles. The evidence does not justify a broad factor-input rewrite
+yet; FTRAN representation has a larger directly visible target on this prefix.
+Raw data/reports and validating batch runner: `target/perf-factor-audit/{adlittle,degen2}.data`,
+`*-report.txt`, `profile.py`. No reference comparison was performed.
+
+A first FTRAN ownership prototype deferred the F2 installation until output
+extraction finished, then moved the dense result and support instead of cloning.
+All arithmetic, output ordering and WORK calls stayed in place; the existing
+frozen FTRAN implementation was untouched. Fast parity passed 940/940. Small
+instruction counts were essentially flat; a sequential PEROLD screen showed
++0.424% instructions and no timing gain beyond spread. The prototype was
+rejected and the accepted source/binary/build metadata restored. Details are in
+STATE.md's rejected-trial entry. This does not test elimination of the L-to-U
+round trip itself.
+
 ## Remaining proof obligations
 
-Before prototyping, measure current factor self cost on these bounded witnesses,
-separate column-copy and immutable-factor allocation costs, and inventory auxiliary
+Before a factor ownership prototype, separate column-copy and immutable-factor
+allocation costs, and inventory auxiliary
 reads between refactorizations. Replay numerical producer/consumer values only
 through the standard dump/comparison tools; stop at the first mismatch. Retain
 existing arithmetic and WORK booking for the first ownership experiment. No
