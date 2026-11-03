@@ -628,6 +628,26 @@ fn gemm_path2(m: usize, n: usize, k: usize) -> bool {
 
 /// Height of the row tile that holds row `i` of `m`: tiles of 12 rows, then the remainder `m % 12` split by its bits 8, 4, 2, 1.
 fn k0_row_tile(m: usize, i: usize) -> usize {
+    assert!(i < m);
+    let remainder = m % 12;
+    let head = m - remainder;
+    if i < head {
+        return 12;
+    }
+    let mut offset = i - head;
+    for tile in [8usize, 4, 2, 1] {
+        if remainder & tile != 0 {
+            if offset < tile {
+                return tile;
+            }
+            offset -= tile;
+        }
+    }
+    unreachable!()
+}
+
+#[cfg(test)]
+fn frozen_k0_row_tile(m: usize, i: usize) -> usize {
     let mut r0 = 0;
     let mut tiles = vec![12; m / 12];
     for t in [8usize, 4, 2, 1] {
@@ -845,7 +865,7 @@ fn frozen_grouped_dgemm_body<const GROUP_S: bool>(
         for j in 0..n {
             let ck = col_kernel(n, j);
             for i in 0..m {
-                let mode = tile_mode(k0_row_tile(m, i), ck);
+                let mode = tile_mode(frozen_k0_row_tile(m, i), ck);
                 let (ar, br) = (&a[i * lda..i * lda + k], &b[j * ldb..j * ldb + k]);
                 let s = acc_terms(mode, k, &|t| (1.0 * ar[t], br[t]));
                 c[j * ldc + i] = c[j * ldc + i] + s;
@@ -2821,7 +2841,7 @@ mod tests {
             for j in 0..n {
                 let ck = col_kernel(n, j);
                 for i in 0..m {
-                    let mode = tile_mode(k0_row_tile(m, i), ck);
+                    let mode = tile_mode(frozen_k0_row_tile(m, i), ck);
                     let (ar, br) = (&a[i * lda..i * lda + k], &b[j * ldb..j * ldb + k]);
                     let s = previous_acc_terms(mode, k, &|t| (1.0 * ar[t], br[t]));
                     c[j * ldc + i] = c[j * ldc + i] + s;
@@ -2863,6 +2883,22 @@ mod tests {
                 j0 += nb;
             }
             k0 += kk;
+        }
+    }
+
+    #[test]
+    fn row_tile_selection_matches_frozen_partition() {
+        for m in 0..=257 {
+            for i in 0..m {
+                assert_eq!(k0_row_tile(m, i), frozen_k0_row_tile(m, i), "{m}/{i}");
+            }
+            assert!(std::panic::catch_unwind(|| k0_row_tile(m, m)).is_err());
+            assert!(std::panic::catch_unwind(|| frozen_k0_row_tile(m, m)).is_err());
+        }
+        for m in [1024, 4096, 10000] {
+            for i in [0, 11, 12, m - 13, m - 12, m - 8, m - 4, m - 2, m - 1] {
+                assert_eq!(k0_row_tile(m, i), frozen_k0_row_tile(m, i));
+            }
         }
     }
 
