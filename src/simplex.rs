@@ -900,6 +900,84 @@ impl Internal {
         )
     }
 
+    /// The extended reduced-cost branch of set_d_from_y, with one control-mode
+    /// check and one packed view of y for the complete column pass.
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    fn reduced_costs_q_native(
+        &self,
+        y: &[crate::f80::F80],
+        pos: &[usize],
+        excluded: Option<usize>,
+        costfree: bool,
+        d: &mut [f64],
+        df: &mut [crate::f80::F80],
+    ) -> bool {
+        use std::arch::asm;
+        let mut cw = 0u16;
+        // SAFETY: fnstcw writes two bytes and leaves the control word unchanged.
+        unsafe {
+            asm!("fnstcw [{cw}]", cw = in(reg) &mut cw, options(nostack, preserves_flags));
+        }
+        if cw & 0x0f3f != 0x033f {
+            return false;
+        }
+        let packed: Vec<[u8; 16]> = y
+            .iter()
+            .map(|v| {
+                let (m, se) = v.repr();
+                let mut b = [0; 16];
+                b[..8].copy_from_slice(&m.to_le_bytes());
+                b[8..10].copy_from_slice(&se.to_le_bytes());
+                b
+            })
+            .collect();
+        let mut acc = [0u8; 16];
+        for j in 0..self.n + self.m {
+            if pos[j] != NONE || excluded == Some(j) {
+                d[j] = 0.0;
+                continue;
+            }
+            let cost = if costfree { 0.0 } else { self.cost[j] };
+            // SAFETY: cost covers the f64 load, acc covers the extended store,
+            // and the x87 stack balances. Promotion is exact.
+            unsafe {
+                asm!("fld qword ptr [{cost}]", "fstp tbyte ptr [{acc}]",
+                    cost = in(reg) &cost, acc = in(reg) acc.as_mut_ptr(),
+                    out("st(0)") _, options(nostack, preserves_flags));
+            }
+            for (i, a) in &self.fcols[j] {
+                let yi = &packed[*i];
+                // SAFETY: all pointers cover their operands and the x87 stack
+                // balances. With the guarded 64-bit significand precision, each
+                // arithmetic instruction rounds separately to extended precision.
+                // Keep that product in a register; an 80-bit store/reload only
+                // copies it (Intel SDM Vol. 1 8.1.5.2; Vol. 2 FST/FSTP).
+                // Store the subtraction result before the next term.
+                unsafe {
+                    asm!(
+                        "fld tbyte ptr [{acc}]",
+                        "fld tbyte ptr [{y}]",
+                        "fld qword ptr [{a}]",
+                        "fmulp st(1), st",
+                        "fsubp st(1), st",
+                        "fstp tbyte ptr [{acc}]",
+                        y = in(reg) yi.as_ptr(), a = in(reg) a,
+                        acc = in(reg) acc.as_mut_ptr(),
+                        out("st(0)") _, out("st(1)") _, out("st(2)") _,
+                        options(nostack, preserves_flags),
+                    );
+                }
+            }
+            let value = crate::f80::F80::from_repr(
+                u64::from_le_bytes(acc[..8].try_into().unwrap()),
+                u16::from_le_bytes(acc[8..10].try_into().unwrap()),
+            );
+            df[j] = value;
+            d[j] = value.to_f64();
+        }
+        true
+    }
+
     fn rank_products(&self, v: &[f64], rank: &[usize]) -> Vec<f64> {
         let mut order: Vec<(usize, usize)> = (0..self.m)
             .filter(|&i| rank[i] != usize::MAX)
@@ -3045,6 +3123,21 @@ impl<'a> Solver<'a> {
         let col_off = |j: usize| offs[j] & 1;
         if self.df.len() != self.d.len() {
             self.df = vec![crate::f80::F80::ZERO; self.d.len()];
+        }
+        #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+        if !self.cleanup && self.p0.is_none() {
+            if let Some(yq) = &self.y_q {
+                if p.reduced_costs_q_native(
+                    yq,
+                    &self.pos_of,
+                    self.excluded,
+                    cf,
+                    &mut self.d,
+                    &mut self.df,
+                ) {
+                    return;
+                }
+            }
         }
         for j in 0..p.n + p.m {
             self.d[j] = if self.pos_of[j] == NONE {
@@ -8805,6 +8898,173 @@ mod rank_product_tests {
                 })
                 .collect();
             check(&p, &v, &rank);
+        }
+    }
+
+    // Frozen extended branch of set_d_from_y before the native kernel (zxxynqtw).
+    fn frozen_costs_q(
+        p: &Internal,
+        yq: &[F80],
+        pos: &[usize],
+        excluded: Option<usize>,
+        cf: bool,
+        d: &mut [f64],
+        df: &mut [F80],
+    ) {
+        use crate::real::Real;
+        let cost = |j: usize| if cf { 0.0 } else { p.cost[j] };
+        for j in 0..p.n + p.m {
+            d[j] = if pos[j] == NONE {
+                if excluded == Some(j) {
+                    0.0
+                } else {
+                    let mut acc = F80::c(cost(j));
+                    for &(i, a) in &p.fcols[j] {
+                        acc -= yq[i] * F80::c(a);
+                    }
+                    df[j] = acc;
+                    acc.to_f64()
+                }
+            } else {
+                0.0
+            };
+        }
+    }
+
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    fn check_costs_q(p: &Internal, y: &[F80], pos: &[usize], excluded: Option<usize>, cf: bool) {
+        let mut d0 = vec![f64::from_bits(0xfff8_0000_0000_0001); p.n + p.m];
+        let mut q0 = vec![F80::from_repr(0, 0x8000); p.n + p.m];
+        let (mut d1, mut q1) = (d0.clone(), q0.clone());
+        frozen_costs_q(p, y, pos, excluded, cf, &mut d0, &mut q0);
+        assert!(p.reduced_costs_q_native(y, pos, excluded, cf, &mut d1, &mut q1));
+        assert_eq!(
+            q0.iter().map(|v| v.repr()).collect::<Vec<_>>(),
+            q1.iter().map(|v| v.repr()).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            d0.iter().map(|v| v.to_bits()).collect::<Vec<_>>(),
+            d1.iter().map(|v| v.to_bits()).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    fn extended_reduced_costs_match_frozen() {
+        let _cw = ControlWord::new(0x037f);
+        let model = crate::mps::parse(include_str!("../tests/fixtures/primal_5959.mps")).unwrap();
+        let scaled = crate::scale::compute(&model).apply(&model).unwrap();
+        let mut p = build(&scaled);
+        // Rounded real-run BTY vectors from zxxynqtw, primal_5959 primal-release,
+        // ROSE_DUMP=scale,dual,header, --max-iterations 20. No new dump kind.
+        let records: serde_json::Value = serde_json::from_str(include_str!(
+            "../tests/fixtures/reduced_cost_q_captured.json"
+        ))
+        .unwrap();
+        for record in records.as_array().unwrap() {
+            let mut y = vec![F80::ZERO; p.m];
+            for e in record["out"].as_array().unwrap() {
+                y[e[0].as_u64().unwrap() as usize] = F80::from_f64(e[1].as_f64().unwrap());
+            }
+            for cf in [false, true] {
+                check_costs_q(&p, &y, &vec![NONE; p.n + p.m], None, cf);
+                let pos: Vec<_> = (0..p.n + p.m)
+                    .map(|j| if j % 2 == 0 { NONE } else { 0 })
+                    .collect();
+                check_costs_q(&p, &y, &pos, Some(0), cf);
+            }
+        }
+        let mut seed = 0x5193_a4d2_b8u64;
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        let edge = [
+            F80::ZERO,
+            F80::from_repr(0, 0x8000),
+            F80::ONE,
+            -F80::ONE,
+            F80::from_repr(1, 0),
+            F80::from_repr(u64::MAX, 0x7ffe),
+            F80::INFINITY,
+            -F80::INFINITY,
+            F80::NAN,
+        ];
+        let coeff = [
+            0.0,
+            -0.0,
+            0.5,
+            -0.5,
+            1.0,
+            -1.0,
+            f64::from_bits(1),
+            f64::MAX,
+            f64::INFINITY,
+            f64::NAN,
+        ];
+        for m in [0, 1, 2, 9] {
+            for round in 0..200 {
+                p.m = m;
+                p.n = if round == 0 { 0 } else { 5 };
+                let n = p.n + p.m;
+                p.cost = (0..n).map(|j| coeff[(round + j) % coeff.len()]).collect();
+                p.fcols = vec![Vec::new(); n];
+                if m > 0 {
+                    for j in 0..n {
+                        for k in 0..round % 17 {
+                            let i = next() as usize % m;
+                            let a = if k % 3 == 0 {
+                                f64::from_bits(next())
+                            } else {
+                                coeff[(k + round) % coeff.len()]
+                            };
+                            p.fcols[j].push((i, a));
+                        }
+                    }
+                }
+                let y: Vec<_> = (0..m)
+                    .map(|i| {
+                        if round % 3 == 0 {
+                            edge[(round + i) % edge.len()]
+                        } else {
+                            F80::from_repr(next(), (next() % 0x10000) as u16)
+                        }
+                    })
+                    .collect();
+                let pos: Vec<_> = (0..n)
+                    .map(|j| if (round + j) % 5 == 0 { 0 } else { NONE })
+                    .collect();
+                check_costs_q(
+                    &p,
+                    &y,
+                    &pos,
+                    if round % 3 == 0 {
+                        Some(round % n.max(1))
+                    } else {
+                        None
+                    },
+                    round % 2 == 0,
+                );
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    fn extended_reduced_costs_control_modes() {
+        let model = crate::mps::parse(include_str!("../tests/fixtures/afiro.mps")).unwrap();
+        let p = build(&model);
+        let y = vec![F80::ONE; p.m];
+        let pos = vec![NONE; p.n + p.m];
+        for cw in [0x027f, 0x077f, 0x0b7f, 0x0f7f] {
+            let _cw = ControlWord::new(cw);
+            let mut d = vec![1.0; p.n + p.m];
+            let mut df = vec![F80::ONE; p.n + p.m];
+            assert!(!p.reduced_costs_q_native(&y, &pos, None, false, &mut d, &mut df));
+            assert!(d.iter().all(|&v| v == 1.0));
+            assert!(df.iter().all(|v| v.repr() == F80::ONE.repr()));
         }
     }
 }
