@@ -126,10 +126,13 @@ five lines each. Re-profile a run when a landed change touched its hot path.
 
 ## In progress
 
-None. Four-output DGEMM is accepted with the measured scope and PDHG timing
-precision limits above. The factor lifecycle audit remains in
+None. The copy-based Chain-mode DGEMM tile has promising target effects but
+misses the predeclared confirmation/noise-separation criterion (recorded below).
+The accepted four-output nocopy tile remains in place. The allocating copy-path
+row-tile selector is a measured remaining cost; its allocation-free integer
+selection has not been tested. The factor lifecycle audit remains in
 [factor-audit.md](factor-audit.md); its rejected ownership prototypes establish
-no runtime gain. Further structural work needs a measured material cost.
+no runtime gain.
 
 ## Extended BTRAN feasibility
 
@@ -347,6 +350,8 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 
 - Share the dense L traversal of entering/pricing FTRAN vectors when both initially select dense L (analysis idea 1), retaining separate eta passes and U solves: frozen f64/F80 random/extreme/captured SC50A tests and fast parity 940/940 pass. Initial version adds about 0.25% DEGEN2 dual-release instructions, with no timing gain. Combining NaN detection with the required nonzero-count scans lowers instructions only about 0.04%; three alternating CPU-4 pairs give median solve medians 0.050441 -> 0.050018 s, within aggregate 0.004460/0.006422 s spreads. Initial interleaving changes NaN payload priority, requiring the original sequential stages whenever dense L produces a NaN, including finite-input overflow. Candidate self profile samples the shared path (2.27% self), so it is active but saves too little. Both variants and test scaffolding reverted (`target/perf-pairl{,2}-target-{before,after}.txt`, `target/perf-pairl-self.txt`). Sparse-to-dense fallback and other jointly traversable stages remain untested.
 
+
+- Batch four copy-based DGEMM outputs when all four use sequential Chain accumulation, retaining alpha's `1.0 * A`, per-output FMA order and final C addition; other modes keep their kernels. The current grouped implementation is independently frozen before editing, and both frozen/current and earlier scalar DGEMM tests pass, as does fast parity 940/940. Current accepted release instruction sampling (BORE3D first, eight DEGEN3 solves capped at 100, 5836 samples at period 4M) locates 21.01% self samples in DGEMM and 0.79% in the allocating row-tile selector; these are batch self fractions, not inclusive/removable bounds. BORE3D instructions +0.05% / no benefit; DEGEN3 -1.22%, GREENBEA +0.01%. Three grouped timing pairs remain within spread or cross bands. Two predeclared DEGEN3 randomized sessions (32 pairs each AB/AA, CPU 4, cap 100, seeds 1379/1453) preserve canonical full results and give medians -1.73/-1.29%, conservative intervals [-3.06%, -1.10%] / [-2.54%, -0.71%], with sign p 9.65e-6 / .000268. The first passes; the second fails the noise-separation criterion because its AA interval is [-1.70%, +1.10%]. Stopped as timing-inconclusive under the declared rule, without repeating until pass or running full gates. Source, accepted CLI and PGO metadata restored. Candidate `/tmp/rose-copy4-candidate{,.rs,-build.json}`; logs `/tmp/rose-copy4-{build,tests}.log`; raw `target/perf-copy4/{transfer-pairs.json,target-*,randomized-degen3-*}`. Current release profile runner/manifests/raw data/report: `target/perf-rowtile/`. The small copy-path effect does not establish a profitable multi-mode or multi-column tile.
 
 - Eliminate the ordinary quad RHS twin: source audit finds its only consumer is recompute_primal while the main factor has zero updates. Run the unchanged force-dense RHS routine on the main factor with spike, WORK/parts, result flags/count, F2, L snapshots and ordering scratch moved aside and restored afterward. Keep the original two-build/two-factor path for numeric-construction diagnostics and repeat PGATE records as before. An independent twin-versus-borrowed test checks complete f64/F80 result bits and retained state after prior FTRAN, needed-FTRAN and BTRAN history, empty/extreme/NaN inputs, repeated calls and seeded snapshots; it and fast parity 940/940 pass. Eight CPU-4 AB/BA pairs per quad fixture preserve complete result objects; instructions fx_quad_obj_5371 -2.15%, Quad_2717 -1.17%, median cycles -0.22/-0.30%. A predeclared randomized Quad screen (32 pairs each AB/AA, seed 631, cap 17000) verifies complete canonical result/exit identity: median +0.47%, interval [-0.77%, +1.73%], 14/32 improving pairs (p .811), AA interval [-1.04%, +0.94%]. No gain; source, accepted CLI and PGO metadata restored before full benchmarking. The prototype establishes numerical feasibility of isolated borrowing for tested cases, not its profitability or full parity. Candidate source/binary/build `/tmp/rose-rhstwin-candidate/`; logs `/tmp/rose-rhstwin-{build,tests}.log`; raw `target/perf-rhstwin/{transfer-pairs.json,randomized-quad-631.json,randomized-quad-631.raw/}`. The existing fresh factor cache still requires an independent main copy before mutation.
 
