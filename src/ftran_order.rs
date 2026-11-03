@@ -739,6 +739,29 @@ impl<R: Real> RefStruct<R> {
         self.lstart.windows(2).map(|s| &self.lentries[s[0]..s[1]])
     }
 
+    /// Compact dense output without a conditional push for each surviving value.
+    #[inline(never)]
+    fn dense_spike(x: &[R]) -> Vec<(usize, R)> {
+        let mut out = Vec::with_capacity(x.len());
+        let dst: *mut (usize, R) = out.as_mut_ptr();
+        let mut count = 0;
+        for (i, &v) in x.iter().enumerate() {
+            // Before iteration i, count <= i < x.len() <= capacity. Rejected
+            // entries overwrite the next unused slot; each accepted entry
+            // advances count, retaining exactly the original order and bits.
+            unsafe {
+                dst.add(count).write((i, v));
+            }
+            count += usize::from(v != R::ZERO);
+        }
+        // Every slot below count holds an accepted entry. R is Copy, so
+        // overwriting or leaving the rejected entries outside len needs no drop.
+        unsafe {
+            out.set_len(count);
+        }
+        out
+    }
+
     fn kahn(&self, start: &[usize]) -> Vec<usize> {
         let mut cnt = vec![0i32; self.m];
         let mut lst: Vec<usize> = start.to_vec();
@@ -1009,10 +1032,14 @@ impl<R: Real> RefStruct<R> {
         // A dense vector goes on as the raw array: the reference keeps the sub-tolerance residues of the L and eta stages.
         if output_dense {
             return (
-                (0..m)
-                    .filter(|&v| x[v] != R::ZERO)
-                    .map(|v| (v, x[v]))
-                    .collect(),
+                if R::LANES {
+                    Self::dense_spike(&x)
+                } else {
+                    (0..m)
+                        .filter(|&v| x[v] != R::ZERO)
+                        .map(|v| (v, x[v]))
+                        .collect()
+                },
                 count_l,
                 e,
             );
@@ -3886,6 +3913,40 @@ mod forward_l_tests {
                 );
             }
             check(&f, &rows, &vals, &rows, &vals, bits);
+        }
+    }
+
+    #[test]
+    fn dense_compaction_preserves_bits() {
+        let mut seed = 0xa7c9e21356u64;
+        for m in [0, 1, 2, 7, 31, 128, 511] {
+            for pattern in 0..5 {
+                let x: Vec<f64> = (0..m)
+                    .map(|i| {
+                        seed ^= seed << 13;
+                        seed ^= seed >> 7;
+                        seed ^= seed << 17;
+                        match pattern {
+                            0 => 0.0,
+                            1 => -0.0,
+                            2 if i % 2 == 0 => 0.0,
+                            3 => f64::from_bits(0x7ff8_0000_0000_0001 + (i as u64 & 1)),
+                            _ => f64::from_bits(seed),
+                        }
+                    })
+                    .collect();
+                let expected: Vec<_> = x
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, v)| **v != 0.0)
+                    .map(|(i, v)| (i, v.to_bits()))
+                    .collect();
+                let actual: Vec<_> = RefStruct::<f64>::dense_spike(&x)
+                    .into_iter()
+                    .map(|(i, v)| (i, v.to_bits()))
+                    .collect();
+                assert_eq!(actual, expected);
+            }
         }
     }
 
