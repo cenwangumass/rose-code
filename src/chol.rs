@@ -501,6 +501,33 @@ fn dgemm_s4(a0: &[f64], a1: &[f64], a2: &[f64], a3: &[f64], b: &[f64]) -> [f64; 
     [s0, s1, s2, s3]
 }
 
+// Eight independent S chains share both row and column loads. Each output's
+// FMA sequence is unchanged, including its initial positive zero.
+fn dgemm_s4x2(
+    a0: &[f64],
+    a1: &[f64],
+    a2: &[f64],
+    a3: &[f64],
+    b0: &[f64],
+    b1: &[f64],
+) -> [[f64; 4]; 2] {
+    let (mut s00, mut s01, mut s02, mut s03) = (0.0, 0.0, 0.0, 0.0);
+    let (mut s10, mut s11, mut s12, mut s13) = (0.0, 0.0, 0.0, 0.0);
+    for t in 0..a0.len() {
+        let (x0, x1, x2, x3) = (a0[t], a1[t], a2[t], a3[t]);
+        let (y0, y1) = (b0[t], b1[t]);
+        s00 = fma(x0, y0, s00);
+        s01 = fma(x1, y0, s01);
+        s02 = fma(x2, y0, s02);
+        s03 = fma(x3, y0, s03);
+        s10 = fma(x0, y1, s10);
+        s11 = fma(x1, y1, s11);
+        s12 = fma(x2, y1, s12);
+        s13 = fma(x3, y1, s13);
+    }
+    [[s00, s01, s02, s03], [s10, s11, s12, s13]]
+}
+
 /// Tile kernel of element (row `i`, column `j`) of an `m x n` product: rows in blocks of 8 (a last block of <= 4 rows is a 4-row block, 5..7 rows a
 /// masked 8-row block), columns in blocks of 6 with a remainder of `n % 6`; remainder 1 or 2: 'N'; 3: 'A'; otherwise 8-row blocks 'S', 4-row 'A'.
 fn gemm_kind(m: usize, n: usize, i: usize, j: usize) -> Kind {
@@ -790,7 +817,48 @@ fn dgemm_body<const GROUP_S: bool>(
     for &kk in &ps {
         let mut j0 = 0;
         for nb in nocopy_n_blocks(n) {
-            for j in 0..nb {
+            let mut j = 0;
+            while j < nb {
+                if GROUP_S
+                    && j + 1 < nb
+                    && gemm_kind(m, nb, 0, j) == Kind::S
+                    && gemm_kind(m, nb, 0, j + 1) == Kind::S
+                {
+                    let br = |col: usize| &b[(j0 + col) * ldb + k0..(j0 + col) * ldb + k0 + kk];
+                    let ar = |row: usize| &a[row * lda + k0..row * lda + k0 + kk];
+                    let mut i = 0;
+                    while i < m {
+                        if i + 4 <= m
+                            && gemm_kind(m, nb, i, j) == Kind::S
+                            && gemm_kind(m, nb, i + 3, j) == Kind::S
+                        {
+                            let sums = dgemm_s4x2(
+                                ar(i),
+                                ar(i + 1),
+                                ar(i + 2),
+                                ar(i + 3),
+                                br(j),
+                                br(j + 1),
+                            );
+                            for col in 0..2 {
+                                for row in 0..4 {
+                                    let ci = (j0 + j + col) * ldc + i + row;
+                                    c[ci] = c[ci] + 1.0 * sums[col][row];
+                                }
+                            }
+                            i += 4;
+                        } else {
+                            for col in j..j + 2 {
+                                let ci = (j0 + col) * ldc + i;
+                                c[ci] =
+                                    dgemm_tn_elem(gemm_kind(m, nb, i, col), ar(i), br(col), c[ci]);
+                            }
+                            i += 1;
+                        }
+                    }
+                    j += 2;
+                    continue;
+                }
                 if GROUP_S {
                     let br = &b[(j0 + j) * ldb + k0..(j0 + j) * ldb + k0 + kk];
                     let mut i = 0;
@@ -833,6 +901,7 @@ fn dgemm_body<const GROUP_S: bool>(
                         );
                     }
                 }
+                j += 1;
             }
             j0 += nb;
         }
@@ -899,7 +968,18 @@ fn frozen_grouped_dgemm_body<const GROUP_S: bool>(
                     let mut i = 0;
                     while i < m {
                         let kind = gemm_kind(m, nb, i, j);
-                        if kind == Kind::S && i + 2 <= m && gemm_kind(m, nb, i + 1, j) == Kind::S {
+                        if kind == Kind::S && i + 4 <= m && gemm_kind(m, nb, i + 3, j) == Kind::S {
+                            let ar = |row: usize| &a[row * lda + k0..row * lda + k0 + kk];
+                            let sums = dgemm_s4(ar(i), ar(i + 1), ar(i + 2), ar(i + 3), br);
+                            for t in 0..4 {
+                                let ci = (j0 + j) * ldc + i + t;
+                                c[ci] = c[ci] + 1.0 * sums[t];
+                            }
+                            i += 4;
+                        } else if kind == Kind::S
+                            && i + 2 <= m
+                            && gemm_kind(m, nb, i + 1, j) == Kind::S
+                        {
                             let ar = |row: usize| &a[row * lda + k0..row * lda + k0 + kk];
                             let sums = dgemm_s2(ar(i), ar(i + 1), br);
                             for t in 0..2 {
@@ -2919,7 +2999,7 @@ mod tests {
                 unsafe {
                     frozen_grouped_dgemm(m, n, k, a, lda, b, ldb, &mut grouped, ldc);
                 }
-                assert_bits("frozen two-output grouped kernel", &grouped, &got);
+                assert_bits("frozen four-output grouped kernel", &grouped, &got);
             }
 
             let mut portable = c.to_vec();
