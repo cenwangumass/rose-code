@@ -4469,6 +4469,137 @@ const ROW_DROP_TOL: f64 = 1e-13;
 /// Pivot-row entries at or below this are left out of the Devex weight update (`0x103d0d`).
 const WEIGHT_DROP_TOL: f64 = 1e-12;
 
+/// The Devex cross term shares one packed tau across every eligible column.
+/// Each column keeps the software kernel's eight lanes and reversed tail.
+struct DevexCrossTerms<'a> {
+    tau: &'a [crate::f80::F80],
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    packed: Option<Vec<[u8; 16]>>,
+}
+
+impl<'a> DevexCrossTerms<'a> {
+    fn new(tau: &'a [crate::f80::F80]) -> Self {
+        #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+        let packed = {
+            let mut cw = 0u16;
+            // SAFETY: fnstcw writes two bytes without changing the control word.
+            unsafe {
+                std::arch::asm!("fnstcw [{cw}]", cw = in(reg) &mut cw,
+                    options(nostack, preserves_flags));
+            }
+            if cw & 0x0f3f == 0x033f {
+                Some(
+                    tau.iter()
+                        .map(|v| {
+                            let (m, se) = v.repr();
+                            let mut b = [0u8; 16];
+                            b[..8].copy_from_slice(&m.to_le_bytes());
+                            b[8..10].copy_from_slice(&se.to_le_bytes());
+                            b
+                        })
+                        .collect(),
+                )
+            } else {
+                None
+            }
+        };
+        Self {
+            tau,
+            #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+            packed,
+        }
+    }
+
+    fn dot(&self, col: &[(usize, f64)]) -> crate::f80::F80 {
+        #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+        if let Some(tau) = &self.packed {
+            return Self::native_dot(col, tau);
+        }
+        use crate::real::Real;
+        let mut vj = crate::f80::F80::ZERO;
+        let mut lanes = [crate::f80::F80::ZERO; 8];
+        let blocks = col.len() / 8;
+        for block in col[..blocks * 8].chunks_exact(8) {
+            for (lane, &(i, a)) in lanes.iter_mut().zip(block) {
+                *lane += crate::f80::F80::c(a) * self.tau[i];
+            }
+        }
+        for lane in lanes {
+            vj += lane;
+        }
+        for &(i, a) in col[blocks * 8..].iter().rev() {
+            vj += crate::f80::F80::c(a) * self.tau[i];
+        }
+        vj
+    }
+
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    fn native_dot(col: &[(usize, f64)], tau: &[[u8; 16]]) -> crate::f80::F80 {
+        use std::arch::asm;
+        let mut lanes = [[0u8; 16]; 8];
+        let mut sum = [0u8; 16];
+        let mut product = [0u8; 16];
+        let blocks = col.len() / 8;
+        // The product is stored before the addition, including at gradual
+        // underflow. All arithmetic uses the constructor's masked nearest/64-bit mode.
+        macro_rules! accumulate {
+            ($out:expr, $a:expr, $v:expr) => {{
+                let out: &mut [u8; 16] = $out;
+                let a: &f64 = $a;
+                let v: &[u8; 16] = $v;
+                // SAFETY: slices checked every index; pointers cover their loads
+                // and stores. The x87 stack balances and both registers are clobbered.
+                unsafe {
+                    asm!(
+                        "fld qword ptr [{a}]", "fld tbyte ptr [{v}]",
+                        "fmulp st(1), st", "fstp tbyte ptr [{product}]",
+                        "fld tbyte ptr [{out}]", "fld tbyte ptr [{product}]",
+                        "faddp st(1), st", "fstp tbyte ptr [{out}]",
+                        a = in(reg) a, v = in(reg) v.as_ptr(),
+                        product = in(reg) product.as_mut_ptr(),
+                        out = in(reg) out.as_mut_ptr(),
+                        out("st(0)") _, out("st(1)") _,
+                        options(nostack, preserves_flags),
+                    );
+                }
+            }};
+        }
+        for block in col[..blocks * 8].chunks_exact(8) {
+            for (lane, (i, a)) in lanes.iter_mut().zip(block) {
+                accumulate!(lane, a, &tau[*i]);
+            }
+        }
+        // SAFETY: all eight lanes are valid 16-byte slots. The sum starts at
+        // positive zero and remains in x87 precision through the same eight
+        // separately rounded additions, in ascending lane order. Both used x87
+        // registers are clobbered and the stack balances.
+        unsafe {
+            asm!(
+                "fld tbyte ptr [{sum}]",
+                "fld tbyte ptr [{lanes}]", "faddp st(1), st",
+                "fld tbyte ptr [{lanes} + 16]", "faddp st(1), st",
+                "fld tbyte ptr [{lanes} + 32]", "faddp st(1), st",
+                "fld tbyte ptr [{lanes} + 48]", "faddp st(1), st",
+                "fld tbyte ptr [{lanes} + 64]", "faddp st(1), st",
+                "fld tbyte ptr [{lanes} + 80]", "faddp st(1), st",
+                "fld tbyte ptr [{lanes} + 96]", "faddp st(1), st",
+                "fld tbyte ptr [{lanes} + 112]", "faddp st(1), st",
+                "fstp tbyte ptr [{sum}]",
+                sum = in(reg) sum.as_mut_ptr(), lanes = in(reg) lanes.as_ptr(),
+                out("st(0)") _, out("st(1)") _,
+                options(nostack, preserves_flags),
+            );
+        }
+        for (i, a) in col[blocks * 8..].iter().rev() {
+            accumulate!(&mut sum, a, &tau[*i]);
+        }
+        crate::f80::F80::from_repr(
+            u64::from_le_bytes(sum[..8].try_into().unwrap()),
+            u16::from_le_bytes(sum[8..10].try_into().unwrap()),
+        )
+    }
+}
+
 /// Pricing calls of the reference's `0x105a50` (the dump's `n`): the retry after a failed scan of the candidate list is one too.
 static PRC: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
@@ -8108,6 +8239,7 @@ fn solve_primal(
             PRIMAL_RESTART_PAIR
                 .with(|c| c.set(Some((alpha_rq, if q < n { alpha_rq } else { arq_x }))));
         }
+        let devex_cross = tau_q.as_deref().map(DevexCrossTerms::new);
         let mut norm_reset = false;
         let mut changed: Vec<usize> = Vec::new();
         let mut rowvals: Vec<(usize, f64)> = Vec::new();
@@ -8171,28 +8303,12 @@ fn solve_primal(
                     }
                 }
             } else if arj.abs() > WEIGHT_DROP_TOL {
-                if let (Some((a_rq, wq_q)), Some(tq), Some(pq)) =
-                    (qw, tau_q.as_ref(), prods_q.as_ref())
+                if let (Some((a_rq, wq_q)), Some(cross), Some(pq)) =
+                    (qw, devex_cross.as_ref(), prods_q.as_ref())
                 {
                     use crate::real::Real;
                     let ratio = pq[j] / a_rq;
-                    let mut vj = crate::f80::F80::ZERO;
-                    // Eight independent x87 accumulators for full blocks, reduced in
-                    // lane order; the remaining entries are consumed backwards.
-                    let col = &p.fcols[j];
-                    let mut lanes = [crate::f80::F80::ZERO; 8];
-                    let blocks = col.len() / 8;
-                    for block in col[..blocks * 8].chunks_exact(8) {
-                        for (lane, &(i, a)) in lanes.iter_mut().zip(block) {
-                            *lane += crate::f80::F80::c(a) * tq[i];
-                        }
-                    }
-                    for lane in lanes {
-                        vj += lane;
-                    }
-                    for &(i, a) in col[blocks * 8..].iter().rev() {
-                        vj += crate::f80::F80::c(a) * tq[i];
-                    }
+                    let vj = cross.dot(&p.fcols[j]);
                     if s.wf.len() != s.w.len() {
                         s.wf = vec![crate::f80::F80::ZERO; s.w.len()];
                     }
@@ -9065,6 +9181,179 @@ mod rank_product_tests {
             assert!(!p.reduced_costs_q_native(&y, &pos, None, false, &mut d, &mut df));
             assert!(d.iter().all(|&v| v == 1.0));
             assert!(df.iter().all(|v| v.repr() == F80::ONE.repr()));
+        }
+    }
+}
+
+#[cfg(test)]
+mod devex_dot_tests {
+    use super::*;
+    use crate::f80::F80;
+    use crate::real::Real;
+
+    // Independent frozen Devex cross term before the native kernel.
+    fn frozen(col: &[(usize, f64)], tq: &[F80]) -> F80 {
+        let mut vj = crate::f80::F80::ZERO;
+        // Eight independent x87 accumulators for full blocks, reduced in
+        // lane order; the remaining entries are consumed backwards.
+        let mut lanes = [crate::f80::F80::ZERO; 8];
+        let blocks = col.len() / 8;
+        for block in col[..blocks * 8].chunks_exact(8) {
+            for (lane, &(i, a)) in lanes.iter_mut().zip(block) {
+                *lane += crate::f80::F80::c(a) * tq[i];
+            }
+        }
+        for lane in lanes {
+            vj += lane;
+        }
+        for &(i, a) in col[blocks * 8..].iter().rev() {
+            vj += crate::f80::F80::c(a) * tq[i];
+        }
+        vj
+    }
+
+    fn check(col: &[(usize, f64)], tau: &[F80]) {
+        let kernel = DevexCrossTerms::new(tau);
+        assert_eq!(
+            kernel.dot(col).repr(),
+            frozen(col, tau).repr(),
+            "{col:?} {tau:?}"
+        );
+    }
+
+    #[test]
+    fn devex_cross_terms_match_frozen() {
+        // Rounded BTT dump values, quad_2717 dual-release local iterations 8/9.
+        let model = crate::mps::parse(include_str!("../tests/fixtures/quad_2717.mps")).unwrap();
+        let scaled = crate::scale::compute(&model).apply(&model).unwrap();
+        let p = build(&scaled);
+        for captured in [
+            [
+                -2.464787518523202e-19,
+                1.1858654717194865e-18,
+                -3.1091435412806475e-19,
+                -1.5543111673442519e-13,
+                0.0,
+                -3.0673487738947705e-18,
+                -1.7845643317150867e-19,
+            ],
+            [
+                -1216283424020.7192,
+                -29595830595.240368,
+                -78229987025550.12,
+                3931343973.1132574,
+                0.0,
+                122854618891589.67,
+                -73492242370328.08,
+            ],
+        ] {
+            let mut tau = vec![F80::ZERO; p.m];
+            for (i, x) in captured.into_iter().enumerate() {
+                tau[i] = F80::c(x);
+            }
+            for col in &p.fcols {
+                check(col, &tau);
+            }
+        }
+        let values = [
+            F80::ZERO,
+            F80::c(-0.0),
+            F80::ONE,
+            F80::c(-1.0),
+            F80::from_repr(1, 0),
+            F80::from_repr(3, 0x8000),
+            F80::from_repr(u64::MAX >> 1, 0),
+            F80::from_repr(1 << 63, 1),
+            F80::from_repr(u64::MAX, 0x7ffe),
+            F80::from_repr(u64::MAX, 0xfffe),
+            F80::c(f64::INFINITY),
+            F80::c(f64::NEG_INFINITY),
+            F80::c(f64::NAN),
+        ];
+        let coefficients = [
+            0.0,
+            -0.0,
+            0.5,
+            -0.5,
+            1.0,
+            -1.0,
+            2.0,
+            f64::from_bits(1),
+            f64::MIN_POSITIVE,
+            f64::MAX,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NAN,
+        ];
+        for v in values {
+            for a in coefficients {
+                for n in [0, 1, 7, 8, 9, 15, 16, 17, 33] {
+                    let col: Vec<_> = (0..n).map(|i| (i % 2, a)).collect();
+                    check(&col, &[v, -v]);
+                }
+            }
+        }
+        let mut seed = 0xd37e_2048_d8a1_732bu64;
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        for trial in 0..2000 {
+            let tau: Vec<_> = (0..19)
+                .map(|_| {
+                    let m = next();
+                    let se = next() as u16;
+                    if trial % 3 == 0 {
+                        values[m as usize % values.len()]
+                    } else {
+                        F80::from_repr(m | (1 << 63), se)
+                    }
+                })
+                .collect();
+            let col: Vec<_> = (0..trial % 65)
+                .map(|_| {
+                    let i = next() as usize % tau.len();
+                    let bits = next();
+                    let a = if trial % 3 == 0 {
+                        coefficients[bits as usize % coefficients.len()]
+                    } else {
+                        f64::from_bits(bits)
+                    };
+                    (i, a)
+                })
+                .collect();
+            check(&col, &tau);
+        }
+    }
+
+    #[test]
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    fn devex_cross_control_modes() {
+        struct Restore(u16);
+
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                unsafe {
+                    std::arch::asm!("fldcw [{cw}]", cw = in(reg) &self.0, options(nostack));
+                }
+            }
+        }
+        let mut old = 0u16;
+        unsafe {
+            std::arch::asm!("fnstcw [{cw}]", cw = in(reg) &mut old, options(nostack));
+        }
+        let _restore = Restore(old);
+        let tau = [F80::ONE, F80::from_repr((1 << 63) + 3, 0x3fff)];
+        let col: Vec<_> = (0..17).map(|i| (i % 2, 0.1)).collect();
+        for cw in [0x037fu16, 0x027f, 0x077f, 0x0b7f, 0x0f7f] {
+            unsafe {
+                std::arch::asm!("fldcw [{cw}]", cw = in(reg) &cw, options(nostack));
+            }
+            let kernel = DevexCrossTerms::new(&tau);
+            assert_eq!(kernel.packed.is_some(), cw == 0x037f);
+            assert_eq!(kernel.dot(&col).repr(), frozen(&col, &tau).repr());
         }
     }
 }
