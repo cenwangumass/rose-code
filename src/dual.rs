@@ -554,7 +554,7 @@ struct Dual<'a, R: Real = f64> {
     /// The update limit of the factor object once the value mode has started (`F+0x188`).
     upd_limit: Option<usize>,
     /// The pivot column of the last iteration by position (for the factor's update).
-    pending_alpha: Option<Vec<R>>,
+    pending_alpha: Option<Vec<(usize, R)>>,
     /// The pivot-check pair of the last iteration that reached the check (`ctx+0x300` = the column's pivot, `ctx+0x308` = the row's): the primal started by the
     /// controller reads it at its first pricing call.
     pair: (f64, f64),
@@ -3806,11 +3806,7 @@ impl<'a, R: Real> Dual<'a, R> {
         for &(i, v) in &tau_out {
             tau_dense[i] = v;
         }
-        let mut alpha_dense = vec![R::ZERO; m];
-        for &(i, v) in &col_out {
-            alpha_dense[i] = v;
-        }
-        let alpha = alpha_dense[r];
+        let alpha = col_out.iter().rfind(|e| e.0 == r).map_or(R::ZERO, |e| e.1);
         // Pivot check: the row's value in the true frame against the column's.
         let sq = if self.st[q] == UB { -1.0 } else { 1.0 };
         let sdir = if above { -1.0 } else { 1.0 };
@@ -4050,8 +4046,7 @@ impl<'a, R: Real> Dual<'a, R> {
         *dump = rec;
         let _ = flips.len();
         // The factor's update is made by the post-iteration pass (it refactorizes instead when one is due).
-        let alpha_vec = alpha_dense;
-        self.pending_alpha = Some(alpha_vec);
+        self.pending_alpha = Some(col_out);
         // The ratio test zeroes row entries of magnitude at most 1e-10 (`0xc7747..0xc7769`, `0xcc606`; bh50022 has an entry exactly -1e-10).
         let row: Vec<(usize, R)> = row
             .into_iter()
@@ -4712,8 +4707,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 self.pivot_cols = Some(pv.col.len());
                 self.refactor(if schedule_due { "scheduled" } else { "request" })?;
             } else {
-                self.factor
-                    .update(pv.r, alpha.iter().map(|v| v.to_f64()).collect());
+                self.factor.update_column(pv.r, alpha);
                 self.mirror.update(pv.r);
                 for (site, est, scale) in std::mem::take(&mut self.mirror.upd_work) {
                     self.work.add(site, est, scale);
