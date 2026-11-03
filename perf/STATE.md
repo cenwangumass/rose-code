@@ -104,8 +104,10 @@ self instruction screen and isolated dense-L-transpose x87 probe are recorded
 below. The finite-input native probe is about 3.1x faster including conversions;
 dense-only solver integration with a guarded exceptional fallback passes fast
 parity but does not establish a repeatable solver timing gain (recorded below).
-Next measure sparse/partial branch coverage before a wider native L-transpose
-kernel; do not infer complete-BTRAN savings from the isolated dense probe. Borrowed factor inputs and immutable factor sharing remain
+Branch counts show dense L already covers essentially all measured quad work;
+sparse/partial native L is not the next target. Test one packed workspace across
+U-transpose, etas and L-transpose instead; do not infer complete-BTRAN savings
+from the isolated dense probe. Borrowed factor inputs and immutable factor sharing remain
 unproven.
 
 ## Extended BTRAN feasibility
@@ -142,6 +144,39 @@ row etas, subnormals and exceptional-value fallback, passed; fast parity passed
 940/940. Eight CPU-4 AB/BA result pairs per fixture matched all output fields
 except seconds. This does not prove full parity or profitability for a complete
 native BTRAN. The dense isolated timing remains a feasibility result only.
+
+### BTRAN branch and stage counts
+
+A temporary `btranpath` dump kind on the accepted source counts arithmetic terms
+for calls reaching L-transpose. Captures are bounded at 5500/17000 iterations;
+both complete output objects match the accepted CLI except seconds. Numeric
+operations and ordering are unchanged. This instrumentation is removed, and the
+accepted CLI hash restored. Instrumented times are not benchmarks; fixed-profile
+PGO hash-mismatch warnings make this binary unsuitable for timing attribution.
+
+| Fixture / L path | Calls reaching L | U scatter terms | Eta terms | L scatter terms | Rows |
+|---|---:|---:|---:|---:|---:|
+| fx_quad_obj_5371 dense | 11320 | 123735 | 56464 | 186969 | 11 |
+| fx_quad_obj_5371 heap | 16 | 66 | 38 | 56 | 11 |
+| quad_2717 dense | 53960 | 463569 | 329434 | 616740 | 8 |
+
+Quad_2717 has no heap/level/partial L calls in this measurement. The dense
+L branch has at most 14 scatter terms per call on Quad_2717, 20 on the smaller
+quad fixture. Zero-term dense calls number 5780/5 respectively. These are term
+counts, not cycle costs: U divisions, graph/list management, packing, allocations
+and threshold tests are excluded. Early returns before L produce no record;
+stage totals therefore describe only calls reaching L, not every BTRAN entry.
+The evidence contradicts extending the native kernel into sparse L as the next
+optimization on these targets. A whole U/eta/L packed workspace would amortize
+conversions across more work, but must preserve the distinct sparse U expression
+`-(v*d)+w`, dense U subtraction, eta assignment/addition, threshold tests, ordered
+supports and each WORK accumulation.
+
+Raw captures/results, validated runner, source snapshots and binary provenance:
+`target/perf-btbranch/{run.py,summary.json,allstages-summary.json,*-allstages.dump,
+*-allstages.json,*-accepted.json,instrumented-ftran.rs,instrumented-dump.rs}`.
+Build logs `/tmp/rose-btbranch-build{,2}.log`. No frozen baselines were changed;
+no reference comparison or new solver speedup is claimed.
 
 ## Candidates
 
