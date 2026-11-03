@@ -128,9 +128,8 @@ five lines each. Re-profile a run when a landed change touched its hot path.
 
 ## In progress
 
-None. Dependency-walk count reuse, maximum simplification and reverse-reference
-length queries are unaccepted below. The latter misses its independent timing
-confirmation; no run was extended until pass. Accepted source/CLI/PGO are restored.
+None. Guarded fresh-factor numerical replay elimination has no established runtime
+benefit below. Accepted source/CLI/PGO are restored; no confirmation was run.
 
 ## Extended BTRAN feasibility
 
@@ -269,6 +268,8 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 - all: dump::on/record construction without dumps remains an unmeasured lead.
 
 ## Tried, no gain
+
+- Skip fresh-factor numerical updates into the Markowitz nucleus only when L is strictly lower and every reached nucleus output is overwritten by a producer U value above tolerance. The cutoff is the first phase-0 pivot, not loff (which precedes phase-4 singletons). Independent frozen-constructor tests compare all fresh factor fields, exact f64/F80 bits and defaults on 26 cached small-model factors per precision plus randomized/extreme/duplicate/nonfinite/missing-output/nontriangular fallback cases; both release tests pass. Fast parity 940/940 and eight ADLITTLE/BORE3D full-result/exit pairs agree. The guarded structural screen covers 492/719 tail columns across the 26 double factors, with 572/655 potential update visits skippable; these are structural counts, not executed arithmetic or attainable time. Small instructions rise 0.10/0.14%; PILOT4 instructions fall 0.57%. Grouped PILOT4 solve 0.074889 -> 0.074054 s stays within spread. The predeclared 32-AB/32-AA screen (CPU 4, cap 800, seed 3511) gives median +0.26%, interval [-0.53%, +1.78%], AA [-2.03%, +1.59%], sign p .811 and mixed execution-order medians. Stopped without reserved confirmation/full gates; no runtime benefit established. Source, accepted CLI and PGO metadata restored. Candidate/frozen source, builds, tests, counters, small/full-result pairs and all timing data: `target/perf-fresh-replay/`; coverage source/reports: `target/perf-fresh-coverage/`. This tests guarded arithmetic elimination while retaining reachability, sorting and entry materialization, not their elimination or direct producer/consumer equality.
 
 - Reuse the existing sorted reverse-row copy in dependency-walk length queries: a tail column absent from rowl[r] has no r entry in A/B, so raw lengths suffice; references retain the exact filter. Move the already-existing clone/sort before the walk (rowl[r] does not change in between), retain its later filtering, and cache each step's length once. Fast parity 940/940 and eight ADLITTLE/BORE3D full-result/exit pairs agree; small instructions -0.08/-0.13%. PILOT4 instructions -1.20%, grouped solve 0.048497 -> 0.047413 s improves beyond both spreads. Two predeclared independent 32-AB/32-AA screens (CPU 4, cap 800, seeds 3371/3433) retain all canonical result/exit pairs, medians -1.51/-1.76%, intervals [-1.80%, -0.92%] / [-3.00%, -0.08%], AA intervals [-0.46%, +0.12%] / [-1.73%, +1.38%]. The first passes. Confirmation has only 23/32 improving pairs (one-sided sign p .0100308, above .01) and fails separation from AA uncertainty. Stopped as timing-inconclusive without extending/repeating the screen or running full gates. Source, accepted CLI and PGO metadata restored. Source/binary/build, logs, counters, both schedules and every controlled raw result: `target/perf-walkrefs/`. This does not establish a qualifying speedup despite promising medians; do not repeat it until it passes.
 

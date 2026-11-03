@@ -1,12 +1,14 @@
 # Factor production and ownership audit
 
-Source inspected: accepted solver b421f8ab. This is a source/lifetime audit, not a
-measurement of attainable speedup. Numerical reuse remains unproven.
+Ownership audit source: b421f8ab; guarded replay screen: accepted d897aa91.
+This is a source/lifetime audit, not a measurement of attainable speedup. Direct numerical reuse remains unproven;
+guarded elimination of overwritten replay arithmetic is feasible on tested
+cases but has no established runtime benefit (below).
 
 | Producer | Consumers and lifetime | Consequence |
 |---|---|---|
 | `lu_order::Structure` | Pivot order, phases, L rows/multipliers/raw entries, diagonal and partial U feed `RefStruct::fresh`; structure and incoming columns remain live for WORK and pricing installation. | Consuming the structure at the current fresh call would invalidate later consumers. Narrow ownership transfers need an installation payload first. |
-| `RefStruct::fresh` | Copies diagonal; remaps L destinations into flat forward storage and builds its transpose. Replays elimination for tail U, then overlays Markowitz entries. | Producer L row IDs and consumer step IDs differ. Moving nested producer vectors directly cannot replace the remap. Reusing numerical U requires intermediate equality evidence. |
+| `RefStruct::fresh` | Copies diagonal; remaps L destinations into flat forward storage and builds its transpose. Replays elimination for tail U, then overlays Markowitz entries. | Producer L row IDs and consumer step IDs differ. Moving nested producer vectors directly cannot replace the remap. Direct numerical U reuse requires intermediate equality evidence; guarded skipping of overwritten replay values is a separate case below. |
 | Primal `reference_order_for` | Returns the accepted growth-check mirror for installation (`simplex.rs`, `growth_factor`). Retried attempts book their own WORK. | Duplicate accepted growth-check construction is already eliminated. Do not count it as remaining savings. |
 | Primal `quad_mirrors` | One fresh extended factor is deep-cloned for the second twin; diagnostic mode retains two builds. A four-entry small-model cache also clones factors. | Duplicate ordinary twin numerical construction is already eliminated. Sharing immutable L/permutation/transpose storage is still a candidate; mutable U, counters, scratch, spikes and cells must stay independent. |
 | Auxiliary `Factor` | Constructed after mirror acceptance; used in primal fallback, cleanup, dual deferred-free pricing and stall-objective evaluation. Update counts also participate in controller decisions. Construction failure can restart primal or return singular basis in dual. | Deletion or laziness requires preserving both numerical consumers and the original failure point. Matching pivot rows is insufficient. |
@@ -132,6 +134,34 @@ source/CLI/PGO metadata restored. Thus isolated borrowing is numerically feasibl
 on tested cases but has not established a runtime benefit; the fresh-factor
 cache's main copy and the RHS routine's temporary work remain present. Exact
 artifacts and bounds are in STATE.md.
+
+## Guarded fresh replay screen
+
+A strictly lower L cannot propagate a nucleus destination back into a singleton
+output. A prototype checked this property during transpose construction, marked
+producer U rows for each tail column, and required every reached nucleus output
+to have a replacement with magnitude above tolerance. Under this guard it skipped
+all numerical updates into the nucleus; uncovered/tiny/NaN/nontriangular cases
+kept the original replay. The boundary was the first phase-0 pivot, not `loff`,
+which precedes phase-4 singleton steps. Singleton arithmetic and order stayed
+unchanged. The guard did not assume equality of replay and producer values.
+
+The frozen full constructor and candidate agree in every fresh state field with
+exact f64/F80 bits on the 26 cached ADLITTLE/BLEND/BORE3D/SC50A factors per
+precision, plus randomized structures with extreme/nonfinite/duplicate values,
+missing producer outputs and nontriangular fallback. Fast parity passes 940/940.
+All 26 double factors have strictly lower L; 492/719 tail columns meet coverage,
+and 572/655 structural update visits could be skipped. These are potential
+visits, not executed operations or a runtime bound. Eight ADLITTLE/BORE3D
+canonical result/exit pairs agree; instructions rise 0.10/0.14% there. PILOT4
+primal instructions fall 0.57%, but its predeclared randomized screen establishes
+no timing gain: median +0.26%, conservative interval [-0.53%, +1.78%], AA
+[-2.03%, +1.59%]. The session stopped without confirmation/full gates, and
+accepted source/CLI/PGO metadata are restored. Reachability, sorting and entry
+materialization remained; eliminating them needs a separate proof and cost
+screen. Artifacts: `target/perf-fresh-replay/` and
+`target/perf-fresh-coverage/`; precise bounds and build hashes are in STATE.md
+and the saved manifest. This is not evidence that direct numerical reuse is safe.
 
 ## Remaining proof obligations
 
