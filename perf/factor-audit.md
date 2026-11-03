@@ -104,6 +104,20 @@ and the accepted source/CLI/build metadata restored. This tests immutable split
 input ownership only; it does not establish the cost of numerical producer
 reuse or immutable factor-data sharing. Exact evidence is in STATE.md.
 
+A forward-factor sharing prototype grouped immutable L starts/entries, L
+transpose, row permutation and L levels behind one shared owner, so fresh quad
+twins and cached-factor clones retained these arrays without deep copies. U,
+diagonals, etas, counters, snapshots and solve scratch remained independent.
+Source audit found no production mutation of the shared fields. All 76 library
+release tests and fast parity 940/940 passed. Target instruction savings were
+only 0.62% on fx_quad_obj_5371 and 0.31% on Quad_2717. A predeclared randomized
+Quad_2717 screen retained all canonical results and timing samples: median
+-0.84%, conservative interval [-3.21%, +0.50%], AA interval [-1.10%, +2.11%].
+The session stopped as inconclusive and restored the accepted implementation.
+This isolates immutable forward storage; mutable-U cloning is still present.
+The Rc prototype was not retained, including its change to Send compatibility.
+Evidence is in STATE.md and `target/perf-sharefactor/`.
+
 ## Remaining proof obligations
 
 Before a factor ownership prototype, separate column-copy and immutable-factor
