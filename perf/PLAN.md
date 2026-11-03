@@ -87,6 +87,11 @@ baseline. No exceptions, no "within a ULP", no re-recording.
   expansion duplicates frames here; DWARF unwinding also loses callers. Use `perf annotate` for hot
   functions. Bound the run with a bench model or `--max-iterations N`. `perf stat -e
   instructions:u,cycles:u,cache-misses:u,branch-misses:u` gives a quick counter picture.
+- For instruction-family self profiles, use the accepted release CLI directly: self attribution does
+  not need frame pointers, which can change instruction counts. Keep the frame-pointer build for
+  caller ancestry. Audit lost/throttled samples and represented instructions against direct counters.
+  Keep wrapper result parsing/validation outside the measured process, and separate solver samples
+  from wrapper samples.
 - `cargo test --release` (about 35 s): the reference-derived tests. Run before each commit.
 - Format with `RUSTFMT=~/.local/bin/rustfmt-custom cargo fmt -- --config blank_line_between_items=true`
   (never plain `cargo fmt`). Version control is `jj`, run from `rose/`.
