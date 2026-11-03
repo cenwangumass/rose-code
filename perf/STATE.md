@@ -102,8 +102,10 @@ block schedules and dense-column maps remain untested, but neither isolated
 planning prototype establishes a material removable share. Current extended-BTRAN
 self instruction screen and isolated dense-L-transpose x87 probe are recorded
 below. The finite-input native probe is about 3.1x faster including conversions;
-next establish branch coverage and a complete exceptional-value fallback before
-solver integration. Borrowed factor inputs and immutable factor sharing remain
+dense-only solver integration with a guarded exceptional fallback passes fast
+parity but does not establish a repeatable solver timing gain (recorded below).
+Next measure sparse/partial branch coverage before a wider native L-transpose
+kernel; do not infer complete-BTRAN savings from the isolated dense probe. Borrowed factor inputs and immutable factor sharing remain
 unproven.
 
 ## Extended BTRAN feasibility
@@ -131,12 +133,15 @@ roughly 3.1x. These are isolated kernel times, not solver speedups or a predicti
 for complete BTRAN. Raw `probe-cpu4.log`, `probe-expanded.log`, and binary hashes
 in `audit.json`; ordinary release probe build leaves the accepted CLI untouched.
 
-The probe is deliberately outside solver dispatch. It requires the expected x87
-control word and has no fallback for nonfinite inputs/intermediates. Integration
-requires proving branch coverage and amortization on actual dense calls, checking
-exceptional results and control-word behavior, preserving each WORK addition,
-independent complete-BTRAN differential tests, full parity and paired solver
-benchmarks. Subnormal correctness cases here do not establish their performance.
+The probe remains outside solver dispatch. A dense-only integration was tested
+and rejected on solver timing (see the rejected-trial entry). It guarded the x87
+control word, nonfinite inputs/coefficients/products/results, left caller input
+untouched on failure, and preserved each WORK addition. Native helper and frozen
+complete-BTRAN differential tests, including f64/F80, sparse/dense/direct inputs,
+row etas, subnormals and exceptional-value fallback, passed; fast parity passed
+940/940. Eight CPU-4 AB/BA result pairs per fixture matched all output fields
+except seconds. This does not prove full parity or profitability for a complete
+native BTRAN. The dense isolated timing remains a feasibility result only.
 
 ## Candidates
 
@@ -240,6 +245,8 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 - Share the dense L traversal of entering/pricing FTRAN vectors when both initially select dense L (analysis idea 1), retaining separate eta passes and U solves: frozen f64/F80 random/extreme/captured SC50A tests and fast parity 940/940 pass. Initial version adds about 0.25% DEGEN2 dual-release instructions, with no timing gain. Combining NaN detection with the required nonzero-count scans lowers instructions only about 0.04%; three alternating CPU-4 pairs give median solve medians 0.050441 -> 0.050018 s, within aggregate 0.004460/0.006422 s spreads. Initial interleaving changes NaN payload priority, requiring the original sequential stages whenever dense L produces a NaN, including finite-input overflow. Candidate self profile samples the shared path (2.27% self), so it is active but saves too little. Both variants and test scaffolding reverted (`target/perf-pairl{,2}-target-{before,after}.txt`, `target/perf-pairl-self.txt`). Sparse-to-dense fallback and other jointly traversable stages remain untested.
 
 - Four-output nocopy DGEMM S tiles (analysis idea 10): frozen random/extreme/captured-input tests, full parity 987/987 and PGO release tests pass; DEGEN3 barrier instructions fall about 9.9% and stable pairs improve 7.5–12.1%. Not accepted because GREENBEA PDHG has an unresolved slowdown with effectively unchanged instructions: the counter recheck includes 2.092976 -> 2.183036 s and 6.465 -> 6.730B cycles. Host speed bands complicate the timing evidence, but it does not establish the required lack of regressions. Raw `target/perf-gemm4-{full,followup,pdhg-recheck,pdhg-counters}*`. The two-output variant is evaluated separately.
+
+- Native x87 dense BTRAN L-transpose pass through Real dispatch, with untouched software fallback and guarded control word/nonfinite input, coefficient, product and result handling. The entire parent BTRAN is frozen as an independent oracle; two release differential tests pass (random full representations, f64/F80, empty/singleton/duplicate inputs, sparse/dense/direct modes, row etas, WORK, row-cache/density flags, subnormals and overflow fallback), as does fast parity 940/940. Eight CPU-4 AB/BA pairs per quad fixture preserve full no-dump results; instructions fx_quad_obj_5371 -1.11%, quad_2717 -1.41%, median cycles +1.18/+0.93%. Three alternating CPU-4 five-run quad timing changes +2.11/-10.33/-1.95% all stay within spread; fx changes +2.68/-28.16/+8.44%, with the middle crossing speed bands. No repeatable target gain; restored source, accepted CLI and PGO metadata before full benchmarking. This tests the dense L branch only, not sparse/partial L or U-transpose/etas. Candidate `/tmp/rose-nativebt-candidate{,-ftran.rs,-f80.rs,-real.rs,-build.json}`; logs `/tmp/rose-nativebt-{build,tests}.log`; raw `target/perf-nativebt/{transfer-pairs.json,target-*-{before,after}.txt}`. The standalone finite native probe remains available; its 3.1x isolated result does not predict solver benefit.
 
 - Precompute barrier assembly column ranges, triple-loop split points and local row indices once in CholSolver's Plan. The existing public assembly kernel remains the independent oracle/fallback. Differential tests on AFIRO/BLEND/BORE3D fronts, both precision modes, scaled/unscaled columns and extreme/signed-zero/NaN inputs pass bit for bit; fast parity 940/940 passes. Eight CPU-4 BORE3D AB/BA pairs preserve complete no-dump results with instructions -0.11% and no timing gain. Three alternating CPU-4 five-run DEGEN3 pairs have instructions +0.19%, solve changes +0.18/-4.03/-0.04%, all within spread; the middle pair crosses speed bands. No qualifying gain; source, accepted CLI and PGO metadata restored. This tests cached assembly ranges/indices, not fully compiled numeric contribution destinations or block schedules. Candidate `/tmp/rose-asmplan-candidate{.rs,,-build.json}`, logs `/tmp/rose-asmplan-{build,tests}.log`; raw `target/perf-asmplan/{transfer-pairs.json,degen3-*-{before,after}.txt}`. No full benchmark or full parity claim.
 
