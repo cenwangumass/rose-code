@@ -60,6 +60,8 @@ baseline. No exceptions, no "within a ULP", no re-recording.
   Ordinary Cargo builds remain the ThinLTO baseline and can overwrite the optimized CLI; rebuild with
   the script before comparing PGO candidates. Save the preceding binary before rebuilding as usual.
   The script uses controlled Rust flags for both stages; it does not inherit `RUSTFLAGS`.
+  Both stages request 64-byte loop alignment (`-Cllvm-args=--align-loops=64`) to keep hot loop heads
+  stable as nearby code changes.
   Training also clears `LLVM_PROFILE_FILE` to retain rustc's default shared online-merge mode.
   Per-process raw profiles regressed barrier benchmarks in a same-source controlled comparison.
 

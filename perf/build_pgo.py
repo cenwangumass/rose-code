@@ -16,6 +16,8 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
+# Align loop heads so nearby code changes do not move them across a boundary.
+CODEGEN_FLAGS = ['-Cllvm-args=--align-loops=64']
 
 
 def run(args, **kwargs):
@@ -70,7 +72,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='training-', dir=artifacts) as tmp:
         raw = Path(tmp) / 'raw'
         raw.mkdir()
-        build([f'-Cprofile-generate={raw}'])
+        build([*CODEGEN_FLAGS, f'-Cprofile-generate={raw}'])
         binary = Path(tmp) / 'rose-instrumented'
         shutil.copy2(ROOT / 'target/release/rose', binary)
         commands = list(training())
@@ -93,7 +95,7 @@ def main():
         profile = artifacts / f'{digest}.profdata'
         shutil.copy2(merged, profile)
     # A content-addressed path ensures Cargo rebuilds when training data changes.
-    flags = [f'-Cprofile-use={profile}']
+    flags = [*CODEGEN_FLAGS, f'-Cprofile-use={profile}']
     build(flags)
     (artifacts / 'build.json').write_text(json.dumps({
         'compiler': compiler, 'profile': str(profile), 'sha256': digest,

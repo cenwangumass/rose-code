@@ -1227,6 +1227,104 @@ fn dot_lanes<R: Real, const W: usize>(mut acc: R, a: &[R], b: &[R], peel: usize)
 /// The reference's dense LU on `a[row][col]` (`0xdd1b2`): column blocks of four with partial pivoting over the rows, the dot
 /// products of the block updates split in two lanes and those of the leftover columns in eight. Returns the row permutation.
 fn dense_lu<R: Real>(a: &mut [Vec<R>], base: usize) -> Vec<usize> {
+    // Different column storage can change the compiler's NaN operand priority.
+    // Preserve the original input for replay, including NaNs from finite overflow.
+    let n = a.len();
+    let original = if R::LANES {
+        let mut saved = Vec::with_capacity(n * n);
+        for row in a.iter() {
+            saved.extend_from_slice(row);
+        }
+        Some(saved)
+    } else {
+        None
+    };
+    let mut perm: Vec<usize> = (0..n).collect();
+    let nb = n / 4 * 4;
+    let peel = |i: usize| (base + i * n) & 1;
+    let pick = |a: &[Vec<R>], k: usize| {
+        let mut p = k;
+        for i in k + 1..n {
+            if a[i][k].abs() > a[p][k].abs() {
+                p = i;
+            }
+        }
+        p
+    };
+    // A panel's column prefixes change only in the first row sweep. Mirror each
+    // updated entry there, then reuse the completed prefixes for all remaining rows.
+    let mut columns: [Vec<R>; 4] = std::array::from_fn(|_| Vec::with_capacity(n));
+    for j0 in (0..nb).step_by(4) {
+        for (q, col) in columns.iter_mut().enumerate() {
+            col.clear();
+            col.extend((0..j0).map(|t| a[t][j0 + q]));
+        }
+        for i in 1..j0 {
+            for (q, col) in columns.iter_mut().enumerate() {
+                let c = j0 + q;
+                a[i][c] = dot_lanes::<R, 2>(a[i][c], &a[i][..i], &col[..i], peel(i));
+                col[i] = a[i][c];
+            }
+        }
+        for i in j0..n {
+            for (q, col) in columns.iter().enumerate() {
+                let c = j0 + q;
+                a[i][c] = dot_lanes::<R, 2>(a[i][c], &a[i][..j0], col, peel(i));
+            }
+        }
+        for k in j0..j0 + 4 {
+            let p = pick(a, k);
+            if p != k {
+                a.swap(p, k);
+                perm.swap(p, k);
+            }
+            let piv = a[k][k];
+            for i in k + 1..n {
+                let l = a[i][k] / piv;
+                a[i][k] = l;
+                for c in k + 1..j0 + 4 {
+                    let u = a[k][c];
+                    a[i][c] -= l * u;
+                }
+            }
+        }
+    }
+    for k in nb..n {
+        let col = &mut columns[0];
+        col.clear();
+        col.extend((0..k).map(|t| a[t][k]));
+        for i in 1..k {
+            a[i][k] = dot_lanes::<R, 8>(a[i][k], &a[i][..i], &col[..i], 0);
+            col[i] = a[i][k];
+        }
+        for i in k..n {
+            a[i][k] = dot_lanes::<R, 8>(a[i][k], &a[i][..k], col, 0);
+        }
+        let p = pick(a, k);
+        if p != k {
+            a.swap(p, k);
+            perm.swap(p, k);
+        }
+        let piv = a[k][k];
+        for i in k + 1..n {
+            a[i][k] /= piv;
+        }
+    }
+    if let Some(original) = original {
+        if a.iter().flatten().any(|v| v.is_nan()) {
+            // Every updated entry includes its previous value, so an intermediate
+            // NaN remains in the final matrix even if subsequent pivots move it.
+            for (row, saved) in a.iter_mut().zip(original.chunks_exact(n)) {
+                row.copy_from_slice(saved);
+            }
+            return dense_lu_uncached(a, base);
+        }
+    }
+    perm
+}
+
+// Preserve the original arithmetic lowering when a factor contains a NaN.
+fn dense_lu_uncached<R: Real>(a: &mut [Vec<R>], base: usize) -> Vec<usize> {
     let n = a.len();
     let mut perm: Vec<usize> = (0..n).collect();
     let nb = n / 4 * 4;
@@ -1329,6 +1427,239 @@ mod bucket_tests {
             }
             for (i, expected) in old.iter().enumerate() {
                 assert_eq!(buckets.list(i), *expected);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod dense_lu_tests {
+    use crate::real::Real;
+
+    fn dot_lanes<R: Real, const W: usize>(mut acc: R, a: &[R], b: &[R], peel: usize) -> R {
+        let len = a.len();
+        if !R::LANES || len < peel + W || len < 2 {
+            for t in 0..len {
+                acc -= a[t] * b[t];
+            }
+            return acc;
+        }
+        let end = len - ((len - peel) % W);
+        for t in 0..peel {
+            acc -= a[t] * b[t];
+        }
+        let mut ln = [R::ZERO; W];
+        ln[0] = acc;
+        let mut t = peel;
+        while t < end {
+            for q in 0..W {
+                ln[q] -= a[t + q] * b[t + q];
+            }
+            t += W;
+        }
+        // Eight lanes are four xmm accumulators: (p0 + p1) + (p2 + p3) per lane parity, then even + odd.
+        let r = if W == 2 {
+            ln[0] + ln[1]
+        } else {
+            let ev = (ln[0] + ln[2]) + (ln[4] + ln[6]);
+            let od = (ln[1] + ln[3]) + (ln[5] + ln[7]);
+            ev + od
+        };
+        let mut acc = r;
+        for t in end..len {
+            acc -= a[t] * b[t];
+        }
+        acc
+    }
+
+    /// The reference's dense LU on `a[row][col]` (`0xdd1b2`): column blocks of four with partial pivoting over the rows, the dot
+    /// products of the block updates split in two lanes and those of the leftover columns in eight. Returns the row permutation.
+    fn dense_lu<R: Real>(a: &mut [Vec<R>], base: usize) -> Vec<usize> {
+        let n = a.len();
+        let mut perm: Vec<usize> = (0..n).collect();
+        let nb = n / 4 * 4;
+        let peel = |i: usize| (base + i * n) & 1;
+        let pick = |a: &[Vec<R>], k: usize| {
+            let mut p = k;
+            for i in k + 1..n {
+                if a[i][k].abs() > a[p][k].abs() {
+                    p = i;
+                }
+            }
+            p
+        };
+        for j0 in (0..nb).step_by(4) {
+            for i in 1..j0 {
+                for c in j0..j0 + 4 {
+                    let col: Vec<R> = (0..i).map(|t| a[t][c]).collect();
+                    a[i][c] = dot_lanes::<R, 2>(a[i][c], &a[i][..i], &col, peel(i));
+                }
+            }
+            for i in j0..n {
+                for c in j0..j0 + 4 {
+                    let col: Vec<R> = (0..j0).map(|t| a[t][c]).collect();
+                    a[i][c] = dot_lanes::<R, 2>(a[i][c], &a[i][..j0], &col, peel(i));
+                }
+            }
+            for k in j0..j0 + 4 {
+                let p = pick(a, k);
+                if p != k {
+                    a.swap(p, k);
+                    perm.swap(p, k);
+                }
+                let piv = a[k][k];
+                for i in k + 1..n {
+                    let l = a[i][k] / piv;
+                    a[i][k] = l;
+                    for c in k + 1..j0 + 4 {
+                        let u = a[k][c];
+                        a[i][c] -= l * u;
+                    }
+                }
+            }
+        }
+        for k in nb..n {
+            for i in 1..k {
+                let col: Vec<R> = (0..i).map(|t| a[t][k]).collect();
+                a[i][k] = dot_lanes::<R, 8>(a[i][k], &a[i][..i], &col, 0);
+            }
+            for i in k..n {
+                let col: Vec<R> = (0..k).map(|t| a[t][k]).collect();
+                a[i][k] = dot_lanes::<R, 8>(a[i][k], &a[i][..k], &col, 0);
+            }
+            let p = pick(a, k);
+            if p != k {
+                a.swap(p, k);
+                perm.swap(p, k);
+            }
+            let piv = a[k][k];
+            for i in k + 1..n {
+                a[i][k] /= piv;
+            }
+        }
+        perm
+    }
+
+    fn check<R: Real>(input: &[Vec<R>], base: usize, bits: impl Fn(R) -> (u64, u16)) {
+        let mut expected = input.to_vec();
+        let mut actual = input.to_vec();
+        let old_perm = dense_lu(&mut expected, base);
+        let new_perm = super::dense_lu(&mut actual, base);
+        assert_eq!(
+            new_perm,
+            old_perm,
+            "pivot permutation, n={}, base={base}",
+            input.len()
+        );
+        for (i, (old, new)) in expected.iter().zip(&actual).enumerate() {
+            for (j, (&old, &new)) in old.iter().zip(new).enumerate() {
+                assert_eq!(
+                    bits(new),
+                    bits(old),
+                    "entry ({i},{j}), n={}, base={base}",
+                    input.len()
+                );
+            }
+        }
+    }
+
+    fn cases<R: Real>(bits: impl Fn(R) -> (u64, u16) + Copy) {
+        let mut seed = 0x9a3f701d284bc561u64;
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        let extremes = [
+            0.0,
+            -0.0,
+            1.0,
+            -1.0,
+            f64::from_bits(1),
+            -f64::MIN_POSITIVE,
+            1e-300,
+            -1e300,
+            f64::MAX,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::from_bits(0x7ff8_0000_0000_1234),
+            f64::from_bits(0xfff8_0000_0000_5678),
+        ];
+        for n in (0..=18).chain([23, 24, 25, 31, 32, 33, 47]) {
+            for kind in 0..4 {
+                let input: Vec<Vec<R>> = (0..n)
+                    .map(|i| {
+                        (0..n)
+                            .map(|j| {
+                                let r = next();
+                                let x = if kind == 0 {
+                                    ((r >> 11) as f64 / ((1u64 << 53) as f64) - 0.5) * 8.0
+                                        + if i == j { n as f64 } else { 0.0 }
+                                } else if kind == 1 {
+                                    extremes[r as usize % extremes.len()]
+                                } else if kind == 3 {
+                                    // Finite inputs can overflow and create NaNs internally.
+                                    extremes[r as usize % 9]
+                                } else if i == j {
+                                    1.0
+                                } else if r & 1 == 0 {
+                                    0.0
+                                } else {
+                                    -0.0
+                                };
+                                R::c(x)
+                            })
+                            .collect()
+                    })
+                    .collect();
+                for base in 0..=1 {
+                    check(&input, base, bits);
+                }
+            }
+        }
+        // First dense handoff of the parent PGO CLI on PILOT4 primal-release.
+        let captured: serde_json::Value =
+            serde_json::from_str(include_str!("../tests/fixtures/dense_lu_captured.json")).unwrap();
+        let input: Vec<Vec<R>> = captured["matrix"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| {
+                row.as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|x| R::c(x.as_f64().unwrap()))
+                    .collect()
+            })
+            .collect();
+        for base in 0..=1 {
+            check(&input, base, bits);
+        }
+    }
+
+    #[test]
+    fn panel_columns_match_frozen_dense_lu_f64() {
+        cases::<f64>(|v| (v.to_bits(), 0));
+    }
+
+    #[test]
+    fn panel_columns_match_frozen_dense_lu_f80() {
+        use crate::f80::F80;
+        cases::<F80>(F80::repr);
+        let values = [
+            F80::from_repr(0x8000_0000_0000_0001, 0x3fff),
+            F80::from_repr(0xffff_ffff_ffff_ffff, 0x7ffe),
+            F80::from_repr(0x8000_0000_0000_0000, 1),
+            F80::from_repr(1, 0),
+            F80::from_repr(0x8000_0000_0000_0001, 0xbfff),
+        ];
+        for n in [3, 4, 5, 8, 9, 12] {
+            let input: Vec<Vec<F80>> = (0..n)
+                .map(|i| (0..n).map(|j| values[(i * n + j) % values.len()]).collect())
+                .collect();
+            for base in 0..=1 {
+                check(&input, base, F80::repr);
             }
         }
     }
