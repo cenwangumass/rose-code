@@ -927,6 +927,28 @@ fn dtrsv_utu_unit(l: &[f64], w: usize, b: &[f64]) -> Vec<f64> {
 /// whose update from all solved rows is an fma accumulator from 0 (structure per tile and column kernel), `x_i = b_i + u_i`, then the in-tile chain).
 /// Smaller `w`: `mkl_blas_avx2_dtrsm_left` (`dtrsm_left_ker`, see the three branches).
 pub fn dtrsm_llu_col(l: &[f64], w: usize, b: &[f64], col: usize, n: usize) -> Vec<f64> {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    if std::arch::is_x86_feature_detected!("fma") {
+        // SAFETY: runtime detection includes the CPU/OS support for this backend.
+        let x = unsafe { dtrsm_existing_fma(l, w, b, col, n) };
+        // Different FMA operand encodings can choose different NaN bits, even
+        // from finite inputs that overflow. Every solved row is retained in x;
+        // replay the original kernel if any row is non-finite.
+        if x.iter().all(|v| v.is_finite()) {
+            return x;
+        }
+    }
+    dtrsm_llu_body(l, w, b, col, n)
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[target_feature(enable = "fma")]
+unsafe fn dtrsm_existing_fma(l: &[f64], w: usize, b: &[f64], col: usize, n: usize) -> Vec<f64> {
+    dtrsm_llu_body(l, w, b, col, n)
+}
+
+#[inline(always)]
+fn dtrsm_llu_body(l: &[f64], w: usize, b: &[f64], col: usize, n: usize) -> Vec<f64> {
     if n == 1 {
         return dtrsv_utu_unit(l, w, b);
     }
@@ -2980,5 +3002,213 @@ mod tests {
             }
         }
         assert!(worst < 1e-10, "A D A' - L D L' = {worst:e}");
+    }
+}
+
+#[cfg(test)]
+mod trsm_replay_tests {
+    use super::*;
+
+    fn frozen_dtrsm_llu_col(l: &[f64], w: usize, b: &[f64], col: usize, n: usize) -> Vec<f64> {
+        if n == 1 {
+            return dtrsv_utu_unit(l, w, b);
+        }
+        let mut x = b.to_vec();
+        if w >= TRSM_LL0_MIN && !(w % 4 == 0 && w <= 88) {
+            let ck = col_kernel(n, col);
+            for i in 0..TRSM_LL0_BLOCK {
+                let mut v = x[i];
+                for j in 0..i {
+                    v = fma(-l[i * w + j], x[j], v);
+                }
+                x[i] = v;
+            }
+            let mut r0 = TRSM_LL0_BLOCK;
+            let mut rows_left = w - TRSM_LL0_BLOCK;
+            let mut tiles = vec![12usize; rows_left / 12];
+            rows_left %= 12;
+            for t in [8usize, 4, 2, 1] {
+                if rows_left & t != 0 {
+                    tiles.push(t);
+                }
+            }
+            for t in tiles {
+                let mode = tile_mode(t, ck);
+                for i in r0..r0 + t {
+                    let acc = acc_terms(mode, r0, &|j| (-l[i * w + j], x[j]));
+                    x[i] = x[i] + acc;
+                }
+                for i in r0..r0 + t {
+                    let mut v = x[i];
+                    for j in r0..i {
+                        v = fma(-l[i * w + j], x[j], v);
+                    }
+                    x[i] = v;
+                }
+                r0 += t;
+            }
+            return x;
+        }
+        if col >= 4 * (n / 4) {
+            for i in 0..w {
+                let mut v = b[i] * 1.0;
+                let mut j0 = 0;
+                if i >= 16 {
+                    // 16-wide loop: four ymm accumulators (j = 16 c + 4 a + l), fused, the first starts at [v, 0, 0, 0].
+                    let mut acc = [[v, 0.0, 0.0, 0.0], [0.0; 4], [0.0; 4], [0.0; 4]];
+                    for c in 0..i / 16 {
+                        for a in 0..4 {
+                            for lane in 0..4 {
+                                let j = 16 * c + 4 * a + lane;
+                                acc[a][lane] = fma(-l[i * w + j], x[j], acc[a][lane]);
+                            }
+                        }
+                    }
+                    let t: Vec<f64> = (0..4)
+                        .map(|k| (acc[0][k] + acc[1][k]) + (acc[2][k] + acc[3][k]))
+                        .collect();
+                    v = (t[0] + t[2]) + (t[1] + t[3]);
+                    j0 = 16 * (i / 16);
+                }
+                let nch = (i - j0) / 4;
+                if nch != 0 {
+                    let mut lanes = [v, 0.0, 0.0, 0.0];
+                    for c in 0..nch {
+                        for k in 0..4 {
+                            lanes[k] = lanes[k] - l[i * w + j0 + 4 * c + k] * x[j0 + 4 * c + k];
+                        }
+                    }
+                    v = (lanes[0] + lanes[2]) + (lanes[1] + lanes[3]);
+                }
+                for j in j0 + 4 * nch..i {
+                    v = v - l[i * w + j] * x[j];
+                }
+                x[i] = v;
+            }
+            return x;
+        }
+        let nb = w / 4;
+        let r0 = 4 * nb;
+        for i in 0..r0 {
+            let mut v = x[i];
+            for j in 0..i {
+                v = fma(-l[i * w + j], x[j], v);
+            }
+            x[i] = v;
+        }
+        for i in r0..w {
+            if r0 != 0 {
+                let mut acc = [0.0f64; 4];
+                for blk in 0..nb {
+                    for k in 0..4 {
+                        acc[k] = l[i * w + 4 * blk + k] * x[4 * blk + k] + acc[k];
+                    }
+                }
+                let s = (acc[0] + acc[2]) + (acc[1] + acc[3]);
+                x[i] = x[i] + (-s);
+            }
+        }
+        for i in r0..w {
+            let mut v = x[i];
+            for j in r0..i {
+                v = v - l[i * w + j] * x[j];
+            }
+            x[i] = v;
+        }
+        x
+    }
+
+    fn check(l: &[f64], w: usize, b: &[f64], col: usize, n: usize) {
+        let want = frozen_dtrsm_llu_col(l, w, b, col, n);
+        let got = dtrsm_llu_col(l, w, b, col, n);
+        assert_eq!(
+            got.iter().map(|x| x.to_bits()).collect::<Vec<_>>(),
+            want.iter().map(|x| x.to_bits()).collect::<Vec<_>>(),
+            "width {w}, col {col}/{n}, l {l:?}, b {b:?}"
+        );
+    }
+
+    #[test]
+    fn trsm_dispatch_replays_nonfinite_outputs() {
+        let w = 12;
+        let l = vec![f64::MAX; w * w];
+        let b = vec![f64::MAX; w];
+        let old = frozen_dtrsm_llu_col(&l, w, &b, 0, 4);
+        assert!(old.iter().any(|x| x.is_nan()));
+        check(&l, w, &b, 0, 4);
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        if std::arch::is_x86_feature_detected!("fma") {
+            let fast = unsafe { dtrsm_existing_fma(&l, w, &b, 0, 4) };
+            assert!(fast.iter().any(|x| !x.is_finite()));
+        }
+    }
+
+    #[test]
+    fn trsm_dispatch_matches_frozen() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../tests/fixtures/chol-kernels.json")).unwrap();
+        let floats = |v: &serde_json::Value| -> Vec<f64> {
+            v.as_array()
+                .unwrap()
+                .iter()
+                .map(|x| x.as_f64().unwrap())
+                .collect()
+        };
+        for t in fixture["trsm"].as_array().unwrap() {
+            let w = t["w"].as_u64().unwrap() as usize;
+            let n = t["n"].as_u64().unwrap() as usize;
+            let l = floats(&t["L"]);
+            for c in t["cols"].as_array().unwrap() {
+                check(
+                    &l,
+                    w,
+                    &floats(&c["b"]),
+                    c["col"].as_u64().unwrap() as usize,
+                    n,
+                );
+            }
+        }
+        let mut seed = 0xb728_904a_611e_5f03u64;
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        for class in 0..3 {
+            for w in [0, 1, 2, 3, 4, 8, 12, 13, 16, 20, 32, 64, 88, 89, 96, 192] {
+                for n in [1, 2, 3, 4, 5, 7] {
+                    let mut value = || {
+                        let bits = next();
+                        match class {
+                            0 => f64::from_bits(
+                                (bits & 0x800f_ffff_ffff_ffff) | ((1010 + bits % 20) << 52),
+                            ),
+                            1 => match bits % 8 {
+                                0 => 0.0,
+                                1 => -0.0,
+                                2 => f64::from_bits(1),
+                                3 => -f64::MIN_POSITIVE,
+                                4 => f64::MAX,
+                                5 => -f64::MAX,
+                                _ => f64::from_bits(bits & 0xffef_ffff_ffff_ffff),
+                            },
+                            _ => match bits % 6 {
+                                0 => f64::INFINITY,
+                                1 => f64::NEG_INFINITY,
+                                2 => f64::from_bits(0x7ff8_0000_0000_0123),
+                                3 => f64::from_bits(0xfff8_0000_0000_0456),
+                                _ => 1.0,
+                            },
+                        }
+                    };
+                    let l: Vec<_> = (0..w * w).map(|_| value()).collect();
+                    let b: Vec<_> = (0..w).map(|_| value()).collect();
+                    for col in 0..n {
+                        check(&l, w, &b, col, n);
+                    }
+                }
+            }
+        }
     }
 }
