@@ -62,6 +62,9 @@ baseline. No exceptions, no "within a ULP", no re-recording.
   The script uses controlled Rust flags for both stages; it does not inherit `RUSTFLAGS`.
   Both stages request 64-byte loop alignment (`-Cllvm-args=--align-loops=64`) to keep hot loop heads
   stable as nearby code changes.
+  `--system-tcmalloc` additionally enables the Linux CLI's optional system allocator feature
+  in both stages and release tests; gperftools development/runtime libraries must be installed.
+  The selected Cargo features are recorded in `build.json`; reproduce them alongside saved flags.
   Training also clears `LLVM_PROFILE_FILE` to retain rustc's default shared online-merge mode.
   Per-process raw profiles regressed barrier benchmarks in a same-source controlled comparison.
 
@@ -72,8 +75,9 @@ baseline. No exceptions, no "within a ULP", no re-recording.
 - `perf/bench.sh [--only ID,..] [--runs N] [--instr] [--bin PATH]`: times the runs of
   [bench.txt](bench.txt) with hyperfine (median of N after a warm-up); `--instr` adds user-space
   instruction counts (`perf stat`), which have far less noise than wall time.
-- For profiling a PGO candidate, include the `rustflags` recorded in `target/perf-pgo/build.json` in
-  addition to the frame-pointer flag below, then parity-check that profiling binary. Without the saved
+- For profiling a PGO candidate, reproduce its `features` and `rustflags` recorded in
+  `target/perf-pgo/build.json` in addition to the frame-pointer flag below, then parity-check that
+  profiling binary. For example, pass `--features system-tcmalloc` when selected. Without the saved
   profile-use flag the profiling build describes the ordinary ThinLTO baseline.
 - For reliable inclusive profiles, build with `RUSTFLAGS='-C force-frame-pointers=yes' cargo build
   --profile profiling`, then parity-check that binary with `--tier full --bin target/profiling/rose`.

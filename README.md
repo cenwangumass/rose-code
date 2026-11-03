@@ -9,6 +9,14 @@ implementation (analysis and specifications: `reverse-engineer/` of the parent r
     target/release/rose solve model.mps [--method primal|dual] [--profile controlled|release] [--output result.json]
                               [--basis-in basis.json] [--basis-out basis.json] [--max-iterations N]
 
+On Linux, an optional CLI build can use the system TCMalloc allocator from gperftools:
+
+    cargo build --release --bin rose --features system-tcmalloc
+    # PGO build with the same allocator during training and final compilation:
+    python3 -B perf/build_pgo.py --system-tcmalloc --check --test
+
+This requires the gperftools development library (`libtcmalloc_minimal` for linking, and its shared library at runtime). The feature affects the CLI; library consumers keep their allocator. Ordinary builds have no TCMalloc dependency.
+
 Fixed and free format MPS (ranged rows, `RANGES`, bounds `UP LO FX FR MI PL`; integer markers and `BV LI UI SC` bounds are rejected). Progress goes to
 stderr; the result is JSON in the `--output` file (stdout if absent):
 

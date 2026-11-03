@@ -13,6 +13,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -31,8 +32,13 @@ def build_env(flags):
     return env
 
 
-def build(flags):
-    run(['cargo', 'build', '--release', '--bin', 'rose'], env=build_env(flags))
+def feature_args(features):
+    return ['--features', ','.join(features)] if features else []
+
+
+def build(flags, features=()):
+    run(['cargo', 'build', '--release', '--bin', 'rose', *feature_args(features)],
+        env=build_env(flags))
 
 
 def training():
@@ -56,7 +62,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check', action='store_true', help='run full parity after the build')
     parser.add_argument('--test', action='store_true', help='run release tests with the same profile')
+    parser.add_argument('--system-tcmalloc', action='store_true',
+                        help='link the Linux CLI with the system libtcmalloc_minimal (gperftools)')
     args = parser.parse_args()
+    if args.system_tcmalloc and sys.platform != 'linux':
+        parser.error('--system-tcmalloc requires Linux')
+    features = ['system-tcmalloc'] if args.system_tcmalloc else []
     compiler = run(['rustc', '-vV'], capture_output=True, text=True).stdout
     profdata = os.environ.get('LLVM_PROFDATA') or shutil.which('llvm-profdata')
     if not profdata:
@@ -72,7 +83,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='training-', dir=artifacts) as tmp:
         raw = Path(tmp) / 'raw'
         raw.mkdir()
-        build([*CODEGEN_FLAGS, f'-Cprofile-generate={raw}'])
+        build([*CODEGEN_FLAGS, f'-Cprofile-generate={raw}'], features)
         binary = Path(tmp) / 'rose-instrumented'
         shutil.copy2(ROOT / 'target/release/rose', binary)
         commands = list(training())
@@ -96,13 +107,13 @@ def main():
         shutil.copy2(merged, profile)
     # A content-addressed path ensures Cargo rebuilds when training data changes.
     flags = [*CODEGEN_FLAGS, f'-Cprofile-use={profile}']
-    build(flags)
+    build(flags, features)
     (artifacts / 'build.json').write_text(json.dumps({
         'compiler': compiler, 'profile': str(profile), 'sha256': digest,
-        'rustflags': flags, 'training': commands,
+        'rustflags': flags, 'features': features, 'training': commands,
     }, indent=2) + '\n')
     if args.test:
-        run(['cargo', 'test', '--release'], env=build_env(flags))
+        run(['cargo', 'test', '--release', *feature_args(features)], env=build_env(flags))
     if args.check:
         run(['target/release/rose-parity', 'check', '--tier', 'full'])
     print(f'PGO CLI: {ROOT / "target/release/rose"}; metadata: {artifacts / "build.json"}')

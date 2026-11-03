@@ -5,6 +5,17 @@ use rose::verify;
 use rose::{mps, solve, Basis, SolveOptions, Status};
 use serde_json::{json, Value};
 
+// Keep the native allocator opt-in and confined to the CLI. Linking its malloc
+// symbols before libc lets Rust's existing System allocator use TCMalloc too.
+#[cfg(all(feature = "system-tcmalloc", not(target_os = "linux")))]
+compile_error!("the system-tcmalloc CLI feature requires Linux and libtcmalloc_minimal");
+
+#[cfg(all(feature = "system-tcmalloc", target_os = "linux"))]
+#[link(name = "tcmalloc_minimal")]
+extern "C" {
+    fn tc_free(ptr: *mut std::ffi::c_void);
+}
+
 fn usage() -> ! {
     eprintln!("usage: rose solve <model.mps> [--output result.json] [--basis-in basis.json] [--basis-out basis.json] [--max-iterations N] [--method primal|dual|pdhg|barrier] [--profile controlled|release] [--barrier-profile release|controlled] [--pdhg-iter-limit N] [--pdhg-rel-tol T] [--pdhg-abs-tol T] [--pdhg-conv-tol T] [--pdhg-seed N] [--pdhg-inject merit@N|reld@N|pobj@N]");
     std::process::exit(2)
@@ -29,6 +40,12 @@ fn basis_from_json(v: &Value) -> Option<Basis> {
 }
 
 fn main() {
+    #[cfg(all(feature = "system-tcmalloc", target_os = "linux"))]
+    // SAFETY: tc_free accepts null just as free does. This reference retains the
+    // shared library under --as-needed, so its malloc symbols bind at startup.
+    unsafe {
+        tc_free(std::ptr::null_mut());
+    }
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.first().map(String::as_str) != Some("solve") || args.len() < 2 {
         usage();
