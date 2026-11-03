@@ -762,6 +762,29 @@ impl<R: Real> RefStruct<R> {
         out
     }
 
+    /// Pack a dense BTRAN result in row order without conditional vector growth.
+    #[inline(never)]
+    fn dense_btran_output(x: &[R], perm: &[usize]) -> Vec<(usize, R)> {
+        let mut out = Vec::with_capacity(perm.len());
+        let dst: *mut (usize, R) = out.as_mut_ptr();
+        let mut count = 0;
+        for (r, &i) in perm.iter().enumerate() {
+            let v = x[i];
+            // count <= r < perm.len() <= capacity before this write. Rejected entries
+            // occupy the next unused slot until a later accepted value overwrites it.
+            unsafe {
+                dst.add(count).write((r, v));
+            }
+            count += usize::from(v != R::ZERO);
+        }
+        // All slots below count are initialized accepted entries in row order. R is Copy,
+        // so overwritten and rejected entries outside len require no destruction.
+        unsafe {
+            out.set_len(count);
+        }
+        out
+    }
+
     fn kahn(&self, start: &[usize]) -> Vec<usize> {
         let mut cnt = vec![0i32; self.m];
         let mut lst: Vec<usize> = start.to_vec();
@@ -2472,6 +2495,9 @@ impl<R: Real> RefStruct<R> {
         if self.bt_dense {
             // The dense result keeps the sub-tolerance entries the L^T pass left in place.
             // and lists them by ascending row.
+            if R::LANES {
+                return Self::dense_btran_output(&x, &self.perm[..m]);
+            }
             let mut out = Vec::with_capacity(m);
             for r in 0..m {
                 let i = self.perm[r];
@@ -3948,6 +3974,67 @@ mod forward_l_tests {
                 assert_eq!(actual, expected);
             }
         }
+    }
+
+    #[test]
+    fn dense_btran_compaction_preserves_row_order_and_bits() {
+        let mut seed = 0x29ace71f3bu64;
+        for m in [0, 1, 2, 7, 31, 128, 511] {
+            for pattern in 0..5 {
+                let x: Vec<f64> = (0..m)
+                    .map(|i| {
+                        seed ^= seed << 13;
+                        seed ^= seed >> 7;
+                        seed ^= seed << 17;
+                        match pattern {
+                            0 => 0.0,
+                            1 => -0.0,
+                            2 if i % 2 == 0 => 0.0,
+                            3 => f64::from_bits(0x7ff8_0000_0000_0001 + (i as u64 & 1)),
+                            _ => f64::from_bits(seed),
+                        }
+                    })
+                    .collect();
+                let mut perm: Vec<_> = (0..m).collect();
+                for i in (1..m).rev() {
+                    seed ^= seed << 13;
+                    seed ^= seed >> 7;
+                    seed ^= seed << 17;
+                    perm.swap(i, seed as usize % (i + 1));
+                }
+                let mut expected = Vec::with_capacity(m);
+                for r in 0..m {
+                    let i = perm[r];
+                    if x[i] != 0.0 {
+                        expected.push((r, x[i]));
+                    }
+                }
+                let actual = RefStruct::<f64>::dense_btran_output(&x, &perm);
+                assert_eq!(actual.capacity(), expected.capacity());
+                assert_eq!(
+                    actual
+                        .iter()
+                        .map(|&(i, v)| (i, v.to_bits()))
+                        .collect::<Vec<_>>(),
+                    expected
+                        .iter()
+                        .map(|&(i, v)| (i, v.to_bits()))
+                        .collect::<Vec<_>>(),
+                );
+            }
+        }
+        let x = [0.0, f64::from_bits(0xfff8_0000_0000_0007), -0.0, 3.0];
+        let out = RefStruct::<f64>::dense_btran_output(&x, &[3, 1, 3, 2, 0]);
+        assert_eq!(
+            out.iter()
+                .map(|&(r, v)| (r, v.to_bits()))
+                .collect::<Vec<_>>(),
+            [
+                (0, 3.0f64.to_bits()),
+                (1, x[1].to_bits()),
+                (2, 3.0f64.to_bits())
+            ]
+        );
     }
 
     #[test]
