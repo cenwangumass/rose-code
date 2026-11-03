@@ -41,6 +41,97 @@ impl<R: Real> TauRow<R> {
     fn get(&self, c: usize) -> Option<R> {
         (self.stamps[c] == self.epoch).then(|| self.values[c])
     }
+
+    /// Append the row's surviving terms in virtual rowl order, including its duplicates.
+    #[inline(never)]
+    fn append_terms(&self, cols: &[usize], x: &[R], out: &mut Vec<(R, R)>) {
+        let mut count = out.len();
+        out.reserve(cols.len());
+        let dst = out.as_mut_ptr();
+        for &c in cols {
+            if let Some(v) = self.get(c) {
+                // Before each write, count <= original_len + visited < original_len + cols.len() <= capacity.
+                // Reads stay checked, and each write initializes the next appended entry.
+                unsafe {
+                    dst.add(count).write((v, x[c]));
+                }
+                count += 1;
+            }
+        }
+        // Appended entries are initialized in the same filtered order as the old extend.
+        unsafe {
+            out.set_len(count);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tau_gather_tests {
+    use super::*;
+
+    fn check<R: Real>(bits: impl Fn(R) -> (u64, u16)) {
+        let values = [
+            0.0,
+            -0.0,
+            f64::from_bits(1),
+            -f64::MIN_POSITIVE,
+            f64::MAX,
+            -f64::MAX,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::from_bits(0x7ff8_0000_0000_0001),
+            f64::from_bits(0xfff8_0000_0000_0007),
+        ];
+        for m in [0, 1, 7, 31, 128] {
+            let x: Vec<_> = (0..m)
+                .map(|i| R::c(values[(i + 3) % values.len()]))
+                .collect();
+            let mut entries = Vec::new();
+            for i in 0..m {
+                if i % 3 != 2 {
+                    entries.push((i, R::c(values[i % values.len()])));
+                    entries.push((i, R::c(19.0)));
+                }
+            }
+            let order: Vec<_> = if m == 0 {
+                Vec::new()
+            } else {
+                (0..m * 2 + 7).rev().map(|i| (i * 7) % m).collect()
+            };
+            let mut row = TauRow::<R>::default();
+            row.prepare(m, &entries);
+            let prefix = (R::c(8.0), R::c(-13.0));
+            let mut expected = vec![prefix];
+            for &c in &order {
+                if let Some(&(_, v)) = entries.iter().find(|e| e.0 == c) {
+                    expected.push((v, x[c]));
+                }
+            }
+            let mut actual = vec![prefix];
+            row.append_terms(&order, &x, &mut actual);
+            assert_eq!(
+                actual
+                    .iter()
+                    .map(|&(v, x)| (bits(v), bits(x)))
+                    .collect::<Vec<_>>(),
+                expected
+                    .iter()
+                    .map(|&(v, x)| (bits(v), bits(x)))
+                    .collect::<Vec<_>>()
+            );
+        }
+        let mut row = TauRow::<R>::default();
+        row.prepare(5, &[]);
+        let mut out = Vec::new();
+        row.append_terms(&[4, 3], &[], &mut out);
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn ordered_gather_keeps_first_duplicates_holes_and_bits() {
+        check::<f64>(|v| (v.to_bits(), 0));
+        check::<crate::f80::F80>(|v| v.repr());
+    }
 }
 
 #[derive(Clone)]
@@ -1439,11 +1530,7 @@ impl<R: Real> RefStruct<R> {
                     _ => {
                         terms.clear();
                         row.prepare(m, &self.ut[p]);
-                        terms.extend(
-                            self.rowl[p]
-                                .iter()
-                                .filter_map(|&c| row.get(c).map(|v| (v, x[c]))),
-                        );
+                        row.append_terms(&self.rowl[p], &x, &mut terms);
                         let dot = if R::QUAD {
                             row_dot_q(x[p], &terms)
                         } else {
@@ -1544,11 +1631,7 @@ impl<R: Real> RefStruct<R> {
                     _ => {
                         terms.clear();
                         row.prepare(m, &self.ut[p]);
-                        terms.extend(
-                            self.rowl[p]
-                                .iter()
-                                .filter_map(|&c| row.get(c).map(|v| (v, x[c]))),
-                        );
+                        row.append_terms(&self.rowl[p], &x, &mut terms);
                         let dot = if R::QUAD {
                             row_dot_q(x[p], &terms)
                         } else {
