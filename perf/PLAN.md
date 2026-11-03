@@ -8,7 +8,7 @@ standing plan and the working loop. The current numbers, hotspots and the ideas 
 ## Goal
 
 Rose at least as fast as the reference: `current/ref` ≤ 1.0 on every bench run, under the invariant
-below. Work on the run with the largest ratio first.
+below. Prioritize measured removable work across ordinary dual, ordinary primal, extended-precision and barrier paths. Historical ratios identify gaps but do not rank opportunities reliably across host timing bands.
 
 - **Like with like.** `ref` is Gurobi's `Runtime` (solve only, single thread, same host: AMD Ryzen 9
   5900X). Compare it with rose's solve time, `diagnostics.seconds` in the result JSON (median over the
@@ -120,10 +120,12 @@ Repeat until the goal above is met. Running out of candidates does not end the w
 with the largest ratio and look one level deeper (inclusive time of the callers, `perf annotate` of the
 hot loops, cache and branch misses) before declaring a gap forbidden by the invariant.
 
-1. **Pick a target.** Unresolved regressions first. Then the bench run with the largest `current/ref`
-   ratio (runs without a `ref`: by absolute time, after the ones with a ratio); if its hotspot list is
-   stale (older than the last landed change touching that path), re-profile it first and rewrite its
-   hotspot entry.
+1. **Pick a target.** Resolve verified regressions first. Then investigate factor production and
+   installation ownership, followed by FTRAN representation boundaries, barrier execution planning,
+   remaining whole extended-precision kernels and primal kernel specialization. Start with
+   [factor-audit.md](factor-audit.md). Use the smallest witness; refresh only the attribution needed
+   to estimate removable cost before implementing. Keep one ordinary dual, ordinary primal, quad
+   and barrier representative. A historical large ratio alone does not justify another small trial.
 2. **Understand it.** Read the hot function and its callers. Find out why it is slow: repeated full
    scans where the reference keeps lists, allocation per iteration, dense loops over sparse data,
    recomputation of invariant values, F80 software arithmetic in a loop that only needs a few values,

@@ -87,7 +87,13 @@ five lines each. Re-profile a run when a landed change touched its hot path.
 
 ## In progress
 
-None.
+Factor ownership audit completed at source/lifetime level: [factor-audit.md](factor-audit.md).
+Accepted growth-factor reuse and quad twin numerical-build reuse already exist;
+remaining candidates are borrowed basis-column inputs and shared immutable factor
+storage. Numerical U reuse and auxiliary laziness remain unproven. Same-binary
+CPU-4 checks retain identical no-dump results across 12 ADLITTLE and 12 capped
+DEGEN2 runs, but timing spans are 18%/12% of median. Current factor self-cost and
+copy-cost attribution are required before a prototype; no new speedup is claimed.
 
 ## Candidates
 
