@@ -95,8 +95,11 @@ Both retained-accounting transfer and dense L-to-U buffer transfer fail the
 performance screen (recorded below). Accepted solver and binary restored. Dense
 L-to-U transfer regresses PEROLD repeatably despite avoiding an allocation;
 measure compaction/normalization costs before any larger representation change.
-Barrier fixed-structure execution planning is the next independent structural
-investigation; borrowed factor inputs and immutable factor sharing remain unproven.
+Barrier child-range/row-map planning saves 0.77% DEGEN3 instructions but timing
+confirmation is inconclusive (recorded below); it is not landed. Assembly ranges,
+rectangular block schedules and dense-column maps remain untested parts of the
+execution-plan hypothesis. Borrowed factor inputs and immutable factor sharing
+also remain unproven.
 
 ## Candidates
 
@@ -200,6 +203,8 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 - Share the dense L traversal of entering/pricing FTRAN vectors when both initially select dense L (analysis idea 1), retaining separate eta passes and U solves: frozen f64/F80 random/extreme/captured SC50A tests and fast parity 940/940 pass. Initial version adds about 0.25% DEGEN2 dual-release instructions, with no timing gain. Combining NaN detection with the required nonzero-count scans lowers instructions only about 0.04%; three alternating CPU-4 pairs give median solve medians 0.050441 -> 0.050018 s, within aggregate 0.004460/0.006422 s spreads. Initial interleaving changes NaN payload priority, requiring the original sequential stages whenever dense L produces a NaN, including finite-input overflow. Candidate self profile samples the shared path (2.27% self), so it is active but saves too little. Both variants and test scaffolding reverted (`target/perf-pairl{,2}-target-{before,after}.txt`, `target/perf-pairl-self.txt`). Sparse-to-dense fallback and other jointly traversable stages remain untested.
 
 - Four-output nocopy DGEMM S tiles (analysis idea 10): frozen random/extreme/captured-input tests, full parity 987/987 and PGO release tests pass; DEGEN3 barrier instructions fall about 9.9% and stable pairs improve 7.5–12.1%. Not accepted because GREENBEA PDHG has an unresolved slowdown with effectively unchanged instructions: the counter recheck includes 2.092976 -> 2.183036 s and 6.465 -> 6.730B cycles. Host speed bands complicate the timing evidence, but it does not establish the required lack of regressions. Raw `target/perf-gemm4-{full,followup,pdhg-recheck,pdhg-counters}*`. The two-output variant is evaluated separately.
+
+- Precompute child-to-parent row maps and child column ranges in the barrier symbolic Plan: numeric loops, update order, single-mode rounding and arithmetic remain unchanged. Width-one updates stop allocating a mapping on each factorization; wider updates use direct mapped indices. Fast parity 940/940 passes. Eight CPU-4 BORE3D AB/BA pairs preserve complete no-dump results, instructions -0.26%; DEGEN3 instructions -0.77%. Three alternating CPU-4 five-run DEGEN3 changes +0.29/-3.85/-4.18% include two gains beyond spread. Two CPU-2 confirmations -0.22/-16.20% stay within spread; the latter crosses speed bands. No repeatable confirmed timing gain; session stopped as inconclusive, source/accepted CLI/PGO metadata restored. This tests only child ranges and row mappings, not assembly ranges or rectangular block schedules. Candidate `/tmp/rose-childplan-candidate{.rs,,-build.json}`, build `/tmp/rose-childplan-build.log`; raw `target/perf-childplan/{fast.txt,transfer-pairs.json,degen3-*,confirm-*}`. No full benchmark or commit-gate claim.
 
 - Borrow contiguous child panels from packed factor storage instead of allocating/copying them before DGEMM (analysis idea 13): fast parity 940/940 passes and DEGEN3 barrier instructions fall about 0.9%. Three alternating CPU-4 pairs cross speed bands; CPU-2 confirmation median solve medians 0.405972 -> 0.396088 s remain within aggregate 0.096096/0.022184 s spreads. The final stable baseline/candidate pair is 0.397590 -> 0.396078 s, within 0.003082/0.006880 s spreads. BORE3D also has no gain beyond spread. Reverted (`target/perf-childpanel-*`); instruction savings alone do not meet acceptance.
 
