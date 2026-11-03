@@ -118,6 +118,21 @@ This isolates immutable forward storage; mutable-U cloning is still present.
 The Rc prototype was not retained, including its change to Send compatibility.
 Evidence is in STATE.md and `target/perf-sharefactor/`.
 
+The RHS twin has only one consumer, `recompute_primal`, guarded by zero main
+factor updates. A prototype removed the ordinary second factor and ran the
+unchanged force-dense RHS solve on the main factor, moving aside and restoring
+all touched solve/accounting state. Diagnostic mode retained both original
+builds and factors. The main numerical factor remained unchanged. Differential
+checks against an independent twin passed for f64/F80 with prior solve history,
+full result bits, retained state and repeated/extreme inputs; fast parity passed
+940/940. Instructions fell 2.15% on fx_quad_obj_5371 and 1.17% on Quad_2717,
+but a predeclared randomized Quad screen reported +0.47% median time, interval
+[-0.77%, +1.73%], and no gain. The prototype was rejected and the accepted
+source/CLI/PGO metadata restored. Thus isolated borrowing is numerically feasible
+on tested cases but has not established a runtime benefit; the fresh-factor
+cache's main copy and the RHS routine's temporary work remain present. Exact
+artifacts and bounds are in STATE.md.
+
 ## Remaining proof obligations
 
 Before a factor ownership prototype, separate column-copy and immutable-factor
