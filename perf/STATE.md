@@ -183,6 +183,28 @@ Raw captures/results, validated runner, source snapshots and binary provenance:
 Build logs `/tmp/rose-btbranch-build{,2}.log`. No frozen baselines were changed;
 no reference comparison or new solver speedup is claimed.
 
+### Current primal source-line screen
+
+A no-frame-pointer, line-table profiling build using the accepted PGO flags and
+system allocator passes full parity 987/987. Its complete ADLITTLE/PILOT4 results
+match the accepted CLI except seconds, but direct instructions rise 8.88/6.44%.
+Do not use its source sample shares as release cost bounds. Eight ADLITTLE and
+32 PILOT4 primal-release solves are capped at 300/800; PILOT4 is optimal in
+690 iterations and 16 refactorizations. Sampled instruction locations identify
+primal control, BTRAN/FTRAN, the specialized row-update kernel and factor
+construction. No source line in the cost-change region appears in the PILOT4
+controller annotation; this is a source-attribution observation, not proof of
+zero inclusive cost. Current source inspection also identifies repeated complete
+structural-column length sums; replacing these from existing prefix offsets
+is tested and rejected as timing-inconclusive below.
+
+Build/manifest, full profiling parity, annotated controller, self report, event
+audit and direct instruction/result comparison: `target/perf-costchange-audit/`;
+build log `/tmp/rose-costchange-profile-build.log`. Direct counters were taken
+after recording, not simultaneously with the sample batches. Represented-event
+coverage was not established, so sample totals do not support absolute costs.
+The accepted release CLI hash is restored and unchanged.
+
 ## Candidates
 
 Ordered by current/ref; reprofile any changed path before choosing a change. Ratios use the current
@@ -285,6 +307,8 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 - Share the dense L traversal of entering/pricing FTRAN vectors when both initially select dense L (analysis idea 1), retaining separate eta passes and U solves: frozen f64/F80 random/extreme/captured SC50A tests and fast parity 940/940 pass. Initial version adds about 0.25% DEGEN2 dual-release instructions, with no timing gain. Combining NaN detection with the required nonzero-count scans lowers instructions only about 0.04%; three alternating CPU-4 pairs give median solve medians 0.050441 -> 0.050018 s, within aggregate 0.004460/0.006422 s spreads. Initial interleaving changes NaN payload priority, requiring the original sequential stages whenever dense L produces a NaN, including finite-input overflow. Candidate self profile samples the shared path (2.27% self), so it is active but saves too little. Both variants and test scaffolding reverted (`target/perf-pairl{,2}-target-{before,after}.txt`, `target/perf-pairl-self.txt`). Sparse-to-dense fallback and other jointly traversable stages remain untested.
 
 - Four-output nocopy DGEMM S tiles (analysis idea 10): frozen random/extreme/captured-input tests, full parity 987/987 and PGO release tests pass; DEGEN3 barrier instructions fall about 9.9% and stable pairs improve 7.5–12.1%. Not accepted because GREENBEA PDHG has an unresolved slowdown with effectively unchanged instructions: the counter recheck includes 2.092976 -> 2.183036 s and 6.465 -> 6.730B cycles. Host speed bands complicate the timing evidence, but it does not establish the required lack of regressions. Raw `target/perf-gemm4-{full,followup,pdhg-recheck,pdhg-counters}*`. The two-output variant is evaluated separately.
+
+- Replace repeated primal structural-nonzero scans with the existing immutable `offs[n]` prefix total (with an empty/no-slack fallback); arithmetic and WORK formulas are unchanged. All 76 library release tests and fast parity 940/940 pass. Eight CPU-4 ADLITTLE/capped-DEGEN2 primal pairs preserve complete no-dump results; instructions -0.14/-0.38%. Three alternating CPU-4 five-run full DEGEN2/PEROLD-primal/PILOT4 pairs remove about 0.99/1.05/0.77% instructions; each has one timing gain beyond spread, others are within spread or cross bands. Three CPU-2 confirmations remain inconclusive: DEGEN2 -5.72/-3.79/-0.61%, PEROLD +23.73/-3.28/-1.90%, PILOT4 +26.76/+3.14/-2.95%; the first PEROLD/PILOT4 pairs cross bands and the rest stay within spread. No repeatable confirmed gain; stopped before full benchmarking and restored source, accepted CLI and PGO metadata. Candidate `/tmp/rose-nnzcache-candidate{,.rs,-build.json}`; logs `/tmp/rose-nnzcache-{build,tests}.log`; raw `target/perf-nnzcache/{transfer-pairs.json,target-*,confirm-*}`. This is a timing-inconclusive work reduction, not evidence that the scans are necessary.
 
 - Share immutable split LU input columns across basis builds and factor-cache entries: lazily create row/value Rc slices once per Internal, retain incoming-entry order, and generalize LU/pair/fresh/WORK input views to accept either owned Vecs or shared slices. This also makes the pair-pass singleton's defensive row clone shallow. No numerical kernel changes. All 76 library release tests and fast parity 940/940 pass; a fresh matching PGO build passes fast parity again. Eight CPU-4 ADLITTLE/capped-DEGEN2 AB/BA pairs preserve complete no-dump results; instructions +0.35/-0.35%. Three alternating CPU-4 five-run PILOT4/PEROLD-dual/Quad_2717 pairs save only 0.07/0.32/0.25% instructions. PEROLD solve changes +6.74/-0.57/-36.91% (first regresses beyond spread, last crosses host bands); PILOT4 +10.03/-7.06/-37.06% and Quad +3.49/+2.73/-46.45% show no repeatable gain (third pairs cross bands). No material target instruction reduction or acceptable timing result; source, accepted CLI and PGO metadata restored before full benchmarking. This tests shared split-column ownership, not reuse of numerical factor production. Candidate source/binary/build `/tmp/rose-sharedcols-candidate/`; build/tests `/tmp/rose-sharedcols-{build,tests,pgo}.log`; raw `target/perf-sharedcols/{fast.txt,transfer-pairs.json,target-*-{before,after}.txt}`. Input cache allocation costs include all model columns once; public input signatures were broadened only in this rejected prototype.
 
