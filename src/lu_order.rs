@@ -244,6 +244,28 @@ impl<R: Real> Structure<R> {
     }
 }
 
+/// Row incidence in ascending column order, retaining every occurrence of a duplicate row.
+fn row_columns(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> (Vec<usize>, Vec<usize>) {
+    let mut offsets = vec![0; m + 1];
+    for (_, rows, _) in cols {
+        for &r in rows {
+            offsets[r + 1] += 1;
+        }
+    }
+    for r in 0..m {
+        offsets[r + 1] += offsets[r];
+    }
+    let mut next = offsets[..m].to_vec();
+    let mut columns = vec![0; offsets[m]];
+    for (c, (_, rows, _)) in cols.iter().enumerate() {
+        for &r in rows {
+            columns[next[r]] = c;
+            next[r] += 1;
+        }
+    }
+    (offsets, columns)
+}
+
 fn phases<R: Real>(
     m: usize,
     cols: &[(bool, Vec<usize>, Vec<f64>)],
@@ -265,6 +287,7 @@ fn phases<R: Real>(
             }
         }
     }
+    let (row_offsets, rowcols) = row_columns(m, cols);
     let mut row_done = vec![false; m];
     let mut col_done = vec![false; n];
     let mut seq = Vec::with_capacity(m);
@@ -285,7 +308,10 @@ fn phases<R: Real>(
             continue;
         }
         rc[i] = 0;
-        let Some(pos) = (0..n).find(|&p| !col_done[p] && !cols[p].0 && cols[p].1.contains(&i))
+        let Some(pos) = rowcols[row_offsets[i]..row_offsets[i + 1]]
+            .iter()
+            .copied()
+            .find(|&p| !col_done[p] && !cols[p].0)
         else {
             continue;
         };
@@ -336,11 +362,7 @@ fn phases<R: Real>(
     // Phase 4: column singletons over the unassigned rows.
     ph = 4;
     let mut cnt = vec![0i64; n];
-    let mut rowcols: Vec<Vec<usize>> = vec![Vec::new(); m];
     for (pos, (_, idx, _)) in cols.iter().enumerate() {
-        for &i in idx {
-            rowcols[i].push(pos);
-        }
         if !col_done[pos] {
             cnt[pos] = idx.iter().filter(|&&i| !row_done[i]).count() as i64;
         }
@@ -353,7 +375,7 @@ fn phases<R: Real>(
         let i = *cols[pos].1.iter().find(|&&i| !row_done[i]).unwrap();
         pivot!(i, pos);
         cnt[pos] = 0;
-        for &c2 in &rowcols[i] {
+        for &c2 in &rowcols[row_offsets[i]..row_offsets[i + 1]] {
             if !col_done[c2] && c2 != pos {
                 cnt[c2] -= 1;
                 if cnt[c2] == 1 {
@@ -1388,6 +1410,25 @@ fn dense_lu_uncached<R: Real>(a: &mut [Vec<R>], base: usize) -> Vec<usize> {
         }
     }
     perm
+}
+
+#[cfg(test)]
+mod row_column_tests {
+    #[test]
+    fn incidence_preserves_column_order_duplicates_and_empty_rows() {
+        let cols = vec![
+            (false, vec![2, 0, 0], vec![]),
+            (true, vec![1], vec![]),
+            (false, vec![0, 2], vec![]),
+            (false, vec![], vec![]),
+            (false, vec![2, 2], vec![]),
+        ];
+        let (offsets, columns) = super::row_columns(4, &cols);
+        assert_eq!(offsets, [0, 3, 4, 8, 8]);
+        assert_eq!(columns, [0, 0, 2, 1, 0, 2, 4, 4]);
+        assert_eq!(super::row_columns(0, &[]), (vec![0], vec![]));
+        assert_eq!(super::row_columns(3, &[]), (vec![0; 4], vec![]));
+    }
 }
 
 #[cfg(test)]
