@@ -91,10 +91,12 @@ Factor ownership audit and current bounded self profiles: [factor-audit.md](fact
 Accepted growth-factor and quad twin build reuse already exist. On the capped
 DEGEN2 profile, fresh construction is 1.40% of batch instruction samples versus
 13.23% for ftran_with/lstage_num combined; allocator ancestry is still unassigned.
-The first retained-FTRAN ownership transfer passes fast parity but fails the
-performance screen (recorded below). Accepted solver and binary restored. Next
-measure L-to-U representation costs before extending that interface; borrowed
-basis-column inputs and immutable factor sharing remain unproven candidates.
+Both retained-accounting transfer and dense L-to-U buffer transfer fail the
+performance screen (recorded below). Accepted solver and binary restored. Dense
+L-to-U transfer regresses PEROLD repeatably despite avoiding an allocation;
+measure compaction/normalization costs before any larger representation change.
+Barrier fixed-structure execution planning is the next independent structural
+investigation; borrowed factor inputs and immutable factor sharing remain unproven.
 
 ## Candidates
 
@@ -140,6 +142,8 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 - Cache ordered tail-only numeric U entries for the second-vector scatter: a fresh frozen complete ftran_needed oracle and cache consistency tests cover f64/F80, captured SC50A, random/extreme inputs, duplicate values, signed zeros/NaN payloads, column replacements and transient/final row-class changes; fast parity 940/940 passes. Net class changes refresh through the maintained U transpose at update completion. PEROLD instructions fall about 1.11%, DEGEN2 0.95% and DEGEN3 dual 2.78%; small-model counts range from flat to +0.3%. Three CPU-4 PEROLD timing changes -1.68/+22.94/+0.61% and CPU-2 confirmations +3.03/-21.39/-1.64% all stay within spread. DEGEN3 has one initial -5.27% pair beyond spread, but its other initial pairs and two confirmations remain within spread; its -23.21% confirmation crosses speed bands and is not credited. No repeatable target timing gain; source/oracles/cache tests restored (`target/perf-tailcache-{small-summary.json,target-*,confirm-*,fast.txt}`, `/tmp/rose-tailcache-{tests.txt,candidate,candidate.rs}`).
 
 - Reuse the existing structural-column offset prefix for primal pivot-row order, row-product work and Devex work (analysis idea 8), with the original zero-row scan fallback: fast parity 940/940 passes; PILOT4 instructions fall 0.40–0.42%, but three CPU-4 solve changes -0.31/-4.22/+3.58% all stay within spread. DEGEN3 primal instructions fall about 0.35%, with +6.57/-1.46/-1.13% timing changes also within spread. Bounded small-model counts are flat. No qualifying timing gain; source restored (`target/perf-nnz-{small-summary.json,target-*,fast.txt}`, `/tmp/rose-nnz-candidate{,.rs}`).
+
+- Retain dense L storage through U, replacing U's zero allocation plus spike scatter with a transferred buffer; sparse filtering stays unchanged and omitted signed zeros are normalized to positive zero. Existing frozen L/complete-FTRAN oracles are untouched; extended f64/F80 random/extreme/NaN/signed-zero/captured-SC50A representation checks and all six FTRAN/L release tests pass, as does fast parity 940/940. Eight bounded CPU-4 AB/BA small pairs preserve complete no-dump results; instructions ADLITTLE +0.28%, capped DEGEN2 +0.82%. Three alternating CPU-4 five-run PEROLD pairs regress solve 1.69/2.46/1.56%, all beyond spreads, instructions +1.61% each. Rejected before full benchmarking; restored source, accepted CLI and PGO metadata. Keeping dense storage still materializes the ordered spike and adds a normalization pass; avoiding the allocation/scatter alone is insufficient. Candidate source/binary/build `/tmp/rose-lu-transfer-candidate{.rs,,-build.json}`; build/test logs `/tmp/rose-lu-transfer-{build,tests}.log`; pairs and counters `target/perf-lu-transfer/{transfer-pairs.json,perold-*-{before,after}.txt}`.
 
 - Transfer solved FTRAN `x` and input support into F2 after output extraction instead of cloning both arrays: fast parity 940/940 passes. ADLITTLE/capped-DEGEN2 eight AB/BA pairs show instructions +0.036/+0.026%; their timings overlap the fast-parity job and are diagnostic only. Sequential CPU-unpinned PEROLD three-run screen has solve 0.187584 -> 0.190345 s within spreads 0.051039/0.007805 s, instructions +0.424%. No qualifying gain; stopped before full benchmark and restored source, accepted CLI and PGO metadata. This tests retained-accounting ownership only, not dense L-to-U transfer. Candidate source/binary/build `/tmp/rose-factor-transfer-candidate{.rs,,-build.json}`; evidence `target/perf-factor-audit/{transfer-fast.txt,transfer-pairs.json,transfer-perold-{before,after}.txt}`.
 

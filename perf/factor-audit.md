@@ -78,6 +78,19 @@ rejected and the accepted source/binary/build metadata restored. Details are in
 STATE.md's rejected-trial entry. This does not test elimination of the L-to-U
 round trip itself.
 
+A second prototype retained dense L storage across U, avoiding the fresh U
+allocation and scatter while retaining the ordered spike for accounting and
+updates. Sparse results kept the existing expansion. Dense omitted signed zeros
+were normalized to positive zero, preserving the old expansion's representation.
+Six frozen f64/F80 FTRAN/L tests and fast parity 940/940 passed. Eight CPU-4 small
+AB/BA pairs matched complete no-dump results. Instructions rose 0.28% on ADLITTLE
+and 0.82% on capped DEGEN2. On PEROLD, three alternating CPU-4 five-run pairs
+regressed solve time 1.69/2.46/1.56%, all beyond spread, with instructions +1.61%.
+The prototype was rejected and the accepted source/binary/PGO metadata restored.
+This rules out transfer plus a separate signed-zero normalization pass; it does
+not establish that removing the ordered spike or fusing compaction is safe or
+profitable. Evidence and exact candidate artifacts are linked in STATE.md.
+
 ## Remaining proof obligations
 
 Before a factor ownership prototype, separate column-copy and immutable-factor
