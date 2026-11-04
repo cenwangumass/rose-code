@@ -212,11 +212,11 @@ measured.
   self samples. Fixed child-rounding dispatch is rejected at matching-PGO counters.
   Unique AA-neighbour construction is qualified with complete ordered-pattern
   equality and two independent positive timing screens. Quotient-order adjacency
-  buffer reuse is also qualified. The current native assembly still round-trips
-  its hash accumulator through the stack; audit the completed hash store's lifetime
-  across vector insertion while preserving every floating operation and order.
-  Refresh remaining partition/numeric-factor attribution before another whole pass;
-  predecessor source annotations are diagnostic and change codegen.
+  buffer reuse and completed-hash store lifetime are also qualified; current
+  native hash loops retain the accumulator in registers with unchanged additions.
+  Return to the larger ordinary dual/primal gaps: refresh PEROLD/PILOT4 instruction
+  families under the accepted build before choosing another whole pass. Remaining
+  partition/numeric-factor annotations predate these changes and are diagnostic.
 
 ## Out of scope
 

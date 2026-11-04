@@ -1203,6 +1203,7 @@ pub fn order(p: &Pattern, levels: &[i64]) -> Result<OrderResult, StructError> {
                 }
                 // Compact both segments before inserting the pivot, so it cannot
                 // overwrite an unread entry at the start of the tail.
+                hsh[i] = h;
                 na.truncate(used);
                 na.insert(pivot_pos, v as i64);
                 ln[i] = na.len() as i64;
@@ -1211,7 +1212,6 @@ pub fn order(p: &Pattern, levels: &[i64]) -> Result<OrderResult, StructError> {
                 elen[i] = ne;
                 let dd = degme + deg[i] - nv[i];
                 deg[i] = s.min(dd);
-                hsh[i] = h;
                 if 5 * ni - 5 * nelim < s + nv[i] {
                     perm[i] = ni - perm[i];
                     ln[i] = -1;

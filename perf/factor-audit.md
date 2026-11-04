@@ -498,6 +498,19 @@ assembly still spills the hash accumulator per term; this gain does not prove
 register retention. Rule/proof/build and complete measurements:
 `target/perf-order-reuse/`.
 
+## Completed ordering-hash lifetime
+
+The completed hsh[i] write precedes vector insertion, ending the hash local's
+lifetime before a possible allocation. Its next read remains after row rebuilding;
+all floating additions and work/degree operations keep their original order.
+Existing full-original-order tests include rounded-hash seeds and model levels.
+Matching release assembly now keeps both hash-loop accumulators in registers.
+Independent target screens qualify median solve gains of 2.02/2.10%, with
+instructions -0.40% and cycles -3.91%. Full parity, all release tests and complete
+benchmark pairs pass; fixed controls establish no unrelated regression.
+Source/build, exact store-relocation proof, assembly and all raw qualification:
+`target/perf-order-hash-store/`.
+
 ## Remaining proof obligations
 
 Before a factor ownership prototype, separate column-copy and immutable-factor

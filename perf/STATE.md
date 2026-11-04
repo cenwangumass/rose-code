@@ -4,12 +4,12 @@ Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (histo
 
 ## Numbers
 
-Baseline solver: `8b645007` (same solver as `vlsokskq`). Current solver: `npsvzyrv` (reused adjacency buffers during quotient ordering, unique AA-neighbour construction, compact pure extended ranked-product-result reuse, compact native extended reduced-cost-result reuse, compact extended RHS-result/WORK-estimate reuse, four-row/four-column SIMD barrier DGEMM tiles with scalar two-column tails, allocation-free row-tile selection, whole-loop primal row dispatch, sparse auxiliary etas, optional Linux CLI `system-tcmalloc`, PGO with 64-byte loop alignment and online profile merging).
+Baseline solver: `8b645007` (same solver as `vlsokskq`). Current solver: `vpqyvlsq` (completed ordering hashes stored before allocation, reused adjacency buffers during quotient ordering, unique AA-neighbour construction, compact pure extended ranked-product-result reuse, compact native extended reduced-cost-result reuse, compact extended RHS-result/WORK-estimate reuse, four-row/four-column SIMD barrier DGEMM tiles with scalar two-column tails, allocation-free row-tile selection, whole-loop primal row dispatch, sparse auxiliary etas, optional Linux CLI `system-tcmalloc`, PGO with 64-byte loop alignment and online profile merging).
 Parity: full tier 987/987; release tests pass. Three timed runs after one warm-up, with direct paired follow-ups noted below, hyperfine 2.0.0; instruction counts are millions from perf stat.
 
 `baseline wall` is the fixed initial process-wall median. Other wall columns
 are the current CPU-4 three-run paired sweep. Solve uses that sweep except its
-2 timing flags, which use fixed three-pair follow-up medians below.
+1 timing flags, which use fixed three-pair follow-up medians below.
 Host speed bands affect snapshot ratios against cached reference Runtime; only
 controlled within-session changes are credited as gains.
 
@@ -65,17 +65,7 @@ source remain identical. The independent complete original constructor checks
 and reordered dense selections, plus AFIRO/SC50A/BLEND/ADLITTLE/BORE3D/DEGEN2.
 Both AA-pattern tests pass with the matching fixed39 PGO build.
 
-The AA-pattern change passed two DEGEN3 barrier screens (32AB+32AA each, CPU4, cap100,
-seeds7277/7331) pass every criterion: median solve -1.71/-1.93%, confidence
-intervals [-2.05%, -1.45%] / [-2.09%, -1.72%], AA [-0.30%, +0.12%] /
-[-0.32%, +0.21%], sign p7.68e-9 and 31/32 improving in each; both execution
-orders improve. Initial target instructions fall 2.40%, cycles 2.55%; BORE3D
-and DEGEN2 instructions fall 2.06/1.37%. Complete bounded results agree.
-
-The AA-pattern qualification, including its full gates, 23 benchmark pairs and
-four regression controls, remains in `target/perf-aat-unique/`. Its qualified
-CLI `4af7f2680d69893f912a4162493a3da12d89c5006ee4b4893c1906f68bad1d79` is the predecessor
-in the current paired measurements.
+Complete AA-pattern qualification and original-source proof: `target/perf-aat-unique/`.
 
 Quotient ordering now reuses each row's owned adjacency buffer. Both segments
 are compacted stably before inserting the pivot at their original boundary,
@@ -86,63 +76,71 @@ Tests compare permutations, NZ and exact Ops/WORK bits on 512 generated graphs,
 multiple levels including large labels that exercise hash rounding, and six
 small models with dense nodes and generated levels.
 
+Complete row-buffer qualification: `target/perf-order-reuse/`. The paired predecessor CLI is `ba7d7a7031f73e68fd126e9f2ef8fcc265d7beefcb705dedda671216ad6e5e1d`.
+
+Each completed row hash is now stored before vector truncation/insertion,
+ending the accumulator's lifetime before a possible allocation. No hash read
+intervenes at the old store position. Every hash addition, degree operation and
+WORK operation retains its original order; the existing independent original
+ordering tests remain unchanged. Matching release assembly retains the hash
+accumulator in a register in both loops, removing their per-term stack
+load/store round trips. Ordering code is 17,697 bytes versus 17,761 before.
+
 Two predeclared DEGEN3 barrier screens (32AB+32AA each, CPU4, cap100,
-seeds8111/8179) pass every criterion: median solve -0.71/-0.64%, intervals
-[-0.89%, -0.41%] / [-0.68%, -0.44%], AA [-0.28%, +0.27%] /
-[-0.19%, +0.35%], 30/32 and 27/32 improving, sign p1.23e-7/5.65e-5.
-Both execution orders improve. Target instructions fall 2.20%, cycles0.95%;
-BORE3D/DEGEN2 instructions fall 1.56/2.66%. Complete bounded results agree.
-Release disassembly still loads/stores the hash accumulator per term: the
-verified gain does not establish register retention. Ordinary ordering code
-is 17,761 bytes versus 15,654 in the predecessor.
+seeds9001/9067) pass all criteria: median solve -2.02/-2.10%, confidence
+intervals [-2.31%, -1.78%] / [-2.49%, -1.73%], AA [-0.27%, +0.21%] /
+[-0.24%, +0.18%], sign p7.68e-9 and 31/32 improving in each. Both execution
+orders improve. Initial target instructions fall 0.40%, cycles 3.91%; complete
+bounded BORE3D/DEGEN2/DEGEN3 results agree. Frozen source and all counter/screen
+binary hashes are verified; full build/provenance checks are archived.
 
 Full frozen parity passes 987/987. All 37 release groups pass (87 library,
 250 total tests), formatting passes, and all 23 complete no-dump benchmark
 result/exit pairs agree. Source/tests stay frozen; the full test build preserves
-the exact screened CLI. Each of 2 full-sweep timing flags receives fixed
-three-pair follow-ups and one predeclared reversed-role control (A=candidate,
-B=predecessor). Significant separated slowdowns are rejected even below0.5%:
+the exact screened CLI. The full sweep has one timing flag, receiving fixed three-pair
+follow-ups and one predeclared reversed-role control (A=candidate,
+B=predecessor). Significant separated slowdowns are rejected even below 0.5%:
 
-degen3.primal-r: follow-up median solve +0.81%, cycles +0.47%.
-greenbea.dual-c: follow-up median solve +0.58%, cycles +0.36%.
+greenbea.dual-r: follow-up median solve -0.38%, cycles -0.28%.
 
-degen3.primal-r (seed 8366): predecessor median -0.10%, interval [-0.32%, +0.25%], AA [-0.26%, +0.33%], sign p 0.43.
-greenbea.dual-c (seed 8645): predecessor median -0.21%, interval [-0.49%, -0.03%], AA [-0.30%, +0.13%], sign p 0.01.
+greenbea.dual-r (seed 9540): predecessor median +0.24%, interval [-0.03%, +0.50%], AA [-0.30%, +0.25%], sign p 0.99.
 
-No control establishes a regression beyond the declared noise criteria; every
-AA control passes its bias check. No sample extension or repeated control is
-used. Current source/build, full original-order proof, both screens, all gates,
-complete benchmark outputs and controls: `target/perf-order-reuse/`.
-The fixed39 PGO training uses online merge, 64-byte loop alignment and system
-TCMalloc as before. Profile SHA256 `c3d2f3082073afd636b268207aafdab2cfc31dc59c6dbb5e4fa574fe960d9da6`;
-CLI SHA256 `ba7d7a7031f73e68fd126e9f2ef8fcc265d7beefcb705dedda671216ad6e5e1d`.
+No control establishes a regression beyond the declared noise criteria;
+every AA control passes its bias check. No samples are extended and no control
+is repeated.
+
+Current source/build, store-relocation proof, release assembly, both screens,
+all gates, complete benchmark outputs and controls: `target/perf-order-hash-store/`.
+Fixed39 PGO training uses online merge, 64-byte loop alignment and system
+TCMalloc. Profile SHA256 `41c121f23bb4b8d8f2650b1568b1aa4a889fc79df80629c34a603f4f79edf045`;
+CLI SHA256 `90878f676735bad3d8fab1f9292db88e3813231b2acd558ec927e47f2229aa93`.
 Frozen baselines and cached original-reference Runtime targets are unchanged.
 
 | run | ref solve | baseline wall | paired base wall | current wall | solve | current/ref | instr |
 |---|---|---|---|---|---|---|---|
-| degen2.primal-c | 0.012711 | 0.182 | 0.039 | 0.039 | 0.033915 | 2.67 | 264.4 |
-| degen2.dual-r | 0.009653 | 0.125 | 0.033 | 0.033 | 0.027524 | 2.85 | 203.1 |
-| degen3.primal-c | 0.163137 | 3.237 | 0.473 | 0.474 | 0.463065 | 2.84 | 3814.7 |
-| degen3.primal-r | 0.193685 | 3.872 | 0.537 | 0.544 | 0.532938 | 2.75 | 4278.3 |
-| perold.primal-c | 0.160994 | 2.430 | 0.490 | 0.492 | 0.484866 | 3.01 | 4334.1 |
-| pilot4.primal-r | 0.015787 | 0.253 | 0.053 | 0.053 | 0.048017 | 3.04 | 472.7 |
-| 80bau3b.primal-c | - | 1.618 | 0.609 | 0.610 | 0.595482 | - | 6154.7 |
-| primal_5959.primal-r | 0.067884 | 0.563 | 0.136 | 0.135 | 0.130753 | 1.93 | 1347.4 |
-| degen3.dual-c | 0.082843 | 1.002 | 0.248 | 0.247 | 0.236602 | 2.86 | 1827.9 |
-| degen3.dual-r | 0.082947 | 1.008 | 0.249 | 0.249 | 0.238149 | 2.87 | 1836.0 |
-| perold.dual-r | 0.038532 | 0.355 | 0.127 | 0.128 | 0.121226 | 3.15 | 1046.0 |
-| 80bau3b.dual-r | - | 1.103 | 0.312 | 0.312 | 0.296881 | - | 2474.5 |
-| greenbea.dual-c | - | 2.870 | 0.661 | 0.663 | 0.650717 | - | 4915.6 |
-| greenbea.dual-r | - | 3.598 | 0.656 | 0.658 | 0.643815 | - | 4856.1 |
-| mode_switch.dual-r | - | 25.815 | 1.256 | 1.254 | 1.228446 | - | 12066.0 |
-| primal_5959.dual-r | 0.098192 | 1.300 | 0.185 | 0.184 | 0.179632 | 1.83 | 1881.9 |
-| quad_2717.dual-r | 0.092814 | 1.130 | 0.215 | 0.213 | 0.208108 | 2.24 | 1976.9 |
-| fx_quad_obj_5371.dual-r | 0.038077 | 0.334 | 0.078 | 0.077 | 0.072860 | 1.91 | 768.3 |
-| degen3.barrier-r | 0.075214 | 0.608 | 0.215 | 0.213 | 0.175313 | 2.33 | 2456.9 |
-| 80bau3b.barrier-r | - | 0.379 | 0.226 | 0.226 | 0.204901 | - | 2627.0 |
-| greenbea.barrier-r | - | 1.569 | 0.780 | 0.779 | 0.749380 | - | 9886.9 |
-| 80bau3b.pdhg | - | 4.552 | 3.637 | 3.590 | 3.576613 | - | 74938.1 |
-| greenbea.pdhg | - | 2.801 | 1.580 | 1.570 | 1.558189 | - | 31946.5 |
+| degen2.primal-c | 0.012711 | 0.182 | 0.038 | 0.039 | 0.033479 | 2.63 | 264.4 |
+| degen2.dual-r | 0.009653 | 0.125 | 0.033 | 0.033 | 0.027558 | 2.85 | 203.1 |
+| degen3.primal-c | 0.163137 | 3.237 | 0.472 | 0.470 | 0.459278 | 2.82 | 3814.9 |
+| degen3.primal-r | 0.193685 | 3.872 | 0.540 | 0.542 | 0.530634 | 2.74 | 4278.5 |
+| perold.primal-c | 0.160994 | 2.430 | 0.491 | 0.490 | 0.483069 | 3.00 | 4334.2 |
+| pilot4.primal-r | 0.015787 | 0.253 | 0.054 | 0.054 | 0.048051 | 3.04 | 472.8 |
+| 80bau3b.primal-c | - | 1.618 | 0.613 | 0.613 | 0.597602 | - | 6154.8 |
+| primal_5959.primal-r | 0.067884 | 0.563 | 0.134 | 0.134 | 0.130237 | 1.92 | 1347.4 |
+| degen3.dual-c | 0.082843 | 1.002 | 0.248 | 0.247 | 0.236237 | 2.85 | 1828.1 |
+| degen3.dual-r | 0.082947 | 1.008 | 0.249 | 0.248 | 0.237902 | 2.87 | 1836.1 |
+| perold.dual-r | 0.038532 | 0.355 | 0.127 | 0.127 | 0.120612 | 3.13 | 1046.0 |
+| 80bau3b.dual-r | - | 1.103 | 0.314 | 0.312 | 0.297543 | - | 2474.7 |
+| greenbea.dual-c | - | 2.870 | 0.665 | 0.661 | 0.647949 | - | 4915.8 |
+| greenbea.dual-r | - | 3.598 | 0.657 | 0.662 | 0.641768 | - | 4856.3 |
+| mode_switch.dual-r | - | 25.815 | 1.263 | 1.276 | 1.250309 | - | 12066.2 |
+| primal_5959.dual-r | 0.098192 | 1.300 | 0.186 | 0.184 | 0.179754 | 1.83 | 1881.9 |
+| quad_2717.dual-r | 0.092814 | 1.130 | 0.211 | 0.213 | 0.207665 | 2.24 | 1976.9 |
+| fx_quad_obj_5371.dual-r | 0.038077 | 0.334 | 0.076 | 0.077 | 0.072994 | 1.92 | 768.3 |
+| degen3.barrier-r | 0.075214 | 0.608 | 0.212 | 0.205 | 0.171563 | 2.28 | 2447.2 |
+| 80bau3b.barrier-r | - | 0.379 | 0.225 | 0.224 | 0.203785 | - | 2626.2 |
+| greenbea.barrier-r | - | 1.569 | 0.776 | 0.776 | 0.746279 | - | 9884.0 |
+| 80bau3b.pdhg | - | 4.552 | 3.575 | 3.652 | 3.638246 | - | 74938.2 |
+| greenbea.pdhg | - | 2.801 | 1.588 | 1.579 | 1.567364 | - | 31946.7 |
 
 ## Hotspots
 
@@ -229,7 +227,7 @@ counts, complete results, build provenance and annotation: `target/perf-barrier-
 
 ## In progress
 
-None. The qualified `npsvzyrv` source, CLI and PGO metadata are installed;
+None. The qualified `vpqyvlsq` source, CLI and PGO metadata are installed;
 the overall reference performance goal remains unmet.
 
 ## Extended BTRAN feasibility
