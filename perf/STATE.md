@@ -288,6 +288,25 @@ separately tested normal-cancellation implementation is rejected below; counts
 alone do not justify retrying it. Source, validating test, raw values/counts,
 summary and original Sub annotation: `target/perf-f80-add-shapes/`.
 
+Extended Devex ratio diagnostic (temporary test-only trace, removed before
+candidate freeze): fx_quad_obj_5371 has 5,270 mode-2 row calls and 100,414
+extended mode-2 weight updates, versus 11 normal-mode calls and 221 ratios.
+Quad_2717 has 15,988 normal-mode calls and 285,143 ratios; six mode-2 calls
+have no extended weight updates. ADLITTLE has none. Original accepted assembly
+retains both `(wq_q / a_rq) / a_rq` Div calls inside the mode-2 loop; GOT 364550
+resolves the two sites to F80::Div. The lazy coefficient trial below is
+unapplied after an inconclusive full-session regression control.
+
+The normal-mode ratio stream has 262 global distinct pairs on Quad_2717;
+FIFO bounds 32/64/128/256/512 give 0/32,751/32,751/32,751/284,881 hits.
+Fx has 179 distinct pairs over 221 terms and only 42 hits even at 512. These
+simulations omit Solver/provider resets and are upper bounds, not a chosen
+cache design. All statuses/iterations/refactors match; comparable optimal
+ADLITTLE/Quad objective/primal/dual/reduced-cost fields equal the CLI. Fx's
+infeasible numeric fields are suppressed by the CLI. Production source, CLI
+and PGO metadata are restored exactly. Counts/ordered stream, scope, validating
+test, original source and annotation: `target/perf-devex-ratios/`.
+
 ## In progress
 
 None. Qualified `ntpwppnk` source, CLI and PGO metadata are installed;
@@ -652,6 +671,8 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 - Borrow Markowitz candidate chains and rotate buckets in place: fast parity 940/940 passes and PEROLD instructions -0.5%, but alternating CPU-2 solve 0.237249 -> 0.236897 s is within 0.006498/0.011017 s spreads; DEGEN3 primal also stays within wide spreads. Reverted (`target/perf-searchborrow-{target,recheck}-{before,after}.txt`).
 
 - Cache first-match pivot-row/column coefficients in a stamped lookup: semantic tests and fast parity 940/940 pass, PEROLD instructions -0.6%, but solve 0.151853 -> 0.151628 s is within 0.004297/0.000431 s spreads; DEGEN2 has a small timing increase with flat instructions and DEGEN3 primal has no gain. Reverted (`target/perf-pivotvalues-target-{before,after}.txt`).
+
+- Lazy reuse of the extended mode-2 coefficient `(wq_q / a_rq) / a_rq` per primal row call. Both immutable operands, division order, first-use location and each column's multiplication/addition order are retained; primitive kernels and WORK sites remain unchanged. Complete frozen row body stays source-identical. Matching fixed39 PGO passes existing whole-row and new repeated-column differential tests, full parity 987/987, all 37 release groups (253 tests), formatting and all 23 complete benchmark result/exit pairs. Fx instructions fall 3.11%; target screens 13217/13289 (32 AB + 32 AA each, CPU 4, cap 5500) both qualify: median -3.620/-4.568%, intervals [-5.541%, -2.697%] / [-5.132%, -4.079%], AA [-2.193%, +1.256%] / [-0.108%, +1.543%], 30/32 and 32/32 improving, both orders improve. Full sweep flags DEGEN3 primal-r +0.76%, PEROLD dual-r +59.10% and GREENBEA dual-c +16.09%, all with unchanged instructions. Fixed three-pair follow-ups are mixed; the predeclared reversed-role controls establish no regression. However DEGEN3's AA control is biased: median +0.675%, interval [+0.077%, +2.751%], p 0.0201. Its predecessor AB median is -0.330%, interval [-0.801%, -0.138%], sign p 0.01003 and no conservative noise separation. PEROLD/GREENBEA controls have healthy AA and no established slowdown. The final control had already completed when stop was requested; all three complete controls are retained. Qualification is inconclusive under the healthy-AA rule; no screen/control is extended or repeated. Source, accepted CLI/build and opaque-input test fix are restored exactly; no optimization is accepted. Source/proof, frozen oracle/new test, diagnostic provenance, matching build/assembly, both positive target screens and every full gate/result/control: `target/perf-devex-mode2/`.
 
 - Exact normal F80 cancellation for opposite effective signs and equal exponents, or adjacent exponents with magnitude ratio below two: a 64-bit difference and normalization replace the general 128-bit align/pack only when no rounding is required. The complete original add/sub primitive is frozen independently; reconstruction reverses only the new branch. Matching fixed39 PGO passes all eleven F80 tests (two million random/full-representation/close-magnitude comparisons, captured SC50A factors, signs/zeros/nonfinites/boundaries and existing x87/conversion tests), fast parity 940/940, and eight ADLITTLE/fx plus three Quad_2717 complete result/exit pairs. Quad instructions -2.11%, but cycles rise in all three pairs (+3.63/+2.05/+1.70%) and branch misses +13.69/+8.33/+5.11%. Fx instructions -1.44%, cycles rise in all eight pairs (+0.61 through +9.50%). These whole-CLI counters do not attribute all extra cost to branch prediction, but establish no useful target gain. Stopped before predeclared timing seeds 12217/12289 and full gates. Source, accepted CLI/build and opaque-input test fix are restored exactly. Candidate/frozen source, algebra/rounding proof, matching build, tests, all outputs/counters and restoration: `target/perf-f80-cancel/`.
 
