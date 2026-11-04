@@ -919,14 +919,65 @@ remains unapplied; no speedup is accepted. Exact candidate/frozen oracle, captur
 fixture, original source, source/build freeze, tests, counters, screen and
 restoration: `target/perf-aux-cache/`.
 
+## Whole FTRAN/BTRAN input and effect reuse
+
+FTRAN/BTRAN exact-input reuse is measured through 194,701 calls across 18
+isolated bounded cases: primal/dual AFIRO, SC50A, BLEND, ADLITTLE, BORE3D and
+DEGEN2; compact fx/Quad; PILOT4 primal, PEROLD dual; and primal5959 primal/dual
+at cap 11000. A test-only monotonic matrix token survives Clone and changes on
+every fresh construction and at entry to every attempted update. No pointer
+identity is used. Full ordered indices, f64 bits or internal F80 m/e/sign fields,
+method flags, needed order and both FP controls form exact keys. All 18 complete
+CLI result objects agree with the accepted binary; original arithmetic/control
+flow/WORK reverses exactly after removing the test-only hooks.
+
+Of 132,997 calls after at least one update, only two repeat an exact key, both
+full FTRAN on fx. Needed FTRAN and BTRAN have no nonfresh repeats, even with an
+unbounded per-version table. A general mutable-version cache is not justified
+by these streams. Fresh BTRAN reuse overlaps the earlier unqualified compact
+BTRAN-result cache and does not justify repeating its failed screen.
+
+Full FTRAN replaces all F2 fields, work/parts, last flags, filtered spike and
+last_alpha; needed FTRAN replaces only F2 tau fields and tau L/U/fin estimates;
+BTRAN sets work/density and conditionally row_cached. Lazy row/transpose-level
+initialization is separately tagged at its exact branch. Across repeated keys,
+output order/bits and all projected written semantic fields/lazy actions have
+zero mismatches. Untouched caller state must remain live; scratch is not payload.
+The ftran_keep/basic wrappers must still execute their original restoration and
+keep-statistic logic. This is a dependency audit and measurement, not proof of
+a complete general result cache.
+
+A separate fresh full-FTRAN lead is favorable: two entries per fresh F80 matrix
+version capture 1730/2883 fx/Quad repeats and 5273/5627 primal5959 primal/dual.
+Most are force_dense=false pivot-column solves, beyond the accepted pure RHS
+provider's force-dense result reuse. Complete key lookup, miss insertion, exact
+F2/spike/scalar effect replay and output copying cost 0.111/0.112/0.199/0.198
+of original stream time on those four streams (fixed 8 alternating CPU-4 pairs,
+16 repetitions, matching accepted-source PGO flags and TCMalloc). Original
+component stream medians are 3.901/4.006/5.279/5.386 ms. Factor matrices are cloned
+once per stream equally, outside individual queries. All four captures reproduce
+exactly on the component build, excluding instrumented elapsed time, and every
+component call's full written-field payload equals the captured original.
+These isolated measurements are not solver speedups or qualification screens.
+
+A two-entry fresh full-FTRAN effect cache remains an
+unimplemented candidate; update/failure invalidation, clone ownership, controls,
+dumps, full-state differential tests and matching-PGO qualification remain.
+Exact source reversal, raw streams, per-version/FIFO bounds, unchanged CLI results,
+projected effects, component source/binary/timings, dependency audit and restoration:
+`target/perf-version-stream/`.
+
 ## Remaining proof obligations
 
 Fresh auxiliary Factor numeric fields are immutable after construction; only
 eta updates and their nnz counter change. Deep-copy constructor reuse is verified
 but its fixed solver screen is inconclusive; do not extend it. Immutable-base
 sharing would need separate ownership, allocation and numeric/WORK proofs.
-Before a whole mutable-factor solve cache, audit every FTRAN/BTRAN dependency,
-version invalidation path, snapshot/order and lazy-cache effect. Replay numerical
-producer/consumer values only through the standard dump/comparison tools; stop
-at the first mismatch. Existing pure-result reuse does not establish numerical
-producer-U identity or safety of broader factor sharing.
+The measured general mutable-version FTRAN/BTRAN result cache has negligible
+nonfresh reuse. Fresh full-FTRAN effect reuse needs a complete frozen oracle,
+full-state hit/miss/clone/update/fallback tests and independent matching-PGO
+qualification. Preserve only the kernel's written fields and every live caller
+field; keep outer wrapper and WORK logic running. Replay numerical producer/
+consumer values through the standard dump/comparison tools and stop at the first
+mismatch. Pure-result reuse does not establish producer-U identity or safety of
+broader factor sharing.

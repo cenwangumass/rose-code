@@ -236,11 +236,19 @@ measured.
   conservative AA separation; do not repeat or extend it. Deep-copy cache remains
   unapplied. Fresh auxiliary numeric fields are read-only after construction;
   immutable-base ownership sharing would be a distinct, unimplemented experiment.
-  Next audit full FTRAN/BTRAN state dependencies and measure exact repeated
-  inputs per immutable matrix version across bounded compact solves. Clone must
-  retain a version identity; every attempted matrix mutation invalidates it,
-  including failures. Preserve numeric, WORK, snapshot/order and lazy-cache
-  effects. Start with cached call/cost evidence and small models.
+  Full FTRAN/BTRAN dependency and version-aware input measurement is complete
+  across 18 bounded cases: 132,997 nonfresh calls have only two repeated full-FTRAN
+  keys and no needed/BTRAN repeats. Do not implement a general mutable-version
+  cache from these streams. Fresh BTRAN overlaps the prior unqualified cache;
+  do not repeat its failed screen. Fresh full FTRAN is a distinct lead: two
+  entries capture 1730/2883 fx/Quad and 5273/5627 primal5959 repeats, predominantly
+  pivot-column solves. Full lookup/effect replay/copy component ratios are
+  0.111/0.112/0.199/0.198 with exact captured outputs and written state. Next
+  protect the complete original FTRAN and test only compact fresh F80 effect
+  reuse. Preserve all F2/spike/WORK/last-field writes, untouched live caller
+  state, wrapper restores and update/failure invalidation. Bypass dumps and
+  unsupported controls; clone sharing must keep every mutable factor independent.
+  Run matching fixed39 PGO and cheap bounded counters before timing qualification.
   Producer/consumer U identity is still unproven: use nontrivial SC50A dual k1,
   repair the old cached LUIN endpoint schema through current bounded refcap,
   and capture producer/pre-overlay values before bypassing replay arithmetic.
