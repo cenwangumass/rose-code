@@ -651,13 +651,42 @@ raw numerator/divisor keys are retained across all updates. Quad has231,284
 eligible queries,492 distinct (owner,column,operand-pair) keys across14 owners
 and96 columns, and a maximum14 keys per column. FIFO1/2/4/8/16 hits are42,404/
 53,950/79,948/148,158/230,792. Sixteen-entry fx/primal hits are58,829/221,325
-of59,284/222,780, with per-column maxima8/12. This justifies a16-entry bound
-for a column-indexed experiment, not a runtime-gain claim. A cache shared by
+of59,284/222,780, with per-column maxima8/12. This justified the tested16-entry
+bound; both column-indexed implementations now lose at counters, as recorded
+below. A cache shared by
 fresh-factor clones must still key both numerical operands across updates;
 its values are pure quotients, not mutable factor results. Original arithmetic
 and every WORK site remain required. Data, lifetime rules, exact tagged source,
 full optimal numeric/status/count validation and restored-source proof:
 `target/perf-diag-div-reuse/`.
+
+The per-column implementation shares only pure full-key quotient values through
+one Arc/Mutex per compact fresh owner (one lock per BTRAN). The complete original
+BTRAN and unchanged arithmetic are independently verified; collision, eviction,
+updates, clone sharing, raw low bits, nonfinites and mode tests pass. Matching PGO
+and fast940 pass. Linear fingerprints give Quad instructions+0.710%, cycles
++3.368%, branch misses+11.82%; integer SIMD fingerprint masks give+0.771%,
++3.000%,+0.976%. FX cycles rise6.482/5.827%. All bounded full result/exit pairs
+agree. Neither variant reaches official timing/full gates. Both are restored;
+source/proofs/build/tests/assembly/raw counters: `target/perf-diag-div-memo/`
+and `v2/`.
+
+A denominator-only diagnostic finds at most3/4/4 distinct normalized divisor
+mantissas per FX/Quad/primal5959 owner-column. Four-entry FIFO parameters would
+hit59,082/231,157/222,218 of59,284/231,284/222,780 eligible divisions. Mantissa
+alone is a valid key for integer reciprocal parameters; it is insufficient for
+quotient-result reuse. Diagnostic scope, all bounds, status/count and optimal
+full-field checks: `target/perf-diag-den-reuse/`.
+
+A standalone optimized probe keeps the complete original F80 module as oracle.
+For normalized denominators, a precomputed65-bit reciprocal gives an exact
+quotient/remainder after at most one correction; normal-result rounding follows
+from that exact remainder and other inputs retain original division. Its own
+integer proof,2,000,050 integer and1,037,249 F80 comparisons pass. Fixed eight
+CPU-4 alternating pairs give about0.45 arithmetic time ratio with parameters
+precomputed and equal nonzero checksums. This establishes arithmetic feasibility
+only: owner/column storage, lookup, fill and solver runtime remain untested.
+Full sources/proof/compiler/results: `target/perf-preinverse-probe/`.
 
 ## Remaining proof obligations
 

@@ -205,12 +205,15 @@ measured.
   stack scratch is verified but has no useful counter gain. Before another
   division fast path, isolate its actual call sites: dense U already inlines
   zero-numerator handling, and global zero counts do not imply removable ABI work.
-  Next test the measured BTRAN quotient scope: at most16 exact operand pairs per
-  diagonal column, shared across clones of one fresh-factor owner, with both
-  inputs keyed across updates. Use the existing three division sites and retain
-  every WORK/threshold/output rule. Measure lookup cost before full gates; the
-  global512-entry quotient cache has high reuse but loses runtime, so reusing
-  its hash/table implementation is not a justified shortcut.
+  Both global and16-entry per-column quotient-result tables lose at counters;
+  integer SIMD fingerprints reduce branch misses without recovering runtime.
+  Do not repeat those cache screens. Next integrate the standalone exact
+  integer-reciprocal probe at the three BTRAN diagonal divisions, keeping only
+  four denominator-mantissa/parameter entries per owner-column. Fresh-factor
+  clones may share pure parameters; the live divisor and numerator still drive
+  sign/exponent/rounding and every WORK/threshold/output rule remains required.
+  Differential arithmetic feasibility is established; measure owner, lookup and
+  parameter-fill overhead before official timing or full qualification.
   Look for a faster exact implementation of the same rounding (the F80 tests and `../reverse-engineer/evidence/f80-subnormal-reference.json`
   define it), and for F80 work that runs where its results are not used.
 - **Dump overhead with no dump selected**: about 70 `dump::on("kind")` sites in `dual.rs` and
