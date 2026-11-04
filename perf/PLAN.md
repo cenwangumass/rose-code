@@ -201,6 +201,10 @@ measured.
   Refresh remaining BTRAN, row/control and software arithmetic after these changes.
   Long-only register eta dots pass exact differential checks, including all MXCSR
   modes, but miss conservative timing-noise separation; do not extend that screen.
+  Current post-Devex-cache attribution still puts extended BTRAN first. Bounded
+  stack scratch is verified but has no useful counter gain. Before another
+  division fast path, isolate its actual call sites: dense U already inlines
+  zero-numerator handling, and global zero counts do not imply removable ABI work.
   Look for a faster exact implementation of the same rounding (the F80 tests and `../reverse-engineer/evidence/f80-subnormal-reference.json`
   define it), and for F80 work that runs where its results are not used.
 - **Dump overhead with no dump selected**: about 70 `dump::on("kind")` sites in `dual.rs` and

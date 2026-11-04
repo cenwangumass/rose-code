@@ -579,6 +579,36 @@ assembly and complete paired results: `target/perf-lwork-charges/` and
 `target/perf-dense-l-outline/`. These local observations do not bound total
 FTRAN bookkeeping cost or establish safety of producer-U reuse.
 
+## Fixed BTRAN scratch storage
+
+The current accepted Quad profile retains extended BTRAN as the largest self
+symbol (13.40% of batch instruction samples, including launcher/startup in scope).
+The period4M recording has7231 samples, zero loss/throttle and represents99.87%
+of counted28.961B batch instructions;7201 samples belong to Rose. All bounded
+complete results agree. Current data/annotations: `target/perf-quad-devex/`.
+
+A trial moves five fixed-size numeric/marker buffers to initialized stack prefixes
+only for extended factors with at most32 rows. Dynamic support/output lists keep
+their original storage. Prefix initialization, exclusive arrays, Copy element
+types and checked bounds justify slice creation from MaybeUninit. The partial
+L-stage handoff copies the exact initialized values instead of moving its Vec.
+Reversal reproduces the complete original BTRAN; independent whole-body tests
+check result/WORK bits, row cache, density and lazy inverse/level state. Separate
+boundary/suffix and low-bit partial-path cases pass, as do all nine FTRAN/L
+tests and fast940 parity with matching fixed39 PGO. Quad/fx instructions fall
+0.396/0.142%, but cycles rise1.50/1.46%. No official timing/full gates follow;
+all accepted artifacts are restored. Source/proof, oracle/tests, build/assembly
+and full result/counter pairs: `target/perf-btran-stack/`.
+
+A separate test-only division measurement excludes independent Devex-shadow
+arithmetic. Quad/primal5959 have131,998/172,580 zero numerators out of599,835/
+817,754 divisions. All solver statuses/counts and optimal numeric fields match
+the accepted CLI. Accepted dense-U assembly already inlines its zero return
+before quotient helpers, so these counts do not establish removable ABI cost.
+The sparse-input out-of-line call remains distinct; no production change is
+made from these counts. Exact scope/counters/source/restoration and symbol/
+relocation proof: `target/perf-f80-div-shapes/`.
+
 ## Remaining proof obligations
 
 Before a factor ownership prototype, separate column-copy and immutable-factor
