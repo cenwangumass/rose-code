@@ -147,7 +147,8 @@ hot loops, cache and branch misses) before declaring a gap forbidden by the inva
    scans where the reference keeps lists, allocation per iteration, dense loops over sparse data,
    recomputation of invariant values, F80 software arithmetic in a loop that only needs a few values,
    string/JSON work on the hot path when no dump is selected, bounds checks in tight loops, cache-hostile
-   layout. Write the hypothesis into STATE.md "In progress" (one line).
+   layout. For a result cache, measure exact ordered input working sets before choosing its bound;
+   a small cache can miss a highly repetitive cycle. Write the hypothesis into STATE.md "In progress" (one line).
 3. **Protect it.** If the change rewrites a numeric kernel, first copy the current version into a
    `#[cfg(test)]` module next to it and add a differential test: old against new, bit for bit
    (`to_bits()`), on random inputs (include zeros, signed zeros, tiny and huge magnitudes, empty and

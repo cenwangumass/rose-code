@@ -4,15 +4,14 @@ Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (histo
 
 ## Numbers
 
-Baseline solver: `8b645007` (same solver as `vlsokskq`). Current solver: `ztrylnzw` (compact native extended reduced-cost-result reuse, compact extended RHS-result/WORK-estimate reuse, four-row/four-column SIMD barrier DGEMM tiles with scalar two-column tails, allocation-free row-tile selection, whole-loop primal row dispatch, sparse auxiliary etas, optional Linux CLI `system-tcmalloc`, PGO with 64-byte loop alignment and online profile merging).
+Baseline solver: `8b645007` (same solver as `vlsokskq`). Current solver: `kpttrrms` (compact pure extended ranked-product-result reuse, compact native extended reduced-cost-result reuse, compact extended RHS-result/WORK-estimate reuse, four-row/four-column SIMD barrier DGEMM tiles with scalar two-column tails, allocation-free row-tile selection, whole-loop primal row dispatch, sparse auxiliary etas, optional Linux CLI `system-tcmalloc`, PGO with 64-byte loop alignment and online profile merging).
 Parity: full tier 987/987; release tests pass. Three timed runs after one warm-up, with direct paired follow-ups noted below, hyperfine 2.0.0; instruction counts are millions from perf stat.
 
 `baseline wall` is the fixed initial process-wall median. Other wall columns
-are the current CPU-4 three-run paired sweep; `solve` uses that sweep except
-fx_quad, which uses candidate AB samples from the two positive screens, and the
-four flagged cases, which use paired follow-ups or regression controls below.
-Host speed bands affect snapshot ratios against cached
-reference Runtime; only controlled within-session changes are credited as gains.
+are the current CPU-4 three-run paired sweep. Solve uses that sweep except its
+two timing flags, which use the fixed direct follow-up medians below. Host speed
+bands affect snapshot ratios against cached reference Runtime; only controlled
+within-session changes are credited as gains.
 
 Reference provenance: original-library cached records `../reverse-engineer/runs/{degen2,degen3,perold,pilot4}-{profile}.json` for the ten previously valid cells. New three-run medians use `/tmp/rose-perf-reference/{primal_5959.primal-r,primal_5959.dual-r,quad_2717.dual-r,fx_quad_obj_5371.dual-r}.{1,2,3}.json`; summary `/tmp/rose-perf-reference/summary.json`. All original-library records identify Ryzen 9 5900X and library SHA256 `8e87fca221fdffc922331c8619426031b3e72dfd419446422f88af0cb0e98f9c`.
 `-` refs are unreachable: original Gurobi rejects 80BAU3B, GREENBEA and mode-switch with license error 10010 (scratch `ID.error.json`, including direct 80BAU3B primal/dual attempts). The old 80BAU3B primal/dual refs used the patched library and have been removed; the old prose mode-switch time is unusable.
@@ -31,106 +30,94 @@ PILOT4 primal instruction comparison (`5b4e350f`, cap 800, all optimal in 690 it
 
 PILOT4 primal allocation sample (`lotvwumw`, preceding frame-pointer PGO build, ADLITTLE first; caps 300/800, both optimal, PILOT4 690 iterations): 186,115 malloc, 11,291 calloc and 100,651 realloc calls, 195,939 frees across the whole CLI. Period-61 primitive-specific stack sampling has zero drops; 1999/4889 samples (about 41%) originate in ftran_order.rs, 1232 in lu_order.rs and 893 in simplex.rs. Prominent individual sites include temporary fresh-factor adjacency, LU pair-row growth, nucleus construction/search, and copying index/value arrays for basis columns. Counts measure allocation frequency, not caller instruction cost. Raw `target/perf-pilot4-trsm-{adlittle,pilot4}.alloc`, summaries/stacks beside them, manifest `target/perf-pilot4-trsm-alloc-manifest.json`, analyzer `target/perf-pilot4-trsm-alloc-analyze.py`; the cached sampler is `/tmp/rose-alloc-profile/sample61.so`.
 
-Compact extended-factor entries now retain an isolated RHS provider. Four exact
-extended input/result pairs and four double-input WORK estimates are bounded per
-existing factor-cache entry. The main factor remains independently owned; repeated
-entries share the RHS provider and avoid its deep factor clone. Ordered input bits
-(including signed zero and full extended low bits) key solve results; the original
-double RHS bits separately key the pure estimate. WORK booking stays at its old
-site and in its original order. Diagnostics execute the existing numerical
-routines, whose source is unchanged; NaN, oversized and malformed solve inputs
-use the original path. Larger/uncacheable factors retain direct RHS ownership.
-The RHS factor never receives updates; its only solver consumer reads returned
-solve/estimate values. Tests cover exact result/estimate bits, history, clones, main
-factor independence, FIFO eviction, Send compatibility and random/stack-boundary
-inputs using an AFIRO mixed basis.
+Compact shared providers retain up to 32 pure extended ranked-product results
+for their Solver's immutable problem, independently of main-factor updates. Keys
+are the participating rows in sorted `(rank, row)` order and each value's exact
+extended representation. Rank magnitudes and unselected values do not affect
+the kernel and are omitted. Signed zeros and full low bits remain distinct.
+Only compact shared owners, at most 50 rows/500 variables, native nearest/64-bit
+masked x87 mode and valid dimensions are eligible; selected NaNs and all dumps
+use the original path. The numerical kernels are source-identical, and both
+consumers retain every WORK call in place. Results and scratch stay independent
+of mutable main factors. Release tests cover rank ties/order changes, low bits,
+signed zeros/extremes/infinity, ignored values, clones, mode fallback and eviction.
 
-Compact shared providers also retain up to four pure native extended reduced-cost
-outputs for a fresh main factor, with at most 500 total variables. Keys preserve
-every ordered extended dual bit, the full nonbasic mask, exclusion and cost mode;
-the problem's columns and costs are immutable for the provider's entire lifetime.
-Hits restore all double reduced costs and only the extended entries the original
-kernel writes. Basic and excluded extended values retain their current contents.
-The original arithmetic kernel is source-identical; all WORK sites remain in place.
-Dumps, NaN inputs, malformed dimensions and other control modes use the original
-path. A release differential test covers exact low bits, signed zeros, extremes,
-clones, changing stale values, mask equivalence, key distinctions and FIFO bounds.
+The test-only working-set measurement records 25,046 eligible calls with 22 exact
+inputs on Quad_2717, and 6,073 calls with 23 inputs on fx_quad_obj_5371. A four-entry
+cache misses the repeating cycle and regresses; that version is retained as
+negative evidence. The final 32-entry bound fits the observed working sets. The
+trace is removed before source/test freeze and all official timing screens.
 
-Two predeclared fx_quad_obj_5371 dual screens (32 AB + 32 AA pairs each, CPU 4,
-cap 5500, seeds 4153/4211) pass every criterion: median solve -6.30/-4.10%,
-intervals [-7.61%, -3.31%] / [-5.16%, -3.19%], AA [-2.65%, +1.04%] /
-[-1.30%, +1.10%], with 32/32 and 30/32 improving pairs. Both orders improve.
+Two predeclared Quad_2717 dual screens (32 AB + 32 AA pairs each, CPU 4,
+cap 17000, seeds 5171/5231) pass every criterion: median solve -7.52/-8.51%,
+intervals [-8.69%, -5.85%] / [-9.26%, -7.83%], AA [-2.28%, +0.62%] /
+[-1.37%, +0.56%], all 32/32 pairs improving in both screens and both orders
+improving. Target instructions fall 4.04%; fx instructions fall 2.98%.
 The screens span different host speed bands; only their paired changes are
-credited. Target instructions fall 1.24%; primal_5959 primal falls 0.96%.
-Eight ADLITTLE/fx result/exit pairs and three primal_5959 primal pairs agree
-completely after excluding only seconds. ADLITTLE instructions are flat.
+credited. Eight ADLITTLE/fx and three Quad_2717 complete result/exit pairs agree.
 
-Full frozen parity passes 987/987. All 37 release test groups pass (82 library,
-245 total tests), and all 23 complete no-dump benchmark result/exit pairs agree.
-Qualified source remained frozen for both screens and all gates; the test build
-retained its exact CLI hash. Four-row/four-column SIMD barrier tiles, scalar
-two-column tails and all earlier numerical/block-boundary rules remain accepted.
+Full frozen parity passes 987/987. All 37 release groups pass (83 library,
+246 total tests), and all 23 complete no-dump benchmark result/exit pairs agree.
+Source/tests remain frozen throughout qualification; the full test build keeps
+the exact screened CLI hash. The full sweep flags GREENBEA controlled dual
++11.15% and mode-switch +2.03%. Their fixed three-pair follow-ups give median
+solve changes -0.49/+0.67% and cycle changes -0.33/-0.01%, respectively.
+Each flag receives one predeclared reversed-role control, with A=current and
+B=predecessor so a positive screen would establish regression:
 
-The full sweep flagged mode-switch +44.09%, primal_5959 dual +5.31%,
-80BAU3B PDHG +46.28% and GREENBEA PDHG +38.37%; these grouped changes are
-not credited as code effects. Fixed three-pair follow-ups give solve changes
-mode-switch +3.94/+2.93/+14.48%, primal_5959 dual -0.56/+2.17/-2.15%,
-80BAU3B PDHG -0.42/-5.92/-1.54% and GREENBEA PDHG +0.16/+1.27/+4.37%.
-Corresponding cycle medians are +1.89/-0.52/-1.01/+0.64%; the large grouped
-slowdowns do not recur. Two remaining flags receive one fixed control each,
-with reversed A=current/B=predecessor roles so a positive result would establish
-regression. No sample extension or repeated confirmation is used.
+greenbea.dual-c (seed 5719): predecessor median -0.30%, interval [-0.77%, +0.01%], AA [-0.76%, +0.44%], sign p 0.0251.
+mode_switch.dual-r (seed 5781): predecessor median -0.40%, interval [-1.30%, +0.57%], AA [-0.88%, +0.70%], sign p 0.189.
 
-mode_switch.dual-r (seed 4327, 32 AB + 32 AA) predecessor median +0.17%, interval [-0.58%, +1.35%], AA [-0.62%, +0.84%], sign p 0.702.
-greenbea.pdhg (seed 4357, 32 AB + 32 AA) predecessor median -0.07%, interval [-0.95%, +1.24%], AA [-0.75%, +1.37%], sign p 0.430.
-Neither control establishes a slowdown beyond variation.
+Neither control establishes a slowdown beyond the declared significance/noise
+rules. No sample extension or repeated confirmation is used. Earlier compact
+RHS/WORK and reduced-cost reuse remains accepted; its ownership/key rules and
+qualification evidence are in `perf/factor-audit.md`, `target/perf-rhs-memo/final/`
+and `target/perf-cost-memo/`. Four-row/four-column barrier tiles, scalar tails
+and all earlier arithmetic/block-boundary rules remain unchanged.
 
-The RHS-only predecessor's two controlled primal_5959 primal gains were
-7.31/4.79%, with target instructions -10.90%; its exact source/build, gates,
-controls and resolved PEROLD timing flag remain in `target/perf-rhs-memo/final/`.
-The new reduced-cost cache is separate from the rejected main-factor BTRAN cache.
-Current source/build, output pairs, controls, ownership/kernel audits, full gates
-and regression follow-ups are in `target/perf-cost-memo/`. The unchanged fixed
-39-case PGO training uses online merge and 64-byte loop alignment:
+Current source/binary/build, kernel/ownership audits, diagnostic working-set
+measurement, both cache versions, complete screens, all gates, full benchmark
+and regression checks: `target/perf-rank-memo/`, qualified variant under `v2/`.
+The fixed 39-case PGO training still uses online merge and 64-byte loop alignment:
 `python3 -B perf/build_pgo.py --system-tcmalloc`.
-Profile SHA256 `bfbe6c70717f667fa1d304afbc132bed867465f935f3fc83a1aa1ceee1045d16`;
-CLI SHA256 `ddd297f0c9c4ce1f5dfe355f359a3b8f5cf14d8860511a85ba01e743099949d7`.
-Paired baseline CLI SHA256
-`70aca8180146534df5b014717b9803529fad986459203fb609b6de990f7d2e3d`.
+Profile SHA256 `a73428af24f77442dc0ac936febf854f6372d9c8ce9493e31fb7b98b2731c2ea`;
+CLI SHA256 `13eba41bca5463721d08e6a634d066449b3d2e5de5d224200ecad88472ebfb9b`.
+Paired predecessor CLI SHA256
+`ddd297f0c9c4ce1f5dfe355f359a3b8f5cf14d8860511a85ba01e743099949d7`.
 Frozen parity baselines and cached original-reference Runtime targets are unchanged.
 
 | run | ref solve | baseline wall | paired base wall | current wall | solve | current/ref | instr |
 |---|---|---|---|---|---|---|---|
-| degen2.primal-c | 0.012711 | 0.182 | 0.061 | 0.060 | 0.051358 | 4.04 | 264.4 |
-| degen2.dual-r | 0.009653 | 0.125 | 0.049 | 0.050 | 0.042564 | 4.41 | 202.9 |
-| degen3.primal-c | 0.163137 | 3.237 | 0.742 | 0.750 | 0.732791 | 4.49 | 3813.8 |
-| degen3.primal-r | 0.193685 | 3.872 | 0.836 | 0.870 | 0.852825 | 4.40 | 4278.3 |
-| perold.primal-c | 0.160994 | 2.430 | 0.763 | 0.769 | 0.760667 | 4.72 | 4332.0 |
-| pilot4.primal-r | 0.015787 | 0.253 | 0.086 | 0.085 | 0.075027 | 4.75 | 472.8 |
-| 80bau3b.primal-c | - | 1.618 | 0.949 | 0.957 | 0.933431 | - | 6154.2 |
-| primal_5959.primal-r | 0.067884 | 0.563 | 0.236 | 0.207 | 0.200615 | 2.96 | 1373.9 |
-| degen3.dual-c | 0.082843 | 1.002 | 0.392 | 0.410 | 0.389034 | 4.70 | 1826.5 |
-| degen3.dual-r | 0.082947 | 1.008 | 0.473 | 0.399 | 0.382503 | 4.61 | 1834.5 |
-| perold.dual-r | 0.038532 | 0.355 | 0.127 | 0.126 | 0.120302 | 3.12 | 1044.5 |
-| 80bau3b.dual-r | - | 1.103 | 0.312 | 0.311 | 0.295662 | - | 2470.1 |
-| greenbea.dual-c | - | 2.870 | 0.660 | 0.659 | 0.646123 | - | 4899.0 |
-| greenbea.dual-r | - | 3.598 | 0.652 | 0.653 | 0.640205 | - | 4838.0 |
-| mode_switch.dual-r | - | 25.815 | 1.265 | 1.823 | 1.884129 | - | 12067.0 |
-| primal_5959.dual-r | 0.098192 | 1.300 | 0.283 | 0.298 | 0.304413 | 3.10 | 1920.9 |
-| quad_2717.dual-r | 0.092814 | 1.130 | 0.378 | 0.378 | 0.370774 | 3.99 | 2060.0 |
-| fx_quad_obj_5371.dual-r | 0.038077 | 0.334 | 0.136 | 0.129 | 0.113665 | 2.99 | 791.9 |
-| degen3.barrier-r | 0.075214 | 0.608 | 0.322 | 0.326 | 0.263257 | 3.50 | 2574.0 |
-| 80bau3b.barrier-r | - | 0.379 | 0.327 | 0.328 | 0.295813 | - | 2647.9 |
-| greenbea.barrier-r | - | 1.569 | 1.169 | 1.151 | 1.105553 | - | 9939.1 |
-| 80bau3b.pdhg | - | 4.552 | 3.555 | 5.200 | 5.097977 | - | 74939.0 |
-| greenbea.pdhg | - | 2.801 | 1.584 | 2.191 | 2.213097 | - | 31947.0 |
+| degen2.primal-c | 0.012711 | 0.182 | 0.061 | 0.061 | 0.053592 | 4.22 | 264.4 |
+| degen2.dual-r | 0.009653 | 0.125 | 0.063 | 0.050 | 0.041736 | 4.32 | 202.9 |
+| degen3.primal-c | 0.163137 | 3.237 | 0.474 | 0.472 | 0.461165 | 2.83 | 3814.5 |
+| degen3.primal-r | 0.193685 | 3.872 | 0.542 | 0.540 | 0.529037 | 2.73 | 4277.9 |
+| perold.primal-c | 0.160994 | 2.430 | 0.492 | 0.491 | 0.483950 | 3.01 | 4334.5 |
+| pilot4.primal-r | 0.015787 | 0.253 | 0.054 | 0.054 | 0.047801 | 3.03 | 472.8 |
+| 80bau3b.primal-c | - | 1.618 | 0.614 | 0.614 | 0.599110 | - | 6155.0 |
+| primal_5959.primal-r | 0.067884 | 0.563 | 0.144 | 0.137 | 0.132099 | 1.95 | 1347.3 |
+| degen3.dual-c | 0.082843 | 1.002 | 0.247 | 0.302 | 0.289852 | 3.50 | 1826.5 |
+| degen3.dual-r | 0.082947 | 1.008 | 0.390 | 0.380 | 0.364285 | 4.39 | 1834.5 |
+| perold.dual-r | 0.038532 | 0.355 | 0.198 | 0.196 | 0.186548 | 4.84 | 1044.4 |
+| 80bau3b.dual-r | - | 1.103 | 0.512 | 0.480 | 0.457423 | - | 2470.1 |
+| greenbea.dual-c | - | 2.870 | 0.946 | 1.053 | 0.646165 | - | 4898.8 |
+| greenbea.dual-r | - | 3.598 | 1.019 | 0.993 | 0.974994 | - | 4837.9 |
+| mode_switch.dual-r | - | 25.815 | 1.943 | 1.983 | 1.253808 | - | 12065.9 |
+| primal_5959.dual-r | 0.098192 | 1.300 | 0.311 | 0.305 | 0.297783 | 3.03 | 1881.7 |
+| quad_2717.dual-r | 0.092814 | 1.130 | 0.384 | 0.357 | 0.349804 | 3.77 | 1976.7 |
+| fx_quad_obj_5371.dual-r | 0.038077 | 0.334 | 0.083 | 0.081 | 0.075614 | 1.99 | 768.2 |
+| degen3.barrier-r | 0.075214 | 0.608 | 0.222 | 0.223 | 0.180112 | 2.39 | 2573.9 |
+| 80bau3b.barrier-r | - | 0.379 | 0.228 | 0.228 | 0.205891 | - | 2647.7 |
+| greenbea.barrier-r | - | 1.569 | 0.783 | 0.785 | 0.752846 | - | 9938.5 |
+| 80bau3b.pdhg | - | 4.552 | 5.147 | 3.600 | 3.585864 | - | 74938.9 |
+| greenbea.pdhg | - | 2.801 | 2.699 | 2.236 | 2.220311 | - | 31947.0 |
 
 ## Hotspots
 
-Profiles below identify their saved solver/build and predate reduced-cost-result
-reuse and the current PGO build. Treat them as earlier attribution, not current
-cost bounds. Reproduce saved flags/features when consulting their annotations, and
-refresh attribution on a changed path before selecting another optimization.
+Profiles below identify their saved solver/build and predate current
+ranked-product reuse and PGO build. Treat them as earlier attribution, not current
+cost bounds. Reproduce saved flags/features when consulting their annotations,
+and refresh attribution on a changed path before selecting another optimization.
 
 Per profiled bench run: the commit it was taken at and the top self-time functions (percent), at most
 five lines each. Re-profile a run when a landed change touched its hot path.
@@ -155,7 +142,7 @@ five lines each. Re-profile a run when a landed change touched its hot path.
 
 ## In progress
 
-None. The qualified `ztrylnzw` source, CLI and PGO metadata are restored;
+None. The qualified `kpttrrms` source, CLI and PGO metadata are installed;
 the overall reference performance goal remains unmet.
 
 ## Extended BTRAN feasibility
@@ -287,7 +274,7 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 - Factor dependency walk: current accepted-release annotation samples repeated A/B length counts and the slot-maximum reduction (`target/perf-update-current/update.asm`). Count caching and maximum algebra have no established runtime gain; reusing the existing reverse row copy saves instructions but misses independent timing confirmation. All three implementations are restored and recorded below. Reprofile before another local variant rather than treating these medians as accepted improvements.
 - Ranked double products: both per-term filtering and maintained required-entry traversal are rejected below. The latter preserves coefficient/duplicate order across ordinary pivots and arbitrary basis differences, but its 32-pair screen has no established timing benefit despite fewer instructions. Do not assume that removing these unused outputs accounts for a comparable runtime share. Reprofile remaining primal control or factor-update costs before another representation variant; the independent cost-change caller still uses the full routine.
 - Other reachable runs follow their table ratios. Four compact extended factors and double structures remain cached; providers reuse exact RHS solve/estimate and pure fresh reduced-cost results. Main factors still clone mutable state; row-capacity growth already uses the numeric U transpose.
-- Quad_2717: the accepted-release refresh below identifies extended BTRAN, ranked products, primal control and the extended row update first. Ranked-product register retention and outlining are rejected below; factor-cache working set and extended reduced-cost pass are settled. Investigate exact repeated ranked-product inputs before another arithmetic rewrite.
+- Quad_2717: pure ranked-product result reuse is qualified above. The saved `ztrylnzw` profile predates it; refresh remaining extended BTRAN, primal row/control and software arithmetic before another kernel change. Ranked-product register retention/outlining remain rejected below; factor-cache working set and extended reduced-cost pass are settled.
 - Barrier: reprofile before choosing more matrix-product, assembly or triangular work. Eight-row/four-column broadcast sharing and four-row/eight-column load sharing have no established timing gains below; reprofile before another tile width or copy-mode change; the four-output copy Chain trial is timing-inconclusive below. Preserve every per-output reduction and block boundary. Four-row/four-column SIMD S tiles with scalar two-column tails and allocation-free row-tile selection are accepted above. The two-column-only vector trial has no established timing gain below. Local scatter row/slice hoisting is timing-inconclusive below; dense-LDL chunks have no established timing gain. Refresh attribution before another local variant. DTRSM dispatch is settled; reprofile remaining FMA callers before choosing another whole kernel.
 - Runs without reachable references, after the reachable ratios: mode-switch's pre-alignment profile above points to factor structure, the maximum reduction and post-update work. B-reference checks are already settled; reprofile and identify the maximum reduction's caller before choosing another change.
 - Allocation: the cached native caller sample attributes about 58% of allocation frequency to refactorization, 19% to iteration outside refactorization. Flat auxiliary LU storage and dual factor-input reuse reduce allocation calls without a timing gain and are rejected below. Current release instruction profiles put FTRAN/L and factor/update traversals ahead of more small buffer changes; allocator instruction ancestry remains unassigned. Native sampling dispatch and bindings are verified; the rejected CLI-local small-block cache remains below.
@@ -296,6 +283,8 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 - Dumps disabled: source audit of the simplex, dual, factor and PDHG hot paths finds JSON emission/serialization guarded by dump selection or an existing recording option; WORK estimates outside those guards remain solver inputs. The cached accepted-release PEROLD self report has no samples under the selected serde/dump/OnceLock symbol names, but inlined checks and preparation remain charged to callers. This is not an inclusive/total overhead bound or proof that all preparation is free. No dump optimization is justified by this screen; source anchors and the selected-symbol query are in `target/perf-dump-audit/`.
 
 ## Tried, no gain
+
+- Four-entry compact-owner extended ranked-product memo: exact sorted participating-row/value keys preserve the unchanged numerical kernel, but the bound thrashes the observed cycles. Release differential and fast parity 940/940 pass, and eight ADLITTLE/fx plus three Quad_2717 complete result/exit pairs agree. With the accepted parent PGO profile, instructions change +0.025/+0.558/+1.444% and cycle medians +0.045/+3.156/+5.365%, respectively. Stopped before own-PGO training or controlled screens. A test-only exact-key trace then measures 22/23 distinct inputs over 25,046/6,073 calls; this supports the separately qualified 32-entry implementation above. V1 source/binary/build context, tests, all results/counters and diagnostic trace: `target/perf-rank-memo/`; V2 qualification is isolated under `v2/`.
 
 - Prepack four A rows into contiguous four-lane records once per sequential-S DGEMM grid, replacing repeated strided scalar loads/shuffles with vector loads while retaining every existing FMA and C-update operation. The unchanged current four-column kernel is the independent oracle. A standalone probe passes 512 exact comparisons on captured AFIRO values, random finite representations, signed zeros, extremes and boundary K sizes. Both paths include output allocation; the candidate additionally includes allocation and construction of packed A on every call. After an initial 12M-term calibration (0.7–3.5ms samples), a fixed 100x workload with six alternating pairs per shape gives median changes 8x8x7 +4.97%, 16x16x32 +7.02%, 24x48x128 +2.17%, 48x48x192 +3.35%, 64x96x192 -3.37%, 128x128x192 +14.86%. The improving 64x96 grid routes through gemm_path2 in production, so it is not eligible for this nocopy-only mechanism. Synthetic grids use sequential-S tiles throughout and do not model full mixed-mode DGEMM; these timings are feasibility evidence, not solver gains. No integration or full solver gates. Solver source, qualified CLI and build remain unchanged. Frozen/generated kernels, captured-input provenance, both workload versions, raw timings and summary: `target/perf-gemm-packed-a/`.
 

@@ -1370,9 +1370,15 @@ struct CostResult {
     df: Vec<crate::f80::F80>,
 }
 
+struct RankResult {
+    key: Vec<(usize, u64, u16)>,
+    out: Vec<crate::f80::F80>,
+}
+
 struct RhsMemo {
     factor: crate::ftran_order::RefStruct<crate::f80::F80>,
     results: Vec<RhsResult>,
+    rank_results: Vec<RankResult>,
     work_results: Vec<(Vec<u64>, f64)>,
     #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
     cost_results: Vec<CostResult>,
@@ -1386,6 +1392,7 @@ impl QuadRhs {
             Self::Shared(std::sync::Arc::new(std::sync::Mutex::new(RhsMemo {
                 factor,
                 results: Vec::new(),
+                rank_results: Vec::new(),
                 work_results: Vec::new(),
                 #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
                 cost_results: Vec::new(),
@@ -1395,6 +1402,68 @@ impl QuadRhs {
         } else {
             Self::Direct(factor)
         }
+    }
+
+    /// Pure products depend on the ordered participating rows, their exact
+    /// values and this solver's immutable problem, independently of updates.
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    fn rank_products(
+        &mut self,
+        p: &Internal,
+        values: &[crate::f80::F80],
+        rank: &[usize],
+    ) -> Option<Vec<crate::f80::F80>> {
+        let Self::Shared(shared) = self else {
+            return None;
+        };
+        if crate::dump::any()
+            || p.m > 50
+            || p.n + p.m > 500
+            || values.len() != p.m
+            || rank.len() != p.m
+        {
+            return None;
+        }
+        let mut cw = 0u16;
+        // SAFETY: read two bytes without changing the floating-point mode.
+        unsafe {
+            std::arch::asm!("fnstcw [{cw}]", cw = in(reg) &mut cw,
+                options(nostack, preserves_flags));
+        }
+        if cw & 0x0f3f != 0x033f {
+            return None;
+        }
+        let mut order = [(usize::MAX, 0usize); 50];
+        let mut len = 0;
+        for (i, &r) in rank.iter().enumerate() {
+            if r != usize::MAX {
+                order[len] = (r, i);
+                len += 1;
+            }
+        }
+        order[..len].sort_unstable();
+        let mut buffer = [(0usize, 0u64, 0u16); 50];
+        for (j, &(_, i)) in order[..len].iter().enumerate() {
+            if values[i].is_nan() {
+                return None;
+            }
+            let (m, se) = values[i].repr();
+            buffer[j] = (i, m, se);
+        }
+        let key = &buffer[..len];
+        let mut memo = shared.lock().unwrap();
+        if let Some(entry) = memo.rank_results.iter().find(|e| e.key == key) {
+            return Some(entry.out.clone());
+        }
+        let out = p.rank_products_q(values, rank);
+        if memo.rank_results.len() == 32 {
+            memo.rank_results.remove(0);
+        }
+        memo.rank_results.push(RankResult {
+            key: key.to_vec(),
+            out: out.clone(),
+        });
+        Some(out)
     }
 
     /// Pure reduced-cost outputs for this solver's immutable problem. The
@@ -2838,6 +2907,17 @@ impl<'a> Solver<'a> {
                     rq[i] = v;
                 }
             }
+            #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+            if let Some(out) = self
+                .mirror_q
+                .as_mut()
+                .and_then(|rhs| rhs.rank_products(p, &rq, &rank))
+            {
+                out
+            } else {
+                p.rank_products_q(&rq, &rank)
+            }
+            #[cfg(not(all(target_arch = "x86_64", target_os = "linux")))]
             p.rank_products_q(&rq, &rank)
         });
         let subq = |s: &mut Self, j: usize, v: crate::f80::F80| {
@@ -8409,7 +8489,16 @@ fn solve_primal(
         });
         // The leaving variable takes part in the row update like any nonbasic: its row product is 1 up to rounding.
         let prods_q: Option<Vec<crate::f80::F80>> = match (rho_rank.as_ref(), rho_q.as_ref()) {
-            (Some(rank), Some(rq)) => Some(p.rank_products_q(rq, rank)),
+            (Some(rank), Some(rq)) => {
+                #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+                let cached = s
+                    .mirror_q
+                    .as_mut()
+                    .and_then(|rhs| rhs.rank_products(&p, rq, rank));
+                #[cfg(not(all(target_arch = "x86_64", target_os = "linux")))]
+                let cached: Option<Vec<crate::f80::F80>> = None;
+                Some(cached.unwrap_or_else(|| p.rank_products_q(rq, rank)))
+            }
             _ => None,
         };
         let prods: Option<Vec<f64>> = match prods_q.as_ref() {
@@ -10319,6 +10408,121 @@ mod rhs_memo_tests {
             assert!(!provider.reduced_costs(&p, &y, &pos, None, false, &mut d, &mut df));
             assert_eq!((bits(&d), qbits(&df)), before);
         }
+    }
+
+    #[test]
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    fn ranked_product_memo_exact_order_values_and_owner() {
+        struct Cw(u16);
+
+        impl Drop for Cw {
+            fn drop(&mut self) {
+                unsafe {
+                    std::arch::asm!("fldcw [{cw}]", cw=in(reg) &self.0, options(nostack));
+                }
+            }
+        }
+        let mut saved = 0u16;
+        let nearest = 0x037fu16;
+        unsafe {
+            std::arch::asm!("fnstcw [{old}]", "fldcw [{new}]",
+            old=in(reg) &mut saved, new=in(reg) &nearest, options(nostack));
+        }
+        let _guard = Cw(saved);
+        let model = crate::mps::parse(include_str!("../tests/fixtures/afiro.mps")).unwrap();
+        let p = build(&crate::scale::compute(&model).apply(&model).unwrap());
+        let (factor, _) = factor();
+        let mut provider = QuadRhs::new(factor.clone(), true);
+        let mut seed = 0x8ab3290f52u64;
+        let special = [
+            F80::ZERO,
+            -F80::ZERO,
+            F80::ONE,
+            -F80::ONE,
+            F80::from_repr(1, 0),
+            F80::from_repr(u64::MAX, 0x7ffe),
+            F80::from_repr(0x8000000000000001, 0x3fff),
+            F80::INFINITY,
+        ];
+        let fullbits = |v: Vec<F80>| {
+            v.into_iter()
+                .map(|x| (x.repr(), x.is_sign_negative()))
+                .collect::<Vec<_>>()
+        };
+        for round in 0..128 {
+            let values: Vec<_> = (0..p.m)
+                .map(|i| {
+                    seed ^= seed << 13;
+                    seed ^= seed >> 7;
+                    seed ^= seed << 17;
+                    if i % 3 == 0 {
+                        special[(i + round) % special.len()]
+                    } else {
+                        F80::from_repr(seed | 1 << 63, (0x3f00 + seed % 512) as u16)
+                    }
+                })
+                .collect();
+            let rank: Vec<_> = (0..p.m)
+                .map(|i| {
+                    if (i + round) % 3 == 0 {
+                        usize::MAX
+                    } else {
+                        (i + round) % 7
+                    }
+                })
+                .collect();
+            let expected = fullbits(p.rank_products_q(&values, &rank));
+            assert_eq!(
+                fullbits(provider.rank_products(&p, &values, &rank).unwrap()),
+                expected
+            );
+            assert_eq!(
+                fullbits(provider.clone().rank_products(&p, &values, &rank).unwrap()),
+                expected
+            );
+            // Rank magnitudes and unselected values are immaterial if order is identical.
+            let shifted: Vec<_> = rank
+                .iter()
+                .map(|&r| if r == usize::MAX { r } else { r * 2 + 1 })
+                .collect();
+            let ignored: Vec<_> = values
+                .iter()
+                .zip(&rank)
+                .map(|(&v, &r)| if r == usize::MAX { -F80::NAN } else { v })
+                .collect();
+            assert_eq!(
+                fullbits(provider.rank_products(&p, &ignored, &shifted).unwrap()),
+                expected
+            );
+            let reversed: Vec<_> = rank
+                .iter()
+                .map(|&r| if r == usize::MAX { r } else { 7 - r })
+                .collect();
+            assert_eq!(
+                fullbits(provider.rank_products(&p, &values, &reversed).unwrap()),
+                fullbits(p.rank_products_q(&values, &reversed))
+            );
+        }
+        let values = vec![F80::ONE; p.m];
+        let rank = vec![0; p.m];
+        let mut changed = values.clone();
+        changed[0] = F80::NAN;
+        assert!(provider.rank_products(&p, &changed, &rank).is_none());
+        assert!(provider
+            .rank_products(&p, &values[..p.m - 1], &rank)
+            .is_none());
+        let mut direct = QuadRhs::new(factor, false);
+        assert!(direct.rank_products(&p, &values, &rank).is_none());
+        for cw in [0x027fu16, 0x077f, 0x0b7f, 0x0f7f] {
+            unsafe {
+                std::arch::asm!("fldcw [{cw}]",cw=in(reg) &cw,options(nostack));
+            }
+            assert!(provider.rank_products(&p, &values, &rank).is_none());
+        }
+        let QuadRhs::Shared(shared) = provider else {
+            panic!()
+        };
+        assert_eq!(shared.lock().unwrap().rank_results.len(), 32);
     }
 
     #[test]

@@ -1,7 +1,7 @@
 # Factor production and ownership audit
 
 Ownership audit source: b421f8ab; guarded replay screen: d897aa91;
-compact RHS reuse: prxvqvrr; pure reduced-cost reuse: ztrylnzw.
+compact RHS reuse: prxvqvrr; pure reduced-cost reuse: ztrylnzw; pure ranked-product reuse: kpttrrms.
 Cost claims below identify their measured scope. Reusing producer U values in
 the consumer factor remains unproven;
 guarded elimination of overwritten replay arithmetic is feasible on tested
@@ -12,7 +12,7 @@ cases but has no established runtime benefit (below).
 | `lu_order::Structure` | Pivot order, phases, L rows/multipliers/raw entries, diagonal and partial U feed `RefStruct::fresh`; structure and incoming columns remain live for WORK and pricing installation. | Consuming the structure at the current fresh call would invalidate later consumers. Narrow ownership transfers need an installation payload first. |
 | `RefStruct::fresh` | Copies diagonal; remaps L destinations into flat forward storage and builds its transpose. Replays elimination for tail U, then overlays Markowitz entries. | Producer L row IDs and consumer step IDs differ. Moving nested producer vectors directly cannot replace the remap. Direct numerical U reuse requires intermediate equality evidence; guarded skipping of overwritten replay values is a separate case below. |
 | Primal `reference_order_for` | Returns the accepted growth-check mirror for installation (`simplex.rs`, `growth_factor`). Retried attempts book their own WORK. | Duplicate accepted growth-check construction is already eliminated. Do not count it as remaining savings. |
-| Primal `quad_mirrors` | Each compact cache entry retains a pure main-factor starting point and an isolated RHS provider. Main factors deep-clone before mutation; repeated RHS owners share the provider. Numeric-build diagnostics retain their two builds; uncacheable factors keep direct RHS ownership. | Duplicate ordinary construction and repeated compact RHS-factor cloning are eliminated. RHS results and pure WORK estimates have separate exact keys and four-entry bounds. Mutable main U/counters/scratch remain independent. |
+| Primal `quad_mirrors` | Each compact cache entry retains a pure main-factor starting point and an isolated RHS provider. Main factors deep-clone before mutation; repeated RHS owners share the provider. Numeric-build diagnostics retain their two builds; uncacheable factors keep direct RHS ownership. | Duplicate ordinary construction and repeated compact RHS-factor cloning are eliminated. RHS results, pure WORK estimates and reduced costs have separate exact keys and four-entry bounds; pure ranked products have a 32-entry bound. Mutable main U/counters/scratch remain independent. |
 | Auxiliary `Factor` | Constructed after mirror acceptance; used in primal fallback, cleanup, dual deferred-free pricing and stall-objective evaluation. Update counts also participate in controller decisions. Construction failure can restart primal or return singular basis in dual. | Deletion or laziness requires preserving both numerical consumers and the original failure point. Matching pivot rows is insufficient. |
 | Incoming basis columns | `reference_order_for` splits immutable `p.fcols` into owned row/value arrays on each cache miss. Retained for structure construction, fresh replay and WORK. | Borrowed column views could remove copying without changing arithmetic; audit all factor interfaces and cache ownership before changing the input type. |
 
@@ -183,6 +183,36 @@ in STATE.md. This establishes the local gain, not the overall reference goal.
 Source/binary/build, kernel/ownership proof and all qualification data:
 `target/perf-cost-memo/`.
 
+## Compact ranked-product reuse
+
+Each shared compact provider belongs to one Solver whose problem and row-wise
+coefficient arrays are immutable. Pure extended ranked-product vectors can be
+reused across main-factor updates: the kernel reads only that problem and its
+ordered participating input rows/values. The key preserves sorted `(rank,row)`
+row order and full extended value bits, including signed zero. Rank magnitudes
+and unselected values do not reach arithmetic and are omitted. Selected NaNs,
+dumps, unsupported native control modes, malformed sizes and larger problems
+keep the original path. Both consumers keep all WORK calls in place; numerical
+kernels are source-identical and mutable factor state is neither read nor replayed.
+
+The bound is 32 FIFO entries per existing provider. A test-only working-set
+measurement shows only 22/23 exact inputs over 25,046/6,073 eligible calls on
+Quad_2717/fx; the first four-entry version thrashes and regresses. Diagnostic
+tracing is removed before frozen source/tests and official timing screens.
+The final release test covers ties/order changes, exact low bits/signed zeros,
+extremes/infinity, ignored values, clones, control-mode fallback and eviction.
+
+At `kpttrrms`, full parity is 987/987, all 246 release tests pass and all 23
+complete no-dump result/exit pairs agree. Two predeclared controlled Quad_2717
+screens improve solve by 7.52/8.51%, each with all 32 pairs improving and full
+noise/significance criteria passing. Instructions fall 4.04%. The full sweep's
+two timing flags have fixed follow-ups and one reversed-role control each;
+neither establishes regression. STATE.md retains exact statistics and current
+snapshot ratios. Source/binary/build, ownership/kernel audit, both variants,
+working-set measurement and all qualification data: `target/perf-rank-memo/`,
+qualified variant under `v2/`. This establishes a local gain, not the overall
+reference performance goal or safety of numerical producer-U reuse.
+
 ## Nucleus coordinate workspace screen
 
 The constructor repeatedly searches immutable pivot L/U vectors for a coefficient.
@@ -231,5 +261,5 @@ Before a factor ownership prototype, separate column-copy and immutable-factor
 allocation costs, and inventory auxiliary
 reads between refactorizations. Replay numerical producer/consumer values only
 through the standard dump/comparison tools; stop at the first mismatch. Retain
-existing arithmetic and WORK booking for the first ownership experiment. No
-solver change or speedup is claimed by this audit.
+existing arithmetic and WORK booking for the first ownership experiment. The accepted pure-result reuse above does not establish numerical producer-U
+identity or safety of broader factor sharing.
