@@ -195,10 +195,11 @@ measured.
   per-iteration or per-element loop, and whether any record is built before the `on` test.
 - **Allocation**: current two-period frame-pointer ancestry puts roughly 45–47%
   of PEROLD allocator self samples under refactorization and 29–30% under iteration.
-  Direct nucleus input construction is rejected at counters. Chain-maintenance
-  counts do not yet justify an intrusive-list rewrite. Test extracting the dense
-  handoff from the 31KB nucleus function, preserving every operation and WORK site;
-  check accepted-release code size/stack and matching-PGO counters before timing.
+  Direct nucleus input construction and dense-handoff extraction are rejected at
+  counters. Chain-maintenance counts do not yet justify an intrusive-list rewrite.
+  Inspect priority-queue work in factor updates/FTRAN before choosing another
+  representation: establish sampled cost, immutable key ordering and duplicate
+  semantics first. Numeric-LU step queues were tested separately and rejected.
   Inspect the allocating callee: an observed ancestor return address can skip it.
   Profiling-build shares do not bound accepted release cost.
 - **Barrier** (`chol.rs`, `barrier.rs`, `sgemm32.rs`) and **PDHG** (`pdhg.rs`): profile after the simplex

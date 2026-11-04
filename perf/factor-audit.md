@@ -433,6 +433,19 @@ changes need direct release verification before timing claims.
 Evidence: `target/perf-nucleus-chains/`, with source annotation in
 `target/perf-alloc-ancestry/perold-fp.nucleus.asm`.
 
+## Dense nucleus handoff extraction
+
+The dense handoff was extracted into a non-inlined helper with identical source
+statements except the boolean success return. Reconstructing the original kernel
+matches normalized source exactly; numeric kernels and WORK are untouched.
+Matching-PGO frozen dense-LU tests and fast parity pass, and all bounded complete
+results agree. Ordinary nucleus code shrinks from 31,086 to 26,157 bytes and its
+stack allocation from 1,736 to 1,496 bytes; the new helper absorbs dense LU.
+PEROLD instructions fall only 0.023%, cycles rise 0.041%. This fails the initial
+useful-counter gate: no controlled timing/full gates follow, and all accepted
+artifacts are restored. Code size/stack reduction alone does not establish a gain.
+Evidence: `target/perf-nucleus-outline/`.
+
 ## Remaining proof obligations
 
 Before a factor ownership prototype, separate column-copy and immutable-factor
