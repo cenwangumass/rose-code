@@ -395,6 +395,19 @@ observed ancestry includes nucleus/structure, fresh installation, FTRAN/L and
 controller/refactor work; inspect the allocating callee before proposing reuse.
 Evidence and runnable analyzers: `target/perf-alloc-ancestry/`.
 
+## Direct nucleus input construction
+
+A complete prototype eliminates filtered temporary numeric columns by building
+nodes directly, converting in original forward order and reversing node segments
+to preserve node IDs/chains exactly. The original numerical kernel and WORK body
+are source-identical. Frozen producer/initializer checks match complete state
+across 1,024 f64/F80 families, and matching-PGO tests/fast parity pass. Bounded
+complete results also match. PEROLD instructions fall only 0.16%, while cycle
+median rises 1.21%; small-model instruction reductions are also below 0.2%.
+The trial stops at initial counters without controlled screens or full gates.
+Qualified source/CLI/build are restored; no input-allocation change is accepted.
+Evidence: `target/perf-nucleus-input/`.
+
 ## Remaining proof obligations
 
 Before a factor ownership prototype, separate column-copy and immutable-factor
