@@ -878,11 +878,55 @@ initialization/operation timings, assembly, builds, tests and results/counters:
 `target/perf-f80-two-word/option-layout.*`,
 `target/perf-f80-two-word/optional-layout-audit.json`.
 
+## Auxiliary-factor constructor input reuse
+
+Auxiliary-factor exact-input reuse is measured across isolated bounded solves.
+AFIRO, SC50A, BLEND, ADLITTLE, BORE3D and DEGEN2 primal/dual each have no repeated
+keys (4–13 calls per case); PILOT4 primal has 17 distinct calls and PEROLD dual 27.
+Compact fx_quad (cap 5500) has 1786 calls/25 unique keys; Quad (cap 17000) has 3024/18.
+An eight-entry FIFO hits 1760/3006, versus four-entry 1758/3000; every hit succeeds.
+Keys retain m, all ordered columns/row indices/value bits including duplicates
+and signed zeros, floor bits, and None/Some prescribed rows. Complete CLI result
+objects agree with the accepted binary for all 16 cases. Test-only capture hooks
+reverse exactly to the accepted source; no new reference comparison is claimed.
+
+Original construction versus deep-copy fixed 8-pair CPU-4 probes give ratios
+0.142/0.198 on fx/Quad. Full eight-entry key lookup, miss insertion and factor
+copy cost 0.261/0.262 times reconstruction, with every stream output checked against
+the unchanged constructor. PGO flags match the accepted source; libtcmalloc is
+explicitly retained like the CLI. These isolated component timings include the
+inactive test-only capture check and are feasibility evidence, not solver gains.
+Source mutation audit shows that fresh numeric fields remain read-only; only
+etas and nnz_eta change through updates. Immutable-base sharing is unimplemented.
+All input streams, costs, simulations, allocator linkage, exact source proof,
+complete results, bounded timings and probe code: `target/perf-aux-inputs/`.
+
+The matching fixed 39-PGO integration caches eight fresh auxiliary constructor
+results per thread for m<=50, returning deep owned clones with independent eta
+updates. Dumps, nonfinite inputs, large matrices and alternate/unmasked/flush
+FP environments retain the original constructor. No arithmetic, caller failure
+point or WORK changes. An independent full original LU oracle passes all eight
+LU tests (four new), covering full captured streams, key/boundary/failure cases,
+random constructors, owned dense/sparse updates, FTRAN/BTRAN continuations and
+all 16 MXCSR modes. All six FTRAN/L tests, fast 940 parity and bounded complete
+result/exit pairs pass. fx instructions/cycles fall 3.162/1.910%; Quad 1.464/5.062%.
+
+Fixed 32-AB/32-AA CPU-4 fx screen 30217 is inconclusive: median -4.682%, conservative
+CI [-6.989,-2.210], 26/32 improving pairs, sign p 0.000268, order medians -4.941/-4.682%.
+AA is healthy (CI [-1.539,+2.338], p 1.0), but conservative separation fails.
+No 30289 confirmation, sample extension or full candidate gates. The candidate
+remains unapplied; no speedup is accepted. Exact candidate/frozen oracle, captured
+fixture, original source, source/build freeze, tests, counters, screen and
+restoration: `target/perf-aux-cache/`.
+
 ## Remaining proof obligations
 
-Before a factor ownership prototype, separate column-copy and immutable-factor
-allocation costs, and inventory auxiliary
-reads between refactorizations. Replay numerical producer/consumer values only
-through the standard dump/comparison tools; stop at the first mismatch. Retain
-existing arithmetic and WORK booking for the first ownership experiment. The accepted pure-result reuse above does not establish numerical producer-U
-identity or safety of broader factor sharing.
+Fresh auxiliary Factor numeric fields are immutable after construction; only
+eta updates and their nnz counter change. Deep-copy constructor reuse is verified
+but its fixed solver screen is inconclusive; do not extend it. Immutable-base
+sharing would need separate ownership, allocation and numeric/WORK proofs.
+Before a whole mutable-factor solve cache, audit every FTRAN/BTRAN dependency,
+version invalidation path, snapshot/order and lazy-cache effect. Replay numerical
+producer/consumer values only through the standard dump/comparison tools; stop
+at the first mismatch. Existing pure-result reuse does not establish numerical
+producer-U identity or safety of broader factor sharing.

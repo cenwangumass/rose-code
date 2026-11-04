@@ -229,13 +229,18 @@ measured.
   Matching-PGO fx/Quad instructions/cycles show no useful gain; stopped before
   timing seeds 29217/29289. Both layouts remain unapplied. Do not infer solver
   gains from ABI, optional sizes or isolated arithmetic/initialization probes.
-  Next audit exact auxiliary Factor-construction inputs (ordered column bits,
-  floor/prescribed rows) and full FTRAN/BTRAN state dependencies. Measure repeated
-  inputs per immutable matrix version across bounded compact solves before any
-  whole-result cache. Clone must retain a version identity; every attempted
-  matrix mutation invalidates it, including failures. Preserve numeric, WORK,
-  snapshot/order and lazy-cache effects; factor-template copies must own their
-  mutable updates. Start with cached call/cost evidence and small models.
+  Exact auxiliary-constructor streams show no repeats on the ordinary small
+  witnesses or bounded PILOT4/PEROLD, but eight entries capture 1760/3006 fx/Quad
+  repeats. Full key/lookup/copy feasibility is favorable; matching-PGO integration
+  reduces target instructions. Fixed fx screen 30217 remains inconclusive under
+  conservative AA separation; do not repeat or extend it. Deep-copy cache remains
+  unapplied. Fresh auxiliary numeric fields are read-only after construction;
+  immutable-base ownership sharing would be a distinct, unimplemented experiment.
+  Next audit full FTRAN/BTRAN state dependencies and measure exact repeated
+  inputs per immutable matrix version across bounded compact solves. Clone must
+  retain a version identity; every attempted matrix mutation invalidates it,
+  including failures. Preserve numeric, WORK, snapshot/order and lazy-cache
+  effects. Start with cached call/cost evidence and small models.
   Producer/consumer U identity is still unproven: use nontrivial SC50A dual k1,
   repair the old cached LUIN endpoint schema through current bounded refcap,
   and capture producer/pre-overlay values before bypassing replay arithmetic.
