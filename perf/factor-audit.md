@@ -183,6 +183,20 @@ in STATE.md. This establishes the local gain, not the overall reference goal.
 Source/binary/build, kernel/ownership proof and all qualification data:
 `target/perf-cost-memo/`.
 
+## Nucleus coordinate workspace screen
+
+The constructor repeatedly searches immutable pivot L/U vectors for a coefficient.
+Temporary position arrays can preserve the first occurrence of duplicate keys;
+clearing each pivot's touched coordinates makes the row array reusable for terminal
+dense assembly. That assembly keeps last-write row positions, matching its old
+HashMap. Node visits, matrix stores, arithmetic and WORK order remain unchanged.
+Both tested variants preserve fast parity and bounded complete outputs; the final
+shared workspace reduces PILOT4 instructions 1.46%, but its fixed timing screen
+fails the declared significance/noise separation rules. The source and qualified
+CLI are restored; there is no accepted speedup from this workspace. Exact evidence
+and the sparse-only/final variant distinction are recorded in STATE.md and
+`target/perf-nucleus-index/`.
+
 ## Guarded fresh replay screen
 
 A strictly lower L cannot propagate a nucleus destination back into a singleton
