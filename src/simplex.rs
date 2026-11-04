@@ -1346,11 +1346,123 @@ fn flip_to_upper(p: &Internal, b: &mut Basis) {
     }
 }
 
-/// A fresh compact quad factor, before either owner mutates it. The solver's matrix and dimensions are immutable.
+/// The RHS factor has one consumer and never receives column updates. Shared
+/// providers belong to one exact compact-factor cache entry; main factors remain
+/// independently owned. The returned values are the only RHS state the solver reads.
+#[derive(Clone)]
+enum QuadRhs {
+    Direct(crate::ftran_order::RefStruct<crate::f80::F80>),
+    Shared(std::sync::Arc<std::sync::Mutex<RhsMemo>>),
+}
+
+struct RhsResult {
+    key: Vec<(usize, u64, u16)>,
+    out: Vec<(usize, crate::f80::F80)>,
+}
+
+struct RhsMemo {
+    factor: crate::ftran_order::RefStruct<crate::f80::F80>,
+    results: Vec<RhsResult>,
+    work_results: Vec<(Vec<u64>, f64)>,
+}
+
+impl QuadRhs {
+    fn new(factor: crate::ftran_order::RefStruct<crate::f80::F80>, cache: bool) -> Self {
+        if cache {
+            Self::Shared(std::sync::Arc::new(std::sync::Mutex::new(RhsMemo {
+                factor,
+                results: Vec::new(),
+                work_results: Vec::new(),
+            })))
+        } else {
+            Self::Direct(factor)
+        }
+    }
+
+    /// The main fresh factor and RHS factor have identical numerics. Cache
+    /// the pure dense-work estimate separately because its input is double
+    /// precision while the actual RHS solve may retain extended perturbations.
+    fn dense_work(&mut self, rhs: &[f64]) -> Option<f64> {
+        let Self::Shared(shared) = self else {
+            return None;
+        };
+        if crate::dump::any() || rhs.len() > 50 {
+            return None;
+        }
+        let mut memo = shared.lock().unwrap();
+        if memo.factor.kinds().len() != rhs.len() {
+            return None;
+        }
+        if let Some((_, work)) = memo.work_results.iter().find(|(key, _)| {
+            key.len() == rhs.len() && key.iter().zip(rhs).all(|(&a, &b)| a == b.to_bits())
+        }) {
+            return Some(*work);
+        }
+        let bq: Vec<_> = rhs.iter().map(|&x| crate::f80::F80::from_f64(x)).collect();
+        let work = memo.factor.ftran_dense_work(&bq);
+        if memo.work_results.len() == 4 {
+            memo.work_results.remove(0);
+        }
+        memo.work_results
+            .push((rhs.iter().map(|v| v.to_bits()).collect(), work));
+        Some(work)
+    }
+
+    fn ftran_basic(
+        &mut self,
+        rows: &[usize],
+        vals: &[crate::f80::F80],
+    ) -> Vec<(usize, crate::f80::F80)> {
+        let Self::Shared(shared) = self else {
+            let Self::Direct(factor) = self else {
+                unreachable!()
+            };
+            return factor.ftran_basic(rows, vals);
+        };
+        let mut memo = shared.lock().unwrap();
+        // Diagnostics need the live solve's internal stages. The numerical
+        // routine is left intact and the provider owns all its mutable state.
+        if crate::dump::any()
+            || rows.len() != vals.len()
+            || rows.len() > 100
+            || vals.iter().any(|v| v.is_nan())
+        {
+            return memo.factor.ftran_basic(rows, vals);
+        }
+        let mut buffer = [std::mem::MaybeUninit::<(usize, u64, u16)>::uninit(); 100];
+        for (i, (&r, &v)) in rows.iter().zip(vals).enumerate() {
+            let (m, se) = v.repr();
+            buffer[i].write((r, m, se));
+        }
+        // SAFETY: the entire borrowed prefix was initialized above, lengths
+        // agree and are bounded by buffer.len(); key fields are all Copy.
+        let key = unsafe {
+            std::slice::from_raw_parts(buffer.as_ptr().cast::<(usize, u64, u16)>(), rows.len())
+        };
+        if let Some(entry) = memo.results.iter().find(|e| e.key == key) {
+            return entry.out.clone();
+        }
+        let out = memo.factor.ftran_basic(rows, vals);
+        if out.len() <= 100 {
+            if memo.results.len() == 4 {
+                memo.results.remove(0);
+            }
+            memo.results.push(RhsResult {
+                key: key.to_vec(),
+                out: out.clone(),
+            });
+        }
+        out
+    }
+}
+
+/// A compact factor's immutable starting point and isolated RHS provider.
+/// The solver's matrix and dimensions are immutable.
 struct QuadFactorCache {
     rows: Vec<(bool, Vec<usize>, Vec<f64>)>,
     threshold: u64,
     factor: crate::ftran_order::RefStruct<crate::f80::F80>,
+    rhs: QuadRhs,
 }
 
 impl QuadFactorCache {
@@ -1477,7 +1589,7 @@ struct Solver<'a> {
     /// Mirror of the reference's FTRAN structure (`faithful_ftran`).
     mirror: Option<Mir>,
     /// The same factor in extended precision, kept after a quad pass (`Handoff::quad`): the basic solution is read from it.
-    mirror_q: Option<crate::ftran_order::RefStruct<crate::f80::F80>>,
+    mirror_q: Option<QuadRhs>,
     /// Four fresh factors for repeated compact bases, keyed by exact ordered input columns and threshold.
     quad_cache: Vec<QuadFactorCache>,
     /// Four double structures for the same compact repeated quad bases.
@@ -1835,16 +1947,14 @@ impl<'a> Solver<'a> {
         )
     }
 
-    /// Independent extended-precision twins of the current basis, built with the double build's gate state.
+    /// Main extended factor and isolated RHS provider for the current basis,
+    /// built with the double build's gate state.
     fn quad_mirrors(
         &mut self,
         gate0: (i64, i64),
         fac_no: usize,
         rows: &[(bool, Vec<usize>, Vec<f64>)],
-    ) -> (
-        crate::ftran_order::RefStruct<crate::f80::F80>,
-        crate::ftran_order::RefStruct<crate::f80::F80>,
-    ) {
+    ) -> (QuadRhs, crate::ftran_order::RefStruct<crate::f80::F80>) {
         let diagnostic = ["ROSE_GATE_LOG", "ROSE_DENSE_INFO", "ROSE_DENSE_DUMP"]
             .iter()
             .any(|name| std::env::var_os(name).is_some());
@@ -1861,9 +1971,7 @@ impl<'a> Solver<'a> {
             {
                 // The preceding double build already left DENSE_N = 0; retain the current factor number.
                 crate::lu_order::set_factorization_number(fac_no);
-                let first = entry.factor.clone();
-                let second = first.clone();
-                return (first, second);
+                return (entry.rhs.clone(), entry.factor.clone());
             }
         }
         let build = || {
@@ -1885,6 +1993,7 @@ impl<'a> Solver<'a> {
             stq.repeat_dumps();
             first.clone()
         };
+        let rhs = QuadRhs::new(first, cacheable);
         if cacheable {
             if self.quad_cache.len() == 4 {
                 self.quad_cache.remove(0);
@@ -1892,10 +2001,11 @@ impl<'a> Solver<'a> {
             self.quad_cache.push(QuadFactorCache {
                 rows: rows.to_vec(),
                 threshold,
-                factor: first.clone(),
+                factor: second.clone(),
+                rhs: rhs.clone(),
             });
         }
-        (first, second)
+        (rhs, second)
     }
 
     /// The in-place repair of a singular basis (see `refactor`): `st` is the failed factorization's structure.
@@ -2978,7 +3088,12 @@ impl<'a> Solver<'a> {
                     *ri -= sh;
                 }
             }
-            let est = mi.ftran_dense_work(&r0);
+            let cached = if mi.is_q() && mi.updates() == 0 {
+                self.mirror_q.as_mut().and_then(|rhs| rhs.dense_work(&r0))
+            } else {
+                None
+            };
+            let est = cached.unwrap_or_else(|| mi.ftran_dense_work(&r0));
             self.work
                 .add_from(0x1219d6, 0x120673, est, crate::work::FAC);
         }
@@ -9902,5 +10017,207 @@ mod primal_row_update_tests {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod rhs_memo_tests {
+    use super::*;
+    use crate::f80::F80;
+
+    type Columns = Vec<(bool, Vec<usize>, Vec<f64>)>;
+
+    fn factor() -> (crate::ftran_order::RefStruct<F80>, Columns) {
+        let model = crate::mps::parse(include_str!("../tests/fixtures/afiro.mps")).unwrap();
+        let m = model.num_rows();
+        let mut cols: Columns = (0..m).map(|i| (true, vec![i], vec![1.0])).collect();
+        for j in 0..model.num_cols() {
+            let pos = j % m;
+            let entries: Vec<_> = model.col(j).collect();
+            let old = std::mem::replace(
+                &mut cols[pos],
+                (
+                    false,
+                    entries.iter().map(|e| e.0).collect(),
+                    entries.iter().map(|e| e.1).collect(),
+                ),
+            );
+            if crate::lu_order::factor_structure_r::<F80>(m, &cols)
+                .pivots
+                .len()
+                != m
+            {
+                cols[pos] = old;
+            }
+        }
+        let st = crate::lu_order::factor_structure_r::<F80>(m, &cols);
+        (
+            crate::ftran_order::RefStruct::fresh(m, model.num_cols(), &st, &cols),
+            cols,
+        )
+    }
+
+    fn bits(v: Vec<(usize, F80)>) -> Vec<(usize, (u64, u16))> {
+        v.into_iter().map(|(i, v)| (i, v.repr())).collect()
+    }
+
+    #[test]
+    fn rhs_memo_matches_original_solve_across_clones_and_history() {
+        fn send<T: Send>() {}
+        send::<QuadRhs>();
+        let (mut old, _) = factor();
+        let m = old.kinds().len();
+        let mut provider = QuadRhs::new(old.clone(), true);
+        let values = [
+            F80::ZERO,
+            -F80::ZERO,
+            F80::ONE,
+            -F80::ONE,
+            F80::from_f64(1e-13),
+            F80::from_repr(0x8000000000000001, 0x3fff),
+            F80::from_repr(1, 0),
+            F80::INFINITY,
+            F80::NAN,
+        ];
+        let mut cases = vec![(Vec::new(), Vec::new())];
+        for (k, &v) in values.iter().enumerate() {
+            cases.push((
+                vec![k % m, k % m, (k + 1) % m],
+                vec![v, F80::ONE, -F80::ONE],
+            ));
+        }
+        cases.push((
+            (0..m).collect(),
+            (0..m).map(|i| F80::from_f64((i + 1) as f64)).collect(),
+        ));
+        for (rows, vals) in &cases {
+            let expected = bits(old.ftran_basic(rows, vals));
+            assert_eq!(bits(provider.ftran_basic(rows, vals)), expected);
+            // The sibling shares only the provider, not the main factor. A
+            // hit skips the solve; a later miss must still equal the old path.
+            let mut sibling = provider.clone();
+            assert_eq!(bits(sibling.ftran_basic(rows, vals)), expected);
+            assert_eq!(bits(provider.ftran_basic(rows, vals)), expected);
+        }
+        let QuadRhs::Shared(shared) = &provider else {
+            panic!()
+        };
+        let shared = shared.clone();
+        let len = shared.lock().unwrap().results.len();
+        assert!(len > 0 && len <= 4);
+        for k in 1..12 {
+            let rows = [0];
+            let vals = [F80::from_f64(k as f64)];
+            assert_eq!(
+                bits(provider.ftran_basic(&rows, &vals)),
+                bits(old.ftran_basic(&rows, &vals))
+            );
+        }
+        assert_eq!(shared.lock().unwrap().results.len(), 4);
+    }
+
+    #[test]
+    fn rhs_memo_random_inputs_and_stack_boundaries() {
+        let (mut old, _) = factor();
+        let m = old.kinds().len();
+        let mut memo = QuadRhs::new(old.clone(), true);
+        let mut seed = 0x1485bb963u64;
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        for n in [0, 1, 2, 27, 49, 99, 100, 101] {
+            for _ in 0..4 {
+                let rows: Vec<_> = (0..n).map(|_| next() as usize % m).collect();
+                let values: Vec<_> = (0..n)
+                    .map(|_| {
+                        let mant = next() | 1 << 63;
+                        let se = 0x3ff0 + (next() % 32) as u16
+                            | if next() % 2 == 0 { 0x8000 } else { 0 };
+                        F80::from_repr(mant, se)
+                    })
+                    .collect();
+                let expected = bits(old.ftran_basic(&rows, &values));
+                assert_eq!(bits(memo.ftran_basic(&rows, &values)), expected);
+                assert_eq!(bits(memo.clone().ftran_basic(&rows, &values)), expected);
+            }
+        }
+    }
+
+    #[test]
+    fn rhs_memo_dense_work_keeps_original_bits_and_input_precision() {
+        let (old, _) = factor();
+        let m = old.kinds().len();
+        let mut memo = QuadRhs::new(old.clone(), true);
+        let mut direct = QuadRhs::new(old.clone(), false);
+        let special = [
+            0.0,
+            -0.0,
+            1.0,
+            -1.0,
+            f64::from_bits(1),
+            1e-13,
+            1e100,
+            f64::INFINITY,
+            f64::NAN,
+        ];
+        for k in 0..special.len() {
+            let rhs: Vec<_> = (0..m).map(|i| special[(i + k) % special.len()]).collect();
+            let bq: Vec<_> = rhs.iter().map(|&v| F80::from_f64(v)).collect();
+            let expected = old.ftran_dense_work(&bq).to_bits();
+            assert_eq!(memo.dense_work(&rhs).unwrap().to_bits(), expected);
+            assert_eq!(memo.clone().dense_work(&rhs).unwrap().to_bits(), expected);
+            assert!(direct.dense_work(&rhs).is_none());
+            // RHS-solve history does not change the estimate's immutable inputs.
+            memo.ftran_basic(&[0], &[F80::from_repr(0x8000000000000001, 0x3fff)]);
+            assert_eq!(memo.dense_work(&rhs).unwrap().to_bits(), expected);
+        }
+        let QuadRhs::Shared(shared) = memo else {
+            panic!()
+        };
+        assert_eq!(shared.lock().unwrap().work_results.len(), 4);
+    }
+
+    #[test]
+    fn rhs_memo_keeps_factors_independent_and_fallbacks_exact() {
+        let (mut old, cols) = factor();
+        let m = old.kinds().len();
+        let mut provider = QuadRhs::new(old.clone(), true);
+        let mut direct = QuadRhs::new(old.clone(), false);
+        let mut main = old.clone();
+        let rows = [0];
+        let vals = [F80::ONE];
+        let expected = bits(old.ftran_basic(&rows, &vals));
+        assert_eq!(bits(provider.ftran_basic(&rows, &vals)), expected);
+        let doubled: Vec<_> = cols[0].2.iter().map(|&v| F80::from_f64(2.0 * v)).collect();
+        let structure = crate::lu_order::factor_structure_r::<F80>(m, &cols);
+        let position = structure.pivots.iter().position(|&(_, c)| c == 0).unwrap();
+        main.ftran(&cols[0].1, &doubled);
+        main.update(position);
+        assert!(main.updates() > 0);
+        assert_eq!(bits(provider.ftran_basic(&rows, &vals)), expected);
+        assert_eq!(bits(direct.ftran_basic(&rows, &vals)), expected);
+        // Oversized, mismatched and NaN inputs retain the original solver path.
+        let long_rows = vec![0; 101];
+        let long_vals = vec![F80::ONE; 101];
+        for (r, v) in [
+            (long_rows.as_slice(), long_vals.as_slice()),
+            (&[0, 1][..], &[F80::ONE][..]),
+            (&[m - 1][..], &[F80::NAN][..]),
+        ] {
+            assert_eq!(
+                bits(provider.ftran_basic(r, v)),
+                bits(old.ftran_basic(r, v))
+            );
+        }
+        let (other, _) = factor();
+        let mut separate = QuadRhs::new(other, true);
+        let (QuadRhs::Shared(a), QuadRhs::Shared(b)) = (&provider, &separate) else {
+            panic!()
+        };
+        assert!(!std::sync::Arc::ptr_eq(a, b));
+        assert_eq!(bits(separate.ftran_basic(&rows, &vals)), expected);
     }
 }

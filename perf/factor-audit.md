@@ -1,7 +1,7 @@
 # Factor production and ownership audit
 
-Ownership audit source: b421f8ab; guarded replay screen: accepted d897aa91.
-This is a source/lifetime audit, not a measurement of attainable speedup. Direct numerical reuse remains unproven;
+Ownership audit source: b421f8ab; guarded replay screen: d897aa91;
+compact RHS reuse: prxvqvrr. Cost claims below identify their measured scope. Direct numerical reuse remains unproven;
 guarded elimination of overwritten replay arithmetic is feasible on tested
 cases but has no established runtime benefit (below).
 
@@ -10,7 +10,7 @@ cases but has no established runtime benefit (below).
 | `lu_order::Structure` | Pivot order, phases, L rows/multipliers/raw entries, diagonal and partial U feed `RefStruct::fresh`; structure and incoming columns remain live for WORK and pricing installation. | Consuming the structure at the current fresh call would invalidate later consumers. Narrow ownership transfers need an installation payload first. |
 | `RefStruct::fresh` | Copies diagonal; remaps L destinations into flat forward storage and builds its transpose. Replays elimination for tail U, then overlays Markowitz entries. | Producer L row IDs and consumer step IDs differ. Moving nested producer vectors directly cannot replace the remap. Direct numerical U reuse requires intermediate equality evidence; guarded skipping of overwritten replay values is a separate case below. |
 | Primal `reference_order_for` | Returns the accepted growth-check mirror for installation (`simplex.rs`, `growth_factor`). Retried attempts book their own WORK. | Duplicate accepted growth-check construction is already eliminated. Do not count it as remaining savings. |
-| Primal `quad_mirrors` | One fresh extended factor is deep-cloned for the second twin; diagnostic mode retains two builds. A four-entry small-model cache also clones factors. | Duplicate ordinary twin numerical construction is already eliminated. Sharing immutable L/permutation/transpose storage is still a candidate; mutable U, counters, scratch, spikes and cells must stay independent. |
+| Primal `quad_mirrors` | Each compact cache entry retains a pure main-factor starting point and an isolated RHS provider. Main factors deep-clone before mutation; repeated RHS owners share the provider. Numeric-build diagnostics retain their two builds; uncacheable factors keep direct RHS ownership. | Duplicate ordinary construction and repeated compact RHS-factor cloning are eliminated. RHS results and pure WORK estimates have separate exact keys and four-entry bounds. Mutable main U/counters/scratch remain independent. |
 | Auxiliary `Factor` | Constructed after mirror acceptance; used in primal fallback, cleanup, dual deferred-free pricing and stall-objective evaluation. Update counts also participate in controller decisions. Construction failure can restart primal or return singular basis in dual. | Deletion or laziness requires preserving both numerical consumers and the original failure point. Matching pivot rows is insufficient. |
 | Incoming basis columns | `reference_order_for` splits immutable `p.fcols` into owned row/value arrays on each cache miss. Retained for structure construction, fresh replay and WORK. | Borrowed column views could remove copying without changing arithmetic; audit all factor interfaces and cache ownership before changing the input type. |
 
@@ -120,20 +120,43 @@ This isolates immutable forward storage; mutable-U cloning is still present.
 The Rc prototype was not retained, including its change to Send compatibility.
 Evidence is in STATE.md and `target/perf-sharefactor/`.
 
-The RHS twin has only one consumer, `recompute_primal`, guarded by zero main
-factor updates. A prototype removed the ordinary second factor and ran the
-unchanged force-dense RHS solve on the main factor, moving aside and restoring
-all touched solve/accounting state. Diagnostic mode retained both original
-builds and factors. The main numerical factor remained unchanged. Differential
-checks against an independent twin passed for f64/F80 with prior solve history,
-full result bits, retained state and repeated/extreme inputs; fast parity passed
-940/940. Instructions fell 2.15% on fx_quad_obj_5371 and 1.17% on Quad_2717,
-but a predeclared randomized Quad screen reported +0.47% median time, interval
-[-0.77%, +1.73%], and no gain. The prototype was rejected and the accepted
-source/CLI/PGO metadata restored. Thus isolated borrowing is numerically feasible
-on tested cases but has not established a runtime benefit; the fresh-factor
-cache's main copy and the RHS routine's temporary work remain present. Exact
-artifacts and bounds are in STATE.md.
+## Compact RHS reuse
+
+`mirror_q` has one solver consumer, `recompute_primal`, which reads returned
+solve/estimate values and never updates that factor. Compact factor-cache entries
+now retain an isolated `QuadRhs` provider. Sharing it avoids the RHS deep clone
+on repeated basis hits; the main factor remains independently owned. Each provider
+retains a separate RHS factor plus at most four extended-input/result pairs and
+four double-input/scalar WORK estimates. Retained storage increases by one RHS
+factor per compact cache entry; the existing four-factor, fewer-than-50-row gate
+bounds the scope.
+
+The result key preserves ordered row indices, duplicates, signed zeros and every
+extended significand bit. The estimate key preserves the original double RHS
+bits, because extended perturbations can make the actual solve's RHS differ.
+WORK booking stays at its original call site and order. Provider factors never
+receive column updates; their numerical FTRAN/work-estimate routines are unchanged.
+NaN, oversized or mismatched solve inputs use the old path. Dumps execute live
+numerics so all internal stage records remain available. Larger and diagnostic
+builds retain direct RHS ownership.
+
+Independent comparisons use an AFIRO mixed basis, finite random full-low-bit
+values, signed zeros, subnormals, nonfinites, repeated/duplicate/empty inputs,
+clone histories, independent main updates, bounded eviction and input lengths
+0, 1, 2, 27, 49, 99, 100 and 101. Exact output and estimate bits agree; Send
+compatibility is retained. Full parity passes 987/987, all 37 release groups pass,
+and all 23 complete no-dump benchmark result/exit pairs agree. Two independent
+predeclared primal_5959 primal screens improve median solve by 7.31/4.79% and
+meet every control rule. Instructions fall 10.90% there, 11.39% on its dual,
+3.98% on Quad_2717 and 8.88% on fx_quad_obj_5371. These are within-session
+measurements, not a claim that Rose meets all original-reference targets.
+
+The earlier isolated RHS-twin borrowing experiment restored every touched main
+factor field, passed its tested numerical cases and fast parity, but had no
+established runtime benefit. It did not reuse returned solves or scalar estimates.
+Its rejection remains in STATE.md; it is distinct from the accepted provider.
+Qualified source/build, raw controls/results, full gates, regression checks and
+implementation audit: `target/perf-rhs-memo/final/`.
 
 ## Guarded fresh replay screen
 
