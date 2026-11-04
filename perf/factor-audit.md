@@ -715,7 +715,7 @@ qualified runtime benefit. Source/proofs/builds/tests, ownership/mutation
 checks, complete counters/results and screen: `target/perf-diag-preinverse/`
 with `v2/` and `v3/`.
 
-Current accepted ordinary-primal PILOT4 profiling (ADLITTLE/DEGEN2 first) gives
+Pre-packed-predicate accepted ordinary-primal PILOT4 profiling (ADLITTLE/DEGEN2 first) gives
 13.92/10.49/8.37/8.17% whole-batch self shares to solve_primal/BTRAN/FTRAN/row
 update, respectively. All16 solves are optimal690 iterations/16 refactors.
 Period4M has1983 samples, no loss/throttle,99.69% instruction coverage;95
@@ -724,6 +724,38 @@ solve_primal is an inferred source attribution. This is current native self
 cost, not allocator ancestry or proof that a scatter rewrite pays off. Existing
 rank-row storage/active-row/rank-order failures still apply. Exact commands,
 results/hash/build/count/audit and annotations: `target/perf-primal-refresh/`.
+
+## Packed ordinary whole-row drop scan
+
+Qualified `sozuzvuv` keeps the original row body and caller WORK but supplies
+ascending indices from an allocation-free packed predicate for ordinary,
+precomputed arrays of at least128 outputs. Integer magnitude bits x are mapped
+with B=3-(T mod4), where T is positive-normal drop-tolerance bits. Since T+B is
+the last point of its four-value bucket, floor((x+B)/4)>floor((T+B)/4) exactly
+when x>T. OR2^62 is disjoint from the shifted range and maps it into positive
+normal doubles. This keeps NaNs and introduces no invalid/denormal exception,
+even for ignored signaling NaNs or subnormals. Original basic-slack `>` and
+nonbasic `<=` handling stays in the body; finite dropped entries made no writes.
+Short, extended and absent/short-product-array calls retain the range iterator.
+
+Current whole body and full-source reversal are exact after undoing iteration/
+wrapper edits. Full-state tests include captured AFIRO, wide/empty/random/
+duplicate/extreme/partial-extended cases;2095552 predicate checks cover16 MXCSR
+modes and unmasked traps. Matching fixed39 PGO/TCMalloc lowers DEGEN2 controlled
+instructions/cycles3.59/3.17%. Screens36217/36289 qualify with median gains
+3.242/4.510%, healthy AA, conservative separation and both-order improvement.
+Full987 parity, all255 release tests (37 groups,22 default ignored), formatting
+and all23 complete benchmark result/exit pairs pass. The three conservative extra
+reversed-role controls have healthy AA and establish no regression; no extension
+or repeat. The baseline mode-switch output-quota failure is preserved; only that
+unmeasured case and later cases resume with workspace TMPDIR. Full solve-time
+comparisons exclude output writes. Accepted source and screened CLI stay frozen.
+
+Complete source/body/mapping proof, captures, diagnostic component limits,
+matching build/tests/screens, all benchmark pairs/follow-ups/controls and quota
+recovery: `target/perf-row-mask/`, subdirectory `solver/`.
+CLI SHA256 `db2bff5ae64aab9068f47ac2ee5b0395a6103916262df1760c18ffcfc36dcb89`;
+profile SHA256 `b549084be3fb4e0937cab94702f2951818b2c8fb393dbc4f827377a0575eabc0`.
 
 ## Maintained eligible ranked-row traversal
 
@@ -795,7 +827,7 @@ matching build/tests/freezes/results/counters/screen/restoration:
 
 ## Ordinary ranked-row packed traversal
 
-Current native primal annotation motivates a separate kernel experiment from
+Saved pre-packed-predicate native primal annotation motivates a separate kernel experiment from
 previous compact-row storage, active-row filtering and rank-order reuse trials.
 Fixed-pair consecutive coverage is86/209 on ADLITTLE,379/770 on BORE3D,177/2122
 on DEGEN2 and1539/2647 on PILOT4. This is static matrix coverage, not dynamic
@@ -847,7 +879,7 @@ without PGO is feasibility evidence, not solver qualification or a general bound
 No cache is integrated. Complete oracle/probe/compiler/inputs/raw data:
 `target/perf-rank-plan-probe/`.
 
-Current accepted row annotation again shows short scalar dots and the Devex
+Saved pre-packed-predicate row annotation shows short scalar dots and the Devex
 recurrence/norm/floor region; the long lane path remains cold in this sample.
 Specializing only the ordinary positive finite floor passes2,097,696 primitive
 comparisons over all16 MXCSR modes, the original complete-row oracle, fast940

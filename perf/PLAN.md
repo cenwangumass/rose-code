@@ -289,13 +289,18 @@ measured.
   Original-scatter accumulator bounds elision passes the complete original
   oracle, memory-invariant proof, matching PGO and fast940. Its fixed screen35217
   is inconclusive with biased AA; do not repeat/extend it or run35289.
-  Next measure the current ordinary whole-row update's drop/eligibility density
-  before selecting a larger control change. The scalar precomputed-product
-  prefilter is already rejected; do not repeat it. Any proposed packed predicate
-  scan must first show component savings including index construction, preserve
-  NaN routing and ascending column order, and compare complete mutable row state
-  against the independent original kernel. Use cached SC50A/DEGEN2/PILOT4 products
-  first; current self shares are not removable bounds.
+  Packed ordinary whole-row drop scanning is qualified: raw-bit bias/shift
+  mapping makes positive-normal surrogate comparisons exact and exception-safe;
+  ascending filtered indices retain the original body. Short (<128 columns),
+  extended and nonprecomputed cases keep the range loop. Matching fixed39 PGO,
+  full987, all255 release tests and both DEGEN2-controlled screens36217/36289
+  pass; all23 full result/exit pairs and the three extra regression controls
+  qualify. No screen/control is extended or repeated.
+  Refresh ordinary row/control instruction attribution on this accepted build
+  before another kernel choice; previous shares are pre-change observations.
+  Retained Devex dots/recurrence and factor-production/installation ownership
+  remain leads to measure. The scalar prefilter and prior rank/layout trials
+  remain rejected; do not infer further gains from isolated predicate costs.
   Comparator alignment stays centralized; normal lunum's build/cache transport
   still needs an explicit no-build/schema-current source option for direct reuse.
   Look for a faster exact implementation of the same rounding (the F80 tests and `../reverse-engineer/evidence/f80-subnormal-reference.json`

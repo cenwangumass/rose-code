@@ -9978,8 +9978,258 @@ fn frozen_primal_row_update(
 
 // The double entry requires absent qw and prods_q. The caller dispatches once;
 // the mixed entry retains all recovery and extended-twin presence combinations.
-#[inline(never)]
+/// Keeps x when !(abs(x) <= ROW_DROP_TOL), including both quiet/signaling NaNs.
+/// The integer mapping sends every input to a positive normal double before
+/// comparison, so scanning skipped columns introduces no FP exceptions.
+struct RowMaskIndices<'a> {
+    values: &'a [f64],
+    next: usize,
+    base: usize,
+    mask: u8,
+}
+
+impl<'a> RowMaskIndices<'a> {
+    fn new(values: &'a [f64]) -> Self {
+        Self {
+            values,
+            next: 0,
+            base: 0,
+            mask: 0,
+        }
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+fn row_mask8(v: &[f64]) -> u8 {
+    use std::arch::x86_64::*;
+    debug_assert!(v.len() >= 8);
+    const T: u64 = ROW_DROP_TOL.to_bits();
+    const B: u64 = 3 - (T & 3);
+    const BASE: u64 = 1 << 62;
+    // For nonnegative magnitude bits x, T+B is the final integer in its
+    // four-value bucket. Thus ((x+B)>>2) > ((T+B)>>2) iff x>T.
+    // Its range is <=2^61, disjoint from BASE; OR BASE maps it monotonically
+    // into finite normal IEEE values (exponents 0x400 through 0x600).
+    unsafe {
+        let abs = _mm_set1_epi64x(i64::MAX);
+        let bias = _mm_set1_epi64x(B as i64);
+        let base = _mm_set1_epi64x(BASE as i64);
+        let threshold = _mm_set1_pd(f64::from_bits(((T + B) >> 2) | BASE));
+        let mut mask = 0;
+        for k in 0..4 {
+            let bits = _mm_and_si128(_mm_loadu_si128(v.as_ptr().add(2 * k).cast()), abs);
+            let mapped = _mm_or_si128(_mm_srli_epi64::<2>(_mm_add_epi64(bits, bias)), base);
+            mask |= (_mm_movemask_pd(_mm_cmpgt_pd(_mm_castsi128_pd(mapped), threshold)) as u8)
+                << (2 * k);
+        }
+        mask
+    }
+}
+
+impl Iterator for RowMaskIndices<'_> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<usize> {
+        loop {
+            if self.mask != 0 {
+                let bit = self.mask.trailing_zeros() as usize;
+                self.mask &= self.mask - 1;
+                return Some(self.base + bit);
+            }
+            if self.next == self.values.len() {
+                return None;
+            }
+            self.base = self.next;
+            #[cfg(target_arch = "x86_64")]
+            if self.values.len() - self.next >= 8 {
+                self.mask = row_mask8(&self.values[self.next..]);
+                self.next += 8;
+                continue;
+            }
+            // Integer classification has the same NaN-inclusive predicate as the
+            // mapped packed comparison, without altering the floating environment.
+            self.next += 1;
+            if self.values[self.base].to_bits() & i64::MAX as u64 > ROW_DROP_TOL.to_bits() {
+                return Some(self.base);
+            }
+        }
+    }
+}
+
 fn primal_row_update<const QUAD: bool>(
+    s: PrimalRowState<'_>,
+    arg: &PrimalRowInput<'_>,
+) -> (bool, Vec<usize>, Vec<(usize, f64)>) {
+    let nm = arg.p.n + arg.p.m;
+    // Short rows retain the range loop; their iterator setup does not amortize.
+    if !QUAD && nm >= 128 {
+        if let Some(values) = arg.prods.and_then(|v| v.get(..nm)) {
+            return primal_row_update_by::<false, _>(s, arg, RowMaskIndices::new(values));
+        }
+    }
+    primal_row_update_by::<QUAD, _>(s, arg, 0..nm)
+}
+
+#[inline(never)]
+fn primal_row_update_by<const QUAD: bool, I: Iterator<Item = usize>>(
+    mut s: PrimalRowState<'_>,
+    arg: &PrimalRowInput<'_>,
+    indices: I,
+) -> (bool, Vec<usize>, Vec<(usize, f64)>) {
+    let PrimalRowInput {
+        p,
+        q,
+        leave,
+        m2,
+        has_mirror,
+        faithful_weights,
+        prods,
+        prods_q,
+        rho,
+        u,
+        qw,
+        cross: devex_cross,
+        theta_d,
+        alpha_rq,
+        wq,
+        theta_dq,
+    } = *arg;
+    // The double entry has no extended state. Keep the mixed entry for every
+    // other presence combination, including partial recovery contexts.
+    let (qw, prods_q, devex_cross, theta_dq) = if QUAD {
+        (qw, prods_q, devex_cross, theta_dq)
+    } else {
+        (None, None, None, None)
+    };
+    let (n, m) = (p.n, p.m);
+    let col_off = &p.offs;
+    let dval = |s: &PrimalRowState<'_>, j: usize| -> crate::f80::F80 {
+        if s.df[j].to_f64() == s.d[j] {
+            s.df[j]
+        } else {
+            crate::f80::F80::from_f64(s.d[j])
+        }
+    };
+    let dsub = |s: &mut PrimalRowState<'_>, j: usize, prod: crate::f80::F80| {
+        if let Some(th) = theta_dq {
+            let nd = dval(s, j) - th * prod;
+            s.df[j] = nd;
+            s.d[j] = nd.to_f64();
+            true
+        } else {
+            false
+        }
+    };
+    let mut norm_reset = false;
+    let mut changed: Vec<usize> = Vec::new();
+    let mut rowvals: Vec<(usize, f64)> = Vec::new();
+    for j in indices {
+        if j >= n && j != q && j != leave && s.pos_of[j] != NONE && has_mirror {
+            let arj = match prods.as_ref() {
+                Some(pr) => pr[j],
+                None => dot(&p.cols[j], &rho),
+            };
+            if arj.abs() > ROW_DROP_TOL {
+                if !s.fixed[j] {
+                    if !prods_q.as_ref().is_some_and(|pq| dsub(&mut s, j, pq[j])) {
+                        s.d[j] -= theta_d * arj;
+                    }
+                }
+                // Mode 2 gives the basic slack's noise product the weight update too, which puts it into the reference framework
+                // (`w > 0`), GREENBEA iteration 6094: a product below the update tolerance leaves `w = 1`.
+                if m2 {
+                    s.w[j] = s.w[j].max(((wq / alpha_rq) / alpha_rq) * arj * arj + 1.0);
+                }
+                // The reference keeps a basic slack's rounding-noise row product in the pivot row like any entry.
+                changed.push(j);
+                rowvals.push((j, arj));
+            }
+            continue;
+        }
+        if s.pos_of[j] != NONE || j == q || s.excluded == Some(j) {
+            // The dropped variable is outside the reference's row copy: its d and weight are not updated (fx_midsing_1496 pricing call 19).
+            continue;
+        }
+        let arj = match prods.as_ref() {
+            Some(pr) => pr[j],
+            None => dot(&p.cols[j], &rho),
+        };
+        // The reference's row product keeps the entries above its drop tolerance (`0x134d90`).
+        if arj.abs() <= ROW_DROP_TOL {
+            continue;
+        }
+        // The Devex update has its own, larger drop tolerance (`0x103d0d`); d and the list keep the row product's.
+        if m2 {
+            // Mode 2 (`0x104c2d`): `w_j = max(w_j, wq / alpha^2 * arj^2 + 1)`, no cross term.
+            if arj.abs() > WEIGHT_DROP_TOL {
+                if let (Some((a_rq, wq_q)), Some(pq)) = (qw, prods_q.as_ref()) {
+                    // 0x257f98 and 0x25809d keep the divisions and row update in x87 precision.
+                    use crate::real::Real;
+                    let nw = ((wq_q / a_rq) / a_rq) * pq[j] * pq[j] + crate::f80::F80::ONE;
+                    if s.wf.len() != s.w.len() {
+                        *s.wf = vec![crate::f80::F80::ZERO; s.w.len()];
+                    }
+                    let old = if s.wf[j].to_f64() == s.w[j] {
+                        s.wf[j]
+                    } else {
+                        crate::f80::F80::c(s.w[j])
+                    };
+                    if nw > old {
+                        s.wf[j] = nw;
+                        s.w[j] = nw.to_f64();
+                    }
+                } else {
+                    s.w[j] = s.w[j].max(((wq / alpha_rq) / alpha_rq) * arj * arj + 1.0);
+                }
+            }
+        } else if arj.abs() > WEIGHT_DROP_TOL {
+            if let (Some((a_rq, wq_q)), Some(cross), Some(pq)) =
+                (qw, devex_cross.as_ref(), prods_q.as_ref())
+            {
+                use crate::real::Real;
+                let ratio = pq[j] / a_rq;
+                let vj = cross.dot(&p.fcols[j]);
+                if s.wf.len() != s.w.len() {
+                    *s.wf = vec![crate::f80::F80::ZERO; s.w.len()];
+                }
+                let old = if s.wf[j].to_f64() == s.w[j] {
+                    s.wf[j]
+                } else {
+                    crate::f80::F80::c(s.w[j])
+                };
+                let nw = ratio * (wq_q * ratio - crate::f80::F80::c(2.0) * vj) + old;
+                s.wf[j] = nw;
+                s.w[j] = nw.to_f64();
+            } else {
+                let ratio = arj / alpha_rq;
+                let vj = dot_lanes(&p.fcols[j], &u, col_off[j] & 1);
+                s.w[j] = ratio * ((wq * ratio - vj) - vj) + s.w[j];
+            }
+            // A fixed structural never resets the framework (PILOT.JA iteration 3856: the fixed EMROP06 went to -3e4); a fixed
+            // slack does (PEROLD iteration 1626, PILOTNOV iteration 1026).
+            if faithful_weights && s.w[j] < NORM_RESET_TOL && !(j < n && s.fixed[j]) {
+                norm_reset = true;
+            }
+            let floor = if faithful_weights { W_MIN } else { 1.0 };
+            s.w[j] = s.w[j].max(floor);
+        }
+        if !s.fixed[j] {
+            // The reference sums the row product in the order of the BTRAN output list.
+            if !prods_q.as_ref().is_some_and(|pq| dsub(&mut s, j, pq[j])) {
+                s.d[j] -= theta_d * arj;
+            }
+        }
+        // The variable dropped from a singular start basis is not in the reference's row copy, so not in its pivot row.
+        if s.excluded != Some(j) {
+            changed.push(j);
+            rowvals.push((j, arj));
+        }
+    }
+    (norm_reset, changed, rowvals)
+}
+
+#[cfg(test)]
+fn frozen_packed_row<const QUAD: bool>(
     mut s: PrimalRowState<'_>,
     arg: &PrimalRowInput<'_>,
 ) -> (bool, Vec<usize>, Vec<(usize, f64)>) {
@@ -10350,6 +10600,34 @@ mod primal_row_update_tests {
     ) {
         let (mut old, mut new) = (b.clone(), b.clone());
         let expected = frozen_primal_row_update(view(&mut old, pos, fixed, excluded), arg);
+        let mut exact = b.clone();
+        let exact_out = if arg.qw.is_none() && arg.prods_q.is_none() {
+            frozen_packed_row::<false>(view(&mut exact, pos, fixed, excluded), arg)
+        } else {
+            frozen_packed_row::<true>(view(&mut exact, pos, fixed, excluded), arg)
+        };
+        assert_eq!(
+            old.w.iter().map(|v| v.to_bits()).collect::<Vec<_>>(),
+            exact.w.iter().map(|v| v.to_bits()).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            old.d.iter().map(|v| v.to_bits()).collect::<Vec<_>>(),
+            exact.d.iter().map(|v| v.to_bits()).collect::<Vec<_>>()
+        );
+        assert_eq!(expected.0, exact_out.0);
+        assert_eq!(expected.1, exact_out.1);
+        assert_eq!(
+            expected
+                .2
+                .iter()
+                .map(|&(i, v)| (i, v.to_bits()))
+                .collect::<Vec<_>>(),
+            exact_out
+                .2
+                .iter()
+                .map(|&(i, v)| (i, v.to_bits()))
+                .collect::<Vec<_>>()
+        );
         let got = if arg.qw.is_none() && arg.prods_q.is_none() {
             primal_row_update::<false>(view(&mut new, pos, fixed, excluded), arg)
         } else {
@@ -10485,7 +10763,18 @@ mod primal_row_update_tests {
             seed ^= seed << 17;
             seed
         };
-        for (n, m) in [(0, 0), (0, 1), (1, 0), (1, 1), (3, 2), (8, 7)] {
+        for (n, m) in [
+            (0, 0),
+            (0, 1),
+            (1, 0),
+            (1, 1),
+            (3, 2),
+            (8, 7),
+            (65, 64),
+            (129, 0),
+            (0, 128),
+            (128, 1),
+        ] {
             p.n = n;
             p.m = m;
             let nm = n + m;
@@ -11203,5 +11492,96 @@ mod devex_delta_tests {
             run!();
             assert_eq!((memo.hits, memo.misses), counts);
         }
+    }
+}
+
+#[cfg(all(test, target_arch = "x86_64"))]
+mod row_mask_predicate_tests {
+    use super::*;
+
+    struct Mode(u32);
+
+    impl Mode {
+        fn set(mx: u32) -> Self {
+            let mut old = 0;
+            unsafe {
+                std::arch::asm!("stmxcsr [{p}]",p=in(reg)&mut old,options(nostack,preserves_flags));
+                std::arch::asm!("ldmxcsr [{p}]",p=in(reg)&mx,options(nostack,preserves_flags));
+            }
+            Self(old)
+        }
+    }
+
+    impl Drop for Mode {
+        fn drop(&mut self) {
+            unsafe {
+                std::arch::asm!("ldmxcsr [{p}]",p=in(reg)&self.0,options(nostack,preserves_flags));
+            }
+        }
+    }
+
+    #[test]
+    fn packed_predicate_modes_and_unmasked_exceptions() {
+        let mut seed = 0x739f123456789abu64;
+        fn next(s: &mut u64) -> u64 {
+            *s ^= *s << 13;
+            *s ^= *s >> 7;
+            *s ^= *s << 17;
+            *s
+        }
+        let mut checks = 0;
+        for rounding in 0..4 {
+            for flush in [0, 0x40, 0x8000, 0x8040] {
+                let _mode = Mode::set(0x1f80 | rounding << 13 | flush);
+                for trial in 0..8192 {
+                    let mut v: Vec<_> = (0..32)
+                        .map(|i| {
+                            let x = next(&mut seed);
+                            let mag = if trial % 4 == 0 {
+                                ROW_DROP_TOL.to_bits().wrapping_add(x % 65).wrapping_sub(32)
+                            } else {
+                                match i % 16 {
+                                    0 => 0,
+                                    1 => 1,
+                                    2 => u64::MAX >> 1,
+                                    3 => 0x7ff0000000000001,
+                                    4 => 0x7ff8000000000123,
+                                    _ => x & i64::MAX as u64,
+                                }
+                            };
+                            f64::from_bits(mag | (x & 1) << 63)
+                        })
+                        .collect();
+                    v.truncate(trial % 33);
+                    let want: Vec<_> = v
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, x)| (!(x.abs() <= ROW_DROP_TOL)).then_some(i))
+                        .collect();
+                    assert_eq!(want, RowMaskIndices::new(&v).collect::<Vec<_>>());
+                    checks += v.len();
+                }
+            }
+        }
+        // With invalid/denormal traps unmasked, integer input loads and positive-normal
+        // surrogate comparisons remain safe even when the skipped data are exceptional.
+        {
+            let _mode = Mode::set(0x1e00);
+            let v = [
+                f64::from_bits(1),
+                f64::MIN_POSITIVE,
+                f64::from_bits(0x7ff0000000000001),
+                f64::NAN,
+                0.,
+                -0.,
+                1.,
+                -1.,
+            ];
+            assert_eq!(
+                RowMaskIndices::new(&v).collect::<Vec<_>>(),
+                vec![2, 3, 6, 7]
+            );
+        }
+        println!("predicate_checks={checks} modes=16 unmasked_invalid_denormal=pass");
     }
 }
