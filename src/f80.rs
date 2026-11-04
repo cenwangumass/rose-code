@@ -1118,6 +1118,7 @@ mod double_bits_tests {
     use super::*;
 
     fn check(x: F80) {
+        let x = std::hint::black_box(x);
         assert_eq!(x.to_f64().to_bits(), x.frozen_to_f64().to_bits(), "{x:?}");
     }
 
