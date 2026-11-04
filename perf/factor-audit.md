@@ -338,14 +338,18 @@ Two column-only storage prototypes reuse the output bitmap instead of cloning
 `x_col`. V1's nonzero-only marker revisits zeros in the fallback output scan.
 The final marker distinguishes unvisited/visited-zero/visited-nonzero, preserving
 the original visitation test while exposing the exact nonzero predicate. Both
-preserve fast parity and complete bounded outputs, but accepted-parent-profile
-instructions still rise about 1% on PEROLD/PILOT4. The final PEROLD cycle median
-is +0.39%, PILOT4 +1.69%; neither qualifies for new PGO/controlled timing or full
-gates. Source/CLI/build are restored, and the storage lead is closed. The proof
-of consumed predicates remains valid; it does not imply profitable compaction.
+preserve fast parity and complete bounded outputs. The final implementation's
+preceding-profile instruction increase is about 1% on PEROLD/PILOT4. Its unchanged
+source/tests are subsequently verified once with matching fixed39-case PGO,
+following the level-queue experiment's demonstrated profile effect. Final own-PGO
+PEROLD instructions still rise 0.07%, cycles fall 0.51%; PILOT4 instructions rise
+0.076%. This fails the predeclared instruction gate, so no controlled timing or
+full gates follow. Qualified source/CLI/build are restored, and no storage variant
+is accepted. Predicate equivalence remains verified; profitable compaction does
+not follow from it.
 Numeric snapshot/copy costs are not isolated by the full FTRAN self shares.
 Source proofs, independent oracles and both complete screens:
-`target/perf-f2-colflags/`; the source dependency inventory remains in
+`target/perf-f2-colflags/` and `target/perf-f2-colflags-pgo/`; the source dependency inventory remains in
 `target/perf-f2-workspace/f2-consumer-audit.json`.
 
 ## Remaining proof obligations

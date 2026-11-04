@@ -193,6 +193,11 @@ measured.
 - **Dump overhead with no dump selected**: about 70 `dump::on("kind")` sites in `dual.rs` and
   `simplex.rs`. Each call scans the selected kinds by string; check whether any of them sits in a
   per-iteration or per-element loop, and whether any record is built before the `on` test.
+- **Rounded ranked products**: the compact provider caches pure extended product
+  vectors, but the primal iteration still converts the full returned vector to doubles
+  on each hit. Audit the two consumers and test caching those exact conversion bits
+  alongside the extended result. Keep original conversion/kernel paths and native-mode
+  guards; quantify the conversion cost before claiming a gain.
 - **Allocation**: `Vec` creation per iteration or per FTRAN/BTRAN call; reuse buffers held in the solver
   state (clear only the touched entries).
 - **Barrier** (`chol.rs`, `barrier.rs`, `sgemm32.rs`) and **PDHG** (`pdhg.rs`): profile after the simplex
