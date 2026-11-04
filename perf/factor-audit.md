@@ -6,7 +6,8 @@ Cost claims below identify their measured scope. General numerical identity
 between producer U and consumer replay is false: the minimal dense handoff
 witness differs by one ULP. Guarded elimination of overwritten replay work is
 a separate data-flow question; its arithmetic-only trial has no established
-runtime benefit. Contiguous-suffix graph pruning remains unimplemented.
+runtime benefit. Contiguous-suffix graph pruning is numerically verified but
+timing-inconclusive and unapplied; accepted source/build are restored.
 
 | Producer | Consumers and lifetime | Consequence |
 |---|---|---|
@@ -866,10 +867,27 @@ Observed sparse-prefix coverage marks 254/878 columns, 933/2210 structural graph
 visits and 502/671 executed update products in covered suffixes. The nine-column
 dense counterexample prefix marks 8 columns, 2080/2130 graph visits and 120/120
 update products. These are unweighted observation/structural counts, not saved
-time or a qualified speedup; guard/setup costs are unmeasured. The prior guarded
-arithmetic-only shortcut kept graph reach/sorting/materialization and failed its
-screen; do not repeat it. Graph pruning needs its own independent full-constructor
-oracle, fallback proof and matching-PGO cost/qualification tests.
+time or a qualified speedup. The arithmetic-only shortcut and the complete
+contiguous-suffix graph-pruning trial both remain unapplied; neither timing
+screen establishes a speedup. Do not repeat or extend either screen.
+
+The graph-pruning trial preserves original merge/retention/order and WORK, using
+strictly lower L and a last-write, above-tolerance suffix certificate. Its frozen
+complete constructor matches every field and raw f64/F80 value on 26 cached
+small factors per precision, randomized/extreme/nonfinite/duplicate cases,
+nontriangular fallbacks, the dense51 mismatch and all 16 SSE modes. All ten
+FTRAN/L tests and fast940 parity pass under matching fixed39 PGO/TCMalloc.
+Eight bounded ADLITTLE/BORE3D/DEGEN2 and three PILOT4/PEROLD result/exit pairs
+agree. PILOT4 instructions/cycles change -1.068/-0.700%; PEROLD -0.494/-1.108%.
+The predeclared PILOT4 primal-release screen (CPU4, cap800, seed32217,
+32AB+32AA) gives median -0.189%, CI [-2.199%, +1.965%], 17/32 improving,
+sign p .430; order medians +1.105/-0.318%. Healthy AA spans
+[-1.380%, +0.641%], p .597. Gain/sign/order/noise separation fail: stop without
+seed32289, extension or full candidate gates. Source, accepted CLI/metadata and
+profile are restored exactly; restored formatting, fast940/full987 and all
+254 release tests pass (22 default ignored). Candidate/frozen oracle, raw-field
+proof, build/freezes, counters, complete results, timing and restoration:
+`target/perf-suffix-replay/`.
 
 Original arithmetic/control/WORK reverses byte-for-byte after removing three
 test-only observer hooks and raw-bit accessors. All probes are removed; accepted

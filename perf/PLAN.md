@@ -255,18 +255,20 @@ measured.
   SC50A k1 supplied subset matches, as do 880 small/DEGEN2 supplied values, but a
   deterministic 51x51 dense handoff differs by one ULP before the mandatory
   overwrite. Do not treat sparse matches as a global proof or bypass the overlay.
-  Next test a separate strictly-lower-L dependency cut: a contiguous suffix whose
-  every final value is supplied above tolerance can be discarded without feeding
-  an earlier output. Measure graph pruning as well as arithmetic removal, keeping
-  merge/retention/order, WORK and all original fallback behavior. Existing sparse
-  counts cover 254/878 columns and 933/2210 graph visits; they are not runtime gains.
-  Protect the complete original constructor first, including the dense mismatch,
-  missing/tiny/duplicate producer values and nontriangular/extreme fallbacks.
-  Use matching fixed39 PGO and bounded small-model counters before official timing;
-  do not repeat the earlier arithmetic-only guarded-replay screen. Further
-  reference capture is unnecessary for this dependency-cut question. Comparator
-  alignment stays centralized; normal lunum's build/cache transport still needs
-  an explicit no-build/schema-current source option for direct reuse.
+  The strictly-lower-L contiguous-suffix dependency cut is now numerically
+  verified with an independent complete constructor, dense mismatch, last-write
+  duplicates/extremes/fallbacks and all SSE modes. Matching fixed39 PGO reduces
+  PILOT4 instructions 1.068%, but screen32217 is inconclusive; stop without
+  seed32289 or full candidate gates. It remains unapplied. Do not repeat either
+  this screen or the earlier arithmetic-only guarded-replay screen.
+  Next audit the larger measured extended BTRAN cost (13.40% self in the accepted
+  Quad profile): inspect the existing native/packed candidates and quantify their
+  conversion, eligibility and setup overhead before proposing a distinct kernel
+  or representation change. Use cached profiles/assembly and bounded small
+  kernels first; further fresh-factor microvariants need new measured cost
+  evidence. Auxiliary immutable-base sharing remains an unimplemented lead.
+  Comparator alignment stays centralized; normal lunum's build/cache transport
+  still needs an explicit no-build/schema-current source option for direct reuse.
   Look for a faster exact implementation of the same rounding (the F80 tests and `../reverse-engineer/evidence/f80-subnormal-reference.json`
   define it), and for F80 work that runs where its results are not used.
 - **Dump overhead with no dump selected**: about 70 `dump::on("kind")` sites in `dual.rs` and
