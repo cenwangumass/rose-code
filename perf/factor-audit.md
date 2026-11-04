@@ -371,6 +371,30 @@ and both orders improving. The experiment stops without confirmation, extension
 or full gates; no conversion cache is accepted. Qualified source/CLI/build are
 restored. Evidence: `target/perf-rank-rounded/`.
 
+## Allocator instruction ancestry
+
+Current accepted-source profiling uses matching PGO/TCMalloc, line tables and
+frame pointers, after full profiling parity 987/987. Plain release DWARF on
+DEGEN2 resolves only 40/92 sampled allocator Rose ancestors, and larger captured
+stacks do not improve it. The frame-pointer build raises DEGEN2 whole-batch
+instructions 11.28%; its shares are ancestry evidence, not release cost bounds.
+
+Two bounded sixteen-solve PEROLD profiles (CPU4, dual release, cap1300; periods
+4M and 3,791,733) put 152/341 and 186/400 allocator self samples under the
+refactorization route, versus 104/341 and 115/400 under iteration. This resolves
+broad instruction ancestry beyond the old allocation-frequency counts. Both
+profiles represent 99.83/99.94% of direct batch instructions with no loss or
+throttle. Complete results agree, and accepted release artifacts are unchanged.
+
+Immediate allocation sites are still not proven by frame-pointer ancestry.
+Disassembly verifies that the leading observed factor_structure return address
+follows a call to nucleus: the immediate caller can be skipped by unwinding.
+Debug return-site lines alone would falsely blame the subsequent sequence extend.
+ELF file offsets must first map through PT_LOAD virtual addresses. Frequent
+observed ancestry includes nucleus/structure, fresh installation, FTRAN/L and
+controller/refactor work; inspect the allocating callee before proposing reuse.
+Evidence and runnable analyzers: `target/perf-alloc-ancestry/`.
+
 ## Remaining proof obligations
 
 Before a factor ownership prototype, separate column-copy and immutable-factor

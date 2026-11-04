@@ -140,6 +140,27 @@ five lines each. Re-profile a run when a landed change touched its hot path.
 
 - quad_2717.dual-r, `ztrylnzw` (accepted native-TCMalloc/PGO release CLI, ADLITTLE first; sixteen dual-release solves capped at 17000, all optimal in 16010 iterations and 3022 refactorizations with matching complete outputs): period-4M instruction self profile has 8270 samples, zero loss/throttle events and represented instructions 99.95% of direct 33.095B whole-batch count. Extended BTRAN is 12.47%, ranked products 8.81%, primal control 8.81%, extended row update 7.59%, native extended reduced costs 4.41%, factor update 3.60% and FTRAN 3.57% self. Software F80 to-f64/sub/mul/add/div remain separately attributed, with inlined operations charged to callers; native malloc/delete/realloc are 2.85/3.01/1.48%. Scope includes launcher, parsing, startup and validation; these fractions are not inclusive or removable bounds. Dual true_d is not a leading symbol here. Exact build/hash/commands, complete results, counters, raw event audit and self report: `target/perf-quad-0436/`.
 
+Allocator ancestry screen on accepted `kpttrrms` source: the matching-PGO,
+TCMalloc line-table/frame-pointer profiling build passes full parity 987/987
+and complete DEGEN2/PEROLD result checks. DEGEN2 whole-batch instructions
+rise 11.28% versus the accepted CLI, so these samples locate ancestry only, not
+accepted-release cost bounds. Two sixteen-solve CPU-4 PEROLD batches, cap 1300,
+periods 4,000,000 / 3,791,733, have 4492/4736 Rose samples and 341/400 allocator
+self samples. Rose ancestors resolve for 341/386 allocator samples. Disjoint
+routes among allocator samples: refactorization 152/186 (44.6/46.5%), iteration
+104/115 (30.5/28.8%), other post-inner 51/44 (15.0/11.0%), setup/other 34/55.
+Represented batch instructions are 99.83/99.94% of the direct 16-solve count;
+both have zero loss/throttle events. Plain-release DWARF on DEGEN2 resolves only
+Rose ancestors for only 40/92 allocator samples; increasing stack capture 8K to 32K does not help.
+Frame-pointer stacks can omit the immediate allocator caller: disassembly shows
+the dominant observed `factor_structure_r` return site calls `nucleus`, rather
+than allocating directly. Other frequent observed ancestors include fresh-factor
+installation, FTRAN/L and dual refactor/controller work. ELF file offsets are
+translated through PT_LOAD before source mapping. No new solver speedup follows.
+Exact builds, full profiling parity, all results, raw stacks/counters, two-period
+audit, ancestry grouping and verified disassembly: `target/perf-alloc-ancestry/`.
+The accepted release CLI and build metadata remain byte-identical.
+
 ## In progress
 
 None. The qualified `kpttrrms` source, CLI and PGO metadata are installed;
@@ -277,7 +298,7 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 - Quad_2717: pure ranked-product result reuse is qualified above. The saved `ztrylnzw` profile predates it; refresh remaining extended BTRAN, primal row/control and software arithmetic before another kernel change. Ranked-product register retention/outlining remain rejected below; factor-cache working set and extended reduced-cost pass are settled.
 - Barrier: reprofile before choosing more matrix-product, assembly or triangular work. Eight-row/four-column broadcast sharing and four-row/eight-column load sharing have no established timing gains below; reprofile before another tile width or copy-mode change; the four-output copy Chain trial is timing-inconclusive below. Preserve every per-output reduction and block boundary. Four-row/four-column SIMD S tiles with scalar two-column tails and allocation-free row-tile selection are accepted above. The two-column-only vector trial has no established timing gain below. Local scatter row/slice hoisting is timing-inconclusive below; dense-LDL chunks have no established timing gain. Refresh attribution before another local variant. DTRSM dispatch is settled; reprofile remaining FMA callers before choosing another whole kernel.
 - Runs without reachable references, after the reachable ratios: mode-switch's pre-alignment profile above points to factor structure, the maximum reduction and post-update work. B-reference checks are already settled; reprofile and identify the maximum reduction's caller before choosing another change.
-- Allocation: the cached native caller sample attributes about 58% of allocation frequency to refactorization, 19% to iteration outside refactorization. Flat auxiliary LU storage and dual factor-input reuse reduce allocation calls without a timing gain and are rejected below. Current release instruction profiles put FTRAN/L and factor/update traversals ahead of more small buffer changes; allocator instruction ancestry remains unassigned. Native sampling dispatch and bindings are verified; the rejected CLI-local small-block cache remains below.
+- Allocation: the cached native caller sample attributes about 58% of allocation frequency to refactorization, 19% to iteration outside refactorization. Flat auxiliary LU storage and dual factor-input reuse reduce allocation calls without a timing gain and are rejected below. Current release instruction profiles put FTRAN/L and factor/update traversals ahead of more small buffer changes; allocator instruction ancestry is now grouped in the frame-pointer screen above, with immediate-site and release-cost limits. Native sampling dispatch and bindings are verified; the rejected CLI-local small-block cache remains below.
 - Dense BTRAN transpose geometry: forming the immutable transpose in constructor order from cached ADLITTLE/BORE3D/DEGEN2 BSOLVE factors gives 376/763, 972/2663 and 4206/14468 entries in consecutive destination pairs; four-wide groups cover only 100/763, 244/2663 and 328/14468. These are structural counts across captured factors, not dense-branch frequency or time savings. The structural query keeps rows in their original order. Stable descending-column gather equivalence is tested separately below and is slower in the standalone probe; no gather solver integration is retained. Data/source locations: `target/perf-primal-0436/transpose-geometry.json`. Existing transpose layout, scalar unroll and bounds-check rejections still apply.
 - Dual tau staging: tau_dense separately serves only the pivot diagnostic and gathers at the column output positions; avoiding that dense expansion remains untested.
 - Dumps disabled: source audit of the simplex, dual, factor and PDHG hot paths finds JSON emission/serialization guarded by dump selection or an existing recording option; WORK estimates outside those guards remain solver inputs. The cached accepted-release PEROLD self report has no samples under the selected serde/dump/OnceLock symbol names, but inlined checks and preparation remain charged to callers. This is not an inclusive/total overhead bound or proof that all preparation is free. No dump optimization is justified by this screen; source anchors and the selected-symbol query are in `target/perf-dump-audit/`.

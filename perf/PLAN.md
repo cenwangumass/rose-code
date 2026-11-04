@@ -193,8 +193,12 @@ measured.
 - **Dump overhead with no dump selected**: about 70 `dump::on("kind")` sites in `dual.rs` and
   `simplex.rs`. Each call scans the selected kinds by string; check whether any of them sits in a
   per-iteration or per-element loop, and whether any record is built before the `on` test.
-- **Allocation**: `Vec` creation per iteration or per FTRAN/BTRAN call; reuse buffers held in the solver
-  state (clear only the touched entries).
+- **Allocation**: current two-period frame-pointer ancestry puts roughly 45–47%
+  of PEROLD allocator self samples under refactorization and 29–30% under iteration.
+  Separate nucleus/structure buffer production from fresh installation before
+  another ownership change. Inspect the allocating callee: an observed ancestor
+  return address can skip it. These profiling-build shares do not bound accepted
+  release cost; confirm any candidate on the accepted release build.
 - **Barrier** (`chol.rs`, `barrier.rs`, `sgemm32.rs`) and **PDHG** (`pdhg.rs`): profile after the simplex
   work; their dense kernels have a fixed summation order (blocked, lane order) that must be kept.
 
