@@ -2,7 +2,47 @@
 
 Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (history is `jj log`).
 
-## Numbers
+## Numbers on AMD EPYC 9V74
+
+The starting solver is `934213eb`. The shipped fixed39 PGO executable runs with genuine Ubuntu gperftools TCMalloc 2.15. Gurobi uses the supplied patched 13.0.3 library, SHA-256 `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. All 23 timed rows use a fresh process, a shared logical CPU, one warm-up per solver and three interleaved timed pairs. The table compares medians of Gurobi Runtime and rose diagnostics.seconds. The fixed GREENBEA PDHG cap is 20,000. This configuration supersedes the preliminary glibc-allocator survey.
+
+| Run | Gurobi Runtime (s) | Rose solve (s) | Rose / Gurobi |
+|---|---:|---:|---:|
+| degen2.primal-c | 0.019153 | 0.043959 | 2.30 |
+| degen2.dual-r | 0.013366 | 0.034534 | 2.58 |
+| degen3.primal-c | 0.197820 | 0.531533 | 2.69 |
+| degen3.primal-r | 0.239772 | 0.626245 | 2.61 |
+| perold.primal-c | 0.198119 | 0.551410 | 2.78 |
+| pilot4.primal-r | 0.020133 | 0.055149 | 2.74 |
+| 80bau3b.primal-c | 0.132110 | 0.623391 | 4.72 |
+| primal_5959.primal-r | 0.056607 | 0.119254 | 2.11 |
+| degen3.dual-c | 0.096471 | 0.279956 | 2.90 |
+| degen3.dual-r | 0.108019 | 0.280635 | 2.60 |
+| perold.dual-r | 0.043718 | 0.130428 | 2.98 |
+| 80bau3b.dual-r | 0.092070 | 0.355276 | 3.86 |
+| greenbea.dual-c | 0.256883 | 0.771987 | 3.01 |
+| greenbea.dual-r | 0.227844 | 0.772700 | 3.39 |
+| mode_switch.dual-r | 0.117143 | 1.652152 | 14.10 |
+| primal_5959.dual-r | 0.084074 | 0.205056 | 2.44 |
+| quad_2717.dual-r | 0.105847 | 0.259393 | 2.45 |
+| fx_quad_obj_5371.dual-r | 0.042942 | 0.105406 | 2.45 |
+| degen3.barrier-r | 0.093120 | 0.203347 | 2.18 |
+| 80bau3b.barrier-r | 0.148597 | 0.240573 | 1.62 |
+| greenbea.barrier-r | 0.543017 | 0.996415 | 1.83 |
+| 80bau3b.pdhg | 2.956445 | 5.214276 | 1.76 |
+| greenbea.pdhg | 1.284483 | 2.117332 | 1.65 |
+
+Starting result: rose wins 0/23. On mode-switch both solvers reach optimality after 11,393 iterations. The pinned Rust 1.98.1 release rebuild using TCMalloc and matching fixed39 training passes frozen full parity 987/987. All model parameters, solver hashes and samples from the starting sweep are in the release evidence.
+
+### Mode-switch profile
+
+Both solvers reach optimality in 11,393 iterations on the 15,000-row block witness. Three sampled rose runs in the preliminary glibc configuration yielded 1,531 whole-process CPU samples. All 158 samples in the maximum reduction returned to sparse forward-L level selection. Two full-dimension FTRAN marker scans accounted for another 130 samples and the sparse BTRAN range loop, including arithmetic on reached positions, for 74. Together these regions account for 23.6% of samples. The libc share was 619/1,531 for rose and 22/507 for the native reference runner across 15 runs. The profile includes each program's input and output work.
+
+A separate run intercepted direct executable requests of at least 15,000 bytes. Rose requested 21.377 GB through calloc, 4.923 GB through memcpy and 0.049 GB through memset. BTRAN directly requested 6.856 GB through calloc. Repeated requests count separately. The probe measures requested sizes and cannot determine physical traffic or a speedup. All sampled and instrumented rose runs reproduced the complete uninstrumented result except elapsed seconds.
+
+## Historical Ryzen 9 5900X measurements
+
+The original host used TCMalloc and a different reference convention. The table and profiles in this historical section retain their original scope and provenance.
 
 Baseline solver: `8b645007` (same solver as `vlsokskq`). Current solver: `sozuzvuv` (packed ordinary whole-row drop-predicate traversal, compact pure normal-Devex increment reuse, bounded-normal F80-to-double bit assembly, completed ordering hashes stored before allocation, reused adjacency buffers during quotient ordering, unique AA-neighbour construction, compact pure extended ranked-product-result reuse, compact native extended reduced-cost-result reuse, compact extended RHS-result/WORK-estimate reuse, four-row/four-column SIMD barrier DGEMM tiles with scalar two-column tails, allocation-free row-tile selection, whole-loop primal row dispatch, sparse auxiliary etas, optional Linux CLI `system-tcmalloc`, PGO with 64-byte loop alignment and online profile merging).
 Parity: full tier 987/987; release tests pass. Three timed runs after one warm-up, with direct paired follow-ups noted below, hyperfine 2.0.0; instruction counts are millions from perf stat.
@@ -796,10 +836,7 @@ projected effects, component source/binary/timings, dependency audit and restora
 
 ## In progress
 
-None. Qualified `sozuzvuv` source, CLI and PGO metadata are installed; all
-capture/component instrumentation is removed. The overall reference performance
-goal remains unmet. The accepted-release instruction refresh is complete; no
-new runtime candidate is active.
+The EPYC release builds now use Rust 1.98.1, LLVM 22.1.8 and genuine TCMalloc. The forward L level scan is the first measured target. The frozen digests remain at their original contents.
 
 ## Extended BTRAN feasibility
 
@@ -1086,8 +1123,9 @@ no new solver speedup or reference timing ratio.
 
 ## Candidates
 
-Ordered by current/ref; reprofile any changed path before choosing a change. Ratios use the current
-sweep's solve medians; paired old/new times determine whether a change gains or regresses.
+The first structural target on the EPYC is FTRAN/BTRAN on mode-switch. Reuse factor-level traversal metadata and workspace across calls, and maintain reached positions so sparse solves initialize, divide and emit only the entries they must visit. Preserve ascending slot order, bucket insertion order, signed-zero and exceptional cases, all F2/dump state, and the original full-range WORK contributions. A standalone L-level maximum cache, blockwise marker skips and several workspace-reuse variants have prior timing rejections on other models. Measure a combined sparse path against the actual starting allocator and run the full gate before accepting it. The profile identifies costs. It does not establish a gain for this proposal.
+
+The remaining candidates below derive from the Ryzen measurements and their historical profiles.
 
 - Ordinary primal/dual snapshot ratios are in Numbers. Host speed bands can reorder them; use paired old/new measurements to establish gains. The current PEROLD dual profile above refreshes the largest measured ratio; the long-eta SIMD trial below is inconclusive, so inspect another measured cost before another dot variant.
 - primal_5959.primal-r: reprofile remaining extended BTRAN, eta products, primal control and refactorization with current PGO flags before another change.
@@ -1100,7 +1138,6 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 - Other reachable runs follow their table ratios. Four compact extended factors and double structures remain cached; providers reuse exact RHS solve/estimate and pure fresh reduced-cost results. Main factors still clone mutable state; row-capacity growth already uses the numeric U transpose.
 - Quad_2717: the accepted `vypkuxry` refresh follows pure increment reuse and still puts extended BTRAN first. Its fixed numeric/marker scratch can use initialized stack prefixes with exact outputs/WORK, but the tested implementation increases cycles and remains unapplied. Division-shape counts below distinguish zero numerators from their call-site codegen; dense U already inlines its zero return before quotient helpers. Native dense/packed BTRAN and the compact BTRAN-result cache remain unqualified. Ranked-product register retention/outlining and global power-of-two multiplication remain rejected; use current attribution before another arithmetic/storage variant.
 - Barrier: reprofile before choosing more matrix-product, assembly or triangular work. Eight-row/four-column broadcast sharing and four-row/eight-column load sharing have no established timing gains below; reprofile before another tile width or copy-mode change; the four-output copy Chain trial is timing-inconclusive below. Preserve every per-output reduction and block boundary. Four-row/four-column SIMD S tiles with scalar two-column tails and allocation-free row-tile selection are accepted above. The two-column-only vector trial has no established timing gain below. Local scatter row/slice hoisting is timing-inconclusive below; dense-LDL chunks have no established timing gain. Refresh attribution before another local variant. DTRSM dispatch is settled; reprofile remaining FMA callers before choosing another whole kernel.
-- Runs without reachable references, after the reachable ratios: mode-switch's pre-alignment profile above points to factor structure, the maximum reduction and post-update work. B-reference checks are already settled; reprofile and identify the maximum reduction's caller before choosing another change.
 - Allocation: the cached native caller sample attributes about 58% of allocation frequency to refactorization, 19% to iteration outside refactorization. Flat auxiliary LU storage and dual factor-input reuse reduce allocation calls without a timing gain and are rejected below. Current release instruction profiles put FTRAN/L and factor/update traversals ahead of more small buffer changes; allocator instruction ancestry is now grouped in the frame-pointer screen above, with immediate-site and release-cost limits. Native sampling dispatch and bindings are verified; the rejected CLI-local small-block cache remains below.
 - Dense BTRAN transpose geometry: forming the immutable transpose in constructor order from cached ADLITTLE/BORE3D/DEGEN2 BSOLVE factors gives 376/763, 972/2663 and 4206/14468 entries in consecutive destination pairs; four-wide groups cover only 100/763, 244/2663 and 328/14468. These are structural counts across captured factors, not dense-branch frequency or time savings. The structural query keeps rows in their original order. Stable descending-column gather equivalence is tested separately below and is slower in the standalone probe; no gather solver integration is retained. Data/source locations: `target/perf-primal-0436/transpose-geometry.json`. Existing transpose layout, scalar unroll and bounds-check rejections still apply.
 - Dual tau staging: tau_dense separately serves only the pivot diagnostic and gathers at the column output positions. Current accepted PEROLD annotation has two scatter-loop instruction samples out of4303 total; allocator cost is separately unassigned. Avoiding this expansion remains untested, but the visible local work does not justify prioritizing it over pivot-row scatter. Annotation: `target/perf-ordinary-260d/iteration.asm`; accepted-source refresh: `target/perf-ordinary-devex/iteration.asm`. Fixed first-touch storage in the larger scatter is timing-inconclusive below; do not extend its screen.

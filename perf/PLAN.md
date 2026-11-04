@@ -7,23 +7,11 @@ standing plan and the working loop. The current numbers, hotspots and the ideas 
 
 ## Goal
 
-Rose at least as fast as the reference: `current/ref` ≤ 1.0 on every bench run, under the invariant
-below. Prioritize measured removable work across ordinary dual, ordinary primal, extended-precision and barrier paths. Historical ratios identify gaps but do not rank opportunities reliably across host timing bands.
+Make rose faster on every fixed row of `bench.txt`. Compare solve times on the same machine and logical CPU. The reference is the supplied `gurobi/patched-lp-size-limits/libgurobi130.so`, SHA-256 `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. Every row has a measured reference, including 80BAU3B, GREENBEA and the mode-switch witness.
 
-- **Like with like.** `ref` is Gurobi's `Runtime` (solve only, single thread, same host: AMD Ryzen 9
-  5900X). Compare it with rose's solve time, `diagnostics.seconds` in the result JSON (median over the
-  timed runs), not with the process wall time of `bench.sh`, which adds start-up and MPS parsing. The
-  harness reports both wall and solve times; STATE.md uses solve time for `current/ref`.
-- **Missing `ref` cells:** STATE.md records which original-library runtimes are reachable and which
-  fail the available license. If more become reachable, run them with
-  `../reverse-engineer/tools/ref_run.py` (see its docstring; the profile names match bench.txt's: `release`, `dual-release`, `barrier-release`, `pdhg-release`, ...)
-  through gurobipy with the unpatched library, three times, and take the median `Runtime`. Records made by
-  `build/native_run` or the patched library have no usable runtime. Write the medians into STATE.md and
-  note the run files used; do not overwrite existing files in `../reverse-engineer/runs/` (write the new
-  ones to a scratch directory).
-- **Done** when every bench run with a `ref` has `current/ref` ≤ 1.0, or the remaining gap of a run is
-  documented in STATE.md as needing something the invariant forbids (name the rule and the measured
-  share of the time it accounts for). A run without a reachable reference time does not block the goal.
+Use Gurobi's `Runtime` with the single-threaded profile parameters in `ref_run.py` and the iteration limit supplied by the bench row. Compare with rose's `diagnostics.seconds`. Take the median of three measurements after one warm-up per solver. Preserve each result, exit code, timing and the library hash. Keep measurements from different hosts, allocators and build configurations labeled separately. The paired host runner and current results are linked from STATE.md.
+
+The goal is met when rose's median solve time is strictly below Gurobi's on every row and full numerical parity passes. Keep any measured gaps and work constrained by the numerical invariant in STATE.md.
 
 ## The invariant
 
@@ -182,10 +170,7 @@ never commit with debug prints, never leave the tree with uncommitted half-work 
 These are leads to verify with a profile, not facts. Remove each from STATE.md's candidates once it is
 measured.
 
-- **The mode-switch witness** (`mode_switch.dual-r`, 15000 rows): a large absolute-time run whose
-  original-library reference currently fails the available license. Work on it after reachable ratios.
-  Check per-iteration scans, repeated candidate/weight rebuilds and dense work on sparse data; use the
-  current profile and instruction count in STATE.md rather than the old, unusable reference timing.
+- **The mode-switch witness** (`mode_switch.dual-r`, 15,000 rows) has the largest relative gap on the measured EPYC. Start from the current FTRAN/BTRAN sparse-workspace profile and large-buffer request counts in STATE.md.
 - **Large dual and primal runs** (DEGEN3, PEROLD, 80BAU3B, GREENBEA): pricing, ratio tests,
   FTRAN/BTRAN (`ftran_order.rs`), the LU update and refactorization (`lu*.rs`), the bound-flip and
   update loops in `dual.rs` / `simplex.rs`.
