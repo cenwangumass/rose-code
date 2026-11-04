@@ -205,15 +205,17 @@ measured.
   stack scratch is verified but has no useful counter gain. Before another
   division fast path, isolate its actual call sites: dense U already inlines
   zero-numerator handling, and global zero counts do not imply removable ABI work.
-  Both global and16-entry per-column quotient-result tables lose at counters;
-  integer SIMD fingerprints reduce branch misses without recovering runtime.
-  Do not repeat those cache screens. Next integrate the standalone exact
-  integer-reciprocal probe at the three BTRAN diagonal divisions, keeping only
-  four denominator-mantissa/parameter entries per owner-column. Fresh-factor
-  clones may share pure parameters; the live divisor and numerator still drive
-  sign/exponent/rounding and every WORK/threshold/output rule remains required.
-  Differential arithmetic feasibility is established; measure owner, lookup and
-  parameter-fill overhead before official timing or full qualification.
+  Global and per-column quotient-result tables lose at counters. Exact reciprocal
+  parameters pass arithmetic and complete-BTRAN oracles, but shared four-entry
+  tables do not reduce target instructions. Preparing parameters on diagonal
+  writes removes lookup/locking and lowers instructions/cycles; its controlled
+  target screen remains inconclusive. Do not extend or repeat that screen.
+  Current accepted ordinary-primal PILOT4 self attribution puts solve_primal,
+  BTRAN, FTRAN and primal row updates first. Audit the annotated ranked-row
+  multiply/add scatter before another implementation: preserve exact per-output
+  term order, duplicate/rank-tie semantics and all WORK. Separate an independent-
+  destination kernel change from the rejected compact-row, active-row and
+  rank-order variants; use cached annotations and small models first.
   Look for a faster exact implementation of the same rounding (the F80 tests and `../reverse-engineer/evidence/f80-subnormal-reference.json`
   define it), and for F80 work that runs where its results are not used.
 - **Dump overhead with no dump selected**: about 70 `dump::on("kind")` sites in `dual.rs` and
@@ -237,8 +239,8 @@ measured.
   equality and two independent positive timing screens. Quotient-order adjacency
   buffer reuse and completed-hash store lifetime are also qualified; current
   native hash loops retain the accumulator in registers with unchanged additions.
-  Return to the larger ordinary dual/primal gaps: refresh PEROLD/PILOT4 instruction
-  families under the accepted build before choosing another whole pass. Remaining
+  Return to the larger ordinary dual/primal gaps: use the current accepted
+  PEROLD/PILOT4 instruction profiles above before choosing another whole pass. Remaining
   partition/numeric-factor annotations predate these changes and are diagnostic.
 
 ## Out of scope

@@ -685,8 +685,43 @@ from that exact remainder and other inputs retain original division. Its own
 integer proof,2,000,050 integer and1,037,249 F80 comparisons pass. Fixed eight
 CPU-4 alternating pairs give about0.45 arithmetic time ratio with parameters
 precomputed and equal nonzero checksums. This establishes arithmetic feasibility
-only: owner/column storage, lookup, fill and solver runtime remain untested.
+only. Integrated storage, lookup and prepared-on-write designs are now tested
+below; none qualifies for adoption.
 Full sources/proof/compiler/results: `target/perf-preinverse-probe/`.
+
+The integrated four-entry per-column parameter cache shares one owner lock per
+BTRAN and keys the normalized divisor mantissa; live inputs still determine
+sign, exponent and rounding. Complete original division/BTRAN oracles, all11
+F80 and8 FTRAN/L tests, fast940 and complete bounded result/exit pairs pass for
+three matching-PGO designs. Original arithmetic outside three division sites
+and all WORK remain unchanged. Initial lookup raises Quad instructions0.249%;
+earlier fallback checks and removal of proved-unreachable normal rounding carry
+still raise them0.089%. The latter removes no original exceptional boundary
+path. Neither reaches official timing.
+
+The prepared variant pairs one reciprocal with each current diagonal entry.
+Fresh factors prepare it, Clone copies it, and a single setter routes the only
+production diagonal mutation and refreshes the parameter. This removes lookup
+and shared synchronization; ordinary/large factors retain original division.
+Clone/update/extreme/fallback checks validate pairing. Quad instructions fall
+0.280%, cycles3.631%; fx0.216%/1.280%. The fixed32-AB/32-AA Quad screen24217 is
+inconclusive (median-0.631%, interval[-4.598%,+2.406%], sign p.430; healthy AA,
+execution orders disagree). No confirmation24289 or full candidate gates;
+accepted source/CLI/metadata/profile restored, formatting and full987 pass.
+The arithmetic feasibility remains valid but its tested integrations have no
+qualified runtime benefit. Source/proofs/builds/tests, ownership/mutation
+checks, complete counters/results and screen: `target/perf-diag-preinverse/`
+with `v2/` and `v3/`.
+
+Current accepted ordinary-primal PILOT4 profiling (ADLITTLE/DEGEN2 first) gives
+13.92/10.49/8.37/8.17% whole-batch self shares to solve_primal/BTRAN/FTRAN/row
+update, respectively. All16 solves are optimal690 iterations/16 refactors.
+Period4M has1983 samples, no loss/throttle,99.69% instruction coverage;95
+samples are Python dispatch. The annotated ranked-row-shaped scatter inside
+solve_primal is an inferred source attribution. This is current native self
+cost, not allocator ancestry or proof that a scatter rewrite pays off. Existing
+rank-row storage/active-row/rank-order failures still apply. Exact commands,
+results/hash/build/count/audit and annotations: `target/perf-primal-refresh/`.
 
 ## Remaining proof obligations
 
