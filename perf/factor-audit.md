@@ -352,6 +352,25 @@ Source proofs, independent oracles and both complete screens:
 `target/perf-f2-colflags/` and `target/perf-f2-colflags-pgo/`; the source dependency inventory remains in
 `target/perf-f2-workspace/f2-consumer-audit.json`.
 
+## Rounded ranked-product conversion reuse
+
+The existing compact provider's two consumers have distinct needs: cost-change
+uses extended products only, while the primal iteration also rounds every output
+to double. A bounded prototype lazily retains those exact converted bits per
+existing 32-entry result. Kernel and conversion bodies and WORK calls remain
+unchanged. Original-trait differential checks cover special values, lazy fill,
+clones and fallback; all six provider tests and fast parity pass with matching
+fixed39 PGO. Diagnostic counters find 461,310 reused versus 1,080 computed values
+on Quad_2717, and 171,072 versus 693 on fx_quad_obj_5371. These counts describe
+eligible rounded calls, not all conversions in the solve.
+
+Own-PGO instructions fall 1.37% on quad and 1.22% on fx. The first predeclared
+32AB/32AA screen gives median -1.27%, interval [-2.79%, -0.235%] with AA
+[-0.718%, +0.439%]. The bound fails noise separation despite sign p0.000268
+and both orders improving. The experiment stops without confirmation, extension
+or full gates; no conversion cache is accepted. Qualified source/CLI/build are
+restored. Evidence: `target/perf-rank-rounded/`.
+
 ## Remaining proof obligations
 
 Before a factor ownership prototype, separate column-copy and immutable-factor
