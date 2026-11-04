@@ -480,22 +480,35 @@ or an accepted solver speedup. The integrated designs below preserve the
 arithmetic but do not qualify for adoption. Complete source/original hash, own integer
 proof, compiler metadata, raw results and summaries: `target/perf-preinverse-probe/`.
 
-Pre-packed-predicate ordinary-primal native release profile uses the prior accepted CLI, with
-bounded ADLITTLE/DEGEN2 runs before sixteen PILOT4 primal/release solves capped
-at800. All PILOT4 solves are optimal at690 iterations/16 refactors and their
-complete result/exit objects agree. Fixed period4M yields1983 samples (1888 Rose,
-95 Python), no loss/throttle, representing99.69% of the directly counted7.956B
-whole-batch instructions. Sampled self shares of that batch: solve_primal13.92%,
-BTRAN10.49%, first-vector FTRAN8.37%, ordinary primal row update8.17%, main
-update5.40%, nucleus4.64%, fresh3.83%, dense numeric LU2.57%, auxiliary LU2.37%
-and L-stage2.32%. These include launcher/parse/output and library work and are
-neither inclusive shares nor solve-only cost bounds. In solve_primal, the
-0x1d1640..0x1d166b multiply/add scatter matches ordinary rank_products dataflow;
-that source attribution is inferred from the assembly, not debug line mapping.
-Existing compact row-storage, active-row and rank-order trials remain rejected;
-this profile does not justify repeating their inconclusive screens. Commands,
-complete outputs/build/hash, small-run timing estimate, counts, sample audit
-and solve_primal/BTRAN annotations: `target/perf-primal-refresh/`.
+Accepted `sozuzvuv` native-release instruction refresh keeps the qualified CLI
+unchanged (SHA db2bff5a, fixed39 PGO/TCMalloc, profile b549084b). Eight SC50A
+controlled solves capped300 precede sixteen DEGEN2 controlled/PILOT4 release/
+PEROLD dual-release solves capped800/800/1300. Every solve is optimal and complete
+results/exit codes agree with the accepted full-benchmark outputs where present.
+DEGEN2/PILOT4/PEROLD finish531/690/1273 iterations with16/16/27 refactors.
+
+At period4M, DEGEN2 has1075 samples and98.84% represented instructions, PILOT4
+1971/99.61%, PEROLD4309/99.88%; all have zero lost/throttle/unthrottle events.
+SC50A's47 samples/91.50% coverage are smoke only. Fixed-period child endpoints
+can underrepresent; no sample totals here imply exact removable costs. The
+whole-batch denominator includes launcher, parsing, startup and validation;
+shares at Rose symbols are self locations, not inclusive or solve-only bounds.
+
+DEGEN2 self shares: primal control14.51%, BTRAN9.95%, candidate-list update6.88%,
+packed row update5.58%, nucleus5.12%, factor update4.74%, FTRAN3.91%, fresh3.26%.
+PILOT4: primal control12.94%, BTRAN10.35%, packed row update8.63%, FTRAN7.51%,
+factor update7.10%, nucleus3.91%, fresh3.65%. PEROLD: iteration13.41%,
+FTRAN9.72%, L-stage8.10%, factor update7.91%, needed FTRAN5.64%, BTRAN5.29%,
+nucleus5.22%, auxiliary factor4.11%, post-inner4.06%.
+
+DEGEN2's candidate-list annotation samples threshold construction/comparison in
+`bucket` and membership paths in `fresh.contains`. The current bucket source
+scans strict thresholds1..58; no replacement or claimed cost saving is verified.
+PILOT4 packed-row annotation and exact symbols are retained too. No solver source
+or build changes are made by this refresh. Commands, bounded results, immutable
+build/hash binding, direct counts, raw event audits and reports/annotations:
+`target/perf-row-accepted-refresh/`. The prior ordinary-primal profile remains in
+`target/perf-primal-refresh/` as pre-packed-predicate evidence.
 
 Ordinary ranked-product working sets are now measured with test-only monotonic
 immutable-model owner IDs, spanning each bounded solve. ADLITTLE/BORE3D primal
@@ -785,8 +798,8 @@ projected effects, component source/binary/timings, dependency audit and restora
 
 None. Qualified `sozuzvuv` source, CLI and PGO metadata are installed; all
 capture/component instrumentation is removed. The overall reference performance
-goal remains unmet. Refresh ordinary row/control attribution before choosing
-another kernel change.
+goal remains unmet. The accepted-release instruction refresh is complete; no
+new runtime candidate is active.
 
 ## Extended BTRAN feasibility
 

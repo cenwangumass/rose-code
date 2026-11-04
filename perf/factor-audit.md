@@ -715,15 +715,24 @@ qualified runtime benefit. Source/proofs/builds/tests, ownership/mutation
 checks, complete counters/results and screen: `target/perf-diag-preinverse/`
 with `v2/` and `v3/`.
 
-Pre-packed-predicate accepted ordinary-primal PILOT4 profiling (ADLITTLE/DEGEN2 first) gives
-13.92/10.49/8.37/8.17% whole-batch self shares to solve_primal/BTRAN/FTRAN/row
-update, respectively. All16 solves are optimal690 iterations/16 refactors.
-Period4M has1983 samples, no loss/throttle,99.69% instruction coverage;95
-samples are Python dispatch. The annotated ranked-row-shaped scatter inside
-solve_primal is an inferred source attribution. This is current native self
-cost, not allocator ancestry or proof that a scatter rewrite pays off. Existing
-rank-row storage/active-row/rank-order failures still apply. Exact commands,
-results/hash/build/count/audit and annotations: `target/perf-primal-refresh/`.
+Accepted packed-row solver `sozuzvuv` is now profiled directly without rebuilding.
+The unchanged CLI db2bff5a uses fixed39 PGO/TCMalloc profile b549084b. After cheap
+SC50A smoke, sixteen bounded DEGEN2-controlled/PILOT4-release/PEROLD-dual-release
+solves per profile retain complete accepted outputs and finish531/690/1273
+iterations,16/16/27 refactors. Period4M samples1075/1971/4309 cover98.84/99.61/
+99.88% of direct instructions, with no lost/throttle events. SC50A47 samples are
+smoke only. These are whole-batch self locations, not inclusive/removable time.
+
+DEGEN2 candidate-list update is6.88% self, behind primal control14.51% and
+BTRAN9.95%; packed row update is5.58%. PILOT4 puts control12.94%, BTRAN10.35%,
+packed row update8.63%, FTRAN7.51% and update7.10% first. PEROLD still puts
+iteration13.41%, FTRAN9.72%, L8.10%, update7.91% and needed FTRAN5.64% first.
+The candidate-list disassembly samples bucket-threshold construction/comparison
+and fresh-membership paths. Source `bucket` scans strict thresholds1..58; a
+constant-time classifier remains unimplemented and unverified. No numerical or
+ownership rule changes. Exact build/source binding, validated results, event and
+instruction audits, self reports and row/list annotations:
+`target/perf-row-accepted-refresh/`.
 
 ## Packed ordinary whole-row drop scan
 

@@ -296,11 +296,20 @@ measured.
   full987, all255 release tests and both DEGEN2-controlled screens36217/36289
   pass; all23 full result/exit pairs and the three extra regression controls
   qualify. No screen/control is extended or repeated.
-  Refresh ordinary row/control instruction attribution on this accepted build
-  before another kernel choice; previous shares are pre-change observations.
-  Retained Devex dots/recurrence and factor-production/installation ownership
-  remain leads to measure. The scalar prefilter and prior rank/layout trials
-  remain rejected; do not infer further gains from isolated predicate costs.
+  Accepted-build ordinary row/control attribution is refreshed on bounded
+  SC50A/DEGEN2/PILOT4/PEROLD runs. DEGEN2 candidate-list update is6.88% instruction
+  self; its annotation samples the linear bucket-threshold scan as well as
+  fresh-membership paths. Before another change, freeze the current bucket loop
+  as an independent oracle and test a direct exponent/mantissa classifier,
+  preserving strict power-of-two boundaries, cap58, negatives/zeros/NaNs/infinity
+  and floating-environment behavior. Keeping the original first comparison
+  against2^-19 would reject exceptional/below-range cases before bit extraction;
+  the proposed normal result is exponent_bits-1003-(fraction==0), capped58.
+  This is an unimplemented hypothesis, not a verified rule or runtime gain.
+  Measure bounded small-model counters before own-PGO qualification/timing.
+  PEROLD FTRAN/L/update and factor-production/installation ownership remain larger
+  measured leads. The scalar prefilter and prior rank/layout trials remain
+  rejected; do not infer further gains from isolated predicate costs.
   Comparator alignment stays centralized; normal lunum's build/cache transport
   still needs an explicit no-build/schema-current source option for direct reuse.
   Look for a faster exact implementation of the same rounding (the F80 tests and `../reverse-engineer/evidence/f80-subnormal-reference.json`
