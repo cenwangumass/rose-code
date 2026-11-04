@@ -107,6 +107,11 @@ baseline. No exceptions, no "within a ULP", no re-recording.
 
 ## Measuring
 
+- A probe built with a preceding source's PGO profile is preliminary. For a changed
+  representation or constructor, verify important codegen conclusions with the matching
+  fixed 39-case profile; preliminary counts can change even outside the changed runtime
+  branch. Preserve both builds and measurements, and freeze final source/tests before
+  official timing screens.
 - Times are wall-clock medians from `perf/bench.sh` on the release build, no dumps. Measure the
   baseline and the candidate in the same session, back to back (`--bin` lets you time a saved copy of the
   previous binary, e.g. `cp target/release/rose /tmp/rose-before` before rebuilding).

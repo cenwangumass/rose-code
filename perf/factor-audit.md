@@ -255,6 +255,38 @@ screen. Artifacts: `target/perf-fresh-replay/` and
 `target/perf-fresh-coverage/`; precise bounds and build hashes are in STATE.md
 and the saved manifest. This is not evidence that direct numerical reuse is safe.
 
+## Sparse-L level FIFO storage screen
+
+The original level solver uses per-level growing vectors. Two representations
+preserve its order: a per-node linked FIFO, and a flat FIFO with exact immutable
+level capacities. The flat metadata retains the original per-node level prefix;
+its cached starts count all nodes assigned to each level. Since each node is
+enqueued at most once, every bucket fits that capacity. Queue reads use increasing
+per-level indices, including same-level appends, while late appends to earlier
+levels remain unprocessed as in the original solver. The numeric loop and WORK
+expressions/order are unchanged; the full frozen L body remains source-identical.
+
+The flat queue reuses `slot_counts` only during the level branch. It resets every
+per-level used count and writes entries before publishing them; the later slot
+sort resizes and zeroes every logical count before reading. Tests alternate both
+consumers, prove original node levels/exact capacities, and compare complete
+f64/F80 outputs/counts/WORK against the original on random duplicate/exceptional,
+same/backward-level and captured SC50A cases. Final code adds no factor fields or
+unsafe operations; the level-field header size is compile-time checked.
+
+Both implementations pass fast parity and bounded complete outputs. Linked queues
+add 0.40% PEROLD instructions under the preceding PGO profile. The flat candidate's
+preceding-profile ADLITTLE instruction regression (+2.11%, on a model without the
+level path) disappears with matching fixed39-case PGO (+0.008%). Final instructions
+fall 2.00% on DEGEN2 and 1.15% on PEROLD; PEROLD initial cycles fall 1.07%.
+Its fixed 32AB/32AA screen remains inconclusive: median -0.4954%, interval
+[-0.78%, -0.15%], AA [-0.36%, +0.41%], 24/32 improving. No reserved confirmation,
+extension or full gates follow. Source/CLI/build are restored; neither storage
+change is accepted. Source/oracle/ownership proofs, all test/build/binary versions,
+counters and controlled evidence: `target/perf-level-links/linked/` and
+`target/perf-level-flat/`. These measurements do not establish a broader bound
+on sparse L or paired-stage optimizations.
+
 ## Short ordinary tau-row screen
 
 The virtual nucleus U row is below eight entries for 91.0% of PEROLD's 36,518
