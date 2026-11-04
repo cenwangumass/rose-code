@@ -467,6 +467,21 @@ samples in tuple max/min heap pops and 4.8% of update-local self samples in
 inlined heap pushes; these are profiling-build locations, not release cost bounds.
 Evidence: `target/perf-slot-heaps/`, `target/perf-heap-audit/`.
 
+## Unique AA-pattern neighbour production
+
+Before sorting, row-incidence generation marks now retain each non-dense
+neighbour once and omit the diagonal. Original dense-column extension and CSR
+output remain untouched. Complete Pattern equality against the frozen original
+constructor preserves all downstream symbolic choices, floating degree/work
+arithmetic and numerical factorization inputs. Both generated-input and six-model
+release comparisons pass. Matching fixed39 PGO gives target instructions -2.40%;
+independent DEGEN3 barrier screens qualify median solve gains of 1.71/1.93%.
+Full parity 987/987, all release tests, formatting and all 23 complete benchmark
+pairs pass; predeclared reversed-role controls establish no unrelated regression.
+No numeric kernel, dump or baseline changes. Current proof/build/measurements:
+`target/perf-aat-unique/`; predecessor sort-caller attribution:
+`target/perf-barrier-refresh/`.
+
 ## Remaining proof obligations
 
 Before a factor ownership prototype, separate column-copy and immutable-factor

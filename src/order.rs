@@ -193,6 +193,80 @@ pub fn aat_pattern(m: &LpModel, dense: &[usize]) -> (Pattern, usize) {
         is_dense[j] = true;
     }
     let mut adj: Vec<Vec<usize>> = vec![Vec::new(); nr];
+    // Row-to-column incidence lets each row form its set before sorting,
+    // avoiding duplicate neighbour storage from overlapping sparse columns.
+    let mut offsets = vec![0usize; nr + 1];
+    for (j, c) in cols.iter().enumerate() {
+        if !is_dense[j] {
+            for &r in c {
+                offsets[r + 1] += 1;
+            }
+        }
+    }
+    for r in 0..nr {
+        offsets[r + 1] += offsets[r];
+    }
+    let mut next = offsets[..nr].to_vec();
+    let mut rowcols = vec![0usize; offsets[nr]];
+    for (j, c) in cols.iter().enumerate() {
+        if !is_dense[j] {
+            for &r in c {
+                rowcols[next[r]] = j;
+                next[r] += 1;
+            }
+        }
+    }
+    // Reuse the completed fill cursors as generation markers.
+    next.fill(usize::MAX);
+    for r in 0..nr {
+        for &j in &rowcols[offsets[r]..offsets[r + 1]] {
+            for &other in &cols[j] {
+                if other != r && next[other] != r {
+                    next[other] = r;
+                    adj[r].push(other);
+                }
+            }
+        }
+        adj[r].sort_unstable();
+    }
+    let mut ext = Vec::new();
+    for (k, &j) in dense.iter().enumerate() {
+        for &r in &cols[j] {
+            adj[r].push(nr + k);
+        }
+        let mut e = cols[j].clone();
+        e.sort_unstable();
+        ext.push(e);
+    }
+    for a in adj.iter_mut() {
+        a.sort_unstable();
+    }
+    adj.extend(ext);
+    let mut colptr = vec![0];
+    let mut rowind = Vec::new();
+    for a in &adj {
+        rowind.extend_from_slice(a);
+        colptr.push(rowind.len());
+    }
+    (
+        Pattern {
+            n: nr + dense.len(),
+            colptr,
+            rowind,
+        },
+        nr,
+    )
+}
+
+#[cfg(test)]
+fn frozen_aat_pattern(m: &LpModel, dense: &[usize]) -> (Pattern, usize) {
+    let nr = m.num_rows();
+    let cols = columns(m);
+    let mut is_dense = vec![false; cols.len()];
+    for &j in dense {
+        is_dense[j] = true;
+    }
+    let mut adj: Vec<Vec<usize>> = vec![Vec::new(); nr];
     for (j, c) in cols.iter().enumerate() {
         if is_dense[j] {
             continue;
@@ -1588,5 +1662,88 @@ mod tests {
         let mut s = idx.clone();
         s.sort();
         assert_eq!(s, (0..1000).collect::<Vec<i64>>());
+    }
+}
+
+#[cfg(test)]
+mod aat_unique_tests {
+    use super::*;
+
+    #[test]
+    fn marked_pattern_matches_original_expansion_and_dense_nodes() {
+        let base = crate::mps::parse(include_str!("../tests/fixtures/afiro.mps")).unwrap();
+        let mut seed = 0xc25491abe3u64;
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        for case in 0..512 {
+            let nr = case % 37;
+            let nc = case % 67;
+            let mut model = base.clone();
+            model.row_lo = vec![0.0; nr];
+            model.row_up = vec![1.0; nr];
+            model.obj = vec![0.0; nc];
+            model.col_lo = vec![0.0; nc];
+            model.col_up = vec![1.0; nc];
+            model.col_start = vec![0];
+            model.row_idx.clear();
+            model.val.clear();
+            for _ in 0..nc {
+                let len = if nr == 0 {
+                    0
+                } else {
+                    next() as usize % (nr + 3)
+                };
+                for _ in 0..len {
+                    model.row_idx.push(next() as usize % nr);
+                    model
+                        .val
+                        .push([0.0, -0.0, 1.0, -2.0, f64::NAN][next() as usize % 5]);
+                }
+                model.col_start.push(model.val.len());
+            }
+            let mut choices = vec![
+                vec![],
+                (0..nc).collect(),
+                (0..nc).rev().filter(|j| j % 3 == 0).collect(),
+            ];
+            if nc > 0 {
+                choices.push(vec![0, nc - 1, 0]);
+            }
+            for dense in choices {
+                assert_eq!(
+                    frozen_aat_pattern(&model, &dense),
+                    aat_pattern(&model, &dense),
+                    "case {case}, dense {dense:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn marked_pattern_matches_original_small_models() {
+        for source in [
+            include_str!("../tests/fixtures/afiro.mps"),
+            include_str!("../tests/fixtures/sc50a.mps"),
+            include_str!("../tests/fixtures/blend.mps"),
+            include_str!("../tests/fixtures/adlittle.mps"),
+            include_str!("../tests/fixtures/bore3d.mps"),
+            include_str!("../tests/fixtures/degen2.mps"),
+        ] {
+            let model = crate::mps::parse(source).unwrap();
+            for dense in [
+                vec![],
+                dense_columns(&model, DENSE_AUTO),
+                dense_columns(&model, 3),
+            ] {
+                assert_eq!(
+                    frozen_aat_pattern(&model, &dense),
+                    aat_pattern(&model, &dense)
+                );
+            }
+        }
     }
 }

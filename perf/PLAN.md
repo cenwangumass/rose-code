@@ -204,12 +204,13 @@ measured.
   Inspect the allocating callee: an observed ancestor return address can skip it.
   Profiling-build shares do not bound accepted release cost.
 - **Barrier** (`chol.rs`, `barrier.rs`, `sgemm32.rs`) and **PDHG** (`pdhg.rs`):
-  the accepted-release refresh puts numeric factorization31.24%, DGEMM14.82%,
+  the predecessor release refresh puts numeric factorization31.24%, DGEMM14.82%,
   DTRSM10.58%, and ordering/partition/integer-sort14.75% of Rose instruction
   self samples. Fixed child-rounding dispatch is rejected at matching-PGO counters.
-  Inspect symbolic graph/integer-sort production as a whole pass, preserving all
-  ordered outputs and floating degree arithmetic, before more local numeric variants.
-  Source annotation is diagnostic: its frame-pointer build changes codegen.
+  Unique AA-neighbour construction is qualified with complete ordered-pattern
+  equality and two independent positive timing screens. Refresh remaining ordering,
+  partition and numeric-factor attribution before choosing another whole pass;
+  predecessor source annotation is diagnostic and changes codegen.
 
 ## Out of scope
 
