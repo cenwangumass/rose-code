@@ -851,15 +851,31 @@ complete screen: `target/perf-f80-two-word/`, integrated `solver/` and
 `solver-v2/`. Earlier toy ABI evidence: `target/perf-f80-abi-audit/`. Rejected
 packed-native probes have different x87 encoding/CW/TLS/conversion costs.
 
-Plain two-word metadata also loses the original optional-value layout: pinned
-size measurements give Option<F80>16→24 and optional pairs32→40. The Devex delta
-cache directly stores Vec<Option<F80>>. A NonZeroU64 metadata toy retains16-byte
-optional values/32-byte optional pairs and passes optional values in registers;
-original/plain optional passthrough uses indirect memory. This is a separate
-unimplemented representation lead, not a cause assigned to current timings.
-Logical field/Option/zero semantics, nonzero/tag invariants and actual operation/
-zero-fill/runtime costs must be independently checked. Source, size output,
-assembly and scope: `target/perf-f80-two-word/option-layout.*`,
+Plain two-word metadata loses the original optional-value layout:
+Option<F80>16→24 and optional pairs 32→40, including active Devex cache and
+primal input storage. A separately verified tagged NonZeroU64 software layout
+restores 16-byte optional values/32-byte optional pairs. It always sets bit 63,
+retains exponent/sign bits and uses only safe constructors/getters. Negation
+changes sign and reasserts the tag; logical zero remains Some, distinct from
+None. No raw-zero F80 initialization was found. The complete original oracle
+checks 1,581,056 operations/conversions/comparisons plus 736 sqrt cases and
+optional/default/tag assertions across boundary/captured values and 16 MXCSR
+modes. No original arithmetic/rounding expression changes.
+
+Standalone fixed 8-pair CPU-4 results are mixed: direct add/mul/div/mul-add
+ratios 1.199/0.598/0.936/1.030; opaque 1.154/0.665/0.941/0.990. Zero-value
+vector initialization at lengths 7/32/410 costs 1.116/1.328/1.005 times original,
+optional vectors 0.759/0.737/0.710, allocation included, default allocator,
+without PGO. These establish feasibility only. Matching fixed 39 PGO retains
+register multiply/divide and passes 10 F80/6 FTRAN tests, fast 940 and all bounded
+canonical result/exit pairs. fx instructions/cycles+0.323/+3.084%; Quad
++0.008/+3.656%, branch misses+19.812%. No useful counter gain: stop before
+seeds 29217/29289 and full candidate gates. Optional expansion is not established
+as the cause of plain-layout timings. Accepted source/CLI/metadata/profile are
+restored, format/fast 940/full 987/all 254 release tests pass. Full source, proof,
+initialization/operation timings, assembly, builds, tests and results/counters:
+`target/perf-f80-niche/`. Original optional toy source/output/assembly:
+`target/perf-f80-two-word/option-layout.*`,
 `target/perf-f80-two-word/optional-layout-audit.json`.
 
 ## Remaining proof obligations

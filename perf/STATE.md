@@ -512,24 +512,40 @@ compiler/flags, raw timing and real operator disassembly:
 `target/perf-f80-abi-audit/`; prior packed-native/x87 probes are a different
 encoding/CW/TLS/conversion design.
 
-The final ABI audit exposes a separate layout cost: Option<F80> is16 bytes in
-the original type and24 in the plain two-word type; optional pairs grow32→40.
-The active DevexDeltaEntry.values vector stores Option<F80>, and primal inputs
-also carry optional values/pairs. A two-field NonZeroU64 metadata toy keeps
-value/optional sizes16/16 and optional pairs32; its optional passthrough uses
-registers, while original/plain optional passthrough uses memory. This does not
-establish the cause of current timings. Tagged nonzero software metadata is
-unimplemented: exact encoding/invariants, logical zero/None separation, zero-fill
-costs, actual operators and solver runtime remain to be checked. Exact pinned
-source, size outputs, passthrough assembly and scope:
+The optional-layout cost is independently checked: Option<F80> grows 16→24 in
+plain two-word storage, and optional pairs 32→40. DevexDeltaEntry.values and
+primal inputs use these types. Tagged NonZeroU64 software metadata retains the
+original 16/16/32 value/optional/pair sizes; bit 63 is always set, low 32 retain the
+unbiased exponent, bit 32 retains sign. Safe constructors, sign toggle, Copy and
+Clone preserve the invariant. None stays distinct from Some(logical zero).
+All original numerical arithmetic remains unchanged; Debug retains field order.
+The independent full original oracle passes 1,581,056 counted checks, plus 736
+sqrt and optional/default/tag assertions, boundary/captured inputs and 16 MXCSR
+modes. No raw-zero F80 initialization was found in the source audit.
+
+Eight fixed CPU-4 standalone pairs remain mixed: direct add/mul/div/mul-add
+ratios 1.199/0.598/0.936/1.030; opaque 1.154/0.665/0.941/0.990. Value-vector
+initialization ratios for lengths 7/32/410 are 1.116/1.328/1.005, optional vectors
+0.759/0.737/0.710 (allocation included, default allocator, no PGO). These are
+isolated feasibility measurements. Matching fixed 39 PGO passes 10 F80 and 6
+FTRAN/L tests, fast 940 and all bounded complete result/exit pairs. Actual
+multiply/divide still use scalar register arguments. fx instructions/cycles
+rise 0.323/3.084%; Quad rises 0.008/3.656%, with branch misses+19.812%.
+Stopped before seeds 29217/29289; no full candidate gates or speedup claim.
+Tagged encoding improves optional sizes but gives no useful target counter gain;
+no attribution of the plain layout's timing deficit to Option expansion follows.
+Exact source/invariant proofs, standalone results, assembly, matching build,
+source freeze, tests, bounded results/counters and restoration:
+`target/perf-f80-niche/`. Prior toy layout/ABI evidence:
 `target/perf-f80-two-word/option-layout.*`, `target/perf-f80-two-word/optional-layout-audit.json`.
 
 ## In progress
 
 None. Accepted `vypkuxry` source, CLI and PGO metadata are restored exactly;
-formatting, fast940 and full987 parity pass. The two-word F80 software layout
-is numerically verified but timing-inconclusive and remains unapplied. The
-overall reference performance goal remains unmet.
+formatting, fast 940, full 987 parity and all 254 release tests pass. Plain and
+tagged two-word F80 layouts remain unapplied; plain timing is inconclusive,
+tagged matching-PGO counters give no useful gain. The overall reference
+performance goal remains unmet.
 
 ## Extended BTRAN feasibility
 

@@ -223,14 +223,13 @@ measured.
   Two-word F80 software layout now has independent full-field equivalence and
   real register-ABI evidence. Direct sign-word operations improve target counters,
   but the fixed controlled screen is inconclusive; do not repeat or extend it.
-  The plain layout also grows Option<F80>16→24 and optional pairs32→40 in hot
-  cache/input storage. A NonZeroU64 metadata toy retains original optional sizes
-  and uses a register optional-return ABI. Next independently probe a tagged
-  nonzero metadata representation: protect all original logical fields/math and
-  Option/zero behavior, prove the encoding invariant, and measure constructor,
-  accessor and zero-fill overhead before solver dispatch. This is unimplemented;
-  layout evidence alone is not runtime attribution or a gain.
-  Also audit exact auxiliary Factor-construction inputs (ordered column bits,
+  The plain layout grows Option<F80>16→24 and optional pairs 32→40. Tagged
+  NonZeroU64 software metadata independently preserves original optional sizes,
+  all full-field arithmetic and zero/None semantics, with a safe tag invariant.
+  Matching-PGO fx/Quad instructions/cycles show no useful gain; stopped before
+  timing seeds 29217/29289. Both layouts remain unapplied. Do not infer solver
+  gains from ABI, optional sizes or isolated arithmetic/initialization probes.
+  Next audit exact auxiliary Factor-construction inputs (ordered column bits,
   floor/prescribed rows) and full FTRAN/BTRAN state dependencies. Measure repeated
   inputs per immutable matrix version across bounded compact solves before any
   whole-result cache. Clone must retain a version identity; every attempted
