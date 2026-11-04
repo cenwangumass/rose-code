@@ -556,6 +556,29 @@ Source/proof, unchanged-source oracle failure/pass, mode tests, assembly and
 full timing evidence: `target/perf-eta-long/`. Accepted release profile and
 counter/event audit: `target/perf-ordinary-devex/`.
 
+## Dense L WORK lifetime screens
+
+Exact immutable per-column charge caching retains every WORK addition and all
+numeric traversal. A guard limits stored `len as f64 * 2.0` charges to counts
+at most 2^53, whose conversion/scaling is exact in every MXCSR mode; larger
+columns retain the original expression. Independent complete L-stage and dense
+WORK bodies verify generated/extreme/captured f64/F80 cases. Matching fixed39
+PGO, seven FTRAN/L tests and fast940 parity pass; all bounded no-dump result/exit
+pairs agree. PEROLD instructions fall only 0.073%, with two of three paired
+cycle changes positive. The cache is restored without timing screens.
+
+A separate complete-loop extraction leaves factor layout and expressions
+unchanged. Source reversal reconstructs both production methods and the helper
+from the original loop. Its ordinary assembly retains WORK in XMM0; matching
+PGO, six FTRAN/L tests and fast940 parity pass. PEROLD instructions fall0.190%
+and cycles change -0.033/+2.951/-0.224% across the three direct pairs. The desired
+register lifetime is established, but a useful runtime gain is not. No official
+timing or full gates follow; all accepted artifacts are restored exactly.
+Ownership/bound and source proofs, independent oracles, build/test provenance,
+assembly and complete paired results: `target/perf-lwork-charges/` and
+`target/perf-dense-l-outline/`. These local observations do not bound total
+FTRAN bookkeeping cost or establish safety of producer-U reuse.
+
 ## Remaining proof obligations
 
 Before a factor ownership prototype, separate column-copy and immutable-factor
