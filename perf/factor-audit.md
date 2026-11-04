@@ -609,6 +609,27 @@ The sparse-input out-of-line call remains distinct; no production change is
 made from these counts. Exact scope/counters/source/restoration and symbol/
 relocation proof: `target/perf-f80-div-shapes/`.
 
+## F80 operand-order lifetime screen
+
+Accepted BTRAN instruction annotation includes conditional field selection in
+inlined F80 addition/subtraction. These locations alone do not establish a
+removable cycle bound. Replacing value tuples with ordered references preserves
+all numeric expressions; an independent complete original routine and source
+reversal protect every path. All ten F80 tests (including random/full-bit/
+boundary/captured internal-field comparisons) and fast940 parity pass with
+matching fixed39 PGO.
+
+The first variant saves0.264% Quad instructions but increases cycles5.3–5.9%
+in all three pairs, with sharply higher branch misses. A second uses explicit
+unpredictable selection for the same references. Its branch-miss penalty is
+largely removed, but target instructions rise0.247% and median cycles1.269%.
+All bounded complete results agree. No official timing/full gates follow;
+source, accepted CLI and metadata are restored exactly. This does not establish
+field-copy removal as profitable or warrant assigning the sampled conditional
+moves their apparent instruction-sample share as removable runtime. Both complete
+variants/proofs/builds/tests, native assembly and paired results:
+`target/perf-f80-add-borrow/`, including `v2/`.
+
 ## Remaining proof obligations
 
 Before a factor ownership prototype, separate column-copy and immutable-factor
