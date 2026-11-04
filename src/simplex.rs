@@ -1379,6 +1379,7 @@ struct RhsMemo {
     factor: crate::ftran_order::RefStruct<crate::f80::F80>,
     results: Vec<RhsResult>,
     rank_results: Vec<RankResult>,
+    devex_deltas: DevexDeltaMemo,
     work_results: Vec<(Vec<u64>, f64)>,
     #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
     cost_results: Vec<CostResult>,
@@ -1393,6 +1394,7 @@ impl QuadRhs {
                 factor,
                 results: Vec::new(),
                 rank_results: Vec::new(),
+                devex_deltas: DevexDeltaMemo::default(),
                 work_results: Vec::new(),
                 #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
                 cost_results: Vec::new(),
@@ -1402,6 +1404,19 @@ impl QuadRhs {
         } else {
             Self::Direct(factor)
         }
+    }
+
+    fn update_row(
+        &mut self,
+        state: PrimalRowState<'_>,
+        arg: &PrimalRowInput<'_>,
+    ) -> (bool, Vec<usize>, Vec<(usize, f64)>) {
+        if let Self::Shared(shared) = self {
+            if !arg.m2 && !crate::dump::any() {
+                return shared.lock().unwrap().devex_deltas.update(state, arg);
+            }
+        }
+        primal_row_update::<true>(state, arg)
     }
 
     /// Pure products depend on the ordered participating rows, their exact
@@ -8584,6 +8599,8 @@ fn solve_primal(
         };
         let (mut norm_reset, mut changed, mut rowvals) = if qw.is_none() && prods_q.is_none() {
             primal_row_update::<false>(state, &input)
+        } else if let Some(rhs) = s.mirror_q.as_mut() {
+            rhs.update_row(state, &input)
         } else {
             primal_row_update::<true>(state, &input)
         };
@@ -9600,6 +9617,184 @@ mod devex_dot_tests {
     }
 }
 
+struct DevexDeltaEntry {
+    key: Vec<(u64, u16)>,
+    values: Vec<Option<crate::f80::F80>>,
+}
+
+#[derive(Default)]
+struct DevexDeltaMemo {
+    entries: Vec<DevexDeltaEntry>,
+    key: Vec<(u64, u16)>,
+    #[cfg(test)]
+    hits: usize,
+    #[cfg(test)]
+    misses: usize,
+}
+
+impl DevexDeltaMemo {
+    fn update(
+        &mut self,
+        state: PrimalRowState<'_>,
+        arg: &PrimalRowInput<'_>,
+    ) -> (bool, Vec<usize>, Vec<(usize, f64)>) {
+        #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+        if !arg.m2 && !crate::dump::any() && arg.p.m <= 50 {
+            let nm = arg.p.n + arg.p.m;
+            if let (Some((a, w)), Some(pq), Some(cross)) = (arg.qw, arg.prods_q, arg.cross) {
+                let mut cw = 0u16;
+                // SAFETY: fnstcw writes two bytes without changing the control word.
+                unsafe {
+                    std::arch::asm!("fnstcw [{cw}]", cw=in(reg) &mut cw,
+                        options(nostack, preserves_flags));
+                }
+                if nm <= 100
+                    && pq.len() == nm
+                    && cross.tau.len() == arg.p.m
+                    && arg.p.fcols.len() == nm
+                    && cross.packed.is_some()
+                    && cw & 0x0f3f == 0x033f
+                    && !a.is_zero()
+                {
+                    self.key.clear();
+                    let mut valid = true;
+                    for value in [a, w]
+                        .into_iter()
+                        .chain(pq.iter().copied())
+                        .chain(cross.tau.iter().copied())
+                    {
+                        if value.is_nan() || value.is_infinite() {
+                            valid = false;
+                            break;
+                        }
+                        self.key.push(value.repr());
+                    }
+                    if valid {
+                        let index =
+                            if let Some(i) = self.entries.iter().position(|e| e.key == self.key) {
+                                #[cfg(test)]
+                                {
+                                    self.hits += 1;
+                                }
+                                i
+                            } else {
+                                #[cfg(test)]
+                                {
+                                    self.misses += 1;
+                                }
+                                if self.entries.len() == 8 {
+                                    self.entries.remove(0);
+                                }
+                                self.entries.push(DevexDeltaEntry {
+                                    key: self.key.clone(),
+                                    values: vec![None; nm],
+                                });
+                                self.entries.len() - 1
+                            };
+                        #[cfg(test)]
+                        let (shadow, expected) = DevexDeltaShadow::run(&state, arg);
+                        let out = primal_row_update_delta(
+                            PrimalRowState {
+                                w: &mut *state.w,
+                                d: &mut *state.d,
+                                wf: &mut *state.wf,
+                                df: &mut *state.df,
+                                pos_of: state.pos_of,
+                                fixed: state.fixed,
+                                excluded: state.excluded,
+                            },
+                            arg,
+                            &mut self.entries[index],
+                        );
+                        #[cfg(test)]
+                        {
+                            shadow.check(&state, &expected, &out);
+                            DEVEX_DELTA_ACTIVITY.with(|c| {
+                                let (rows, terms) = c.get();
+                                c.set((rows + 1, terms));
+                            });
+                        }
+                        return out;
+                    }
+                }
+            }
+        }
+        primal_row_update::<true>(state, arg)
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    static DEVEX_DELTA_ACTIVITY: std::cell::Cell<(usize,usize)> = const {std::cell::Cell::new((0,0))};
+}
+
+#[cfg(test)]
+struct DevexDeltaShadow {
+    w: Vec<f64>,
+    d: Vec<f64>,
+    wf: Vec<crate::f80::F80>,
+    df: Vec<crate::f80::F80>,
+}
+
+#[cfg(test)]
+impl DevexDeltaShadow {
+    fn run(
+        state: &PrimalRowState<'_>,
+        arg: &PrimalRowInput<'_>,
+    ) -> (Self, (bool, Vec<usize>, Vec<(usize, f64)>)) {
+        let mut shadow = Self {
+            w: state.w.to_vec(),
+            d: state.d.to_vec(),
+            wf: state.wf.clone(),
+            df: state.df.to_vec(),
+        };
+        let out = frozen_primal_row_update(
+            PrimalRowState {
+                w: &mut shadow.w,
+                d: &mut shadow.d,
+                wf: &mut shadow.wf,
+                df: &mut shadow.df,
+                pos_of: state.pos_of,
+                fixed: state.fixed,
+                excluded: state.excluded,
+            },
+            arg,
+        );
+        (shadow, out)
+    }
+
+    fn check(
+        &self,
+        state: &PrimalRowState<'_>,
+        expected: &(bool, Vec<usize>, Vec<(usize, f64)>),
+        got: &(bool, Vec<usize>, Vec<(usize, f64)>),
+    ) {
+        let bits = |v: &[f64]| v.iter().map(|v| v.to_bits()).collect::<Vec<_>>();
+        let extended = |v: &[crate::f80::F80]| {
+            v.iter()
+                .map(|v| (v.repr(), v.is_sign_negative()))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(bits(&self.w), bits(state.w), "cached Devex weights");
+        assert_eq!(bits(&self.d), bits(state.d), "cached Devex costs");
+        assert_eq!(
+            extended(&self.wf),
+            extended(state.wf),
+            "cached Devex weight twins"
+        );
+        assert_eq!(
+            extended(&self.df),
+            extended(state.df),
+            "cached Devex cost twins"
+        );
+        assert_eq!(expected.0, got.0, "cached Devex reset");
+        assert_eq!(expected.1, got.1, "cached Devex changed order");
+        let rows =
+            |v: &[(usize, f64)]| v.iter().map(|&(i, v)| (i, v.to_bits())).collect::<Vec<_>>();
+        assert_eq!(rows(&expected.2), rows(&got.2), "cached Devex row order");
+    }
+}
+
 /// Arrays touched by the primal row update, borrowed separately from controller state.
 struct PrimalRowState<'a> {
     w: &'a mut [f64],
@@ -9940,6 +10135,182 @@ fn primal_row_update<const QUAD: bool>(
     (norm_reset, changed, rowvals)
 }
 
+fn primal_row_update_delta(
+    mut s: PrimalRowState<'_>,
+    arg: &PrimalRowInput<'_>,
+    deltas: &mut DevexDeltaEntry,
+) -> (bool, Vec<usize>, Vec<(usize, f64)>) {
+    let PrimalRowInput {
+        p,
+        q,
+        leave,
+        m2,
+        has_mirror,
+        faithful_weights,
+        prods,
+        prods_q,
+        rho,
+        u,
+        qw,
+        cross: devex_cross,
+        theta_d,
+        alpha_rq,
+        wq,
+        theta_dq,
+    } = *arg;
+    // The double entry has no extended state. Keep the mixed entry for every
+    // other presence combination, including partial recovery contexts.
+    let (qw, prods_q, devex_cross, theta_dq) = if true {
+        (qw, prods_q, devex_cross, theta_dq)
+    } else {
+        (None, None, None, None)
+    };
+    let (n, m) = (p.n, p.m);
+    let col_off = &p.offs;
+    let dval = |s: &PrimalRowState<'_>, j: usize| -> crate::f80::F80 {
+        if s.df[j].to_f64() == s.d[j] {
+            s.df[j]
+        } else {
+            crate::f80::F80::from_f64(s.d[j])
+        }
+    };
+    let dsub = |s: &mut PrimalRowState<'_>, j: usize, prod: crate::f80::F80| {
+        if let Some(th) = theta_dq {
+            let nd = dval(s, j) - th * prod;
+            s.df[j] = nd;
+            s.d[j] = nd.to_f64();
+            true
+        } else {
+            false
+        }
+    };
+    let mut norm_reset = false;
+    let mut changed: Vec<usize> = Vec::new();
+    let mut rowvals: Vec<(usize, f64)> = Vec::new();
+    for j in 0..n + m {
+        if j >= n && j != q && j != leave && s.pos_of[j] != NONE && has_mirror {
+            let arj = match prods.as_ref() {
+                Some(pr) => pr[j],
+                None => dot(&p.cols[j], &rho),
+            };
+            if arj.abs() > ROW_DROP_TOL {
+                if !s.fixed[j] {
+                    if !prods_q.as_ref().is_some_and(|pq| dsub(&mut s, j, pq[j])) {
+                        s.d[j] -= theta_d * arj;
+                    }
+                }
+                // Mode 2 gives the basic slack's noise product the weight update too, which puts it into the reference framework
+                // (`w > 0`), GREENBEA iteration 6094: a product below the update tolerance leaves `w = 1`.
+                if m2 {
+                    s.w[j] = s.w[j].max(((wq / alpha_rq) / alpha_rq) * arj * arj + 1.0);
+                }
+                // The reference keeps a basic slack's rounding-noise row product in the pivot row like any entry.
+                changed.push(j);
+                rowvals.push((j, arj));
+            }
+            continue;
+        }
+        if s.pos_of[j] != NONE || j == q || s.excluded == Some(j) {
+            // The dropped variable is outside the reference's row copy: its d and weight are not updated (fx_midsing_1496 pricing call 19).
+            continue;
+        }
+        let arj = match prods.as_ref() {
+            Some(pr) => pr[j],
+            None => dot(&p.cols[j], &rho),
+        };
+        // The reference's row product keeps the entries above its drop tolerance (`0x134d90`).
+        if arj.abs() <= ROW_DROP_TOL {
+            continue;
+        }
+        // The Devex update has its own, larger drop tolerance (`0x103d0d`); d and the list keep the row product's.
+        if m2 {
+            // Mode 2 (`0x104c2d`): `w_j = max(w_j, wq / alpha^2 * arj^2 + 1)`, no cross term.
+            if arj.abs() > WEIGHT_DROP_TOL {
+                if let (Some((a_rq, wq_q)), Some(pq)) = (qw, prods_q.as_ref()) {
+                    // 0x257f98 and 0x25809d keep the divisions and row update in x87 precision.
+                    use crate::real::Real;
+                    let nw = ((wq_q / a_rq) / a_rq) * pq[j] * pq[j] + crate::f80::F80::ONE;
+                    if s.wf.len() != s.w.len() {
+                        *s.wf = vec![crate::f80::F80::ZERO; s.w.len()];
+                    }
+                    let old = if s.wf[j].to_f64() == s.w[j] {
+                        s.wf[j]
+                    } else {
+                        crate::f80::F80::c(s.w[j])
+                    };
+                    if nw > old {
+                        s.wf[j] = nw;
+                        s.w[j] = nw.to_f64();
+                    }
+                } else {
+                    s.w[j] = s.w[j].max(((wq / alpha_rq) / alpha_rq) * arj * arj + 1.0);
+                }
+            }
+        } else if arj.abs() > WEIGHT_DROP_TOL {
+            if let (Some((a_rq, wq_q)), Some(cross), Some(pq)) =
+                (qw, devex_cross.as_ref(), prods_q.as_ref())
+            {
+                use crate::real::Real;
+                let cached = deltas.values[j];
+                let (ratio, vj) = if cached.is_some() {
+                    (crate::f80::F80::ZERO, crate::f80::F80::ZERO)
+                } else {
+                    (pq[j] / a_rq, cross.dot(&p.fcols[j]))
+                };
+                if s.wf.len() != s.w.len() {
+                    *s.wf = vec![crate::f80::F80::ZERO; s.w.len()];
+                }
+                let old = if s.wf[j].to_f64() == s.w[j] {
+                    s.wf[j]
+                } else {
+                    crate::f80::F80::c(s.w[j])
+                };
+                let increment = match cached {
+                    Some(value) => {
+                        #[cfg(test)]
+                        DEVEX_DELTA_ACTIVITY.with(|c| {
+                            let (rows, terms) = c.get();
+                            c.set((rows, terms + 1));
+                        });
+                        value
+                    }
+                    None => {
+                        let value = ratio * (wq_q * ratio - crate::f80::F80::c(2.0) * vj);
+                        deltas.values[j] = Some(value);
+                        value
+                    }
+                };
+                let nw = increment + old;
+                s.wf[j] = nw;
+                s.w[j] = nw.to_f64();
+            } else {
+                let ratio = arj / alpha_rq;
+                let vj = dot_lanes(&p.fcols[j], &u, col_off[j] & 1);
+                s.w[j] = ratio * ((wq * ratio - vj) - vj) + s.w[j];
+            }
+            // A fixed structural never resets the framework (PILOT.JA iteration 3856: the fixed EMROP06 went to -3e4); a fixed
+            // slack does (PEROLD iteration 1626, PILOTNOV iteration 1026).
+            if faithful_weights && s.w[j] < NORM_RESET_TOL && !(j < n && s.fixed[j]) {
+                norm_reset = true;
+            }
+            let floor = if faithful_weights { W_MIN } else { 1.0 };
+            s.w[j] = s.w[j].max(floor);
+        }
+        if !s.fixed[j] {
+            // The reference sums the row product in the order of the BTRAN output list.
+            if !prods_q.as_ref().is_some_and(|pq| dsub(&mut s, j, pq[j])) {
+                s.d[j] -= theta_d * arj;
+            }
+        }
+        // The variable dropped from a singular start basis is not in the reference's row copy, so not in its pivot row.
+        if s.excluded != Some(j) {
+            changed.push(j);
+            rowvals.push((j, arj));
+        }
+    }
+    (norm_reset, changed, rowvals)
+}
+
 #[cfg(test)]
 mod primal_row_update_tests {
     use super::*;
@@ -9997,6 +10368,14 @@ mod primal_row_update_tests {
             new.df.iter().map(|x| x.repr()).collect::<Vec<_>>(),
             "cost twins"
         );
+        #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+        if arg.qw.is_some() || arg.prods_q.is_some() {
+            let mut cache = DevexDeltaMemo::default();
+            let mut b = b.clone();
+            for _ in 0..3 {
+                cache.update(view(&mut b, pos, fixed, excluded), arg);
+            }
+        }
         assert_eq!(expected.0, got.0, "norm reset");
         assert_eq!(expected.1, got.1, "changed order");
         assert_eq!(
@@ -10683,5 +11062,146 @@ mod rhs_memo_tests {
         };
         assert!(!std::sync::Arc::ptr_eq(a, b));
         assert_eq!(bits(separate.ftran_basic(&rows, &vals)), expected);
+    }
+}
+
+#[cfg(test)]
+mod devex_delta_tests {
+    use super::*;
+    use crate::f80::F80;
+
+    #[test]
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    fn real_cached_rows_match_frozen() {
+        for (name, cap, iterations, refs, status) in [
+            ("fx_quad_obj_5371", 5500, 5319, 5, Status::Infeasible),
+            ("quad_2717", 17000, 16010, 3022, Status::Optimal),
+            ("primal_5959", 16000, 15688, 7842, Status::NumericalFailure),
+        ] {
+            let model = crate::mps::parse(
+                &std::fs::read_to_string(format!("tests/fixtures/{name}.mps")).unwrap(),
+            )
+            .unwrap();
+            let mut opts = SolveOptions::dual_release();
+            opts.max_iterations = cap;
+            DEVEX_DELTA_ACTIVITY.with(|c| c.set((0, 0)));
+            let r = crate::solve(&model, None, &opts).unwrap();
+            assert_eq!(
+                (r.status, r.iterations, r.refactorizations),
+                (status, iterations, refs)
+            );
+            let (rows, saved) = DEVEX_DELTA_ACTIVITY.with(|c| c.get());
+            assert!(rows > 0, "cache not exercised: {name}");
+            if name != "fx_quad_obj_5371" {
+                assert!(saved > 1000, "cache hits not exercised: {name}");
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    fn exact_keys_eviction_and_control_modes() {
+        let model = crate::mps::parse(include_str!("../tests/fixtures/afiro.mps")).unwrap();
+        let p = build(&model);
+        let nm = p.n + p.m;
+        let pos = vec![NONE; nm];
+        let fixed = vec![false; nm];
+        let rho = vec![0.25; p.m];
+        let tau = vec![F80::from_repr(0x8000000000000001, 0x3fff); p.m];
+        let cross = DevexCrossTerms::new(&tau);
+        let pq: Vec<_> = (0..nm)
+            .map(|i| F80::from_repr(0x8000000000000001 + i as u64, 0x3fff))
+            .collect();
+        let prods = vec![1.0; nm];
+        let mut w = vec![1.0; nm];
+        let mut d = vec![0.5; nm];
+        let mut wf = Vec::new();
+        let mut df = vec![F80::from_f64(0.5); nm];
+        let mut arg = PrimalRowInput {
+            p: &p,
+            q: NONE,
+            leave: NONE,
+            m2: false,
+            has_mirror: true,
+            faithful_weights: true,
+            prods: Some(&prods),
+            prods_q: Some(&pq),
+            rho: &rho,
+            u: &rho,
+            qw: Some((F80::ONE, F80::ONE)),
+            cross: Some(&cross),
+            theta_d: 0.25,
+            alpha_rq: 1.0,
+            wq: 1.0,
+            theta_dq: Some(F80::from_f64(0.25)),
+        };
+        let mut memo = DevexDeltaMemo::default();
+        macro_rules! run {
+            () => {
+                memo.update(
+                    PrimalRowState {
+                        w: &mut w,
+                        d: &mut d,
+                        wf: &mut wf,
+                        df: &mut df,
+                        pos_of: &pos,
+                        fixed: &fixed,
+                        excluded: None,
+                    },
+                    &arg,
+                )
+            };
+        }
+        run!();
+        assert_eq!((memo.hits, memo.misses), (0, 1));
+        run!();
+        assert_eq!((memo.hits, memo.misses), (1, 1));
+        for i in 1..=8 {
+            arg.qw = Some((F80::ONE, F80::from_repr(0x8000000000000001 + i, 0x3fff)));
+            run!();
+        }
+        assert_eq!(memo.entries.len(), 8);
+        arg.qw = Some((F80::ONE, F80::ONE));
+        let misses = memo.misses;
+        run!();
+        assert_eq!(memo.misses, misses + 1);
+        let mut changed = pq.clone();
+        changed[0] = F80::from_repr(0x8000000000000002, 0x3fff);
+        arg.prods_q = Some(&changed);
+        let misses = memo.misses;
+        run!();
+        assert_eq!(memo.misses, misses + 1);
+        let counts = (memo.hits, memo.misses);
+        arg.qw = Some((F80::ZERO, F80::ONE));
+        run!();
+        arg.qw = Some((F80::NAN, F80::ONE));
+        run!();
+        arg.qw = Some((F80::ONE, F80::ONE));
+        arg.m2 = true;
+        run!();
+        assert_eq!((memo.hits, memo.misses), counts);
+        arg.m2 = false;
+        struct Restore(u16);
+
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                unsafe {
+                    std::arch::asm!("fldcw [{cw}]",cw=in(reg)&self.0,options(nostack));
+                }
+            }
+        }
+        let mut cw = 0u16;
+        unsafe {
+            std::arch::asm!("fnstcw [{cw}]",cw=in(reg)&mut cw,options(nostack));
+        }
+        let _restore = Restore(cw);
+        for mode in [0x027fu16, 0x077f, 0x0b7f, 0x0f7f] {
+            unsafe {
+                std::arch::asm!("fldcw [{cw}]",cw=in(reg)&mode,options(nostack));
+            }
+            let counts = (memo.hits, memo.misses);
+            run!();
+            assert_eq!((memo.hits, memo.misses), counts);
+        }
     }
 }

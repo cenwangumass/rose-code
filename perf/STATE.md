@@ -4,7 +4,7 @@ Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (histo
 
 ## Numbers
 
-Baseline solver: `8b645007` (same solver as `vlsokskq`). Current solver: `ntpwppnk` (bounded-normal F80-to-double bit assembly, completed ordering hashes stored before allocation, reused adjacency buffers during quotient ordering, unique AA-neighbour construction, compact pure extended ranked-product-result reuse, compact native extended reduced-cost-result reuse, compact extended RHS-result/WORK-estimate reuse, four-row/four-column SIMD barrier DGEMM tiles with scalar two-column tails, allocation-free row-tile selection, whole-loop primal row dispatch, sparse auxiliary etas, optional Linux CLI `system-tcmalloc`, PGO with 64-byte loop alignment and online profile merging).
+Baseline solver: `8b645007` (same solver as `vlsokskq`). Current solver: `vypkuxry` (compact pure normal-Devex increment reuse, bounded-normal F80-to-double bit assembly, completed ordering hashes stored before allocation, reused adjacency buffers during quotient ordering, unique AA-neighbour construction, compact pure extended ranked-product-result reuse, compact native extended reduced-cost-result reuse, compact extended RHS-result/WORK-estimate reuse, four-row/four-column SIMD barrier DGEMM tiles with scalar two-column tails, allocation-free row-tile selection, whole-loop primal row dispatch, sparse auxiliary etas, optional Linux CLI `system-tcmalloc`, PGO with 64-byte loop alignment and online profile merging).
 Parity: full tier 987/987; release tests pass. Three timed runs after one warm-up, with direct paired follow-ups noted below, hyperfine 2.0.0; instruction counts are millions from perf stat.
 
 `baseline wall` is the fixed initial process-wall median. Other wall columns
@@ -129,62 +129,88 @@ factor values plus low-bit variations, and all 16 MXCSR rounding/flush modes.
 Exact bits agree, including ties, carries, subnormals, overflow and NaNs.
 Native assembly uses integer rounding/bit assembly on the admitted path.
 
-Initial complete bounded ADLITTLE/fx/Quad_2717 pairs agree. Target instructions
-fall 3.16%, cycles 3.94%; fx instructions fall 2.47%, cycles 3.16%.
-Two independent Quad_2717 screens (32 AB + 32 AA, CPU 4, cap 17000,
-seeds 10427/10499) pass every criterion: median solve -4.641/-4.398%,
-intervals [-5.139%, -3.592%] / [-5.819%, -3.431%], AA [-1.523%, +0.768%] /
-[-0.813%, +1.134%], sign p 7.68e-9/1.23e-7, 31/32 and 30/32 improving.
-Both execution orders improve and both AA controls are healthy.
+Complete bounded-normal conversion qualification remains in
+`target/perf-f80-double-bits/`. Its qualified CLI
+`569e13b50e004005676d6eb1a2334a3cf8ef6d00a118fbc81d9e875c95711c6c` is this trial's paired predecessor;
+the opaque-input test fix changes no production code.
 
-Full frozen parity passes 987/987. All 37 release groups pass (89 library,
-252 total tests), formatting passes, and all 23 complete no-dump benchmark
-result/exit pairs agree. Source/tests and the screened CLI stay frozen.
-The full sweep has 2 timing flags, each receiving the fixed three-pair
-follow-up and one predeclared reversed-role control (A=candidate,
-B=predecessor), rejecting established regressions even below 0.5%:
+The compact shared provider now retains up to eight FIFO normal-Devex input
+keys. Each key preserves the full extended representations of `a_rq`, `wq_q`,
+every `pq` value and every cross `tau` value, including signed zeros and low
+bits. Its Solver owns immutable problem columns. Per-column values are filled
+lazily with exactly `ratio * (wq_q * ratio - 2 * cross.dot(column))`, where
+`ratio = pq[j] / a_rq`. Every call still reads and adds the current old weight,
+and retains all floors, costs, twins, state flags, reset/output order and WORK.
+Misses compute ratio/dot at their original point before reading the old weight;
+the remaining expression retains its original operation order.
 
-pilot4.primal-r: follow-up median solve +1.12%, cycles +0.46%.
-greenbea.pdhg: follow-up median solve +0.78%, cycles -0.10%.
+Only native x86_64 Linux, packed-cross, normal mode with at most 50 rows and
+100 total variables, valid dimensions, finite key inputs, nonzero divisor and
+standard masked nearest/64-bit x87 control is admitted. Dumps, mode 2 and all
+unsupported cases run the unchanged original kernel. No F80 primitive changes.
+The complete original production and independent frozen row bodies remain
+source-identical. A reversal proof checks the cached specialization against
+the original. Every eligible row in release unit-test builds also executes the
+independent frozen kernel and compares full mutable weight/cost/twin bits, reset, changed
+order and complete ordered output. New tests exercise actual warm hits on
+bounded Quad/primal5959 solves, plus fx rows, low key bits, eviction and control
+fallbacks.
 
-pilot4.primal-r (seed 10722): predecessor median -0.128%, interval [-0.482%, +0.206%], AA [-0.316%, +0.541%], sign p 0.298.
-greenbea.pdhg (seed 11249): predecessor median -0.170%, interval [-0.407%, +0.453%], AA [-0.387%, +0.461%], sign p 0.298.
+Initial complete bounded ADLITTLE/fx/Quad pairs agree. Quad instructions fall
+5.90% and median cycles 8.31%. Two independent Quad screens (32 AB + 32 AA,
+CPU 4, cap 17000, seeds 14221/14293) pass every criterion: median solve
+-11.104/-9.825%, intervals [-13.671%, -9.874%] / [-11.300%, -8.986%],
+AA [-2.811%, +0.339%] / [-2.080%, +1.219%]. All 32 pairs improve in both;
+sign p 2.33e-10 each, both execution orders improve and AA controls are healthy.
+
+Full frozen parity passes 987/987. All 37 release groups pass (91 library, 254 total tests).
+Formatting passes and all 23 complete no-dump benchmark result/exit pairs agree.
+Source/tests and the screened CLI remain frozen. The 2 full-sweep timing
+flags each receive fixed three-pair follow-ups and one predeclared reversed-role
+control (A=candidate, B=predecessor), rejecting established regressions even
+below 0.5%:
+
+degen3.primal-c: follow-up median solve +0.11%, cycles -0.00%.
+greenbea.pdhg: follow-up median solve +0.62%, cycles +0.57%.
+
+degen3.primal-c (seed 14419): predecessor median -0.037%, interval [-0.757%, +0.832%], AA [-1.124%, +0.528%], sign p 0.57.
+greenbea.pdhg (seed 15039): predecessor median +0.261%, interval [-0.910%, +0.751%], AA [-0.786%, +0.590%], sign p 0.811.
 
 No control establishes a regression; every AA control passes its bias check.
 No samples are extended and no control is repeated.
 
-Current source/build, exact conversion proof, frozen oracle, disassembly,
-both screens and every gate/result/control: `target/perf-f80-double-bits/`.
-Fixed 39-case PGO training uses online merge, 64-byte loop alignment and system
-TCMalloc. Profile SHA256 `cf8fa9b9dbda620de8dad567acc407004b448fa406147a26dbebe1a7462f14db`;
-CLI SHA256 `569e13b50e004005676d6eb1a2334a3cf8ef6d00a118fbc81d9e875c95711c6c`.
+Current source/build, source/ownership proof, differential tests, both screens
+and every gate/result/control: `target/perf-devex-delta/`. Fixed 39-case PGO uses
+online merge, 64-byte loop alignment and system TCMalloc.
+Profile SHA256 `79f8f3009d54e96bd4d3db1caa16684a4bf4477e58f31120852c6f02f304a84a`;
+CLI SHA256 `998efcda56a3d020475cd730cd64a80766bbe5cf8b73fc49122d862ad095d630`.
 Frozen baselines and cached original-reference Runtime targets are unchanged.
 
 | run | ref solve | baseline wall | paired base wall | current wall | solve | current/ref | instr |
 |---|---|---|---|---|---|---|---|
-| degen2.primal-c | 0.012711 | 0.182 | 0.039 | 0.039 | 0.033993 | 2.67 | 264.4 |
-| degen2.dual-r | 0.009653 | 0.125 | 0.034 | 0.033 | 0.027726 | 2.87 | 203.1 |
-| degen3.primal-c | 0.163137 | 3.237 | 0.472 | 0.475 | 0.463313 | 2.84 | 3815.0 |
-| degen3.primal-r | 0.193685 | 3.872 | 0.541 | 0.541 | 0.530451 | 2.74 | 4279.2 |
-| perold.primal-c | 0.160994 | 2.430 | 0.492 | 0.495 | 0.488074 | 3.03 | 4333.6 |
-| pilot4.primal-r | 0.015787 | 0.253 | 0.054 | 0.054 | 0.048781 | 3.09 | 472.8 |
-| 80bau3b.primal-c | - | 1.618 | 0.613 | 0.609 | 0.594304 | - | 6155.0 |
-| primal_5959.primal-r | 0.067884 | 0.563 | 0.136 | 0.132 | 0.127246 | 1.87 | 1313.5 |
-| degen3.dual-c | 0.082843 | 1.002 | 0.247 | 0.247 | 0.236339 | 2.85 | 1828.2 |
-| degen3.dual-r | 0.082947 | 1.008 | 0.250 | 0.251 | 0.239904 | 2.89 | 1836.2 |
-| perold.dual-r | 0.038532 | 0.355 | 0.129 | 0.128 | 0.121323 | 3.15 | 1046.0 |
-| 80bau3b.dual-r | - | 1.103 | 0.313 | 0.313 | 0.297694 | - | 2474.8 |
-| greenbea.dual-c | - | 2.870 | 0.663 | 0.665 | 0.650797 | - | 4916.0 |
-| greenbea.dual-r | - | 3.598 | 0.658 | 0.657 | 0.643605 | - | 4856.5 |
-| mode_switch.dual-r | - | 25.815 | 1.277 | 1.265 | 1.238757 | - | 12066.3 |
-| primal_5959.dual-r | 0.098192 | 1.300 | 0.188 | 0.180 | 0.174980 | 1.78 | 1833.9 |
-| quad_2717.dual-r | 0.092814 | 1.130 | 0.212 | 0.203 | 0.198434 | 2.14 | 1914.4 |
-| fx_quad_obj_5371.dual-r | 0.038077 | 0.334 | 0.079 | 0.076 | 0.071267 | 1.87 | 749.3 |
-| degen3.barrier-r | 0.075214 | 0.608 | 0.206 | 0.205 | 0.171797 | 2.28 | 2447.3 |
-| 80bau3b.barrier-r | - | 0.379 | 0.227 | 0.227 | 0.204947 | - | 2626.3 |
-| greenbea.barrier-r | - | 1.569 | 0.779 | 0.779 | 0.750260 | - | 9884.1 |
-| 80bau3b.pdhg | - | 4.552 | 3.603 | 3.617 | 3.603943 | - | 74938.3 |
-| greenbea.pdhg | - | 2.801 | 1.574 | 1.608 | 1.560960 | - | 31946.8 |
+| degen2.primal-c | 0.012711 | 0.182 | 0.061 | 0.061 | 0.053684 | 4.22 | 264.5 |
+| degen2.dual-r | 0.009653 | 0.125 | 0.052 | 0.051 | 0.043423 | 4.50 | 203.1 |
+| degen3.primal-c | 0.163137 | 3.237 | 0.742 | 0.755 | 0.464185 | 2.85 | 3815.3 |
+| degen3.primal-r | 0.193685 | 3.872 | 1.035 | 0.860 | 0.842698 | 4.35 | 4279.7 |
+| perold.primal-c | 0.160994 | 2.430 | 0.495 | 0.494 | 0.486881 | 3.02 | 4333.6 |
+| pilot4.primal-r | 0.015787 | 0.253 | 0.054 | 0.054 | 0.048191 | 3.05 | 472.8 |
+| 80bau3b.primal-c | - | 1.618 | 0.613 | 0.614 | 0.599289 | - | 6155.2 |
+| primal_5959.primal-r | 0.067884 | 0.563 | 0.139 | 0.125 | 0.121007 | 1.78 | 1247.7 |
+| degen3.dual-c | 0.082843 | 1.002 | 0.248 | 0.248 | 0.237682 | 2.87 | 1828.4 |
+| degen3.dual-r | 0.082947 | 1.008 | 0.249 | 0.250 | 0.239304 | 2.89 | 1836.4 |
+| perold.dual-r | 0.038532 | 0.355 | 0.127 | 0.128 | 0.121213 | 3.15 | 1046.1 |
+| 80bau3b.dual-r | - | 1.103 | 0.315 | 0.314 | 0.298138 | - | 2475.0 |
+| greenbea.dual-c | - | 2.870 | 1.337 | 1.127 | 1.099721 | - | 4916.4 |
+| greenbea.dual-r | - | 3.598 | 1.066 | 0.988 | 0.968622 | - | 4856.9 |
+| mode_switch.dual-r | - | 25.815 | 1.977 | 2.008 | 1.969685 | - | 12067.0 |
+| primal_5959.dual-r | 0.098192 | 1.300 | 0.274 | 0.258 | 0.251384 | 2.56 | 1768.6 |
+| quad_2717.dual-r | 0.092814 | 1.130 | 0.336 | 0.296 | 0.288196 | 3.11 | 1801.5 |
+| fx_quad_obj_5371.dual-r | 0.038077 | 0.334 | 0.121 | 0.122 | 0.115692 | 3.04 | 749.4 |
+| degen3.barrier-r | 0.075214 | 0.608 | 0.300 | 0.311 | 0.259368 | 3.45 | 2447.6 |
+| 80bau3b.barrier-r | - | 0.379 | 0.331 | 0.338 | 0.306871 | - | 2626.6 |
+| greenbea.barrier-r | - | 1.569 | 1.176 | 1.182 | 1.137118 | - | 9884.6 |
+| 80bau3b.pdhg | - | 4.552 | 3.618 | 3.562 | 3.548543 | - | 74938.6 |
+| greenbea.pdhg | - | 2.801 | 2.207 | 3.074 | 1.569199 | - | 31947.5 |
 
 ## Hotspots
 
@@ -297,19 +323,25 @@ retains both `(wq_q / a_rq) / a_rq` Div calls inside the mode-2 loop; GOT 364550
 resolves the two sites to F80::Div. The lazy coefficient trial below is
 unapplied after an inconclusive full-session regression control.
 
-The normal-mode ratio stream has 262 global distinct pairs on Quad_2717;
-FIFO bounds 32/64/128/256/512 give 0/32,751/32,751/32,751/284,881 hits.
-Fx has 179 distinct pairs over 221 terms and only 42 hits even at 512. These
-simulations omit Solver/provider resets and are upper bounds, not a chosen
-cache design. All statuses/iterations/refactors match; comparable optimal
-ADLITTLE/Quad objective/primal/dual/reduced-cost fields equal the CLI. Fx's
-infeasible numeric fields are suppressed by the CLI. Production source, CLI
-and PGO metadata are restored exactly. Counts/ordered stream, scope, validating
-test, original source and annotation: `target/perf-devex-ratios/`.
+Reset/owner-aware test-only traces retain provider Arcs during measurement to
+prevent identity reuse, identify Solver starts explicitly, and capture full
+`(a_rq,wq_q,pq[],tau[])` keys plus actual used-column masks. Quad has eight
+owners with five distinct keys each. Eight FIFO entries per owner save
+284,403/285,143 terms (four entries save only 20,223); primal5959 primal/dual
+save 168,720/170,311 and 167,264/168,455 terms. Fx has no normal-mode hits.
+These measurements justify the current bound; the earlier global scalar-only
+512-entry simulation did not model ownership and is superseded. All keys are
+finite with nonzero divisor in these traces; the production guard checks them.
+Optimal ADLITTLE/Quad full numeric fields and all status/iteration/refactor
+counts match the accepted CLI. Nonoptimal numeric fields are CLI-suppressed.
+Instrumentation is removed before qualification. Counts, exact ordered streams,
+Solver/owner scope, source snapshots, validating tests and restoration proof:
+`target/perf-devex-reuse/`; original mode-2/scalar ratio diagnostic and assembly:
+`target/perf-devex-ratios/`.
 
 ## In progress
 
-None. Qualified `ntpwppnk` source, CLI and PGO metadata are installed;
+None. Qualified `vypkuxry` source, CLI and PGO metadata are installed;
 the overall reference performance goal remains unmet.
 
 ## Extended BTRAN feasibility

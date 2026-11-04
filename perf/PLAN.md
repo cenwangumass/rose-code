@@ -193,7 +193,12 @@ measured.
   software x87 extended-precision type; its add/mul/div are in every quad kernel. Bounded-normal
   to-double bit assembly is now qualified with the complete original conversion
   and all MXCSR modes as oracles; preserve its original boundary fallback.
-  Refresh remaining BTRAN, row/control and software arithmetic after this change.
+  Eight-entry pure normal-Devex increment reuse is qualified per compact owner;
+  full extended input keys and lazy column fills preserve live mutable state.
+  Reset/owner-aware measurements justify that bound on small problems; larger
+  problems and mode 2 retain the original path. The lazy mode-2 coefficient
+  trial remains unapplied after an inconclusive full-session control.
+  Refresh remaining BTRAN, row/control and software arithmetic after these changes.
   Look for a faster exact implementation of the same rounding (the F80 tests and `../reverse-engineer/evidence/f80-subnormal-reference.json`
   define it), and for F80 work that runs where its results are not used.
 - **Dump overhead with no dump selected**: about 70 `dump::on("kind")` sites in `dual.rs` and

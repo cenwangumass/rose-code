@@ -213,6 +213,27 @@ working-set measurement and all qualification data: `target/perf-rank-memo/`,
 qualified variant under `v2/`. This establishes a local gain, not the overall
 reference performance goal or safety of numerical producer-U reuse.
 
+## Compact normal-Devex increment reuse
+
+The existing shared provider also owns an eight-entry FIFO of pure extended
+normal-Devex increments. Its Solver owns immutable problem columns; full-bit
+`a_rq`, `wq_q`, `pq[]` and `tau[]` keys identify every arithmetic input. Entries
+fill only used columns. Each call still adds its live old weight and performs
+all original cost/twin/reset/state/order updates and WORK. The bound is at most
+50 rows/100 total variables; mode 2, dumps, malformed/nonfinite inputs and
+unsupported native/x87 modes retain the original production kernel.
+
+Reset/owner-aware measurements show five keys per Quad owner and >99% saved
+terms with eight entries. Native cross has no address-dependent peel or FP
+status input. Production/frozen row kernels remain source-identical; reversal
+proof and release-test per-row full-state differential checks cover hits and
+fallbacks. At `vypkuxry`, two fixed target screens gain 11.10/9.83%; instructions
+fall 5.90%. Full 987-run parity, all 254 release tests, formatting and 23 complete
+benchmark pairs pass; fixed regression controls are healthy and establish no
+slowdown. Scope/proof and every qualification record:
+`target/perf-devex-delta/`; ownership-aware diagnostic:
+`target/perf-devex-reuse/`. The overall reference performance goal is unmet.
+
 ## Nucleus coordinate workspace screen
 
 The constructor repeatedly searches immutable pivot L/U vectors for a coefficient.
