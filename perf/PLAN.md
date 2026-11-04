@@ -211,14 +211,17 @@ measured.
   writes removes lookup/locking and lowers instructions/cycles; its controlled
   target screen remains inconclusive. Do not extend or repeat that screen.
   Current accepted ordinary-primal PILOT4 self attribution puts solve_primal,
-  BTRAN, FTRAN and primal row updates first. Dynamic consecutive-pair SSE2 and
-  planned consecutive-run SIMD products preserve the original per-output terms
-  but both lose at counters. Do not extend them into timing screens. Before
-  another ordinary-product cache, measure full ordered input and row-order
-  working sets per immutable model owner, spanning all calls in a bounded solve.
-  Preserve full value bits and canonical (rank,row) order, including ties and
-  duplicates; exclude unrelated test-only oracle arithmetic. Use existing dump
-  inputs and a test-only observer before selecting bounds or writing a cache.
+  BTRAN, FTRAN and primal row updates first. Packed pair/run products lose at
+  counters. Exact ordered numeric streams have negligible full-result reuse;
+  repeated row orders cover about half the terms, but the tested eight-entry
+  gather-plan stream costs3.09 times the original standalone computation once
+  lookup/construction are included. Do not implement those caches from hit rates
+  alone. The ordinary positive-floor rewrite lowers instructions but its fixed
+  controlled screen is inconclusive; do not extend it or use its median as a gain.
+  Return to remaining whole factor-production/update or FTRAN passes using the
+  native profiles and ownership audit; check prior constructor/storage rejections
+  before another implementation. Producer/consumer numerical identity still
+  requires standard dump/comparison evidence before bypassing replay arithmetic.
   Look for a faster exact implementation of the same rounding (the F80 tests and `../reverse-engineer/evidence/f80-subnormal-reference.json`
   define it), and for F80 work that runs where its results are not used.
 - **Dump overhead with no dump selected**: about 70 `dump::on("kind")` sites in `dual.rs` and

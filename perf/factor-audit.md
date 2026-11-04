@@ -749,6 +749,46 @@ The tested traversals have no qualified solver benefit. Sources, proofs,
 structure counts, builds/tests, complete pairs/counters and assembly:
 `target/perf-rank-pairs/`, planned variant `v2/`.
 
+## Ordinary product reuse and gather-plan cost
+
+Test-only monotonic Internal IDs isolate immutable model lifetimes; keys preserve
+canonical sorted row order and full input bits. The capped release ADLITTLE,
+BORE3D and DEGEN2 prefix make no ordinary-product calls. PILOT4 release makes367
+calls/1,401,403 terms with359 numeric keys. FIFO1..16 has zero numeric hits;
+even512 entries save only57 terms in8 calls. A full-result cache is unjustified
+on this measured stream. All statuses/counts and optimal full numeric fields
+agree with the accepted CLI; original production arithmetic/WORK are unchanged.
+
+The203 distinct row orders have152 eight-entry FIFO hits, covering704,634 terms;
+117 are consecutive repeats. Of249 changed adjacent orders,72 need at most two
+ordered insertions/deletions; the median needs12 edits with a261-row changed
+span. These counts do not establish cheap plan maintenance. Exact coefficient/
+query streams, every bound, transition analysis and source reversal/validation:
+`target/perf-rank-reuse/`.
+
+A standalone gather plan retains per-output term order and uses original scalar
+fallback for nonfinite values/coefficients. Its unchanged complete original
+ranked-product oracle passes5984 full-vector checks over captured queries,
+boundaries/nonfinites and16 MXCSR modes. Fixed eight CPU-4 alternating pairs
+(four cold captured streams per variant) give0.916 arithmetic time ratio with
+plans/order precomputed, but3.091 full eight-FIFO plan/original ratio including
+sort/lookup/construction. Checksums agree and are nonzero. Standalone ThinLTO
+without PGO is feasibility evidence, not solver qualification or a general bound.
+No cache is integrated. Complete oracle/probe/compiler/inputs/raw data:
+`target/perf-rank-plan-probe/`.
+
+Current accepted row annotation again shows short scalar dots and the Devex
+recurrence/norm/floor region; the long lane path remains cold in this sample.
+Specializing only the ordinary positive finite floor passes2,097,696 primitive
+comparisons over all16 MXCSR modes, the original complete-row oracle, fast940
+and bounded full result/exit pairs. Matching-PGO PILOT4 instructions fall0.381%,
+cycles+0.221%. The fixed32-AB/32-AA screen26217 remains inconclusive (median
+-0.952%, interval[-3.249%,+2.688%], sign p.430, healthy AA, opposite execution
+orders). No confirmation26289 or full candidate gates. Source/CLI/profile/
+metadata restored; formatting and full987 pass. No solver gain is accepted.
+Original source/proof, builds/tests, counters/results and complete screen:
+`target/perf-weight-floor/`; annotation `target/perf-rank-reuse/primal-row.asm`.
+
 ## Remaining proof obligations
 
 Before a factor ownership prototype, separate column-copy and immutable-factor

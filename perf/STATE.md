@@ -440,12 +440,50 @@ this profile does not justify repeating their inconclusive screens. Commands,
 complete outputs/build/hash, small-run timing estimate, counts, sample audit
 and solve_primal/BTRAN annotations: `target/perf-primal-refresh/`.
 
+Ordinary ranked-product working sets are now measured with test-only monotonic
+immutable-model owner IDs, spanning each bounded solve. ADLITTLE/BORE3D primal
+release at cap300 have no ordinary rank_products calls; DEGEN2 release's cap300
+prefix also has none. This does not describe their controlled profile or later
+DEGEN2 work. PILOT4 primal release at cap800 has367 calls under one model owner,
+1,401,403 terms and359 distinct exact ordered numeric keys. FIFO1..16 hits none;
+32/64/128/512 hit1/3/6/8 calls, saving only5/19/47/57 terms. Full-result reuse
+has negligible measured scope. The canonical key is the sorted (rank,row) order
+projected to (row,full vi bits); ignored values and literal rank numbers cannot
+change this arithmetic. Complete raw coefficient bits are retained per owner.
+All statuses/counts and optimal objective/x/dual/reduced-cost bits match the
+accepted CLI; nonoptimal numeric vectors are CLI-suppressed. Diagnostic reversal
+recovers the original source exactly apart from final whitespace.
+
+Ignoring numeric bits yields203 row orders. FIFO1/2/4/8/16 hits117/135/145/152/
+156 calls, covering553,542/635,322/684,823/704,634/704,690 terms. Additional space
+has almost no term benefit. Among366 adjacent queries,117 orders are identical;
+72 changed orders need at most two insertions/deletions, while the median changed
+order needs12 edits and has a261-row changed span. These are structural reuse
+measurements, not construction-cost savings. Exact streams, every bound,
+transition analysis, source/build/scope and validation: `target/perf-rank-reuse/`.
+
+A standalone release gather-plan probe preserves the complete original ranked
+product as its independent oracle. Plans group terms by output while retaining
+each output's exact original term order; nonfinite input/coefficient cases use
+the original scalar traversal. All5984 complete-vector comparisons pass across
+16 MXCSR rounding/flush modes, all367 captured PILOT4 queries and boundary/
+nonfinite vectors. Eight fixed alternating CPU-4 pairs replay four cold
+solve-equivalent streams per variant. With order/plans precomputed and common
+output allocation, median gather/scatter arithmetic ratio is0.916. Including
+original order collection/sort plus actual eight-entry FIFO lookup/construction,
+median plan/original ratio is3.091. The rolling checksums agree and are nonzero.
+The standalone ThinLTO probe has no PGO and excludes solver integration; neither
+ratio is an official solver screen or a universal lower bound. The initial
+unpinned smoke is retained separately and excluded from these ratios. No plan
+cache is installed. Original source proof, complete captured inputs, code/build/
+compiler, raw timings and summaries: `target/perf-rank-plan-probe/`.
+
 ## In progress
 
-None. Accepted `vypkuxry` source, CLI and PGO metadata are restored exactly.
-The packed ranked-row product variants fail at counters; no official screen is
-run. The overall reference performance goal remains unmet. Next measurements
-are in PLAN.md.
+None. Accepted `vypkuxry` source, CLI and PGO metadata are restored exactly;
+formatting, fast940 and full987 parity pass. No solver speedup is accepted from
+the ordinary-product working-set, gather-plan or weight-floor experiments.
+The overall reference performance goal remains unmet.
 
 ## Extended BTRAN feasibility
 
@@ -635,6 +673,8 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 - Batch two independent ordinary Devex weight recurrences with SSE2, preserving each column dot and every multiply/subtract/add boundary. The original scalar row body and complete frozen oracle remain source-identical. The first helper-level nonfinite test exposes a NaN payload difference in an inlined scalar fallback (round 9); the final entry admits finite immutable coefficients and finite state/vector/scalar inputs, otherwise executes the original complete row kernel. Immutable coefficient eligibility is computed once; per-call state/vector checks remain. Two final-PGO release tests pass: 50,000 finite recurrence pairs (including finite inputs producing overflow/cancellation), plus captured scaled-AFIRO and expanded random whole-row cases covering modes, original exceptional fallback, signed zeros/NaN payloads, empty dimensions and extended state. Fast parity passes 940/940. Eight ADLITTLE/BORE3D and three PILOT4 complete result/exit pairs agree. Small instructions rise 0.07/0.13%; PILOT4 instructions rise 1.19% and initial median cycles about 3.19%. The full machinery has no benefit; stopped before controlled screens/full gates and restored source, accepted CLI and PGO metadata. Disassembly verifies packed multiply/divide/subtract/add and no new FMA. First/final source, failing/passing tests, exact binaries/builds, all counter/result pairs, oracle proof, assembly and restoration proof: `target/perf-primal-weight2/`. This rejects the complete finite-guarded two-output weight implementation; it does not bound every possible batched kernel.
 
 - Guard the ordinary primal row entry once for present mirror/products, mode 1, faithful weights and no excluded variable. A const-specialized loop retains the original arithmetic; the complete independent frozen row oracle remains byte-identical. Parent/final-PGO release differential tests explicitly exercise the guarded entry on captured scaled AFIRO data and random/empty/extreme/signed-zero/NaN/duplicate cases. Fast parity passes 940/940; eight ADLITTLE/BORE3D canonical result/exit pairs and three PILOT4 pairs agree. Small instructions are flat; PILOT4 instructions fall 1.68%, initial median cycles about 0.97%, and the hot row body shrinks 3057 -> 2394 bytes. The predeclared 32-AB/32-AA screen (CPU 4, cap 800, seed 4421) gives median -0.83%, interval [-4.11%, +0.89%], AA [-2.60%, +0.62%], 19/32 improving pairs, sign p .189; both orders improve, but noise separation fails. Stopped without reserved confirmation/full gates; source, accepted CLI and PGO metadata restored. No qualifying gain is credited. Exact source/binary/build, oracle proof, tests, small/direct counters/results, symbol sizes and complete controlled schedule/raw outputs: `target/perf-primal-prepared/`.
+
+- Ordinary positive weight-floor specialization: the floor is always finite and strictly positive (W_MIN or1), allowing register-only SSE2 maximum with original NaN selection; the extended path keeps its existing max. The independent complete row oracle is byte-identical; reversal changes only the one ordinary floor selection. A frozen runtime primitive passes2,097,696 full-bit/boundary/quiet-and-signaling-NaN comparisons across all16 MXCSR modes; the complete captured/random full-row test and fast940 pass with matching fixed39 PGO. Eight controlled ADLITTLE/BORE3D and three release PILOT4 complete result/exit pairs agree. Instructions fall0.143/0.050/0.381%; PILOT4 cycles+0.221% are effectively flat. Its predeclared32-AB/32-AA PILOT4 screen (CPU4, cap800, seed26217) is inconclusive: median-0.952%, interval[-3.249%,+2.688%],17/32 improving, sign p.430, healthy AA[-2.561%,+1.320%], execution orders-1.820%/+1.342%. Stop without confirmation26289 or full candidate gates. No qualifying runtime gain. Source/accepted CLI/metadata/profile restored exactly; restored formatting, fast940 and full987 pass. Native accepted-row annotation, complete source/oracle/proof, builds/tests/freezes, bounded results/counters and controlled screen: `target/perf-weight-floor/`; accepted annotation is also retained in `target/perf-rank-reuse/primal-row.asm`.
 
 - Consecutive-destination SSE2 ordinary ranked-row products. Static fixed-pair coverage on scaled ADLITTLE/BORE3D/DEGEN2/PILOT4 is86/209,379/770,177/2122,1539/2647 pairs (no duplicate pairs in those models). Immutable model metadata admits only finite-coefficient rows with at least8 entries and two-thirds consecutive pairs; nonfinite input values retain the original scalar loop. Each packed lane updates a distinct output with the same multiply/add and per-output term order; gaps, duplicate destinations, rank ties and exceptional inputs retain their scalar behavior. The independently frozen complete original product, captured AFIRO rho fixture, random finite/extreme/duplicate/rank-tie inputs, existing nonfinite payloads and all16 MXCSR rounding/flush combinations pass; matching fixed39 PGO and fast940 pass for both variants. Eight bounded ADLITTLE/BORE3D pairs and three PILOT4 pairs preserve complete result/exit objects. V1 checks pairs and two-element slices dynamically: PILOT4 instructions+0.944%, cycles+0.495%; small instructions+0.057/+0.078%. V2 stores flat ordered consecutive-run ranges once per immutable model row, validates one destination slice per run and packs its independent pairs. Independent plan tests verify complete ordered partitioning, including duplicates and unsorted gaps. It still loses: PILOT4 instructions+0.814%, cycles+1.396%; small instructions+0.022/+0.119%. Native code confirms packed arithmetic, V1 pair/slice checks and V2 planned-run loops; no exclusive cause is assigned to whole-program counter changes. Neither enters official timing: seeds25217/25289 unused, no full candidate gates. Accepted source/CLI/metadata/profile restored exactly; formatting, fast940 and full987 pass. Static measurement, original/candidate source/proofs, tests/builds/freezes, complete result/counter pairs, native assembly and decisions: `target/perf-rank-pairs/` and `v2/`. This rejects the tested pair/run metadata traversal, not every independent-destination implementation.
 
