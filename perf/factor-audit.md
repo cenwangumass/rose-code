@@ -255,6 +255,28 @@ screen. Artifacts: `target/perf-fresh-replay/` and
 `target/perf-fresh-coverage/`; precise bounds and build hashes are in STATE.md
 and the saved manifest. This is not evidence that direct numerical reuse is safe.
 
+## Short ordinary tau-row screen
+
+The virtual nucleus U row is below eight entries for 91.0% of PEROLD's 36,518
+row dots and 84.6% of DEGEN2's 19,765 in bounded complete dual-release solves.
+A candidate also bounds the numeric U row below eight and uses its first matching
+coefficient directly for each virtual entry, preserving duplicate selection,
+filtering and sequential subtraction order. Longer and extended rows keep the
+original path; every WORK call remains in place. Original row-dot and frozen
+needed-FTRAN bodies are source-identical. The length distribution is not a
+measurement of the combined guard's coverage or removable cost.
+
+The frozen final source/tests pass exact pipeline checks on 100,000 random/full
+representations with independently generated duplicate coefficients, signed zeros,
+NaN payloads/extremes and captured SC50A data; frozen f64/F80 FTRAN, fast parity
+and bounded complete results also pass. Matching fixed39-case PGO reduces PEROLD
+instructions 0.56%, but its predeclared 32AB/32AA timing screen is inconclusive
+(median +0.06%, interval [-2.46%, +1.51%], 16/32 improving). No independent
+confirmation, sample extension or full gates follow. Qualified source/CLI/build
+are restored; there is no accepted short-row specialization. Exact distributions,
+source/oracle proof, all versions/tests/results/counters and controlled samples:
+`target/perf-short-tau/`.
+
 ## F2 snapshot lifetime and consumer audit
 
 The existing F2 payload retains column/tau solved numeric arrays, input positions,
