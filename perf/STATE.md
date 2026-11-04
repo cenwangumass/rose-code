@@ -603,6 +603,8 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 
 - Cache first-match pivot-row/column coefficients in a stamped lookup: semantic tests and fast parity 940/940 pass, PEROLD instructions -0.6%, but solve 0.151853 -> 0.151628 s is within 0.004297/0.000431 s spreads; DEGEN2 has a small timing increase with flat instructions and DEGEN3 primal has no gain. Reverted (`target/perf-pivotvalues-target-{before,after}.txt`).
 
+- Schedule all sparse-L successor queue insertions for each column before its numeric scatter, keeping identical queue insertion/active/remaining updates and the same numeric operations/order. The complete frozen L oracle passes all three focused release tests (f64/F80 random/extreme/captured inputs, output order/value bits, density and WORK estimate), and fast parity passes940/940. Eight bounded ADLITTLE/DEGEN2 pairs and three PEROLD pairs preserve complete no-dump result/exit objects. PEROLD instructions +0.108%, cycles +0.184%, median solve +0.800%; DEGEN2 instructions +0.120%, cycles +0.325%. No useful target counter gain; stopped before predeclared timing seeds9601/9667 or full gates. Source, accepted CLI and PGO metadata restored exactly. Candidate source/build, original source, frozen-source hash, oracle logs, assembly, complete results/counters and setup-build provenance: `target/perf-lschedule/`.
+
 Outlined four-register SSE2 eta dot was rejected before timing. Its independent
 complete original-dot oracle fails on two distinct NaN payloads at n=4,
 peel0, which takes the original scalar fallback; changed call context changes
