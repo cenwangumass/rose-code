@@ -789,6 +789,50 @@ metadata restored; formatting and full987 pass. No solver gain is accepted.
 Original source/proof, builds/tests, counters/results and complete screen:
 `target/perf-weight-floor/`; annotation `target/perf-rank-reuse/primal-row.asm`.
 
+## Packed ordinary L-entry stream
+
+A fitting ordinary factor can encode each immutable L row index as32 bits with
+its unchanged f64 value in12 bytes (wide tuple16). Extended and out-of-range
+cases keep wide entries. Packed reads copy values without unaligned references;
+logical entry counts/ordering and every numeric/WORK expression remain original.
+Source reversal checks fresh/L-stage/full/needed/Kahn bodies. The original L
+oracle reads retained wide storage; independent tests cover exact bits, cloning,
+large-index/extended fallback and full/needed solves. All8 matching-PGO FTRAN/L
+tests and fast940 pass; complete bounded ADLITTLE/DEGEN2/PEROLD results agree.
+
+The complete prototype loses: instructions+0.453/+0.739/+0.501%, PEROLD cycles
++0.600%. No official timing/full candidate gates, seeds27217/27289 unused.
+Accepted source/CLI/metadata/profile restored, formatting and full987 pass.
+Stream bytes alone do not establish allocator-footprint or runtime savings.
+Full sources/oracles/proof, builds/tests, raw results/counters and disassembly:
+`target/perf-lpacked/`.
+
+## Producer-U cached evidence limits
+
+Delegated ref-compare audit confirms controlled-dual SC50A/ADLITTLE k0 factors
+have zero nucleus/tail columns. Their perf-fresh case0 fixtures instead describe
+primal-controlled inputs. SC50A dual k1 is the first nontrivial witness (5 nucleus,
+10 tail columns;4 guarded columns/2 structural visits). No current tag pairs
+pre-overlay replay with producer U; post-overlay equality follows by construction.
+Cached dual LUIN p68 length m cannot satisfy lunum --u's m+1 endpoint schema.
+Current bounded refcap lu_in --lim2 and a paired pre-overlay diagnostic are
+needed before claiming numerical identity. No new capture or agreement range
+is reported. Exact inputs, geometry, commands, provenance and gap report:
+`target/perf-fresh-u-cache-audit/`.
+
+## F80 software ABI lead
+
+Actual accepted F80 multiply/divide take operand pointers and an indirect result
+pointer. Pinned optimized toy code reproduces memory passing for the three-field
+shape; two u64 fields use argument/result registers. A sign plus unbiased
+exponent metadata word could retain the original software arithmetic with that
+shape. This is unimplemented: exact full-field equivalence, real operator codegen,
+constructor/accessor overhead and solver runtime all require independent checks.
+The prior packed-native representation has separate x87 encoding/conversion and
+CW/TLS costs, so its rejection does not settle this software-only layout lead.
+Actual entry disassembly, toy source/assembly and compiler/hash manifest:
+`target/perf-f80-abi-audit/`.
+
 ## Remaining proof obligations
 
 Before a factor ownership prototype, separate column-copy and immutable-factor

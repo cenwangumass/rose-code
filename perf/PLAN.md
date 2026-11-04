@@ -218,10 +218,17 @@ measured.
   lookup/construction are included. Do not implement those caches from hit rates
   alone. The ordinary positive-floor rewrite lowers instructions but its fixed
   controlled screen is inconclusive; do not extend it or use its median as a gain.
-  Return to remaining whole factor-production/update or FTRAN passes using the
-  native profiles and ownership audit; check prior constructor/storage rejections
-  before another implementation. Producer/consumer numerical identity still
-  requires standard dump/comparison evidence before bypassing replay arithmetic.
+  Packed32-bit immutable ordinary L entries preserve numeric/WORK behavior but
+  lose at matching-PGO counters; do not treat reduced stream bytes as a gain.
+  Next test the F80 software call boundary in a standalone probe: preserve the
+  entire original arithmetic/rounding as oracle, combine unbiased exponent/sign
+  into one metadata word, and validate full internal fields before any solver
+  change. Accepted multiply/divide use indirect operands/results; the two-word
+  ABI toy uses registers, but actual codegen/runtime are still unproven. Keep
+  this separate from the rejected packed-native/x87-encoding probes.
+  Producer/consumer U identity is still unproven: use nontrivial SC50A dual k1,
+  repair the old cached LUIN endpoint schema through current bounded refcap,
+  and capture producer/pre-overlay values before bypassing replay arithmetic.
   Look for a faster exact implementation of the same rounding (the F80 tests and `../reverse-engineer/evidence/f80-subnormal-reference.json`
   define it), and for F80 work that runs where its results are not used.
 - **Dump overhead with no dump selected**: about 70 `dump::on("kind")` sites in `dual.rs` and

@@ -478,12 +478,37 @@ unpinned smoke is retained separately and excluded from these ratios. No plan
 cache is installed. Original source proof, complete captured inputs, code/build/
 compiler, raw timings and summaries: `target/perf-rank-plan-probe/`.
 
+Cached producer-U identity audit: the first controlled-dual SC50A and ADLITTLE
+factors have no nucleus or tail columns, so they provide no nontrivial equality
+witness. The first nontrivial SC50A dual factor is k1 (5 nucleus rows,10 tail
+columns; existing guarded coverage marks4 columns/2 structural update visits).
+The perf-fresh SC50A/ADLITTLE case0 fixtures are primal-controlled, not dual.
+No existing tag pairs pre-overlay replay values with producer U; final overwritten
+entries agree by construction only. Cached dual LUIN p68 has m entries rather
+than the m+1 endpoint schema required by compare.py lunum --u. No numerical
+identity, new agreement range or optimization follows. Delegated cached-data
+conclusion, runnable peek/geometry commands, exact inputs/results/provenance and
+missing-schema/pre-overlay requirements: `target/perf-fresh-u-cache-audit/`.
+
+F80 ABI audit of accepted CLI: actual out-of-line multiply/divide receive
+operand pointers and an indirect result pointer. A pinned optimized compiler
+toy with the same three-field shape also uses memory, while a two-u64-field
+shape receives/returns scalar registers. Both are16 bytes on this host. This
+suggests combining the existing unbiased32-bit exponent and sign into one word
+while retaining original software arithmetic, rather than changing to x87
+encoding/native operations. That software representation is not implemented or
+validated yet; toy ABI codegen establishes neither real F80 codegen nor speed.
+Earlier packed-native probes include encoding/conversion/CW/TLS costs and do
+not answer this distinct software-layout question. Actual accepted entry
+assembly, toy source/assembly, compiler/hash and scope: `target/perf-f80-abi-audit/`.
+
 ## In progress
 
 None. Accepted `vypkuxry` source, CLI and PGO metadata are restored exactly;
-formatting, fast940 and full987 parity pass. No solver speedup is accepted from
-the ordinary-product working-set, gather-plan or weight-floor experiments.
-The overall reference performance goal remains unmet.
+formatting, fast940 and full987 parity pass. Packed ordinary L storage loses
+at counters. F80 two-word software representation is an ABI feasibility lead
+only; no numeric rewrite is installed. The overall reference performance goal
+remains unmet.
 
 ## Extended BTRAN feasibility
 
@@ -673,6 +698,8 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 - Batch two independent ordinary Devex weight recurrences with SSE2, preserving each column dot and every multiply/subtract/add boundary. The original scalar row body and complete frozen oracle remain source-identical. The first helper-level nonfinite test exposes a NaN payload difference in an inlined scalar fallback (round 9); the final entry admits finite immutable coefficients and finite state/vector/scalar inputs, otherwise executes the original complete row kernel. Immutable coefficient eligibility is computed once; per-call state/vector checks remain. Two final-PGO release tests pass: 50,000 finite recurrence pairs (including finite inputs producing overflow/cancellation), plus captured scaled-AFIRO and expanded random whole-row cases covering modes, original exceptional fallback, signed zeros/NaN payloads, empty dimensions and extended state. Fast parity passes 940/940. Eight ADLITTLE/BORE3D and three PILOT4 complete result/exit pairs agree. Small instructions rise 0.07/0.13%; PILOT4 instructions rise 1.19% and initial median cycles about 3.19%. The full machinery has no benefit; stopped before controlled screens/full gates and restored source, accepted CLI and PGO metadata. Disassembly verifies packed multiply/divide/subtract/add and no new FMA. First/final source, failing/passing tests, exact binaries/builds, all counter/result pairs, oracle proof, assembly and restoration proof: `target/perf-primal-weight2/`. This rejects the complete finite-guarded two-output weight implementation; it does not bound every possible batched kernel.
 
 - Guard the ordinary primal row entry once for present mirror/products, mode 1, faithful weights and no excluded variable. A const-specialized loop retains the original arithmetic; the complete independent frozen row oracle remains byte-identical. Parent/final-PGO release differential tests explicitly exercise the guarded entry on captured scaled AFIRO data and random/empty/extreme/signed-zero/NaN/duplicate cases. Fast parity passes 940/940; eight ADLITTLE/BORE3D canonical result/exit pairs and three PILOT4 pairs agree. Small instructions are flat; PILOT4 instructions fall 1.68%, initial median cycles about 0.97%, and the hot row body shrinks 3057 -> 2394 bytes. The predeclared 32-AB/32-AA screen (CPU 4, cap 800, seed 4421) gives median -0.83%, interval [-4.11%, +0.89%], AA [-2.60%, +0.62%], 19/32 improving pairs, sign p .189; both orders improve, but noise separation fails. Stopped without reserved confirmation/full gates; source, accepted CLI and PGO metadata restored. No qualifying gain is credited. Exact source/binary/build, oracle proof, tests, small/direct counters/results, symbol sizes and complete controlled schedule/raw outputs: `target/perf-primal-prepared/`.
+
+- Packed ordinary immutable L-entry indices: fitting ordinary factors store checked32-bit row indices with unchanged numeric values in12-byte packed entries instead of16-byte usize/f64 tuples; extended and out-of-range inputs retain wide storage. Logical entry counts, order, snapshots/dumps and WORK are unchanged. Column views expose exact Copy values; source reversal preserves fresh arithmetic and complete L-stage/FTRAN/needed/Kahn bodies apart from field installation and iteration binding. Existing complete L tests now read independent wide storage for the frozen oracle. All8 matching fixed39-PGO FTRAN/L tests pass, including exact payload/index encoding, clone/large-index/extended fallback, full/needed solves and captured SC50A L arrays. Fast940 and eight bounded ADLITTLE/DEGEN2 plus three PEROLD complete result/exit pairs agree. Instructions rise0.453/0.739/0.501%; PEROLD cycles+0.600%. Stop at counters without timing seeds27217/27289 or full candidate gates; no compression variant is accepted. Original source/accepted CLI/metadata/profile restored exactly; restored formatting, fast940 and full987 pass. Source/proof, codec and wide-storage oracles, matching builds/tests/freezes, all outputs/counters and native assembly: `target/perf-lpacked/`. This tests logical stream compression, not an allocator-footprint claim or direct numerical producer-U reuse.
 
 - Ordinary positive weight-floor specialization: the floor is always finite and strictly positive (W_MIN or1), allowing register-only SSE2 maximum with original NaN selection; the extended path keeps its existing max. The independent complete row oracle is byte-identical; reversal changes only the one ordinary floor selection. A frozen runtime primitive passes2,097,696 full-bit/boundary/quiet-and-signaling-NaN comparisons across all16 MXCSR modes; the complete captured/random full-row test and fast940 pass with matching fixed39 PGO. Eight controlled ADLITTLE/BORE3D and three release PILOT4 complete result/exit pairs agree. Instructions fall0.143/0.050/0.381%; PILOT4 cycles+0.221% are effectively flat. Its predeclared32-AB/32-AA PILOT4 screen (CPU4, cap800, seed26217) is inconclusive: median-0.952%, interval[-3.249%,+2.688%],17/32 improving, sign p.430, healthy AA[-2.561%,+1.320%], execution orders-1.820%/+1.342%. Stop without confirmation26289 or full candidate gates. No qualifying runtime gain. Source/accepted CLI/metadata/profile restored exactly; restored formatting, fast940 and full987 pass. Native accepted-row annotation, complete source/oracle/proof, builds/tests/freezes, bounded results/counters and controlled screen: `target/perf-weight-floor/`; accepted annotation is also retained in `target/perf-rank-reuse/primal-row.asm`.
 
