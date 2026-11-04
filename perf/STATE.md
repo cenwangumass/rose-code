@@ -490,25 +490,46 @@ identity, new agreement range or optimization follows. Delegated cached-data
 conclusion, runnable peek/geometry commands, exact inputs/results/provenance and
 missing-schema/pre-overlay requirements: `target/perf-fresh-u-cache-audit/`.
 
-F80 ABI audit of accepted CLI: actual out-of-line multiply/divide receive
-operand pointers and an indirect result pointer. A pinned optimized compiler
-toy with the same three-field shape also uses memory, while a two-u64-field
-shape receives/returns scalar registers. Both are16 bytes on this host. This
-suggests combining the existing unbiased32-bit exponent and sign into one word
-while retaining original software arithmetic, rather than changing to x87
-encoding/native operations. That software representation is not implemented or
-validated yet; toy ABI codegen establishes neither real F80 codegen nor speed.
-Earlier packed-native probes include encoding/conversion/CW/TLS costs and do
-not answer this distinct software-layout question. Actual accepted entry
-assembly, toy source/assembly, compiler/hash and scope: `target/perf-f80-abi-audit/`.
+F80 ABI audit and software-layout feasibility are complete. Actual accepted
+multiply/divide use operand pointers and an indirect result pointer; actual
+two-word software operators use scalar registers. The same16-byte value size
+holds in both. The new metadata word stores the original unbiased i32 exponent
+in low32 bits and sign in bit32. Mechanical constructor/field-read edits reverse
+exactly; all original arithmetic/rounding/packing expressions remain unchanged.
+Debug retains the original fields/order. A complete untouched original type is
+the independent oracle, including all internal sign/exponent/mantissa bits.
+
+The standalone release probe passes1,581,056 arithmetic/comparison/conversion
+checks, boundary/zero/nonfinite/captured-QTAU values and16 MXCSR modes. Eight
+fixed alternating CPU-4 pairs use4096 input pairs×16 repetitions, with equal
+nonzero rolling checksums. Ordinary operator-dispatch new/old time ratios for
+add/mul/div/mul-add are1.193/0.715/0.921/0.898; forced opaque call boundaries give
+1.147/0.426/0.969/0.824. These are mixed isolated results without PGO, not solver
+speedup claims. The two matching-PGO integrations are recorded below; neither
+qualifies. Original/transformed code, reversible edit records, full-field checks,
+compiler/flags, raw timing and real operator disassembly:
+`target/perf-f80-two-word/`. Earlier toy/accepted-ABI evidence remains in
+`target/perf-f80-abi-audit/`; prior packed-native/x87 probes are a different
+encoding/CW/TLS/conversion design.
+
+The final ABI audit exposes a separate layout cost: Option<F80> is16 bytes in
+the original type and24 in the plain two-word type; optional pairs grow32→40.
+The active DevexDeltaEntry.values vector stores Option<F80>, and primal inputs
+also carry optional values/pairs. A two-field NonZeroU64 metadata toy keeps
+value/optional sizes16/16 and optional pairs32; its optional passthrough uses
+registers, while original/plain optional passthrough uses memory. This does not
+establish the cause of current timings. Tagged nonzero software metadata is
+unimplemented: exact encoding/invariants, logical zero/None separation, zero-fill
+costs, actual operators and solver runtime remain to be checked. Exact pinned
+source, size outputs, passthrough assembly and scope:
+`target/perf-f80-two-word/option-layout.*`, `target/perf-f80-two-word/optional-layout-audit.json`.
 
 ## In progress
 
 None. Accepted `vypkuxry` source, CLI and PGO metadata are restored exactly;
-formatting, fast940 and full987 parity pass. Packed ordinary L storage loses
-at counters. F80 two-word software representation is an ABI feasibility lead
-only; no numeric rewrite is installed. The overall reference performance goal
-remains unmet.
+formatting, fast940 and full987 parity pass. The two-word F80 software layout
+is numerically verified but timing-inconclusive and remains unapplied. The
+overall reference performance goal remains unmet.
 
 ## Extended BTRAN feasibility
 
@@ -698,6 +719,8 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 - Batch two independent ordinary Devex weight recurrences with SSE2, preserving each column dot and every multiply/subtract/add boundary. The original scalar row body and complete frozen oracle remain source-identical. The first helper-level nonfinite test exposes a NaN payload difference in an inlined scalar fallback (round 9); the final entry admits finite immutable coefficients and finite state/vector/scalar inputs, otherwise executes the original complete row kernel. Immutable coefficient eligibility is computed once; per-call state/vector checks remain. Two final-PGO release tests pass: 50,000 finite recurrence pairs (including finite inputs producing overflow/cancellation), plus captured scaled-AFIRO and expanded random whole-row cases covering modes, original exceptional fallback, signed zeros/NaN payloads, empty dimensions and extended state. Fast parity passes 940/940. Eight ADLITTLE/BORE3D and three PILOT4 complete result/exit pairs agree. Small instructions rise 0.07/0.13%; PILOT4 instructions rise 1.19% and initial median cycles about 3.19%. The full machinery has no benefit; stopped before controlled screens/full gates and restored source, accepted CLI and PGO metadata. Disassembly verifies packed multiply/divide/subtract/add and no new FMA. First/final source, failing/passing tests, exact binaries/builds, all counter/result pairs, oracle proof, assembly and restoration proof: `target/perf-primal-weight2/`. This rejects the complete finite-guarded two-output weight implementation; it does not bound every possible batched kernel.
 
 - Guard the ordinary primal row entry once for present mirror/products, mode 1, faithful weights and no excluded variable. A const-specialized loop retains the original arithmetic; the complete independent frozen row oracle remains byte-identical. Parent/final-PGO release differential tests explicitly exercise the guarded entry on captured scaled AFIRO data and random/empty/extreme/signed-zero/NaN/duplicate cases. Fast parity passes 940/940; eight ADLITTLE/BORE3D canonical result/exit pairs and three PILOT4 pairs agree. Small instructions are flat; PILOT4 instructions fall 1.68%, initial median cycles about 0.97%, and the hot row body shrinks 3057 -> 2394 bytes. The predeclared 32-AB/32-AA screen (CPU 4, cap 800, seed 4421) gives median -0.83%, interval [-4.11%, +0.89%], AA [-2.60%, +0.62%], 19/32 improving pairs, sign p .189; both orders improve, but noise separation fails. Stopped without reserved confirmation/full gates; source, accepted CLI and PGO metadata restored. No qualifying gain is credited. Exact source/binary/build, oracle proof, tests, small/direct counters/results, symbol sizes and complete controlled schedule/raw outputs: `target/perf-primal-prepared/`.
+
+- Two-word F80 software layout with unchanged m/exponent/sign semantics and original integer arithmetic. Complete original type, reversible source edits and logical sign-word proof independently protect the representation. Both matching fixed39 PGO variants pass all10 F80 release tests (new full-field oracle plus existing conversion/x87 tests), all6 FTRAN/L tests and fast940; eight bounded ADLITTLE/fx plus three Quad complete result/exit pairs agree. Initial mechanical layout: fx instructions-0.013%, cycles-3.182%; Quad instructions+0.043%, cycles+0.220%, branch misses+16.676%. Direct sign-bit negation and order-independent sign comparison retain the same numerical branches while avoiding metadata reconstruction: fx instructions-0.526%, cycles-2.508%; Quad instructions-0.440%, cycles-1.759%, branch misses+9.920%. The predeclared32-AB/32-AA Quad screen (CPU4, cap17000, seed28217) is inconclusive despite27/32 improving pairs: median-2.203%, interval[-4.210%,-1.191%], sign p5.65e-5, both orders-2.881%/-1.709%, healthy AA[-2.943%,+2.425%]. Conservative noise separation fails. Stop without confirmation28289, extension or full candidate gates; no solver gain is accepted. Accepted source/CLI/metadata/profile restored exactly, temporary oracle file removed; restored formatting, fast940 and full987 pass. Full sources/original oracle/proof, builds/tests/freezes, all bounded outputs/counters and complete screen: `target/perf-f80-two-word/solver/` and `solver-v2/`. This establishes exact software-layout feasibility, not a qualified runtime benefit.
 
 - Packed ordinary immutable L-entry indices: fitting ordinary factors store checked32-bit row indices with unchanged numeric values in12-byte packed entries instead of16-byte usize/f64 tuples; extended and out-of-range inputs retain wide storage. Logical entry counts, order, snapshots/dumps and WORK are unchanged. Column views expose exact Copy values; source reversal preserves fresh arithmetic and complete L-stage/FTRAN/needed/Kahn bodies apart from field installation and iteration binding. Existing complete L tests now read independent wide storage for the frozen oracle. All8 matching fixed39-PGO FTRAN/L tests pass, including exact payload/index encoding, clone/large-index/extended fallback, full/needed solves and captured SC50A L arrays. Fast940 and eight bounded ADLITTLE/DEGEN2 plus three PEROLD complete result/exit pairs agree. Instructions rise0.453/0.739/0.501%; PEROLD cycles+0.600%. Stop at counters without timing seeds27217/27289 or full candidate gates; no compression variant is accepted. Original source/accepted CLI/metadata/profile restored exactly; restored formatting, fast940 and full987 pass. Source/proof, codec and wide-storage oracles, matching builds/tests/freezes, all outputs/counters and native assembly: `target/perf-lpacked/`. This tests logical stream compression, not an allocator-footprint claim or direct numerical producer-U reuse.
 

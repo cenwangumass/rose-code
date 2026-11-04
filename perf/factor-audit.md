@@ -820,18 +820,47 @@ needed before claiming numerical identity. No new capture or agreement range
 is reported. Exact inputs, geometry, commands, provenance and gap report:
 `target/perf-fresh-u-cache-audit/`.
 
-## F80 software ABI lead
+## F80 two-word software layout
 
-Actual accepted F80 multiply/divide take operand pointers and an indirect result
-pointer. Pinned optimized toy code reproduces memory passing for the three-field
-shape; two u64 fields use argument/result registers. A sign plus unbiased
-exponent metadata word could retain the original software arithmetic with that
-shape. This is unimplemented: exact full-field equivalence, real operator codegen,
-constructor/accessor overhead and solver runtime all require independent checks.
-The prior packed-native representation has separate x87 encoding/conversion and
-CW/TLS costs, so its rejection does not settle this software-only layout lead.
-Actual entry disassembly, toy source/assembly and compiler/hash manifest:
-`target/perf-f80-abi-audit/`.
+Actual accepted F80 multiply/divide pass operands/results through memory. A
+complete two-word software type now uses scalar registers at the real operator
+boundary, retaining16-byte values, the original unbiased exponent/sign and all
+original integer arithmetic/rounding/packing. A reversible mechanical edit
+changes constructors and field reads; custom Debug preserves original fields.
+The complete original type independently checks full internal fields, conversions,
+comparisons, zeros/nonfinites, captured QTAU and16 MXCSR modes (1,581,056 checks).
+Standalone fixed8-pair CPU-4 results are mixed: operator dispatch add/mul/div/
+mul-add ratios1.193/0.715/0.921/0.898, opaque calls1.147/0.426/0.969/0.824.
+These isolated, untrained results do not establish solver performance.
+
+Both matching39-case PGO integrations pass10 F80 and6 FTRAN/L tests, fast940
+and all bounded complete result/exit pairs. Mechanical layout leaves Quad
+instructions+0.043%, cycles+0.220%. Direct sign-bit negation and sign comparison
+independent of magnitude selection preserve all original numerical paths and
+improve instructions0.440%, cycles1.759%; fx0.526%/2.508%. Actual measured
+branch misses rise9.920% on Quad; no exclusive cause is assigned.
+
+Fixed32-AB/32-AA screen28217 is inconclusive: median-2.203%, AB interval
+[-4.210%,-1.191%],27 improving pairs, sign p5.65e-5, both orders improve, healthy
+AA[-2.943%,+2.425%]. Conservative noise separation fails. No confirmation28289,
+extension or full candidate gates. Accepted source/CLI/metadata/profile restored,
+temporary frozen-type file removed; formatting and full987 pass. Exact numeric
+feasibility remains valid, but no runtime gain is accepted. All original/new
+code, edit/sign-word proofs, full tests/builds/freezes, counters/results and
+complete screen: `target/perf-f80-two-word/`, integrated `solver/` and
+`solver-v2/`. Earlier toy ABI evidence: `target/perf-f80-abi-audit/`. Rejected
+packed-native probes have different x87 encoding/CW/TLS/conversion costs.
+
+Plain two-word metadata also loses the original optional-value layout: pinned
+size measurements give Option<F80>16→24 and optional pairs32→40. The Devex delta
+cache directly stores Vec<Option<F80>>. A NonZeroU64 metadata toy retains16-byte
+optional values/32-byte optional pairs and passes optional values in registers;
+original/plain optional passthrough uses indirect memory. This is a separate
+unimplemented representation lead, not a cause assigned to current timings.
+Logical field/Option/zero semantics, nonzero/tag invariants and actual operation/
+zero-fill/runtime costs must be independently checked. Source, size output,
+assembly and scope: `target/perf-f80-two-word/option-layout.*`,
+`target/perf-f80-two-word/optional-layout-audit.json`.
 
 ## Remaining proof obligations
 

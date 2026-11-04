@@ -220,12 +220,23 @@ measured.
   controlled screen is inconclusive; do not extend it or use its median as a gain.
   Packed32-bit immutable ordinary L entries preserve numeric/WORK behavior but
   lose at matching-PGO counters; do not treat reduced stream bytes as a gain.
-  Next test the F80 software call boundary in a standalone probe: preserve the
-  entire original arithmetic/rounding as oracle, combine unbiased exponent/sign
-  into one metadata word, and validate full internal fields before any solver
-  change. Accepted multiply/divide use indirect operands/results; the two-word
-  ABI toy uses registers, but actual codegen/runtime are still unproven. Keep
-  this separate from the rejected packed-native/x87-encoding probes.
+  Two-word F80 software layout now has independent full-field equivalence and
+  real register-ABI evidence. Direct sign-word operations improve target counters,
+  but the fixed controlled screen is inconclusive; do not repeat or extend it.
+  The plain layout also grows Option<F80>16→24 and optional pairs32→40 in hot
+  cache/input storage. A NonZeroU64 metadata toy retains original optional sizes
+  and uses a register optional-return ABI. Next independently probe a tagged
+  nonzero metadata representation: protect all original logical fields/math and
+  Option/zero behavior, prove the encoding invariant, and measure constructor,
+  accessor and zero-fill overhead before solver dispatch. This is unimplemented;
+  layout evidence alone is not runtime attribution or a gain.
+  Also audit exact auxiliary Factor-construction inputs (ordered column bits,
+  floor/prescribed rows) and full FTRAN/BTRAN state dependencies. Measure repeated
+  inputs per immutable matrix version across bounded compact solves before any
+  whole-result cache. Clone must retain a version identity; every attempted
+  matrix mutation invalidates it, including failures. Preserve numeric, WORK,
+  snapshot/order and lazy-cache effects; factor-template copies must own their
+  mutable updates. Start with cached call/cost evidence and small models.
   Producer/consumer U identity is still unproven: use nontrivial SC50A dual k1,
   repair the old cached LUIN endpoint schema through current bounded refcap,
   and capture producer/pre-overlay values before bypassing replay arithmetic.
