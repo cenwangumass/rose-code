@@ -153,9 +153,8 @@ five lines each. Re-profile a run when a landed change touched its hot path.
 
 ## In progress
 
-None. Four-row/eight-column DGEMM confirmation is inconclusive below. The
-qualified `ztrylnzw` source, CLI and PGO metadata are restored; the overall
-reference performance goal remains unmet.
+None. The qualified `ztrylnzw` source, CLI and PGO metadata are restored;
+the overall reference performance goal remains unmet.
 
 ## Extended BTRAN feasibility
 
@@ -295,6 +294,8 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 - Dumps disabled: source audit of the simplex, dual, factor and PDHG hot paths finds JSON emission/serialization guarded by dump selection or an existing recording option; WORK estimates outside those guards remain solver inputs. The cached accepted-release PEROLD self report has no samples under the selected serde/dump/OnceLock symbol names, but inlined checks and preparation remain charged to callers. This is not an inclusive/total overhead bound or proof that all preparation is free. No dump optimization is justified by this screen; source anchors and the selected-symbol query are in `target/perf-dump-audit/`.
 
 ## Tried, no gain
+
+- Restrict fresh dense extended BTRAN result reuse to the compact RHS owner and the dual-recomputation consumer. The independent main factor runs the unchanged numerical BTRAN on misses; hits restore exact WORK, density and inverse-row initialization, retaining update-saving row metadata. Four-entry exact ordered input keys exclude NaNs, dumps, updates and row etas. A release test covers 64 input families with signed zeros, low bits, extremes/infinity, duplicates and clone histories, followed by FTRAN/update/BTRAN continuation; fast parity passes 940/940. Using the accepted parent PGO profile for this initial screen, eight complete ADLITTLE/fx result/exit pairs and three primal_5959 primal pairs agree. Instructions change +0.14/-0.77/-1.66%; cycle medians +0.76/+1.63/-0.11%. No useful initial target cycle gain, with fx cycles higher; rejected before new PGO training, controlled screens or full gates. Source, accepted CLI and build metadata restored. This is narrower ownership than the earlier general main-factor cache and adds no RefStruct fields; neither implementation establishes a solver timing gain. Source snapshots, original-kernel audit, passing test/parity logs, all bounded outputs/counters and restoration proof: `target/perf-owned-btran/`.
 
 - Pack software F80's sign and unchanged normalized exponent into one metadata word beside the mantissa, retaining the integer arithmetic and rounding expressions. Production disassembly shows the original operators use pointer arguments and memory returns; the standalone packed prototype uses the two-word ABI. Numeric differential checks pass for 100,157 pairs (edge cases including negated NaNs, captured QTAU values and random representations), plus 100,000 from-f64 and 100,000 from-i64 conversions. Checks include representation, sign, classes, f64 conversion bits, arithmetic, square root, comparisons, min/max and abs/neg; Debug formatting and full solver parity are not tested. Four fixed alternating CPU-4 pairs of 640,000 recurrence terms are all slower: median +19.82% with inlined operations and +8.17% with explicitly outlined add/multiply calls. These are standalone non-PGO feasibility timings, not controlled solver screens. Rejected before integration; production source and accepted CLI/PGO metadata remain unchanged. Transform, original/generated source, validation and raw timing logs, compiler metadata, production/probe disassembly and summary: `target/perf-f80-layout/`. This rejects normalized metadata packing for the tested software arithmetic; it does not establish a bound for other representations or whole kernels.
 
