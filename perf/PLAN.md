@@ -203,8 +203,13 @@ measured.
   pass over further small heap or constructor buffer variants.
   Inspect the allocating callee: an observed ancestor return address can skip it.
   Profiling-build shares do not bound accepted release cost.
-- **Barrier** (`chol.rs`, `barrier.rs`, `sgemm32.rs`) and **PDHG** (`pdhg.rs`): profile after the simplex
-  work; their dense kernels have a fixed summation order (blocked, lane order) that must be kept.
+- **Barrier** (`chol.rs`, `barrier.rs`, `sgemm32.rs`) and **PDHG** (`pdhg.rs`):
+  the accepted-release refresh puts numeric factorization31.24%, DGEMM14.82%,
+  DTRSM10.58%, and ordering/partition/integer-sort14.75% of Rose instruction
+  self samples. Fixed child-rounding dispatch is rejected at matching-PGO counters.
+  Inspect symbolic graph/integer-sort production as a whole pass, preserving all
+  ordered outputs and floating degree arithmetic, before more local numeric variants.
+  Source annotation is diagnostic: its frame-pointer build changes codegen.
 
 ## Out of scope
 

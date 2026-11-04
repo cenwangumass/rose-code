@@ -181,6 +181,20 @@ bounds removable accepted-release cost. The kernel contains the full dense
 handoff setup/output path alongside sparse elimination. Exact entry disassembly,
 annotation screen and ancestry evidence are retained beside the chain counts.
 
+Current barrier instruction refresh (`kpttrrms`, accepted CLI13e, CPU4;
+eight DEGEN3 barrier-release solves capped at100, complete outputs agree):
+2,638 period-8M samples represent 99.89% of the direct 21.128B batch count,
+with zero loss/throttle events. Rose-only self attribution puts numeric_factor
+31.24%, DGEMM14.82%, DTRSM10.58%, order7.77%, partition3.64% and integer
+quicksort3.34%. CLI read/startup and launcher/validation are separate scopes;
+these are instruction locations, not inclusive solve-time or removable bounds.
+BORE3D and DEGEN2 bounded results are retained too. The already full-parity
+qualified line-table/frame-pointer CLI12603 has matching complete outputs on
+all three models. Its 633 numeric-factor self samples locate child-update
+scatter, rounding tests and dense LDL loops; codegen differs from release.
+The fixed child-rounding dispatch is tested and rejected below. Raw profiles,
+counts, complete results, build provenance and annotation: `target/perf-barrier-refresh/`.
+
 ## In progress
 
 None. The qualified `kpttrrms` source, CLI and PGO metadata are installed;
@@ -324,6 +338,8 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 - Dumps disabled: source audit of the simplex, dual, factor and PDHG hot paths finds JSON emission/serialization guarded by dump selection or an existing recording option; WORK estimates outside those guards remain solver inputs. The cached accepted-release PEROLD self report has no samples under the selected serde/dump/OnceLock symbol names, but inlined checks and preparation remain charged to callers. This is not an inclusive/total overhead bound or proof that all preparation is free. No dump optimization is justified by this screen; source anchors and the selected-symbol query are in `target/perf-dump-audit/`.
 
 ## Tried, no gain
+
+- Select child-update rounding mode once per call, specializing both complete width-one and blocked child kernels without changing arithmetic expressions, update order or DGEMM/block boundaries. Complete original child bodies are frozen independently; reconstruction matches after method/rounding-selector substitution only. Original-versus-new tests cover double/single modes, 320 synthetic shape/value families, signed zeros/subnormals/extremes/two NaN payloads/captured kernel values and real ADLITTLE/SC50A/BORE3D front updates. Matching fixed39 PGO, both tests and fast parity 940/940 pass. Eight BORE3D/DEGEN2 and three DEGEN3 barrier complete result/exit pairs agree. Instructions rise +0.57/+1.01/+1.28%; cycles +1.27/+1.56/+2.14%. Stop at counters without seeds7151/7213 or full gates. Source/qualified CLI/build restored exactly. Frozen bodies, complete candidate/build, tests and measurements: `target/perf-child-rounding/`.
 
 - Store scalar permutation slots instead of (slot, position) tuples in immutable-slot U-order and row-elimination heaps, decoding positions with at[slot]. Slot/at bijection preserves priority and duplicate multiplicity. Independently frozen original uorder/eliminate bodies compare sparse/dense inputs, random permutations, duplicate initial entries, f64/F80 values/order and exact visited/dense WORK bits within the existing complete-FTRAN test. Source reconstruction confirms only heap types/keys/decode change. Matching fixed39 PGO, that test and fast parity 940/940 pass; eight ADLITTLE/DEGEN2 and three PEROLD/PILOT4 complete result/exit pairs agree. Instructions fall 0.029/0.113/0.249/0.144%; cycles +0.246/+0.392/+0.077/-0.337%. The predeclared PEROLD screen (seed7001, CPU4, cap1300, 32AB+32AA) is inconclusive: median -0.124%, interval [-0.414%, +0.164%], AA [-0.457%, +0.243%], 19/32 improving, sign p0.189, both orders improve. Stop without seed7069, extension or full gates. Qualified source/CLI/build restored exactly. Candidate, source/frozen-body proof, tests and all raw measurements: `target/perf-slot-heaps/`; preceding heap source annotation `target/perf-heap-audit/`.
 
