@@ -188,6 +188,11 @@ measured.
 - **Dump overhead with no dump selected**: about 70 `dump::on("kind")` sites in `dual.rs` and
   `simplex.rs`. Each call scans the selected kinds by string; check whether any of them sits in a
   per-iteration or per-element loop, and whether any record is built before the `on` test.
+- **F2 WORK-only state**: the source audit in `factor-audit.md` identifies the numeric
+  snapshot predicates consumed by joint-U accounting. Before another ownership trial,
+  test whether predicate-only storage can avoid snapshot copies/scans without a new
+  per-element cost. Keep an independent original numeric/WORK oracle and book the
+  original sums in the original order. Start with the small fixtures; no gain is assumed.
 - **Allocation**: `Vec` creation per iteration or per FTRAN/BTRAN call; reuse buffers held in the solver
   state (clear only the touched entries).
 - **Barrier** (`chol.rs`, `barrier.rs`, `sgemm32.rs`) and **PDHG** (`pdhg.rs`): profile after the simplex

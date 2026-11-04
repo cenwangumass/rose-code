@@ -255,6 +255,33 @@ screen. Artifacts: `target/perf-fresh-replay/` and
 `target/perf-fresh-coverage/`; precise bounds and build hashes are in STATE.md
 and the saved manifest. This is not evidence that direct numerical reuse is safe.
 
+## F2 snapshot lifetime and consumer audit
+
+The existing F2 payload retains column/tau solved numeric arrays, input positions,
+counts and raw-tau flags for later joint-U WORK accounting. The previous snapshot
+is not read during the next full/needed solve's arithmetic. A persistent-workspace
+prototype takes those buffers, zeroes/reuses them and moves the exact new snapshots
+back after output extraction, retaining all numeric operations and WORK calls.
+Repeated frozen f64/F80 comparisons and fast parity pass, but the initial accepted-
+profile screen increases PEROLD instructions 1.09% and cycles 1.11% (PILOT4
++0.94/+0.77%). It is rejected before new PGO or controlled screens; qualified
+source/CLI/build are restored. This extends the earlier move-only experiment;
+allocation removal alone has no demonstrated benefit. Evidence and restoration:
+`target/perf-f2-workspace/`.
+
+The remaining source dependency is narrower than the stored values: production
+reads of `x_col` and `x_tau` occur only in `third_work` and `dense_pair_work` as
+`x_col[c] != ZERO` and `x_tau[c] != ZERO && tau_raw[c]`. Ordered `col_in`, input
+counts and factor structure are separate required inputs. No production dump
+emits the numeric F2 arrays; the frozen tests currently compare them in full.
+This proves the consumed predicates, not a profitable compressed implementation.
+A new representation needs an independent original numeric/WORK oracle and exact
+predicate construction for signed zeros, NaNs, tolerance branches and tiny retained
+tau values. Preserve the original WORK sums and order. The refreshed PEROLD self
+shares (FTRAN 9.26%, needed FTRAN 7.43%, joint-U 2.45%) include other numerical
+work and do not bound snapshot-removal savings. Consumer/source proof:
+`target/perf-f2-workspace/f2-consumer-audit.json`.
+
 ## Remaining proof obligations
 
 Before a factor ownership prototype, separate column-copy and immutable-factor
