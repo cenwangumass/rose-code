@@ -161,6 +161,26 @@ Exact builds, full profiling parity, all results, raw stacks/counters, two-perio
 audit, ancestry grouping and verified disassembly: `target/perf-alloc-ancestry/`.
 The accepted release CLI and build metadata remain byte-identical.
 
+Nucleus chain-maintenance diagnostic on accepted source (temporary standard
+`nucleuswork` dump, removed): complete bounded dual-release results equal the
+accepted CLI on ADLITTLE/DEGEN2/PEROLD, caps 300/640/1300. The 9/16/27 nucleus
+calls shift 2,103/86,995/1,424,407 IDs through front insertions and copy
+2,832/33,771/541,599 IDs into chain snapshots. PEROLD cleans 184,154 IDs,
+removing 40,353 dead IDs; elimination scans 350,277 IDs, performs 88,400 existing
+numeric updates and computes 26,807 fill terms. Eleven PEROLD nucleus calls exit
+through dense handoff; the small models have none. These are operation/movement
+counts, not cycle costs or a linked-list speedup proof. Original source, accepted
+CLI and metadata are restored exactly. Raw dumps/results/source/build and runner:
+`target/perf-nucleus-chains/`.
+
+Accepted-release disassembly has a 31,086-byte ordinary nucleus function and
+0x6c8-byte local stack frame, with dense LU itself already separate. Matching-PGO
+frame-pointer annotation (238 self samples) places about 18.9% of local sampled
+instructions at stack-addressing instructions; this neither attributes stalls nor
+bounds removable accepted-release cost. The kernel contains the full dense
+handoff setup/output path alongside sparse elimination. Exact entry disassembly,
+annotation screen and ancestry evidence are retained beside the chain counts.
+
 ## In progress
 
 None. The qualified `kpttrrms` source, CLI and PGO metadata are installed;

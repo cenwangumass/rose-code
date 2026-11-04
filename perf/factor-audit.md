@@ -408,6 +408,31 @@ The trial stops at initial counters without controlled screens or full gates.
 Qualified source/CLI/build are restored; no input-allocation change is accepted.
 Evidence: `target/perf-nucleus-input/`.
 
+## Nucleus chain-maintenance counts and code size
+
+A temporary standard dump kind counts list work while preserving every numeric
+operation and WORK call. Complete ADLITTLE/DEGEN2/PEROLD bounded results equal
+the accepted CLI; source, dump registry, CLI and build are then restored exactly.
+
+| Model | Nucleus calls / dense exits | Front-shift IDs | Snapshot IDs | Clean visits / removed dead IDs |
+|---|---:|---:|---:|---:|
+| ADLITTLE | 9 / 0 | 2,103 | 2,832 | 1,900 / 489 |
+| DEGEN2 | 16 / 0 | 86,995 | 33,771 | 22,900 / 7,908 |
+| PEROLD | 27 / 11 | 1,424,407 | 541,599 | 184,154 / 40,353 |
+
+PEROLD elimination scans 350,277 IDs for 88,400 existing numeric updates and
+26,807 candidate fill terms. The measured ID movement alone does not establish
+that an intrusive-list rewrite pays off; it has no cycle attribution. Accepted
+release ordinary nucleus code is 31,086 bytes with a 0x6c8 local stack frame;
+dense LU is already a separate function. The full dense handoff construction
+and output installation remain inside nucleus. Frame-pointer annotation has
+238 nucleus self samples with 18.9% on stack-addressing instructions, but its
+codegen differs from release. Splitting the handoff can be tested without
+changing numeric operations, list layout or bookkeeping; code size and stack
+changes need direct release verification before timing claims.
+Evidence: `target/perf-nucleus-chains/`, with source annotation in
+`target/perf-alloc-ancestry/perold-fp.nucleus.asm`.
+
 ## Remaining proof obligations
 
 Before a factor ownership prototype, separate column-copy and immutable-factor
