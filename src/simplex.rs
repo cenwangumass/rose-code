@@ -1360,10 +1360,24 @@ struct RhsResult {
     out: Vec<(usize, crate::f80::F80)>,
 }
 
+#[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+struct CostResult {
+    y: Vec<crate::f80::F80>,
+    nonbasic: Vec<bool>,
+    excluded: Option<usize>,
+    costfree: bool,
+    d: Vec<f64>,
+    df: Vec<crate::f80::F80>,
+}
+
 struct RhsMemo {
     factor: crate::ftran_order::RefStruct<crate::f80::F80>,
     results: Vec<RhsResult>,
     work_results: Vec<(Vec<u64>, f64)>,
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    cost_results: Vec<CostResult>,
+    #[cfg(test)]
+    cost_hits: usize,
 }
 
 impl QuadRhs {
@@ -1373,10 +1387,93 @@ impl QuadRhs {
                 factor,
                 results: Vec::new(),
                 work_results: Vec::new(),
+                #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+                cost_results: Vec::new(),
+                #[cfg(test)]
+                cost_hits: 0,
             })))
         } else {
             Self::Direct(factor)
         }
+    }
+
+    /// Pure reduced-cost outputs for this solver's immutable problem. The
+    /// caller only uses this provider on a fresh main factor. Unlike `d`, `df`
+    /// is not written for basic/excluded entries by the original kernel.
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    fn reduced_costs(
+        &mut self,
+        p: &Internal,
+        y: &[crate::f80::F80],
+        pos: &[usize],
+        excluded: Option<usize>,
+        costfree: bool,
+        d: &mut [f64],
+        df: &mut [crate::f80::F80],
+    ) -> bool {
+        let Self::Shared(shared) = self else {
+            return false;
+        };
+        let n = p.n + p.m;
+        if crate::dump::any()
+            || n > 500
+            || y.len() != p.m
+            || pos.len() != n
+            || d.len() != n
+            || df.len() != n
+            || y.iter().any(|v| v.is_nan())
+        {
+            return false;
+        }
+        let mut cw = 0u16;
+        // SAFETY: fnstcw writes exactly two bytes without changing the mode.
+        unsafe {
+            std::arch::asm!("fnstcw [{cw}]", cw = in(reg) &mut cw,
+                options(nostack, preserves_flags));
+        }
+        if cw & 0x0f3f != 0x033f {
+            return false;
+        }
+        let mut memo = shared.lock().unwrap();
+        if let Some(entry) = memo.cost_results.iter().find(|entry| {
+            entry.excluded == excluded
+                && entry.y.len() == y.len()
+                && entry.nonbasic.len() == pos.len()
+                && entry.costfree == costfree
+                && entry.y.iter().zip(y).all(|(a, b)| a.repr() == b.repr())
+                && entry
+                    .nonbasic
+                    .iter()
+                    .zip(pos)
+                    .all(|(&a, &b)| a == (b == NONE))
+        }) {
+            d.copy_from_slice(&entry.d);
+            for j in 0..n {
+                if pos[j] == NONE && excluded != Some(j) {
+                    df[j] = entry.df[j];
+                }
+            }
+            #[cfg(test)]
+            {
+                memo.cost_hits += 1;
+            }
+            return true;
+        }
+        if !p.reduced_costs_q_native(y, pos, excluded, costfree, d, df) {
+            return false;
+        }
+        if memo.cost_results.len() == 4 {
+            memo.cost_results.remove(0);
+        }
+        memo.cost_results.push(CostResult {
+            y: y.to_vec(),
+            nonbasic: pos.iter().map(|&v| v == NONE).collect(),
+            excluded,
+            costfree,
+            d: d.to_vec(),
+            df: df.to_vec(),
+        });
+        true
     }
 
     /// The main fresh factor and RHS factor have identical numerics. Cache
@@ -3242,6 +3339,21 @@ impl<'a> Solver<'a> {
         #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
         if !self.cleanup && self.p0.is_none() {
             if let Some(yq) = &self.y_q {
+                if self.mirror.as_ref().is_some_and(|mi| mi.updates() == 0)
+                    && self.mirror_q.as_mut().is_some_and(|rhs| {
+                        rhs.reduced_costs(
+                            p,
+                            yq,
+                            &self.pos_of,
+                            self.excluded,
+                            cf,
+                            &mut self.d,
+                            &mut self.df,
+                        )
+                    })
+                {
+                    return;
+                }
                 if p.reduced_costs_q_native(
                     yq,
                     &self.pos_of,
@@ -10059,6 +10171,154 @@ mod rhs_memo_tests {
 
     fn bits(v: Vec<(usize, F80)>) -> Vec<(usize, (u64, u16))> {
         v.into_iter().map(|(i, v)| (i, v.repr())).collect()
+    }
+
+    #[test]
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    fn reduced_cost_memo_keeps_exact_keys_and_partial_writes() {
+        struct Cw(u16);
+
+        impl Drop for Cw {
+            fn drop(&mut self) {
+                unsafe {
+                    std::arch::asm!("fldcw [{cw}]", cw = in(reg) &self.0, options(nostack));
+                }
+            }
+        }
+        let mut saved = 0u16;
+        let nearest = 0x037fu16;
+        unsafe {
+            std::arch::asm!("fnstcw [{old}]", "fldcw [{new}]",
+            old = in(reg) &mut saved, new = in(reg) &nearest, options(nostack));
+        }
+        let _guard = Cw(saved);
+        let model = crate::mps::parse(include_str!("../tests/fixtures/afiro.mps")).unwrap();
+        let p = build(&crate::scale::compute(&model).apply(&model).unwrap());
+        let (factor, _) = factor();
+        let mut provider = QuadRhs::new(factor.clone(), true);
+        let mut clone = provider.clone();
+        let n = p.n + p.m;
+        let bits = |d: &[f64]| d.iter().map(|v| v.to_bits()).collect::<Vec<_>>();
+        let qbits = |d: &[F80]| d.iter().map(|v| v.repr()).collect::<Vec<_>>();
+        let mut seed = 0x9188dd32a7u64;
+        for round in 0..64 {
+            let y: Vec<_> = (0..p.m)
+                .map(|i| {
+                    seed ^= seed << 13;
+                    seed ^= seed >> 7;
+                    seed ^= seed << 17;
+                    match (round + i) % 9 {
+                        0 => F80::ZERO,
+                        1 => F80::from_f64(-0.0),
+                        2 => F80::from_repr(1, 0),
+                        3 => F80::from_repr(u64::MAX, 0x7ffe),
+                        _ => F80::from_repr(seed | (1 << 63), (0x3f80 + seed % 256) as u16),
+                    }
+                })
+                .collect();
+            let pos: Vec<_> = (0..n)
+                .map(|j| if (j + round) % 3 == 0 { j % p.m } else { NONE })
+                .collect();
+            let excluded = Some(round % n);
+            for repetition in 0..3 {
+                let mut old_d = vec![-0.0; n];
+                let mut new_d = old_d.clone();
+                let mut old_df = vec![F80::from_repr((1 << 63) + repetition, 0x3fff); n];
+                let mut new_df = old_df.clone();
+                assert!(p.reduced_costs_q_native(
+                    &y,
+                    &pos,
+                    excluded,
+                    round % 2 == 0,
+                    &mut old_d,
+                    &mut old_df
+                ));
+                assert!(clone.reduced_costs(
+                    &p,
+                    &y,
+                    &pos,
+                    excluded,
+                    round % 2 == 0,
+                    &mut new_d,
+                    &mut new_df
+                ));
+                assert_eq!(bits(&new_d), bits(&old_d));
+                assert_eq!(qbits(&new_df), qbits(&old_df));
+            }
+            let QuadRhs::Shared(shared) = &provider else {
+                unreachable!()
+            };
+            assert_eq!(shared.lock().unwrap().cost_hits, (round + 1) * 2);
+            assert_eq!(
+                shared.lock().unwrap().cost_results.len(),
+                (round + 1).min(4)
+            );
+        }
+        // Exact low bits, signed zero, the mask, exclusion and cost mode each
+        // distinguish keys; use equal nonbasic masks with different positions.
+        let y = vec![F80::ONE; p.m];
+        let pos = vec![NONE; n];
+        let mut d = vec![0.0; n];
+        let mut df = vec![F80::ZERO; n];
+        for variant in 0..7 {
+            let mut yv = y.clone();
+            let mut pv = pos.clone();
+            let mut ex = None;
+            let mut cf = false;
+            match variant {
+                1 => yv[0] = F80::from_repr((1 << 63) + 1, 0x3fff),
+                2 => yv[0] = F80::ZERO,
+                3 => yv[0] = F80::from_f64(-0.0),
+                4 => pv[0] = 0,
+                5 => ex = Some(0),
+                6 => cf = true,
+                _ => (),
+            }
+            let QuadRhs::Shared(shared) = &provider else {
+                unreachable!()
+            };
+            let hits = shared.lock().unwrap().cost_hits;
+            assert!(provider.reduced_costs(&p, &yv, &pv, ex, cf, &mut d, &mut df));
+            let QuadRhs::Shared(shared) = &provider else {
+                unreachable!()
+            };
+            assert_eq!(shared.lock().unwrap().cost_hits, hits);
+        }
+        let nan_y = vec![F80::NAN; p.m];
+        let before = (bits(&d), qbits(&df));
+        assert!(!provider.reduced_costs(&p, &nan_y, &pos, None, false, &mut d, &mut df));
+        assert!(!provider.reduced_costs(&p, &y[..p.m - 1], &pos, None, false, &mut d, &mut df));
+        assert!(!provider.reduced_costs(&p, &y, &pos[..n - 1], None, false, &mut d, &mut df));
+        assert_eq!((bits(&d), qbits(&df)), before);
+        // Positions themselves are not read by the kernel, only nonbasic membership.
+        let mut pv = pos.clone();
+        pv[0] = 0;
+        assert!(provider.reduced_costs(&p, &y, &pv, None, false, &mut d, &mut df));
+        let QuadRhs::Shared(shared) = &provider else {
+            unreachable!()
+        };
+        let hits = shared.lock().unwrap().cost_hits;
+        pv[0] = p.m - 1;
+        let mut expected_d = d.clone();
+        let mut expected_df = df.clone();
+        assert!(p.reduced_costs_q_native(&y, &pv, None, false, &mut expected_d, &mut expected_df));
+        assert!(provider.reduced_costs(&p, &y, &pv, None, false, &mut d, &mut df));
+        assert_eq!(bits(&d), bits(&expected_d));
+        assert_eq!(qbits(&df), qbits(&expected_df));
+        let QuadRhs::Shared(shared) = &provider else {
+            unreachable!()
+        };
+        assert_eq!(shared.lock().unwrap().cost_hits, hits + 1);
+        let mut direct = QuadRhs::new(factor, false);
+        assert!(!direct.reduced_costs(&p, &y, &pos, None, false, &mut d, &mut df));
+        for cw in [0x027fu16, 0x077f, 0x0b7f, 0x0f7f] {
+            unsafe {
+                std::arch::asm!("fldcw [{cw}]", cw = in(reg) &cw, options(nostack));
+            }
+            let before = (bits(&d), qbits(&df));
+            assert!(!provider.reduced_costs(&p, &y, &pos, None, false, &mut d, &mut df));
+            assert_eq!((bits(&d), qbits(&df)), before);
+        }
     }
 
     #[test]

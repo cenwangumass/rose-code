@@ -1,7 +1,9 @@
 # Factor production and ownership audit
 
 Ownership audit source: b421f8ab; guarded replay screen: d897aa91;
-compact RHS reuse: prxvqvrr. Cost claims below identify their measured scope. Direct numerical reuse remains unproven;
+compact RHS reuse: prxvqvrr; pure reduced-cost reuse: ztrylnzw.
+Cost claims below identify their measured scope. Reusing producer U values in
+the consumer factor remains unproven;
 guarded elimination of overwritten replay arithmetic is feasible on tested
 cases but has no established runtime benefit (below).
 
@@ -122,8 +124,9 @@ Evidence is in STATE.md and `target/perf-sharefactor/`.
 
 ## Compact RHS reuse
 
-`mirror_q` has one solver consumer, `recompute_primal`, which reads returned
-solve/estimate values and never updates that factor. Compact factor-cache entries
+The RHS factor has one solver consumer, `recompute_primal`, which reads returned
+solve/estimate values and never updates it. Its provider also owns the separate
+pure reduced-cost cache below; that cache does not inspect or mutate the factor. Compact factor-cache entries
 now retain an isolated `QuadRhs` provider. Sharing it avoids the RHS deep clone
 on repeated basis hits; the main factor remains independently owned. Each provider
 retains a separate RHS factor plus at most four extended-input/result pairs and
@@ -157,6 +160,28 @@ established runtime benefit. It did not reuse returned solves or scalar estimate
 Its rejection remains in STATE.md; it is distinct from the accepted provider.
 Qualified source/build, raw controls/results, full gates, regression checks and
 implementation audit: `target/perf-rhs-memo/final/`.
+
+## Compact reduced-cost reuse
+
+On a fresh main factor, `set_d_from_y` can reuse pure native extended reduced-cost
+outputs from the existing shared provider. Each provider belongs to one Solver;
+its `p` columns/costs remain immutable. Ordered full extended dual bits, the full
+nonbasic mask, exclusion and costfree flag key up to four FIFO entries. At most
+500 variables are retained. Other control modes, dumps, NaNs and malformed sizes
+fall back. Main factor metadata is neither read from cached outputs nor restored.
+The numerical kernel and WORK call sites are unchanged.
+
+The old kernel writes every double entry, but only nonbasic non-excluded extended
+entries. Hits preserve current extended values at all other positions, rather
+than replaying stale values there. Differential release tests compare the unchanged
+kernel across clones, history, low-bit/signed-zero/extreme inputs, mask equivalence,
+key changes and eviction. Full parity passes 987/987, all 245 release tests pass,
+and all 23 complete no-dump result/exit pairs agree. Two independent controlled
+fx_quad_obj_5371 screens improve solve by 6.30/4.10%; instructions fall 1.24%.
+The full sweep's four timing flags and their fixed follow-ups/controls are resolved
+in STATE.md. This establishes the local gain, not the overall reference goal.
+Source/binary/build, kernel/ownership proof and all qualification data:
+`target/perf-cost-memo/`.
 
 ## Guarded fresh replay screen
 

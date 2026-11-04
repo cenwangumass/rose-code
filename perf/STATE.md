@@ -4,13 +4,14 @@ Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (histo
 
 ## Numbers
 
-Baseline solver: `8b645007` (same solver as `vlsokskq`). Current solver: `prxvqvrr` (compact extended RHS-result/WORK-estimate reuse, four-row/four-column SIMD barrier DGEMM tiles with scalar two-column tails, allocation-free row-tile selection, whole-loop primal row dispatch, sparse auxiliary etas, optional Linux CLI `system-tcmalloc`, PGO with 64-byte loop alignment and online profile merging).
+Baseline solver: `8b645007` (same solver as `vlsokskq`). Current solver: `ztrylnzw` (compact native extended reduced-cost-result reuse, compact extended RHS-result/WORK-estimate reuse, four-row/four-column SIMD barrier DGEMM tiles with scalar two-column tails, allocation-free row-tile selection, whole-loop primal row dispatch, sparse auxiliary etas, optional Linux CLI `system-tcmalloc`, PGO with 64-byte loop alignment and online profile merging).
 Parity: full tier 987/987; release tests pass. Three timed runs after one warm-up, with direct paired follow-ups noted below, hyperfine 2.0.0; instruction counts are millions from perf stat.
 
 `baseline wall` is the fixed initial process-wall median. Other wall columns
 are the current CPU-4 three-run paired sweep; `solve` uses that sweep except
-primal_5959 primal, which uses the candidate AB samples from the two positive
-controlled screens. Host speed bands affect snapshot ratios against cached
+fx_quad, which uses candidate AB samples from the two positive screens, and the
+four flagged cases, which use paired follow-ups or regression controls below.
+Host speed bands affect snapshot ratios against cached
 reference Runtime; only controlled within-session changes are credited as gains.
 
 Reference provenance: original-library cached records `../reverse-engineer/runs/{degen2,degen3,perold,pilot4}-{profile}.json` for the ten previously valid cells. New three-run medians use `/tmp/rose-perf-reference/{primal_5959.primal-r,primal_5959.dual-r,quad_2717.dual-r,fx_quad_obj_5371.dual-r}.{1,2,3}.json`; summary `/tmp/rose-perf-reference/summary.json`. All original-library records identify Ryzen 9 5900X and library SHA256 `8e87fca221fdffc922331c8619426031b3e72dfd419446422f88af0cb0e98f9c`.
@@ -44,71 +45,91 @@ solve/estimate values. Tests cover exact result/estimate bits, history, clones, 
 factor independence, FIFO eviction, Send compatibility and random/stack-boundary
 inputs using an AFIRO mixed basis.
 
-Two independent predeclared primal_5959 primal screens (32 AB + 32 AA pairs each,
-CPU 4, cap 11000, seeds 3967/4021) pass every criterion: median solve
--7.31/-4.79%, conservative intervals [-7.86%, -5.69%] / [-6.51%, -2.39%],
-AA [-0.72%, +0.59%] / [-0.43%, +1.97%], with 31/32 and 29/32 improving pairs.
-Both execution orders improve; complete results/status/exit agree, including the
-unchanged numerical_failure at 10780 iterations. Target instructions fall 10.90%.
-Small ADLITTLE/fx_quad_obj_5371 eight-pair results agree exactly; instructions are
-+0.03/-8.88%. Initial and final binaries are archived separately; added boundary
-tests and final rebuilding preceded both official screens.
+Compact shared providers also retain up to four pure native extended reduced-cost
+outputs for a fresh main factor, with at most 500 total variables. Keys preserve
+every ordered extended dual bit, the full nonbasic mask, exclusion and cost mode;
+the problem's columns and costs are immutable for the provider's entire lifetime.
+Hits restore all double reduced costs and only the extended entries the original
+kernel writes. Basic and excluded extended values retain their current contents.
+The original arithmetic kernel is source-identical; all WORK sites remain in place.
+Dumps, NaN inputs, malformed dimensions and other control modes use the original
+path. A release differential test covers exact low bits, signed zeros, extremes,
+clones, changing stale values, mask equivalence, key distinctions and FIFO bounds.
 
-All 23 full-sweep result/exit pairs agree, including full PDHG workloads. Quad
-instruction changes are primal_5959 dual -11.39%, Quad_2717 -3.98% and fx_quad
--8.88%; grouped solve changes are -6.31/-2.70/-4.06%. Large unrelated gains
-crossing host bands are uncredited. The only timing flag is PEROLD dual +0.90%:
-fixed direct follow-ups give cycles +0.84/+0.85/-0.80%. One predeclared control
-(seed 4099, 32 AB + 32 AA, CPU 4, cap 1300) reverses roles to test whether the
-baseline beats the candidate: baseline median -0.12%, interval [-1.13%, +1.05%],
-AA [-1.23%, +0.76%], sign p .430. No slowdown beyond variation is established;
-no confirmation/repeat-until-pass was used for that check.
+Two predeclared fx_quad_obj_5371 dual screens (32 AB + 32 AA pairs each, CPU 4,
+cap 5500, seeds 4153/4211) pass every criterion: median solve -6.30/-4.10%,
+intervals [-7.61%, -3.31%] / [-5.16%, -3.19%], AA [-2.65%, +1.04%] /
+[-1.30%, +1.10%], with 32/32 and 30/32 improving pairs. Both orders improve.
+The screens span different host speed bands; only their paired changes are
+credited. Target instructions fall 1.24%; primal_5959 primal falls 0.96%.
+Eight ADLITTLE/fx result/exit pairs and three primal_5959 primal pairs agree
+completely after excluding only seconds. ADLITTLE instructions are flat.
 
-Full frozen parity 987/987 and all 37 matching release test groups pass (81
-library tests; 244 total tests). Four-row/four-column SIMD barrier tiles, scalar
-two-column tails and the earlier arithmetic/block-boundary rules remain accepted.
-Commands, exact binaries/builds, unit/fast/full logs, all output/counter pairs,
-controls, implementation audit and full sweep/follow-ups: `target/perf-rhs-memo/`,
-qualified build under `final/`. Build with the unchanged fixed 39-case training:
-`python3 -B perf/build_pgo.py --system-tcmalloc` (online merge, 64-byte loop alignment).
-Profile SHA256 `f6e3c5b9215e2712b935c7aa19265ade8e437dc8b65f2b2b85e5fa779a82d1d5`;
-CLI SHA256 `70aca8180146534df5b014717b9803529fad986459203fb609b6de990f7d2e3d`.
-The source remained frozen during official screens and all gates; the test build
-retained the qualified CLI hash. Paired baseline CLI SHA256
-`a1e725b233d99fca0c31fc6d2b836b1365dbb80aaded3a85a88b8cfb48647db2`.
+Full frozen parity passes 987/987. All 37 release test groups pass (82 library,
+245 total tests), and all 23 complete no-dump benchmark result/exit pairs agree.
+Qualified source remained frozen for both screens and all gates; the test build
+retained its exact CLI hash. Four-row/four-column SIMD barrier tiles, scalar
+two-column tails and all earlier numerical/block-boundary rules remain accepted.
+
+The full sweep flagged mode-switch +44.09%, primal_5959 dual +5.31%,
+80BAU3B PDHG +46.28% and GREENBEA PDHG +38.37%; these grouped changes are
+not credited as code effects. Fixed three-pair follow-ups give solve changes
+mode-switch +3.94/+2.93/+14.48%, primal_5959 dual -0.56/+2.17/-2.15%,
+80BAU3B PDHG -0.42/-5.92/-1.54% and GREENBEA PDHG +0.16/+1.27/+4.37%.
+Corresponding cycle medians are +1.89/-0.52/-1.01/+0.64%; the large grouped
+slowdowns do not recur. Two remaining flags receive one fixed control each,
+with reversed A=current/B=predecessor roles so a positive result would establish
+regression. No sample extension or repeated confirmation is used.
+
+mode_switch.dual-r (seed 4327, 32 AB + 32 AA) predecessor median +0.17%, interval [-0.58%, +1.35%], AA [-0.62%, +0.84%], sign p 0.702.
+greenbea.pdhg (seed 4357, 32 AB + 32 AA) predecessor median -0.07%, interval [-0.95%, +1.24%], AA [-0.75%, +1.37%], sign p 0.430.
+Neither control establishes a slowdown beyond variation.
+
+The RHS-only predecessor's two controlled primal_5959 primal gains were
+7.31/4.79%, with target instructions -10.90%; its exact source/build, gates,
+controls and resolved PEROLD timing flag remain in `target/perf-rhs-memo/final/`.
+The new reduced-cost cache is separate from the rejected main-factor BTRAN cache.
+Current source/build, output pairs, controls, ownership/kernel audits, full gates
+and regression follow-ups are in `target/perf-cost-memo/`. The unchanged fixed
+39-case PGO training uses online merge and 64-byte loop alignment:
+`python3 -B perf/build_pgo.py --system-tcmalloc`.
+Profile SHA256 `bfbe6c70717f667fa1d304afbc132bed867465f935f3fc83a1aa1ceee1045d16`;
+CLI SHA256 `ddd297f0c9c4ce1f5dfe355f359a3b8f5cf14d8860511a85ba01e743099949d7`.
+Paired baseline CLI SHA256
+`70aca8180146534df5b014717b9803529fad986459203fb609b6de990f7d2e3d`.
 Frozen parity baselines and cached original-reference Runtime targets are unchanged.
 
 | run | ref solve | baseline wall | paired base wall | current wall | solve | current/ref | instr |
 |---|---|---|---|---|---|---|---|
-| degen2.primal-c | 0.012711 | 0.182 | 0.060 | 0.061 | 0.052415 | 4.12 | 264.4 |
-| degen2.dual-r | 0.009653 | 0.125 | 0.053 | 0.052 | 0.043505 | 4.51 | 202.9 |
-| degen3.primal-c | 0.163137 | 3.237 | 0.800 | 0.744 | 0.727863 | 4.46 | 3813.6 |
-| degen3.primal-r | 0.193685 | 3.872 | 0.882 | 0.858 | 0.840980 | 4.34 | 4278.2 |
-| perold.primal-c | 0.160994 | 2.430 | 0.775 | 0.779 | 0.768936 | 4.78 | 4331.5 |
-| pilot4.primal-r | 0.015787 | 0.253 | 0.085 | 0.085 | 0.077009 | 4.88 | 472.8 |
-| 80bau3b.primal-c | - | 1.618 | 1.008 | 0.609 | 0.594362 | - | 6152.8 |
-| primal_5959.primal-r | 0.067884 | 0.563 | 0.156 | 0.146 | 0.220454 | 3.25 | 1387.2 |
-| degen3.dual-c | 0.082843 | 1.002 | 0.246 | 0.247 | 0.236101 | 2.85 | 1826.4 |
-| degen3.dual-r | 0.082947 | 1.008 | 0.248 | 0.249 | 0.238134 | 2.87 | 1834.4 |
-| perold.dual-r | 0.038532 | 0.355 | 0.127 | 0.128 | 0.121706 | 3.16 | 1044.4 |
-| 80bau3b.dual-r | - | 1.103 | 0.312 | 0.312 | 0.297130 | - | 2470.1 |
-| greenbea.dual-c | - | 2.870 | 0.659 | 0.663 | 0.649165 | - | 4898.9 |
-| greenbea.dual-r | - | 3.598 | 0.977 | 0.659 | 0.645969 | - | 4837.9 |
-| mode_switch.dual-r | - | 25.815 | 1.953 | 1.931 | 1.892753 | - | 12065.6 |
-| primal_5959.dual-r | 0.098192 | 1.300 | 0.344 | 0.324 | 0.316003 | 3.22 | 1940.4 |
-| quad_2717.dual-r | 0.092814 | 1.130 | 0.399 | 0.389 | 0.381216 | 4.11 | 2079.2 |
-| fx_quad_obj_5371.dual-r | 0.038077 | 0.334 | 0.142 | 0.137 | 0.130075 | 3.42 | 801.8 |
-| degen3.barrier-r | 0.075214 | 0.608 | 0.324 | 0.316 | 0.258629 | 3.44 | 2574.0 |
-| 80bau3b.barrier-r | - | 0.379 | 0.335 | 0.337 | 0.302040 | - | 2647.9 |
-| greenbea.barrier-r | - | 1.569 | 1.126 | 1.169 | 1.121493 | - | 9939.1 |
-| 80bau3b.pdhg | - | 4.552 | 3.642 | 3.656 | 3.642034 | - | 74938.2 |
-| greenbea.pdhg | - | 2.801 | 2.284 | 2.269 | 2.252355 | - | 31947.0 |
+| degen2.primal-c | 0.012711 | 0.182 | 0.061 | 0.060 | 0.051358 | 4.04 | 264.4 |
+| degen2.dual-r | 0.009653 | 0.125 | 0.049 | 0.050 | 0.042564 | 4.41 | 202.9 |
+| degen3.primal-c | 0.163137 | 3.237 | 0.742 | 0.750 | 0.732791 | 4.49 | 3813.8 |
+| degen3.primal-r | 0.193685 | 3.872 | 0.836 | 0.870 | 0.852825 | 4.40 | 4278.3 |
+| perold.primal-c | 0.160994 | 2.430 | 0.763 | 0.769 | 0.760667 | 4.72 | 4332.0 |
+| pilot4.primal-r | 0.015787 | 0.253 | 0.086 | 0.085 | 0.075027 | 4.75 | 472.8 |
+| 80bau3b.primal-c | - | 1.618 | 0.949 | 0.957 | 0.933431 | - | 6154.2 |
+| primal_5959.primal-r | 0.067884 | 0.563 | 0.236 | 0.207 | 0.200615 | 2.96 | 1373.9 |
+| degen3.dual-c | 0.082843 | 1.002 | 0.392 | 0.410 | 0.389034 | 4.70 | 1826.5 |
+| degen3.dual-r | 0.082947 | 1.008 | 0.473 | 0.399 | 0.382503 | 4.61 | 1834.5 |
+| perold.dual-r | 0.038532 | 0.355 | 0.127 | 0.126 | 0.120302 | 3.12 | 1044.5 |
+| 80bau3b.dual-r | - | 1.103 | 0.312 | 0.311 | 0.295662 | - | 2470.1 |
+| greenbea.dual-c | - | 2.870 | 0.660 | 0.659 | 0.646123 | - | 4899.0 |
+| greenbea.dual-r | - | 3.598 | 0.652 | 0.653 | 0.640205 | - | 4838.0 |
+| mode_switch.dual-r | - | 25.815 | 1.265 | 1.823 | 1.884129 | - | 12067.0 |
+| primal_5959.dual-r | 0.098192 | 1.300 | 0.283 | 0.298 | 0.304413 | 3.10 | 1920.9 |
+| quad_2717.dual-r | 0.092814 | 1.130 | 0.378 | 0.378 | 0.370774 | 3.99 | 2060.0 |
+| fx_quad_obj_5371.dual-r | 0.038077 | 0.334 | 0.136 | 0.129 | 0.113665 | 2.99 | 791.9 |
+| degen3.barrier-r | 0.075214 | 0.608 | 0.322 | 0.326 | 0.263257 | 3.50 | 2574.0 |
+| 80bau3b.barrier-r | - | 0.379 | 0.327 | 0.328 | 0.295813 | - | 2647.9 |
+| greenbea.barrier-r | - | 1.569 | 1.169 | 1.151 | 1.105553 | - | 9939.1 |
+| 80bau3b.pdhg | - | 4.552 | 3.555 | 5.200 | 5.097977 | - | 74939.0 |
+| greenbea.pdhg | - | 2.801 | 1.584 | 2.191 | 2.213097 | - | 31947.0 |
 
 ## Hotspots
 
-Profiles below identify their saved solver/build and predate compact RHS reuse
-and the current PGO build. Treat them as earlier attribution, not current cost
-bounds. Reproduce saved flags/features when consulting their annotations, and
+Profiles below identify their saved solver/build and predate reduced-cost-result
+reuse and the current PGO build. Treat them as earlier attribution, not current
+cost bounds. Reproduce saved flags/features when consulting their annotations, and
 refresh attribution on a changed path before selecting another optimization.
 
 Per profiled bench run: the commit it was taken at and the top self-time functions (percent), at most
@@ -125,15 +146,15 @@ five lines each. Re-profile a run when a landed change touched its hot path.
 - primal_5959.dual-r, `tplnupps` (stale after factor reuse; frame-pointer build passes full parity; three solves capped at 16000 iterations, `target/perf-dual5959-full.data`): F80 add_signed 7.50%, primal control 5.70%, F80 multiply 4.54%, F80 nucleus 3.88%, double nucleus 3.74% self. All three reach numerical_failure, 15688 iterations, 7842 refactorizations. Refactorization is 51.10% inclusive, quad mirrors 21.69% before factor reuse. LUIN capture `target/perf-dual5959-luin.log` has 7822 records and 40 input-head/threshold combinations; two-entry LRU estimate 99.3% hits. Wide-shift arithmetic rewrites are rejected below. The earlier 11000-iteration capture stopped early and is not the full-run profile.
 - pilot4.primal-r, `tnplmxwr` (accepted native-TCMalloc/PGO release CLI, ADLITTLE first; 32 PILOT4 solves capped at 800, all optimal in 690 iterations with matching complete outputs): period-4M instruction self profile has 3934 samples, no lost/throttle events and represented instructions 99.73% of the direct 15.779B batch count. Primal control is 16.47%, factor update 10.45%, specialized primal row update 8.82%, BTRAN 7.65%, nucleus 5.49%, FTRAN 5.39%, fresh structure 4.55% self. These are batch fractions including launcher/parsing/startup/validation, not solve-only/inclusive costs or removable bounds. Row-update annotation samples sparse short-dot loads and bounds checks plus the Devex recurrence/norm path; non-precise samples cannot establish norm-check misprediction. Control remains the largest individual self symbol. Raw data, validated results, runner, exact build/hash/commands, direct count, event audit and both annotations: `target/perf-primal-current/`.
 - primal_5959.primal-r, `zxxynqtw` (stale after native extended reduced costs; PGO with all saved flags plus frame pointers; full profiling parity 987/987; twenty solves capped at 11000 iterations, all numerical_failure in 10780 iterations and 5381 refactorizations; `target/perf-primal5959-current.data`): primal control 14.30%, F80 add 12.74%, F80 multiply 5.64%, set_d_from_y 5.36%, malloc/free 7.72% self. Refactorization is 28.35%, set_d_from_y 9.62%, recompute_primal 8.18%, extended BTRAN 7.84% inclusive. Reprofile remaining extended BTRAN, eta products, primal control and refactorization before another change.
-- fx_quad_obj_5371.dual-r, `tnplmxwr` (accepted native-TCMalloc/PGO release CLI, ADLITTLE first; 64 dual-release solves capped at 5500, all infeasible in 5319 iterations with matching complete outputs): period-8M instruction self profile has 7048 samples, zero loss/throttle events and represented instructions 99.84% of direct 56.476B whole-batch count. Primal control is 8.50%, extended BTRAN 8.30%, FTRAN 7.46%, set_d_from_y 7.45%, ranked products 4.44%, unsigned 128-bit division helper 3.92%, factor update 3.63%, L stage 3.21%, F80 division 2.75%, to_f64 2.51%, multiply 2.24%, add 1.93% and sub 1.39% self. Batch scope includes launcher/parsing/startup/validation; inlined arithmetic is charged to callers and these fractions are not removable or solve-only bounds. The initial period-2M capture had 357 throttle/unthrottle pairs and is excluded from quantitative attribution, despite 99.58% represented instructions. Raw data, validated results, hashes/build, exact commands/direct counts and both audits: `target/perf-packed-number/`, clean capture under `profile8m/`.
+- fx_quad_obj_5371.dual-r, `prxvqvrr` (preceding compact-RHS/native-TCMalloc/PGO release CLI, stale after reduced-cost-result reuse; ADLITTLE first; 64 dual-release solves capped at 5500, all infeasible in 5319 iterations with matching complete outputs): period-8M instruction self profile has 6409 samples, zero loss/throttle events and represented instructions 99.61% of direct 51.475B whole-batch count. Primal control is 9.19%, extended BTRAN 8.16%, FTRAN 6.93%, set_d_from_y 6.07%, ranked products 4.88%, factor update 4.51%, unsigned 128-bit division helper 3.76%, L stage 2.96%, auxiliary factor 2.92%, F80 division 2.47%, to_f64 2.43%, multiply 2.08%, add 1.93% and sub 1.65% self. Native malloc/delete[]/realloc are 3.85/2.90/2.32%. Scope includes launcher/parsing/startup/validation; inlined arithmetic is charged to callers and these fractions are not removable or solve-only bounds. Raw data, validated results, exact build/hash/commands, direct counts and event audit: `target/perf-rhs-current/`. The preceding profile remains in `target/perf-packed-number/profile8m/`; its period-2M exploratory capture was throttled and is excluded.
 - degen3.dual-c, `nzspmlyk` (all saved PGO flags plus frame pointers; full profiling parity 987/987; five solves capped at 2300, all optimal in 2212 iterations and 24 refactorizations; `target/perf-degen3c-taugather.data`): iteration 10.43%, FTRAN 8.64%, L stage 7.38%, needed FTRAN 6.57%, numeric LU 4.76%, BTRAN 4.36%, update 4.20% self. Iteration 49.92%, refactorization 21.27%, needed FTRAN 16.05%, FTRAN 14.05%, L stage 9.79% inclusive. The new term gather is 0.94% self. Current annotations `target/perf-degen3c-taugather-{needed,gather}.txt`; inspect remaining joint FTRAN/L work and iteration control while accounting for rejected traversal/estimate trials below.
 - degen3.dual-r, `rxqrkvwm` (stale after eta gather-buffer reuse; frame-pointer build passes full 987/987 parity; five solves capped at 2300 iterations, `target/perf-dual3-rest.data`): L stage 9.24%, FTRAN 8.62%, ftran_needed 7.61%, iteration 7.02%, BTRAN 5.83% self. ftran_needed is 21.69%, L stage 13.85%, FTRAN 15.30%, refactorization 23.59% inclusive. All five optimal in 2212 iterations, 24 refactorizations. Dense L-stage output compaction is another 2.52% self; reserving it failed the timing gate below. Eta gathers now reuse one buffer per call. Reprofile before choosing more L-stage numeric scatter or output conversion work (`target/perf-dual3-rest-lstage-annotate.txt`).
 - mode_switch.dual-r, `yxpknytr` (stale after loop alignment; PGO release CLI, self-only profile; three solves capped at 12000 iterations, all optimal in 11393 iterations and 17 refactorizations; `target/perf-densecols-mode-before.data`): factor_structure 12.81%, usize maximum reduction 9.20%, post_inner 7.99%, FTRAN 5.96%, BTRAN 5.85% self. The FTRAN annotation samples two full marker scans; both hot loop heads are on 64-byte boundaries in this binary. The landed loop-alignment setting keeps these marker heads at boundaries as nearby code changes. The earlier marker-block trial is recorded below. Annotate the maximum reduction's caller before assigning it to a field.
 
 ## In progress
 
-None. Compact RHS result/WORK-estimate reuse is verified above. All reachable
-reference ratios still need to meet the goal; no completion is claimed.
+None. Compact reduced-cost and RHS-result/WORK-estimate reuse are verified above.
+All reachable reference ratios still need to meet the goal; no completion is claimed.
 
 ## Extended BTRAN feasibility
 
@@ -255,7 +276,7 @@ no new solver speedup or reference timing ratio.
 Ordered by current/ref; reprofile any changed path before choosing a change. Ratios use the current
 sweep's solve medians; paired old/new times determine whether a change gains or regresses.
 
-- pilot4.primal-r (4.88x), perold.primal-c (4.78x), degen2.dual-r (4.51x), degen3.primal-c (4.46x), degen3.primal-r (4.34x), degen2.primal-c (4.12x): reprofile changed paths first. Host speed bands can reorder these snapshot ratios; paired old/new measurements determine gains.
+- pilot4.primal-r (4.75x), perold.primal-c (4.72x), degen3.dual-c (4.70x), degen3.dual-r (4.61x), degen3.primal-c (4.49x), degen2.dual-r (4.41x): reprofile changed paths first. Host speed bands can reorder these snapshot ratios; paired old/new measurements determine gains.
 - primal_5959.primal-r: reprofile remaining extended BTRAN, eta products, primal control and refactorization with current PGO flags before another change.
 - DEGEN2 joint FTRAN: dense interleaving, sparse-column/dense-tau traversal and individual/combined U-estimate deferral are rejected below. Combined deferral has also been tested with shared runtime-policy kernels, unchanged factor fields and the original column vector return; it reduces instructions without a repeatable PEROLD timing gain. The final mode-switch variants do not isolate the cause of the earlier const-generic regression. Reprofile remaining FTRAN/L traversals before another change. Reference control-flow evidence: `target/perf-pairpack-reference-audit.txt`.
 - Forward-L layout evidence: cached SC50A has 10/29 entries in consecutive-row runs of at least two after sorting, none in runs of four. Bounded restored-release BSOLVE captures (ADLITTLE cap 300, BORE3D 500, DEGEN2 640; all reach their normal optimal exits) show no duplicate or non-lower L entries. In DEGEN2's largest captured L matrix, 584/1578 entries are in runs of two and 138/1578 in runs of four; the smaller models have little long-run coverage. A sorted contiguous-run cache remains untested and its constructor/storage cost needs justification before implementation. Geometry/data: `target/perf-lranges-{full-summary.json,adlittle-300.log,bore3d-500.log,degen2-640.log}`.
@@ -263,7 +284,7 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 - PILOT4 primal-release: the refreshed accepted-release self profile puts primal control (16.47%), factor update (10.45%) and specialized row update (8.82%) first. The cached original-reference comparison identifies pricing/control and factor construction/update as the largest excesses; its historical shares are not current solver costs. BTRAN has a much smaller instruction excess. Direct BTRAN-list traversal to avoid the row-product order scan/sort is rejected below after a quad primal regression. The remaining hot primal samples lie in row-product scatter and the Devex recurrence/norm test. Short Devex dots already use scalar length-unrolled code; the long eight-lane path is cold in the current annotation. Non-precise branch samples cannot assign misses to the norm check, and branch-stack sampling is unavailable. The paired short-dot trial is rejected below. Reprofile the specialized row update and remaining control/factor work before another change. A/B lookup reuse and batching U-transpose deletions are rejected below; their tiny instruction changes do not justify a larger index solely from redundant-looking source scans. Fresh-factor temporary adjacency, per-tail-column traversal scratch and invariant structural entry counts are rejected below. Produced factor data and basis-column copies remain constructor leads.
 - Factor dependency walk: current accepted-release annotation samples repeated A/B length counts and the slot-maximum reduction (`target/perf-update-current/update.asm`). Count caching and maximum algebra have no established runtime gain; reusing the existing reverse row copy saves instructions but misses independent timing confirmation. All three implementations are restored and recorded below. Reprofile before another local variant rather than treating these medians as accepted improvements.
 - Ranked double products: both per-term filtering and maintained required-entry traversal are rejected below. The latter preserves coefficient/duplicate order across ordinary pivots and arbitrary basis differences, but its 32-pair screen has no established timing benefit despite fewer instructions. Do not assume that removing these unused outputs accounts for a comparable runtime share. Reprofile remaining primal control or factor-update costs before another representation variant; the independent cost-change caller still uses the full routine.
-- Other reachable runs follow their table ratios. Four compact extended factors and double structures remain cached; RHS providers now reuse exact solve and estimate results. Main factors still clone mutable state; row-capacity growth already uses the numeric U transpose.
+- Other reachable runs follow their table ratios. Four compact extended factors and double structures remain cached; providers reuse exact RHS solve/estimate and pure fresh reduced-cost results. Main factors still clone mutable state; row-capacity growth already uses the numeric U transpose.
 - Quad_2717: reprofile remaining software extended arithmetic after native Devex cross-term dots before choosing another whole-kernel optimization. Ranked-product register retention and outlining are rejected below; factor-cache working set and extended reduced-cost pass are settled.
 - Barrier: reprofile before choosing more matrix-product, assembly or triangular work. Eight-row/four-column broadcast sharing has no established timing gain below; reprofile before another tile width or copy-mode change; the four-output copy Chain trial is timing-inconclusive below. Preserve every per-output reduction and block boundary. Four-row/four-column SIMD S tiles with scalar two-column tails and allocation-free row-tile selection are accepted above. The two-column-only vector trial has no established timing gain below. Local scatter row/slice hoisting is timing-inconclusive below; dense-LDL chunks have no established timing gain. Refresh attribution before another local variant. DTRSM dispatch is settled; reprofile remaining FMA callers before choosing another whole kernel.
 - Runs without reachable references, after the reachable ratios: mode-switch's pre-alignment profile above points to factor structure, the maximum reduction and post-update work. B-reference checks are already settled; reprofile and identify the maximum reduction's caller before choosing another change.
