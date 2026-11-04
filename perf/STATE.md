@@ -726,11 +726,10 @@ projected effects, component source/binary/timings, dependency audit and restora
 
 ## In progress
 
-No active runtime candidate. Maintained eligible ranked-row traversal is a
-standalone feasibility result: producer-notified maintenance improves the
-PILOT4 component but regresses smaller witnesses, so it is unapplied. Accepted
-source/CLI/PGO metadata remain exact. The overall reference performance goal
-remains unmet.
+No active runtime candidate. The maintained-traversal workload gate and bitset
+alternative have no broadly profitable component; the original scatter's bounds
+elision is timing-inconclusive and unapplied. Accepted source/CLI/metadata are
+restored exactly. The overall reference performance goal remains unmet.
 
 ## Extended BTRAN feasibility
 
@@ -921,6 +920,52 @@ all254 release tests pass (22 default ignored). No candidate solver build or
 official timing screen is run. Captures/baseline scope, all three plan sources,
 preliminary negative timings, final source/binary freeze, all final timings/raw
 checks, generation-scope limits and restoration: `target/perf-active-rank/`.
+
+### Ranked-traversal gate and original bounds check
+
+The separate gate admits a query after cumulative dense work reaches eight
+immutable-matrix passes; dense means at least half the matrix's entries are
+visited. Every sparse fallback still notifies an existing plan of the committed
+pivot, or invalidates its generation. Complete64-stream, eight alternating CPU4
+component pairs include all predicate/counting/construction/maintenance costs.
+SC50A activates0/8 calls, DEGEN242/181 and PILOT4281/367. Changes versus the
+original component are +6.04/+73.85/-9.70%; the gate is not broadly profitable.
+All492530 retained captured outputs and76723 edge-case outputs agree exactly.
+A bounded independent PEROLD primal-release prefix (cap600, iteration limit,
+14 refactors) has no calls to this path; it supplies no generation/performance
+coverage. Its test-only actual-refactor-count capture is removed and the accepted
+source/CLI stay exact. Source, fixed gate, freeze, all samples and validation:
+`target/perf-gated-rank/`.
+
+A different flat active-entry bitset retains immutable coefficients, replaces
+swap removal/location arrays with per-column bit updates and walks set bits in
+original entry order, including duplicates. Preliminary captured-stream costs
+are SC50A+202.43%, DEGEN2+59.19%, PILOT4+4.06%; no solver integration follows.
+The initial edge fixture incorrectly demanded an unused basic-column output;
+it is corrected to the retained-output contract, and76723 edge checks now pass,
+including duplicate/unsorted entry order. The earlier timings ran despite that
+fixture failure and remain preliminary; no qualified gain is asserted. Original
+and corrected fixture/binaries, timing freeze, all samples and limits:
+`target/perf-bit-rank/`.
+
+The original ordinary ranked scatter's accumulator access is a separate trial.
+`build` enumerates exactly n+m columns into private rwise; production dimensions
+and that matrix stay paired and unchanged. Removing only its per-entry result
+bounds check retains all entries, numeric expressions/order, callers and WORK.
+The complete independent original method is source-identical, and its new
+captured-AFIRO plus random/duplicate/nonfinite/two-NaN/all16-MXCSR tests pass.
+Matching fixed39 PGO/TCMalloc and fast940 parity pass. Eight bounded SC50A/
+DEGEN2 and three PILOT4 complete result/exit pairs agree. Instructions change
+-0.059/-0.243/-0.738%; cycles -1.840/+0.372/-0.314%.
+
+The fixed PILOT4 screen35217 (32AB+32AA, CPU4, cap800) is inconclusive: median
++0.729%, CI [-2.617%, +3.146%],14/32 improving, sign p .811; order medians
++1.793/+0.592%. AA is biased (median+1.411%, CI[+0.288%, +2.244%], p .007).
+Stop without35289, extension or full candidate gates. Source, accepted CLI/
+metadata/profile restored exactly; restored formatting, fast940/full987 and all
+254 release tests pass (22 default ignored). The bounds-elision trial remains
+unapplied. Full original/source/memory proof, matching build/freeze/tests, all
+results/counters, screen and restoration: `target/perf-rank-unchecked/`.
 
 ### Current primal source-line screen
 

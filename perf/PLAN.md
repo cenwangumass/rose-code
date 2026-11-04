@@ -281,14 +281,21 @@ measured.
   omit59.55% of entries, but scanning basis positions/sets still loses in the
   component. Producer-notified maintenance improves PILOT4's component18.45%
   while regressing SC50A/DEGEN2; no unconditional solver integration follows.
-  Before integrating this distinct traversal, measure a workload/amortization
-  gate on complete captured histories, including sparse fallback calls. Bind
-  invalidation to actual solver refactor/repair events and invalidate on skipped
-  product routes; do not assume the component's inferred generation is a solver
-  lifecycle proof. Duplicate/unsorted rows need the original full kernel. Protect
-  the complete original kernel and caller-consumed state first; WORK stays live.
-  Use SC50A/DEGEN2 witnesses before PILOT4. Existing per-entry output masks,
-  rank-pair/gather-plan/floor and storage failures remain unapplied.
+  The fixed half-matrix-density/eight-pass warm-up gate is now tested across
+  complete histories, including sparse fallback notifications. It remains slower
+  on SC50A/DEGEN2 despite a PILOT4 component gain. Flat bitset membership likewise
+  has no useful captured-stream gain. Do not integrate these tested mechanisms
+  from arithmetic savings alone; actual refactor/repair binding remains absent.
+  Original-scatter accumulator bounds elision passes the complete original
+  oracle, memory-invariant proof, matching PGO and fast940. Its fixed screen35217
+  is inconclusive with biased AA; do not repeat/extend it or run35289.
+  Next measure the current ordinary whole-row update's drop/eligibility density
+  before selecting a larger control change. The scalar precomputed-product
+  prefilter is already rejected; do not repeat it. Any proposed packed predicate
+  scan must first show component savings including index construction, preserve
+  NaN routing and ascending column order, and compare complete mutable row state
+  against the independent original kernel. Use cached SC50A/DEGEN2/PILOT4 products
+  first; current self shares are not removable bounds.
   Comparator alignment stays centralized; normal lunum's build/cache transport
   still needs an explicit no-build/schema-current source option for direct reuse.
   Look for a faster exact implementation of the same rounding (the F80 tests and `../reverse-engineer/evidence/f80-subnormal-reference.json`

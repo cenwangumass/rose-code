@@ -753,9 +753,20 @@ The frozen standalone pinned-release/system-allocator probe includes per-stream
 construction, all membership/resync work and output allocation; common sorted
 row-order preparation stays outside timing. Eight alternating CPU4 pairs of64
 complete streams yield SC50A+408.82%, DEGEN2+40.17%, PILOT4-18.45%. Unconditional
-integration is unprofitable despite fewer arithmetic terms. A future attempt
-needs a measured workload/amortization gate and complete basis-lifecycle proof;
-these component results establish no solver gain.
+integration is unprofitable despite fewer arithmetic terms. The separate fixed
+gate (half-matrix query density and eight dense matrix passes before admission)
+includes sparse fallback notifications and all setup/counting costs. It activates
+0/8 SC50A,42/181 DEGEN2 and281/367 PILOT4 queries, giving component changes
++6.04/+73.85/-9.70%. All retained/mode/edge values agree, but the gate remains
+unprofitable across witnesses. An actual-refactor-count PEROLD capture capped600
+has no ordinary-pivot calls and provides no lifecycle/performance coverage.
+A flat bitset alternative reduces mutation metadata and preserves original
+entry order, including duplicates. Preliminary changes +202.43/+59.19/+4.06%
+show no benefit on SC50A/DEGEN2/PILOT4. Its initial edge fixture compared an
+unused basic output; corrected retained-output/duplicate-order checks pass76723
+values. Timings that ran despite that fixture failure remain preliminary.
+No maintained traversal is integrated. Sources, gate/bitset freezes, all samples,
+capture and validation limits: `target/perf-gated-rank/`, `target/perf-bit-rank/`.
 
 All492530 retained captured outputs and76723 extreme/nonfinite/NaN/duplicate-
 fallback/mode/history/stamp-overflow edge values agree exactly. Original source,
@@ -764,6 +775,23 @@ all254 release tests pass (22 default ignored). No candidate solver build or
 official screen. All captures, validation/source proof, preliminary/final probe
 sources/timings, exact final binary freeze and restoration:
 `target/perf-active-rank/`.
+
+## Original ordinary ranked-scatter bounds access
+
+Internal::build enumerates exactly n+m columns into the private immutable row
+matrix. The separate original-scatter trial removes only the output bounds check
+under that construction invariant, retaining every output and all arithmetic/
+WORK/callers. A complete original method is independently frozen and restored
+by reversing that access edit. Two release differential tests compare captured
+AFIRO plus random/duplicate/extreme/nonfinite/two-NaN/all16-MXCSR full outputs.
+Matching fixed39 PGO, those tests, fast940 and every bounded result/exit pair pass.
+PILOT4 instructions/cycles fall0.738/0.314%, but screen35217 is inconclusive:
+median+0.729%, CI[-2.617,+3.146]%,14/32 improving and biased AA (p .007,
+CI[+0.288,+2.244]%). Stop without35289, extension or full candidate gates.
+Original source/accepted CLI/metadata/profile restored exactly; formatting,
+fast940/full987 and all254 release tests pass (22 default ignored). This bounds-access trial remains unapplied. Complete source/memory proof, original oracle,
+matching build/tests/freezes/results/counters/screen/restoration:
+`target/perf-rank-unchecked/`.
 
 ## Ordinary ranked-row packed traversal
 
