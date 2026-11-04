@@ -269,17 +269,29 @@ source/CLI/build are restored. This extends the earlier move-only experiment;
 allocation removal alone has no demonstrated benefit. Evidence and restoration:
 `target/perf-f2-workspace/`.
 
-The remaining source dependency is narrower than the stored values: production
-reads of `x_col` and `x_tau` occur only in `third_work` and `dense_pair_work` as
-`x_col[c] != ZERO` and `x_tau[c] != ZERO && tau_raw[c]`. Ordered `col_in`, input
-counts and factor structure are separate required inputs. No production dump
-emits the numeric F2 arrays; the frozen tests currently compare them in full.
-This proves the consumed predicates, not a profitable compressed implementation.
-A new representation needs an independent original numeric/WORK oracle and exact
-predicate construction for signed zeros, NaNs, tolerance branches and tiny retained
-tau values. Preserve the original WORK sums and order. The refreshed PEROLD self
-shares (FTRAN 9.26%, needed FTRAN 7.43%, joint-U 2.45%) include other numerical
-work and do not bound snapshot-removal savings. Consumer/source proof:
+Production reads of `x_col` and `x_tau` occur only in `third_work` and
+`dense_pair_work` as `x_col[c] != ZERO` and `x_tau[c] != ZERO && tau_raw[c]`.
+Ordered `col_in`, counts and factor structure remain separate required inputs.
+No production dump emits these numeric F2 arrays. The consumed predicates are
+now independently checked against original numeric state and original joint-U,
+third and dense WORK routines: five original numeric/WORK bodies remain identical
+after oracle/state identifiers, visibility and whitespace normalization only.
+Repeated full/needed f64/F80 tests cover captured SC50A inputs, exact predicate
+bits and WORK; 3,072 random original states exercise branch/count/list conditions,
+signed zeros and nonfinites.
+
+Two column-only storage prototypes reuse the output bitmap instead of cloning
+`x_col`. V1's nonzero-only marker revisits zeros in the fallback output scan.
+The final marker distinguishes unvisited/visited-zero/visited-nonzero, preserving
+the original visitation test while exposing the exact nonzero predicate. Both
+preserve fast parity and complete bounded outputs, but accepted-parent-profile
+instructions still rise about 1% on PEROLD/PILOT4. The final PEROLD cycle median
+is +0.39%, PILOT4 +1.69%; neither qualifies for new PGO/controlled timing or full
+gates. Source/CLI/build are restored, and the storage lead is closed. The proof
+of consumed predicates remains valid; it does not imply profitable compaction.
+Numeric snapshot/copy costs are not isolated by the full FTRAN self shares.
+Source proofs, independent oracles and both complete screens:
+`target/perf-f2-colflags/`; the source dependency inventory remains in
 `target/perf-f2-workspace/f2-consumer-audit.json`.
 
 ## Remaining proof obligations
