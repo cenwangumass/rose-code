@@ -4,37 +4,41 @@ Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (histo
 
 ## Numbers on AMD EPYC 9V74
 
-The current solver retains the maximum forward L level with the immutable level vector at factor construction. Sparse triangular solves use that bound to allocate level buckets. The comparison executable uses the preceding solver source at `934213eb`. Both executables use pinned Rust 1.98.1, matching fixed39 PGO with 64-byte loop alignment, and genuine gperftools TCMalloc 2.15. The reference for every row is the patched Gurobi 13.0.3 library with SHA-256 `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`.
+The current solver caches the maximum forward L level when constructing the factor. The full forward solve now reuses its saved numeric column as the next workspace. Sparse calls mark touched blocks, clear only those blocks, and consume reached positions in the original output order. Dense calls use an ascending scan.
 
-All three executables ran in fresh processes on the same logical CPU, with a rotating order, one warm-up, and three timed samples each. Ratios use the median solve-only times. Background work on other logical CPUs and host timing bands affected this sweep. The separate randomized target screens use same-binary controls.
+A fresh source build of the original `934213eb` and the forward-level release `3409b051` took 2.565061 and 1.939177 s on full mode-switch in their paired sweep (-24.4%). On 3,000-pivot runs, two 32-pair randomized screens gave −21.24% and −16.81%. Their same-binary controls passed. Five reversed-role checks found no established regression on the flagged rows. Other logical CPUs were active during that three-way sweep, and the reference times varied widely. The table below compares directly with the executable in the original upload.
 
-| Run | Gurobi (s) | Previous rose (s) | Current rose (s) | Current / Gurobi |
+Relative to `3409b051`, the workspace step took 1.764155 → 1.507018 s (-14.6%) in the complete same-core sweep. Two randomized full-length mode-switch screens gave -16.18% and -17.29%. The exact output, exit and all 202,772 WORK records matched the preceding solver. A separate instrumentation run attributes about 0.55 GB of large zero-allocation and copy requests directly to full FTRAN, down from 3.79 GB. Counts are requested bytes per solve, including repeated requests.
+
+Both rose builds use genuine gperftools TCMalloc 2.15. Gurobi uses the patched library with SHA-256 `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. All three programs ran in fresh processes on logical CPU 2, one warm-up and three timed samples each with rotating order. The table uses solve-only medians. The deployed release wins **0/23** rows against Gurobi. Its full mode-switch median is -25.3% relative to the uploaded executable in this separate sweep.
+
+| Run | Gurobi (s) | Uploaded rose (s) | Current rose (s) | Current / Gurobi |
 |---|---:|---:|---:|---:|
-| degen2.primal-c | 0.017253 | 0.047071 | 0.045195 | 2.62 |
-| degen2.dual-r | 0.015746 | 0.046368 | 0.038374 | 2.44 |
-| degen3.primal-c | 0.278752 | 0.738195 | 0.743082 | 2.67 |
-| degen3.primal-r | 0.547377 | 0.883625 | 0.901950 | 1.65 |
-| perold.primal-c | 0.407584 | 0.791955 | 0.820488 | 2.01 |
-| pilot4.primal-r | 0.025079 | 0.057154 | 0.106007 | 4.23 |
-| 80bau3b.primal-c | 0.185047 | 0.935035 | 0.921104 | 4.98 |
-| primal_5959.primal-r | 0.090970 | 0.197350 | 0.365805 | 4.02 |
-| degen3.dual-c | 0.129962 | 0.925064 | 0.760437 | 5.85 |
-| degen3.dual-r | 0.139089 | 0.564490 | 0.433761 | 3.12 |
-| perold.dual-r | 0.054490 | 0.177753 | 0.159232 | 2.92 |
-| 80bau3b.dual-r | 0.127205 | 0.577346 | 1.097449 | 8.63 |
-| greenbea.dual-c | 0.517188 | 1.188169 | 1.066904 | 2.06 |
-| greenbea.dual-r | 0.315530 | 1.037614 | 1.101116 | 3.49 |
-| mode_switch.dual-r | 0.329561 | 2.565061 | 1.939177 | 5.88 |
-| primal_5959.dual-r | 0.129131 | 0.306576 | 0.278518 | 2.16 |
-| quad_2717.dual-r | 0.120107 | 0.305087 | 0.275927 | 2.30 |
-| fx_quad_obj_5371.dual-r | 0.043615 | 0.115480 | 0.115664 | 2.65 |
-| degen3.barrier-r | 0.126345 | 0.287716 | 0.254661 | 2.02 |
-| 80bau3b.barrier-r | 0.176285 | 0.310562 | 0.355595 | 2.02 |
-| greenbea.barrier-r | 0.986226 | 1.367153 | 1.317324 | 1.34 |
-| 80bau3b.pdhg | 3.655204 | 7.435998 | 6.933949 | 1.90 |
-| greenbea.pdhg | 1.435563 | 2.485019 | 2.468227 | 1.72 |
+| degen2.primal-c | 0.015746 | 0.037747 | 0.039832 | 2.53 |
+| degen2.dual-r | 0.011659 | 0.031688 | 0.030375 | 2.61 |
+| degen3.primal-c | 0.188599 | 0.505627 | 0.529380 | 2.81 |
+| degen3.primal-r | 0.222018 | 0.620996 | 0.597338 | 2.69 |
+| perold.primal-c | 0.190209 | 0.502522 | 0.556410 | 2.93 |
+| pilot4.primal-r | 0.018898 | 0.053683 | 0.054802 | 2.90 |
+| 80bau3b.primal-c | 0.121379 | 0.585640 | 0.551625 | 4.54 |
+| primal_5959.primal-r | 0.057639 | 0.113132 | 0.137732 | 2.39 |
+| degen3.dual-c | 0.098152 | 0.282354 | 0.266896 | 2.72 |
+| degen3.dual-r | 0.098681 | 0.264319 | 0.277737 | 2.81 |
+| perold.dual-r | 0.044492 | 0.134995 | 0.129662 | 2.91 |
+| 80bau3b.dual-r | 0.095020 | 0.340474 | 0.312742 | 3.29 |
+| greenbea.dual-c | 0.210448 | 0.746799 | 0.732846 | 3.48 |
+| greenbea.dual-r | 0.251455 | 0.776471 | 0.745570 | 2.97 |
+| mode_switch.dual-r | 0.103931 | 1.544696 | 1.153582 | 11.10 |
+| primal_5959.dual-r | 0.088110 | 0.174188 | 0.174875 | 1.98 |
+| quad_2717.dual-r | 0.087084 | 0.190372 | 0.194357 | 2.23 |
+| fx_quad_obj_5371.dual-r | 0.030773 | 0.084961 | 0.079070 | 2.57 |
+| degen3.barrier-r | 0.094586 | 0.189824 | 0.185905 | 1.97 |
+| 80bau3b.barrier-r | 0.112897 | 0.208828 | 0.211615 | 1.87 |
+| greenbea.barrier-r | 0.513962 | 0.804725 | 0.841373 | 1.64 |
+| 80bau3b.pdhg | 2.246382 | 3.761702 | 3.919668 | 1.74 |
+| greenbea.pdhg | 0.962129 | 1.720039 | 1.762371 | 1.83 |
 
-Mode-switch took 2.565061 → 1.939177 s (-24.4%) at the full 11,393 iterations. Two independent 3,000-iteration screens on CPU 2 gave -21.24% and -16.81% (29/32 and 30/32 improving, healthy AA). The qualification includes complete benchmark outputs and exit codes, frozen full parity 987/987, the release suite, and a differential test against the original scan on a nonzero-level cloned factor. Five reversed-role controls covered PILOT4 primal, primal_5959 primal, 80BAU3B dual, GREENBEA dual release, and 80BAU3B barrier. None established a slowdown under the paired-screen rule. All 23 solve-time medians remain above Gurobi.
+The committed numerical source passed full frozen parity (987/987) and the release test suite. All 987 baseline digests and META.json were checked byte for byte against the original upload. Full benchmark outputs were compared after replacing only the one elapsed-time token. The raw comparisons, timing schedules and compiler metadata accompany the release.
 
 ### Mode-switch profile
 
@@ -838,7 +842,7 @@ projected effects, component source/binary/timings, dependency audit and restora
 
 ## In progress
 
-The immutable forward-level upper bound is now stored by the factor. Further sparse workspace experiments target reached positions and initialization in FTRAN and BTRAN. Their runtime gains require independent qualification on the cumulative source.
+The release above is the qualified state. The remaining gaps include ordinary primal and dual, extended-precision, barrier and PDHG. The structural trials listed below retain their measured disposition.
 
 ## Extended BTRAN feasibility
 
@@ -1125,7 +1129,7 @@ no new solver speedup or reference timing ratio.
 
 ## Candidates
 
-The first structural target on the EPYC is FTRAN/BTRAN on mode-switch. Reuse workspace across calls and maintain reached positions so sparse solves initialize, divide and emit only the entries they must visit. Preserve ascending slot order, bucket insertion order, signed-zero and exceptional cases, all F2/dump state, and the original full-range WORK contributions. A standalone L-level maximum cache, blockwise marker skips and several workspace-reuse variants have prior timing rejections on other models. Measure a combined sparse path against the actual starting allocator and run the full gate before accepting it. The profile identifies costs. It does not establish a gain for this proposal.
+The full forward U solve now carries its numeric column and dirty blocks across calls. Reprofile FTRAN/L, pricing and factor updates on the qualified binary before choosing the next large pass. The occupied-slot BTRAN, touched-only pivot-row and PDHG packet/fused-step experiments below have completed their prescribed screens. Initial unit-weight setup is about 3.3% of full mode-switch time in the recorded baseline sample.
 
 The remaining candidates below derive from the Ryzen measurements and their historical profiles.
 
@@ -1146,6 +1150,24 @@ The remaining candidates below derive from the Ryzen measurements and their hist
 - Dumps disabled: source audit of the simplex, dual, factor and PDHG hot paths finds JSON emission/serialization guarded by dump selection or an existing recording option; WORK estimates outside those guards remain solver inputs. The cached accepted-release PEROLD self report has no samples under the selected serde/dump/OnceLock symbol names, but inlined checks and preparation remain charged to callers. This is not an inclusive/total overhead bound or proof that all preparation is free. No dump optimization is justified by this screen; source anchors and the selected-symbol query are in `target/perf-dump-audit/`.
 
 ## Tried, no gain
+
+### EPYC structural trials
+
+- Sparse FTRAN occupied-block traversal alone preserved 987/987 and the complete solver result. The first capped mode-switch screen passed. The second gave -17.88% paired median, 95% interval [-20.61%, -10.07%], AA [-10.18%, +7.82%], 27/32 pairs improving. The conservative noise-separation criterion failed. The subsequent column-workspace experiment also changes numeric buffer ownership, reset and output bookkeeping.
+
+- Sparse BTRAN U-transpose workspace preserved 987/987 and the exact full mode-switch WORK trace. The fixed mode-switch screen gave -8.05% paired median, 95% interval [-10.84%, -4.78%], AA [-5.87%, +3.37%], 27/32 pairs improving. The conservative noise bound failed.
+
+- Dual pivot-row accumulation reused coefficient and membership arrays and reset only touched coordinates. Full parity passed. The mode-switch screen gave -5.31% paired median, 95% interval [-12.54%, +4.46%], AA [-3.30%, +5.32%], 18/32 pairs improving. The interval includes zero.
+
+- Packed short-row PDHG grouped independent equal-length rows in four lanes in both sparse multiplications. Full parity passed. The GREENBEA screen gave -14.32% paired median, 95% interval [-22.17%, -7.28%], AA [-4.02%, +23.02%], 28/32 pairs improving. The same-binary interval was too wide to qualify the change.
+
+- Initial dual weights from structurally isolated unit right-hand sides reduced a prior-profile mode-switch zero-pivot pilot by 41.6%. The four complete-run ratios crossed in both directions and the full median increased 5.5%. The original entire weight-initialization loop was about 3.3% of this solve. The preliminary source was left out of the solver.
+
+- Auxiliary LU ownership audit found no identical complete constructor inputs on PILOT4 primal (17 constructors) or PEROLD dual (27). Canonical identical independent components could reuse zero of 223,269 elimination products on PILOT4 and 81 of 1,081,134 on PEROLD dual. Deferring construction still has to preserve the exact singular-factor decision.
+
+- PDHG ordinary-step fusion combined each sparse matrix multiply with the projection and Halpern update. Checks, restarts and limit-boundary steps kept their original paths. Full parity passed. The fixed GREENBEA screen gave -9.42% paired median, 95% interval [-15.06%, -2.20%], AA [-9.83%, +11.96%], 24/32 pairs improving. Its interval overlapped the same-binary uncertainty. No confirmation was run.
+
+<!-- end EPYC structural trials -->
 
 - Memoize pure F80 quotients in a const thread-local table of512 entries (128 four-way FIFO sets,32KiB table). Eligibility is finite nonzero inputs; raw full operand fields and exact-key verification protect fingerprint collisions. The complete original division remains independently frozen, and source reversal removes only lookup/store around its unchanged arithmetic. Original zero/NaN/infinity paths remain numerically unchanged; all stores use original packed results. Collision/eviction and cold/warm random/full-bit/boundary/captured comparisons check internal sign/exponent/mantissa. Matching fixed39 PGO, all eleven F80 tests and fast940 parity pass; eight ADLITTLE/fx and three Quad complete result/exit pairs agree. Despite high simulated reuse, fx instructions fall only0.473% with cycles+0.845%; Quad instructions+0.230%, cycles+5.671%. Stop at counters without seeds21217/21289 or full gates. Assembly/relocation audit confirms both baseline and candidate retain only one out-of-line Div call site in BTRAN; the original dense-U division remains inlined, so loss of that inlining does not explain the regression. Source, accepted CLI and metadata restored exactly; restored fast940 parity passes. Full source/frozen oracle, proof, matching build, tests, assembly, call audit and all paired result/counters: `target/perf-div-memo/`. This rejects the tested global table; the separately tested column scope also loses at counters, as recorded below.
 

@@ -11,6 +11,81 @@ use crate::lu_order::Structure;
 use crate::real::Real;
 use std::collections::BinaryHeap;
 
+/// Sparse U solves visit only reached rows, in ascending basis position. Dense
+/// solves retain their contiguous marker scan. Duplicate touches are idempotent.
+enum FtranTouched {
+    Dense(Vec<bool>),
+    Sparse { words: Vec<u64>, occupied: Vec<usize> },
+}
+
+impl FtranTouched {
+    fn new(m: usize, dense: bool, occupied: Vec<usize>) -> Self {
+        if dense {
+            Self::Dense(vec![false; m])
+        } else {
+            Self::Sparse { words: vec![0; m.div_ceil(64)], occupied }
+        }
+    }
+
+    /// Returns true on the first visit, as needed by the tail dependency walk.
+    #[inline]
+    fn insert(&mut self, row: usize) -> bool {
+        match self {
+            Self::Dense(flags) => !std::mem::replace(&mut flags[row], true),
+            Self::Sparse { words, occupied } => {
+                let block = row / 64;
+                let word = &mut words[block];
+                if *word == 0 {
+                    occupied.push(block);
+                }
+                let bit = 1u64 << (row % 64);
+                let fresh = *word & bit == 0;
+                *word |= bit;
+                fresh
+            }
+        }
+    }
+
+    /// Consume a row in U's requested output order. Every numeric write has been
+    /// marked by this point, so duplicate and zero outputs can consume the same bit.
+    fn take_sparse(&mut self, row: usize) -> bool {
+        let Self::Sparse { words, .. } = self else { unreachable!() };
+        let bit = 1u64 << (row % 64);
+        let word = &mut words[row / 64];
+        let was_set = *word & bit != 0;
+        *word &= !bit;
+        was_set
+    }
+
+    fn finish(&mut self) {
+        if let Self::Sparse { occupied, .. } = self {
+            occupied.sort_unstable();
+        }
+    }
+
+    #[inline]
+    fn for_each(&self, mut visit: impl FnMut(usize)) {
+        match self {
+            Self::Dense(flags) => {
+                for (row, &flag) in flags.iter().enumerate() {
+                    if flag {
+                        visit(row);
+                    }
+                }
+            }
+            Self::Sparse { words, occupied } => {
+                for &block in occupied {
+                    let mut bits = words[block];
+                    while bits != 0 {
+                        visit(block * 64 + bits.trailing_zeros() as usize);
+                        bits &= bits - 1;
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Direct numeric row lookup for tau dots. Stamps retain the first duplicate without clearing per row.
 #[derive(Clone, Default)]
 struct TauRow<R> {
@@ -257,6 +332,9 @@ struct F2<R> {
     col_n: Option<usize>,
     col_in: Vec<usize>,
     x_col: Vec<R>,
+    /// All 64-row blocks written by the preceding sparse U solve. This list
+    /// travels with its snapshot so a clone or replaced factor resets its own data.
+    dirty_blocks: Option<Vec<usize>>,
     tau_n: Option<usize>,
     x_tau: Vec<R>,
     /// Whether the raw value of tau at a tail column exceeded the tolerance before the division (the joint routines test it first).
@@ -269,6 +347,7 @@ impl<R> Default for F2<R> {
             col_n: None,
             col_in: Vec::new(),
             x_col: Vec::new(),
+            dirty_blocks: None,
             tau_n: None,
             x_tau: Vec::new(),
             tau_raw: Vec::new(),
@@ -1904,7 +1983,22 @@ impl<R: Real> RefStruct<R> {
     fn ftran_with(&mut self, rows: &[usize], vals: &[R], force_dense: bool) -> Vec<(usize, R)> {
         let m = self.m;
         let (spike, count_l, e_l) = self.lstage_num(rows, vals, force_dense);
-        let mut x = vec![R::ZERO; m];
+        // The previous column snapshot has served every consumer. Reuse it as
+        // numeric work and reset only blocks that could contain a prior write.
+        let old = self.f2.get_mut();
+        let mut x = std::mem::take(&mut old.x_col);
+        let mut dirty = old.dirty_blocks.take();
+        if x.len() != m {
+            x = vec![R::ZERO; m];
+            dirty = None;
+        } else if let Some(blocks) = &mut dirty {
+            for block in blocks.drain(..) {
+                let start = block * 64;
+                x[start..m.min(start + 64)].fill(R::ZERO);
+            }
+        } else {
+            x.fill(R::ZERO);
+        }
         for &(p, v) in &spike {
             x[p] = v;
         }
@@ -1916,10 +2010,10 @@ impl<R: Real> RefStruct<R> {
                 || self.dens * (spike.len() as f64) < 2.0 * m as f64)
             || self.lev_dense_ft;
         let bs = force_dense && crate::dump::on("bsolve");
-        let mut touched = vec![false; m];
+        let mut touched = FtranTouched::new(m, u_dense, dirty.unwrap_or_default());
         let mut tail: Vec<usize> = Vec::new();
         for &(p, _) in &spike {
-            touched[p] = true;
+            touched.insert(p);
         }
         if u_dense && !bs {
             // Unreached columns contain zero and the dense kernel skips them before division.
@@ -1936,8 +2030,7 @@ impl<R: Real> RefStruct<R> {
                 let c = tail[k];
                 k += 1;
                 for &j in &self.a[c] {
-                    if !touched[j] {
-                        touched[j] = true;
+                    if touched.insert(j) {
                         tail.push(j);
                     }
                 }
@@ -1959,12 +2052,13 @@ impl<R: Real> RefStruct<R> {
             x[c] = xc;
             for &(j, v) in &self.uc[c] {
                 x[j] -= v * xc;
-                touched[j] = true;
+                touched.insert(j);
             }
         }
         let x_t = if bs { x.clone() } else { Vec::new() };
-        for p in 0..m {
-            if touched[p] && self.kind[p] != -2 {
+        touched.finish();
+        touched.for_each(|p| {
+            if self.kind[p] != -2 {
                 let v = x[p] / self.diag[p];
                 x[p] = if (u_dense && x[p].abs() <= R::c(TOL)) || v.abs() <= R::c(TOL) {
                     R::ZERO
@@ -1972,7 +2066,7 @@ impl<R: Real> RefStruct<R> {
                     v
                 };
             }
-        }
+        });
         if bs {
             crate::dump::emit(
                 "bsolve",
@@ -1995,36 +2089,36 @@ impl<R: Real> RefStruct<R> {
             !dense,
             if vec_dense { None } else { Some(spike.len()) },
         );
-        *self.f2.borrow_mut() = F2 {
-            col_n: if vec_dense { None } else { Some(spike.len()) },
-            col_in: inp.clone(),
-            x_col: x.clone(),
-            ..F2::<R>::default()
-        };
         self.work = u_est + e_l;
         self.work_parts = (e_l, u_est);
         self.last_dense = dense;
         self.last_ordered = dense || u_dense;
-        let ord = if dense || u_dense {
-            (0..m).collect()
+        let mut out = Vec::new();
+        if dense || u_dense {
+            out.extend(x.iter().copied().enumerate().filter(|&(_, v)| v != R::ZERO));
         } else {
-            self.uorder(&inp, &x)
-        };
-        let mut out: Vec<(usize, R)> = Vec::new();
-        let mut done = vec![false; m];
-        for &p in &ord {
-            if !done[p] {
-                done[p] = true;
-                if x[p] != R::ZERO {
+            for p in self.uorder(&inp, &x) {
+                if touched.take_sparse(p) && x[p] != R::ZERO {
                     out.push((p, x[p]));
                 }
             }
+            touched.for_each(|p| {
+                if x[p] != R::ZERO {
+                    out.push((p, x[p]));
+                }
+            });
         }
-        for p in 0..m {
-            if touched[p] && !done[p] && x[p] != R::ZERO {
-                out.push((p, x[p]));
-            }
-        }
+        let dirty_blocks = match touched {
+            FtranTouched::Sparse { occupied, .. } => Some(occupied),
+            FtranTouched::Dense(_) => None,
+        };
+        *self.f2.get_mut() = F2 {
+            col_n: if vec_dense { None } else { Some(spike.len()) },
+            col_in: inp,
+            x_col: x,
+            dirty_blocks,
+            ..F2::<R>::default()
+        };
         // The column replacement receives the spike in ascending order after a dense solve (the reference scans the dense vector),
         // and in L-stage order after a sparse one.
         let mut spike = spike;
@@ -3846,6 +3940,61 @@ mod dense_tail_tests {
                     .collect();
             }
             check(&f, &x, bits);
+        }
+    }
+
+    #[test]
+    fn sparse_touches_match_frozen_ftran_across_block_boundaries() {
+        let m = 1025;
+        let mut f = identity::<f64>(m);
+        f.lev_dense_ft = false;
+        f.dthr = 1;
+        f.i21 = m - 2;
+        for p in f.i21..m {
+            f.kind[p] = -2;
+        }
+        // Unsorted touches, repeated indices, cancellations and two tail columns.
+        f.a[m - 1] = vec![m - 2];
+        f.uc[m - 1] = vec![(512, 2.0), (m - 2, 1.0), (64, 1.0), (512, -2.0)];
+        f.uc[m - 2] = vec![(63, 1.0), (0, -1.0)];
+        let mut x = vec![0.0; m];
+        for i in [1, 63, 64, 511, 960, m - 1] {
+            x[i] = 1.0;
+        }
+        check(&f, &x, |v| (v.to_bits(), 0));
+        check(&f, &vec![0.0; m], |v| (v.to_bits(), 0));
+    }
+
+    #[test]
+    fn column_snapshot_recycles_only_written_blocks() {
+        let m = 513;
+        let cols: Vec<_> = (0..m).map(|r| (true, vec![r], vec![1.0])).collect();
+        let st = crate::lu_order::factor_structure_r::<f64>(m, &cols);
+        let mut new = RefStruct::fresh(m, m, &st, &cols);
+        let mut old = new.clone();
+        let encode = |v: &[(usize, f64)]| v.iter().map(|&(p, x)| (p, x.to_bits())).collect::<Vec<_>>();
+        for round in 0..12 {
+            if round == 5 {
+                new = new.clone();
+                old = old.clone();
+            }
+            let rows = [round * 39, 64, 512, round * 39, 0];
+            let values = [3.5, -0.0, -(round as f64), -3.5, f64::from_bits(1)];
+            let dense = round % 4 == 2;
+            new.lev_dense_ft = dense;
+            old.lev_dense_ft = dense;
+            let a = new.ftran_with(&rows, &values, dense);
+            let b = old.frozen_ftran_with(&rows, &values, dense);
+            assert_eq!(encode(&a), encode(&b));
+            assert_eq!(new.work.to_bits(), old.work.to_bits());
+            assert_eq!(encode(&new.spike), encode(&old.spike));
+            let nf = new.f2.borrow();
+            let of = old.f2.borrow();
+            assert_eq!(nf.dirty_blocks.is_none(), dense);
+            assert_eq!(nf.col_in, of.col_in);
+            assert_eq!(nf.col_n, of.col_n);
+            let bits = |v: &[f64]| v.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
+            assert_eq!(bits(&nf.x_col), bits(&of.x_col));
         }
     }
 
