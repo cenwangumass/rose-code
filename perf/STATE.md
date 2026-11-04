@@ -494,13 +494,58 @@ adapter supplies cached records to unchanged compare.py cmd_lunum alignment;
 normal lunum rebuilds and still prefers the legacy cache. No new alignment rule
 or broad source/parity identity for that example binary is claimed.
 
-No tag pairs producer st.u_rows with Rose's pre-overlay replay, so final-U
-agreement still cannot justify bypassing numeric replay. The next datum is a
-paired factor-indexed producer/pre-overlay/final-value diagnostic; no additional
-reference capture is needed yet. Current capture, bounded example output,
-standard-comparator adapter/results, raw-bit scope and executable provenance:
-`target/perf-fresh-u-current/`. Earlier geometry/cached-data audit:
-`target/perf-fresh-u-cache-audit/`.
+Producer/pre-overlay observation now has a nontrivial paired witness and a
+counterexample. SC50A dual-controlled factors 0/1 match the existing reference
+input columns bit-for-bit and match pivot row/column orders. Factor 1 has 5
+Markowitz phase0 rows, 4 phase3 special-row positions and 5 phase4 singleton rows:
+i21=40, loff=45, tail 10. Earlier geometry's “nucleus 5” means the Markowitz block;
+it is different from RefStruct.nuc's phase3 block. SC50A's four producer-supplied
+entries match pre-overlay raw bits and remain the installed values, but nine
+other replay entries are absent from that producer subset. Existing final
+reference U agreement covers 13 entries, not a complete producer replay proof.
+
+Across 43 observed/reconstructed small/DEGEN2 factors (30 nontrivial; includes
+live/cached overlap), 880 supplied values match replay bits. The 26 cached cases
+are SC50A/ADLITTLE/BLEND/BORE3D; DEGEN2 is bounded at 300 controlled-dual iterations
+and 16 fresh calls (eight observed). Small live probes use eight iterations and
+two fresh calls; AFIRO hits that factor limit, and some initial factors are
+vacuous. No observed sparse-factor retained Markowitz entry is missing from
+the producer subset; 2596 earlier-row replay entries are not supplied there.
+These observations do not establish general numerical identity.
+
+A deterministic 51x51 double matrix exercises the actual dense handoff at its
+minimum permitted size (`remaining>50`). At the first difference, tail step 8,
+incoming column 42, pivot-row step 6 (original row 44), producer bits are
+`0xbf51473431609794` (-0.0010545739837737088); replay/pre-entry bits are
+`0xbf51473431609793` (-0.0010545739837737086): one ULP. The original final
+column installs the producer bits. Observation stops at that column, with no
+later column executed. The dense producer uses lane-wise dot kernels while
+replay is scalar; no exact intermediate-cause model is claimed. This is a
+Rose-internal counterexample, not a new reference-solver comparison.
+Unconditional numerical producer/replay identity is false; preserve the original
+overlay and do not use the matching sparse cases as a global proof.
+
+A separate data-flow lead does not require identity: with strictly lower L,
+a contiguous producer-covered suffix [cut,t) cannot feed an earlier output. If
+every last-effective supplied value in that suffix survives tolerance retention,
+all its final outputs are overwritten. Skipping that region's input/graph/numeric
+work could preserve the earlier replay and original merge/retention/order logic.
+Observed sparse-prefix coverage marks 254/878 columns, 933/2210 structural graph
+visits and 502/671 executed update products in covered suffixes. The nine-column
+dense counterexample prefix marks 8 columns, 2080/2130 graph visits and 120/120
+update products. These are unweighted observation/structural counts, not saved
+time or a qualified speedup; guard/setup costs are unmeasured. The prior guarded
+arithmetic-only shortcut kept graph reach/sorting/materialization and failed its
+screen; do not repeat it. Graph pruning needs its own independent full-constructor
+oracle, fallback proof and matching-PGO cost/qualification tests.
+
+Original arithmetic/control/WORK reverses byte-for-byte after removing three
+test-only observer hooks and raw-bit accessors. All probes are removed; accepted
+source/CLI/PGO remain exact. Formatting, fast 940/full 987 parity and 254 release
+tests pass. Raw producer/pre-overlay/final data, deterministic matrix/seed,
+exact input/pivot scope checker, geometry definitions, first-difference stop,
+source/binary/build provenance, suffix-count analysis and restoration:
+`target/perf-pre-overlay/`.
 
 F80 ABI audit and software-layout feasibility are complete. Actual accepted
 multiply/divide use operand pointers and an indirect result pointer; actual
@@ -664,10 +709,11 @@ projected effects, component source/binary/timings, dependency audit and restora
 
 ## In progress
 
-None. Accepted `vypkuxry` source, CLI and PGO metadata are restored exactly;
-formatting, fast 940/full 987 parity and 254 release tests pass. Fresh full-FTRAN
-reuse is numerically verified but timing-inconclusive and remains unapplied.
-The overall reference performance goal remains unmet.
+None. Accepted `vypkuxry` source, CLI and PGO metadata are byte-identical;
+all observers are removed. Formatting, fast 940/full 987 parity and 254 release
+tests pass. General producer/replay identity is disproven; overwritten-suffix
+graph pruning is a separate unimplemented hypothesis. The overall reference
+performance goal remains unmet.
 
 ## Extended BTRAN feasibility
 

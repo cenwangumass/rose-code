@@ -251,15 +251,22 @@ measured.
   not repeat or extend it. This cache remains unapplied. Next pursue larger
   factor-production/installation ownership savings, with exact numerical and
   allocation evidence. Auxiliary immutable-base sharing remains unimplemented;
-  producer/pre-overlay U identity still needs a nontrivial controlled witness.
-  Producer/pre-overlay U identity is still unproven. Current bounded SC50A dual
-  k1 data resolves the endpoint schema and verifies final diag/L/U under the
-  existing alignment with a separate no-build example. Next collect producer
-  st.u_rows and pre-overlay replay values paired with final installed U in a
-  factor-indexed test diagnostic. No additional reference capture is needed yet;
-  do not infer pre-overlay equality from final overridden values. Keep supported
-  comparator alignment centralized; normal lunum's build/cache transport still
-  needs an explicit no-build/schema-current source option for direct reuse.
+  general producer/pre-overlay numerical identity is now disproven. The paired
+  SC50A k1 supplied subset matches, as do 880 small/DEGEN2 supplied values, but a
+  deterministic 51x51 dense handoff differs by one ULP before the mandatory
+  overwrite. Do not treat sparse matches as a global proof or bypass the overlay.
+  Next test a separate strictly-lower-L dependency cut: a contiguous suffix whose
+  every final value is supplied above tolerance can be discarded without feeding
+  an earlier output. Measure graph pruning as well as arithmetic removal, keeping
+  merge/retention/order, WORK and all original fallback behavior. Existing sparse
+  counts cover 254/878 columns and 933/2210 graph visits; they are not runtime gains.
+  Protect the complete original constructor first, including the dense mismatch,
+  missing/tiny/duplicate producer values and nontriangular/extreme fallbacks.
+  Use matching fixed39 PGO and bounded small-model counters before official timing;
+  do not repeat the earlier arithmetic-only guarded-replay screen. Further
+  reference capture is unnecessary for this dependency-cut question. Comparator
+  alignment stays centralized; normal lunum's build/cache transport still needs
+  an explicit no-build/schema-current source option for direct reuse.
   Look for a faster exact implementation of the same rounding (the F80 tests and `../reverse-engineer/evidence/f80-subnormal-reference.json`
   define it), and for F80 work that runs where its results are not used.
 - **Dump overhead with no dump selected**: about 70 `dump::on("kind")` sites in `dual.rs` and
