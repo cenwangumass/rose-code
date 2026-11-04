@@ -24,6 +24,19 @@ Native release instruction-family self profiles (`lpnyrpqs`, stale after sparse 
 
 Allocation caller sampling of the `1a430e43` frame-pointer PGO binary (ADLITTLE first, then PEROLD caps 300/1300; all optimal at 73/1273 iterations): PEROLD makes 563,368 malloc, 32,023 calloc and 221,924 realloc calls, with 593,333 frees, over the whole CLI. Temporary interposition samples stacks every 61 or 64 allocation calls separately per primitive, excludes recursive profiler allocations and drops no stacks; sampled caller rankings agree across periods. Top individual sites include dual true_d column clone/sort, phase row adjacency, nucleus search chain clones, pricing reset row adjacency and sparse-L level queue growth. The first and third already have rejected trials below. Sparse-L level queue pushes account for roughly 18,000 calls; this estimates allocation frequency, not the instruction cost of a caller. Instrumented times are diagnostic only. Reproducible sampler, commands, exact binary hash, raw stacks and inline-aware analysis: `/tmp/rose-alloc-profile/{manifest.json,run.py,sample.c,sample61.c,analyze.py,perold.alloc,perold61.alloc,*.summary.json}`.
 
+Current native release instruction profile (`vpqyvlsq`, CLI SHA256
+`90878f676735bad3d8fab1f9292db88e3813231b2acd558ec927e47f2229aa93`):
+ADLITTLE/DEGEN2 bounded batches precede sixteen PEROLD dual solves, cap1300,
+all optimal at1273 iterations. Period4M records4303 samples, no loss/throttle,
+and represents99.91% of the directly counted17.228B batch instructions.
+Rose self shares are L-stage9.39%, first FTRAN9.20%, needed FTRAN8.39%,
+iteration14.06%, BTRAN5.72%, nucleus5.48%, update4.97%, factor3.97%,
+fresh3.49%. These are sampled whole-CLI self costs, not inclusive solve-only
+bounds. Eta dot disassembly still indexes stack lane accumulators; sparse-L
+queue pushes and input gathers also remain visible. Exact build, bounded
+runner, direct counts, recording, audit and disassembly:
+`target/perf-ordinary-260d/`.
+
 Native allocation caller sampling (`lpnyrpqs`, saved PGO/loop-alignment/frame-pointer flags and `system-tcmalloc` feature; ADLITTLE cap 300 before PEROLD cap 1300, both normal optimal exits): PEROLD makes 546,494 malloc, 32,077 calloc and 214,625 realloc calls, with 576,513 frees. Independent periods 61/64 give identical totals, 13,004/12,395 sampled stacks and no drops. Refactorization ancestry accounts for 58.34/58.31% of sampled allocations, iteration outside refactorization 19.21/19.14%, other/setup 22.45/22.54%; these are allocation frequencies, not time shares. Both periods rank true_d column copies, nucleus search clones, pricing-reset adjacency, sparse-L queues, auxiliary numeric LU and fresh-factor lists among the leading sites. Several already have rejected trials below; prioritize produced factor storage/basis-column copies before another broad iteration workspace. The interposer calls exported tc_malloc/tc_calloc/tc_realloc/tc_free directly, with dynamic binding and mapping evidence, preserving the accepted allocator. Child-only instrumentation passes fast parity 940/940; never preload the non-native parity harness itself (mixed allocator alignment paths can abort). Commands, exact binary hash/build, sampled stacks, summaries and bindings: `target/perf-native-alloc/{manifest.json,sample61.c,sample64.c,bindings.txt,perold{61,64}.{alloc,summary.json,stacks.json},fast-parity.txt}`. Instrumented timings are diagnostic only.
 
 PILOT4 primal instruction comparison (`5b4e350f`, cap 800, all optimal in 690 iterations and 16 Rose refactorizations): direct Rose whole-CLI count 528.698M versus original-reference fresh-read/solve slope 152.956M. Corrected period-8M profiles use two independent reference `(33 - 1) / 32` batches and Rose `(9 - 1) / 8` CLI batches; the latter include wrapper dispatch/result handling (counted slope 534.892M). All ten recordings have zero throttle/loss records; represented batch totals differ from counted totals by 0.003–1.56%. Period-1M data was throttled and is excluded. Observed self masses, Rose versus reference, are pricing/control/row products 158–166M versus 47–49M, factor construction/fresh/update wrappers 126–128M versus 25–31M, libc heap management 86–91M versus approximately zero, FTRAN/L 49–50M versus 24–26M, and BTRAN 35–40M versus 32–33M. Prioritize the first three excesses; allocator caller ancestry remains unknown. These ranges are repeat spread, not confidence intervals; coarse sampling and unmatched scopes leave tens-of-millions uncertainty in large buckets. Native unmapped 11–14M and libc unmapped 5–6M remain explicit. Library provenance/mapping verified; official Runtime targets unchanged. Commands, audits and analyzers: `/tmp/rose-pilot4-primal-families-8m/{summary.json,audit.json,analysis.json,commands.json,run.py,analyze.py}`.
@@ -589,6 +602,14 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 - Borrow Markowitz candidate chains and rotate buckets in place: fast parity 940/940 passes and PEROLD instructions -0.5%, but alternating CPU-2 solve 0.237249 -> 0.236897 s is within 0.006498/0.011017 s spreads; DEGEN3 primal also stays within wide spreads. Reverted (`target/perf-searchborrow-{target,recheck}-{before,after}.txt`).
 
 - Cache first-match pivot-row/column coefficients in a stamped lookup: semantic tests and fast parity 940/940 pass, PEROLD instructions -0.6%, but solve 0.151853 -> 0.151628 s is within 0.004297/0.000431 s spreads; DEGEN2 has a small timing increase with flat instructions and DEGEN3 primal has no gain. Reverted (`target/perf-pivotvalues-target-{before,after}.txt`).
+
+Outlined four-register SSE2 eta dot was rejected before timing. Its independent
+complete original-dot oracle fails on two distinct NaN payloads at n=4,
+peel0, which takes the original scalar fallback; changed call context changes
+compiler NaN operand priority despite source-identical arithmetic. Fast940
+parity passed, but the differential gate did not. No test was weakened and
+no timing screen was run. Exact source/build, independent oracle, assembly,
+failure and restored accepted binary: `target/perf-eta-sse2/`.
 
 - Pair eight-element eta chunks to eliminate per-lane checks: frozen f64/F80 tests and fast parity 940/940 pass, dot code shrinks 1037 -> 879 bytes and PEROLD instructions -1.5%, but CPU-4 solve medians are 0.150879/0.150880 s; alternating CPU-2 changes stay inside wide spreads. Reverted (`target/perf-dotchunks-{target,recheck}-{before,after}.txt`).
 
