@@ -24,18 +24,20 @@ Native release instruction-family self profiles (`lpnyrpqs`, stale after sparse 
 
 Allocation caller sampling of the `1a430e43` frame-pointer PGO binary (ADLITTLE first, then PEROLD caps 300/1300; all optimal at 73/1273 iterations): PEROLD makes 563,368 malloc, 32,023 calloc and 221,924 realloc calls, with 593,333 frees, over the whole CLI. Temporary interposition samples stacks every 61 or 64 allocation calls separately per primitive, excludes recursive profiler allocations and drops no stacks; sampled caller rankings agree across periods. Top individual sites include dual true_d column clone/sort, phase row adjacency, nucleus search chain clones, pricing reset row adjacency and sparse-L level queue growth. The first and third already have rejected trials below. Sparse-L level queue pushes account for roughly 18,000 calls; this estimates allocation frequency, not the instruction cost of a caller. Instrumented times are diagnostic only. Reproducible sampler, commands, exact binary hash, raw stacks and inline-aware analysis: `/tmp/rose-alloc-profile/{manifest.json,run.py,sample.c,sample61.c,analyze.py,perold.alloc,perold61.alloc,*.summary.json}`.
 
-Current native release instruction profile (`vpqyvlsq`, CLI SHA256
-`90878f676735bad3d8fab1f9292db88e3813231b2acd558ec927e47f2229aa93`):
+Current native release instruction profile (`vypkuxry`, CLI SHA256
+`998efcda56a3d020475cd730cd64a80766bbe5cf8b73fc49122d862ad095d630`):
 ADLITTLE/DEGEN2 bounded batches precede sixteen PEROLD dual solves, cap1300,
-all optimal at1273 iterations. Period4M records4303 samples, no loss/throttle,
-and represents99.91% of the directly counted17.228B batch instructions.
-Rose self shares are L-stage9.39%, first FTRAN9.20%, needed FTRAN8.39%,
-iteration14.06%, BTRAN5.72%, nucleus5.48%, update4.97%, factor3.97%,
-fresh3.49%. These are sampled whole-CLI self costs, not inclusive solve-only
-bounds. Eta dot disassembly still indexes stack lane accumulators; sparse-L
-queue pushes and input gathers also remain visible. Exact build, bounded
-runner, direct counts, recording, audit and disassembly:
-`target/perf-ordinary-260d/`.
+all optimal at1273 iterations. Period4M records4302 samples, no loss/throttle,
+and represents99.87% of the directly counted17.230B batch instructions.
+Whole-batch self shares at Rose symbols are L-stage10.18%, first FTRAN8.83%,
+needed FTRAN7.23%, iteration12.95%, BTRAN6.04%, nucleus5.25%, update5.97%,
+auxiliary factor4.09% and fresh3.44%. Scope includes launcher, parsing,
+startup and validation; these are self observations, not inclusive solve-only
+bounds. L-stage annotation still shows stack-indexed eight-lane eta partial
+sums, dense numeric scatter and a spilled dense WORK accumulator. The long-only
+SIMD eta trial below removes the indexed sums but has no qualifying timing
+gain. Exact accepted build/hash, bounded runner, direct counts, recording,
+event audit and both kernel annotations: `target/perf-ordinary-devex/`.
 
 Native allocation caller sampling (`lpnyrpqs`, saved PGO/loop-alignment/frame-pointer flags and `system-tcmalloc` feature; ADLITTLE cap 300 before PEROLD cap 1300, both normal optimal exits): PEROLD makes 546,494 malloc, 32,077 calloc and 214,625 realloc calls, with 576,513 frees. Independent periods 61/64 give identical totals, 13,004/12,395 sampled stacks and no drops. Refactorization ancestry accounts for 58.34/58.31% of sampled allocations, iteration outside refactorization 19.21/19.14%, other/setup 22.45/22.54%; these are allocation frequencies, not time shares. Both periods rank true_d column copies, nucleus search clones, pricing-reset adjacency, sparse-L queues, auxiliary numeric LU and fresh-factor lists among the leading sites. Several already have rejected trials below; prioritize produced factor storage/basis-column copies before another broad iteration workspace. The interposer calls exported tc_malloc/tc_calloc/tc_realloc/tc_free directly, with dynamic binding and mapping evidence, preserving the accepted allocator. Child-only instrumentation passes fast parity 940/940; never preload the non-native parity harness itself (mixed allocator alignment paths can abort). Commands, exact binary hash/build, sampled stacks, summaries and bindings: `target/perf-native-alloc/{manifest.json,sample61.c,sample64.c,bindings.txt,perold{61,64}.{alloc,summary.json,stacks.json},fast-parity.txt}`. Instrumented timings are diagnostic only.
 
@@ -464,7 +466,7 @@ no new solver speedup or reference timing ratio.
 Ordered by current/ref; reprofile any changed path before choosing a change. Ratios use the current
 sweep's solve medians; paired old/new times determine whether a change gains or regresses.
 
-- Ordinary primal/dual snapshot ratios are in Numbers. Host speed bands can reorder them; use paired old/new measurements to establish gains. The current PEROLD dual profile above refreshes the largest measured ratio; reprofile changed paths before another candidate.
+- Ordinary primal/dual snapshot ratios are in Numbers. Host speed bands can reorder them; use paired old/new measurements to establish gains. The current PEROLD dual profile above refreshes the largest measured ratio; the long-eta SIMD trial below is inconclusive, so inspect another measured cost before another dot variant.
 - primal_5959.primal-r: reprofile remaining extended BTRAN, eta products, primal control and refactorization with current PGO flags before another change.
 - DEGEN2 joint FTRAN: dense interleaving, sparse-column/dense-tau traversal and individual/combined U-estimate deferral are rejected below. Combined deferral has also been tested with shared runtime-policy kernels, unchanged factor fields and the original column vector return; it reduces instructions without a repeatable PEROLD timing gain. The final mode-switch variants do not isolate the cause of the earlier const-generic regression. Reprofile remaining FTRAN/L traversals before another change. Reference control-flow evidence: `target/perf-pairpack-reference-audit.txt`.
 - Forward-L layout evidence: cached SC50A has 10/29 entries in consecutive-row runs of at least two after sorting, none in runs of four. Bounded restored-release BSOLVE captures (ADLITTLE cap 300, BORE3D 500, DEGEN2 640; all reach their normal optimal exits) show no duplicate or non-lower L entries. In DEGEN2's largest captured L matrix, 584/1578 entries are in runs of two and 138/1578 in runs of four; the smaller models have little long-run coverage. A sorted contiguous-run cache remains untested and its constructor/storage cost needs justification before implementation. Geometry/data: `target/perf-lranges-{full-summary.json,adlittle-300.log,bore3d-500.log,degen2-640.log}`.
@@ -478,7 +480,7 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 - Runs without reachable references, after the reachable ratios: mode-switch's pre-alignment profile above points to factor structure, the maximum reduction and post-update work. B-reference checks are already settled; reprofile and identify the maximum reduction's caller before choosing another change.
 - Allocation: the cached native caller sample attributes about 58% of allocation frequency to refactorization, 19% to iteration outside refactorization. Flat auxiliary LU storage and dual factor-input reuse reduce allocation calls without a timing gain and are rejected below. Current release instruction profiles put FTRAN/L and factor/update traversals ahead of more small buffer changes; allocator instruction ancestry is now grouped in the frame-pointer screen above, with immediate-site and release-cost limits. Native sampling dispatch and bindings are verified; the rejected CLI-local small-block cache remains below.
 - Dense BTRAN transpose geometry: forming the immutable transpose in constructor order from cached ADLITTLE/BORE3D/DEGEN2 BSOLVE factors gives 376/763, 972/2663 and 4206/14468 entries in consecutive destination pairs; four-wide groups cover only 100/763, 244/2663 and 328/14468. These are structural counts across captured factors, not dense-branch frequency or time savings. The structural query keeps rows in their original order. Stable descending-column gather equivalence is tested separately below and is slower in the standalone probe; no gather solver integration is retained. Data/source locations: `target/perf-primal-0436/transpose-geometry.json`. Existing transpose layout, scalar unroll and bounds-check rejections still apply.
-- Dual tau staging: tau_dense separately serves only the pivot diagnostic and gathers at the column output positions. Current accepted PEROLD annotation has two scatter-loop instruction samples out of4303 total; allocator cost is separately unassigned. Avoiding this expansion remains untested, but the visible local work does not justify prioritizing it over pivot-row scatter. Annotation: `target/perf-ordinary-260d/iteration.asm`. Fixed first-touch storage in the larger scatter is timing-inconclusive below; do not extend its screen.
+- Dual tau staging: tau_dense separately serves only the pivot diagnostic and gathers at the column output positions. Current accepted PEROLD annotation has two scatter-loop instruction samples out of4303 total; allocator cost is separately unassigned. Avoiding this expansion remains untested, but the visible local work does not justify prioritizing it over pivot-row scatter. Annotation: `target/perf-ordinary-260d/iteration.asm`; accepted-source refresh: `target/perf-ordinary-devex/iteration.asm`. Fixed first-touch storage in the larger scatter is timing-inconclusive below; do not extend its screen.
 - Dumps disabled: source audit of the simplex, dual, factor and PDHG hot paths finds JSON emission/serialization guarded by dump selection or an existing recording option; WORK estimates outside those guards remain solver inputs. The cached accepted-release PEROLD self report has no samples under the selected serde/dump/OnceLock symbol names, but inlined checks and preparation remain charged to callers. This is not an inclusive/total overhead bound or proof that all preparation is free. No dump optimization is justified by this screen; source anchors and the selected-symbol query are in `target/perf-dump-audit/`.
 
 ## Tried, no gain
@@ -714,13 +716,35 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 
 - Schedule all sparse-L successor queue insertions for each column before its numeric scatter, keeping identical queue insertion/active/remaining updates and the same numeric operations/order. The complete frozen L oracle passes all three focused release tests (f64/F80 random/extreme/captured inputs, output order/value bits, density and WORK estimate), and fast parity passes940/940. Eight bounded ADLITTLE/DEGEN2 pairs and three PEROLD pairs preserve complete no-dump result/exit objects. PEROLD instructions +0.108%, cycles +0.184%, median solve +0.800%; DEGEN2 instructions +0.120%, cycles +0.325%. No useful target counter gain; stopped before predeclared timing seeds9601/9667 or full gates. Source, accepted CLI and PGO metadata restored exactly. Candidate source/build, original source, frozen-source hash, oracle logs, assembly, complete results/counters and setup-build provenance: `target/perf-lschedule/`.
 
-Outlined four-register SSE2 eta dot was rejected before timing. Its independent
-complete original-dot oracle fails on two distinct NaN payloads at n=4,
-peel0, which takes the original scalar fallback; changed call context changes
-compiler NaN operand priority despite source-identical arithmetic. Fast940
-parity passed, but the differential gate did not. No test was weakened and
-no timing screen was run. Exact source/build, independent oracle, assembly,
-failure and restored accepted binary: `target/perf-eta-sse2/`.
+The first outlined four-register SSE2 eta-dot trial stopped before timing at
+n=4, peel0 with two distinct NaN payloads in its unchanged scalar fallback.
+The same nonopaque original-versus-frozen test also fails on unchanged accepted
+source at exactly that case. That observation is not proof of a SIMD arithmetic
+mismatch. Making both function pointers opaque preserves every test input and
+comparison and makes the original/frozen test pass before any kernel rewrite.
+The first candidate remains unqualified; its evidence is in
+`target/perf-eta-sse2/`.
+
+A separate long-only eta trial places native dispatch after the unchanged short
+and extended branches. Four SSE2 registers retain the original eight scalar
+chains and reduction tree; a nonfinite native result falls through the complete
+original long body. Source reversal reproduces the original dot exactly, and
+all WORK sites remain unchanged. Matching fixed39 PGO passes the validated
+opaque original oracle on random/full-bit/extreme/two-NaN-payload/captured
+inputs and all16 MXCSR rounding/flush modes. All eight FTRAN/L tests and fast
+parity940 pass; eight bounded ADLITTLE/DEGEN2 and three PEROLD canonical
+result/exit pairs agree. Native assembly has register accumulators and packed
+multiply/add, without reassociation or FMA. Instructions fall0.11/0.49/1.83%;
+PEROLD median cycles fall0.73%. The predeclared PEROLD screen (seed15431,
+32AB+32AA, CPU4, cap1300) is inconclusive: median -1.506%, interval
+[-2.550%, -0.759%], AA [-0.882%, +1.017%], 24/32 improving, sign p0.00350,
+both orders improve and AA is healthy. Conservative noise separation fails.
+Stop without seed15503, extension or full gates. Solver sources, accepted CLI
+and build metadata are restored exactly; restored fast parity940 passes.
+The new test/oracle snapshots are retained only as evidence, with no production
+or committed test change. Baseline failure/pass, source proof, matching build,
+all differential tests, assembly, counters, complete schedule/results and
+restoration: `target/perf-eta-long/`.
 
 - Pair eight-element eta chunks to eliminate per-lane checks: frozen f64/F80 tests and fast parity 940/940 pass, dot code shrinks 1037 -> 879 bytes and PEROLD instructions -1.5%, but CPU-4 solve medians are 0.150879/0.150880 s; alternating CPU-2 changes stay inside wide spreads. Reverted (`target/perf-dotchunks-{target,recheck}-{before,after}.txt`).
 

@@ -532,6 +532,30 @@ benchmark pairs pass; fixed controls establish no unrelated regression.
 Source/build, exact store-relocation proof, assembly and all raw qualification:
 `target/perf-order-hash-store/`.
 
+## Current ordinary L-stage refresh
+
+Accepted release `vypkuxry` is sampled directly after bounded ADLITTLE/DEGEN2
+checks, then sixteen PEROLD dual solves, cap1300. All complete results agree.
+The period4M recording has4302 samples, zero loss/throttle, and represents99.87%
+of the counted17.230B batch instructions. Whole-batch sample shares include
+L-stage10.18%, first/needed FTRAN8.83/7.23%, nucleus5.25%, auxiliary factor4.09%
+and fresh3.44%; launcher/startup/parsing/validation remain in scope. These are
+self observations, not inclusive or removable cost bounds. Annotation still
+locates numeric scatter, dense WORK accumulation and stack-indexed eta lanes.
+
+A long-only four-register eta prototype preserves every scalar accumulation
+chain, reduction and WORK site. Opaque original/frozen calls validate before
+the rewrite and pass with matching PGO, all16 MXCSR modes, nonfinites/extremes
+and captured values. The earlier nonopaque scalar-fallback NaN test failure
+also reproduces on unchanged accepted source, so it cannot establish a SIMD
+bug. Eight FTRAN/L tests and fast940 parity pass. PEROLD instructions fall1.83%,
+but its fixed32AB/32AA screen fails conservative noise separation: median
+-1.506%, interval[-2.550%,-0.759%], AA[-0.882%,+1.017%]. No confirmation,
+extension or full gates follow; all accepted artifacts are restored exactly.
+Source/proof, unchanged-source oracle failure/pass, mode tests, assembly and
+full timing evidence: `target/perf-eta-long/`. Accepted release profile and
+counter/event audit: `target/perf-ordinary-devex/`.
+
 ## Remaining proof obligations
 
 Before a factor ownership prototype, separate column-copy and immutable-factor
