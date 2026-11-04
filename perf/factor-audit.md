@@ -630,6 +630,35 @@ moves their apparent instruction-sample share as removable runtime. Both complet
 variants/proofs/builds/tests, native assembly and paired results:
 `target/perf-f80-add-borrow/`, including `v2/`.
 
+## Pure quotient reuse scope
+
+Global per-CLI-equivalent streams retain full raw F80 operand fields across all
+Solver resets and exclude test-only Devex-oracle divisions. A fixed512-entry
+four-way table would reuse99.3/87.1/99.0% of eligible fx/Quad/primal5959 divisions.
+The corresponding32KiB const thread-local implementation preserves the complete
+original arithmetic, exact keys and all WORK. Frozen original, collision,
+eviction and cold/warm boundary/random/captured tests pass, along with all
+eleven F80 tests and fast940 parity. It still loses cycles: fx+0.845%, Quad
++5.671%. Full bounded outputs agree; no official timing/full gates follow.
+The accepted source/CLI/metadata are restored. Exact scope/simulations:
+`target/perf-div-reuse/`; complete prototype/proof/build/tests/counters and
+relocation/call audit: `target/perf-div-memo/`. The dense-U division remains
+inlined in both binaries.
+
+A separate diagnostic tags only BTRAN's three diagonal-division sites. Fresh
+factor IDs are monotonic and survive Clone; no pointer identity is used. Full
+raw numerator/divisor keys are retained across all updates. Quad has231,284
+eligible queries,492 distinct (owner,column,operand-pair) keys across14 owners
+and96 columns, and a maximum14 keys per column. FIFO1/2/4/8/16 hits are42,404/
+53,950/79,948/148,158/230,792. Sixteen-entry fx/primal hits are58,829/221,325
+of59,284/222,780, with per-column maxima8/12. This justifies a16-entry bound
+for a column-indexed experiment, not a runtime-gain claim. A cache shared by
+fresh-factor clones must still key both numerical operands across updates;
+its values are pure quotients, not mutable factor results. Original arithmetic
+and every WORK site remain required. Data, lifetime rules, exact tagged source,
+full optimal numeric/status/count validation and restored-source proof:
+`target/perf-diag-div-reuse/`.
+
 ## Remaining proof obligations
 
 Before a factor ownership prototype, separate column-copy and immutable-factor

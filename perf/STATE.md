@@ -361,6 +361,41 @@ restored exactly. Source snapshots, shape summary, full numeric validation,
 bounded command/build, accepted assembly/relocations and restoration scope:
 `target/perf-f80-div-shapes/`, `target/perf-quad-devex/btran.asm`.
 
+Exact scalar-quotient working sets include full raw sign/exponent/mantissa of
+both finite nonzero inputs and span every internal Solver/factor reset within
+one CLI-equivalent solve. Test-only Devex shadow arithmetic is excluded; all
+status/iteration/refactor counts and optimal full numeric fields match the CLI.
+FX/Quad/primal5959 eligible counts are392,202/467,837/645,174, with2342/746/4470
+distinct pairs. A predeclared four-way hash with512 entries hits389,578/407,488/
+638,531; a full FIFO512 simulation hits389,759/466,068/638,567. Bounds16–512
+and raw scope/source/build remain in `target/perf-div-reuse/`. These operation
+streams are diagnostic, not accepted-release cycle costs. The corresponding
+global cache implementation is rejected below despite high reuse.
+
+Power-of-two divisors with normal-result range occur25,040/71,493/63,624 times.
+Zero first remainder occurs25,185/73,498/63,993 times, including equal mantissas
+3738/17,421/8303 times. These counts are too small to treat cheap integer
+shortcuts as the leading unmeasured cost; no shortcut is implemented. Original
+dense-U assembly still calls the second quotient helper after forming a zero
+remainder. The remainder classifier's exponent-difference field is explicitly
+not a boundary-complete normalized-result predicate. Bounds, all statuses and
+optimal numeric-vector checks, exact source/commands and restored artifacts:
+`target/perf-div-powers/`, including `remainders/`.
+
+Owner/column-aware BTRAN division measurement uses monotonic test-only fresh
+factor IDs retained across Clone; IDs are never pointer-based or reused. Only
+the three diagonal-division sites are tagged, and both raw operands remain in
+every key across updates. FX/Quad/primal5959 have59,284/231,284/222,780 eligible
+divisions across22/14/66 owners and166/96/428 owner-columns, with455/492/1455
+distinct pairs. Maximum per-column cardinalities are8/14/12. FIFO bounds1/2/4/
+8/16 give Quad hits42,404/53,950/79,948/148,158/230,792; sixteen-entry FX/primal
+hits are58,829/221,325. Thus16 entries nearly eliminate misses in the measured
+column scope; a shared per-column implementation is still unapplied and its
+runtime benefit is unproven. Exact records for all bounds and models, full
+scope/owner rules, numeric validation, source snapshots and restoration:
+`target/perf-diag-div-reuse/`. Temporary hooks are removed and accepted source,
+CLI and metadata restored exactly.
+
 ## In progress
 
 None. Qualified `vypkuxry` source, CLI and PGO metadata are installed;
@@ -504,6 +539,8 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 - Dumps disabled: source audit of the simplex, dual, factor and PDHG hot paths finds JSON emission/serialization guarded by dump selection or an existing recording option; WORK estimates outside those guards remain solver inputs. The cached accepted-release PEROLD self report has no samples under the selected serde/dump/OnceLock symbol names, but inlined checks and preparation remain charged to callers. This is not an inclusive/total overhead bound or proof that all preparation is free. No dump optimization is justified by this screen; source anchors and the selected-symbol query are in `target/perf-dump-audit/`.
 
 ## Tried, no gain
+
+- Memoize pure F80 quotients in a const thread-local table of512 entries (128 four-way FIFO sets,32KiB table). Eligibility is finite nonzero inputs; raw full operand fields and exact-key verification protect fingerprint collisions. The complete original division remains independently frozen, and source reversal removes only lookup/store around its unchanged arithmetic. Original zero/NaN/infinity paths remain numerically unchanged; all stores use original packed results. Collision/eviction and cold/warm random/full-bit/boundary/captured comparisons check internal sign/exponent/mantissa. Matching fixed39 PGO, all eleven F80 tests and fast940 parity pass; eight ADLITTLE/fx and three Quad complete result/exit pairs agree. Despite high simulated reuse, fx instructions fall only0.473% with cycles+0.845%; Quad instructions+0.230%, cycles+5.671%. Stop at counters without seeds21217/21289 or full gates. Assembly/relocation audit confirms both baseline and candidate retain only one out-of-line Div call site in BTRAN; the original dense-U division remains inlined, so loss of that inlining does not explain the regression. Source, accepted CLI and metadata restored exactly; restored fast940 parity passes. Full source/frozen oracle, proof, matching build, tests, assembly, call audit and all paired result/counters: `target/perf-div-memo/`. This rejects the tested global table; column-indexed sharing has different measured scope and is unimplemented.
 
 - Borrow magnitude-ordered F80 operands instead of copying their fields. Full original add_signed is independently frozen; reversal reproduces it exactly after the selector substitution. All arithmetic, shift/round/pack expressions, exceptional cases and WORK remain unchanged. New complete-routine differential tests compare internal sign/exponent/mantissa on random/full representations, exponent-gap/zero/subnormal/overflow/nonfinite boundaries, both effective signs and captured SC50A values. Matching fixed39 PGO, all ten F80 tests and fast940 parity pass; eight ADLITTLE/fx and three Quad full result/exit pairs agree per variant. V1 instructions fall0.264% on Quad, but cycles rise5.31/5.87/5.69% and branch misses rise21.9–29.4%; native ordering introduces branches and indirect sign loads. V2 uses std::hint::select_unpredictable for the same two references (availability compiled on pinned1.98.1; local core implementation inspected). It removes most of that miss penalty, but Quad instructions rise0.247% and median cycles1.269%; fx instructions rise0.058% with cycles-0.306%. Neither variant has useful target gain. Stop at counters without either reserved timing pair or full gates. Source, accepted CLI and build metadata restored exactly; restored fast940 parity passes. Original/frozen/candidate source, exact reversal and mode-independent value proof, both matching builds, tests, native assembly and complete paired outputs/counters: `target/perf-f80-add-borrow/`, v2 under `v2/`.
 

@@ -205,6 +205,12 @@ measured.
   stack scratch is verified but has no useful counter gain. Before another
   division fast path, isolate its actual call sites: dense U already inlines
   zero-numerator handling, and global zero counts do not imply removable ABI work.
+  Next test the measured BTRAN quotient scope: at most16 exact operand pairs per
+  diagonal column, shared across clones of one fresh-factor owner, with both
+  inputs keyed across updates. Use the existing three division sites and retain
+  every WORK/threshold/output rule. Measure lookup cost before full gates; the
+  global512-entry quotient cache has high reuse but loses runtime, so reusing
+  its hash/table implementation is not a justified shortcut.
   Look for a faster exact implementation of the same rounding (the F80 tests and `../reverse-engineer/evidence/f80-subnormal-reference.json`
   define it), and for F80 work that runs where its results are not used.
 - **Dump overhead with no dump selected**: about 70 `dump::on("kind")` sites in `dual.rs` and
