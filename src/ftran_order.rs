@@ -163,9 +163,9 @@ pub struct RefStruct<R: Real = f64> {
     etas: Vec<Eta<R>>,
     /// Immutable L transpose, in ascending source-column order, shared by all BTRAN calls of this factor.
     lt: Vec<Vec<(usize, R)>>,
-    /// Longest-path level of each L node, when the reference solves L level by level (`0x12a990`): only for `m >= 250`, a
-    /// small level count (`< m/10`) and a short Markowitz L part. Otherwise the L solve is the Kahn FIFO.
-    levels: Option<Vec<usize>>,
+    /// Immutable forward levels and their maximum for level-bucket L solves (`0x12a990`). Used only
+    /// for `m >= 250`, a small level count (`< m/10`) and a short Markowitz L part.
+    levels: Option<(Vec<usize>, usize)>,
     /// Immutable transpose-graph levels and maximum, initialized when a BTRAN first uses level buckets.
     lt_levels: std::cell::OnceCell<(Vec<usize>, usize)>,
     lev_built: bool,
@@ -656,7 +656,7 @@ impl<R: Real> RefStruct<R> {
                 lev_dense = lev_dense_ft;
                 lev_built = true;
                 if !lev_dense_ft && outer {
-                    Some(lev)
+                    Some((lev, maxlev))
                 } else {
                     None
                 }
@@ -955,10 +955,10 @@ impl<R: Real> RefStruct<R> {
             }
             let count_l = (0..self.m).filter(|&v| x[v].abs() > R::c(TOL)).count();
             (Vec::new(), count_l)
-        } else if let Some(lev) = &self.levels {
+        } else if let Some((lev, maxlev)) = &self.levels {
             // Level-bucket L solve: nodes are taken level by level, each level in insertion order (inputs first, then the
             // nodes reached from lower levels); values below the tolerance are dropped without propagating.
-            let maxlev = lev.iter().copied().max().unwrap_or(0);
+            let maxlev = *maxlev;
             let mut buckets: Vec<Vec<usize>> = vec![Vec::new(); maxlev + 1];
             let mut active = vec![false; self.m];
             let mut l = usize::MAX;
@@ -1216,7 +1216,7 @@ impl<R: Real> RefStruct<R> {
             }
             let count_l = (0..self.m).filter(|&v| x[v].abs() > R::c(TOL)).count();
             (Vec::new(), count_l)
-        } else if let Some(lev) = &self.levels {
+        } else if let Some((lev, _)) = &self.levels {
             // Level-bucket L solve: nodes are taken level by level, each level in insertion order (inputs first, then the
             // nodes reached from lower levels); values below the tolerance are dropped without propagating.
             let maxlev = lev.iter().copied().max().unwrap_or(0);
@@ -3901,6 +3901,30 @@ mod forward_l_tests {
                 assert_eq!(old.1, new.1);
                 assert_eq!(old.2.to_bits(), new.2.to_bits());
             }
+        }
+    }
+
+    #[test]
+    fn level_bucket_range_survives_factor_clone() {
+        let m = 250;
+        let cols: Vec<_> = (0..m)
+            .map(|i| {
+                if i < 4 {
+                    (false, vec![i, i + 1], vec![1.0, 0.5])
+                } else {
+                    (true, vec![i], vec![1.0])
+                }
+            })
+            .collect();
+        let st = crate::lu_order::factor_structure_r::<f64>(m, &cols);
+        let f = RefStruct::fresh(m, m, &st, &cols);
+        let (levels, max_level) = f.levels.as_ref().unwrap();
+        assert_eq!(*max_level, 4);
+        assert_eq!(levels.iter().copied().max(), Some(*max_level));
+        for factor in [&f, &f.clone()] {
+            check(factor, &[0], &[1.0], &[4, 0, 0], &[0.5, -1.0, 1.0], |v| {
+                (v.to_bits(), 0)
+            });
         }
     }
 

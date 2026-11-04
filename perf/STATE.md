@@ -4,35 +4,37 @@ Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (histo
 
 ## Numbers on AMD EPYC 9V74
 
-The starting solver is `934213eb`. The shipped fixed39 PGO executable runs with genuine Ubuntu gperftools TCMalloc 2.15. Gurobi uses the supplied patched 13.0.3 library, SHA-256 `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. All 23 timed rows use a fresh process, a shared logical CPU, one warm-up per solver and three interleaved timed pairs. The table compares medians of Gurobi Runtime and rose diagnostics.seconds. The fixed GREENBEA PDHG cap is 20,000. This configuration supersedes the preliminary glibc-allocator survey.
+The current solver retains the maximum forward L level with the immutable level vector at factor construction. Sparse triangular solves use that bound to allocate level buckets. The comparison executable uses the preceding solver source at `934213eb`. Both executables use pinned Rust 1.98.1, matching fixed39 PGO with 64-byte loop alignment, and genuine gperftools TCMalloc 2.15. The reference for every row is the patched Gurobi 13.0.3 library with SHA-256 `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`.
 
-| Run | Gurobi Runtime (s) | Rose solve (s) | Rose / Gurobi |
-|---|---:|---:|---:|
-| degen2.primal-c | 0.019153 | 0.043959 | 2.30 |
-| degen2.dual-r | 0.013366 | 0.034534 | 2.58 |
-| degen3.primal-c | 0.197820 | 0.531533 | 2.69 |
-| degen3.primal-r | 0.239772 | 0.626245 | 2.61 |
-| perold.primal-c | 0.198119 | 0.551410 | 2.78 |
-| pilot4.primal-r | 0.020133 | 0.055149 | 2.74 |
-| 80bau3b.primal-c | 0.132110 | 0.623391 | 4.72 |
-| primal_5959.primal-r | 0.056607 | 0.119254 | 2.11 |
-| degen3.dual-c | 0.096471 | 0.279956 | 2.90 |
-| degen3.dual-r | 0.108019 | 0.280635 | 2.60 |
-| perold.dual-r | 0.043718 | 0.130428 | 2.98 |
-| 80bau3b.dual-r | 0.092070 | 0.355276 | 3.86 |
-| greenbea.dual-c | 0.256883 | 0.771987 | 3.01 |
-| greenbea.dual-r | 0.227844 | 0.772700 | 3.39 |
-| mode_switch.dual-r | 0.117143 | 1.652152 | 14.10 |
-| primal_5959.dual-r | 0.084074 | 0.205056 | 2.44 |
-| quad_2717.dual-r | 0.105847 | 0.259393 | 2.45 |
-| fx_quad_obj_5371.dual-r | 0.042942 | 0.105406 | 2.45 |
-| degen3.barrier-r | 0.093120 | 0.203347 | 2.18 |
-| 80bau3b.barrier-r | 0.148597 | 0.240573 | 1.62 |
-| greenbea.barrier-r | 0.543017 | 0.996415 | 1.83 |
-| 80bau3b.pdhg | 2.956445 | 5.214276 | 1.76 |
-| greenbea.pdhg | 1.284483 | 2.117332 | 1.65 |
+All three executables ran in fresh processes on the same logical CPU, with a rotating order, one warm-up, and three timed samples each. Ratios use the median solve-only times. Background work on other logical CPUs and host timing bands affected this sweep. The separate randomized target screens use same-binary controls.
 
-Starting result: rose wins 0/23. On mode-switch both solvers reach optimality after 11,393 iterations. The pinned Rust 1.98.1 release rebuild using TCMalloc and matching fixed39 training passes frozen full parity 987/987. All model parameters, solver hashes and samples from the starting sweep are in the release evidence.
+| Run | Gurobi (s) | Previous rose (s) | Current rose (s) | Current / Gurobi |
+|---|---:|---:|---:|---:|
+| degen2.primal-c | 0.017253 | 0.047071 | 0.045195 | 2.62 |
+| degen2.dual-r | 0.015746 | 0.046368 | 0.038374 | 2.44 |
+| degen3.primal-c | 0.278752 | 0.738195 | 0.743082 | 2.67 |
+| degen3.primal-r | 0.547377 | 0.883625 | 0.901950 | 1.65 |
+| perold.primal-c | 0.407584 | 0.791955 | 0.820488 | 2.01 |
+| pilot4.primal-r | 0.025079 | 0.057154 | 0.106007 | 4.23 |
+| 80bau3b.primal-c | 0.185047 | 0.935035 | 0.921104 | 4.98 |
+| primal_5959.primal-r | 0.090970 | 0.197350 | 0.365805 | 4.02 |
+| degen3.dual-c | 0.129962 | 0.925064 | 0.760437 | 5.85 |
+| degen3.dual-r | 0.139089 | 0.564490 | 0.433761 | 3.12 |
+| perold.dual-r | 0.054490 | 0.177753 | 0.159232 | 2.92 |
+| 80bau3b.dual-r | 0.127205 | 0.577346 | 1.097449 | 8.63 |
+| greenbea.dual-c | 0.517188 | 1.188169 | 1.066904 | 2.06 |
+| greenbea.dual-r | 0.315530 | 1.037614 | 1.101116 | 3.49 |
+| mode_switch.dual-r | 0.329561 | 2.565061 | 1.939177 | 5.88 |
+| primal_5959.dual-r | 0.129131 | 0.306576 | 0.278518 | 2.16 |
+| quad_2717.dual-r | 0.120107 | 0.305087 | 0.275927 | 2.30 |
+| fx_quad_obj_5371.dual-r | 0.043615 | 0.115480 | 0.115664 | 2.65 |
+| degen3.barrier-r | 0.126345 | 0.287716 | 0.254661 | 2.02 |
+| 80bau3b.barrier-r | 0.176285 | 0.310562 | 0.355595 | 2.02 |
+| greenbea.barrier-r | 0.986226 | 1.367153 | 1.317324 | 1.34 |
+| 80bau3b.pdhg | 3.655204 | 7.435998 | 6.933949 | 1.90 |
+| greenbea.pdhg | 1.435563 | 2.485019 | 2.468227 | 1.72 |
+
+Mode-switch took 2.565061 → 1.939177 s (-24.4%) at the full 11,393 iterations. Two independent 3,000-iteration screens on CPU 2 gave -21.24% and -16.81% (29/32 and 30/32 improving, healthy AA). The qualification includes complete benchmark outputs and exit codes, frozen full parity 987/987, the release suite, and a differential test against the original scan on a nonzero-level cloned factor. Five reversed-role controls covered PILOT4 primal, primal_5959 primal, 80BAU3B dual, GREENBEA dual release, and 80BAU3B barrier. None established a slowdown under the paired-screen rule. All 23 solve-time medians remain above Gurobi.
 
 ### Mode-switch profile
 
@@ -836,7 +838,7 @@ projected effects, component source/binary/timings, dependency audit and restora
 
 ## In progress
 
-The EPYC release builds now use Rust 1.98.1, LLVM 22.1.8 and genuine TCMalloc. The forward L level scan is the first measured target. The frozen digests remain at their original contents.
+The immutable forward-level upper bound is now stored by the factor. Further sparse workspace experiments target reached positions and initialization in FTRAN and BTRAN. Their runtime gains require independent qualification on the cumulative source.
 
 ## Extended BTRAN feasibility
 
@@ -1123,7 +1125,7 @@ no new solver speedup or reference timing ratio.
 
 ## Candidates
 
-The first structural target on the EPYC is FTRAN/BTRAN on mode-switch. Reuse factor-level traversal metadata and workspace across calls, and maintain reached positions so sparse solves initialize, divide and emit only the entries they must visit. Preserve ascending slot order, bucket insertion order, signed-zero and exceptional cases, all F2/dump state, and the original full-range WORK contributions. A standalone L-level maximum cache, blockwise marker skips and several workspace-reuse variants have prior timing rejections on other models. Measure a combined sparse path against the actual starting allocator and run the full gate before accepting it. The profile identifies costs. It does not establish a gain for this proposal.
+The first structural target on the EPYC is FTRAN/BTRAN on mode-switch. Reuse workspace across calls and maintain reached positions so sparse solves initialize, divide and emit only the entries they must visit. Preserve ascending slot order, bucket insertion order, signed-zero and exceptional cases, all F2/dump state, and the original full-range WORK contributions. A standalone L-level maximum cache, blockwise marker skips and several workspace-reuse variants have prior timing rejections on other models. Measure a combined sparse path against the actual starting allocator and run the full gate before accepting it. The profile identifies costs. It does not establish a gain for this proposal.
 
 The remaining candidates below derive from the Ryzen measurements and their historical profiles.
 
