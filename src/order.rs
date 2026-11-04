@@ -1177,6 +1177,310 @@ pub fn order(p: &Pattern, levels: &[i64]) -> Result<OrderResult, StructError> {
             for &i in &lme {
                 let mut s: i64 = 0;
                 let mut h = (perm[i] * ni) as f64;
+                let mut na = std::mem::take(&mut adj[i]);
+                let old_len = ln[i] as usize;
+                let ei = elen[i] as usize;
+                let mut used = 0usize;
+                for pos in 0..ei {
+                    let e = na[pos];
+                    if ln[e as usize] > 0 {
+                        s += deg[e as usize];
+                        h += e as f64;
+                        na[used] = e;
+                        used += 1;
+                    }
+                }
+                let pivot_pos = used;
+                let ne = (pivot_pos + 1) as i64;
+                for pos in ei..old_len {
+                    let j = na[pos];
+                    if v as i64 != w[j as usize] && nv[j as usize] > 0 {
+                        s += nv[j as usize];
+                        na[used] = j;
+                        used += 1;
+                        h += j as f64;
+                    }
+                }
+                // Compact both segments before inserting the pivot, so it cannot
+                // overwrite an unread entry at the start of the tail.
+                na.truncate(used);
+                na.insert(pivot_pos, v as i64);
+                ln[i] = na.len() as i64;
+                work += 3.75 * ln[i] as f64;
+                adj[i] = na;
+                elen[i] = ne;
+                let dd = degme + deg[i] - nv[i];
+                deg[i] = s.min(dd);
+                hsh[i] = h;
+                if 5 * ni - 5 * nelim < s + nv[i] {
+                    perm[i] = ni - perm[i];
+                    ln[i] = -1;
+                }
+            }
+            let mut keep: Vec<i64> = Vec::new();
+            for &i in &lme {
+                if perm[i] == -level && ln[i] == 1 {
+                    nv[v] += nv[i];
+                    degme -= nv[i];
+                    nv[i] = 0;
+                    parent[i] = v;
+                    ln[i] = -1;
+                } else if perm[i] < ni {
+                    keep.push(i as i64);
+                }
+            }
+            let k = nv[v];
+            nz += k * degme + k * (k - 1) / 2;
+            let s = degme + k;
+            let kk = (k * (k - 1)) as f64;
+            ops = (2 * k - 1) as f64 * kk / 6.0
+                + ((k as f64 * s as f64 * s as f64 + ops) - s as f64 * kk);
+            nelim += k;
+            nv[v] = degme;
+            work += 15.0 * keep.len() as f64;
+            for &i in &keep {
+                let i = i as usize;
+                deg[i] = (ni - 1).min(degme - nv[i] + deg[i]);
+            }
+            let mut lst = keep;
+            shellsort(&mut lst, &hsh);
+            let m = lst.len();
+            let mut pos = 0;
+            while pos < m {
+                let start = pos;
+                pos = start + 1;
+                while pos < m && hsh[lst[start] as usize] == hsh[lst[pos] as usize] {
+                    pos += 1;
+                }
+                for a0 in start..pos {
+                    for b0 in a0 + 1..pos {
+                        let (i, j) = (lst[a0], lst[b0]);
+                        if i >= 0 && j >= 0 {
+                            let (i, j) = (i as usize, j as usize);
+                            if perm[i] == perm[j]
+                                && ln[i] == ln[j]
+                                && elen[i] == elen[j]
+                                && adj[i][..ln[i] as usize] == adj[j][..ln[j] as usize]
+                            {
+                                nv[i] += nv[j];
+                                deg[i] -= nv[j];
+                                nv[j] = 0;
+                                parent[j] = i;
+                                ln[j] = -1;
+                                lst[b0] = -1;
+                            }
+                        }
+                    }
+                }
+            }
+            lst.retain(|&x| x >= 0);
+            ln[v] = lst.len() as i64;
+            elen[v] = 0;
+            mind = d;
+            for &i in &lst {
+                if perm[i as usize] == -level {
+                    link!(i);
+                    mind = mind.min(deg[i as usize]);
+                }
+            }
+            adj[v] = lst;
+        }
+        for i in 0..n {
+            if perm[i] == ni + level {
+                perm[i] = nelim;
+                ln[i] = -1;
+                nelim += nv[i];
+                nz += ni - 1;
+                nv[i] = 0;
+            }
+        }
+    }
+    for i in 0..n {
+        if perm[i] < 0 {
+            let mut r = parent[i];
+            while parent[r] != r {
+                r = parent[r];
+            }
+            perm[i] = perm[r];
+            perm[r] += 1;
+        }
+    }
+    Ok(OrderResult {
+        perm,
+        nz,
+        ops,
+        work,
+    })
+}
+
+#[cfg(test)]
+fn frozen_allocating_order(p: &Pattern, levels: &[i64]) -> Result<OrderResult, StructError> {
+    let n = p.n;
+    let ni = n as i64;
+    let mut adj: Vec<Vec<i64>> = (0..n)
+        .map(|i| p.adj(i).iter().map(|&x| x as i64).collect())
+        .collect();
+    let mut ln: Vec<i64> = adj.iter().map(|a| a.len() as i64).collect();
+    let mut elen = vec![0i64; n];
+    let mut deg = ln.clone();
+    let mut nv = vec![1i64; n];
+    let mut parent: Vec<usize> = (0..n).collect();
+    let mut perm: Vec<i64> = levels.to_vec();
+    let maxlev = perm
+        .iter()
+        .filter(|&&x| x < 0)
+        .map(|&x| -x)
+        .max()
+        .unwrap_or(0);
+    let mut head = vec![-1i64; n + 1];
+    let mut prev = vec![-1i64; n];
+    let mut nxt = vec![-1i64; n];
+    let mut w = vec![-1i64; n];
+    let mut hsh = vec![0f64; n];
+    let mut nz: i64 = 0;
+    let mut ops = 0f64;
+    let mut work = 0f64;
+    let mut nelim: i64 = 0;
+    let thr = if n > 0 {
+        dense_threshold(n, p.nnz())
+    } else {
+        100
+    };
+    let mut ndense = 0;
+    for i in 0..n {
+        if ln[i] > thr {
+            ndense += 1;
+            perm[i] = ni - perm[i];
+            ln[i] = -1;
+        }
+    }
+    if ndense > 0 {
+        for i in 0..n {
+            let l = ln[i];
+            if l > 0 {
+                adj[i] = adj[i][..l as usize]
+                    .iter()
+                    .copied()
+                    .filter(|&j| perm[j as usize] < 0)
+                    .collect();
+                ln[i] = adj[i].len() as i64;
+            } else {
+                ln[i] = 0;
+                adj[i] = Vec::new();
+            }
+        }
+    }
+    for i in 0..n {
+        if perm[i] == -1 && ln[i] == 0 {
+            perm[i] = nelim;
+            nelim += 1;
+            ln[i] = -1;
+            ops += 1.0;
+        }
+    }
+    macro_rules! link {
+        ($v:expr) => {{
+            let v = $v as usize;
+            let d = deg[v] as usize;
+            nxt[v] = head[d];
+            if head[d] != -1 {
+                prev[head[d] as usize] = v as i64;
+            }
+            prev[v] = -1;
+            head[d] = v as i64;
+        }};
+    }
+
+    macro_rules! unlink {
+        ($v:expr) => {{
+            let v = $v as usize;
+            let (pp, qq) = (prev[v], nxt[v]);
+            if pp == -1 {
+                head[deg[v] as usize] = qq;
+            } else {
+                nxt[pp as usize] = qq;
+            }
+            if qq != -1 {
+                prev[qq as usize] = pp;
+            }
+        }};
+    }
+    while nelim < ni {
+        let mut level = maxlev;
+        for i in 0..n {
+            if perm[i] < 0 && nv[i] > 0 {
+                level = level.min(-perm[i]);
+            } else if perm[i] > ni && nv[i] > 0 {
+                level = level.min(perm[i] - ni);
+            }
+        }
+        let mut mind = ni;
+        for v in (0..n).rev() {
+            if perm[v] == -level && nv[v] > 0 {
+                link!(v);
+                mind = mind.min(deg[v]);
+            }
+        }
+        loop {
+            let mut d = mind;
+            while d < ni && head[d as usize] == -1 {
+                d += 1;
+            }
+            if d >= ni {
+                break;
+            }
+            let v = head[d as usize] as usize;
+            unlink!(v);
+            perm[v] = nelim;
+            w[v] = v as i64;
+            let mut lme: Vec<usize> = Vec::new();
+            let mut degme: i64 = 0;
+            let elv = elen[v] as usize;
+            let a = adj[v].clone();
+            for &e in &a[..elv] {
+                let e = e as usize;
+                for &j in &adj[e][..ln[e] as usize] {
+                    let j = j as usize;
+                    if w[j] != v as i64 && nv[j] > 0 && perm[j] < 0 {
+                        lme.push(j);
+                        w[j] = v as i64;
+                        degme += nv[j];
+                    }
+                }
+                elen[e] = -1;
+                ln[e] = -1;
+            }
+            for &j in &a[elv..ln[v] as usize] {
+                let j = j as usize;
+                if w[j] != v as i64 && nv[j] > 0 && perm[j] < 0 {
+                    lme.push(j);
+                    w[j] = v as i64;
+                    degme += nv[j];
+                }
+            }
+            for &i in &lme {
+                for &e in &adj[i][..elen[i] as usize] {
+                    deg[e as usize] = nv[e as usize];
+                }
+            }
+            for &i in &lme {
+                for &e in &adj[i][..elen[i] as usize] {
+                    let e = e as usize;
+                    deg[e] -= nv[i];
+                    if deg[e] == 0 {
+                        ln[e] = 0;
+                    }
+                }
+                work += 5.25 * elen[i] as f64;
+            }
+            for &i in &lme {
+                if perm[i] == -level {
+                    unlink!(i);
+                }
+            }
+            for &i in &lme {
+                let mut s: i64 = 0;
+                let mut h = (perm[i] * ni) as f64;
                 let mut na: Vec<i64> = Vec::new();
                 let ei = elen[i] as usize;
                 for &e in &adj[i][..ei] {
@@ -1743,6 +2047,87 @@ mod aat_unique_tests {
                     frozen_aat_pattern(&model, &dense),
                     aat_pattern(&model, &dense)
                 );
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod order_row_buffer_tests {
+    use super::*;
+
+    fn check(pattern: &Pattern, levels: &[i64]) {
+        let old = frozen_allocating_order(pattern, levels).unwrap();
+        let new = order(pattern, levels).unwrap();
+        assert_eq!(old.perm, new.perm);
+        assert_eq!(old.nz, new.nz);
+        assert_eq!(old.ops.to_bits(), new.ops.to_bits());
+        assert_eq!(old.work.to_bits(), new.work.to_bits());
+    }
+
+    #[test]
+    fn row_buffers_preserve_original_ordering_and_float_hash_effects() {
+        let mut seed = 0xc1a958b62u64;
+        for case in 0..512 {
+            let n = case % 130;
+            let mut adj = vec![Vec::new(); n];
+            for i in 0..n {
+                for j in i + 1..n {
+                    seed ^= seed << 13;
+                    seed ^= seed >> 7;
+                    seed ^= seed << 17;
+                    let edge = match case % 7 {
+                        0 => false,
+                        1 => j == i + 1,
+                        2 => i % 2 != j % 2,
+                        3 => true,
+                        _ => seed % 17 < (case % 9) as u64,
+                    };
+                    if edge {
+                        adj[i].push(j);
+                        adj[j].push(i);
+                    }
+                }
+            }
+            let mut offsets = vec![0];
+            let mut rows = Vec::new();
+            for a in &mut adj {
+                a.sort_unstable();
+                rows.extend_from_slice(a);
+                offsets.push(rows.len());
+            }
+            let p = Pattern {
+                n,
+                colptr: offsets,
+                rowind: rows,
+            };
+            check(&p, &vec![-1; n]);
+            check(&p, &(0..n).map(|i| -1 - (i % 3) as i64).collect::<Vec<_>>());
+            // Large legal level labels make the floating hash additions round,
+            // exercising their original sequential order without a huge graph.
+            check(&p, &vec![-((1i64 << 56) / (n as i64).max(1)); n]);
+        }
+    }
+
+    #[test]
+    fn row_buffers_preserve_original_small_model_orderings() {
+        for source in [
+            include_str!("../tests/fixtures/afiro.mps"),
+            include_str!("../tests/fixtures/sc50a.mps"),
+            include_str!("../tests/fixtures/blend.mps"),
+            include_str!("../tests/fixtures/adlittle.mps"),
+            include_str!("../tests/fixtures/bore3d.mps"),
+            include_str!("../tests/fixtures/degen2.mps"),
+        ] {
+            let model = crate::mps::parse(source).unwrap();
+            for dense in [
+                vec![],
+                dense_columns(&model, DENSE_AUTO),
+                dense_columns(&model, 3),
+            ] {
+                let (p, n1) = aat_pattern(&model, &dense);
+                check(&p, &vec![-1; p.n]);
+                check(&p, &levels(&p, n1, None).unwrap());
             }
         }
     }

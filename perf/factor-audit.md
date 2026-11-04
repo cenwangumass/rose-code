@@ -482,6 +482,22 @@ No numeric kernel, dump or baseline changes. Current proof/build/measurements:
 `target/perf-aat-unique/`; predecessor sort-caller attribution:
 `target/perf-barrier-refresh/`.
 
+## Quotient-order row ownership
+
+Row rebuilding takes ownership of the existing adjacency buffer, stably compacts
+its element and variable segments, then inserts the pivot at the saved segment
+boundary. Deferring insertion prevents clobbering unread tail values. All ordered
+hash additions, degree updates, resulting lists and WORK expressions are retained.
+The independently frozen complete original ordering verifies permutations/NZ and
+Ops/WORK bits on generated graphs (including large floating-hash seeds) and real
+small-model patterns/levels. Matching-PGO tests, full parity 987/987, all 250
+release tests and 23 complete benchmark pairs pass. Independent DEGEN3 barrier
+screens establish median gains of 0.71/0.64%, with instructions -2.20%.
+Predeclared reversed-role controls establish no unrelated regression. Native
+assembly still spills the hash accumulator per term; this gain does not prove
+register retention. Rule/proof/build and complete measurements:
+`target/perf-order-reuse/`.
+
 ## Remaining proof obligations
 
 Before a factor ownership prototype, separate column-copy and immutable-factor

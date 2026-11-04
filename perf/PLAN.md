@@ -124,7 +124,10 @@ baseline. No exceptions, no "within a ULP", no re-recording.
   uncertainty comparable to the proposed gain makes the session inconclusive.
   For a change below 3% on its target, require the instruction count to drop.
   Full parity, release tests, complete no-dump result validation and the full paired
-  benchmark remain required; resolve any unrelated regression before accepting.
+  benchmark remain required; resolve any unrelated regression before accepting. A
+  reversed-role slowdown passing significance, AA health, conservative noise
+  separation and both-order checks is a regression even below 0.5%; the minimum
+  gain threshold applies to accepting speedups.
 - A change must not slow any other bench run by more than the noise. Run the whole bench set before
   committing; time only the affected runs while iterating.
 - Regressions against the baseline column: a run whose `current` is slower than `baseline` by more than
@@ -208,9 +211,12 @@ measured.
   DTRSM10.58%, and ordering/partition/integer-sort14.75% of Rose instruction
   self samples. Fixed child-rounding dispatch is rejected at matching-PGO counters.
   Unique AA-neighbour construction is qualified with complete ordered-pattern
-  equality and two independent positive timing screens. Refresh remaining ordering,
-  partition and numeric-factor attribution before choosing another whole pass;
-  predecessor source annotation is diagnostic and changes codegen.
+  equality and two independent positive timing screens. Quotient-order adjacency
+  buffer reuse is also qualified. The current native assembly still round-trips
+  its hash accumulator through the stack; audit the completed hash store's lifetime
+  across vector insertion while preserving every floating operation and order.
+  Refresh remaining partition/numeric-factor attribution before another whole pass;
+  predecessor source annotations are diagnostic and change codegen.
 
 ## Out of scope
 
