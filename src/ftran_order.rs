@@ -86,6 +86,196 @@ impl FtranTouched {
     }
 }
 
+/// Per-factor scratch and an index of the append-only row etas. A cloned
+/// factor builds its own scratch on demand; no caller can observe the cache.
+#[derive(Default)]
+struct LevelCache<R>(std::cell::RefCell<Option<Box<LevelWorkspace<R>>>>);
+
+impl<R: Default> Clone for LevelCache<R> {
+    fn clone(&self) -> Self {
+        Self::default()
+    }
+}
+
+#[derive(Default)]
+struct LevelWorkspace<R> {
+    values: Vec<R>,
+    // 0 = untouched, 1 = queued for L, 2 = member of the sparse result.
+    state: Vec<u8>,
+    touched: Vec<usize>,
+    buckets: Vec<Vec<usize>>,
+    order: Vec<usize>,
+    // For a newly active input, schedule only later etas that read it.
+    uses: Vec<Vec<usize>>,
+    term_ends: Vec<usize>,
+    pending: Vec<u64>,
+    gather: Vec<R>,
+    incompatible: bool,
+}
+
+impl<R: Real> LevelWorkspace<R> {
+    fn prepare(&mut self, f: &RefStruct<R>, nlevels: usize) -> bool {
+        if self.incompatible {
+            return false;
+        }
+        if self.values.is_empty() {
+            self.values.resize(f.m, R::ZERO);
+            self.state.resize(f.m, 0);
+            self.buckets.resize_with(nlevels, Vec::new);
+        }
+        if self.term_ends.len() < f.etas.len() {
+            self.uses.resize_with(f.m, Vec::new);
+            for e in self.term_ends.len()..f.etas.len() {
+                let eta = &f.etas[e];
+                // The omitted eta would receive only positive zeros. Its
+                // result rounds to canonical zero even with signed coefficients.
+                if eta.ind.first() != Some(&eta.idx) || !eta.val.iter().all(|v| v.to_f64().is_finite()) {
+                    self.incompatible = true;
+                    return false;
+                }
+                let end = self.term_ends.last().copied().unwrap_or(0) + eta.ind.len();
+                // The reference adds nonnegative integer WORK terms to a double.
+                // This bound makes both its full sum and every partial sum exact.
+                if end as u64 > (1u64 << 50) {
+                    self.incompatible = true;
+                    return false;
+                }
+                for &row in &eta.ind {
+                    let uses = &mut self.uses[row];
+                    if uses.is_empty() && f.first_eta[row] != e {
+                        self.incompatible = true;
+                        return false;
+                    }
+                    if uses.last() != Some(&e) {
+                        uses.push(e);
+                    }
+                }
+                self.term_ends.push(end);
+            }
+            self.pending.resize(f.etas.len().div_ceil(64), 0);
+        }
+
+        for row in self.touched.drain(..) {
+            self.values[row] = R::ZERO;
+            self.state[row] = 0;
+        }
+        self.order.clear();
+        true
+    }
+
+    fn queue(&mut self, row: usize, level: usize) {
+        if self.state[row] == 0 {
+            self.state[row] = 1;
+            self.touched.push(row);
+            self.buckets[level].push(row);
+        }
+    }
+
+    fn schedule(&mut self, row: usize, after: usize) {
+        let uses = &self.uses[row];
+        let start = uses.partition_point(|&index| index < after);
+        for &e in &uses[start..] {
+            self.pending[e / 64] |= 1u64 << (e % 64);
+        }
+    }
+
+    fn solve(
+        &mut self, f: &RefStruct<R>, levels: &[usize], maxlev: usize,
+        rows: &[usize], vals: &[R],
+    ) -> Option<(Vec<(usize, R)>, usize, f64)> {
+        if !self.prepare(f, maxlev + 1) {
+            return None;
+        }
+        let mut low = maxlev + 1;
+        let mut high = 0;
+        for (&r, &v) in rows.iter().zip(vals) {
+            let i = f.perm[r];
+            self.values[i] += v;
+            self.queue(i, levels[i]);
+            low = low.min(levels[i]);
+            high = high.max(levels[i]);
+        }
+        let mut at_tolerance = false;
+        while low <= high {
+            let mut j = 0;
+            while j < self.buckets[low].len() {
+                let row = self.buckets[low][j];
+                j += 1;
+                let x = self.values[row];
+                if x.abs() >= R::c(TOL) {
+                    self.order.push(row);
+                    self.state[row] = 2;
+                    at_tolerance |= x.abs() == R::c(TOL);
+                    for &(to, a) in f.lcolumn(row) {
+                        self.queue(to, levels[to]);
+                        high = high.max(levels[to]);
+                        self.values[to] -= a * x;
+                    }
+                } else {
+                    self.values[row] = R::ZERO;
+                }
+            }
+            self.buckets[low].clear();
+            low += 1;
+        }
+        let count = self.order.len();
+        // The accounting suffix and numerical prefix may start with different
+        // supports on a tolerance tie. Dense handoffs also retain raw residues.
+        if !f.etas.is_empty() && (at_tolerance || count * f.dthr > f.m) {
+            return None;
+        }
+        let mut work = ((f.nnz_l + f.m + 2 * f.m) as f64 * 5.0 * count as f64)
+            / (f.m + 1) as f64 + 0.0;
+        if crate::dump::on("lstage") {
+            f.lsnap.borrow_mut().0.clone_from(&self.values);
+        }
+        if !f.etas.is_empty() {
+            let mut first = f.etas.len();
+            for j in 0..count {
+                let row = self.order[j];
+                first = first.min(f.first_eta[row]);
+                self.schedule(row, 0);
+            }
+            for word in first / 64..self.pending.len() {
+                while self.pending[word] != 0 {
+                    let bit = self.pending[word].trailing_zeros() as usize;
+                    self.pending[word] &= self.pending[word] - 1;
+                    let e = word * 64 + bit;
+                    let eta = &f.etas[e];
+                    self.gather.clear();
+                    self.gather.extend(eta.ind.iter().map(|&row| self.values[row]));
+                    let v = dot(&self.gather, &eta.val, eta.peel);
+                    let row = eta.idx;
+                    if v.abs() <= R::c(TOL) {
+                        self.values[row] = R::ZERO;
+                    } else {
+                        self.values[row] = v;
+                        if self.state[row] != 2 {
+                            if self.state[row] == 0 {
+                                self.touched.push(row);
+                            }
+                            self.state[row] = 2;
+                            self.order.push(row);
+                            self.schedule(row, e + 1);
+                        }
+                    }
+                }
+            }
+            let prefix = first.checked_sub(1).map_or(0, |i| self.term_ends[i]);
+            let terms = self.term_ends.last().unwrap() - prefix;
+            let ew = 2.0 * terms as f64 + (f.etas.len() - first) as f64 * 3.0;
+            work = ew + 3.0 * self.order.len() as f64 + work;
+        }
+        if crate::dump::on("lstage") {
+            f.lsnap.borrow_mut().1.clone_from(&self.values);
+        }
+        let out = self.order.iter().copied()
+            .filter(|&i| self.values[i].abs() > R::c(TOL))
+            .map(|i| (i, self.values[i])).collect();
+        Some((out, count, work))
+    }
+}
+
 /// Direct numeric row lookup for tau dots. Stamps retain the first duplicate without clearing per row.
 #[derive(Clone, Default)]
 struct TauRow<R> {
@@ -241,6 +431,7 @@ pub struct RefStruct<R: Real = f64> {
     /// Immutable forward levels and their maximum for level-bucket L solves (`0x12a990`). Used only
     /// for `m >= 250`, a small level count (`< m/10`) and a short Markowitz L part.
     levels: Option<(Vec<usize>, usize)>,
+    level_cache: LevelCache<R>,
     /// Immutable transpose-graph levels and maximum, initialized when a BTRAN first uses level buckets.
     lt_levels: std::cell::OnceCell<(Vec<usize>, usize)>,
     lev_built: bool,
@@ -889,6 +1080,7 @@ impl<R: Real> RefStruct<R> {
             etas: Vec::new(),
             lt,
             levels,
+            level_cache: LevelCache::default(),
             lt_levels: Default::default(),
             lev_built,
             diag: st.diag.clone(),
@@ -1005,6 +1197,16 @@ impl<R: Real> RefStruct<R> {
         let m = self.m;
         let mut e = 0.0f64;
         let dense_l = rows.len() * self.dthr > self.m || force_dense || self.lev_dense_ft;
+        if R::LANES && !dense_l {
+            if let Some((levels, maxlev)) = &self.levels {
+                let mut cache = self.level_cache.0.borrow_mut();
+                if let Some(result) = cache.get_or_insert_with(Box::default)
+                    .solve(self, levels, *maxlev, rows, vals)
+                {
+                    return result;
+                }
+            }
+        }
         let mut x = vec![R::ZERO; self.m];
         let mut start: Vec<usize> = if dense_l {
             Vec::new()
@@ -4074,6 +4276,107 @@ mod forward_l_tests {
             check(factor, &[0], &[1.0], &[4, 0, 0], &[0.5, -1.0, 1.0], |v| {
                 (v.to_bits(), 0)
             });
+        }
+    }
+
+    #[test]
+    fn indexed_level_etas_preserve_order_values_and_work_across_updates() {
+        let m = 321;
+        let mut f = factor::<f64>(m);
+        let mut cols = vec![Vec::new(); m];
+        for r in 0..m-1 {
+            if r % 8 < 6 {
+                cols[r].push((r + 1, if r % 2 == 0 { 0.5 } else { -0.25 }));
+            }
+        }
+        store(&mut f, cols);
+        f.levels = Some(((0..m).map(|i| i % 8).collect(), 7));
+        f.dthr = 2;
+        f.nnz_l = f.lentries.len();
+        let bits = |v: f64| (v.to_bits(), 0);
+        for i in 0..137 {
+            let r = (37 * i) % m;
+            let a = (r + 1) % m;
+            let b = (r + 65) % m;
+            let ind = vec![r, a, a, b];
+            for &j in &ind {
+                f.first_eta[j] = f.first_eta[j].min(i);
+            }
+            f.etas.push(Eta {
+                idx: r, ind, val: vec![1.0, 0.5, -0.5, 0.25], peel: i % 2,
+            });
+            f.sum_eta += 4.0;
+            if [0, 1, 63, 64, 65, 136].contains(&i) {
+                check(&f, &[0, 64, 0, r], &[1.0, -3.25, 0.75, -0.0],
+                         &[r, b, b], &[2.0, 3.0, -3.0], bits);
+                check(&f, &[], &[], &[8, 11], &[TOL, f64::from_bits(1)], bits);
+                check(&f, &[b], &[f64::INFINITY], &[r], &[f64::NEG_INFINITY], bits);
+            }
+        }
+        let rows: Vec<usize> = (0..161).step_by(2).collect();
+        check(&f, &rows, &vec![1.0; rows.len()], &[60, 79], &[1.0, -1.0], bits);
+        check(&f.clone(), &[0, 1], &[0.5, -0.125], &[218], &[5.0], bits);
+        let i = f.etas.len();
+        let ind = vec![32, 100];
+        for &j in &ind {
+            f.first_eta[j] = f.first_eta[j].min(i);
+        }
+        f.etas.push(Eta { idx: 32, ind, val: vec![1.0, f64::INFINITY], peel: 0 });
+        f.sum_eta += 2.0;
+        check(&f, &[40], &[1.0], &[64], &[3.0], bits);
+    }
+
+    #[test]
+    fn level_workspace_matches_captured_factors_and_random_update_streams() {
+        let captures: serde_json::Value =
+            serde_json::from_str(include_str!("../tests/fixtures/ftran_l_captured.json")).unwrap();
+        let mut seed = 0x9f2324abcd_u64;
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed as usize
+        };
+        for rec in captures.as_array().unwrap() {
+            let m = 321;
+            let mut f = factor::<f64>(m);
+            let perm: Vec<usize> = serde_json::from_value(rec["perm"].clone()).unwrap();
+            f.perm[..perm.len()].copy_from_slice(&perm);
+            let destinations: Vec<Vec<usize>> = serde_json::from_value(rec["lcols"].clone()).unwrap();
+            let coeff: Vec<Vec<f64>> = serde_json::from_value(rec["lvals"].clone()).unwrap();
+            let mut cols = vec![Vec::new(); m];
+            for (column, (indices, values)) in destinations.into_iter().zip(coeff).enumerate() {
+                cols[column] = indices.into_iter().zip(values).collect();
+            }
+            let mut levels = vec![0; m];
+            for (i, column) in cols.iter().enumerate() {
+                for &(j, _) in column {
+                    levels[j] = levels[j].max(levels[i] + 1);
+                }
+            }
+            let maxlev = levels.iter().copied().max().unwrap();
+            f.levels = Some((levels, maxlev));
+            store(&mut f, cols);
+            f.nnz_l = f.lentries.len();
+            f.dthr = 2;
+            let captured_rows: Vec<usize> = serde_json::from_value(rec["rows"].clone()).unwrap();
+            let captured_vals: Vec<f64> = serde_json::from_value(rec["vals"].clone()).unwrap();
+            for e in 0..90 {
+                let row = next() % m;
+                let mut ind = vec![row];
+                for _ in 0..next() % 12 {
+                    ind.push(next() % m);
+                }
+                for &j in &ind {
+                    f.first_eta[j] = f.first_eta[j].min(e);
+                }
+                let val = (0..ind.len()).map(|_| (next() % 17) as f64 * 0.125 - 1.0).collect();
+                f.sum_eta += ind.len() as f64;
+                f.etas.push(Eta { idx: row, ind, val, peel: e % 2 });
+                let rows: Vec<_> = (0..1 + next() % 13).map(|_| next() % m).collect();
+                let vals: Vec<_> = rows.iter().map(|_| (next() % 127) as f64 * 0.25 - 8.0).collect();
+                check(&f, &captured_rows, &captured_vals, &rows, &vals, |v| (v.to_bits(), 0));
+            }
         }
     }
 
