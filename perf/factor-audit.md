@@ -913,9 +913,19 @@ A separate range-certified register product matches1,048,576 raw arithmetic
 triples and all80 component cases but improves that component only0.44% over
 the stored-product block; no solver integration or speedup follows. Short cycle
 profiles locate native arithmetic and representation transfers without precise
-stall attribution. The native division-before-drop order remains a distinct
-unmeasured cost; accepted software's zero return is already inlined. Component
-sources/timings: `target/perf-native-cache-audit/`; integration proof, tests,
+stall attribution. Native division-before-drop counts and its separate trial
+are now complete:5231/30836 fx/Quad native calls all succeed, with25317/125250
+zero numerators out of57541/246688 dense-U positions (44.00/50.77%). Moving the
+finite drop before division preserves the frozen complete BTRAN, WORK and state,
+all ten focused tests, matching fixed39 PGO and fast940. All bounded result/exit
+pairs agree; fx/Quad instructions fall3.214/4.480%, cycles rise0.916/0.441%.
+Fixed Quad screen34217 (32AB+32AA,CPU4,cap17000) establishes slowdown:
+median+3.859%, CI[+3.186,+5.494]%, healthy AA[-0.669,+0.882]%, both orders slower,
+one-sided slowdown sign p9.65e-6. Reject without34289, extension or full candidate
+gates. Accepted source/CLI/metadata/profile restored exactly; formatting,
+fast940/full987 and all254 release tests pass (22 default ignored). Complete
+measurement/candidate/proof/tests/results/screen/restoration:
+`target/perf-native-drop/`. Component sources/timings: `target/perf-native-cache-audit/`; integration proof, tests,
 matching build, counters/results/profiles and restoration:
 `target/perf-native-scatter/`.
 

@@ -726,10 +726,11 @@ projected effects, component source/binary/timings, dependency audit and restora
 
 ## In progress
 
-No active runtime candidate. Combined-block native BTRAN is rejected at counters;
-accepted source, CLI and PGO metadata are restored exactly. Formatting, fast940,
-full987 parity and all254 release tests pass (22 default ignored). The overall
-reference performance goal remains unmet.
+No active runtime candidate. Native BTRAN with early finite-numerator drops is
+rejected after a controlled target slowdown. Accepted source/CLI/PGO metadata
+are restored exactly; formatting, fast940/full987 parity and all254 release
+tests pass (22 default ignored). The overall reference performance goal remains
+unmet.
 
 ## Extended BTRAN feasibility
 
@@ -806,15 +807,47 @@ cases also agree. Eight additional alternating pairs give stored-product
 on-demand -16.18% versus software, register-product -16.54%; the extra register
 variant is only0.44% faster than the stored component and has no integrated or
 qualified solver gain. Neither coefficient caching nor register retention alone
-justifies another solver trial from these measurements. The native dense loop
-still divides zero/tiny numerators before rejecting them, whereas accepted
-software already has an inlined zero return; quantify this distinct routing
-cost before changing another representation.
+justifies another solver trial from these measurements. The separate early-drop
+measurement and matching-PGO integration below reject the remaining tested
+native division-routing variant too.
 
 Frozen sources, arithmetic/component variants, inputs, compiler commands and all
 component timings: `target/perf-native-cache-audit/`. Complete candidate/original
 source proof, tests/build/freezes, all solver result/counter pairs, assembly,
 profiles/event audit, decision and restoration: `target/perf-native-scatter/`.
+
+### Native dense-U division before dropping values
+
+Test-only counters on the prior combined-block native kernel observe5231/30836
+native attempts on bounded fx/Quad solves, all successful. Dense U visits57541/
+246688 positions;25317/125250 numerators are zero and fail tolerance (44.00/
+50.77%). ADLITTLE has no native attempts. These are native-call operation counts,
+not whole-solver division totals or removable-time bounds. Original production
+arithmetic/WORK are unchanged during counting. Status/iteration/refactor counts
+match accepted CLI results; all optimal objective/primal/dual/reduced-cost bits
+match. Source is restored after counting and before candidate installation.
+
+The separate predicate-first candidate drops finite at/below-tolerance numerators
+before computing their quotient. The original loop drops them regardless of the
+quotient, including a NaN diagonal; WORK has no increment for evaluating the
+division. All ten focused FTRAN/L tests pass, retaining the independent complete
+original BTRAN and full-field/mode tests; a targeted NaN-diagonal case verifies
+the newly successful native route. Matching fixed39 PGO/TCMalloc and fast940
+parity pass. All80 component cases agree; eight alternating CPU4 pairs improve
+the component6.80% versus the prior native ordering, without a solver gain claim.
+Eight bounded ADLITTLE/fx and three Quad complete result/exit pairs agree.
+Instructions change -0.047/-3.214/-4.480%; cycles +2.264/+0.916/+0.441%.
+
+The predeclared Quad dual-release screen (CPU4, cap17000, seed34217,32AB+32AA)
+gives median +3.859%, CI [+3.186%, +5.494%], only4/32 improving; the one-sided
+slowdown sign p is9.65e-6. Both order medians slow (+3.524/+4.975%). AA is healthy
+(p .860), CI [-0.669%, +0.882%]; the entire slowdown interval exceeds that
+uncertainty. Reject, with no34289, extension or full candidate gates. Accepted
+source/CLI/metadata/profile restored exactly; restored formatting, fast940/
+full987 and all254 release tests pass (22 default ignored). No native BTRAN
+implementation is accepted. Source/counting driver and reversal, component
+variants/timings, original/complete oracle, matching build/freezes, all bounded
+results/counters, screen and restoration: `target/perf-native-drop/`.
 
 ### BTRAN branch and stage counts
 

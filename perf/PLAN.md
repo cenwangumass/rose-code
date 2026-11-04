@@ -268,13 +268,19 @@ measured.
   fx/Quad cycles5.75/4.84% despite fewer instructions; rejected before33217/33289.
   Register-product range certificates pass1M raw triples but add only0.44%
   component improvement, insufficient evidence for another integration.
-  Next quantify dead native divisions: its dense U loop executes x87 division
-  before dropping zero/tiny numerators, whereas accepted software inlines its
-  zero return. Protect complete output/WORK/state against the original BTRAN before testing a predicate-first native path; use bounded small
-  kernels and actual call-site counts first. Do not infer the native opportunity
-  from whole-solver zero-division totals or repeat coefficient-cache/register
-  variants without new cost evidence. Auxiliary immutable-base sharing remains
-  an unimplemented lead; further fresh-factor microvariants need measured costs.
+  Native division-routing measurement is complete:44.0/50.8% of dense-U
+  positions on successful fx/Quad native calls have zero numerators. Dropping them
+  before division preserves complete original outputs/WORK/state and matching-PGO
+  fast940 parity, and lowers instructions, but fixed screen34217 establishes a
+  Quad slowdown beyond AA uncertainty. Reject; no34289 or extension. Do not
+  repeat the tested native dense U/eta/L variants from zero counts or isolated
+  component improvements. Auxiliary immutable-base sharing remains unimplemented.
+  Return to ordinary-primal pricing/control: the accepted PILOT4 profile places
+  solve_primal first (13.92% instruction self), and the cached original-reference
+  family comparison shows a much larger pricing/control excess than BTRAN.
+  Audit the current annotation and source to locate a remaining whole control
+  pass before selecting another change; existing rank-pair/gather-plan/floor and
+  storage failures still apply. Use ADLITTLE/BORE3D/DEGEN2 before bounded PILOT4.
   Comparator alignment stays centralized; normal lunum's build/cache transport
   still needs an explicit no-build/schema-current source option for direct reuse.
   Look for a faster exact implementation of the same rounding (the F80 tests and `../reverse-engineer/evidence/f80-subnormal-reference.json`
