@@ -726,10 +726,10 @@ projected effects, component source/binary/timings, dependency audit and restora
 
 ## In progress
 
-No active runtime candidate. Contiguous overwritten-suffix graph/numeric pruning
-is numerically verified but timing-inconclusive and unapplied. The accepted
-Devex build is restored, with full987 parity and all254 release tests passing.
-The overall reference performance goal remains unmet.
+No active runtime candidate. Combined-block native BTRAN is rejected at counters;
+accepted source, CLI and PGO metadata are restored exactly. Formatting, fast940,
+full987 parity and all254 release tests pass (22 default ignored). The overall
+reference performance goal remains unmet.
 
 ## Extended BTRAN feasibility
 
@@ -765,6 +765,56 @@ row etas, subnormals and exceptional-value fallback, passed; fast parity passed
 940/940. Eight CPU-4 AB/BA result pairs per fixture matched all output fields
 except seconds. This does not prove full parity or profitability for a complete
 native BTRAN. The dense isolated timing remains a feasibility result only.
+
+### Native conversion and operation-boundary audit
+
+Small isolated dense U/eta/L tests use 80 finite cases with synthetic U/etas,
+SC50A captured L and sizes8/11/32. Every output retains full raw F80 fields.
+Eight alternating CPU4 pairs show old on-demand packed code +11.09% versus
+software, prepacked coefficients +7.55%, rebuilding the cache each call +24.32%.
+Combining multiply/store/subtract in one assembly block preserves both roundings
+and improves the on-demand component by15.36% versus software. These are
+standalone pinned-release component times, without solver PGO or ownership/cache
+maintenance costs; they do not predict solver speedup.
+
+The matching fixed39-PGO/TCMalloc integration keeps the complete original BTRAN
+as an independent oracle and unchanged fallback. It uses canonical normal/zero
+eligibility, rejects exceptional/subnormal intermediates, preserves all WORK
+additions, output ordering, row-cache/density fields and lazy inverse-row state.
+All three new differential tests pass, including full raw f64/F80 outputs,
+26 cached small factors per precision, duplicates/extremes/low bits, all16 SSE
+modes and unsupported x87 mode dispatch. Fast940 parity passes. Eight bounded
+ADLITTLE/fx and three Quad complete result/exit pairs agree. Instructions change
+-0.052/-2.876/-3.844%; cycles +3.518/+5.755/+4.842%. Reject before seeds33217/
+33289 or full candidate gates. Accepted source/CLI/metadata/profile are restored
+exactly; restored formatting, fast940/full987 and all254 release tests pass.
+
+Short CPU4 user-cycle profiles of eight fx solves each (cap5500) have no lost or
+throttled events. The candidate helper has179 samples (6.89% batch self), with
+remaining BTRAN2.54%; baseline BTRAN8.32%. Samples fall around multiply/divide,
+ten-byte loads/stores and surrounding representation traffic. This is sampled
+location evidence, not precise stall attribution or comparable absolute costs.
+The initial candidate profile attempt failed before solver execution because
+the saved executable lacked its execute bit; it is retained as invalid. The
+`after-valid` recording includes all eight validated results.
+
+A separate register-product component checks1,048,576 raw full-precision triples,
+including exponent boundaries. Under guarded nearest/64-bit x87 mode, a normal
+finite product exponent certificate permits keeping the rounded product in a
+register; other products use the stored-product path. All80 complete component
+cases also agree. Eight additional alternating pairs give stored-product
+on-demand -16.18% versus software, register-product -16.54%; the extra register
+variant is only0.44% faster than the stored component and has no integrated or
+qualified solver gain. Neither coefficient caching nor register retention alone
+justifies another solver trial from these measurements. The native dense loop
+still divides zero/tiny numerators before rejecting them, whereas accepted
+software already has an inlined zero return; quantify this distinct routing
+cost before changing another representation.
+
+Frozen sources, arithmetic/component variants, inputs, compiler commands and all
+component timings: `target/perf-native-cache-audit/`. Complete candidate/original
+source proof, tests/build/freezes, all solver result/counter pairs, assembly,
+profiles/event audit, decision and restoration: `target/perf-native-scatter/`.
 
 ### BTRAN branch and stage counts
 

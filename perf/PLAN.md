@@ -261,12 +261,20 @@ measured.
   PILOT4 instructions 1.068%, but screen32217 is inconclusive; stop without
   seed32289 or full candidate gates. It remains unapplied. Do not repeat either
   this screen or the earlier arithmetic-only guarded-replay screen.
-  Next audit the larger measured extended BTRAN cost (13.40% self in the accepted
-  Quad profile): inspect the existing native/packed candidates and quantify their
-  conversion, eligibility and setup overhead before proposing a distinct kernel
-  or representation change. Use cached profiles/assembly and bounded small
-  kernels first; further fresh-factor microvariants need new measured cost
-  evidence. Auxiliary immutable-base sharing remains an unimplemented lead.
+  The extended BTRAN conversion/operation-boundary audit is complete. Prepacking
+  alone does not make the small component faster than software; rebuilding its
+  cache per call is worse. Combined multiply/store/subtract blocks retain both
+  roundings and improve the component, but matching-PGO integration raises
+  fx/Quad cycles5.75/4.84% despite fewer instructions; rejected before33217/33289.
+  Register-product range certificates pass1M raw triples but add only0.44%
+  component improvement, insufficient evidence for another integration.
+  Next quantify dead native divisions: its dense U loop executes x87 division
+  before dropping zero/tiny numerators, whereas accepted software inlines its
+  zero return. Protect complete output/WORK/state against the original BTRAN before testing a predicate-first native path; use bounded small
+  kernels and actual call-site counts first. Do not infer the native opportunity
+  from whole-solver zero-division totals or repeat coefficient-cache/register
+  variants without new cost evidence. Auxiliary immutable-base sharing remains
+  an unimplemented lead; further fresh-factor microvariants need measured costs.
   Comparator alignment stays centralized; normal lunum's build/cache transport
   still needs an explicit no-build/schema-current source option for direct reuse.
   Look for a faster exact implementation of the same rounding (the F80 tests and `../reverse-engineer/evidence/f80-subnormal-reference.json`

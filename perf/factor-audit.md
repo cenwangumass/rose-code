@@ -897,6 +897,28 @@ exact input/pivot scope checker, geometry definitions, first-difference stop,
 source/binary/build provenance, suffix-count analysis and restoration:
 `target/perf-pre-overlay/`.
 
+## Native BTRAN conversion and rounding boundaries
+
+The current accepted Quad profile puts extended BTRAN at13.40% instruction self.
+The isolated80-case SC50A-L/synthetic-U/eta audit does not justify a cached native
+coefficient mirror: prepacking alone remains slower than software and rebuilding
+it per call costs more. Combined multiply/store/subtract blocks retain both
+roundings and improve the isolated component by15.36%, but the matching fixed39
+PGO integration raises fx/Quad cycles5.755/4.842% while reducing instructions
+2.876/3.844%. Complete frozen BTRAN/raw-field/state/mode tests, fast940 and every
+bounded no-dump result/exit pair pass. Reject before official seeds33217/33289
+or full candidate gates; source/accepted CLI/metadata/profile restored exactly,
+with formatting/full987 and all254 release tests passing (22 default ignored).
+A separate range-certified register product matches1,048,576 raw arithmetic
+triples and all80 component cases but improves that component only0.44% over
+the stored-product block; no solver integration or speedup follows. Short cycle
+profiles locate native arithmetic and representation transfers without precise
+stall attribution. The native division-before-drop order remains a distinct
+unmeasured cost; accepted software's zero return is already inlined. Component
+sources/timings: `target/perf-native-cache-audit/`; integration proof, tests,
+matching build, counters/results/profiles and restoration:
+`target/perf-native-scatter/`.
+
 ## F80 two-word software layout
 
 Actual accepted F80 multiply/divide pass operands/results through memory. A
