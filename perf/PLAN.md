@@ -190,8 +190,11 @@ measured.
   FTRAN/BTRAN (`ftran_order.rs`), the LU update and refactorization (`lu*.rs`), the bound-flip and
   update loops in `dual.rs` / `simplex.rs`.
 - **The quad passes** (`quad_2717`, `fx_quad_obj_5371`, `primal_5959.dual-r`): `crate::f80` is a
-  software x87 extended-precision type; its add/mul/div are in every quad kernel. Look for a faster
-  exact implementation of the same rounding (the F80 tests and `../reverse-engineer/evidence/f80-subnormal-reference.json`
+  software x87 extended-precision type; its add/mul/div are in every quad kernel. Bounded-normal
+  to-double bit assembly is now qualified with the complete original conversion
+  and all MXCSR modes as oracles; preserve its original boundary fallback.
+  Refresh remaining BTRAN, row/control and software arithmetic after this change.
+  Look for a faster exact implementation of the same rounding (the F80 tests and `../reverse-engineer/evidence/f80-subnormal-reference.json`
   define it), and for F80 work that runs where its results are not used.
 - **Dump overhead with no dump selected**: about 70 `dump::on("kind")` sites in `dual.rs` and
   `simplex.rs`. Each call scans the selected kinds by string; check whether any of them sits in a

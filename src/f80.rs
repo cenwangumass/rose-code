@@ -215,6 +215,60 @@ impl F80 {
 
     /// Round to the nearest double (ties to even); overflow gives infinity.
     pub fn to_f64(self) -> f64 {
+        // In this bounded normal range the old integer rounding produces an
+        // exact double significand, and both its scale and product are normal
+        // and finite under every hardware rounding/flush mode. Assemble those
+        // same bits directly; keep the original routine at all boundaries.
+        if (-970..=1022).contains(&self.e) && self.m >= 1u64 << 63 {
+            let mut q = self.m >> 11;
+            let rem = self.m & 2047;
+            if rem > 1024 || (rem == 1024 && q & 1 == 1) {
+                q += 1;
+            }
+            // q includes its implicit leading bit; a rounding carry naturally
+            // advances the exponent when added to this one-less exponent.
+            let bits = (((self.e + 1022) as u64) << 52) + q;
+            return f64::from_bits(bits | ((self.neg as u64) << 63));
+        }
+        if self.is_nan() {
+            return f64::NAN;
+        }
+        let sgn = if self.neg { -1.0 } else { 1.0 };
+        if self.is_infinite() {
+            return sgn * f64::INFINITY;
+        }
+        if self.m == 0 {
+            return sgn * 0.0;
+        }
+        // Number of significand bits kept: 53 for normal doubles, fewer below 2^-1022.
+        let keep = if self.e >= -1022 {
+            53
+        } else {
+            53 - (-1022 - self.e)
+        };
+        if keep < 0 {
+            return sgn * 0.0;
+        }
+        let drop = 64 - keep as u32;
+        let (mut q, rem, half) = if drop >= 64 {
+            (0u64, self.m, 1u64 << 63)
+        } else {
+            (
+                self.m >> drop,
+                self.m & ((1u64 << drop) - 1),
+                1u64 << (drop - 1),
+            )
+        };
+        if rem > half || (rem == half && q & 1 == 1) {
+            q += 1;
+        }
+        // value = q * 2^(e - 63 + drop)
+        let r = (q as f64) * pow2(self.e - 63 + drop as i32);
+        sgn * r
+    }
+
+    #[cfg(test)]
+    fn frozen_to_f64(self) -> f64 {
         if self.is_nan() {
             return f64::NAN;
         }
@@ -1054,6 +1108,117 @@ mod tests {
                 }
                 let h = op(b'q', a.abs(), a);
                 assert_eq!(h.repr(), a.abs().sqrt().repr(), "sqrt {:?}", a.repr());
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod double_bits_tests {
+    use super::*;
+
+    fn check(x: F80) {
+        assert_eq!(x.to_f64().to_bits(), x.frozen_to_f64().to_bits(), "{x:?}");
+    }
+
+    #[test]
+    fn frozen_random_boundaries_and_captured() {
+        for se in 0..=u16::MAX {
+            for m in [
+                0,
+                1,
+                0x7fff_ffff_ffff_ffff,
+                1u64 << 63,
+                (1u64 << 63) + 1023,
+                (1u64 << 63) + 1024,
+                (1u64 << 63) + 1025,
+                (1u64 << 63) + 3072,
+                u64::MAX - 1024,
+                u64::MAX,
+            ] {
+                check(F80::from_repr(m, se));
+            }
+        }
+        let mut seed = 0x319839b19272a03du64;
+        for _ in 0..1000000 {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            let m = seed;
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            check(F80::from_repr(m, seed as u16));
+        }
+        let captured: serde_json::Value =
+            serde_json::from_str(include_str!("../tests/fixtures/ftran_l_captured.json")).unwrap();
+        for case in captured.as_array().unwrap() {
+            for v in case["l"].as_array().unwrap().iter().chain(
+                case["lvals"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .flat_map(|v| v.as_array().unwrap()),
+            ) {
+                let x = F80::from_f64(v.as_f64().unwrap());
+                check(x);
+                if x.m >= 1u64 << 63 {
+                    for low in [1, 1023, 1024, 1025, 2047] {
+                        check(F80 { m: x.m | low, ..x });
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn frozen_under_all_mxcsr_rounding_and_flush_modes() {
+        use std::arch::asm;
+
+        struct Restore(u32);
+
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                unsafe {
+                    asm!("ldmxcsr [{p}]", p=in(reg) &self.0, options(nostack));
+                }
+            }
+        }
+        let mut old = 0u32;
+        unsafe {
+            asm!("stmxcsr [{p}]", p=in(reg) &mut old, options(nostack));
+        }
+        let _restore = Restore(old);
+        for mode in 0..16u32 {
+            let csr = (old & !0xe040)
+                | 0x1f80
+                | ((mode & 3) << 13)
+                | ((mode & 4) << 13)
+                | ((mode & 8) << 3);
+            unsafe {
+                asm!("ldmxcsr [{p}]", p=in(reg) &csr, options(nostack));
+            }
+            for e in [
+                -16445, -1076, -1075, -1074, -1023, -1022, -971, -970, -969, -1, 0, 1, 1021, 1022,
+                1023, 1024, 16383,
+            ] {
+                for m in [
+                    0,
+                    1u64 << 63,
+                    (1u64 << 63) + 1023,
+                    (1u64 << 63) + 1024,
+                    (1u64 << 63) + 1025,
+                    (1u64 << 63) + 3072,
+                    u64::MAX,
+                ] {
+                    for neg in [false, true] {
+                        check(F80 { m, e, neg });
+                    }
+                }
+            }
+            for x in [F80::NAN, -F80::NAN, F80::INFINITY, -F80::INFINITY] {
+                check(x);
             }
         }
     }
