@@ -726,11 +726,11 @@ projected effects, component source/binary/timings, dependency audit and restora
 
 ## In progress
 
-No active runtime candidate. Native BTRAN with early finite-numerator drops is
-rejected after a controlled target slowdown. Accepted source/CLI/PGO metadata
-are restored exactly; formatting, fast940/full987 parity and all254 release
-tests pass (22 default ignored). The overall reference performance goal remains
-unmet.
+No active runtime candidate. Maintained eligible ranked-row traversal is a
+standalone feasibility result: producer-notified maintenance improves the
+PILOT4 component but regresses smaller witnesses, so it is unapplied. Accepted
+source/CLI/PGO metadata remain exact. The overall reference performance goal
+remains unmet.
 
 ## Extended BTRAN feasibility
 
@@ -881,6 +881,46 @@ Raw captures/results, validated runner, source snapshots and binary provenance:
 *-allstages.json,*-accepted.json,instrumented-ftran.rs,instrumented-dump.rs}`.
 Build logs `/tmp/rose-btbranch-build{,2}.log`. No frozen baselines were changed;
 no reference comparison or new solver speedup is claimed.
+
+### Maintained eligible ranked-row traversal
+
+The ordinary pivot consumes nonbasic structural products (including fixed), all
+slacks, q and leave. A separate cost-change caller retains its complete original
+product. A maintained row stream can remove other basic structural entries once
+per basis change, avoiding the rejected per-entry eligibility test. Strictly
+ascending column IDs certify that each row has no duplicates; duplicate/unsorted
+rows retain the original full traversal. Swapping distinct column entries changes
+no output's row accumulation order, so all retained arithmetic stays ordered.
+
+Test-only caller captures preserve all original arithmetic/WORK. ADLITTLE,
+BORE3D and DEGEN2 capped300 have no ordinary-pivot calls; SC50A capped300 and
+DEGEN2 capped800 provide smaller witnesses (8/181 calls, optimal32/690 iterations,
+7/17 refactors). PILOT4 capped800 has367 calls, optimal690/16. Its keys match all
+367 calls of the cached general ranked-product diagnostic exactly. All bounded
+statuses/counts and optimal full numeric vectors match the accepted CLI.
+
+PILOT4 can omit834595/1401403 entries (59.55%). Full basis-position comparison
+causes3943 changed slots and56385 entry updates; comparing membership sets needs
+only7503 updates. Both complete scan-based component plans still lose roughly
+32–35% in preliminary timing. A separate producer-notified plan applies the known
+pivot and resynchronizes only at inferred basis-reorder events. Its final frozen
+standalone release probe includes construction once per stream, result allocation
+and every membership/resync update. Sorted row-order preparation is common and
+outside timing; this uses the system allocator, no solver PGO. Eight alternating
+CPU4 pairs of64 complete streams give SC50A+408.82%, DEGEN2+40.17%,
+PILOT4-18.45%. These are component costs, not solver speedups; generation events
+are inferred from the captured predicted post-pivot basis, not integrated with
+the solver's refactor/repair lifecycle. Unconditional integration is unprofitable.
+
+All492530 retained captured f64 values and76723 edge-case values agree bit for
+bit. Edge cases cover16 MXCSR modes, sizes1/2/8/31, signed zeros/subnormals/extremes,
+infinities/two NaN payloads, row orders, basis replacement/reordering and stamp
+overflow; duplicate/unsorted fallback eligibility is checked. All diagnostics are
+removed; accepted source/CLI/metadata stay exact. Formatting, full987 parity and
+all254 release tests pass (22 default ignored). No candidate solver build or
+official timing screen is run. Captures/baseline scope, all three plan sources,
+preliminary negative timings, final source/binary freeze, all final timings/raw
+checks, generation-scope limits and restoration: `target/perf-active-rank/`.
 
 ### Current primal source-line screen
 

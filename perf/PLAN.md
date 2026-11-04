@@ -275,12 +275,20 @@ measured.
   Quad slowdown beyond AA uncertainty. Reject; no34289 or extension. Do not
   repeat the tested native dense U/eta/L variants from zero counts or isolated
   component improvements. Auxiliary immutable-base sharing remains unimplemented.
-  Return to ordinary-primal pricing/control: the accepted PILOT4 profile places
-  solve_primal first (13.92% instruction self), and the cached original-reference
-  family comparison shows a much larger pricing/control excess than BTRAN.
-  Audit the current annotation and source to locate a remaining whole control
-  pass before selecting another change; existing rank-pair/gather-plan/floor and
-  storage failures still apply. Use ADLITTLE/BORE3D/DEGEN2 before bounded PILOT4.
+  The ordinary-primal ranked-row consumer audit and maintained eligibility
+  component are complete. Ordinary pivot streams need only nonbasics, all slacks,
+  q and leave; the cost-change consumer must retain the full product. PILOT4 can
+  omit59.55% of entries, but scanning basis positions/sets still loses in the
+  component. Producer-notified maintenance improves PILOT4's component18.45%
+  while regressing SC50A/DEGEN2; no unconditional solver integration follows.
+  Before integrating this distinct traversal, measure a workload/amortization
+  gate on complete captured histories, including sparse fallback calls. Bind
+  invalidation to actual solver refactor/repair events and invalidate on skipped
+  product routes; do not assume the component's inferred generation is a solver
+  lifecycle proof. Duplicate/unsorted rows need the original full kernel. Protect
+  the complete original kernel and caller-consumed state first; WORK stays live.
+  Use SC50A/DEGEN2 witnesses before PILOT4. Existing per-entry output masks,
+  rank-pair/gather-plan/floor and storage failures remain unapplied.
   Comparator alignment stays centralized; normal lunum's build/cache transport
   still needs an explicit no-build/schema-current source option for direct reuse.
   Look for a faster exact implementation of the same rounding (the F80 tests and `../reverse-engineer/evidence/f80-subnormal-reference.json`

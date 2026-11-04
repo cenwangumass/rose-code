@@ -725,6 +725,46 @@ cost, not allocator ancestry or proof that a scatter rewrite pays off. Existing
 rank-row storage/active-row/rank-order failures still apply. Exact commands,
 results/hash/build/count/audit and annotations: `target/perf-primal-refresh/`.
 
+## Maintained eligible ranked-row traversal
+
+A different mechanism from per-entry output masking maintains contiguous active
+row coefficients as structural basis membership changes. Nonbasics including
+fixed, every slack, q and leave remain; the cost-change consumer keeps the full
+original product. Rows must have strictly ascending, unique column IDs. That
+certificate permits swap removal across distinct columns without changing any
+individual output's multiplication/addition order; duplicates/unsorted rows use
+the complete original traversal.
+
+Actual ordinary-pivot streams are now retained with immutable matrices, full f64
+bits, row order, basis, q and leave: SC50A8 calls (cap300), DEGEN2181 (cap800),
+PILOT4367 (cap800). Three earlier cheap caps300 have no calls. Every bounded
+status/count and optimal full numeric vector equals the accepted CLI. The new
+PILOT4 keys equal all367 calls in the prior generic-ranked-product stream, with
+1401403 visited entries. Eligibility can omit834595 entries (59.55%). Position
+synchronization performs56385 entry updates due to basis reordering; actual
+membership plus temporary leave updates needs7503. The full scan-based variants
+still lose32–35% in preliminary component timing.
+
+The final producer-notified prototype commits known q/leave membership after
+computing each product. It resynchronizes only at basis-order changes inferred
+from the captured predicted post-pivot basis. This is a component input model;
+no actual solver generation or refactor/repair callback has been integrated.
+The frozen standalone pinned-release/system-allocator probe includes per-stream
+construction, all membership/resync work and output allocation; common sorted
+row-order preparation stays outside timing. Eight alternating CPU4 pairs of64
+complete streams yield SC50A+408.82%, DEGEN2+40.17%, PILOT4-18.45%. Unconditional
+integration is unprofitable despite fewer arithmetic terms. A future attempt
+needs a measured workload/amortization gate and complete basis-lifecycle proof;
+these component results establish no solver gain.
+
+All492530 retained captured outputs and76723 extreme/nonfinite/NaN/duplicate-
+fallback/mode/history/stamp-overflow edge values agree exactly. Original source,
+accepted CLI and build metadata remain byte-identical; formatting/full987 and
+all254 release tests pass (22 default ignored). No candidate solver build or
+official screen. All captures, validation/source proof, preliminary/final probe
+sources/timings, exact final binary freeze and restoration:
+`target/perf-active-rank/`.
+
 ## Ordinary ranked-row packed traversal
 
 Current native primal annotation motivates a separate kernel experiment from
