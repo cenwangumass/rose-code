@@ -807,17 +807,30 @@ Stream bytes alone do not establish allocator-footprint or runtime savings.
 Full sources/oracles/proof, builds/tests, raw results/counters and disassembly:
 `target/perf-lpacked/`.
 
-## Producer-U cached evidence limits
+## Producer-U numerical evidence limits
 
-Delegated ref-compare audit confirms controlled-dual SC50A/ADLITTLE k0 factors
-have zero nucleus/tail columns. Their perf-fresh case0 fixtures instead describe
-primal-controlled inputs. SC50A dual k1 is the first nontrivial witness (5 nucleus,
-10 tail columns;4 guarded columns/2 structural visits). No current tag pairs
-pre-overlay replay with producer U; post-overlay equality follows by construction.
-Cached dual LUIN p68 length m cannot satisfy lunum --u's m+1 endpoint schema.
-Current bounded refcap lu_in --lim2 and a paired pre-overlay diagnostic are
-needed before claiming numerical identity. No new capture or agreement range
-is reported. Exact inputs, geometry, commands, provenance and gap report:
+Controlled-dual SC50A/ADLITTLE k0 has no nucleus/tail columns; old perf-fresh
+case0 fixtures instead describe primal-controlled inputs. SC50A dual k1 is the
+first nontrivial witness (5 nucleus, 10 tail columns; 4 guarded columns/2 visits).
+A delegated bounded current refcap now supplies 51 p68 endpoints for k1, fixing
+the old legacy-LIM400 endpoint-data gap. The separate existing no-build
+trace_dump is capped at 8 iterations, with no third fresh factor. LUIN/LUOUT n1
+pairs to reference k1 after the merged LUSTART factor0. Basis columns and pivot
+rows match; raw bits match for 50 diagonals/29 L values plus stored L row order.
+All 13 final U values agree by pivot(column,row) under unchanged compare.py
+lunum alignment. All 92 compared values are finite/nonzero; physical U order and
+zero/nonfinite behavior are untested. The example fingerprint records accepted
+PGO/system-TCMalloc/align64, but it is not the qualified CLI and no broad source/
+parity identity is asserted. No Rust source/build/CLI/PGO files changed.
+
+Normal lunum always rebuilds and its cache selector prefers old LIM400; the
+scratch no-build adapter only supplies records to its unchanged alignment.
+Producer st.u_rows and pre-overlay replay remain unrecorded. Final-U equality
+does not prove either, so no arithmetic bypass is justified. Next obtain a paired
+factor-indexed producer/pre-overlay/final-value diagnostic; further reference
+capture is not needed yet. Commands, capture/metadata, bounded dumps/trace,
+raw-bit pairing/scope, adapter/results and preserved executable/provenance:
+`target/perf-fresh-u-current/`; earlier geometry/cached-data audit:
 `target/perf-fresh-u-cache-audit/`.
 
 ## F80 two-word software layout
@@ -960,9 +973,35 @@ exactly on the component build, excluding instrumented elapsed time, and every
 component call's full written-field payload equals the captured original.
 These isolated measurements are not solver speedups or qualification screens.
 
-A two-entry fresh full-FTRAN effect cache remains an
-unimplemented candidate; update/failure invalidation, clone ownership, controls,
-dumps, full-state differential tests and matching-PGO qualification remain.
+The two-entry fresh full-FTRAN effect cache is numerically verified but
+unapplied. It shares exact ordered row/full F80-bit/force-dense keys only through
+the existing compact fresh template owner (m<50), with independent mutable factor
+state. It replays complete F2, spike, work/parts and last-field values; original
+wrappers and caller WORK sites remain unchanged. Updates and direct U replacement
+detach the child cache before mutation. Dumps, updated/large factors, malformed/
+nonfinite inputs and unsupported SSE/x87 modes retain the original kernel.
+The complete current kernel is independently frozen; token reversal verifies all
+other original constructor/helper/update/WORK and Real/F80 arithmetic unchanged.
+
+Matching fixed 39 PGO passes ten FTRAN/L and nine F80 tests, fast 940 parity and
+all bounded complete result/exit pairs. Every library-test hit also executes the
+whole frozen kernel on a deep clone and compares ordered full-field result bits
+and every original factor field value, including scratch and untouched caller
+state. Captured input values, cold/warm clone histories, owned updates/failures,
+eviction, raw low bits/zeros/duplicates/nonfinites, all 16 MXCSR modes, alternate
+x87 controls and a bounded fx solve with >1000 shadow-checked hits pass.
+
+fx instructions/cycles fall 4.021/3.285%; Quad 1.621/2.369%. The fixed 32-AB/32-AA
+CPU-4 fx screen 31217 is inconclusive: median -0.355%, CI [-2.043,+1.454], 17/32
+improving pairs, sign p 0.430; order medians -1.338/+0.142%. AA is healthy
+(CI [-3.360,+0.425], p 0.215). The gain, significance, order and conservative
+noise-separation criteria fail. Stop without confirmation 31289, extension or
+full candidate gates; no solver speedup is accepted. Source/CLI/metadata/profile
+are restored exactly; formatting, fast 940/full 987 parity and 254 release tests
+pass. Exact original/current/frozen sources, input fixture, source proofs,
+matching build/freeze, tests, counters/results, complete screen and restoration:
+`target/perf-fresh-ftran/`.
+
 Exact source reversal, raw streams, per-version/FIFO bounds, unchanged CLI results,
 projected effects, component source/binary/timings, dependency audit and restoration:
 `target/perf-version-stream/`.
@@ -974,9 +1013,9 @@ eta updates and their nnz counter change. Deep-copy constructor reuse is verifie
 but its fixed solver screen is inconclusive; do not extend it. Immutable-base
 sharing would need separate ownership, allocation and numeric/WORK proofs.
 The measured general mutable-version FTRAN/BTRAN result cache has negligible
-nonfresh reuse. Fresh full-FTRAN effect reuse needs a complete frozen oracle,
-full-state hit/miss/clone/update/fallback tests and independent matching-PGO
-qualification. Preserve only the kernel's written fields and every live caller
+nonfresh reuse. Fresh full-FTRAN effect reuse has complete-kernel/full-state oracle and
+matching-PGO evidence, but its fixed solver screen is inconclusive; do not
+extend it. Preserve only the kernel's written fields and every live caller
 field; keep outer wrapper and WORK logic running. Replay numerical producer/
 consumer values through the standard dump/comparison tools and stop at the first
 mismatch. Pure-result reuse does not establish producer-U identity or safety of

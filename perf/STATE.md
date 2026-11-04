@@ -478,17 +478,29 @@ unpinned smoke is retained separately and excluded from these ratios. No plan
 cache is installed. Original source proof, complete captured inputs, code/build/
 compiler, raw timings and summaries: `target/perf-rank-plan-probe/`.
 
-Cached producer-U identity audit: the first controlled-dual SC50A and ADLITTLE
-factors have no nucleus or tail columns, so they provide no nontrivial equality
-witness. The first nontrivial SC50A dual factor is k1 (5 nucleus rows,10 tail
-columns; existing guarded coverage marks4 columns/2 structural update visits).
-The perf-fresh SC50A/ADLITTLE case0 fixtures are primal-controlled, not dual.
-No existing tag pairs pre-overlay replay values with producer U; final overwritten
-entries agree by construction only. Cached dual LUIN p68 has m entries rather
-than the m+1 endpoint schema required by compare.py lunum --u. No numerical
-identity, new agreement range or optimization follows. Delegated cached-data
-conclusion, runnable peek/geometry commands, exact inputs/results/provenance and
-missing-schema/pre-overlay requirements: `target/perf-fresh-u-cache-audit/`.
+Producer-U identity audit: controlled-dual SC50A/ADLITTLE k0 has no nucleus or
+tail columns. The first nontrivial SC50A dual factor is k1 (5 nucleus rows,
+10 tail columns; existing geometry marks 4 guarded columns/2 structural visits).
+The older perf-fresh SC50A/ADLITTLE case0 fixtures are primal-controlled.
+
+The current two-call SC50A dual-controlled refcap has 51 p68 endpoints, resolving
+the old m-entry endpoint gap in the legacy LIM400 cache. An existing no-build
+trace_dump (SHA 763e5f2d…e02, system-TCMalloc/align64/accepted-profile fingerprint;
+separate from the qualified CLI) capped at 8 iterations agrees with k1: input
+basis-column IDs, pivot rows, 50 diagonal bits and 29 stored L bits/index order;
+13 final U values agree by pivot(column,row). All 92 values are finite/nonzero;
+physical U storage order and zero/nonfinite behavior are untested. The scratch
+adapter supplies cached records to unchanged compare.py cmd_lunum alignment;
+normal lunum rebuilds and still prefers the legacy cache. No new alignment rule
+or broad source/parity identity for that example binary is claimed.
+
+No tag pairs producer st.u_rows with Rose's pre-overlay replay, so final-U
+agreement still cannot justify bypassing numeric replay. The next datum is a
+paired factor-indexed producer/pre-overlay/final-value diagnostic; no additional
+reference capture is needed yet. Current capture, bounded example output,
+standard-comparator adapter/results, raw-bit scope and executable provenance:
+`target/perf-fresh-u-current/`. Earlier geometry/cached-data audit:
+`target/perf-fresh-u-cache-audit/`.
 
 F80 ABI audit and software-layout feasibility are complete. Actual accepted
 multiply/divide use operand pointers and an indirect result pointer; actual
@@ -617,19 +629,45 @@ exactly on the component build, excluding instrumented elapsed time, and every
 component call's full written-field payload equals the captured original.
 These isolated measurements are not solver speedups or qualification screens.
 
-A two-entry fresh full-FTRAN effect cache remains an
-unimplemented candidate; update/failure invalidation, clone ownership, controls,
-dumps, full-state differential tests and matching-PGO qualification remain.
+The two-entry fresh full-FTRAN effect cache is numerically verified but
+unapplied. It shares exact ordered row/full F80-bit/force-dense keys only through
+the existing compact fresh template owner (m<50), with independent mutable factor
+state. It replays complete F2, spike, work/parts and last-field values; original
+wrappers and caller WORK sites remain unchanged. Updates and direct U replacement
+detach the child cache before mutation. Dumps, updated/large factors, malformed/
+nonfinite inputs and unsupported SSE/x87 modes retain the original kernel.
+The complete current kernel is independently frozen; token reversal verifies all
+other original constructor/helper/update/WORK and Real/F80 arithmetic unchanged.
+
+Matching fixed 39 PGO passes ten FTRAN/L and nine F80 tests, fast 940 parity and
+all bounded complete result/exit pairs. Every library-test hit also executes the
+whole frozen kernel on a deep clone and compares ordered full-field result bits
+and every original factor field value, including scratch and untouched caller
+state. Captured input values, cold/warm clone histories, owned updates/failures,
+eviction, raw low bits/zeros/duplicates/nonfinites, all 16 MXCSR modes, alternate
+x87 controls and a bounded fx solve with >1000 shadow-checked hits pass.
+
+fx instructions/cycles fall 4.021/3.285%; Quad 1.621/2.369%. The fixed 32-AB/32-AA
+CPU-4 fx screen 31217 is inconclusive: median -0.355%, CI [-2.043,+1.454], 17/32
+improving pairs, sign p 0.430; order medians -1.338/+0.142%. AA is healthy
+(CI [-3.360,+0.425], p 0.215). The gain, significance, order and conservative
+noise-separation criteria fail. Stop without confirmation 31289, extension or
+full candidate gates; no solver speedup is accepted. Source/CLI/metadata/profile
+are restored exactly; formatting, fast 940/full 987 parity and 254 release tests
+pass. Exact original/current/frozen sources, input fixture, source proofs,
+matching build/freeze, tests, counters/results, complete screen and restoration:
+`target/perf-fresh-ftran/`.
+
 Exact source reversal, raw streams, per-version/FIFO bounds, unchanged CLI results,
 projected effects, component source/binary/timings, dependency audit and restoration:
 `target/perf-version-stream/`.
 
 ## In progress
 
-None. Accepted `vypkuxry` source, CLI and PGO metadata remain byte-identical;
-all measurement hooks are removed. Formatting, fast 940/full 987 parity and 254
-release tests pass. Fresh full-FTRAN effect reuse is measured but unimplemented;
-the overall reference performance goal remains unmet.
+None. Accepted `vypkuxry` source, CLI and PGO metadata are restored exactly;
+formatting, fast 940/full 987 parity and 254 release tests pass. Fresh full-FTRAN
+reuse is numerically verified but timing-inconclusive and remains unapplied.
+The overall reference performance goal remains unmet.
 
 ## Extended BTRAN feasibility
 

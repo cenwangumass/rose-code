@@ -243,15 +243,23 @@ measured.
   do not repeat its failed screen. Fresh full FTRAN is a distinct lead: two
   entries capture 1730/2883 fx/Quad and 5273/5627 primal5959 repeats, predominantly
   pivot-column solves. Full lookup/effect replay/copy component ratios are
-  0.111/0.112/0.199/0.198 with exact captured outputs and written state. Next
-  protect the complete original FTRAN and test only compact fresh F80 effect
-  reuse. Preserve all F2/spike/WORK/last-field writes, untouched live caller
-  state, wrapper restores and update/failure invalidation. Bypass dumps and
-  unsupported controls; clone sharing must keep every mutable factor independent.
-  Run matching fixed39 PGO and cheap bounded counters before timing qualification.
-  Producer/consumer U identity is still unproven: use nontrivial SC50A dual k1,
-  repair the old cached LUIN endpoint schema through current bounded refcap,
-  and capture producer/pre-overlay values before bypassing replay arithmetic.
+  0.111/0.112/0.199/0.198 with exact captured outputs and written state. The
+  matching-PGO integration preserves the complete original kernel, replaying
+  only written fields and keeping wrappers/caller WORK live. All focused and
+  per-hit full-field oracle checks pass; fx/Quad instructions fall 4.021/1.621%.
+  Fixed fx screen 31217 is inconclusive, including opposite order medians; do
+  not repeat or extend it. This cache remains unapplied. Next pursue larger
+  factor-production/installation ownership savings, with exact numerical and
+  allocation evidence. Auxiliary immutable-base sharing remains unimplemented;
+  producer/pre-overlay U identity still needs a nontrivial controlled witness.
+  Producer/pre-overlay U identity is still unproven. Current bounded SC50A dual
+  k1 data resolves the endpoint schema and verifies final diag/L/U under the
+  existing alignment with a separate no-build example. Next collect producer
+  st.u_rows and pre-overlay replay values paired with final installed U in a
+  factor-indexed test diagnostic. No additional reference capture is needed yet;
+  do not infer pre-overlay equality from final overridden values. Keep supported
+  comparator alignment centralized; normal lunum's build/cache transport still
+  needs an explicit no-build/schema-current source option for direct reuse.
   Look for a faster exact implementation of the same rounding (the F80 tests and `../reverse-engineer/evidence/f80-subnormal-reference.json`
   define it), and for F80 work that runs where its results are not used.
 - **Dump overhead with no dump selected**: about 70 `dump::on("kind")` sites in `dual.rs` and
