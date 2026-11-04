@@ -273,6 +273,21 @@ scatter, rounding tests and dense LDL loops; codegen differs from release.
 The fixed child-rounding dispatch is tested and rejected below. Raw profiles,
 counts, complete results, build provenance and annotation: `target/perf-barrier-refresh/`.
 
+F80 add-shape diagnostic on accepted production source (temporary test-only
+counters, removed before candidate freeze): ADLITTLE has no finite-nonzero
+F80 additions; fx_quad_obj_5371 counts 1,044,229, including 156,186 equal-exponent
+opposite-sign cases; Quad_2717 counts 2,785,649, including 651,694 such cases
+(14.96%/23.39%). Nonzero cancellation results number 152,586/625,468; adjacent
+exponent/opposite-sign cases number 43,258/247,975, without a ratio predicate.
+These are direct-solve operation frequencies, not cycle/removable-time shares.
+All bounded statuses/iterations/refactors match the CLI; optimal ADLITTLE and
+Quad objective/primal/dual/reduced-cost fields match exactly. Infeasible fx CLI
+suppresses those fields to null, so no numeric-vector assertion is made there.
+Original source, installed CLI and PGO metadata are restored exactly. The
+separately tested normal-cancellation implementation is rejected below; counts
+alone do not justify retrying it. Source, validating test, raw values/counts,
+summary and original Sub annotation: `target/perf-f80-add-shapes/`.
+
 ## In progress
 
 None. Qualified `ntpwppnk` source, CLI and PGO metadata are installed;
@@ -637,6 +652,8 @@ sweep's solve medians; paired old/new times determine whether a change gains or 
 - Borrow Markowitz candidate chains and rotate buckets in place: fast parity 940/940 passes and PEROLD instructions -0.5%, but alternating CPU-2 solve 0.237249 -> 0.236897 s is within 0.006498/0.011017 s spreads; DEGEN3 primal also stays within wide spreads. Reverted (`target/perf-searchborrow-{target,recheck}-{before,after}.txt`).
 
 - Cache first-match pivot-row/column coefficients in a stamped lookup: semantic tests and fast parity 940/940 pass, PEROLD instructions -0.6%, but solve 0.151853 -> 0.151628 s is within 0.004297/0.000431 s spreads; DEGEN2 has a small timing increase with flat instructions and DEGEN3 primal has no gain. Reverted (`target/perf-pivotvalues-target-{before,after}.txt`).
+
+- Exact normal F80 cancellation for opposite effective signs and equal exponents, or adjacent exponents with magnitude ratio below two: a 64-bit difference and normalization replace the general 128-bit align/pack only when no rounding is required. The complete original add/sub primitive is frozen independently; reconstruction reverses only the new branch. Matching fixed39 PGO passes all eleven F80 tests (two million random/full-representation/close-magnitude comparisons, captured SC50A factors, signs/zeros/nonfinites/boundaries and existing x87/conversion tests), fast parity 940/940, and eight ADLITTLE/fx plus three Quad_2717 complete result/exit pairs. Quad instructions -2.11%, but cycles rise in all three pairs (+3.63/+2.05/+1.70%) and branch misses +13.69/+8.33/+5.11%. Fx instructions -1.44%, cycles rise in all eight pairs (+0.61 through +9.50%). These whole-CLI counters do not attribute all extra cost to branch prediction, but establish no useful target gain. Stopped before predeclared timing seeds 12217/12289 and full gates. Source, accepted CLI/build and opaque-input test fix are restored exactly. Candidate/frozen source, algebra/rounding proof, matching build, tests, all outputs/counters and restoration: `target/perf-f80-cancel/`.
 
 - Normal F80 division normalizes the quotient before one exact 128-by-64 DIV, then rounds from its exact remainder; boundary/exceptional results retain the complete original two-step expansion/packer. Complete original division is frozen independently; source reconstruction removes only the normal branch. Final matching-PGO checks pass all eleven F80 tests (one million random divisions, captured SC50A values, boundary/nonfinite/signed-zero cases, 100,000 helper comparisons and existing x87/conversion tests), plus fast parity 940/940. Eight bounded ADLITTLE/fx and three Quad_2717 pairs preserve complete no-dump result/exit objects. Quad instructions -2.40%, cycles -4.35%; fx instructions -3.18%, cycles -5.88%. Native normal code has one DIV; fallback retains both helper calls. The first predeclared Quad screen (seed 11411, 32 AB + 32 AA, CPU 4, cap 17000) is inconclusive: median -4.060%, interval [-5.100%, -1.557%], AA [-0.251%, +1.760%], 28/32 improving, sign p9.65e-6, both orders improve, healthy AA. Conservative noise separation fails. The reserved confirmation 11483 was accidentally started after a shell assertion because the shell lacked stop-on-error; it was interrupted (exit 130), and partial schedule/raw data are retained without a confirmation decision. No extension or full gates. Source, qualified CLI/build and separately committed opaque-input test fix are restored exactly. Initial failed mode-test evidence, final source/proof/build/tests/assembly/counters, complete failed screen and partial confirmation: `target/perf-f80-div-normal/`.
 
