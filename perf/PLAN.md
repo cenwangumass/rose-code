@@ -197,9 +197,10 @@ measured.
   of PEROLD allocator self samples under refactorization and 29–30% under iteration.
   Direct nucleus input construction and dense-handoff extraction are rejected at
   counters. Chain-maintenance counts do not yet justify an intrusive-list rewrite.
-  Inspect priority-queue work in factor updates/FTRAN before choosing another
-  representation: establish sampled cost, immutable key ordering and duplicate
-  semantics first. Numeric-LU step queues were tested separately and rejected.
+  Scalar slot-only U-order/elimination heap keys are verified equivalent but
+  timing-inconclusive; do not extend that screen. Numeric-LU step queues were
+  tested separately and rejected. Prioritize a whole remaining numeric/control
+  pass over further small heap or constructor buffer variants.
   Inspect the allocating callee: an observed ancestor return address can skip it.
   Profiling-build shares do not bound accepted release cost.
 - **Barrier** (`chol.rs`, `barrier.rs`, `sgemm32.rs`) and **PDHG** (`pdhg.rs`): profile after the simplex

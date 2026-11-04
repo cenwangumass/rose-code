@@ -446,6 +446,27 @@ useful-counter gate: no controlled timing/full gates follow, and all accepted
 artifacts are restored. Code size/stack reduction alone does not establish a gain.
 Evidence: `target/perf-nucleus-outline/`.
 
+## Immutable-slot heap-key compaction
+
+U-order and row-elimination borrow the factor immutably. Slots and positions
+are inverse permutations, so slot priority alone preserves the original tuple
+priority, including identical duplicate entries. A complete two-site prototype
+halves heap entry size and decodes each popped position through at[slot]. Frozen
+original bodies check both consumers over random slot permutations, sparse/dense
+inputs, duplicate initial entries and f64/F80 results/order/WORK. Reconstruction
+matches source except key representation/decode; matching-PGO tests and fast
+parity pass. Bounded complete results agree.
+
+PEROLD instructions fall 0.249%, cycles rise 0.077%. The first predeclared screen
+(seed7001, 32AB/32AA) gives median -0.124%, interval [-0.414%, +0.164%], AA
+[-0.457%, +0.243%], sign p0.189. It is inconclusive; no confirmation, extension
+or full gates follow. All accepted artifacts are restored. Equivalence is
+verified, profitability is not. This differs from the earlier numeric-LU pending
+step bitset trial. Frame-pointer annotation locates about 0.39/0.37% Rose self
+samples in tuple max/min heap pops and 4.8% of update-local self samples in
+inlined heap pushes; these are profiling-build locations, not release cost bounds.
+Evidence: `target/perf-slot-heaps/`, `target/perf-heap-audit/`.
+
 ## Remaining proof obligations
 
 Before a factor ownership prototype, separate column-copy and immutable-factor
