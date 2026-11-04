@@ -723,6 +723,32 @@ cost, not allocator ancestry or proof that a scatter rewrite pays off. Existing
 rank-row storage/active-row/rank-order failures still apply. Exact commands,
 results/hash/build/count/audit and annotations: `target/perf-primal-refresh/`.
 
+## Ordinary ranked-row packed traversal
+
+Current native primal annotation motivates a separate kernel experiment from
+previous compact-row storage, active-row filtering and rank-order reuse trials.
+Fixed-pair consecutive coverage is86/209 on ADLITTLE,379/770 on BORE3D,177/2122
+on DEGEN2 and1539/2647 on PILOT4. This is static matrix coverage, not dynamic
+ranked-query coverage or a runtime bound. Finite immutable rows with at least8
+entries and two-thirds consecutive pairs admit SSE2, with nonfinite vi fallback.
+Finite coefficients/vi cannot produce a multiplication NaN, preserving existing
+addition payloads; each independent lane retains its exact per-output order.
+
+The complete original product is independently frozen. Captured AFIRO rho,
+random/extreme/duplicate/rank-tie inputs, existing nonfinite payloads and all16
+MXCSR rounding/flush combinations agree bit for bit. Both matching fixed39 PGO
+variants pass fast940 and complete bounded small/PILOT4 result/exit pairs.
+Dynamic per-pair selection and checked two-element slices raise PILOT4
+instructions0.944%, cycles0.495%. Flat ordered run plans validate destination
+slices once per run; their independent partition test includes duplicate and
+unsorted gaps. Instructions still rise0.814%, cycles1.396%. The native code
+contains packed multiply/add in both, but no exclusive cost attribution is
+claimed. No official timing or full candidate gates; seeds25217/25289 unused.
+Accepted source/CLI/metadata/profile restored, formatting and full987 pass.
+The tested traversals have no qualified solver benefit. Sources, proofs,
+structure counts, builds/tests, complete pairs/counters and assembly:
+`target/perf-rank-pairs/`, planned variant `v2/`.
+
 ## Remaining proof obligations
 
 Before a factor ownership prototype, separate column-copy and immutable-factor

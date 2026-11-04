@@ -211,11 +211,14 @@ measured.
   writes removes lookup/locking and lowers instructions/cycles; its controlled
   target screen remains inconclusive. Do not extend or repeat that screen.
   Current accepted ordinary-primal PILOT4 self attribution puts solve_primal,
-  BTRAN, FTRAN and primal row updates first. Audit the annotated ranked-row
-  multiply/add scatter before another implementation: preserve exact per-output
-  term order, duplicate/rank-tie semantics and all WORK. Separate an independent-
-  destination kernel change from the rejected compact-row, active-row and
-  rank-order variants; use cached annotations and small models first.
+  BTRAN, FTRAN and primal row updates first. Dynamic consecutive-pair SSE2 and
+  planned consecutive-run SIMD products preserve the original per-output terms
+  but both lose at counters. Do not extend them into timing screens. Before
+  another ordinary-product cache, measure full ordered input and row-order
+  working sets per immutable model owner, spanning all calls in a bounded solve.
+  Preserve full value bits and canonical (rank,row) order, including ties and
+  duplicates; exclude unrelated test-only oracle arithmetic. Use existing dump
+  inputs and a test-only observer before selecting bounds or writing a cache.
   Look for a faster exact implementation of the same rounding (the F80 tests and `../reverse-engineer/evidence/f80-subnormal-reference.json`
   define it), and for F80 work that runs where its results are not used.
 - **Dump overhead with no dump selected**: about 70 `dump::on("kind")` sites in `dual.rs` and
