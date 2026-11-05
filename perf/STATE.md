@@ -4,37 +4,45 @@ Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (histo
 
 ## Numbers on AMD EPYC 9V74
 
-The compact primal solver retains each ordered basis and its unscaled factor charges. When it revisits that basis, it restores the main numerical factor into its owned buffers and reuses a compatible auxiliary factor after clearing its eta updates. Each installation applies its current work scale in the original order.
+The barrier solver still computes every rounded extended product, error and sum of its original Kahan recurrence. For same-sign operands at the same exponent, it can carry their exact signed significand difference directly into the following compensation subtraction, normalizing or falling back at the original precision boundaries. Exceptional operands retain the original operations. The two binary64 conversions and final homogeneous expression stay in their original order.
 
-The full primal_5959.dual-r sweep took 0.257346 → 0.162680 seconds versus the preceding commit `c337c24d` (-36.8%). The prespecified randomized timing comparisons measured -12.36% and -11.26%. Frozen parity passed 987/987, 275 runnable release tests passed, and all full-length mode-switch WORK records matched. Full outputs and exit codes agreed on every benchmark. 2 reversed-role controls covered flagged regressions; none established a slowdown.
+The full 80bau3b.barrier-r sweep took 0.266418 → 0.241987 seconds versus the preceding commit `db13d89c` (-9.2%). The prespecified randomized timing comparisons measured -5.13% and -5.62%. Frozen parity passed 987/987, 277 runnable release tests passed, and all full-length mode-switch WORK records matched. Full outputs and exit codes agreed on every benchmark. 5 reversed-role controls covered flagged regressions; none established a slowdown.
 
 The table gives same-CPU medians after one warm-up and three fresh-process timed solves for each of the four executables, with rotating order. All rose binaries use genuine TCMalloc. The patched Gurobi library hash is `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. Current rose wins **2/23**.
 
 | Run | Gurobi (s) | Uploaded rose (s) | Preceding rose (s) | Current rose (s) | Current / Gurobi |
 |---|---:|---:|---:|---:|---:|
-| degen2.primal-c | 0.017879 | 0.049075 | 0.049343 | 0.046647 | 2.61 |
-| degen2.dual-r | 0.012430 | 0.036912 | 0.034710 | 0.028433 | 2.29 |
-| degen3.primal-c | 0.228659 | 0.692536 | 0.642531 | 0.707483 | 3.09 |
-| degen3.primal-r | 0.259474 | 0.880842 | 0.778252 | 0.694707 | 2.68 |
-| perold.primal-c | 0.239362 | 0.700087 | 0.674638 | 0.650383 | 2.72 |
-| pilot4.primal-r | 0.023448 | 0.050328 | 0.064975 | 0.067283 | 2.87 |
-| 80bau3b.primal-c | 0.167784 | 0.771424 | 0.511797 | 0.600763 | 3.58 |
-| primal_5959.primal-r | 0.074380 | 0.165726 | 0.171539 | 0.130770 | 1.76 |
-| degen3.dual-c | 0.104088 | 0.300749 | 0.329136 | 0.355010 | 3.41 |
-| degen3.dual-r | 0.099596 | 0.374659 | 0.366604 | 0.349716 | 3.51 |
-| perold.dual-r | 0.054843 | 0.175048 | 0.169209 | 0.182202 | 3.32 |
-| 80bau3b.dual-r | 0.113836 | 0.451990 | 0.380631 | 0.372560 | 3.27 |
-| greenbea.dual-c | 0.278972 | 1.005004 | 0.919202 | 0.951970 | 3.41 |
-| greenbea.dual-r | 0.227262 | 0.958887 | 0.958399 | 0.895376 | 3.94 |
-| mode_switch.dual-r | 0.152760 | 2.003254 | 0.905081 | 0.938266 | 6.14 |
-| primal_5959.dual-r | 0.089676 | 0.204015 | 0.257346 | 0.162680 | 1.81 |
-| quad_2717.dual-r | 0.113003 | 0.234786 | 0.208651 | 0.213554 | 1.89 |
-| fx_quad_obj_5371.dual-r | 0.046947 | 0.081334 | 0.100972 | 0.090821 | 1.93 |
-| degen3.barrier-r | 0.120266 | 0.258886 | 0.250381 | 0.226423 | 1.88 |
-| 80bau3b.barrier-r | 0.120795 | 0.284524 | 0.315571 | 0.273277 | 2.26 |
-| greenbea.barrier-r | 0.559584 | 1.137248 | 1.151523 | 1.051009 | 1.88 |
-| 80bau3b.pdhg | 3.342804 | 5.536849 | 2.407004 | 2.345527 | 0.70 |
-| greenbea.pdhg | 1.511083 | 2.212916 | 1.393775 | 1.506280 | 1.00 |
+| degen2.primal-c | 0.018531 | 0.037571 | 0.037755 | 0.037604 | 2.03 |
+| degen2.dual-r | 0.013622 | 0.036944 | 0.037046 | 0.033003 | 2.42 |
+| degen3.primal-c | 0.244798 | 0.702798 | 0.593671 | 0.640677 | 2.62 |
+| degen3.primal-r | 0.274561 | 0.677915 | 0.736279 | 0.683684 | 2.49 |
+| perold.primal-c | 0.226954 | 0.622533 | 0.651310 | 0.581851 | 2.56 |
+| pilot4.primal-r | 0.019253 | 0.067686 | 0.064811 | 0.065330 | 3.39 |
+| 80bau3b.primal-c | 0.136931 | 0.755726 | 0.567466 | 0.647178 | 4.73 |
+| primal_5959.primal-r | 0.053699 | 0.123080 | 0.125156 | 0.109780 | 2.04 |
+| degen3.dual-c | 0.102262 | 0.329623 | 0.272829 | 0.323164 | 3.16 |
+| degen3.dual-r | 0.111087 | 0.308351 | 0.313642 | 0.337154 | 3.04 |
+| perold.dual-r | 0.057400 | 0.163157 | 0.165391 | 0.157468 | 2.74 |
+| 80bau3b.dual-r | 0.102107 | 0.396287 | 0.389607 | 0.363160 | 3.56 |
+| greenbea.dual-c | 0.275224 | 0.914003 | 0.918559 | 0.785845 | 2.86 |
+| greenbea.dual-r | 0.241648 | 0.896536 | 0.836371 | 0.930685 | 3.85 |
+| mode_switch.dual-r | 0.152570 | 2.081924 | 0.822840 | 1.004669 | 6.58 |
+| primal_5959.dual-r | 0.122089 | 0.249087 | 0.220361 | 0.181008 | 1.48 |
+| quad_2717.dual-r | 0.113687 | 0.249701 | 0.250070 | 0.244770 | 2.15 |
+| fx_quad_obj_5371.dual-r | 0.044811 | 0.094125 | 0.086249 | 0.091696 | 2.05 |
+| degen3.barrier-r | 0.133721 | 0.253107 | 0.246466 | 0.230187 | 1.72 |
+| 80bau3b.barrier-r | 0.134620 | 0.309550 | 0.266418 | 0.241987 | 1.80 |
+| greenbea.barrier-r | 0.577582 | 0.972047 | 0.921438 | 1.008503 | 1.75 |
+| 80bau3b.pdhg | 2.653025 | 4.785183 | 2.049188 | 2.265362 | 0.85 |
+| greenbea.pdhg | 1.038612 | 1.912318 | 0.951289 | 0.842800 | 0.81 |
+
+### Preceding release db13d89c
+
+The compact primal solver retains each ordered basis and its unscaled factor charges. When it revisits that basis, it restores the main numerical factor into its owned buffers and reuses a compatible auxiliary factor after clearing its eta updates. Each installation applies its current work scale in the original order.
+
+The full primal_5959.dual-r sweep took 0.257346 → 0.162680 seconds versus the preceding commit `c337c24d` (-36.8%). The prespecified randomized timing comparisons measured -12.36% and -11.26%. Frozen parity passed 987/987, 275 runnable release tests passed, and all full-length mode-switch WORK records matched. Full outputs and exit codes agreed on every benchmark. 2 reversed-role controls covered flagged regressions; none established a slowdown.
+
+The table gives same-CPU medians after one warm-up and three fresh-process timed solves for each of the four executables, with rotating order. All rose binaries use genuine TCMalloc. The patched Gurobi library hash is `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. Current rose wins **2/23**.
 
 ### Preceding release c337c24d
 
@@ -44,9 +52,15 @@ The full greenbea.pdhg sweep took 1.975066 → 1.384803 seconds versus the prece
 
 The table gives same-CPU medians after one warm-up and three fresh-process timed solves for each of the four executables, with rotating order. All rose binaries use genuine TCMalloc. The patched Gurobi library hash is `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. Current rose wins **3/23**.
 
-### Randomized comparisons with patched Gurobi
+### Independent barrier comparisons
 
-The compact LU executable ran 48 mixed rose/Gurobi pairs and 48 Gurobi/Gurobi controls per PDHG row on CPU5. Each sample used a fresh process, the original benchmark settings and each solver’s own timer. Every rose output and exit matched the original rose. Every Gurobi result matched the original patched reference. The evidence contains the 388 raw outputs, run orders and numerical audits.
+On CPU4 one warm-up and three complete independent solves per role measured 0.242183 seconds for the current 36-step 80BAU3B barrier solver, 0.273153 seconds for its direct parent, and 0.117189 seconds for the patched reference. The original 38, 105 and 16 barrier records and the numerical outputs on 80BAU3B, GREENBEA and DEGEN3 all matched. The parent and candidate also matched on 185,880 public result bits and floating-point environment records, including exceptional operands, with identical unmasked traps.
+
+The original CPU2 four-way sweep put GREENBEA barrier 9.45% above its parent. A separate 96-pair reversed-role trial on the complete 103-step solve put the parent at +1.10% against the new solver, 95% interval [-1.45%, +3.30%]. Its identical-binary control sign p was 1.0000. The comparison did not establish a regression.
+
+### Direct PDHG measurements on the preceding db13d89c solver
+
+The preceding compact LU executable ran 48 mixed rose/Gurobi pairs and 48 Gurobi/Gurobi controls per PDHG row on CPU5. Each sample used a fresh process, the original benchmark settings and each solver’s own timer. Every rose output and exit matched the original rose. Every Gurobi result matched the original patched reference. The evidence contains the 388 raw outputs, run orders and numerical audits.
 
 | Run | Iterations | Rose vs Gurobi, paired median | 95% interval | Rose faster | Identical-Gurobi interval | Prespecified criteria |
 |---|---:|---:|---:|---:|---:|---|
@@ -907,7 +921,11 @@ projected effects, component source/binary/timings, dependency audit and restora
 
 The compact LU change was measured incrementally on the c337c24d source. The four complete compact WORK streams contained 1,377,120 records and matched the uploaded solver byte for byte. Each restored auxiliary LU discards its preceding eta updates. A parked factor is eligible only for the same solver-owned ordered basis and compatible floating-point controls and sticky flags. The previous standalone installer and auxiliary lookup each missed a timing criterion.
 
-Separate work covers operation-preserving barrier Kahan feedback, width-one and width-two Cholesky fronts, and current paired profiles of ordinary simplex. The interval-only barrier shortcut remains outside the operation-order rule. The width-one and width-two Cholesky branch measured −3.43% and −3.58% on its original parent and passed all 273 release tests. It needs an independent incremental comparison against this release.
+The main compact factor revisits numerical trajectories across separate installations of the same exact cached basis. An earlier audit distinguished every update with a new monotonic version and saw only two nonfresh FTRAN hits. The current diagnostic gives identical operation prefixes the same identity across reinstalls, then checks returned indices and numerical bits and observed state exactly. Each compact basis had one observed continuation at every prefix. The largest sequences over four original full benchmarks contained 17, 22, 22 and 34 operations. On quad_2717.dual-r the main factor had 45,153 repeated BTRANs after updates. A bounded solver-owned prototype is testing whole numerical-state reuse with exact input, floating-environment and lifetime checks.
+
+Standalone compact replay ELF 73717e9e passed frozen parity, 259,079 instrumented hits, 2,269 complete state recomputations, 1,319,417 replay-active WORK records and all 1,377,120 diagnostic WORK records. Two exact full quad_2717.dual-r 192-pair studies against db13d89c both measured −32.56% with 191/192 paired wins. The 32-pair secondaries measured −33.79% on fx_quad_obj_5371.dual-r and −28.54% on primal_5959.dual-r. The full four-way CPU2 sweep still shows 2 of 23 medians below patched Gurobi. On quad_2717.dual-r the candidate took 0.138553 s versus 0.113801 s for Gurobi on CPU2 and 0.121092 s versus 0.085410 s on CPU0. A separate build of the replay changes on the ordered-feedback barrier source has passed 987/987 and its active and diagnostic WORK comparisons. Its incremental timing is tied to the accepted barrier source.
+
+The current barrier implementation executes all five rounded extended Kahan intermediates in the original order. On the older c337c24d numerical parent its full 80BAU3B trials measured −6.59% and −5.17%, but the second identical-binary control was biased. Those measurements are independent of the qualified db13d89c comparison in the current release. The width-one and width-two Cholesky research has two earlier favorable comparisons and a held NaN oracle as documented under the structural trials. Other work is focused on bounded recurrent compact factor states and on the large verified no-fill prefix of ordinary primal refactorization.
 
 On GREENBEA PDHG the CPU2 survey measured an 8.07% increase versus the preceding rose. An additional 48-pair role-reversed CPU2 check put the preceding solver at -0.97% relative to this build, 95% interval [-4.67%, +3.65%]. This control found no qualifying regression. The direct patched-Gurobi comparison for this row is reported separately in the table above.
 

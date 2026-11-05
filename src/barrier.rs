@@ -797,10 +797,20 @@ fn ldexp(v: f64, e: i32) -> f64 {
     v * crate::real::pow2(h) * crate::real::pow2(e - h)
 }
 
+#[path = "barrier/extended.rs"]
+mod extended;
+
 /// `0x35adf0`: Kahan summation in extended precision of the extended products `a_i b_i`:
 /// `t = a b; y = t - c; s' = s + y; c = (s' - s) - y` with every operation rounded to 64 bits (C).
 fn kahan_dot(a: &[f64], b: &[f64]) -> Ext {
-    let (mut s, mut c) = (Ext::ZERO, Ext::ZERO);
+    if extended::default_environment() && b.len() >= a.len() {
+        extended::stream(a, b)
+    } else {
+        software_kahan_tail(a, b, Ext::ZERO, Ext::ZERO)
+    }
+}
+
+fn software_kahan_tail(a: &[f64], b: &[f64], mut s: Ext, mut c: Ext) -> Ext {
     for i in 0..a.len() {
         let t = Ext::mul_f64(a[i], b[i]);
         let y = t.sub(c);
