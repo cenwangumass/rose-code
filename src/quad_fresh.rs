@@ -272,7 +272,7 @@ pub(super) mod audit {
             return None;
         };
         Some(DualBefore {
-            factor: quad_main::QuadMain::Direct((**b).clone()),
+            factor: quad_main::QuadMain::Direct(Box::new((**b).clone())),
             w: s.work.w,
             y: s.y_ref.clone(),
             yq: s.y_q.clone(),

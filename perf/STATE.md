@@ -4,37 +4,71 @@ Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (histo
 
 ## Numbers on AMD EPYC 9V74
 
-The compact controller can reuse the original general cost-change BTRAN when its ordered inputs, pricing state, rank owner and factor cursor agree. It advances to the exact original successor, applies the original partial writes and issues the same chronological WORK calls.
+A recurring compact primal basis now restores its accepted variable order into the live buffer and installs its two factor handles directly. Fresh, singular and diagnostic factorizations retain the original work and pivot rules.
 
-The full quad_2717.dual-r sweep took 0.167139 → 0.164750 seconds versus the preceding commit `2d278c18` (-1.4%). The prespecified randomized timing comparisons measured -13.60% and -10.87%. Frozen parity passed 987/987, 283 runnable release tests passed, and all full-length mode-switch WORK records matched. Full outputs and exit codes agreed on every benchmark. 8 reversed-role controls covered flagged regressions; none established a slowdown.
+The full primal_5959.primal-r sweep took 0.094669 → 0.078778 seconds versus the preceding commit `e4df849b` (-16.8%). The prespecified randomized timing comparisons measured -11.52% and -10.51%. Frozen parity passed 987/987, 283 runnable release tests passed, and all full-length mode-switch WORK records matched. Full outputs and exit codes agreed on every benchmark. 4 reversed-role controls covered flagged regressions; none established a slowdown.
 
 The table gives same-CPU medians after one warm-up and three fresh-process timed solves for each of the four executables, with rotating order. All rose binaries use genuine TCMalloc. The patched Gurobi library hash is `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. Current rose wins **5/23**.
 
 | Run | Gurobi (s) | Uploaded rose (s) | Preceding rose (s) | Current rose (s) | Current / Gurobi |
 |---|---:|---:|---:|---:|---:|
-| degen2.primal-c | 0.071522 | 0.109099 | 0.067160 | 0.069032 | 0.97 |
-| degen2.dual-r | 0.040396 | 0.150221 | 0.076322 | 0.125655 | 3.11 |
-| degen3.primal-c | 0.343843 | 1.187429 | 2.072352 | 1.033640 | 3.01 |
-| degen3.primal-r | 0.439506 | 1.459666 | 1.600743 | 1.176389 | 2.68 |
-| perold.primal-c | 0.351352 | 1.170022 | 1.361991 | 1.159881 | 3.30 |
-| pilot4.primal-r | 0.056236 | 0.206320 | 0.200589 | 0.194573 | 3.46 |
-| 80bau3b.primal-c | 0.441320 | 1.539619 | 1.051896 | 1.306899 | 2.96 |
-| primal_5959.primal-r | 0.095990 | 0.219655 | 0.098309 | 0.109005 | 1.14 |
-| degen3.dual-c | 0.198593 | 0.794805 | 0.651236 | 1.007446 | 5.07 |
-| degen3.dual-r | 0.157990 | 0.590194 | 0.618045 | 0.617355 | 3.91 |
-| perold.dual-r | 0.076615 | 0.246543 | 0.280309 | 0.311844 | 4.07 |
-| 80bau3b.dual-r | 0.316452 | 0.858438 | 0.952376 | 0.550886 | 1.74 |
-| greenbea.dual-c | 0.480286 | 1.557556 | 2.736278 | 1.468517 | 3.06 |
-| greenbea.dual-r | 0.362096 | 1.418038 | 2.255328 | 1.482414 | 4.09 |
-| mode_switch.dual-r | 0.256875 | 3.073155 | 1.311072 | 1.904818 | 7.42 |
-| primal_5959.dual-r | 0.117998 | 0.294636 | 0.126200 | 0.106172 | 0.90 |
-| quad_2717.dual-r | 0.144086 | 0.386317 | 0.167139 | 0.164750 | 1.14 |
-| fx_quad_obj_5371.dual-r | 0.049269 | 0.147071 | 0.047247 | 0.048546 | 0.99 |
-| degen3.barrier-r | 0.210614 | 0.352055 | 0.342108 | 0.377035 | 1.79 |
-| 80bau3b.barrier-r | 0.251893 | 0.625857 | 0.406878 | 0.473795 | 1.88 |
-| greenbea.barrier-r | 0.784694 | 1.696247 | 1.583949 | 1.220010 | 1.55 |
-| 80bau3b.pdhg | 3.719483 | 6.701907 | 2.993275 | 2.941794 | 0.79 |
-| greenbea.pdhg | 1.681354 | 3.123729 | 1.757371 | 1.434643 | 0.85 |
+| degen2.primal-c | 0.019700 | 0.070753 | 0.051559 | 0.086430 | 4.39 |
+| degen2.dual-r | 0.018759 | 0.055531 | 0.043750 | 0.061261 | 3.27 |
+| degen3.primal-c | 0.285311 | 0.863128 | 0.810041 | 0.782957 | 2.74 |
+| degen3.primal-r | 0.324561 | 0.911660 | 1.049446 | 0.787360 | 2.43 |
+| perold.primal-c | 0.271103 | 0.759709 | 1.040564 | 0.823650 | 3.04 |
+| pilot4.primal-r | 0.042927 | 0.087877 | 0.094110 | 0.093569 | 2.18 |
+| 80bau3b.primal-c | 0.175074 | 0.989292 | 0.795513 | 0.806673 | 4.61 |
+| primal_5959.primal-r | 0.090778 | 0.207468 | 0.094669 | 0.078778 | 0.87 |
+| degen3.dual-c | 0.146547 | 0.433089 | 0.374213 | 0.381341 | 2.60 |
+| degen3.dual-r | 0.137805 | 0.445857 | 0.433228 | 0.487388 | 3.54 |
+| perold.dual-r | 0.067197 | 0.211987 | 0.265044 | 0.225320 | 3.35 |
+| 80bau3b.dual-r | 0.127239 | 0.603060 | 0.557311 | 0.475941 | 3.74 |
+| greenbea.dual-c | 0.354868 | 1.187191 | 1.196558 | 1.176313 | 3.31 |
+| greenbea.dual-r | 0.311835 | 1.201368 | 1.261721 | 1.301069 | 4.17 |
+| mode_switch.dual-r | 0.237340 | 2.336878 | 1.144451 | 1.191617 | 5.02 |
+| primal_5959.dual-r | 0.129710 | 0.269287 | 0.117423 | 0.096123 | 0.74 |
+| quad_2717.dual-r | 0.116162 | 0.331867 | 0.124672 | 0.123069 | 1.06 |
+| fx_quad_obj_5371.dual-r | 0.045304 | 0.110665 | 0.041111 | 0.040029 | 0.88 |
+| degen3.barrier-r | 0.135277 | 0.276130 | 0.284263 | 0.297667 | 2.20 |
+| 80bau3b.barrier-r | 0.168752 | 0.361854 | 0.320291 | 0.363318 | 2.15 |
+| greenbea.barrier-r | 0.699639 | 1.461157 | 1.342396 | 1.373002 | 1.96 |
+| 80bau3b.pdhg | 3.719941 | 6.932070 | 3.035841 | 2.795014 | 0.75 |
+| greenbea.pdhg | 1.524285 | 2.748687 | 1.449413 | 1.465858 | 0.96 |
+
+### Compact primal basis installation
+
+A complete immutable installation retains the variable indices in the accepted pivot order. A recurring basis copies that order into its existing storage. A fresh installation moves the order into place. Direct mutable factors live behind owned pointers, so passing a shared installation between the builder and solver transfers a small handle. All pivot choices, factor lifetimes, cache matches and eviction rules are unchanged. The standalone CLI reads its constant factor diagnostics inside the solve timer. Library callers retain live environment checks.
+
+The two disjoint installation routines saved a median 8.91% of the full parent primal_5959.primal-r solver time across eight paired instrumented runs. That figure includes routine entry and return, handling cache misses and reinstalling the factor. All four original compact solves and 2,696,537 chronological WORK records agreed across the two modes. An independent check changed diagnostic settings within an actual library solve and compared factor counts and diagnostic streams.
+
+The full ordinary primal cases added 457,580 matching WORK records on 6 rows.
+
+The first whole-solve comparison measured -11.52% with interval [-12.99%, -10.85%]. Rose won 60/64 pairs. The confirm whole-solve comparison measured -10.51% with interval [-11.65%, -9.57%]. Rose won 107/128 pairs. 
+
+Fresh CPU6 comparisons against the supplied patched Gurobi used 48 mixed and 48 identical-Gurobi pairs per row.
+
+| Row | Rose vs Gurobi | 95% interval | Faster pairs | Paired test |
+|---|---:|---:|---:|---|
+| primal_5959.dual-r | -6.65% | [-12.62%, +0.60%] | 31/48 | Inconclusive |
+| fx_quad_obj_5371.dual-r | -16.11% | [-18.39%, -6.79%] | 38/48 | Passed |
+| quad_2717.dual-r | -7.29% | [-11.09%, -1.44%] | 33/48 | Inconclusive |
+| primal_5959.primal-r | -6.76% | [-10.53%, -0.46%] | 32/48 | Inconclusive |
+
+An independent CPU3 comparison of the same executable used 48 mixed and 48 identical-Gurobi pairs on each original PDHG solve.
+
+- greenbea.pdhg measured -6.25%, interval [-8.81%, -1.79%], 37/48 faster pairs. Inconclusive.
+- 80bau3b.pdhg measured -19.30%, interval [-22.23%, -17.23%], 48/48 faster pairs. Passed.
+
+Rose won 14/69 individual timed comparisons against Gurobi in the 23-row sweep.
+
+### Preceding release e4df849b
+
+The compact controller can reuse the original general cost-change BTRAN when its ordered inputs, pricing state, rank owner and factor cursor agree. It advances to the exact original successor, applies the original partial writes and issues the same chronological WORK calls.
+
+The full quad_2717.dual-r sweep took 0.167139 → 0.164750 seconds versus the preceding commit `2d278c18` (-1.4%). The prespecified randomized timing comparisons measured -13.60% and -10.87%. Frozen parity passed 987/987, 283 runnable release tests passed, and all full-length mode-switch WORK records matched. Full outputs and exit codes agreed on every benchmark. 8 reversed-role controls covered flagged regressions; none established a slowdown.
+
+The table gives same-CPU medians after one warm-up and three fresh-process timed solves for each of the four executables, with rotating order. All rose binaries use genuine TCMalloc. The patched Gurobi library hash is `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. Current rose wins **5/23**.
 
 ### Phase-one compact cost updates
 
@@ -56,6 +90,8 @@ A separate CPU2 comparison used 48 mixed and 48 identical-Gurobi pairs on each c
 A separate CPU8 follow-up checked every additional ordinary or barrier row that had beaten Gurobi in the sweep.
 
 - degen2.primal-c measured +130.40% against patched Gurobi, with 95% interval [+121.44%, +144.98%] and 0/48 pairs faster. The prespecified test did not pass.
+
+An independent CPU6 direct check of this committed solver used 48 mixed and 48 identical-Gurobi pairs per PDHG row. On 80bau3b.pdhg Rose was 19.00% faster, interval [-21.63%, -17.01%], and won 46/48 pairs. On greenbea.pdhg it was 6.31% faster, interval [-8.83%, +1.30%], and won 29/48. Only 80BAU3B passed the prespecified direct comparison. All 388 complete original outputs and exit statuses were reverified. Evidence in next/committed-pdhg-reference.
 
 ### Preceding release 2d278c18
 
@@ -1052,9 +1088,7 @@ projected effects, component source/binary/timings, dependency audit and restora
 
 ## In progress
 
-Further work measures reuse of complete compact pivot directions, the remaining numerical reconstruction costs and a general sparse-matrix program for ordinary PDHG iterations. All timing comparisons use the original stopping conditions.
-
-The current comparison above uses the original arguments for every benchmark. The remaining compact primal costs under investigation include reconstructing fresh primal and dual quantities, and computing native extended reduced costs for a recurring dual vector and active basis mask. Current solve-only profiles and independent whole-input measurements identify these costs after recurrent FTRAN, BTRAN and factor update work has been removed.
+Connected ordinary dual pricing and ordinary primal step computation remain under investigation. Current paired profiles on the controlled GREENBEA dual run attribute 282 of 2,278 Rose CPU samples to pivot-row production. The previous disconnected mode-switch pivot representation and generated PDHG range-certificate trials are documented under structural trials.
 
 ## Extended BTRAN feasibility
 
@@ -1364,6 +1398,38 @@ The remaining candidates below derive from the Ryzen measurements and their hist
 ## Tried, no gain
 
 ### EPYC structural trials
+
+- On full DEGEN3 primal-r the entering FTRAN took 21.76% of solve time across 5,232 calls. Although 2,988 raw right-hand sides repeated, only one had a previously seen identical ordered output. PEROLD primal-c had nine such recurrences in 3,490 calls, with an optimistic 0.00953% whole-solve reuse bound. For DEGEN3 pricing0 the entire method took 12.50%, including its 5.55% numerical BTRAN. None of 3,694 pricing BTRANs repeated even an unordered input support within its live factor version. Evidence in next/primal-full-scope.
+
+- Across 4,500 physical component installations on mode-switch, the main and auxiliary factors never shared an entire local pivot order. Their common prefixes covered 59/145,484 auxiliary products. Three disjoint local Markowitz, fresh-U and auxiliary-column loops accounted for 174/1,637 full-solve samples, or 10.63%. Reaching a net 10% improvement from those three loops would require removing about 94% of their combined cost before paying for validation and materializing the ordered outputs. Evidence in next/mode-local-elimination.
+
+- On three complete connected dual models the original U scatter and transpose solve loops occupied 7.38% on GREENBEA, 9.26% on DEGEN3 and 9.96% on PEROLD. Grouping four nearby mutable U slots retained the products and their order. On DEGEN3 it could merge 544,473 destination updates but would have to maintain panels containing 2,548,460 affected coefficient entries over the complete pivot sequence. No production panel was admitted. Evidence in next/connected-u-panels.
+
+- A barrier triangular-solve plan stored four independent rectangle rows coefficient-major and updated the diagonal block in place. The original forward and backward Rust kernels agreed bit for bit on four captured numerical factors per model and 16 generated RHS vectors per factor. Excluding setup, complete triangular time on GREENBEA was 23.29% lower in seven paired batches; 80BAU3B measured 24.88% lower. The GREENBEA threshold was 40% before packet construction. The probe stopped there. These are kernel replay measurements. Evidence in next/barrier-triangular-program.
+
+
+- A transposed matrix program evaluated independent connected ordinary dual pivot-row outputs together while preserving row arithmetic and updating nonbasic membership. It passed 987/987, 448 independent FP-control cases, 5,919,040 original row-output comparisons and 508,011 original WORK records. Seven paired GREENBEA dual-controlled runs measured at most 0.715% of the full solve saved by the native interval (four pairs favorable). The predeclared 5% minimum and five-pair requirement failed. Evidence in next/connected-pivot-program.
+
+- A right-looking barrier factor delivered each completed front directly to its consumers in the original child order. Every packed numerical factor, pivot, reciprocal, parity offset and minimum ratio matched across 104 GREENBEA, 15 DEGEN3 and 37 80BAU3B factor installations. On all 103 natural GREENBEA steps the median CPU saving was 5.32%, eight of nine faster, below its prespecified 10% cutoff. The diagnostic stopped before production qualification. Evidence in next/barrier-newton-graph.
+
+
+- A component-coordinate ordinary dual pivot prototype reduced full mode-switch requested zero/copy/fill ranges from 7,799,440,529 to 191,905,238 bytes (97.54%) at the actual pivot entry. Both f64/F80 crossed-handoff marker and frozen-factor/spill oracles agreed. All 11,393 pivot payloads, 202,772 chronological WORK records and frozen full 987 matched. The 12-pair full CPU pilot measured −12.18% with both orders favorable, but 8/12 improved against the prespecified 9 required. No formal comparison, confirmation or landing. The independent prescribed reference panel measured parent 0.901255, candidate 0.748702, and genuine patched Gurobi 0.138421 seconds (one warm-up and three measured solves per role). Every result and exit matched its original for both solvers. Complete observations and hashes are in mode_switch.dual-r/report.json. Evidence in next/ordinary-pivot-view.
+
+- The solve-owned range certificate for generated ordinary PDHG kernels replaced the prior per-step full-coordinate scan. It passed 987/987, 480 exceptional-state comparisons and 3,960 consecutive expiry/restart tests. On full GREENBEA the first prespecified screen gained 11.27% (56/64 faster). Confirmation gained 6.72% (48/64), interval [-12.15%, -4.57%] against the original parent, missing both the required 10% and noise separation. All 516 full outputs/exits agreed. The independent 23-row engineering sweep measured 80BAU3B PDHG 15.6% slower than its parent, although it beat the patched reference in all three rounds there. The trial stopped after this confirmation. Evidence in next/pdhg-envelope-final.
+
+
+On the corrected f2e71888 ELF, 42 native scoped full solves and 14 source-observed full solves all matched their original endpoints/exits. All 68 auxiliary numeric reads were fresh: 54 actual stall-objective FTRANs and 14 final BTRAN vectors demonstrably overwritten by active mirror results. Across all 14 ordinary rows, even granting all dense/raw updates, complete eta retirement and all auxiliary triangular solves for free accounted for only 0.19–1.12% of the whole solve. The separately observed 572 constructors still make their immediate singular decisions. A new signed-incidence full-basis certificate had only 2/572 complete bases even eligible for its liberal column-support pretest, together 0.014% of the one affected full row. No separate solver patch.
+
+The existing whole-factor-generation arena covered every small allocation in all 15 complete mode-switch refactors and measured 5.61% faster solver time, 4.89% faster child CPU, versus its required 8%; connected PEROLD measured 11.38% slower. A fresh 40-solve lifetime clock panel on f2e71888 bracketed all residual larger-than-256-byte TCMalloc requests, their later reallocation/copy and freeing, with all endpoints matching and zero outstanding allocations. Their entire measured underlying cost was 1.24% of mode-switch, 2.15% of PEROLD, 1.03% of GREENBEA and 0.80% of 80BAU3B. All-family Rust-side native drop-glue was independently 0.73% of mode-switch. Even treating both extra costs as entirely removable gives an indicative 7.58% mode-switch projection before any new backing, clearing, copying or ownership overhead. No new arena experiment.
+
+The complete dual-rebuild owner was stopped on the corrected 7dba613b release. On full 5959 dual, 7,742 fresh and 15,474 nonfresh keys repeated exactly. The proof validates the immediately preceding BTRAN and actual resident reduced-cost owner, restores all d and only the written df, executes the native last column on updated factors, and retains the live phase, tolerance/counter and WORK decisions. The new fixed39 TCMalloc executable 5d61e75f passed 987/987, both four-row WORK modes (1,319,417 replay-active plus 1,377,120 dump events) and eleven alternate FP settings. The prespecified seven full paired native-scope comparisons counted 23,391 BTRANs and 23,385 post-recomputes per solver per run. Post-recompute medians were 9.435 ms before and 3.780 ms after; BTRAN medians were 5.451 ms before and 5.604 ms after. Median paired aggregate scope savings divided by the full parent solve were **4.75035%**, below the frozen **5.00%** threshold. The individual pair estimates ranged from −12.91% to +10.06%. Only this mechanism comparison ran. The branch did not advance to formal timing or landing.
+
+The independent release-lib shadow also passed on the three complete 5959, quad and fx trajectories. It exercised 40,793 actual restores, reran and checked 418 original numerical post-recomputes (including full d/df, tolerance/counter, sum, x87 CW/SW and MXCSR) and independently checked 429 original WORK recomputations.
+
+- Across 56 original ordinary solves covering all 14 rows, the combined dense/sparse base-L operations accounted for 5.82–11.50% of solve time. Building a replacement two-direction layout cost 0.95–2.48% per full solve. Even an optimistic per-install selector that removes all indicated triangular arithmetic, scheduling and WORK had a timer-corrected 9.51% ceiling on the most promising row, 80BAU3B dual. The dense-only share never exceeded 9.81%. The lower-only proposal stopped before production.
+
+- Full compact post-pivot row geometry and candidate-list reuse passed complete output and WORK checks. Its primary nine-pair diagnostic put whole 5959 dual CPU 5.34% lower with seven favorable pairs. Independent inclusive instrumentation over the original row producer, factor update, complete list transition and next price call attributed only 3.17 ms of 155.31 ms, or 2.04% of whole-solve CPU, to the change. It stopped before PGO and formal comparison.
+
 
 - The compact pivot direction prototype retained exact FTRAN successor state, ordered/signed binary64 and extended outputs and both dense representations. The point update reused its checked numerical result for repeated inputs. Across four original model solves, re-executing the original verified 46,594 directions, 46,591 point steps and 331 complete successor-factor snapshots. Both WORK modes and 987/987 frozen cases agreed. The primary full fx viability test changed by -3.33%, interval [-14.40%, +4.31%]. It stopped below the 5% minimum.
 

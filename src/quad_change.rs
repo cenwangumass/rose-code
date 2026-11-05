@@ -244,7 +244,7 @@ pub(super) mod audit {
             level: s.level,
             words: s.pivot_order.words.clone(),
             w: s.work.w,
-            factor: quad_main::QuadMain::Direct((**f).clone()),
+            factor: quad_main::QuadMain::Direct(Box::new((**f).clone())),
         })
     }
     pub(in super::super) fn check(

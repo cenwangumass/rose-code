@@ -7,7 +7,7 @@ type Work = Vec<(u32, f64, f64)>;
 
 #[derive(Clone)]
 pub(crate) enum QuadMain {
-    Direct(Factor),
+    Direct(Box<Factor>),
     Shared(Rc<State>),
 }
 
@@ -151,7 +151,7 @@ impl QuadMain {
                 costs: Default::default(),
             }))
         } else {
-            Self::Direct(f)
+            Self::Direct(Box::new(f))
         }
     }
 
@@ -172,7 +172,7 @@ impl QuadMain {
 
     pub(super) fn restart(&self) -> Self {
         match self {
-            Self::Shared(s) if status().is_none() => Self::Direct(s.factor.clone()),
+            Self::Shared(s) if status().is_none() => Self::Direct(Box::new(s.factor.clone())),
             _ => self.clone(),
         }
     }
@@ -229,7 +229,7 @@ impl QuadMain {
         }
         let mut f = state.factor.clone();
         let out = op.run(&mut f);
-        *self = Self::Direct(f);
+        *self = Self::Direct(Box::new(f));
         out
     }
 

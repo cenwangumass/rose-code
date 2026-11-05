@@ -153,6 +153,7 @@ fn main() {
         model.num_cols()
     );
     let t = std::time::Instant::now();
+    rose::simplex::fix_factor_diagnostics_for_process();
     let r = solve(&model, start.as_ref(), &opts).unwrap_or_else(|e| match e {
         rose::simplex::SolveError::Unsupported(_) => fail(&e.to_string()),
         _ => fail(&format!("invalid input: {e}")),
