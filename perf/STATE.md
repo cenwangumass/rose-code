@@ -4,37 +4,43 @@ Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (histo
 
 ## Numbers on AMD EPYC 9V74
 
-The current solver retains its sparse forward-L workspace and level queues across calls. An index of eta input rows schedules the updates reached by a right-hand side in their original order. An exact bounded suffix sum books the original sparse WORK estimate, including skipped terms. Nonfinite coefficients, exact tolerance ties with etas and dense handoffs retain the general path. The preceding solver `60298604` already caches the level bound and reuses the forward U-column workspace.
+The factor update now retains its numerical workspace, snapshots just the referenced slots and maintains the set of empty tail columns that qualify for demotion. Selection preserves the reference slot order. On mode-switch, an allocation trace of the complete solve counted 45,520 fewer large zero-allocation requests (3.073 GB) and 11,380 fewer large copies (1.366 GB). The replacement issued 15 additional large fills totalling 1.8 MB.
+
+Against `6a5f7ade`, full 11,393-pivot mode-switch took 1.398917 → 1.119417 s, a -20.0% change. Two independently seeded 64-pair comparisons measured -13.34% and -12.29%, with 59 and 50 improving pairs and healthy controls. All 202,772 WORK records agreed with the uploaded solver. The fixed39 PGO executable passed 987/987 frozen runs and 260 runnable release tests. All 23 full output and exit comparisons agreed. The sweep flagged 4 additional reversed-role checks. None established a slowdown under the predeclared criteria.
+
+All four executables ran in fresh processes on logical CPU2, with one warm-up, three timed solves and rotating order. All rose builds used genuine TCMalloc. The Gurobi reference is the supplied patched library with SHA-256 `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. The new solver wins **0/23** against that reference.
+
+| Run | Gurobi (s) | Uploaded rose (s) | Preceding rose (s) | Current rose (s) | Current / Gurobi |
+|---|---:|---:|---:|---:|---:|
+| degen2.primal-c | 0.018764 | 0.040801 | 0.039971 | 0.045074 | 2.40 |
+| degen2.dual-r | 0.012956 | 0.035962 | 0.037390 | 0.036205 | 2.79 |
+| degen3.primal-c | 0.224734 | 0.578244 | 0.551587 | 0.632174 | 2.81 |
+| degen3.primal-r | 0.287163 | 0.729726 | 0.719669 | 0.654796 | 2.28 |
+| perold.primal-c | 0.233008 | 0.646060 | 0.691645 | 0.566306 | 2.43 |
+| pilot4.primal-r | 0.017345 | 0.065077 | 0.063220 | 0.055287 | 3.19 |
+| 80bau3b.primal-c | 0.124382 | 0.802361 | 0.759258 | 0.689349 | 5.54 |
+| primal_5959.primal-r | 0.081418 | 0.167988 | 0.148011 | 0.152518 | 1.87 |
+| degen3.dual-c | 0.093170 | 0.312874 | 0.328940 | 0.272485 | 2.92 |
+| degen3.dual-r | 0.117266 | 0.349291 | 0.364603 | 0.372172 | 3.17 |
+| perold.dual-r | 0.055418 | 0.178075 | 0.193356 | 0.190005 | 3.43 |
+| 80bau3b.dual-r | 0.115048 | 0.416127 | 0.351659 | 0.326189 | 2.84 |
+| greenbea.dual-c | 0.252654 | 0.925874 | 0.782973 | 0.786075 | 3.11 |
+| greenbea.dual-r | 0.281147 | 0.906836 | 0.732877 | 0.856072 | 3.04 |
+| mode_switch.dual-r | 0.102964 | 1.636627 | 1.398917 | 1.119417 | 10.87 |
+| primal_5959.dual-r | 0.082669 | 0.181132 | 0.238132 | 0.274641 | 3.32 |
+| quad_2717.dual-r | 0.115020 | 0.265580 | 0.241687 | 0.262950 | 2.29 |
+| fx_quad_obj_5371.dual-r | 0.043547 | 0.097048 | 0.078505 | 0.083862 | 1.93 |
+| degen3.barrier-r | 0.104832 | 0.244618 | 0.237459 | 0.186954 | 1.78 |
+| 80bau3b.barrier-r | 0.137575 | 0.275359 | 0.275103 | 0.278745 | 2.03 |
+| greenbea.barrier-r | 0.597544 | 0.990460 | 0.987276 | 0.918899 | 1.54 |
+| 80bau3b.pdhg | 2.674718 | 4.494542 | 4.755971 | 4.943250 | 1.85 |
+| greenbea.pdhg | 1.159376 | 1.909995 | 1.974511 | 2.126652 | 1.83 |
+
+### Preceding forward-L change
+
+The preceding forward-L change retains its sparse forward-L workspace and level queues across calls. An index of eta input rows schedules the updates reached by a right-hand side in their original order. An exact bounded suffix sum books the original sparse WORK estimate, including skipped terms. Nonfinite coefficients, exact tolerance ties with etas and dense handoffs retain the general path. The preceding solver `60298604` already caches the level bound and reuses the forward U-column workspace.
 
 On the full 11,393-pivot mode-switch solve, the new stage took 1.388262 → 1.191710 seconds versus `60298604` (-14.2%). Two randomized 48-pair CPU2 screens measured -11.38% and -12.89%, each with 45/48 improving and healthy same-binary controls. All 202,772 WORK records agreed byte for byte. The captured-factor and incremental-eta differential tests, 987/987 frozen parity and all 260 runnable release tests passed. Eleven reversed-role controls covered rows flagged by either sweep or by the raw-file audit. None established a slowdown. On GREENBEA dual the identical-binary control was biased (p=.021), and the mixed pairs split 8–8. A separate fixed, drift-balanced 48-quartet CPU5 comparison plus 48 same-binary quartets gave -1.95% solve time and -0.83% whole-process CPU time. Both excluded the flagged increase, with healthy identical-binary controls. See the retained raw quartets and intervals.
-
-Each table cell is a median of three solve-only timings after one warm-up. The first sweep completed 22 rows before interruption. A restart repeated the complete sweep shown here. The original raw timings were retained, and regression flags from both sweeps were checked. Archive verification found one inconsistent Gurobi timing on primal_5959.primal-r and three inconsistent unscored warm-ups on degen2.dual-r and degen3.barrier-r. Fresh four-way runs replaced those three rows, and two additional 32-pair reversed checks covered the new flags. All 368 final raw timings agree with the ledger. All four executables used fresh processes and the same logical CPU, with rotating order. The Gurobi reference is patched 13.0.3 with SHA-256 `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. All rose binaries used genuine TCMalloc. All 23 sets of complete rose results matched the starting outputs byte for byte after replacing the elapsed-time token. The current build wins **0/23** rows against Gurobi.
-
-| Run | Gurobi (s) | Uploaded rose (s) | Previous rose (s) | Current rose (s) | Current / Gurobi |
-|---|---:|---:|---:|---:|---:|
-| degen2.primal-c | 0.015614 | 0.039638 | 0.037289 | 0.038281 | 2.45 |
-| degen2.dual-r | 0.013584 | 0.042052 | 0.037474 | 0.036819 | 2.71 |
-| degen3.primal-c | 0.232403 | 0.498674 | 0.572417 | 0.535169 | 2.30 |
-| degen3.primal-r | 0.259989 | 0.753349 | 0.759362 | 0.635599 | 2.44 |
-| perold.primal-c | 0.237891 | 0.661635 | 0.612383 | 0.692061 | 2.91 |
-| pilot4.primal-r | 0.019958 | 0.063674 | 0.061463 | 0.065355 | 3.27 |
-| 80bau3b.primal-c | 0.137991 | 0.727281 | 0.597086 | 0.674867 | 4.89 |
-| primal_5959.primal-r | 0.068742 | 0.161405 | 0.119897 | 0.168274 | 2.45 |
-| degen3.dual-c | 0.107459 | 0.254941 | 0.294682 | 0.316188 | 2.94 |
-| degen3.dual-r | 0.107944 | 0.304470 | 0.289748 | 0.289549 | 2.68 |
-| perold.dual-r | 0.043868 | 0.129239 | 0.160576 | 0.142543 | 3.25 |
-| 80bau3b.dual-r | 0.098961 | 0.326952 | 0.313780 | 0.287856 | 2.91 |
-| greenbea.dual-c | 0.221482 | 0.773340 | 0.935770 | 0.807390 | 3.65 |
-| greenbea.dual-r | 0.221806 | 0.766364 | 0.725375 | 0.774251 | 3.49 |
-| mode_switch.dual-r | 0.104305 | 1.845150 | 1.388262 | 1.191710 | 11.43 |
-| primal_5959.dual-r | 0.087197 | 0.194534 | 0.235620 | 0.227927 | 2.61 |
-| quad_2717.dual-r | 0.083419 | 0.216966 | 0.223338 | 0.208996 | 2.51 |
-| fx_quad_obj_5371.dual-r | 0.043388 | 0.073905 | 0.094126 | 0.088422 | 2.04 |
-| degen3.barrier-r | 0.115725 | 0.205120 | 0.182419 | 0.239259 | 2.07 |
-| 80bau3b.barrier-r | 0.140990 | 0.274815 | 0.233879 | 0.253279 | 1.80 |
-| greenbea.barrier-r | 0.609738 | 1.102271 | 0.972153 | 1.000583 | 1.64 |
-| 80bau3b.pdhg | 2.350826 | 4.546074 | 4.397782 | 4.424116 | 1.88 |
-| greenbea.pdhg | 1.192530 | 1.894263 | 1.836754 | 2.030438 | 1.70 |
 
 ### Mode-switch profile
 
@@ -838,7 +844,7 @@ projected effects, component source/binary/timings, dependency audit and restora
 
 ## In progress
 
-Indexed factor updates are being evaluated incrementally against the retained L workspace. Other ongoing source experiments cover native compensated barrier dots, the child-update executor and shared-expression PDHG row families. Completed screens and their disposition appear below.
+Independent source candidates cover whole sparse BTRAN workspace and reverse eta scheduling, the two-column dual handoff, packed sparse dual pivot rows, dense intervals and bound projection in PDHG, barrier final-state ownership and auxiliary LU validation. The full-length shared-product PDHG schedule was inconclusive on its independent confirmation and has been retained as negative evidence.
 
 ## Extended BTRAN feasibility
 
@@ -1148,6 +1154,14 @@ The remaining candidates below derive from the Ryzen measurements and their hist
 ## Tried, no gain
 
 ### EPYC structural trials
+
+- Link live Markowitz coefficients in both row and column order, eliminating front shifts and stale-chain cleanup. PEROLD dual. The full frozen corpus passed. The first randomized timing comparison measured -2.54% with a 95% interval of [-5.83%, +0.09%]. Same-binary interval [-0.83%, +6.91%]. The predeclared screen was inconclusive.
+
+- Reuse the primal row-product workspaces and visit reachable columns for sparse BTRAN support. DEGEN2 primal. The full frozen corpus passed. The first randomized timing comparison measured -3.65% with a 95% interval of [-5.33%, -1.58%]. Same-binary interval [-2.70%, +1.46%]. The predeclared screen was inconclusive.
+
+- Guarded native x87 Kahan products for the barrier. GREENBEA barrier. The full frozen corpus passed. The first randomized timing comparison measured -4.77% with a 95% interval of [-10.20%, +0.71%]. Same-binary interval [-3.31%, +5.81%]. The predeclared screen was inconclusive.
+
+- Compute only consumed entries in eligible child frontal updates. 80BAU3B barrier. The full frozen corpus passed. The first randomized timing comparison measured -7.31% with a 95% interval of [-13.59%, -1.53%]. Same-binary interval [-5.04%, +15.78%]. The predeclared screen was inconclusive.
 
 - Touched-only factor update storage. The completed screen gave -25.95% median, 95% interval [-33.24%, +6.28%], AA [-12.50%, +3.43%]. The candidate remains unqualified.
 

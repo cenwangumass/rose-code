@@ -421,6 +421,8 @@ pub struct RefStruct<R: Real = f64> {
     dense_est: std::cell::Cell<f64>,
     /// Density threshold fixed at factorization time (`f104` in the notes): 2, or `5 (nnzL/m + 1)^2` capped at `m`.
     dthr: usize,
+    /// Columns eligible for demotion, keyed by identity so slot walks need no index repairs.
+    empty_tail: std::collections::BTreeSet<usize>,
     slot: Vec<usize>,
     at: Vec<usize>,
     /// Reused counts for ordering dense lists of permutation slots.
@@ -444,6 +446,9 @@ pub struct RefStruct<R: Real = f64> {
     spike: Vec<(usize, R)>,
     /// Whether the column replacement has used the spike since the last FTRAN.
     spike_used: bool,
+    /// Reused by the two disjoint numeric phases of a column replacement.
+    update_values: Vec<R>,
+    update_seen: Vec<bool>,
     /// Dense x of the most recent solve after the L stage and after the row etas, for the `lstage` dump.
     lsnap: std::cell::RefCell<(Vec<R>, Vec<R>)>,
     /// Refactorization trigger inputs (`0x142350`): updates since the factorization, accumulated solve result counts, accumulated
@@ -1061,6 +1066,9 @@ impl<R: Real> RefStruct<R> {
             bt_dense: false,
             row_cached: None,
             m,
+            empty_tail: (0..m)
+                .filter(|&x| kind[x] == -2 && a[x].is_empty() && b[x].is_empty())
+                .collect(),
             kind,
             nuc,
             i21,
@@ -1087,6 +1095,8 @@ impl<R: Real> RefStruct<R> {
             uc,
             ut,
             spike: Vec::new(),
+            update_values: Vec::new(),
+            update_seen: Vec::new(),
             spike_used: false,
             lsnap: Default::default(),
         }
@@ -3360,17 +3370,17 @@ impl<R: Real> RefStruct<R> {
     }
 
     /// Row elimination of a column replacement at `r`: the eta multipliers `(position, multiplier)` in elimination order.
-    fn eliminate(&self, r: usize) -> (Vec<(usize, R)>, usize) {
+    fn eliminate(&self, r: usize, w: &mut [R], seen: &mut [bool]) -> (Vec<(usize, R)>, usize) {
         let m = self.m;
         let d0 = self.diag[r];
         // Tail entries of the maintained transpose, in the same ascending column order as the CSR rebuild.
         let rows = |i: usize| self.ut[i].iter().filter(|&&(k, _)| self.kind[k] == -2);
-        let mut w = vec![R::ZERO; m];
-        let mut seen = vec![false; m];
+        let mut touched = Vec::new();
         let mut heap: std::collections::BinaryHeap<std::cmp::Reverse<(usize, usize)>> =
             std::collections::BinaryHeap::new();
         for &(k, v) in rows(r) {
             w[k] = v * (R::ONE / d0);
+            touched.push(k);
             seen[k] = true;
             heap.push(std::cmp::Reverse((self.slot[k], k)));
         }
@@ -3414,6 +3424,7 @@ impl<R: Real> RefStruct<R> {
             for &(l, v) in rows(k) {
                 w[l] += c * v;
                 if !seen[l] {
+                    touched.push(l);
                     seen[l] = true;
                     heap.push(std::cmp::Reverse((self.slot[l], l)));
                 }
@@ -3423,6 +3434,10 @@ impl<R: Real> RefStruct<R> {
         // The solve returns at once, booking nothing, when row `r` of the row-wise copy is empty.
         self.dense_est
             .set(if rows(r).next().is_none() { 0.0 } else { dense });
+        for i in touched {
+            w[i] = R::ZERO;
+            seen[i] = false;
+        }
         (eta, visited)
     }
 
@@ -3452,8 +3467,6 @@ impl<R: Real> RefStruct<R> {
         self.before_last = (self.upd, self.sum_alpha);
         self.upd += 1;
         self.upd_work.clear();
-        // The reference's position array is read by the mark raises before it is rewritten at the end of the update.
-        let slot0 = self.slot.clone();
         // The eta is stored first, at the current pool fill; its value array sits on a 16-byte boundary when the fill is even.
         let peel = self.fill % 2;
         // The old column's entries leave the row-wise copy after the new column's entries have been added.
@@ -3484,9 +3497,11 @@ impl<R: Real> RefStruct<R> {
             ));
         }
         self.sum_alpha += self.last_alpha as f64;
-        let spike: Vec<usize> = self.spike.iter().map(|e| e.0).collect();
-        let spike = &spike[..];
-        let (eta_cand, solve_len) = self.eliminate(r);
+        let mut values = std::mem::take(&mut self.update_values);
+        let mut seen = std::mem::take(&mut self.update_seen);
+        values.resize(m, R::ZERO);
+        seen.resize(m, false);
+        let (eta_cand, solve_len) = self.eliminate(r, &mut values, &mut seen);
         // The solve runs only when a spike entry lies below `max(slot[r], i21 - 1)` (`0xf1859..0xf191f`).
         let solve_floor = self.slot[r].max(self.i21.saturating_sub(1));
         let cached = self.row_cached.take() == Some(r);
@@ -3504,17 +3519,15 @@ impl<R: Real> RefStruct<R> {
             };
             self.upd_work.push((0x1322ed, est, crate::work::FAC));
         }
-        let mut spk = vec![R::ZERO; m];
+        let mut sp = Vec::with_capacity(self.spike.len());
         for &(p, v) in &self.spike {
-            spk[p] = v;
-        }
-        let d0 = self.diag[r];
-        let mut sp: Vec<usize> = Vec::with_capacity(spike.len());
-        for &x in spike {
-            if !sp.contains(&x) {
-                sp.push(x);
+            values[p] = v;
+            if !seen[p] {
+                seen[p] = true;
+                sp.push(p);
             }
         }
+        let d0 = self.diag[r];
         if let Some(i) = sp.iter().position(|&x| x == r) {
             // The reference keeps the spike as a tail group and a nucleus group; the leaving column is deleted from the nucleus
             // group by moving that group's last entry into its place.
@@ -3543,7 +3556,7 @@ impl<R: Real> RefStruct<R> {
         // A new column without entries besides its diagonal is not a tail column: it stays among the non-tail columns (at the
         // last non-tail slot) and keeps its place in the nucleus lists that refer to it.
         let bare = k == 0 && old != -2;
-        let mut demoted_front = vec![false; m];
+        let mut demoted_front = Vec::new();
         let mut convslot: Option<usize> = None;
         let mut conv: Option<usize> = None;
         // The reference demotes a bare tail column only when the new column depends on the tail; with no tail entries in the spike
@@ -3552,10 +3565,13 @@ impl<R: Real> RefStruct<R> {
             && self.slot[r] + 1 != self.i21
             && sp.iter().any(|&y| y != r && self.kind[y] == -2)
         {
-            conv = (0..m)
-                .filter(|&x| self.kind[x] == -2 && self.a[x].is_empty() && self.b[x].is_empty())
+            conv = self
+                .empty_tail
+                .iter()
+                .copied()
                 .max_by_key(|&x| self.slot[x]);
             if let Some(x) = conv {
+                self.empty_tail.remove(&x);
                 convslot = Some(self.slot[x]);
                 // Only a column some tail column refers to joins the nucleus list; the others become singletons.
                 let mut refs: Vec<usize> = self.rowl[x]
@@ -3581,7 +3597,7 @@ impl<R: Real> RefStruct<R> {
                             self.upd_work.push((0xf3eac, p as f64, crate::work::CTX));
                         }
                         self.b[k].insert(0, x);
-                        demoted_front[k] = true;
+                        demoted_front.push(k);
                     }
                 }
             }
@@ -3667,6 +3683,14 @@ impl<R: Real> RefStruct<R> {
         }
         let av: Vec<usize> = sp.iter().copied().filter(|&x| self.kind[x] == -2).collect();
         let bv: Vec<usize> = sp.iter().copied().filter(|&x| self.kind[x] >= 0).collect();
+        let mut refcols = self.rowl[r].clone();
+        refcols.sort_unstable();
+        refcols.dedup();
+        refcols.retain(|&x| {
+            x != r && self.kind[x] == -2 && (self.a[x].contains(&r) || self.b[x].contains(&r))
+        });
+        // Only a surviving row-r reference can raise the mark after the slot walk.
+        let refcols: Vec<_> = refcols.into_iter().map(|k| (k, self.slot[k])).collect();
         let oldslot = self.slot[r];
         let top: i64 = av.iter().map(|&x| self.slot[x] as i64).max().unwrap_or(-1);
         let mut moved = true;
@@ -3721,19 +3745,13 @@ impl<R: Real> RefStruct<R> {
         let keep = (old != -2 && av.is_empty() && conv.is_none()) || (old == -2 && !moved);
         // Row r of U: the tail columns that reference r (`0xf2a51`), unless the column stays in its slot or the empty spike skips the row solve.
         // The maintained row list avoids scanning unrelated columns. Restore the old scan's ascending order and uniqueness.
-        let mut refcols = self.rowl[r].clone();
-        refcols.sort_unstable();
-        refcols.dedup();
-        refcols.retain(|&x| {
-            x != r && self.kind[x] == -2 && (self.a[x].contains(&r) || self.b[x].contains(&r))
-        });
         let refs = refcols.len();
         if refs > 0 && !sp.is_empty() && !(keep && !moved) {
             self.upd_work
                 .push((0xf2a51, 3.0 * refs as f64, crate::work::CTX));
         }
         let mut elim: Vec<usize> = Vec::new();
-        for k in refcols {
+        for (k, old_ref_slot) in refcols {
             if k == r || self.kind[k] != -2 {
                 continue;
             }
@@ -3749,7 +3767,7 @@ impl<R: Real> RefStruct<R> {
                     .iter()
                     .position(|&y| y == r)
                     .unwrap_or(0)
-                    .saturating_sub(usize::from(demoted_front[k]));
+                    .saturating_sub(usize::from(demoted_front.binary_search(&k).is_ok()));
                 let (site, units) = if keep {
                     (0xf4073, if old != -2 && in_b { pb } else { 0 })
                 } else if in_a {
@@ -3783,7 +3801,8 @@ impl<R: Real> RefStruct<R> {
                     elim.push(k);
                     // A column left without entries raises the mark to its slot (`0xf29d5`).
                     if self.a[k].is_empty() && self.b[k].is_empty() {
-                        self.mark = self.mark.max(slot0[k]);
+                        self.empty_tail.insert(k);
+                        self.mark = self.mark.max(old_ref_slot);
                     }
                 }
             }
@@ -3791,7 +3810,7 @@ impl<R: Real> RefStruct<R> {
         if !keep {
             self.rowl[r].clear();
         }
-        let mut newdiag = spk[r];
+        let mut newdiag = values[r];
         if !elim.is_empty() {
             let mut ind = vec![r];
             let mut val = vec![R::ONE / d0];
@@ -3799,7 +3818,7 @@ impl<R: Real> RefStruct<R> {
                 ind.push(k);
                 val.push(c);
             }
-            let xs: Vec<R> = ind.iter().map(|&j| spk[j]).collect();
+            let xs: Vec<R> = ind.iter().map(|&j| values[j]).collect();
             // The diagonal is summed from the scratch eta, whose alignment is fixed per factor object.
             newdiag = dot_diag(&xs, &val, self.scratch_peel);
             self.sum_eta += ind.len() as f64;
@@ -3818,9 +3837,15 @@ impl<R: Real> RefStruct<R> {
             });
             self.fill += esz;
         }
+        for &(p, _) in &self.spike {
+            values[p] = R::ZERO;
+            seen[p] = false;
+        }
+        self.update_values = values;
+        self.update_seen = seen;
         if k == 0 {
             // A new column without entries is a candidate for the scan (`0xf2e58`).
-            self.mark = self.mark.max(slot0[r]);
+            self.mark = self.mark.max(oldslot);
         }
         if k > 0 {
             self.upd_work
@@ -3874,6 +3899,11 @@ impl<R: Real> RefStruct<R> {
             self.rowl[y].push(r);
         }
         self.b[r] = bb;
+        if self.kind[r] == -2 && self.a[r].is_empty() && self.b[r].is_empty() {
+            self.empty_tail.insert(r);
+        } else {
+            self.empty_tail.remove(&r);
+        }
         self.spike_used = true;
     }
 }
