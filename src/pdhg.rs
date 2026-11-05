@@ -5,9 +5,11 @@
 //! scaled by the reference's Ruiz + Pock-Chambolle scaling before the iteration and unscaled on return.
 //! Diagnostic records: `ROSE_DUMP=pdhg` (`crate::dump`).
 
+mod ordered;
 use crate::dump;
 use crate::model::{LpModel, Sense};
 use crate::simplex::Status;
+use ordered::Ordered;
 
 /// The reference's infinity inside the scaled model.
 const BIG: f64 = 1e30;
@@ -697,6 +699,14 @@ impl<'a> State<'a> {
         dual_dense(&mut self.y, &self.y0, &self.ax, a, sigma, w);
     }
 
+    fn ordinary_ordered_step(&mut self, tau: f64, sigma: f64, ordered: &mut Ordered) {
+        let w = (self.k + 1) as f64 / (self.k + 2) as f64;
+        if ordered.step(self.a, &self.y, &self.x, &self.x0, &mut self.ax, tau, w) {
+            dual_dense(&mut self.y, &self.y0, &self.ax, self.a, sigma, w);
+        } else {
+            self.ordinary_step(tau, sigma);
+        }
+    }
     /// `0x3685a0`: the residual scalars at `(xh, yh)`. `flag1`: the first pass and the final pass.
     fn residual(&mut self, flag1: bool) -> Resid {
         let a = self.a;
@@ -1033,6 +1043,7 @@ fn solve_inner<const BATCHED: bool>(model: &LpModel, opts: &PdhgOptions) -> Pdhg
     if status == 1 {
         st.r_prev = st.r;
         st.power(250, true);
+        let mut ordered = Ordered::new(&a);
         let mut just_restarted = false;
         let mut tau;
         let mut sigma;
@@ -1041,12 +1052,13 @@ fn solve_inner<const BATCHED: bool>(model: &LpModel, opts: &PdhgOptions) -> Pdhg
             tau = st.eta / st.omega;
             sigma = st.eta * st.omega;
             if BATCHED && !chk && !just_restarted && ((st.total + 1) as f64) < opts.iter_limit {
-                st.ordinary_step(tau, sigma);
+                st.ordinary_ordered_step(tau, sigma, &mut ordered);
                 st.total += 1;
                 st.n8 += 1;
                 st.k += 1;
                 continue;
             }
+            ordered.observe(&mut st.x, &mut st.xb);
             // primal step
             a.mul_t(&st.y, &mut st.aty);
             for j in 0..n {
@@ -1360,6 +1372,123 @@ mod ordinary_step_tests {
                 assert_eq!(bits(&a.relative), bits(&b.relative));
                 assert_eq!(a.primal_residual.to_bits(), b.primal_residual.to_bits());
                 assert_eq!(a.dual_residual.to_bits(), b.dual_residual.to_bits());
+            }
+        }
+    }
+    #[test]
+    fn ordered_recurrence_matches_full_observations_and_restart() {
+        let model = crate::mps::parse(include_str!("../tests/fixtures/afiro.mps")).unwrap();
+        let mut a = Scaled::new(&build(&model));
+        for j in 0..a.n {
+            a.c[j] = if j % 2 == 0 { 100. } else { -100. };
+            a.lb[j] = -0.0;
+            a.ub[j] = 1.0;
+        }
+        let (tau, sigma) = (0.1, 0.001);
+        for inject in [
+            0.0,
+            -0.0,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::from_bits(0x7ff8_0000_0000_1001),
+            f64::from_bits(0xfff8_0000_0000_0042),
+        ] {
+            let mut frozen = initial(&a, || 0.0);
+            let mut current = frozen.clone();
+            let mut ordered = Ordered::new(&a);
+            for step in 0..83 {
+                if step == 38 {
+                    current.y[0] = inject;
+                    frozen.y[0] = inject;
+                }
+                if step == 48 || step == 82 {
+                    ordered.observe(&mut current.x, &mut current.xb);
+                    for st in [&mut frozen, &mut current] {
+                        a.mul_t(&st.y, &mut st.aty);
+                        for j in 0..a.n {
+                            let t = st.x[j] - (a.c[j] - st.aty[j]) * tau;
+                            st.xh[j] = t.max(a.lb[j]).min(a.ub[j]);
+                            st.zc[j] = (st.xh[j] - t) / tau;
+                        }
+                        original(st, tau, sigma);
+                        st.r = st.merit();
+                        st.res = st.residual(false);
+                    }
+                    assert_eq!(
+                        bits(&frozen.aty),
+                        bits(&current.aty),
+                        "raw observed transpose {step}"
+                    );
+                    assert_eq!(bits(&frozen.xh), bits(&current.xh));
+                    assert_eq!(bits(&frozen.zc), bits(&current.zc));
+                    assert_eq!(frozen.res.pobj.to_bits(), current.res.pobj.to_bits());
+                    assert_eq!(frozen.res.dobj.to_bits(), current.res.dobj.to_bits());
+                    assert_eq!(frozen.r.to_bits(), current.r.to_bits());
+                    frozen.apply_restart();
+                    current.apply_restart();
+                } else {
+                    original(&mut frozen, tau, sigma);
+                    current.ordinary_ordered_step(tau, sigma, &mut ordered);
+                }
+                let (cx, cxb) = ordered.snapshot(&current.x, &current.xb);
+                assert_eq!(
+                    bits(&frozen.xb),
+                    bits(&cxb),
+                    "xb {step}, injection {:x}",
+                    inject.to_bits()
+                );
+                assert_eq!(bits(&frozen.x), bits(&cx));
+                assert_eq!(bits(&frozen.y), bits(&current.y));
+                frozen.k += 1;
+                current.k += 1;
+            }
+        }
+    }
+    #[test]
+    fn randomized_permuted_state_matches_all_original_outputs() {
+        let model = crate::mps::parse(include_str!("../tests/fixtures/greenbea.mps")).unwrap();
+        let a = Scaled::new(&build(&model));
+        let mut rng = 2613921u64;
+        for case in 0..10 {
+            let mut next = || {
+                rng ^= rng << 13;
+                rng ^= rng >> 7;
+                rng ^= rng << 17;
+                if case % 3 == 0 {
+                    f64::from_bits(rng)
+                } else if case % 3 == 1 {
+                    [
+                        -0.0,
+                        0.0,
+                        f64::from_bits(1),
+                        f64::from_bits(0x7ff8_0000_0000_0132),
+                        f64::INFINITY,
+                        -1.0,
+                        3.0,
+                    ][rng as usize % 7]
+                } else {
+                    (rng as i64 as f64) * 1e-18
+                }
+            };
+            let mut old = initial(&a, &mut next);
+            let mut curr = old.clone();
+            let mut ord = Ordered::new(&a);
+            for k in 0..7 {
+                let tau = next();
+                let sigma = next();
+                original(&mut old, tau, sigma);
+                curr.ordinary_ordered_step(tau, sigma, &mut ord);
+                let (x, xb) = ord.snapshot(&curr.x, &curr.xb);
+                for (v, actual) in [(&old.x, &x), (&old.xb, &xb), (&old.y, &curr.y)] {
+                    for (j, (a, b)) in v.iter().zip(actual).enumerate() {
+                        assert_eq!(a.to_bits(), b.to_bits(), "case {case} it {k} pos {j}");
+                    }
+                }
+                if k == 3 {
+                    ord.observe(&mut curr.x, &mut curr.xb);
+                }
+                old.k += 1;
+                curr.k += 1;
             }
         }
     }
