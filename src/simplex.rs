@@ -225,6 +225,9 @@ pub struct TraceEvent {
     pub flips: Vec<usize>,
 }
 
+#[path = "quad_change.rs"]
+mod quad_change;
+
 /// What the dual controller hands to the primal it starts (`0x154f43..0x155190`): the pivot-check pair the dual's last iteration left in `ctx+0x300` / `ctx+0x308`
 /// (the primal's first pricing call reads it), the pivot threshold `ctx+0x390`, and the retry counter `ctx+0x184`.
 /// The primal's FTRAN/BTRAN mirror: the double one, or, after a quad dual, the x87 long double one (values rounded to a double where the primal stores them).
@@ -1414,6 +1417,7 @@ struct CostResult {
 }
 
 struct RankResult {
+    identity: std::sync::OnceLock<std::sync::Arc<()>>,
     key: Vec<(usize, u64, u16)>,
     out: Vec<crate::f80::F80>,
 }
@@ -1485,6 +1489,17 @@ impl QuadRhs {
         values: &[crate::f80::F80],
         rank: &[usize],
     ) -> Option<Vec<crate::f80::F80>> {
+        self.rank_products_observed(p, values, rank, None)
+    }
+
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    fn rank_products_observed(
+        &mut self,
+        p: &Internal,
+        values: &[crate::f80::F80],
+        rank: &[usize],
+        witness: Option<&mut Option<std::sync::Weak<()>>>,
+    ) -> Option<Vec<crate::f80::F80>> {
         let Self::Shared(shared) = self else {
             return None;
         };
@@ -1525,6 +1540,11 @@ impl QuadRhs {
         let key = &buffer[..len];
         let mut memo = shared.lock().unwrap();
         if let Some(entry) = memo.rank_results.iter().find(|e| e.key == key) {
+            if let Some(witness) = witness {
+                *witness = Some(std::sync::Arc::downgrade(
+                    entry.identity.get_or_init(|| std::sync::Arc::new(())),
+                ));
+            }
             return Some(entry.out.clone());
         }
         let out = p.rank_products_q(values, rank);
@@ -1532,6 +1552,7 @@ impl QuadRhs {
             memo.rank_results.remove(0);
         }
         memo.rank_results.push(RankResult {
+            identity: Default::default(),
             key: key.to_vec(),
             out: out.clone(),
         });
@@ -3278,6 +3299,43 @@ impl<'a> Solver<'a> {
         alpha_rq: f64,
         q_only: bool,
     ) {
+        if let Some((state, flags)) = quad_change::eligible(self, dc, q, q_only) {
+            if let Some(effect) = state.change() {
+                #[cfg(test)]
+                let before = quad_change::audit::start(self);
+                if effect.replay(self, &state, dc, q, leave, alpha_rq, flags) {
+                    #[cfg(test)]
+                    quad_change::audit::check(self, before, dc, q, leave, alpha_rq, effect);
+                    return;
+                }
+            } else {
+                let key = quad_change::Key::capture(self, dc, q, leave, alpha_rq);
+                let mut witness = None;
+                let work =
+                    self.cost_change_original(dc, q, leave, alpha_rq, q_only, Some(&mut witness));
+                if let (Some(work), Some(witness), Some(flags), Some(Mir::Q(main))) =
+                    (work, witness, quad_main::status(), self.mirror.as_ref())
+                {
+                    state.record_change(
+                        main,
+                        quad_change::Effect::capture(self, key, witness, work, flags),
+                    );
+                }
+                return;
+            }
+        }
+        self.cost_change_original(dc, q, leave, alpha_rq, q_only, None);
+    }
+
+    fn cost_change_original(
+        &mut self,
+        dc: &[(usize, f64)],
+        q: usize,
+        leave: usize,
+        alpha_rq: f64,
+        q_only: bool,
+        witness: Option<&mut Option<std::sync::Weak<()>>>,
+    ) -> Option<[f64; 3]> {
         if q_only {
             // Only the entering variable changed class: no BTRAN and no row product. The reference applies `d_j -= dc * arj` over the
             // previous pivot row (`0x1084a0` again, with `dc` as the step) and repeats its list update (`0x107e14`).
@@ -3296,7 +3354,7 @@ impl<'a> Solver<'a> {
                 self.update_list(&c, e, 0x107e14);
                 self.last_upd = Some((c, e));
             }
-            return;
+            return None;
         }
         // The entering variable's own change next to others: the reference first repeats the previous pivot row for it alone
         // (`0x107e14` pass), then solves for the remaining changes.
@@ -3306,11 +3364,11 @@ impl<'a> Solver<'a> {
                 self.cost_change_work(&[dc[k]], q, leave, alpha_rq, true);
                 let rest: Vec<(usize, f64)> = dc.iter().copied().filter(|e| e.0 != r).collect();
                 self.cost_change_work(&rest, q, leave, alpha_rq, false);
-                return;
+                return None;
             }
         }
         let Some(mi) = self.mirror.as_mut() else {
-            return;
+            return None;
         };
         let (n, m) = (self.p.n, self.p.m);
         let dc_sorted = dc.to_vec();
@@ -3328,8 +3386,9 @@ impl<'a> Solver<'a> {
         } else {
             mi.btran(&dc_sorted, false, false)
         };
+        let btran = mi.work();
         self.work
-            .add_from(0x12de50, 0x10804b, mi.work(), crate::work::FAC);
+            .add_from(0x12de50, 0x10804b, btran, crate::work::FAC);
         if crate::dump::on("costchg") {
             crate::dump::emit(
                 "costchg",
@@ -3345,7 +3404,7 @@ impl<'a> Solver<'a> {
                 rho[i] = v;
             }
         }
-        self.row_product_work(&rho, q, leave, 0x10820b);
+        let products = self.row_product_work(&rho, q, leave, 0x10820b);
         // The row's slack part is `rho` itself, basic slacks included (they are the positions whose cost changed). The
         // reference subtracts the row product from `d` in place, summing in the order of the BTRAN output list.
         let p = self.p;
@@ -3369,7 +3428,7 @@ impl<'a> Solver<'a> {
             if let Some(out) = self
                 .mirror_q
                 .as_mut()
-                .and_then(|rhs| rhs.rank_products(p, &rq, &rank))
+                .and_then(|rhs| rhs.rank_products_observed(p, &rq, &rank, witness))
             {
                 out
             } else {
@@ -3431,7 +3490,8 @@ impl<'a> Solver<'a> {
             eprintln!("CORD {}", serde_json::json!({"nz": nz, "changed": changed}));
         }
         let changed = self.pivot_row_order_by(&nz, &changed, nz.len());
-        self.update_list(&changed, usize::from(q < n), 0x108280);
+        let list = self.update_list(&changed, usize::from(q < n), 0x108280);
+        Some([btran, products, list])
     }
 
     /// Work of the reference's dual recomputation after a factorization (`0x108d70`): a BTRAN of the dense vector of basic costs,
@@ -4201,7 +4261,7 @@ impl<'a> Solver<'a> {
     /// Work of the reference's pivot-row product (`0x134d90`) for the row combination `rho` (`reverse-engineer/specs/primal-simplex.md`,
     /// "Work counter"): its rows hold the nonbasic structural columns that are not fixed, where `q` already counts as basic and
     /// `leave` as nonbasic.
-    fn row_product_work(&mut self, rho: &[f64], q: usize, leave: usize, caller: u32) {
+    fn row_product_work(&mut self, rho: &[f64], q: usize, leave: usize, caller: u32) -> f64 {
         let (n, m) = (self.p.n, self.p.m);
         let nz: Vec<usize> = (0..m).filter(|&i| rho[i] != 0.0).collect();
         let nnz_a: usize = self.p.structural_nnz();
@@ -4249,6 +4309,7 @@ impl<'a> Solver<'a> {
             11.5 * nr + 3.5 * p5 as f64 + 3.0 * d as f64
         };
         self.work.add_from(0x135e92, caller, est, crate::work::CTX);
+        est
     }
 
     /// Eligibility and score `d^2 / w` of a nonbasic variable, or `None` if it cannot enter.
@@ -4602,7 +4663,7 @@ impl<'a> Solver<'a> {
 
     /// After a pivot: score the changed entries (in index order), raise the level if a higher bucket appears,
     /// keep still-qualifying old entries first, then append the new ones.
-    fn update_list(&mut self, changed: &[usize], extra: usize, caller: u32) {
+    fn update_list(&mut self, changed: &[usize], extra: usize, caller: u32) -> f64 {
         let mut fresh: Vec<usize> = Vec::new();
         // The reference empties the old list when the level rises, so it scans none of it.
         let mut raised = false;
@@ -4655,6 +4716,7 @@ impl<'a> Solver<'a> {
             );
         }
         self.work.add_from(0x1087b1, caller, est, crate::work::CTX);
+        est
     }
 }
 

@@ -15,6 +15,7 @@ pub(crate) struct State {
     factor: Factor,
     edge: OnceCell<Edge>,
     depth: usize,
+    change: OnceCell<super::quad_change::Effect>,
     pricing_rows: super::quad_row::PricingRows,
     dual: OnceCell<super::quad_fresh::DualSnapshot>,
     #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
@@ -143,6 +144,7 @@ impl QuadMain {
                 factor: f,
                 edge: OnceCell::new(),
                 depth: 0,
+                change: OnceCell::new(),
                 pricing_rows: Default::default(),
                 dual: OnceCell::new(),
                 #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
@@ -205,6 +207,7 @@ impl QuadMain {
                     factor: next,
                     edge: OnceCell::new(),
                     depth: state.depth + 1,
+                    change: OnceCell::new(),
                     pricing_rows: Default::default(),
                     dual: OnceCell::new(),
                     #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
@@ -450,5 +453,30 @@ impl State {
     }
     pub(super) fn record_dual(&self, d: super::quad_fresh::DualSnapshot) {
         let _ = self.dual.set(d);
+    }
+}
+
+impl State {
+    pub(super) fn change(&self) -> Option<&super::quad_change::Effect> {
+        self.change.get()
+    }
+    pub(super) fn advance_change(&self, live: &mut QuadMain, flags: u32) -> bool {
+        let Some(edge) = self.edge.get() else {
+            return false;
+        };
+        if edge.flags & !flags != 0 || !matches!(edge.input, Op::Transpose(_, false, false)) {
+            return false;
+        }
+        *live = QuadMain::Shared(edge.next.clone());
+        true
+    }
+    pub(super) fn record_change(&self, live: &QuadMain, effect: super::quad_change::Effect) {
+        if let Some(edge) = self.edge.get() {
+            if matches!(edge.input, Op::Transpose(_, false, false))
+                && matches!(live,QuadMain::Shared(s) if Rc::ptr_eq(s,&edge.next))
+            {
+                let _ = self.change.set(effect);
+            }
+        }
     }
 }

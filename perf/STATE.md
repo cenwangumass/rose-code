@@ -4,37 +4,66 @@ Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (histo
 
 ## Numbers on AMD EPYC 9V74
 
+The compact controller can reuse the original general cost-change BTRAN when its ordered inputs, pricing state, rank owner and factor cursor agree. It advances to the exact original successor, applies the original partial writes and issues the same chronological WORK calls.
+
+The full quad_2717.dual-r sweep took 0.167139 → 0.164750 seconds versus the preceding commit `2d278c18` (-1.4%). The prespecified randomized timing comparisons measured -13.60% and -10.87%. Frozen parity passed 987/987, 283 runnable release tests passed, and all full-length mode-switch WORK records matched. Full outputs and exit codes agreed on every benchmark. 8 reversed-role controls covered flagged regressions; none established a slowdown.
+
+The table gives same-CPU medians after one warm-up and three fresh-process timed solves for each of the four executables, with rotating order. All rose binaries use genuine TCMalloc. The patched Gurobi library hash is `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. Current rose wins **5/23**.
+
+| Run | Gurobi (s) | Uploaded rose (s) | Preceding rose (s) | Current rose (s) | Current / Gurobi |
+|---|---:|---:|---:|---:|---:|
+| degen2.primal-c | 0.071522 | 0.109099 | 0.067160 | 0.069032 | 0.97 |
+| degen2.dual-r | 0.040396 | 0.150221 | 0.076322 | 0.125655 | 3.11 |
+| degen3.primal-c | 0.343843 | 1.187429 | 2.072352 | 1.033640 | 3.01 |
+| degen3.primal-r | 0.439506 | 1.459666 | 1.600743 | 1.176389 | 2.68 |
+| perold.primal-c | 0.351352 | 1.170022 | 1.361991 | 1.159881 | 3.30 |
+| pilot4.primal-r | 0.056236 | 0.206320 | 0.200589 | 0.194573 | 3.46 |
+| 80bau3b.primal-c | 0.441320 | 1.539619 | 1.051896 | 1.306899 | 2.96 |
+| primal_5959.primal-r | 0.095990 | 0.219655 | 0.098309 | 0.109005 | 1.14 |
+| degen3.dual-c | 0.198593 | 0.794805 | 0.651236 | 1.007446 | 5.07 |
+| degen3.dual-r | 0.157990 | 0.590194 | 0.618045 | 0.617355 | 3.91 |
+| perold.dual-r | 0.076615 | 0.246543 | 0.280309 | 0.311844 | 4.07 |
+| 80bau3b.dual-r | 0.316452 | 0.858438 | 0.952376 | 0.550886 | 1.74 |
+| greenbea.dual-c | 0.480286 | 1.557556 | 2.736278 | 1.468517 | 3.06 |
+| greenbea.dual-r | 0.362096 | 1.418038 | 2.255328 | 1.482414 | 4.09 |
+| mode_switch.dual-r | 0.256875 | 3.073155 | 1.311072 | 1.904818 | 7.42 |
+| primal_5959.dual-r | 0.117998 | 0.294636 | 0.126200 | 0.106172 | 0.90 |
+| quad_2717.dual-r | 0.144086 | 0.386317 | 0.167139 | 0.164750 | 1.14 |
+| fx_quad_obj_5371.dual-r | 0.049269 | 0.147071 | 0.047247 | 0.048546 | 0.99 |
+| degen3.barrier-r | 0.210614 | 0.352055 | 0.342108 | 0.377035 | 1.79 |
+| 80bau3b.barrier-r | 0.251893 | 0.625857 | 0.406878 | 0.473795 | 1.88 |
+| greenbea.barrier-r | 0.784694 | 1.696247 | 1.583949 | 1.220010 | 1.55 |
+| 80bau3b.pdhg | 3.719483 | 6.701907 | 2.993275 | 2.941794 | 0.79 |
+| greenbea.pdhg | 1.681354 | 3.123729 | 1.757371 | 1.434643 | 0.85 |
+
+### Phase-one compact cost updates
+
+A repeated general cost BTRAN can restore the original sparse writes and pricing list and advance to its exact factor successor. Each original WORK addition still happens in order. On the independent pre-integration numerical branch redoing 211 real hits verified the full factor, numerical outputs, list and chronological WORK operands. The phase occupied 25.65 ms before the change and 5.97 ms afterward on full quad_2717. The final price and phase-one releases both exercise the independent full-model Devex and higher-level pricing checks.
+
+The first full quad_2717.dual-r comparison measured -13.60%, 95% interval [-14.41%, -12.63%], with 169/192 pairs faster. The second full quad_2717.dual-r comparison measured -10.87%, 95% interval [-13.20%, -6.42%], with 135/192 pairs faster. 
+
+In the 23-row sweep, Rose won 13/69 timed comparisons. It finished faster in all three rounds on 80bau3b.pdhg, greenbea.pdhg.
+
+A separate CPU2 comparison used 48 mixed and 48 identical-Gurobi pairs on each compact run. Every original output and exit code was checked.
+
+| Run | Rose vs Gurobi | 95% interval | Faster pairs | Outcome |
+|---|---:|---:|---:|---|
+| primal_5959.dual-r | -0.53% | [-5.77%, +7.98%] | 24/48 | Inconclusive |
+| fx_quad_obj_5371.dual-r | -5.16% | [-9.09%, +5.84%] | 28/48 | Inconclusive |
+| quad_2717.dual-r | +0.75% | [-4.47%, +7.22%] | 23/48 | Inconclusive |
+| primal_5959.primal-r | +4.69% | [+0.12%, +11.91%] | 15/48 | Gurobi faster |
+
+A separate CPU8 follow-up checked every additional ordinary or barrier row that had beaten Gurobi in the sweep.
+
+- degen2.primal-c measured +130.40% against patched Gurobi, with 95% interval [+121.44%, +144.98%] and 0/48 pairs faster. The prespecified test did not pass.
+
+### Preceding release 2d278c18
+
 The compact primal solver retains the ordered pricing row independently of mutable prices. A recurring transition restores only the costs, weights and extended twins on its original support. A miss runs the original row update.
 
 The full fx_quad_obj_5371.dual-r sweep took 0.066168 → 0.046607 seconds versus the preceding commit `caf46745` (-29.6%). The prespecified randomized timing comparisons measured -20.79% and -20.77%. Frozen parity passed 987/987, 282 runnable release tests passed, and all full-length mode-switch WORK records matched. Full outputs and exit codes agreed on every benchmark. 1 reversed-role controls covered flagged regressions; none established a slowdown.
 
 The table gives same-CPU medians after one warm-up and three fresh-process timed solves for each of the four executables, with rotating order. All rose binaries use genuine TCMalloc. The patched Gurobi library hash is `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. Current rose wins **3/23**.
-
-| Run | Gurobi (s) | Uploaded rose (s) | Preceding rose (s) | Current rose (s) | Current / Gurobi |
-|---|---:|---:|---:|---:|---:|
-| degen2.primal-c | 0.014728 | 0.036564 | 0.035616 | 0.035331 | 2.40 |
-| degen2.dual-r | 0.012703 | 0.034812 | 0.041285 | 0.034338 | 2.70 |
-| degen3.primal-c | 0.251494 | 0.762750 | 0.652098 | 0.648209 | 2.58 |
-| degen3.primal-r | 0.318402 | 0.957536 | 0.736704 | 0.827629 | 2.60 |
-| perold.primal-c | 0.271729 | 0.764769 | 0.755137 | 0.781670 | 2.88 |
-| pilot4.primal-r | 0.024798 | 0.073681 | 0.072049 | 0.070228 | 2.83 |
-| 80bau3b.primal-c | 0.185808 | 0.901528 | 0.729005 | 0.754177 | 4.06 |
-| primal_5959.primal-r | 0.082258 | 0.180785 | 0.098028 | 0.090837 | 1.10 |
-| degen3.dual-c | 0.135701 | 0.396940 | 0.378153 | 0.391336 | 2.88 |
-| degen3.dual-r | 0.133846 | 0.419252 | 0.388859 | 0.383262 | 2.86 |
-| perold.dual-r | 0.060981 | 0.197481 | 0.209870 | 0.195327 | 3.20 |
-| 80bau3b.dual-r | 0.124905 | 0.537537 | 0.427319 | 0.397532 | 3.18 |
-| greenbea.dual-c | 0.314773 | 1.155066 | 1.066361 | 1.136651 | 3.61 |
-| greenbea.dual-r | 0.303575 | 1.253818 | 1.065795 | 1.119609 | 3.69 |
-| mode_switch.dual-r | 0.214856 | 2.548540 | 1.329455 | 1.308266 | 6.09 |
-| primal_5959.dual-r | 0.115396 | 0.279317 | 0.140189 | 0.121858 | 1.06 |
-| quad_2717.dual-r | 0.104275 | 0.286579 | 0.140936 | 0.141940 | 1.36 |
-| fx_quad_obj_5371.dual-r | 0.052959 | 0.114801 | 0.066168 | 0.046607 | 0.88 |
-| degen3.barrier-r | 0.140687 | 0.295909 | 0.343270 | 0.279916 | 1.99 |
-| 80bau3b.barrier-r | 0.178055 | 0.343278 | 0.328340 | 0.324666 | 1.82 |
-| greenbea.barrier-r | 0.704104 | 1.356708 | 1.320497 | 1.242817 | 1.77 |
-| 80bau3b.pdhg | 3.686642 | 6.336998 | 3.149546 | 2.665532 | 0.72 |
-| greenbea.pdhg | 1.640386 | 2.847585 | 1.599253 | 1.558887 | 0.95 |
 
 ### Integrated compact pricing rows
 
