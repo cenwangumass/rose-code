@@ -598,6 +598,7 @@ struct Resid {
     gap: f64,
 }
 
+#[cfg_attr(test, derive(Clone))]
 struct State<'a> {
     a: &'a Scaled,
     objoff: f64,
@@ -634,7 +635,68 @@ struct State<'a> {
     ptol: f64,
 }
 
+// Matching slices establish all bounds before entering either dense kernel.
+// Keeping these passes separate from sparse gathering also gives the compiler
+// non-aliasing input/output references and independent coordinates to vectorize.
+#[inline(never)]
+fn primal_dense(
+    x: &mut [f64],
+    xb: &mut [f64],
+    anchor: &[f64],
+    aty: &[f64],
+    a: &Scaled,
+    tau: f64,
+    w: f64,
+) {
+    let n = x.len();
+    let xb = &mut xb[..n];
+    let anchor = &anchor[..n];
+    let aty = &aty[..n];
+    let c = &a.c[..n];
+    let lb = &a.lb[..n];
+    let ub = &a.ub[..n];
+    let w1 = 1.0 - w;
+    for j in 0..n {
+        let old = x[j];
+        let g = (c[j] - aty[j]) * tau;
+        let t = old - g;
+        let xp = t.max(lb[j]).min(ub[j]);
+        let reflected = (xp + xp) - old;
+        xb[j] = reflected;
+        x[j] = reflected * w + anchor[j] * w1;
+    }
+}
+#[inline(never)]
+fn dual_dense(y: &mut [f64], anchor: &[f64], ax: &[f64], a: &Scaled, sigma: f64, w: f64) {
+    let n = y.len();
+    let anchor = &anchor[..n];
+    let ax = &ax[..n];
+    let rhs = &a.b[..n];
+    let eq = &a.eq[..n];
+    let w1 = 1.0 - w;
+    for i in 0..n {
+        let old = y[i];
+        let t3 = old - ax[i] * sigma;
+        let nsb = (-sigma) * rhs[i];
+        let yp = if eq[i] { t3 - nsb } else { t3 - t3.max(nsb) };
+        let reflected = (yp - old) + yp;
+        y[i] = reflected * w + anchor[i] * w1;
+    }
+}
+
 impl<'a> State<'a> {
+    /// Outside residual, restart and termination boundaries, only the reflected
+    /// primal vector and the next x/y feed subsequent work. Keep both sparse
+    /// matvecs intact and evaluate the dense state transforms in independent lanes.
+    fn ordinary_step(&mut self, tau: f64, sigma: f64) {
+        let a = self.a;
+        let w = (self.k + 1) as f64 / (self.k + 2) as f64;
+        a.mul_t(&self.y, &mut self.aty);
+        primal_dense(&mut self.x, &mut self.xb, &self.x0, &self.aty, a, tau, w);
+        a.mul(&self.xb, &mut self.ax);
+        dual_dense(&mut self.y, &self.y0, &self.ax, a, sigma, w);
+    }
+
     /// `0x3685a0`: the residual scalars at `(xh, yh)`. `flag1`: the first pass and the final pass.
     fn residual(&mut self, flag1: bool) -> Resid {
         let a = self.a;
@@ -902,6 +964,9 @@ fn trivial(model: &LpModel) -> PdhgResult {
 
 /// Solves `model` with the reflected restarted Halpern PDHG.
 pub fn solve(model: &LpModel, opts: &PdhgOptions) -> PdhgResult {
+    solve_inner::<true>(model, opts)
+}
+fn solve_inner<const BATCHED: bool>(model: &LpModel, opts: &PdhgOptions) -> PdhgResult {
     if model.num_rows() == 0 || model.val.is_empty() {
         return trivial(model);
     }
@@ -975,6 +1040,13 @@ pub fn solve(model: &LpModel, opts: &PdhgOptions) -> PdhgResult {
             let chk = (st.n8 + 1) % CHECK == 0;
             tau = st.eta / st.omega;
             sigma = st.eta * st.omega;
+            if BATCHED && !chk && !just_restarted && ((st.total + 1) as f64) < opts.iter_limit {
+                st.ordinary_step(tau, sigma);
+                st.total += 1;
+                st.n8 += 1;
+                st.k += 1;
+                continue;
+            }
             // primal step
             a.mul_t(&st.y, &mut st.aty);
             for j in 0..n {
@@ -1144,5 +1216,151 @@ fn readout(
         dual_residual: st.res.d_inf,
         relative: [st.res.rel_p, st.res.rel_d, st.res.gap],
         checks,
+    }
+}
+
+#[cfg(test)]
+mod ordinary_step_tests {
+    use super::*;
+
+    // The original complete ordinary iteration, including both staging matvecs
+    // and the two separate Halpern passes. Observations remain in solve_inner.
+    fn original(st: &mut State<'_>, tau: f64, sigma: f64) {
+        let a = st.a;
+        a.mul_t(&st.y, &mut st.aty);
+        for j in 0..a.n {
+            let g = (a.c[j] - st.aty[j]) * tau;
+            let t = st.x[j] - g;
+            let xp = t.max(a.lb[j]).min(a.ub[j]);
+            st.xb[j] = (xp + xp) - st.x[j];
+        }
+        a.mul(&st.xb, &mut st.ax);
+        for i in 0..a.m {
+            let t3 = st.y[i] - st.ax[i] * sigma;
+            let nsb = (-sigma) * a.b[i];
+            let yp = if a.eq[i] { t3 - nsb } else { t3 - t3.max(nsb) };
+            st.yh[i] = yp;
+            st.yb[i] = (yp - st.y[i]) + yp;
+        }
+        let w = (st.k + 1) as f64 / (st.k + 2) as f64;
+        let w1 = 1.0 - w;
+        for j in 0..a.n {
+            st.x[j] = st.xb[j] * w + st.x0[j] * w1;
+        }
+        for i in 0..a.m {
+            st.y[i] = st.yb[i] * w + st.y0[i] * w1;
+        }
+    }
+
+    fn initial(a: &Scaled, mut next: impl FnMut() -> f64) -> State<'_> {
+        let mut fill = |n| (0..n).map(|_| next()).collect();
+        State {
+            a,
+            objoff: 0.0,
+            x: fill(a.n),
+            y: fill(a.m),
+            x0: fill(a.n),
+            y0: fill(a.m),
+            xh: fill(a.n),
+            yh: fill(a.m),
+            zc: fill(a.n),
+            xb: fill(a.n),
+            yb: fill(a.m),
+            ax: fill(a.m),
+            aty: fill(a.n),
+            eta: 0.5,
+            omega: 2.0,
+            omega0: 2.0,
+            integral: 0.0,
+            total: 143,
+            n8: 21,
+            k: 12,
+            power_iters: 122,
+            r: 1.0,
+            r_prev: 2.0,
+            r0: 3.0,
+            nb: 1.0,
+            nc: 1.0,
+            ncons: a.n,
+            res: Resid::default(),
+            pv: fill(a.m),
+            perr: 0.0,
+            ptol: 1e-4,
+        }
+    }
+
+    fn bits(values: &[f64]) -> Vec<u64> {
+        values.iter().map(|x| x.to_bits()).collect()
+    }
+
+    #[test]
+    fn ordered_step_matches_materialized_vectors() {
+        let model = crate::mps::parse(include_str!("../tests/fixtures/afiro.mps")).unwrap();
+        let a = Scaled::new(&build(&model));
+        let mut rng = 19_u64;
+        for case in 0..32 {
+            let mut next = || {
+                rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1);
+                match case % 4 {
+                    0 => (rng as i64 as f64) * 1e-16,
+                    1 => f64::from_bits(rng),
+                    2 => [-0.0, f64::MAX, f64::MIN_POSITIVE, -1.0, 2.0, f64::INFINITY]
+                        [(rng >> 32) as usize % 6],
+                    _ => [
+                        f64::from_bits(0x7ff8_0000_0000_0001),
+                        -0.0,
+                        -f64::INFINITY,
+                        -4.0,
+                    ][(rng >> 32) as usize % 4],
+                }
+            };
+            let mut fused = initial(&a, &mut next);
+            let mut frozen = fused.clone();
+            for _ in 0..3 {
+                let (tau, sigma) = (next(), next());
+                original(&mut frozen, tau, sigma);
+                fused.ordinary_step(tau, sigma);
+                assert_eq!(bits(&frozen.x), bits(&fused.x), "x case {case}");
+                assert_eq!(bits(&frozen.y), bits(&fused.y), "y case {case}");
+                assert_eq!(bits(&frozen.xb), bits(&fused.xb), "xb case {case}");
+                frozen.k += 1;
+                fused.k += 1;
+            }
+        }
+    }
+
+    #[test]
+    fn complete_results_around_checks_and_restarts() {
+        let m = crate::mps::parse(include_str!("../tests/fixtures/adlittle.mps")).unwrap();
+        let mut opts = PdhgOptions {
+            iter_limit: 4000.0,
+            abs_tol: 0.0,
+            rel_tol: 0.0,
+            conv_tol: 0.0,
+            record_checks: true,
+            ..Default::default()
+        };
+        let first = solve_inner::<false>(&m, &opts);
+        let at = first.checks[0]["total"].as_u64().unwrap();
+        for limit in [1, at - 1, at, at + 1, at + 99, at + 100, at + 101, at + 850] {
+            for inject in [None, Some((100, Inject::Merit)), Some((100, Inject::Pobj))] {
+                opts.iter_limit = limit as f64;
+                opts.inject = inject;
+                let a = solve_inner::<false>(&m, &opts);
+                let b = solve_inner::<true>(&m, &opts);
+                assert_eq!(
+                    (a.status, a.iterations, a.restarts),
+                    (b.status, b.iterations, b.restarts)
+                );
+                assert_eq!(a.checks, b.checks);
+                assert_eq!(a.objective.to_bits(), b.objective.to_bits());
+                assert_eq!(bits(&a.x), bits(&b.x));
+                assert_eq!(bits(&a.dual), bits(&b.dual));
+                assert_eq!(bits(&a.reduced_cost), bits(&b.reduced_cost));
+                assert_eq!(bits(&a.relative), bits(&b.relative));
+                assert_eq!(a.primal_residual.to_bits(), b.primal_residual.to_bits());
+                assert_eq!(a.dual_residual.to_bits(), b.dual_residual.to_bits());
+            }
+        }
     }
 }
