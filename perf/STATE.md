@@ -4,37 +4,62 @@ Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (histo
 
 ## Numbers on AMD EPYC 9V74
 
+The compact primal solver retains the ordered pricing row independently of mutable prices. A recurring transition restores only the costs, weights and extended twins on its original support. A miss runs the original row update.
+
+The full fx_quad_obj_5371.dual-r sweep took 0.066168 → 0.046607 seconds versus the preceding commit `caf46745` (-29.6%). The prespecified randomized timing comparisons measured -20.79% and -20.77%. Frozen parity passed 987/987, 282 runnable release tests passed, and all full-length mode-switch WORK records matched. Full outputs and exit codes agreed on every benchmark. 1 reversed-role controls covered flagged regressions; none established a slowdown.
+
+The table gives same-CPU medians after one warm-up and three fresh-process timed solves for each of the four executables, with rotating order. All rose binaries use genuine TCMalloc. The patched Gurobi library hash is `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. Current rose wins **3/23**.
+
+| Run | Gurobi (s) | Uploaded rose (s) | Preceding rose (s) | Current rose (s) | Current / Gurobi |
+|---|---:|---:|---:|---:|---:|
+| degen2.primal-c | 0.014728 | 0.036564 | 0.035616 | 0.035331 | 2.40 |
+| degen2.dual-r | 0.012703 | 0.034812 | 0.041285 | 0.034338 | 2.70 |
+| degen3.primal-c | 0.251494 | 0.762750 | 0.652098 | 0.648209 | 2.58 |
+| degen3.primal-r | 0.318402 | 0.957536 | 0.736704 | 0.827629 | 2.60 |
+| perold.primal-c | 0.271729 | 0.764769 | 0.755137 | 0.781670 | 2.88 |
+| pilot4.primal-r | 0.024798 | 0.073681 | 0.072049 | 0.070228 | 2.83 |
+| 80bau3b.primal-c | 0.185808 | 0.901528 | 0.729005 | 0.754177 | 4.06 |
+| primal_5959.primal-r | 0.082258 | 0.180785 | 0.098028 | 0.090837 | 1.10 |
+| degen3.dual-c | 0.135701 | 0.396940 | 0.378153 | 0.391336 | 2.88 |
+| degen3.dual-r | 0.133846 | 0.419252 | 0.388859 | 0.383262 | 2.86 |
+| perold.dual-r | 0.060981 | 0.197481 | 0.209870 | 0.195327 | 3.20 |
+| 80bau3b.dual-r | 0.124905 | 0.537537 | 0.427319 | 0.397532 | 3.18 |
+| greenbea.dual-c | 0.314773 | 1.155066 | 1.066361 | 1.136651 | 3.61 |
+| greenbea.dual-r | 0.303575 | 1.253818 | 1.065795 | 1.119609 | 3.69 |
+| mode_switch.dual-r | 0.214856 | 2.548540 | 1.329455 | 1.308266 | 6.09 |
+| primal_5959.dual-r | 0.115396 | 0.279317 | 0.140189 | 0.121858 | 1.06 |
+| quad_2717.dual-r | 0.104275 | 0.286579 | 0.140936 | 0.141940 | 1.36 |
+| fx_quad_obj_5371.dual-r | 0.052959 | 0.114801 | 0.066168 | 0.046607 | 0.88 |
+| degen3.barrier-r | 0.140687 | 0.295909 | 0.343270 | 0.279916 | 1.99 |
+| 80bau3b.barrier-r | 0.178055 | 0.343278 | 0.328340 | 0.324666 | 1.82 |
+| greenbea.barrier-r | 0.704104 | 1.356708 | 1.320497 | 1.242817 | 1.77 |
+| 80bau3b.pdhg | 3.686642 | 6.336998 | 3.149546 | 2.665532 | 0.72 |
+| greenbea.pdhg | 1.640386 | 2.847585 | 1.599253 | 1.558887 | 0.95 |
+
+### Integrated compact pricing rows
+
+A compact pivot row retains its checked geometry and up to eight sparse numerical price transitions. A hit copies the four price values only at participating positions. The earlier diagnostic reran 45,888 original operations and checked all four arrays, including untouched positions. The existing Devex test exercises the original lower cache directly and still requires more than 1,000 actual lower-kernel cache hits. Separately, the integrated full-model test keeps pricing reuse enabled, checks the entire numerical state and ordered row against the original kernel on every verified hit and requires more than 1,000 genuine hits per model. The oracle excludes its own work from the live cache-hit counter. A new independent PGO build and new timings were required after the earlier prototype failed the original lower-cache coverage assertion.
+
+The first full fx_quad_obj_5371.dual-r comparison measured -20.79%, 95% interval [-21.96%, -19.34%], with 172/192 pairs faster. The second full fx_quad_obj_5371.dual-r comparison measured -20.77%, 95% interval [-23.43%, -18.44%], with 164/192 pairs faster. 
+
+In the 23-row sweep, Rose won 10/69 timed comparisons. It finished faster in all three rounds on 80bau3b.pdhg, greenbea.pdhg.
+
+A separate CPU2 comparison used 48 mixed and 48 identical-Gurobi pairs on each compact run. Every original output and exit code was checked.
+
+| Run | Rose vs Gurobi | 95% interval | Faster pairs | Outcome |
+|---|---:|---:|---:|---|
+| primal_5959.dual-r | -3.61% | [-11.88%, +3.67%] | 27/48 | Inconclusive |
+| fx_quad_obj_5371.dual-r | +3.26% | [-6.31%, +12.70%] | 21/48 | Inconclusive |
+| quad_2717.dual-r | +17.82% | [+13.26%, +21.23%] | 5/48 | Gurobi faster |
+| primal_5959.primal-r | +4.47% | [-9.66%, +22.88%] | 19/48 | Inconclusive |
+
+### Preceding release caf46745
+
 A fresh compact main factor can own the numerical effects of reconstructing its primal and dual values. Matching basis, ordered inputs and floating-point state allow the solver to restore the original writes and advance to the exact existing transpose successor. It still evaluates the drift and pricing decisions and books each original WORK site.
 
 The full primal_5959.dual-r sweep took 0.138375 → 0.122820 seconds versus the preceding commit `f4fca9d5` (-11.2%). The prespecified randomized timing comparisons measured -11.93% and -9.16%. Frozen parity passed 987/987, 280 runnable release tests passed, and all full-length mode-switch WORK records matched. Full outputs and exit codes agreed on every benchmark. 8 reversed-role controls covered flagged regressions; none established a slowdown.
 
 The table gives same-CPU medians after one warm-up and three fresh-process timed solves for each of the four executables, with rotating order. All rose binaries use genuine TCMalloc. The patched Gurobi library hash is `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. Current rose wins **1/23**.
-
-| Run | Gurobi (s) | Uploaded rose (s) | Preceding rose (s) | Current rose (s) | Current / Gurobi |
-|---|---:|---:|---:|---:|---:|
-| degen2.primal-c | 0.017099 | 0.043970 | 0.041117 | 0.040445 | 2.37 |
-| degen2.dual-r | 0.013406 | 0.036959 | 0.034663 | 0.032846 | 2.45 |
-| degen3.primal-c | 0.249683 | 0.757074 | 0.839837 | 0.704940 | 2.82 |
-| degen3.primal-r | 0.262960 | 0.734757 | 0.660856 | 0.728240 | 2.77 |
-| perold.primal-c | 0.195836 | 0.623798 | 0.640211 | 0.664916 | 3.40 |
-| pilot4.primal-r | 0.019700 | 0.057947 | 0.053850 | 0.074609 | 3.79 |
-| 80bau3b.primal-c | 0.139371 | 0.827653 | 0.550294 | 0.686477 | 4.93 |
-| primal_5959.primal-r | 0.073716 | 0.163841 | 0.095155 | 0.080716 | 1.09 |
-| degen3.dual-c | 0.131723 | 0.423990 | 0.336994 | 0.354443 | 2.69 |
-| degen3.dual-r | 0.123392 | 0.381000 | 0.331099 | 0.346814 | 2.81 |
-| perold.dual-r | 0.057639 | 0.178818 | 0.183176 | 0.185638 | 3.22 |
-| 80bau3b.dual-r | 0.116140 | 0.467923 | 0.381117 | 0.410619 | 3.54 |
-| greenbea.dual-c | 0.275717 | 0.983870 | 0.994473 | 0.987772 | 3.58 |
-| greenbea.dual-r | 0.312731 | 1.207918 | 1.088615 | 1.172848 | 3.75 |
-| mode_switch.dual-r | 0.131641 | 2.007307 | 0.958006 | 0.770008 | 5.85 |
-| primal_5959.dual-r | 0.113670 | 0.250212 | 0.138375 | 0.122820 | 1.08 |
-| quad_2717.dual-r | 0.114140 | 0.250876 | 0.135857 | 0.143097 | 1.25 |
-| fx_quad_obj_5371.dual-r | 0.046008 | 0.108545 | 0.057310 | 0.052568 | 1.14 |
-| degen3.barrier-r | 0.174443 | 0.363123 | 0.455771 | 0.442727 | 2.54 |
-| 80bau3b.barrier-r | 0.175040 | 0.335766 | 0.429579 | 0.506532 | 2.89 |
-| greenbea.barrier-r | 0.725012 | 2.576603 | 2.325766 | 1.448228 | 2.00 |
-| 80bau3b.pdhg | 3.519194 | 6.401593 | 2.736362 | 2.862504 | 0.81 |
-| greenbea.pdhg | 1.478840 | 3.137567 | 1.462617 | 1.624095 | 1.10 |
 
 ### Compact primal and dual reconstruction
 
@@ -998,7 +1023,7 @@ projected effects, component source/binary/timings, dependency audit and restora
 
 ## In progress
 
-The next compact simplex measurements address the remaining pricing row and the general cost-change BTRAN. Their contributions are measured independently against each actual production parent.
+Further work measures reuse of complete compact pivot directions, the remaining numerical reconstruction costs and a general sparse-matrix program for ordinary PDHG iterations. All timing comparisons use the original stopping conditions.
 
 The current comparison above uses the original arguments for every benchmark. The remaining compact primal costs under investigation include reconstructing fresh primal and dual quantities, and computing native extended reduced costs for a recurring dual vector and active basis mask. Current solve-only profiles and independent whole-input measurements identify these costs after recurrent FTRAN, BTRAN and factor update work has been removed.
 
@@ -1310,6 +1335,18 @@ The remaining candidates below derive from the Ryzen measurements and their hist
 ## Tried, no gain
 
 ### EPYC structural trials
+
+- The compact pivot direction prototype retained exact FTRAN successor state, ordered/signed binary64 and extended outputs and both dense representations. The point update reused its checked numerical result for repeated inputs. Across four original model solves, re-executing the original verified 46,594 directions, 46,591 point steps and 331 complete successor-factor snapshots. Both WORK modes and 987/987 frozen cases agreed. The primary full fx viability test changed by -3.33%, interval [-14.40%, +4.31%]. It stopped below the 5% minimum.
+
+- A matrix-specific PDHG program emitted ordinary sparse products in their original arithmetic order at solve start. A same-build feasibility comparison was 34.23% faster for GREENBEA and 26.43% for 80BAU3B. Production inserted mandatory finite-domain checks before any state mutation and preserved the earlier operator on exceptional inputs and protection failures. Full parity passed 987/987, the exact production/parent exceptional-state audit matched 552,480 numerical values and 480 floating environments, and all 59,679 eligible ordinary benchmark steps took the compiled path. The fixed39 production test on original GREENBEA measured -1.97%, interval [-6.42%, +6.56%], with 18/32 pairs faster. It stopped without confirmation or a release commit.
+
+
+- Ordinary dual pivot transaction, measured on 2731b202. Solve-only native stacks, exact ELF-scoped interposition and 24 complete phase profiles separated earlier pivot-frame, secondary FTRAN, output-order/WORK and sparse-level costs from the remaining pivot handoffs. The earlier regions cover 97.8% of 7.799 GB of mode-switch transfer requests and 92.4% of 1.047 GB on 80BAU3B. PEROLD has only seven iteration libc leaves in 990 solve samples. Remaining packing, alignment, flip preparation, basis changes and row canonicalization cost 1.65%/2.67%/2.77% on mode-switch/PEROLD/80BAU3B. The full ratio test, basic/Devex update and reduced-cost update still perform required arithmetic. Even granting all three for free in addition to free handoffs gives 5.31%/9.92%/10.78%, before owner bookkeeping. The ordered ratio-coefficient vector repeated 0/11,393, 1/1,185 and 9/5,185 times respectively, disregarding additional live cost dependencies. No dense/joint FTRAN outputs occurred in mode-switch. No qualifying whole-pivot rewrite was implemented. Complete raw controls, outputs, source lines, scripts, and disjoint estimates: next/pivot-transaction/review.md.
+
+- On 80BAU3B barrier, 12,022 to 12,061 of 12,061 input weights changed between adjacent factors. In 20,052 front transitions, no front retained the full set of its own required diagonal inputs. Across different rows in one factor, all 1,503 DEGEN3 diagonal supports and all 2,262 80BAU3B diagonal supports were distinct. The additional ordering call in the CLI runs after the end of the solve timer. These checks did not support reuse of complete numerical fronts or credit for removing the post-solve ordering call.
+
+- A PDHG program classified homogeneous operand-address sequences and common projection bounds. It matched both original full outcomes and focused exceptional cases. Nine complete GREENBEA paired trials gave 0.18% less CPU time, with five of nine improving. The exact-ELF primal phase, 22.49% of solve time, was 1.40% slower in the separate phase test. The production build and formal comparisons were held.
+
 
 - Ordinary dual factor storage across epochs, 2731b202. Solve-only native stacks put dual refactor at 42.6% of mode-switch and 30.5% of PEROLD dual. A six-model exact row/capacity census and two actual allocator-pointer campaigns separated typed storage from numerical work and unrelated allocations. The 17 studied families include split basis inputs, structural output, main mirror and transpose, auxiliary L/U and pricing reset. The allocations, reallocations and frees of buffers fitting an alternating same-slot bank, including every previously untagged retiring buffer, accounted for an estimated 7.02% of the entire mode-switch solve (95% solve-bootstrap 5.78–8.35%) and 2.33% of PEROLD (1.55–3.24%) before owner bookkeeping. The complete local numeric factor never repeated in 4,200 between-refactor block comparisons under physical coordinate translation. Identical complete physical Markowitz rows covered 9.0% of its local cross products. All diagnostic results and exits were canonical. No production patch or new speedup claim. Evidence and scripts in next/refactor-slot-lifetime and next/refactor-retired-slots.
 

@@ -15,6 +15,7 @@ pub(crate) struct State {
     factor: Factor,
     edge: OnceCell<Edge>,
     depth: usize,
+    pricing_rows: super::quad_row::PricingRows,
     dual: OnceCell<super::quad_fresh::DualSnapshot>,
     #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
     costs: super::quad_cost::CompactCosts,
@@ -129,12 +130,20 @@ impl std::ops::Deref for QuadMain {
 }
 
 impl QuadMain {
+    pub(super) fn pricing_rows(&self) -> Option<&super::quad_row::PricingRows> {
+        match self {
+            Self::Shared(state) => Some(&state.pricing_rows),
+            Self::Direct(_) => None,
+        }
+    }
+
     pub(super) fn new(f: Factor, eligible: bool) -> Self {
         if eligible && status().is_some() {
             Self::Shared(Rc::new(State {
                 factor: f,
                 edge: OnceCell::new(),
                 depth: 0,
+                pricing_rows: Default::default(),
                 dual: OnceCell::new(),
                 #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
                 costs: Default::default(),
@@ -196,6 +205,7 @@ impl QuadMain {
                     factor: next,
                     edge: OnceCell::new(),
                     depth: state.depth + 1,
+                    pricing_rows: Default::default(),
                     dual: OnceCell::new(),
                     #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
                     costs: Default::default(),

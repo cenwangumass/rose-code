@@ -235,6 +235,8 @@ mod quad_cost;
 mod quad_fresh;
 #[path = "quad_main.rs"]
 mod quad_main;
+#[path = "quad_row.rs"]
+mod quad_row;
 use quad_main::QuadMain;
 
 pub(crate) enum Mir {
@@ -1453,10 +1455,22 @@ impl QuadRhs {
         &mut self,
         state: PrimalRowState<'_>,
         arg: &PrimalRowInput<'_>,
-    ) -> (bool, Vec<usize>, Vec<(usize, f64)>) {
+        effect: Option<&quad_row::PricingRows>,
+    ) -> quad_row::ResultRow {
         if let Self::Shared(shared) = self {
             if !arg.m2 && !crate::dump::any() {
-                return shared.lock().unwrap().devex_deltas.update(state, arg);
+                return shared
+                    .lock()
+                    .unwrap()
+                    .devex_deltas
+                    .update_scoped(state, arg, effect);
+            }
+        }
+        if arg.m2 {
+            if let Some(effect) = effect {
+                return effect.apply(state, arg, None, |st, _| {
+                    (primal_row_update::<true>(st, arg), true)
+                });
             }
         }
         primal_row_update::<true>(state, arg)
@@ -9082,7 +9096,11 @@ fn solve_primal(
         let (mut norm_reset, mut changed, mut rowvals) = if qw.is_none() && prods_q.is_none() {
             primal_row_update::<false>(state, &input)
         } else if let Some(rhs) = s.mirror_q.as_mut() {
-            rhs.update_row(state, &input)
+            let effect = match &s.mirror {
+                Some(Mir::Q(main)) => main.pricing_rows(),
+                _ => None,
+            };
+            rhs.update_row(state, &input, effect)
         } else {
             primal_row_update::<true>(state, &input)
         };
@@ -10100,6 +10118,7 @@ mod devex_dot_tests {
 }
 
 struct DevexDeltaEntry {
+    identity: std::sync::Arc<()>,
     key: Vec<(u64, u16)>,
     values: Vec<Option<crate::f80::F80>>,
 }
@@ -10115,10 +10134,19 @@ struct DevexDeltaMemo {
 }
 
 impl DevexDeltaMemo {
+    #[cfg(test)]
     fn update(
         &mut self,
         state: PrimalRowState<'_>,
         arg: &PrimalRowInput<'_>,
+    ) -> (bool, Vec<usize>, Vec<(usize, f64)>) {
+        self.update_scoped(state, arg, None)
+    }
+    fn update_scoped(
+        &mut self,
+        state: PrimalRowState<'_>,
+        arg: &PrimalRowInput<'_>,
+        effect: Option<&quad_row::PricingRows>,
     ) -> (bool, Vec<usize>, Vec<(usize, f64)>) {
         #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
         if !arg.m2 && !crate::dump::any() && arg.p.m <= 50 {
@@ -10168,6 +10196,7 @@ impl DevexDeltaMemo {
                                     self.entries.remove(0);
                                 }
                                 self.entries.push(DevexDeltaEntry {
+                                    identity: std::sync::Arc::new(()),
                                     key: self.key.clone(),
                                     values: vec![None; nm],
                                 });
@@ -10175,19 +10204,33 @@ impl DevexDeltaMemo {
                             };
                         #[cfg(test)]
                         let (shadow, expected) = DevexDeltaShadow::run(&state, arg);
-                        let out = primal_row_update_delta(
-                            PrimalRowState {
-                                w: &mut *state.w,
-                                d: &mut *state.d,
-                                wf: &mut *state.wf,
-                                df: &mut *state.df,
-                                pos_of: state.pos_of,
-                                fixed: state.fixed,
-                                excluded: state.excluded,
-                            },
-                            arg,
-                            &mut self.entries[index],
-                        );
+                        let entry = &mut self.entries[index];
+                        let state_view = PrimalRowState {
+                            w: &mut *state.w,
+                            d: &mut *state.d,
+                            wf: &mut *state.wf,
+                            df: &mut *state.df,
+                            pos_of: state.pos_of,
+                            fixed: state.fixed,
+                            excluded: state.excluded,
+                        };
+                        let out = if let Some(effect) = effect {
+                            let identity = entry.identity.clone();
+                            effect.apply(state_view, arg, Some(&identity), |state, record| {
+                                let filled = if record {
+                                    entry.values.iter().filter(|v| v.is_some()).count()
+                                } else {
+                                    0
+                                };
+                                let out = primal_row_update_delta(state, arg, entry);
+                                let warm = record
+                                    && entry.values.iter().filter(|v| v.is_some()).count()
+                                        == filled;
+                                (out, warm)
+                            })
+                        } else {
+                            primal_row_update_delta(state_view, arg, entry)
+                        };
                         #[cfg(test)]
                         {
                             shadow.check(&state, &expected, &out);
@@ -11844,6 +11887,7 @@ mod devex_delta_tests {
     #[test]
     #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
     fn real_cached_rows_match_frozen() {
+        let _original = super::quad_row::audit::exercise_original();
         for (name, cap, iterations, refs, status) in [
             ("fx_quad_obj_5371", 5500, 5319, 5, Status::Infeasible),
             ("quad_2717", 17000, 16010, 3022, Status::Optimal),
