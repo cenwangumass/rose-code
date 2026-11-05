@@ -8,6 +8,7 @@ enum Mode {
     Original,
     Compare,
 }
+
 thread_local! {
     static MODE: Cell<Mode> = const { Cell::new(Mode::Normal) };
     static VERIFIED: Cell<usize> = const { Cell::new(0) };
@@ -74,6 +75,7 @@ impl Expected {
             row,
         }
     }
+
     pub(super) fn check(&self, state: &PrimalRowState<'_>, reset: bool, plan: &Plan) {
         assert!(doubles(&self.weights, state.w) && doubles(&self.costs, state.d));
         assert!(

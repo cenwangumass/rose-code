@@ -4,15 +4,18 @@ use crate::f80::F80;
 use std::{cell::RefCell, sync::Arc};
 
 pub(super) type ResultRow = (bool, Vec<usize>, Vec<(usize, f64)>);
+
 #[derive(Default)]
 pub(super) struct PricingRows(RefCell<Option<Plan>>);
 
 fn doubles(a: &[f64], b: &[f64]) -> bool {
     a.len() == b.len() && a.iter().zip(b).all(|(a, b)| a.to_bits() == b.to_bits())
 }
+
 fn extended(a: &[F80], b: &[F80]) -> bool {
     a.len() == b.len() && a.iter().zip(b).all(|(a, b)| a.same_bits(*b))
 }
+
 // Only returned row positions can read or modify the four numerical price arrays.
 #[derive(Clone, Copy)]
 struct Price {
@@ -21,6 +24,7 @@ struct Price {
     extended_weight: F80,
     extended_cost: F80,
 }
+
 impl Price {
     fn at(s: &PrimalRowState<'_>, j: usize) -> Self {
         Self {
@@ -30,12 +34,14 @@ impl Price {
             extended_cost: s.df[j],
         }
     }
+
     fn matches(&self, s: &PrimalRowState<'_>, j: usize) -> bool {
         self.weight.to_bits() == s.w[j].to_bits()
             && self.cost.to_bits() == s.d[j].to_bits()
             && self.extended_weight.same_bits(s.wf[j])
             && self.extended_cost.same_bits(s.df[j])
     }
+
     fn restore(self, s: &mut PrimalRowState<'_>, j: usize) {
         s.w[j] = self.weight;
         s.d[j] = self.cost;
@@ -59,6 +65,7 @@ struct Inputs {
     tau: Vec<F80>,
     scalars: [F80; 3],
 }
+
 impl Inputs {
     fn flags(s: &PrimalRowState<'_>, a: &PrimalRowInput<'_>) -> [u64; 10] {
         [
@@ -74,10 +81,12 @@ impl Inputs {
             a.wq.to_bits(),
         ]
     }
+
     fn scalars(a: &PrimalRowInput<'_>) -> [F80; 3] {
         let (alpha, weight) = a.qw.unwrap();
         [alpha, weight, a.theta_dq.unwrap()]
     }
+
     fn new(s: &PrimalRowState<'_>, a: &PrimalRowInput<'_>) -> Self {
         Self {
             pos: s.pos_of.to_vec(),
@@ -91,6 +100,7 @@ impl Inputs {
             scalars: Self::scalars(a),
         }
     }
+
     fn matches(&self, s: &PrimalRowState<'_>, a: &PrimalRowInput<'_>) -> bool {
         self.flags == Self::flags(s, a)
             && extended(&self.scalars, &Self::scalars(a))
@@ -103,6 +113,7 @@ impl Inputs {
             && extended(&self.tau, a.cross.map_or(&[][..], |x| x.tau))
     }
 }
+
 const MAX_OVERLAYS: usize = 8;
 
 struct Overlay {
@@ -111,6 +122,7 @@ struct Overlay {
     reset: bool,
     flags: u32,
 }
+
 struct Plan {
     inputs: Inputs,
     delta: Option<Arc<()>>,
@@ -118,6 +130,7 @@ struct Plan {
     row_values: Vec<(usize, f64)>,
     overlays: Vec<Overlay>,
 }
+
 impl PricingRows {
     pub(super) fn apply(
         &self,

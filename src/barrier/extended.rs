@@ -41,6 +41,7 @@ fn finish_significand(neg: bool, v: u128, e: i32, shift: u32) -> Ext {
         }
     }
 }
+
 #[inline(always)]
 fn checked_product(a: f64, b: f64) -> Option<Ext> {
     let (x, y) = (a.to_bits(), b.to_bits());
@@ -63,6 +64,7 @@ fn checked_product(a: f64, b: f64) -> Option<Ext> {
         shift,
     ))
 }
+
 #[cfg(test)]
 fn exact_product(a: f64, b: f64) -> Ext {
     checked_product(a, b).unwrap_or_else(|| Ext::mul_f64(a, b))
@@ -80,6 +82,7 @@ fn normalize_difference(neg: bool, v: u64, e: i32) -> Ext {
         e: e - lz as i32,
     }
 }
+
 #[inline(always)]
 // Align three low guard bits, using the same low-bit jam as Ext::add. The
 // legacy alignment uses 62 bits. Shifting its result right 59 bits with a jam
@@ -137,10 +140,12 @@ fn exact_add(x: Ext, y: Ext) -> Ext {
     };
     finish_significand(a.neg, v, a.e - 3, shift)
 }
+
 #[inline(always)]
 fn exact_sub(x: Ext, y: Ext) -> Ext {
     exact_add(x, y.neg())
 }
+
 /// Computes both original feedback operations. With a common sign and
 /// exponent the difference is an exact signed integer at that exponent.
 #[inline(always)]
@@ -177,6 +182,7 @@ fn feedback(next: Ext, sum: Ext, y: Ext) -> (Ext, Ext) {
     let h = exact_sub(next, sum);
     (h, exact_sub(h, y))
 }
+
 #[inline(never)]
 pub(super) fn stream(a: &[f64], b: &[f64]) -> Ext {
     let (mut sum, mut c) = (Ext::ZERO, Ext::ZERO);
@@ -197,15 +203,18 @@ pub(super) fn stream(a: &[f64], b: &[f64]) -> Ext {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     fn same(x: Ext, y: Ext) {
         assert_eq!((x.neg, x.m, x.e), (y.neg, y.m, y.e));
     }
+
     fn random(s: &mut u64) -> u64 {
         *s ^= *s << 13;
         *s ^= *s >> 7;
         *s ^= *s << 17;
         *s
     }
+
     fn shadow(a: &[f64], b: &[f64]) {
         let (mut s, mut c, mut sr, mut cr) = (Ext::ZERO, Ext::ZERO, Ext::ZERO, Ext::ZERO);
         for (&a, &b) in a.iter().zip(b) {
@@ -232,6 +241,7 @@ mod tests {
             super::super::software_kahan_tail(a, b, Ext::ZERO, Ext::ZERO),
         );
     }
+
     #[test]
     fn extended_add_matches_full_alignment() {
         let mant = [
@@ -283,6 +293,7 @@ mod tests {
             same(exact_sub(a, b), a.sub(b));
         }
     }
+
     #[test]
     fn all_five_kahan_values_match_software() {
         let special = [

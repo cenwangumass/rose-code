@@ -137,6 +137,7 @@ mod tests {
             asm!("fldcw [{cw}]",cw=in(reg)&cw,options(nostack,preserves_flags));
         }
     }
+
     fn set_csr(csr: u32) {
         unsafe {
             asm!("ldmxcsr [{csr}]",csr=in(reg)&csr,options(nostack,preserves_flags));
@@ -151,6 +152,7 @@ mod tests {
             asm!("fnstcw [{cw}]", "stmxcsr [{csr}]",cw=in(reg)&mut original_cw,csr=in(reg)&mut original_csr,options(nostack,preserves_flags));
         }
         struct Restore(u16, u32);
+
         impl Drop for Restore {
             fn drop(&mut self) {
                 set_cw(self.0);

@@ -15,7 +15,10 @@ use std::collections::BinaryHeap;
 /// solves retain their contiguous marker scan. Duplicate touches are idempotent.
 enum FtranTouched {
     Dense(Vec<bool>),
-    Sparse { words: Vec<u64>, occupied: Vec<usize> },
+    Sparse {
+        words: Vec<u64>,
+        occupied: Vec<usize>,
+    },
 }
 
 impl FtranTouched {
@@ -23,7 +26,10 @@ impl FtranTouched {
         if dense {
             Self::Dense(vec![false; m])
         } else {
-            Self::Sparse { words: vec![0; m.div_ceil(64)], occupied }
+            Self::Sparse {
+                words: vec![0; m.div_ceil(64)],
+                occupied,
+            }
         }
     }
 
@@ -49,7 +55,9 @@ impl FtranTouched {
     /// Consume a row in U's requested output order. Every numeric write has been
     /// marked by this point, so duplicate and zero outputs can consume the same bit.
     fn take_sparse(&mut self, row: usize) -> bool {
-        let Self::Sparse { words, .. } = self else { unreachable!() };
+        let Self::Sparse { words, .. } = self else {
+            unreachable!()
+        };
         let bit = 1u64 << (row % 64);
         let word = &mut words[row / 64];
         let was_set = *word & bit != 0;
@@ -131,7 +139,9 @@ impl<R: Real> LevelWorkspace<R> {
                 let eta = &f.etas[e];
                 // The omitted eta would receive only positive zeros. Its
                 // result rounds to canonical zero even with signed coefficients.
-                if eta.ind.first() != Some(&eta.idx) || !eta.val.iter().all(|v| v.to_f64().is_finite()) {
+                if eta.ind.first() != Some(&eta.idx)
+                    || !eta.val.iter().all(|v| v.to_f64().is_finite())
+                {
                     self.incompatible = true;
                     return false;
                 }
@@ -182,8 +192,12 @@ impl<R: Real> LevelWorkspace<R> {
     }
 
     fn solve(
-        &mut self, f: &RefStruct<R>, levels: &[usize], maxlev: usize,
-        rows: &[usize], vals: &[R],
+        &mut self,
+        f: &RefStruct<R>,
+        levels: &[usize],
+        maxlev: usize,
+        rows: &[usize],
+        vals: &[R],
     ) -> Option<(Vec<(usize, R)>, usize, f64)> {
         if !self.prepare(f, maxlev + 1) {
             return None;
@@ -226,8 +240,8 @@ impl<R: Real> LevelWorkspace<R> {
         if !f.etas.is_empty() && (at_tolerance || count * f.dthr > f.m) {
             return None;
         }
-        let mut work = ((f.nnz_l + f.m + 2 * f.m) as f64 * 5.0 * count as f64)
-            / (f.m + 1) as f64 + 0.0;
+        let mut work =
+            ((f.nnz_l + f.m + 2 * f.m) as f64 * 5.0 * count as f64) / (f.m + 1) as f64 + 0.0;
         if crate::dump::on("lstage") {
             f.lsnap.borrow_mut().0.clone_from(&self.values);
         }
@@ -245,7 +259,8 @@ impl<R: Real> LevelWorkspace<R> {
                     let e = word * 64 + bit;
                     let eta = &f.etas[e];
                     self.gather.clear();
-                    self.gather.extend(eta.ind.iter().map(|&row| self.values[row]));
+                    self.gather
+                        .extend(eta.ind.iter().map(|&row| self.values[row]));
                     let v = dot(&self.gather, &eta.val, eta.peel);
                     let row = eta.idx;
                     if v.abs() <= R::c(TOL) {
@@ -271,9 +286,13 @@ impl<R: Real> LevelWorkspace<R> {
         if crate::dump::on("lstage") {
             f.lsnap.borrow_mut().1.clone_from(&self.values);
         }
-        let out = self.order.iter().copied()
+        let out = self
+            .order
+            .iter()
+            .copied()
             .filter(|&i| self.values[i].abs() > R::c(TOL))
-            .map(|i| (i, self.values[i])).collect();
+            .map(|i| (i, self.values[i]))
+            .collect();
         Some((out, count, work))
     }
 }
@@ -344,7 +363,9 @@ struct SparseBtranTail<R> {
 
 trait BtranTail<R: Real> {
     fn entry(&mut self, p: usize, slots: &[usize]) -> &mut R;
+
     fn next_slot(&self, from: usize, end: usize) -> Option<usize>;
+
     fn take(&mut self, p: usize, slot: usize) -> R;
 }
 
@@ -1589,7 +1610,8 @@ impl<R: Real> RefStruct<R> {
         if R::LANES && !dense_l {
             if let Some((levels, maxlev)) = &self.levels {
                 let mut cache = self.level_cache.0.borrow_mut();
-                if let Some(result) = cache.get_or_insert_with(Box::default)
+                if let Some(result) = cache
+                    .get_or_insert_with(Box::default)
                     .solve(self, levels, *maxlev, rows, vals)
                 {
                     return result;
@@ -4733,7 +4755,8 @@ mod dense_tail_tests {
         let st = crate::lu_order::factor_structure_r::<f64>(m, &cols);
         let mut new = RefStruct::fresh(m, m, &st, &cols);
         let mut old = new.clone();
-        let encode = |v: &[(usize, f64)]| v.iter().map(|&(p, x)| (p, x.to_bits())).collect::<Vec<_>>();
+        let encode =
+            |v: &[(usize, f64)]| v.iter().map(|&(p, x)| (p, x.to_bits())).collect::<Vec<_>>();
         for round in 0..12 {
             if round == 5 {
                 new = new.clone();
@@ -4895,7 +4918,7 @@ mod forward_l_tests {
         let m = 321;
         let mut f = factor::<f64>(m);
         let mut cols = vec![Vec::new(); m];
-        for r in 0..m-1 {
+        for r in 0..m - 1 {
             if r % 8 < 6 {
                 cols[r].push((r + 1, if r % 2 == 0 { 0.5 } else { -0.25 }));
             }
@@ -4914,25 +4937,46 @@ mod forward_l_tests {
                 f.first_eta[j] = f.first_eta[j].min(i);
             }
             f.etas.push(Eta {
-                idx: r, ind, val: vec![1.0, 0.5, -0.5, 0.25], peel: i % 2,
+                idx: r,
+                ind,
+                val: vec![1.0, 0.5, -0.5, 0.25],
+                peel: i % 2,
             });
             f.sum_eta += 4.0;
             if [0, 1, 63, 64, 65, 136].contains(&i) {
-                check(&f, &[0, 64, 0, r], &[1.0, -3.25, 0.75, -0.0],
-                         &[r, b, b], &[2.0, 3.0, -3.0], bits);
+                check(
+                    &f,
+                    &[0, 64, 0, r],
+                    &[1.0, -3.25, 0.75, -0.0],
+                    &[r, b, b],
+                    &[2.0, 3.0, -3.0],
+                    bits,
+                );
                 check(&f, &[], &[], &[8, 11], &[TOL, f64::from_bits(1)], bits);
                 check(&f, &[b], &[f64::INFINITY], &[r], &[f64::NEG_INFINITY], bits);
             }
         }
         let rows: Vec<usize> = (0..161).step_by(2).collect();
-        check(&f, &rows, &vec![1.0; rows.len()], &[60, 79], &[1.0, -1.0], bits);
+        check(
+            &f,
+            &rows,
+            &vec![1.0; rows.len()],
+            &[60, 79],
+            &[1.0, -1.0],
+            bits,
+        );
         check(&f.clone(), &[0, 1], &[0.5, -0.125], &[218], &[5.0], bits);
         let i = f.etas.len();
         let ind = vec![32, 100];
         for &j in &ind {
             f.first_eta[j] = f.first_eta[j].min(i);
         }
-        f.etas.push(Eta { idx: 32, ind, val: vec![1.0, f64::INFINITY], peel: 0 });
+        f.etas.push(Eta {
+            idx: 32,
+            ind,
+            val: vec![1.0, f64::INFINITY],
+            peel: 0,
+        });
         f.sum_eta += 2.0;
         check(&f, &[40], &[1.0], &[64], &[3.0], bits);
     }
@@ -4953,7 +4997,8 @@ mod forward_l_tests {
             let mut f = factor::<f64>(m);
             let perm: Vec<usize> = serde_json::from_value(rec["perm"].clone()).unwrap();
             f.perm[..perm.len()].copy_from_slice(&perm);
-            let destinations: Vec<Vec<usize>> = serde_json::from_value(rec["lcols"].clone()).unwrap();
+            let destinations: Vec<Vec<usize>> =
+                serde_json::from_value(rec["lcols"].clone()).unwrap();
             let coeff: Vec<Vec<f64>> = serde_json::from_value(rec["lvals"].clone()).unwrap();
             let mut cols = vec![Vec::new(); m];
             for (column, (indices, values)) in destinations.into_iter().zip(coeff).enumerate() {
@@ -4981,12 +5026,24 @@ mod forward_l_tests {
                 for &j in &ind {
                     f.first_eta[j] = f.first_eta[j].min(e);
                 }
-                let val = (0..ind.len()).map(|_| (next() % 17) as f64 * 0.125 - 1.0).collect();
+                let val = (0..ind.len())
+                    .map(|_| (next() % 17) as f64 * 0.125 - 1.0)
+                    .collect();
                 f.sum_eta += ind.len() as f64;
-                f.etas.push(Eta { idx: row, ind, val, peel: e % 2 });
+                f.etas.push(Eta {
+                    idx: row,
+                    ind,
+                    val,
+                    peel: e % 2,
+                });
                 let rows: Vec<_> = (0..1 + next() % 13).map(|_| next() % m).collect();
-                let vals: Vec<_> = rows.iter().map(|_| (next() % 127) as f64 * 0.25 - 8.0).collect();
-                check(&f, &captured_rows, &captured_vals, &rows, &vals, |v| (v.to_bits(), 0));
+                let vals: Vec<_> = rows
+                    .iter()
+                    .map(|_| (next() % 127) as f64 * 0.25 - 8.0)
+                    .collect();
+                check(&f, &captured_rows, &captured_vals, &rows, &vals, |v| {
+                    (v.to_bits(), 0)
+                });
             }
         }
     }

@@ -1,6 +1,7 @@
 //! Complete compact main-factor states, rooted at one exact installation.
 use crate::{f80::F80, ftran_order::RefStruct};
 use std::{borrow::Cow, cell::OnceCell, rc::Rc};
+
 type Factor = RefStruct<F80>;
 type Values = Vec<(usize, F80)>;
 type Work = Vec<(u32, f64, f64)>;
@@ -122,6 +123,7 @@ pub(super) fn status() -> Option<u32> {
 
 impl std::ops::Deref for QuadMain {
     type Target = Factor;
+
     fn deref(&self) -> &Factor {
         match self {
             Self::Direct(f) => f,
@@ -239,12 +241,15 @@ impl QuadMain {
         };
         out
     }
+
     pub(super) fn ftran(&mut self, r: &[usize], v: &[F80]) -> Values {
         self.column(r, v, false)
     }
+
     pub(super) fn ftran_basic(&mut self, r: &[usize], v: &[F80]) -> Values {
         self.column(r, v, true)
     }
+
     fn column(&mut self, r: &[usize], v: &[F80], basic: bool) -> Values {
         let Output::Values(out) = self.apply(Op::Column(Cow::Borrowed(r), Cow::Borrowed(v), basic))
         else {
@@ -252,12 +257,14 @@ impl QuadMain {
         };
         out
     }
+
     pub(super) fn update(&mut self, r: usize) -> Work {
         let Output::Work(w) = self.apply(Op::Update(r)) else {
             unreachable!()
         };
         w
     }
+
     pub(super) fn count_all_updates(&mut self) {
         self.apply(Op::Count);
     }
@@ -266,6 +273,7 @@ impl QuadMain {
 #[cfg(all(test, target_arch = "x86_64", target_os = "linux"))]
 mod tests {
     use super::*;
+
     fn factor(m: usize) -> Factor {
         let cols: Vec<_> = (0..m)
             .map(|i| (false, vec![i, (i + 1) % m], vec![2. + i as f64, 0.125]))
@@ -273,6 +281,7 @@ mod tests {
         let st = crate::lu_order::factor_structure_r::<F80>(m, &cols);
         RefStruct::fresh(m, m, &st, &cols)
     }
+
     fn fresh_controls() -> u32 {
         let mut csr = 0;
         unsafe {
@@ -280,11 +289,13 @@ mod tests {
         }
         csr
     }
+
     fn set_controls(csr: u32) {
         unsafe {
             std::arch::asm!("ldmxcsr [{p}]",p=in(reg)&csr,options(nostack,preserves_flags));
         }
     }
+
     fn same(a: Output, b: Output) {
         match (a, b) {
             (Output::Values(a), Output::Values(b)) => {
@@ -304,6 +315,7 @@ mod tests {
             _ => panic!("operation output changed"),
         }
     }
+
     fn compare(q: &mut QuadMain, f: &mut Factor, op: Op<'_>) {
         let expected = op.run(f);
         let actual = q.apply(op);
@@ -311,6 +323,7 @@ mod tests {
         // The original Clone intentionally clears independent BTRAN and level work areas.
         assert_eq!(format!("{:?}", (**q).clone()), format!("{:?}", f.clone()));
     }
+
     #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
     #[test]
     fn compact_main_complete_transition_states() {
@@ -444,6 +457,7 @@ impl State {
         *live = QuadMain::Shared(edge.next.clone());
         Some(data)
     }
+
     pub(super) fn may_record(&self, post: &QuadMain) -> bool {
         self.dual.get().is_none()
             && self.edge.get().is_some_and(|edge| {
@@ -451,6 +465,7 @@ impl State {
                     && matches!(post,QuadMain::Shared(after) if Rc::ptr_eq(after,&edge.next))
             })
     }
+
     pub(super) fn record_dual(&self, d: super::quad_fresh::DualSnapshot) {
         let _ = self.dual.set(d);
     }
@@ -460,6 +475,7 @@ impl State {
     pub(super) fn change(&self) -> Option<&super::quad_change::Effect> {
         self.change.get()
     }
+
     pub(super) fn advance_change(&self, live: &mut QuadMain, flags: u32) -> bool {
         let Some(edge) = self.edge.get() else {
             return false;
@@ -470,6 +486,7 @@ impl State {
         *live = QuadMain::Shared(edge.next.clone());
         true
     }
+
     pub(super) fn record_change(&self, live: &QuadMain, effect: super::quad_change::Effect) {
         if let Some(edge) = self.edge.get() {
             if matches!(edge.input, Op::Transpose(_, false, false))

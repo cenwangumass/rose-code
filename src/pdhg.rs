@@ -7,6 +7,7 @@
 
 mod forward;
 mod ordered;
+
 use crate::dump;
 use crate::model::{LpModel, Sense};
 use crate::simplex::Status;
@@ -669,6 +670,7 @@ fn primal_dense(
         x[j] = reflected * w + anchor[j] * w1;
     }
 }
+
 #[inline(never)]
 fn dual_dense(y: &mut [f64], anchor: &[f64], ax: &[f64], a: &Scaled, sigma: f64, w: f64) {
     let n = y.len();
@@ -733,6 +735,7 @@ impl<'a> State<'a> {
             self.ordinary_step(tau, sigma);
         }
     }
+
     /// `0x3685a0`: the residual scalars at `(xh, yh)`. `flag1`: the first pass and the final pass.
     fn residual(&mut self, flag1: bool) -> Resid {
         let a = self.a;
@@ -1002,6 +1005,7 @@ fn trivial(model: &LpModel) -> PdhgResult {
 pub fn solve(model: &LpModel, opts: &PdhgOptions) -> PdhgResult {
     solve_inner::<true>(model, opts)
 }
+
 fn solve_inner<const BATCHED: bool>(model: &LpModel, opts: &PdhgOptions) -> PdhgResult {
     if model.num_rows() == 0 || model.val.is_empty() {
         return trivial(model);
@@ -1401,6 +1405,7 @@ mod ordinary_step_tests {
             }
         }
     }
+
     #[test]
     fn ordered_recurrence_matches_full_observations_and_restart() {
         let model = crate::mps::parse(include_str!("../tests/fixtures/afiro.mps")).unwrap();
@@ -1470,6 +1475,7 @@ mod ordinary_step_tests {
             }
         }
     }
+
     #[test]
     fn randomized_permuted_state_matches_all_original_outputs() {
         let model = crate::mps::parse(include_str!("../tests/fixtures/greenbea.mps")).unwrap();

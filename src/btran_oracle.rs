@@ -1,4 +1,5 @@
 use super::*;
+
 #[rustfmt::skip]
 impl<R: Real> RefStruct<R> {
     fn frozen_btran(&mut self, inp: &[(usize, R)], direct: bool, dense_in: bool) -> Vec<(usize, R)> {

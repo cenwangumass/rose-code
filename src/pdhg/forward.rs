@@ -1,14 +1,17 @@
 //! Compute forward rows directly in the reflected primal layout. Each tile
 //! feeds the dual projection before the next tile replaces its row products.
 use super::{dual_project, gather_sum, Scaled};
+
 pub(super) struct Forward {
     ends: Vec<usize>,
     spans: Vec<Span>,
 }
+
 struct Span {
     input: Option<u32>,
     blocks: usize,
 }
+
 impl Forward {
     pub(super) fn new(offsets: &[usize], index: &[u32]) -> Self {
         let mut result = Self {

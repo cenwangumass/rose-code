@@ -7,10 +7,12 @@ enum Input {
     Linear(u32),
     Indexed([u32; 4]),
 }
+
 struct PacketTerm {
     input: Input,
     value: [f64; 4],
 }
+
 struct Batch {
     start: usize,
     count: usize,
@@ -32,6 +34,7 @@ pub(super) struct Ordered {
     xb: Vec<f64>,
     live: bool,
 }
+
 // AVX2 interprets every gather offset as a signed i32 on both matrix sides.
 fn fits_gather_offsets(rows: usize, columns: usize) -> bool {
     rows.max(columns) <= i32::MAX as usize
@@ -119,6 +122,7 @@ impl Ordered {
             live: false,
         }
     }
+
     #[cfg(test)]
     pub(super) fn snapshot(&self, x: &[f64], xb: &[f64]) -> (Vec<f64>, Vec<f64>) {
         let mut p = x.to_vec();
@@ -131,6 +135,7 @@ impl Ordered {
         }
         (p, r)
     }
+
     pub(super) fn observe(&mut self, x: &mut [f64], xb: &mut [f64]) {
         if self.live {
             for (i, &j) in self.columns.iter().enumerate() {
@@ -140,6 +145,7 @@ impl Ordered {
             self.live = false;
         }
     }
+
     fn scalar(&mut self, i: usize, a: &Scaled, y: &[f64], tau: f64, w: f64) {
         let j = self.columns[i];
         let v = gather_sum(&a.cval, &a.crow, y, a.cp[j], a.cp[j + 1]);
@@ -150,6 +156,7 @@ impl Ordered {
         self.xb[i] = xb;
         self.x[i] = xb * w + self.anchor[i] * (1.0 - w);
     }
+
     pub(super) fn step(
         &mut self,
         a: &Scaled,
@@ -186,6 +193,7 @@ impl Ordered {
         }
         false
     }
+
     #[cfg(target_arch = "x86_64")]
     #[target_feature(enable = "avx2")]
     unsafe fn packed(&mut self, a: &Scaled, y: &[f64], tau: f64, w: f64) {
@@ -206,6 +214,7 @@ impl Ordered {
             }
         }
     }
+
     #[cfg(target_arch = "x86_64")]
     #[target_feature(enable = "avx2")]
     unsafe fn group<const N: usize>(&mut self, id: usize, a: &Scaled, y: &[f64], tau: f64, w: f64) {

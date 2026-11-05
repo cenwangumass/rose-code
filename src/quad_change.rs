@@ -56,14 +56,17 @@ pub(super) struct Key {
     valid: bool,
     provider: Weak<Mutex<RhsMemo>>,
 }
+
 fn bits(v: &[bool]) -> u64 {
     v.iter()
         .enumerate()
         .fold(0, |m, (i, &b)| m | (u64::from(b) << i))
 }
+
 fn doubles(a: &[f64], b: &[f64]) -> bool {
     a.len() == b.len() && a.iter().zip(b).all(|(x, y)| x.to_bits() == y.to_bits())
 }
+
 impl Key {
     pub(super) fn capture(
         s: &Solver,
@@ -99,6 +102,7 @@ impl Key {
             provider: Arc::downgrade(provider),
         }
     }
+
     fn matches(&self, s: &Solver, dc: &[(usize, f64)], q: usize, leave: usize, alpha: f64) -> bool {
         let Some(QuadRhs::Shared(provider)) = s.mirror_q.as_ref() else {
             return false;
@@ -144,6 +148,7 @@ pub(super) struct Effect {
     work: [f64; 3],
     flags: u32,
 }
+
 impl Effect {
     pub(super) fn capture(
         s: &Solver,
@@ -164,6 +169,7 @@ impl Effect {
             flags,
         }
     }
+
     pub(super) fn replay(
         &self,
         s: &mut Solver,
@@ -208,7 +214,9 @@ pub(super) mod audit {
     use super::super::{SolveOptions, Status};
     use super::*;
     use std::cell::Cell;
+
     thread_local! {static RUN:Cell<bool>=const{Cell::new(false)};static COUNTS:Cell<[usize;3]>=const{Cell::new([0;3])};}
+
     fn note(k: usize) -> usize {
         COUNTS.with(|b| {
             let mut a = b.get();
@@ -217,6 +225,7 @@ pub(super) mod audit {
             a[k]
         })
     }
+
     pub(in super::super) struct Before {
         d: Vec<f64>,
         df: Vec<F80>,
@@ -226,6 +235,7 @@ pub(super) mod audit {
         w: f64,
         factor: quad_main::QuadMain,
     }
+
     pub(in super::super) fn start(s: &Solver) -> Option<Before> {
         if !RUN.get() {
             return None;
@@ -247,6 +257,7 @@ pub(super) mod audit {
             factor: quad_main::QuadMain::Direct(Box::new((**f).clone())),
         })
     }
+
     pub(in super::super) fn check(
         s: &mut Solver,
         b: Option<Before>,
@@ -317,6 +328,7 @@ pub(super) mod audit {
         );
         s.mirror = owner;
     }
+
     #[test]
     #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
     fn complete_phase_cost_updates_match_unmodified_controller() {

@@ -240,6 +240,7 @@ mod quad_fresh;
 mod quad_main;
 #[path = "quad_row.rs"]
 mod quad_row;
+
 use quad_main::QuadMain;
 
 pub(crate) enum Mir {
@@ -1780,6 +1781,7 @@ enum OrderInstallation {
 
 impl std::ops::Deref for OrderInstallation {
     type Target = InstalledOrder;
+
     fn deref(&self) -> &InstalledOrder {
         match self {
             Self::Fresh(data) => data,
@@ -2282,6 +2284,7 @@ impl PivotRowOrder {
 #[cfg(test)]
 mod pivot_order_tests {
     use super::*;
+
     // Original complete pivot-row ordering across sparse and dense paths.
     fn frozen(
         n: usize,
@@ -10221,6 +10224,7 @@ impl DevexDeltaMemo {
     ) -> (bool, Vec<usize>, Vec<(usize, f64)>) {
         self.update_scoped(state, arg, None)
     }
+
     fn update_scoped(
         &mut self,
         state: PrimalRowState<'_>,
@@ -12194,6 +12198,7 @@ mod row_mask_predicate_tests {
 #[cfg(test)]
 mod compact_install_tests {
     use super::*;
+
     #[test]
     fn auxiliary_lease_tracks_order_identity_and_clears_each_update() {
         let mut ids = Vec::new();
@@ -12282,6 +12287,7 @@ mod compact_install_tests {
             }
         }
     }
+
     #[test]
     fn shared_basis_and_separate_rows_match_only_the_same_coefficient_bits() {
         let input = vec![(

@@ -13,6 +13,7 @@ pub(super) struct DualSnapshot {
     yq: Vec<F80>,
     rank: Vec<usize>,
 }
+
 impl DualSnapshot {
     pub(super) fn matches(
         &self,
@@ -28,6 +29,7 @@ impl DualSnapshot {
             && self.basic == basic
             && self.signs == signs
     }
+
     pub(super) fn capture(s: &Solver, signs: Vec<i8>, costfree: bool, flags: u32) -> Self {
         Self {
             basic: s.basic.clone(),
@@ -40,6 +42,7 @@ impl DualSnapshot {
             rank: s.y_rank.clone(),
         }
     }
+
     pub(super) fn restore(&self, s: &mut Solver) {
         s.y_ref.get_or_insert_with(Vec::new).clone_from(&self.y);
         s.y_q.get_or_insert_with(Vec::new).clone_from(&self.yq);
@@ -69,6 +72,7 @@ pub(super) struct PrimalMemo {
     pub(super) generation: u64,
     data: [Option<PrimalSnapshot>; 2],
 }
+
 struct PrimalSnapshot {
     basic: Vec<usize>,
     nonbasic: u64,
@@ -84,6 +88,7 @@ struct PrimalSnapshot {
     work: f64,
     flags: u32,
 }
+
 fn masks(s: &Solver) -> (u64, u64) {
     let mut nonbasic = 0u64;
     let mut upper = 0u64;
@@ -97,6 +102,7 @@ fn masks(s: &Solver) -> (u64, u64) {
     }
     (nonbasic, upper)
 }
+
 impl PrimalMemo {
     // Both original RHS memo lookups must remain hits. A changed provider
     // invalidates all reconstruction snapshots before it mutates either cache.
@@ -104,6 +110,7 @@ impl PrimalMemo {
         self.generation = self.generation.wrapping_add(1);
         self.data = Default::default();
     }
+
     pub(super) fn restore(&self, s: &mut Solver) -> bool {
         let Some(p) = &self.data[usize::from(s.want_drift)] else {
             return false;
@@ -146,6 +153,7 @@ impl PrimalMemo {
         }
         true
     }
+
     pub(super) fn record(&mut self, s: &Solver, work: f64) {
         let slot = &mut self.data[usize::from(s.want_drift)];
         if slot.is_some() {
@@ -182,7 +190,9 @@ pub(super) mod audit {
     use super::super::{Mir, SolveOptions, Status};
     use super::*;
     use std::cell::Cell;
+
     thread_local! {static ENABLED:Cell<bool>=const{Cell::new(false)};static EVENTS:Cell<[usize;6]>=const{Cell::new([0;6])};}
+
     fn count(k: usize) -> usize {
         EVENTS.with(|b| {
             let mut v = b.get();
@@ -191,6 +201,7 @@ pub(super) mod audit {
             v[k]
         })
     }
+
     fn sample(k: usize) -> bool {
         if !ENABLED.get() {
             return false;
@@ -198,9 +209,11 @@ pub(super) mod audit {
         let n = count(k);
         n <= 48 || n % 89 == 0
     }
+
     fn bits(v: &[f64]) -> Vec<u64> {
         v.iter().map(|n| n.to_bits()).collect()
     }
+
     fn longs(v: &[F80]) -> Vec<(u64, u16, bool)> {
         v.iter()
             .map(|x| {
@@ -209,6 +222,7 @@ pub(super) mod audit {
             })
             .collect()
     }
+
     pub(in super::super) struct Before {
         x: Vec<f64>,
         q: Option<Vec<F80>>,
@@ -217,6 +231,7 @@ pub(super) mod audit {
         drift: Option<F80>,
         w: f64,
     }
+
     pub(in super::super) fn start_primal(s: &Solver) -> Option<Before> {
         sample(0).then(|| Before {
             x: s.x.clone(),
@@ -227,6 +242,7 @@ pub(super) mod audit {
             w: s.work.w,
         })
     }
+
     pub(in super::super) fn primal(s: &mut Solver, before: Option<Before>) {
         if !ENABLED.get() {
             return;
@@ -257,6 +273,7 @@ pub(super) mod audit {
         s.recompute_primal_direct();
         assert_eq!(obs(s), fast, "all partial primal writes and ordered WORK");
     }
+
     pub(in super::super) struct DualBefore {
         factor: quad_main::QuadMain,
         w: f64,
@@ -264,6 +281,7 @@ pub(super) mod audit {
         yq: Option<Vec<F80>>,
         rank: Vec<usize>,
     }
+
     pub(in super::super) fn start_dual(s: &Solver) -> Option<DualBefore> {
         if !sample(1) {
             return None;
@@ -279,6 +297,7 @@ pub(super) mod audit {
             rank: s.y_rank.clone(),
         })
     }
+
     pub(in super::super) fn dual(s: &mut Solver, site: &str, before: Option<DualBefore>) {
         if !ENABLED.get() {
             return;
@@ -316,6 +335,7 @@ pub(super) mod audit {
         );
         s.mirror = after;
     }
+
     #[test]
     #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
     fn fresh_reconstructions_match_the_live_unmodified_recurrences() {
