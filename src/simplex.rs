@@ -815,6 +815,14 @@ pub(crate) struct Internal {
 }
 
 impl Internal {
+    /// The first slack starts after all structural entries, including range columns.
+    fn structural_nnz(&self) -> usize {
+        self.offs
+            .get(self.n)
+            .copied()
+            .unwrap_or_else(|| self.cols[..self.n].iter().map(Vec::len).sum())
+    }
+
     /// `rank_dot(&cols[j], v, rank)` for every column at once, iterating only the rows with a rank (in rank order), so each
     /// column's sum is accumulated in the same order from 0.0 as `rank_dot` does.
     fn rank_products_q(&self, v: &[crate::f80::F80], rank: &[usize]) -> Vec<crate::f80::F80> {
@@ -1812,6 +1820,7 @@ struct Solver<'a> {
     cleanup_keep_head: bool,
     /// The pivot row and `extra` of the last list update from the pivot step (`0x1442ab`), which `0x107e14` repeats.
     last_upd: Option<(Vec<usize>, usize)>,
+    pivot_order: PivotRowOrder,
     /// The pivot row's values (`arj`) of that update, and the row being built for the next one.
     last_row: Vec<(usize, f64)>,
     pending_row: Option<Vec<(usize, f64)>>,
@@ -1963,6 +1972,201 @@ impl Buckets {
         }
         self.tail[k] = j as i64;
         self.next[j] = -1;
+    }
+}
+
+/// Membership of the reference pivot row. Each consumed entry is cleared, so
+/// that the same words can serve cost changes and successive pivots.
+#[derive(Default)]
+struct PivotRowOrder {
+    words: Vec<u64>,
+}
+
+impl PivotRowOrder {
+    fn take(&mut self, j: usize) -> bool {
+        let word = &mut self.words[j / 64];
+        let bit = 1u64 << (j % 64);
+        let pending = *word & bit != 0;
+        *word &= !bit;
+        pending
+    }
+
+    fn drain_prefix(&mut self, end: usize, out: &mut Vec<usize>) {
+        for (k, word) in self.words[..end.div_ceil(64)].iter_mut().enumerate() {
+            let remaining = end - k * 64;
+            let mask = if remaining >= 64 {
+                u64::MAX
+            } else {
+                (1u64 << remaining) - 1
+            };
+            let mut bits = *word & mask;
+            *word &= !mask;
+            while bits != 0 {
+                out.push(k * 64 + bits.trailing_zeros() as usize);
+                bits &= bits - 1;
+            }
+        }
+    }
+
+    fn order(
+        &mut self,
+        n: usize,
+        m: usize,
+        sparse: bool,
+        rows: &[Vec<usize>],
+        nz: &[usize],
+        changed: &[usize],
+    ) -> Vec<usize> {
+        self.words.resize((n + m).div_ceil(64), 0);
+        for &j in changed {
+            self.words[j / 64] |= 1u64 << (j % 64);
+        }
+        let mut out = Vec::with_capacity(changed.len());
+        if sparse {
+            for &r in nz {
+                for &j in &rows[r] {
+                    if self.take(j) {
+                        out.push(j);
+                    }
+                }
+            }
+        } else {
+            self.drain_prefix(n, &mut out);
+        }
+        for &r in nz {
+            if self.take(n + r) {
+                out.push(n + r);
+            }
+        }
+        // Duplicates in changed can make this test conservative. A set bit
+        // still only emits once, as in the original full-domain scan.
+        if out.len() < changed.len() {
+            self.drain_prefix(n + m, &mut out);
+        }
+        out
+    }
+}
+
+#[cfg(test)]
+mod pivot_order_tests {
+    use super::*;
+    // Original complete pivot-row ordering across sparse and dense paths.
+    fn frozen(
+        n: usize,
+        m: usize,
+        sparse: bool,
+        rows: &[Vec<usize>],
+        nz: &[usize],
+        changed: &[usize],
+    ) -> Vec<usize> {
+        let mut keep = vec![false; n + m];
+        for &j in changed {
+            keep[j] = true;
+        }
+        let mut out = Vec::with_capacity(changed.len());
+        if sparse {
+            for &i in nz {
+                for &j in &rows[i] {
+                    if keep[j] {
+                        keep[j] = false;
+                        out.push(j);
+                    }
+                }
+            }
+        } else {
+            for j in 0..n {
+                if keep[j] {
+                    keep[j] = false;
+                    out.push(j);
+                }
+            }
+        }
+        for &i in nz {
+            if keep[n + i] {
+                keep[n + i] = false;
+                out.push(n + i);
+            }
+        }
+        out.extend((0..n + m).filter(|&j| keep[j]));
+        out
+    }
+
+    #[test]
+    fn pivot_membership_matches_complete_original_order() {
+        let mut s = 0x469ad47d693cf828u64;
+        let mut next = || {
+            s ^= s << 13;
+            s ^= s >> 7;
+            s ^= s << 17;
+            s as usize
+        };
+        let mut order = PivotRowOrder::default();
+        for &(n, m) in &[
+            (0, 0),
+            (0, 1),
+            (1, 0),
+            (0, 129),
+            (129, 0),
+            (1, 1),
+            (31, 32),
+            (63, 5),
+            (64, 64),
+            (65, 64),
+            (127, 96),
+            (513, 260),
+        ] {
+            let rows: Vec<Vec<usize>> = (0..m)
+                .map(|_| {
+                    if n == 0 {
+                        vec![]
+                    } else {
+                        (0..next() % 16).map(|_| next() % n).collect()
+                    }
+                })
+                .collect();
+            for t in 0..64 {
+                let nz: Vec<_> = if m == 0 {
+                    Vec::new()
+                } else {
+                    (0..next() % (2 * m + 1)).map(|_| next() % m).collect()
+                };
+                let changed: Vec<_> = if n + m == 0 {
+                    vec![]
+                } else {
+                    (0..next() % (2 * (n + m) + 1))
+                        .map(|_| next() % (n + m))
+                        .collect()
+                };
+                for sparse in [t % 2 == 0, t % 2 != 0] {
+                    assert_eq!(
+                        order.order(n, m, sparse, &rows, &nz, &changed),
+                        frozen(n, m, sparse, &rows, &nz, &changed)
+                    );
+                    assert!(order.words.iter().all(|&w| w == 0));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn column_prefix_counts_range_and_slack_boundaries() {
+        for model in [
+            include_str!("../tests/fixtures/fx_bar_rngord.mps"),
+            include_str!("../tests/fixtures/80bau3b.mps"),
+        ] {
+            let model = crate::mps::parse(model).unwrap();
+            let mut p = build(&model);
+            assert_eq!(
+                p.structural_nnz(),
+                p.cols[..p.n].iter().map(Vec::len).sum::<usize>()
+            );
+            p.n = p.cols.len();
+            p.m = 0;
+            assert_eq!(
+                p.structural_nnz(),
+                p.cols.iter().map(Vec::len).sum::<usize>()
+            );
+        }
     }
 }
 
@@ -2338,7 +2542,7 @@ impl<'a> Solver<'a> {
                 if self.cleanup {
                     // The clean-up pass's setup (`0xe84b9`): two units per nonzero of the constraint matrix; the dual simplex install of the
                     // factor then books `3 m` (`0xf48ae`), `nnz(U)` (`0x1327dc`) and `3 m` (`0x1329c1`) at the factor object's scale.
-                    let nnz_a: usize = (0..self.p.n).map(|j| self.p.cols[j].len()).sum();
+                    let nnz_a: usize = self.p.structural_nnz();
                     self.work.add(0xe84b9, 2.0 * nnz_a as f64, crate::work::CTX);
                 }
                 book_retried_attempts(&mut self.work);
@@ -2697,7 +2901,7 @@ impl<'a> Solver<'a> {
             // The switch books the Devex initialization (`0x142c4c`: `3 (n + m)`; `0x132d88`: `2 nnz(A)`), then the reference runs the Devex
             // factorization handling too: the primal update's `x_B` pass (`0x107b57`) and the reduced-cost pass (`0x1021b0`), on top of the
             // `pricing0` handling already booked.
-            let nnz_a: usize = (0..self.p.n).map(|j| self.p.cols[j].len()).sum();
+            let nnz_a: usize = self.p.structural_nnz();
             self.work.add(
                 0x142c4c,
                 3.0 * (self.p.n + self.p.m) as f64,
@@ -2840,7 +3044,7 @@ impl<'a> Solver<'a> {
             // Only the entering variable changed class: no BTRAN and no row product. The reference applies `d_j -= dc * arj` over the
             // previous pivot row (`0x1084a0` again, with `dc` as the step) and repeats its list update (`0x107e14`).
             let step = dc[0].1 / alpha_rq;
-            for &(j, arj) in &self.last_row.clone() {
+            for &(j, arj) in &self.last_row {
                 if j == q {
                     // The entering variable carries its own cost change: `(d - y) + dc` keeps the noise of `d`.
                     self.d[j] = (self.d[j] - step * arj) + dc[0].1;
@@ -2850,8 +3054,9 @@ impl<'a> Solver<'a> {
                     self.d[j] -= step * arj;
                 }
             }
-            if let Some((c, e)) = self.last_upd.clone() {
+            if let Some((c, e)) = self.last_upd.take() {
                 self.update_list(&c, e, 0x107e14);
+                self.last_upd = Some((c, e));
             }
             return;
         }
@@ -3636,45 +3841,17 @@ impl<'a> Solver<'a> {
 
     /// Order in which the reference stores the pivot-row entries: with a sparse `rho`, structurals in first-touch
     /// order over the rows of `rho`; otherwise structurals in index order; then slacks in row order.
-    fn pivot_row_order(&self, rho: &[f64], changed: &[usize]) -> Vec<usize> {
+    fn pivot_row_order(&mut self, rho: &[f64], changed: &[usize]) -> Vec<usize> {
         let nz: Vec<usize> = (0..self.p.m).rev().filter(|&i| rho[i] != 0.0).collect();
         self.pivot_row_order_by(&nz, changed, nz.len())
     }
 
     /// As `pivot_row_order`, with the rows of `rho` in the order the reference stores them.
-    fn pivot_row_order_by(&self, nz: &[usize], changed: &[usize], cnt: usize) -> Vec<usize> {
+    fn pivot_row_order_by(&mut self, nz: &[usize], changed: &[usize], cnt: usize) -> Vec<usize> {
         let (n, m) = (self.p.n, self.p.m);
-        let nnz_a: usize = self.p.cols[..n].iter().map(Vec::len).sum();
-        let mut keep = vec![false; n + m];
-        for &j in changed {
-            keep[j] = true;
-        }
-        let mut out = Vec::with_capacity(changed.len());
-        if cnt * 3 * nnz_a < m * n {
-            for &i in nz {
-                for &j in &self.rrows[i] {
-                    if keep[j] {
-                        keep[j] = false;
-                        out.push(j);
-                    }
-                }
-            }
-        } else {
-            for j in 0..n {
-                if keep[j] {
-                    keep[j] = false;
-                    out.push(j);
-                }
-            }
-        }
-        for &i in nz {
-            if keep[n + i] {
-                keep[n + i] = false;
-                out.push(n + i);
-            }
-        }
-        out.extend((0..n + m).filter(|&j| keep[j]));
-        out
+        let sparse = cnt * 3 * self.p.structural_nnz() < m * n;
+        self.pivot_order
+            .order(n, m, sparse, &self.rrows, nz, changed)
     }
 
     /// Full scan used when the work estimate needs distinct columns or the maintained row lengths are unavailable.
@@ -3705,7 +3882,7 @@ impl<'a> Solver<'a> {
     fn row_product_work(&mut self, rho: &[f64], q: usize, leave: usize, caller: u32) {
         let (n, m) = (self.p.n, self.p.m);
         let nz: Vec<usize> = (0..m).filter(|&i| rho[i] != 0.0).collect();
-        let nnz_a: usize = self.p.cols[..n].iter().map(Vec::len).sum();
+        let nnz_a: usize = self.p.structural_nnz();
         let dense = nz.len() != 1 && m * n <= nz.len() * 3 * nnz_a;
         let (mut p5, mut d) = (0usize, 0usize);
         if dense && self.p0.is_none() && self.row_work_valid && self.excluded.is_none() {
@@ -4020,7 +4197,7 @@ impl<'a> Solver<'a> {
             self.repaired = false;
             // Admitting the variable rebuilds the candidate list (`0x138532`: one pass over all variables) and the row-wise copy
             // (`0x132d88`: `2 nnz(A)`), before the driver restarts.
-            let nnz_a: usize = (0..self.p.n).map(|j| self.p.cols[j].len()).sum();
+            let nnz_a: usize = self.p.structural_nnz();
             let nm = self.p.n + self.p.m;
             self.work.add(0x138532, 2.0 * nm as f64, crate::work::CTX);
             if self.p0.is_none() {
@@ -4104,10 +4281,6 @@ impl<'a> Solver<'a> {
     /// After a pivot: score the changed entries (in index order), raise the level if a higher bucket appears,
     /// keep still-qualifying old entries first, then append the new ones.
     fn update_list(&mut self, changed: &[usize], extra: usize, caller: u32) {
-        if caller == 0x1442ab {
-            self.last_upd = Some((changed.to_vec(), extra));
-            self.last_row = self.pending_row.take().unwrap_or_default();
-        }
         let mut fresh: Vec<usize> = Vec::new();
         // The reference empties the old list when the level rises, so it scans none of it.
         let mut raised = false;
@@ -6112,7 +6285,7 @@ fn repair_basis_at(
         // (quad seed 2594: 0.9); reset_pair_gate also resets the threshold.
         crate::lu_order::set_threshold(threshold);
     }
-    crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
+    crate::lu_order::set_pool_dims(p.n, p.structural_nnz());
     crate::lu_order::set_factorization_number(1);
     let st = crate::lu_order::factor_structure(m, &cols);
     let piv = st.pivots.clone();
@@ -6313,7 +6486,7 @@ fn solve_primal(
                 // it in place (seed 8825, quad LU k13).
                 crate::lu_order::reset_pair_gate();
                 crate::lu_order::set_threshold(h.thr);
-                crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
+                crate::lu_order::set_pool_dims(p.n, p.structural_nnz());
                 let gate = crate::lu_order::gate_get();
                 let rows: Vec<_> = b
                     .basic
@@ -6392,7 +6565,7 @@ fn solve_primal(
         start_work.add(0x138532, 2.0 * (n + m) as f64, crate::work::CTX);
         crate::lu_order::reset_pair_gate();
         crate::lu_order::set_threshold(handoff.unwrap().thr);
-        crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
+        crate::lu_order::set_pool_dims(p.n, p.structural_nnz());
         let gate = crate::lu_order::gate_get();
         let (order, st, rows, growth_factor) = reference_order_for(
             &p,
@@ -6471,7 +6644,7 @@ fn solve_primal(
             if let Some(r) = rs {
                 crate::lu_order::set_threshold(r.thr);
             }
-            crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
+            crate::lu_order::set_pool_dims(p.n, p.structural_nnz());
             let gate = crate::lu_order::gate_get();
             let (order, st, rows, growth_factor) = reference_order_for(
                 &p,
@@ -6600,6 +6773,7 @@ fn solve_primal(
         acc_thr: crate::lu_order::THRESHOLD,
         cleanup_keep_head: false,
         last_upd: None,
+        pivot_order: PivotRowOrder::default(),
         last_row: Vec::new(),
         pending_row: None,
         upd_work: Vec::new(),
@@ -6687,7 +6861,7 @@ fn solve_primal(
                 // The double dual's artificial-bound exit keeps its pivot threshold `ctx+0x390` for the primal that follows (witness_primal_r31_double4: 0.5).
                 crate::lu_order::set_threshold(t);
             }
-            crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
+            crate::lu_order::set_pool_dims(p.n, p.structural_nnz());
             let gate = crate::lu_order::gate_get();
             let (order, st, rows, growth_factor) =
                 reference_order_for(s.p, &s.basic, 1, s.growth_limit(), "lustart");
@@ -6869,7 +7043,7 @@ fn solve_primal(
         let mut check_state = None;
         if opts.refactor_schedule.is_none() {
             if let Some(mi) = s.mirror.as_ref() {
-                let nnz_a: usize = p.cols[..p.n].iter().map(Vec::len).sum();
+                let nnz_a: usize = p.structural_nnz();
                 check_state = Some(s.work.decision_state());
                 chk = Some((mi.refactor_due(), mi.updates(), nnz_a));
             }
@@ -7533,7 +7707,7 @@ fn solve_primal(
         if std::mem::take(&mut s.restarted) && opts.refactor_schedule.is_none() {
             // The check of this iteration reads the factor that the restart replaced: take it again from the new one.
             if let Some(mi) = s.mirror.as_ref() {
-                let nnz_a: usize = p.cols[..p.n].iter().map(Vec::len).sum();
+                let nnz_a: usize = p.structural_nnz();
                 check_state = Some(s.work.decision_state());
                 chk = Some((mi.refactor_due(), mi.updates(), nnz_a));
             }
@@ -8778,7 +8952,7 @@ fn solve_primal(
         };
         if s.mirror.is_some() {
             let nn = p.n;
-            let nnz_a: usize = p.cols[..nn].iter().map(Vec::len).sum();
+            let nnz_a: usize = p.structural_nnz();
             let rowlen = changed
                 .iter()
                 .filter(|&&j| j >= nn || !s.is_fixed(j))
@@ -8815,12 +8989,13 @@ fn solve_primal(
             // Mode 2's restart empties the list (count 0, level kept) and skips the list update (`0x108ade`).
             s.reset_weights();
             s.list.clear();
-        } else if norm_reset && opts.faithful_weights {
-            // The reset sets the weights; the candidate list keeps its entries and level and takes the normal update.
-            s.reset_weights();
-            s.update_list(&changed, 1, 0x1442ab);
         } else {
+            if norm_reset && opts.faithful_weights {
+                s.reset_weights();
+            }
+            s.last_row = s.pending_row.take().unwrap_or_default();
             s.update_list(&changed, 1, 0x1442ab);
+            s.last_upd = Some((changed, 1));
         }
         if qw.is_some() {
             let v = dval(&s, leave) - crate::f80::F80::from_f64(leave_penalty);

@@ -4,37 +4,47 @@ Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (histo
 
 ## Numbers on AMD EPYC 9V74
 
+The primal solver retains the structural nonzero count and uses the changed variables to assemble its ordered candidate history. The full 5,022-pivot 80BAU3B trajectory matched all 72,071 WORK, 3,949 ORD and 249 CORD records and every output byte after timing normalization.
+
+The full 80bau3b.primal-c sweep took 1.355297 → 1.757710 seconds versus the preceding commit `8eb01cef` (+29.7%). The prespecified randomized timing comparisons measured -15.87% and -14.49%. Frozen parity passed 987/987, 268 runnable release tests passed, and all full-length mode-switch WORK records matched. Full outputs and exit codes agreed on every benchmark. 9 reversed-role controls covered flagged regressions; none established a slowdown.
+
+The three-round CPU2 sweep put 80BAU3B controlled primal 29.69% above its predecessor. The two independent CPU8 comparisons each found a gain. In the prespecified follow-up on CPU6, 48 mixed drift-balanced quartets and 48 identical-binary quartets put candidate solve time 13.33% lower, 95% interval [−17.61%, −8.24%], and child CPU time 12.28% lower. On primal_5959 dual, the corresponding +2.64% solve-time and +1.43% process-CPU differences were within the identical-binary intervals. The table retains the original warmup-plus-three measurements in full, including these two cases.
+
+The table gives same-CPU medians after one warm-up and three fresh-process timed solves for each of the four executables, with rotating order. All rose binaries use genuine TCMalloc. The patched Gurobi library hash is `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. Current rose wins **1/23**.
+
+| Run | Gurobi (s) | Uploaded rose (s) | Preceding rose (s) | Current rose (s) | Current / Gurobi |
+|---|---:|---:|---:|---:|---:|
+| degen2.primal-c | 0.018441 | 0.046019 | 0.058782 | 0.054311 | 2.95 |
+| degen2.dual-r | 0.013881 | 0.039304 | 0.037295 | 0.041773 | 3.01 |
+| degen3.primal-c | 0.251050 | 0.810639 | 0.722177 | 0.677660 | 2.70 |
+| degen3.primal-r | 0.527537 | 1.181319 | 1.234118 | 0.992282 | 1.88 |
+| perold.primal-c | 0.273077 | 0.938434 | 0.847598 | 1.227023 | 4.49 |
+| pilot4.primal-r | 0.034124 | 0.139064 | 0.106872 | 0.117699 | 3.45 |
+| 80bau3b.primal-c | 0.250862 | 0.824330 | 1.355297 | 1.757710 | 7.01 |
+| primal_5959.primal-r | 0.162758 | 0.323012 | 0.317296 | 0.391497 | 2.41 |
+| degen3.dual-c | 0.113796 | 0.383458 | 0.427215 | 0.495214 | 4.35 |
+| degen3.dual-r | 0.364531 | 1.472346 | 1.269140 | 1.111941 | 3.05 |
+| perold.dual-r | 0.117676 | 0.265877 | 0.456667 | 0.333270 | 2.83 |
+| 80bau3b.dual-r | 0.297348 | 1.211000 | 0.862861 | 1.159655 | 3.90 |
+| greenbea.dual-c | 0.563058 | 4.023967 | 3.844058 | 3.672362 | 6.52 |
+| greenbea.dual-r | 0.739468 | 2.447133 | 2.459064 | 1.870334 | 2.53 |
+| mode_switch.dual-r | 0.314429 | 4.876997 | 1.712310 | 2.072626 | 6.59 |
+| primal_5959.dual-r | 0.271772 | 0.546504 | 0.374788 | 0.425867 | 1.57 |
+| quad_2717.dual-r | 0.253807 | 0.640202 | 0.663181 | 0.583211 | 2.30 |
+| fx_quad_obj_5371.dual-r | 0.174254 | 0.255309 | 0.276839 | 0.250297 | 1.44 |
+| degen3.barrier-r | 0.184613 | 0.297986 | 0.419296 | 0.444484 | 2.41 |
+| 80bau3b.barrier-r | 0.352139 | 0.657044 | 0.730891 | 0.587883 | 1.67 |
+| greenbea.barrier-r | 1.409958 | 2.280027 | 2.924068 | 2.307267 | 1.64 |
+| 80bau3b.pdhg | 5.403264 | 8.561834 | 4.769068 | 4.514437 | 0.84 |
+| greenbea.pdhg | 1.808997 | 3.860811 | 2.580191 | 2.525777 | 1.40 |
+
+### Preceding release 8eb01cef
+
 During ordinary PDHG steps, dense primal projection and Halpern averaging use matching slices, while the dual pass consumes the resulting matrix product in independent coordinates. This lets the compiler vectorize the dense loops. Checks, restarts, residual calculation and termination use the original materialized states and the original sparse products.
 
 The full 80bau3b.pdhg sweep took 4.794536 → 3.246851 seconds versus the preceding commit `f23a2eb0` (-32.3%). The prespecified randomized timing comparisons measured -31.66% and -31.88%. Frozen parity passed 987/987, 266 runnable release tests passed, and all full-length mode-switch WORK records matched. Full outputs and exit codes agreed on every benchmark. 5 reversed-role controls covered flagged regressions; none established a slowdown.
 
 The table gives same-CPU medians after one warm-up and three fresh-process timed solves for each of the four executables, with rotating order. All rose binaries use genuine TCMalloc. The patched Gurobi library hash is `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. Current rose wins **0/23**.
-
-| Run | Gurobi (s) | Uploaded rose (s) | Preceding rose (s) | Current rose (s) | Current / Gurobi |
-|---|---:|---:|---:|---:|---:|
-| degen2.primal-c | 0.018580 | 0.048540 | 0.051063 | 0.053497 | 2.88 |
-| degen2.dual-r | 0.013063 | 0.037376 | 0.036206 | 0.037243 | 2.85 |
-| degen3.primal-c | 0.229304 | 0.678413 | 0.618690 | 0.658292 | 2.87 |
-| degen3.primal-r | 0.259602 | 0.748433 | 0.691306 | 0.609814 | 2.35 |
-| perold.primal-c | 0.190463 | 0.565409 | 0.636557 | 0.608481 | 3.19 |
-| pilot4.primal-r | 0.023823 | 0.059905 | 0.053792 | 0.069470 | 2.92 |
-| 80bau3b.primal-c | 0.135427 | 0.682448 | 0.728763 | 0.590196 | 4.36 |
-| primal_5959.primal-r | 0.059323 | 0.169726 | 0.138105 | 0.120705 | 2.03 |
-| degen3.dual-c | 0.119997 | 0.334290 | 0.364199 | 0.368532 | 3.07 |
-| degen3.dual-r | 0.117065 | 0.352948 | 0.314792 | 0.322942 | 2.76 |
-| perold.dual-r | 0.045060 | 0.139124 | 0.142127 | 0.160565 | 3.56 |
-| 80bau3b.dual-r | 0.116965 | 0.430120 | 0.384067 | 0.386257 | 3.30 |
-| greenbea.dual-c | 0.235748 | 0.893498 | 0.868807 | 0.917704 | 3.89 |
-| greenbea.dual-r | 0.270084 | 0.852155 | 0.924299 | 0.952260 | 3.53 |
-| mode_switch.dual-r | 0.127204 | 1.757401 | 0.922702 | 0.727348 | 5.72 |
-| primal_5959.dual-r | 0.116999 | 0.231129 | 0.236384 | 0.220397 | 1.88 |
-| quad_2717.dual-r | 0.086516 | 0.190835 | 0.181298 | 0.232928 | 2.69 |
-| fx_quad_obj_5371.dual-r | 0.030562 | 0.082234 | 0.076675 | 0.089411 | 2.93 |
-| degen3.barrier-r | 0.097136 | 0.222280 | 0.247533 | 0.239798 | 2.47 |
-| 80bau3b.barrier-r | 0.159155 | 0.293578 | 0.256919 | 0.270507 | 1.70 |
-| greenbea.barrier-r | 0.498821 | 1.086101 | 1.100028 | 1.058425 | 2.12 |
-| 80bau3b.pdhg | 2.526350 | 4.539852 | 4.794536 | 3.246851 | 1.29 |
-| greenbea.pdhg | 1.198978 | 2.163611 | 1.970451 | 1.506289 | 1.26 |
 
 ### Preceding release f23a2eb0
 
@@ -860,7 +870,7 @@ projected effects, component source/binary/timings, dependency audit and restora
 
 ## In progress
 
-Primal pivot metadata passed independent full 80BAU3B controlled checks at −15.70% and −15.32% on the BTRAN predecessor, with all original WORK and order records identical. The incremental release-lineage build passed frozen parity and two full comparisons at −15.87% and −14.49%. Its full 23-row sweep and both balanced-rotation diagnostics for biased control rows have finished. Other independent experiments cover sparse secondary FTRAN, stationary PDHG columns and their compact forward product, and exact scalar barrier leaves. These experiments are outside the release table above.
+On the dense-state experimental branch, ordered PDHG completed the uncapped 42,154-iteration 80BAU3B row in 3.617 s versus 4.145 s for patched Gurobi (CPU7), then 5.219 s versus 5.805 s on an independent CPU4 comparison. Exact output and exit checks passed. The GREENBEA 20,000-iteration comparison took 2.740 s versus 2.374 s for Gurobi. The ordered operator is under qualification on this release lineage. The independent sparse secondary FTRAN trial passed 987/987, but its full mode-switch interval included zero and it was set aside.
 
 ## Extended BTRAN feasibility
 
