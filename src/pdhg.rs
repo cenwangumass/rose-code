@@ -5,6 +5,7 @@
 //! scaled by the reference's Ruiz + Pock-Chambolle scaling before the iteration and unscaled on return.
 //! Diagnostic records: `ROSE_DUMP=pdhg` (`crate::dump`).
 
+mod forward;
 mod ordered;
 use crate::dump;
 use crate::model::{LpModel, Sense};
@@ -675,6 +676,24 @@ fn dual_dense(y: &mut [f64], anchor: &[f64], ax: &[f64], a: &Scaled, sigma: f64,
     let ax = &ax[..n];
     let rhs = &a.b[..n];
     let eq = &a.eq[..n];
+    dual_project(y, anchor, ax, rhs, eq, sigma, w);
+}
+
+#[inline]
+fn dual_project(
+    y: &mut [f64],
+    anchor: &[f64],
+    ax: &[f64],
+    rhs: &[f64],
+    eq: &[bool],
+    sigma: f64,
+    w: f64,
+) {
+    let n = y.len();
+    let anchor = &anchor[..n];
+    let ax = &ax[..n];
+    let rhs = &rhs[..n];
+    let eq = &eq[..n];
     let w1 = 1.0 - w;
     for i in 0..n {
         let old = y[i];
@@ -701,9 +720,16 @@ impl<'a> State<'a> {
 
     fn ordinary_ordered_step(&mut self, tau: f64, sigma: f64, ordered: &mut Ordered) {
         let w = (self.k + 1) as f64 / (self.k + 2) as f64;
-        if ordered.step(self.a, &self.y, &self.x, &self.x0, &mut self.ax, tau, w) {
-            dual_dense(&mut self.y, &self.y0, &self.ax, self.a, sigma, w);
-        } else {
+        if !ordered.step(
+            self.a,
+            &mut self.y,
+            &self.y0,
+            &self.x,
+            &self.x0,
+            tau,
+            sigma,
+            w,
+        ) {
             self.ordinary_step(tau, sigma);
         }
     }

@@ -21,6 +21,7 @@ struct Batch {
 pub(super) struct Ordered {
     columns: Vec<usize>,
     mapped_col: Vec<u32>,
+    forward: super::forward::Forward,
     batches: Vec<Batch>,
     loose: usize,
     c: Vec<f64>,
@@ -31,6 +32,20 @@ pub(super) struct Ordered {
     xb: Vec<f64>,
     live: bool,
 }
+// AVX2 interprets every gather offset as a signed i32 on both matrix sides.
+fn fits_gather_offsets(rows: usize, columns: usize) -> bool {
+    rows.max(columns) <= i32::MAX as usize
+}
+
+#[cfg(test)]
+#[test]
+fn both_input_dimensions_fit_signed_gather_offsets() {
+    let max = i32::MAX as usize;
+    assert!(fits_gather_offsets(max, max));
+    assert!(!fits_gather_offsets(max + 1, 1));
+    assert!(!fits_gather_offsets(1, max + 1));
+}
+
 impl Ordered {
     pub(super) fn new(a: &Scaled) -> Self {
         assert!(a.crow.iter().all(|&i| (i as usize) < a.m));
@@ -86,7 +101,8 @@ impl Ordered {
         for (i, &j) in columns.iter().enumerate() {
             inverse[j] = i as u32;
         }
-        let mapped_col = a.rcol.iter().map(|&j| inverse[j as usize]).collect();
+        let mapped_col: Vec<u32> = a.rcol.iter().map(|&j| inverse[j as usize]).collect();
+        let forward = super::forward::Forward::new(&a.rp, &mapped_col);
         let permute = |v: &[f64]| columns.iter().map(|&i| v[i]).collect();
         Self {
             c: permute(&a.c),
@@ -96,6 +112,7 @@ impl Ordered {
             anchor: vec![0.; a.n],
             xb: vec![0.; a.n],
             mapped_col,
+            forward,
             columns,
             batches,
             loose,
@@ -136,18 +153,16 @@ impl Ordered {
     pub(super) fn step(
         &mut self,
         a: &Scaled,
-        y: &[f64],
+        y: &mut [f64],
+        y0: &[f64],
         x: &[f64],
         anchor: &[f64],
-        ax: &mut [f64],
         tau: f64,
+        sigma: f64,
         w: f64,
     ) -> bool {
         #[cfg(target_arch = "x86_64")]
-        if std::is_x86_feature_detected!("avx2")
-            && a.m <= i32::MAX as usize
-            && a.n <= u32::MAX as usize
-        {
+        if std::is_x86_feature_detected!("avx2") && fits_gather_offsets(a.m, a.n) {
             assert_eq!(y.len(), a.m);
             if !self.live {
                 for (i, &j) in self.columns.iter().enumerate() {
@@ -163,8 +178,9 @@ impl Ordered {
             for i in self.loose..self.columns.len() {
                 self.scalar(i, a, y, tau, w);
             }
-            for (r, z) in ax.iter_mut().enumerate() {
-                *z = gather_sum(&a.rval, &self.mapped_col, &self.xb, a.rp[r], a.rp[r + 1]);
+            unsafe {
+                self.forward
+                    .project(a, &self.mapped_col, &self.xb, y, y0, sigma, w);
             }
             return true;
         }

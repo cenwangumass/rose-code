@@ -4,37 +4,45 @@ Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (histo
 
 ## Numbers on AMD EPYC 9V74
 
+The forward operator compiles contiguous input blocks in the retained reflected-primal coordinates. It keeps the original scalar prefix, eight independent arithmetical lanes, horizontal reduction tree and tail, then feeds each small group of complete row products directly to the dual projection. On x86-64, gather dispatch bounds both dimensions before using signed vector offsets.
+
+The full greenbea.pdhg sweep took 1.975066 → 1.384803 seconds versus the preceding commit `52a90742` (-29.9%). The prespecified randomized timing comparisons measured -18.63% and -20.44%. Frozen parity passed 987/987, 271 runnable release tests passed, and all full-length mode-switch WORK records matched. Full outputs and exit codes agreed on every benchmark. 5 reversed-role controls covered flagged regressions; none established a slowdown.
+
+The table gives same-CPU medians after one warm-up and three fresh-process timed solves for each of the four executables, with rotating order. All rose binaries use genuine TCMalloc. The patched Gurobi library hash is `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. Current rose wins **3/23**.
+
+| Run | Gurobi (s) | Uploaded rose (s) | Preceding rose (s) | Current rose (s) | Current / Gurobi |
+|---|---:|---:|---:|---:|---:|
+| degen2.primal-c | 0.018473 | 0.050252 | 0.047853 | 0.047775 | 2.59 |
+| degen2.dual-r | 0.012954 | 0.036617 | 0.044554 | 0.043482 | 3.36 |
+| degen3.primal-c | 0.293491 | 0.827343 | 0.835911 | 0.785460 | 2.68 |
+| degen3.primal-r | 0.317757 | 0.883361 | 0.795621 | 0.893339 | 2.81 |
+| perold.primal-c | 0.256421 | 0.646710 | 0.698371 | 0.703400 | 2.74 |
+| pilot4.primal-r | 0.019763 | 0.056819 | 0.057193 | 0.056305 | 2.85 |
+| 80bau3b.primal-c | 0.172820 | 0.905094 | 0.719694 | 0.720233 | 4.17 |
+| primal_5959.primal-r | 0.055648 | 0.121838 | 0.128923 | 0.117809 | 2.12 |
+| degen3.dual-c | 0.124993 | 0.403538 | 0.378641 | 0.376485 | 3.01 |
+| degen3.dual-r | 0.132237 | 0.398555 | 0.393338 | 0.379959 | 2.87 |
+| perold.dual-r | 0.051696 | 0.149768 | 0.175859 | 0.166991 | 3.23 |
+| 80bau3b.dual-r | 0.113372 | 0.416800 | 0.334862 | 0.410260 | 3.62 |
+| greenbea.dual-c | 0.304942 | 1.033311 | 1.123640 | 0.939903 | 3.08 |
+| greenbea.dual-r | 0.323587 | 1.148462 | 1.032218 | 1.223045 | 3.78 |
+| mode_switch.dual-r | 0.164839 | 2.254458 | 1.035646 | 1.113214 | 6.75 |
+| primal_5959.dual-r | 0.134691 | 0.240028 | 0.284022 | 0.287524 | 2.13 |
+| quad_2717.dual-r | 0.180114 | 0.274311 | 0.286622 | 0.293895 | 1.63 |
+| fx_quad_obj_5371.dual-r | 0.062406 | 0.162814 | 0.109509 | 0.112920 | 1.81 |
+| degen3.barrier-r | 0.162778 | 0.266797 | 0.250488 | 0.228138 | 1.40 |
+| 80bau3b.barrier-r | 0.371068 | 0.458255 | 0.303095 | 0.354342 | 0.95 |
+| greenbea.barrier-r | 0.694052 | 1.241755 | 1.432329 | 1.419159 | 2.04 |
+| 80bau3b.pdhg | 3.173418 | 6.192722 | 3.273348 | 2.910711 | 0.92 |
+| greenbea.pdhg | 1.510589 | 2.682477 | 1.975066 | 1.384803 | 0.92 |
+
+### Preceding release 52a90742
+
 Short columns with the same number of terms share an instruction sequence for four independent transpose dots. Their results feed the box projection directly. Ordinary steps retain the primal vector, anchor and reflected vector in this order, while the forward matrix uses their remapped indices. Observation and restart boundaries restore the original coordinate order.
 
 The full 80bau3b.pdhg sweep took 4.750526 → 3.324115 seconds versus the preceding commit `2969bd40` (-30.0%). The prespecified randomized timing comparisons measured -28.27% and -26.50%. Frozen parity passed 987/987, 270 runnable release tests passed, and all full-length mode-switch WORK records matched. Full outputs and exit codes agreed on every benchmark. 9 reversed-role controls covered flagged regressions; none established a slowdown.
 
 The table gives same-CPU medians after one warm-up and three fresh-process timed solves for each of the four executables, with rotating order. All rose binaries use genuine TCMalloc. The patched Gurobi library hash is `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. Current rose wins **0/23**.
-
-| Run | Gurobi (s) | Uploaded rose (s) | Preceding rose (s) | Current rose (s) | Current / Gurobi |
-|---|---:|---:|---:|---:|---:|
-| degen2.primal-c | 0.036784 | 0.118012 | 0.107933 | 0.097938 | 2.66 |
-| degen2.dual-r | 0.018540 | 0.041041 | 0.043170 | 0.039745 | 2.14 |
-| degen3.primal-c | 0.327685 | 1.037845 | 0.785282 | 0.724837 | 2.21 |
-| degen3.primal-r | 0.374466 | 0.980429 | 0.909426 | 0.966607 | 2.58 |
-| perold.primal-c | 0.281039 | 0.884736 | 0.827614 | 0.717632 | 2.55 |
-| pilot4.primal-r | 0.068514 | 0.166418 | 0.186587 | 0.189003 | 2.76 |
-| 80bau3b.primal-c | 0.196812 | 1.049945 | 0.957226 | 0.839360 | 4.26 |
-| primal_5959.primal-r | 0.100812 | 0.204887 | 0.204819 | 0.209770 | 2.08 |
-| degen3.dual-c | 0.144541 | 0.432239 | 0.359664 | 0.393840 | 2.72 |
-| degen3.dual-r | 0.118924 | 0.348416 | 0.350643 | 0.365574 | 3.07 |
-| perold.dual-r | 0.065562 | 0.167106 | 0.185502 | 0.166848 | 2.54 |
-| 80bau3b.dual-r | 0.118580 | 0.475552 | 0.467899 | 0.406286 | 3.43 |
-| greenbea.dual-c | 0.257611 | 0.953920 | 1.083452 | 1.098271 | 4.26 |
-| greenbea.dual-r | 0.268617 | 1.047110 | 0.896181 | 0.958587 | 3.57 |
-| mode_switch.dual-r | 0.117699 | 2.067677 | 0.812108 | 0.978986 | 8.32 |
-| primal_5959.dual-r | 0.186512 | 0.304891 | 0.322243 | 0.278790 | 1.49 |
-| quad_2717.dual-r | 0.146664 | 0.326010 | 0.309613 | 0.392362 | 2.68 |
-| fx_quad_obj_5371.dual-r | 0.057030 | 0.095537 | 0.127946 | 0.145282 | 2.55 |
-| degen3.barrier-r | 0.148524 | 0.638045 | 0.329339 | 0.379065 | 2.55 |
-| 80bau3b.barrier-r | 0.175098 | 0.391576 | 0.290532 | 0.426062 | 2.43 |
-| greenbea.barrier-r | 0.665466 | 1.306152 | 1.214137 | 1.449062 | 2.18 |
-| 80bau3b.pdhg | 3.146922 | 5.993422 | 4.750526 | 3.324115 | 1.06 |
-| greenbea.pdhg | 1.423418 | 2.526797 | 2.211238 | 1.500274 | 1.05 |
 
 ### Preceding release 2969bd40
 
@@ -878,7 +886,7 @@ projected effects, component source/binary/timings, dependency audit and restora
 
 ## In progress
 
-The full CPU6 reference comparison on this exact executable put 80BAU3B PDHG at 3.013159 s against patched Gurobi at 3.897919 s. The solver won all three measured CPU6 rounds. On CPU2 the four-way sweep put the same executables at 3.324115 s and 3.146922 s. GREENBEA was slower in both setups (1.880829 s versus 1.575628 s on CPU6 and 1.500274 s versus 1.423418 s on CPU2). The standalone ordered source on its older parent showed an invalid same-binary control (p=0.01035) in its designated trial, so its planned second trial was cancelled. Timings from the standalone branch are retained in the evidence. A separate candidate projects dual coordinates directly from forward row tiles with signed offsets checked for both inputs. It passed 987/987, five release-compiled boundary/recurrence oracles, all 368 sweep samples, all 202,772 mode-switch WORK records and five reversed controls. Its CPU2 survey recorded 2.910711 s versus 3.173418 s for patched Gurobi on 80BAU3B PDHG and 1.384803 s versus 1.510589 s on GREENBEA PDHG. Both wins repeated on CPU5 (2.645657 s versus 3.455131 s, and 1.086920 s versus 1.201770 s), all three measured rounds for each. The CPU2 survey also had 80BAU3B barrier at 0.354342 s versus 0.371068 s, but a new independent CPU3 repeat reversed that result (0.325849 s versus 0.202369 s). The first fixed 160-pair GREENBEA improvement on this lineage was 18.63%, interval [15.85%, 20.25%]. That source has a separate release suite and independent confirmation. Additional experiments cover a shared factor arena for barrier, retained compact basis ownership, the ordinary LU nucleus, and global primal pricing.
+The independent CPU5 comparison on 80bau3b.pdhg measured 2.645657 s for this executable, 2.875764 s for its parent and 3.455131 s for patched Gurobi. The independent CPU5 comparison on greenbea.pdhg measured 1.086920 s for this executable, 1.640154 s for its parent and 1.201770 s for patched Gurobi. The additional CPU3 check on 80bau3b.barrier-r measured 0.325849 s for this solver and 0.202369 s for Gurobi. The CPU2 table result for this unaffected code path did not replicate. The predecessor experimental executable was superseded because AVX2 uses signed 32-bit gather offsets on the forward pass. Its preliminary two-row gain was rechecked on this executable with both dimensions bounded. The table above reports the current same-CPU four-way run.
 
 ## Extended BTRAN feasibility
 
