@@ -4,39 +4,62 @@ Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (histo
 
 ## Numbers on AMD EPYC 9V74
 
+A fresh compact main factor can own the numerical effects of reconstructing its primal and dual values. Matching basis, ordered inputs and floating-point state allow the solver to restore the original writes and advance to the exact existing transpose successor. It still evaluates the drift and pricing decisions and books each original WORK site.
+
+The full primal_5959.dual-r sweep took 0.138375 → 0.122820 seconds versus the preceding commit `f4fca9d5` (-11.2%). The prespecified randomized timing comparisons measured -11.93% and -9.16%. Frozen parity passed 987/987, 280 runnable release tests passed, and all full-length mode-switch WORK records matched. Full outputs and exit codes agreed on every benchmark. 8 reversed-role controls covered flagged regressions; none established a slowdown.
+
+The table gives same-CPU medians after one warm-up and three fresh-process timed solves for each of the four executables, with rotating order. All rose binaries use genuine TCMalloc. The patched Gurobi library hash is `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. Current rose wins **1/23**.
+
+| Run | Gurobi (s) | Uploaded rose (s) | Preceding rose (s) | Current rose (s) | Current / Gurobi |
+|---|---:|---:|---:|---:|---:|
+| degen2.primal-c | 0.017099 | 0.043970 | 0.041117 | 0.040445 | 2.37 |
+| degen2.dual-r | 0.013406 | 0.036959 | 0.034663 | 0.032846 | 2.45 |
+| degen3.primal-c | 0.249683 | 0.757074 | 0.839837 | 0.704940 | 2.82 |
+| degen3.primal-r | 0.262960 | 0.734757 | 0.660856 | 0.728240 | 2.77 |
+| perold.primal-c | 0.195836 | 0.623798 | 0.640211 | 0.664916 | 3.40 |
+| pilot4.primal-r | 0.019700 | 0.057947 | 0.053850 | 0.074609 | 3.79 |
+| 80bau3b.primal-c | 0.139371 | 0.827653 | 0.550294 | 0.686477 | 4.93 |
+| primal_5959.primal-r | 0.073716 | 0.163841 | 0.095155 | 0.080716 | 1.09 |
+| degen3.dual-c | 0.131723 | 0.423990 | 0.336994 | 0.354443 | 2.69 |
+| degen3.dual-r | 0.123392 | 0.381000 | 0.331099 | 0.346814 | 2.81 |
+| perold.dual-r | 0.057639 | 0.178818 | 0.183176 | 0.185638 | 3.22 |
+| 80bau3b.dual-r | 0.116140 | 0.467923 | 0.381117 | 0.410619 | 3.54 |
+| greenbea.dual-c | 0.275717 | 0.983870 | 0.994473 | 0.987772 | 3.58 |
+| greenbea.dual-r | 0.312731 | 1.207918 | 1.088615 | 1.172848 | 3.75 |
+| mode_switch.dual-r | 0.131641 | 2.007307 | 0.958006 | 0.770008 | 5.85 |
+| primal_5959.dual-r | 0.113670 | 0.250212 | 0.138375 | 0.122820 | 1.08 |
+| quad_2717.dual-r | 0.114140 | 0.250876 | 0.135857 | 0.143097 | 1.25 |
+| fx_quad_obj_5371.dual-r | 0.046008 | 0.108545 | 0.057310 | 0.052568 | 1.14 |
+| degen3.barrier-r | 0.174443 | 0.363123 | 0.455771 | 0.442727 | 2.54 |
+| 80bau3b.barrier-r | 0.175040 | 0.335766 | 0.429579 | 0.506532 | 2.89 |
+| greenbea.barrier-r | 0.725012 | 2.576603 | 2.325766 | 1.448228 | 2.00 |
+| 80bau3b.pdhg | 3.519194 | 6.401593 | 2.736362 | 2.862504 | 0.81 |
+| greenbea.pdhg | 1.478840 | 3.137567 | 1.462617 | 1.624095 | 1.10 |
+
+### Compact primal and dual reconstruction
+
+On the independent compact LU branch the original primal and dual reconstruction routines consumed a combined 29% of full 5959 dual time. Restoring their verified numerical writes and advancing the exact BTRAN successor saved 10.60% of solve time in the instrumented comparison, including lookup and restore costs. The two independent whole-solve comparisons on that source measured 10.71% and 10.77% gains. The production comparisons below use the actual reduced-cost parent.
+
+The first whole 5959 dual comparison changed time by -11.93%, 95% interval [-14.51%, -9.37%]. Rose improved in 145/192 pairs. The confirm whole 5959 dual comparison changed time by -9.16%, 95% interval [-11.77%, -6.22%]. Rose improved in 143/192 pairs. 
+
+The CPU7 columns use one warm-up and three full runs per role. The last three columns use 48 mixed Rose/Gurobi pairs and 48 identical-Gurobi pairs on CPU2, with all original results and exit codes checked.
+
+| Run | CPU7 Rose (s) | CPU7 Gurobi (s) | CPU2 paired change | 95% interval | Test |
+|---|---:|---:|---:|---:|---|
+| primal_5959.dual-r | 0.200750 | 0.247125 | +13.45% | [+9.72%, +19.98%] | Gurobi faster |
+| fx_quad_obj_5371.dual-r | 0.056303 | 0.040817 | +20.47% | [+17.08%, +28.04%] | Gurobi faster |
+| quad_2717.dual-r | 0.157666 | 0.140523 | +28.31% | [+22.46%, +35.95%] | Gurobi faster |
+| primal_5959.primal-r | 0.211758 | 0.160609 | +13.93% | [+7.78%, +19.93%] | Gurobi faster |
+
+### Preceding release f4fca9d5
+
 At a compact LU state, an exact repeat of the extended dual vector, active columns and cost-free mode can reuse the earlier native reduced costs. The solver restores only the slots written by the original pass and executes the final active column again to preserve x87 effects. Any incompatible floating-point or basis state runs the original pass.
 
 The full primal_5959.dual-r sweep took 0.146243 → 0.108262 seconds versus the preceding commit `2731b202` (-26.0%). The prespecified randomized timing comparisons measured -8.77% and -8.93%. Frozen parity passed 987/987, 279 runnable release tests passed, and all full-length mode-switch WORK records matched. Full outputs and exit codes agreed on every benchmark. 3 reversed-role controls covered flagged regressions; none established a slowdown.
 
 The table gives same-CPU medians after one warm-up and three fresh-process timed solves for each of the four executables, with rotating order. All rose binaries use genuine TCMalloc. The patched Gurobi library hash is `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. Current rose wins **2/23**.
 
-| Run | Gurobi (s) | Uploaded rose (s) | Preceding rose (s) | Current rose (s) | Current / Gurobi |
-|---|---:|---:|---:|---:|---:|
-| degen2.primal-c | 0.018744 | 0.050380 | 0.044433 | 0.044508 | 2.37 |
-| degen2.dual-r | 0.013453 | 0.039912 | 0.035636 | 0.040116 | 2.98 |
-| degen3.primal-c | 0.241071 | 0.694725 | 0.659590 | 0.632014 | 2.62 |
-| degen3.primal-r | 0.274803 | 0.626043 | 0.665218 | 0.603041 | 2.19 |
-| perold.primal-c | 0.215773 | 0.550727 | 0.529416 | 0.582316 | 2.70 |
-| pilot4.primal-r | 0.017142 | 0.050864 | 0.057878 | 0.049583 | 2.89 |
-| 80bau3b.primal-c | 0.165876 | 0.830416 | 0.703676 | 0.658835 | 3.97 |
-| primal_5959.primal-r | 0.072452 | 0.190253 | 0.120822 | 0.114324 | 1.58 |
-| degen3.dual-c | 0.118555 | 0.393788 | 0.353584 | 0.372950 | 3.15 |
-| degen3.dual-r | 0.125620 | 0.331944 | 0.349093 | 0.363837 | 2.90 |
-| perold.dual-r | 0.044070 | 0.149615 | 0.163383 | 0.143867 | 3.26 |
-| 80bau3b.dual-r | 0.109240 | 0.495071 | 0.377993 | 0.376709 | 3.45 |
-| greenbea.dual-c | 0.248218 | 0.981054 | 0.908857 | 0.916313 | 3.69 |
-| greenbea.dual-r | 0.221761 | 0.831917 | 0.712977 | 0.878412 | 3.96 |
-| mode_switch.dual-r | 0.134518 | 1.849975 | 0.864265 | 0.859692 | 6.39 |
-| primal_5959.dual-r | 0.103357 | 0.243779 | 0.146243 | 0.108262 | 1.05 |
-| quad_2717.dual-r | 0.081952 | 0.207581 | 0.141576 | 0.144197 | 1.76 |
-| fx_quad_obj_5371.dual-r | 0.045156 | 0.107209 | 0.058798 | 0.055391 | 1.23 |
-| degen3.barrier-r | 0.122083 | 0.247164 | 0.264374 | 0.240786 | 1.97 |
-| 80bau3b.barrier-r | 0.187084 | 0.272955 | 0.298229 | 0.284127 | 1.52 |
-| greenbea.barrier-r | 0.631252 | 1.163216 | 1.047002 | 1.053708 | 1.67 |
-| 80bau3b.pdhg | 2.931067 | 5.074952 | 1.993931 | 2.044362 | 0.70 |
-| greenbea.pdhg | 1.336653 | 2.435047 | 1.092245 | 1.240279 | 0.93 |
-
-### Compact native reduced costs
+### Native reduced costs on the preceding solver
 
 More than 99% of the original slow-path calls on the four compact models used an already observed extended dual vector and active column set. In a complete 5959 dual run on the independent LU branch, the native reduced-cost pass fell from 13.03 ms to 4.40 ms. That comparison includes checks on both misses and hits, result copies and re-execution of the final column.
 
@@ -975,7 +998,7 @@ projected effects, component source/binary/timings, dependency audit and restora
 
 ## In progress
 
-A pending change to fresh primal and dual reconstructions is being compared against this reduced-cost release. The independent reconstruction branch improved full 5959 dual by 10.71% and 10.77%. The sparse pricing-row branch improved full fx by 17.33% and 17.66%. Each subsequent commit requires an independent full comparison on its actual parent.
+The next compact simplex measurements address the remaining pricing row and the general cost-change BTRAN. Their contributions are measured independently against each actual production parent.
 
 The current comparison above uses the original arguments for every benchmark. The remaining compact primal costs under investigation include reconstructing fresh primal and dual quantities, and computing native extended reduced costs for a recurring dual vector and active basis mask. Current solve-only profiles and independent whole-input measurements identify these costs after recurrent FTRAN, BTRAN and factor update work has been removed.
 

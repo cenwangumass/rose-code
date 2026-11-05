@@ -231,6 +231,8 @@ pub struct TraceEvent {
 #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
 #[path = "quad_cost.rs"]
 mod quad_cost;
+#[path = "quad_fresh.rs"]
+mod quad_fresh;
 #[path = "quad_main.rs"]
 mod quad_main;
 use quad_main::QuadMain;
@@ -1420,6 +1422,7 @@ struct RhsMemo {
     rank_results: Vec<RankResult>,
     devex_deltas: DevexDeltaMemo,
     work_results: Vec<(Vec<u64>, f64)>,
+    fresh: quad_fresh::PrimalMemo,
     #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
     cost_results: Vec<CostResult>,
     #[cfg(test)]
@@ -1435,6 +1438,7 @@ impl QuadRhs {
                 rank_results: Vec::new(),
                 devex_deltas: DevexDeltaMemo::default(),
                 work_results: Vec::new(),
+                fresh: Default::default(),
                 #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
                 cost_results: Vec::new(),
                 #[cfg(test)]
@@ -1618,6 +1622,7 @@ impl QuadRhs {
         }) {
             return Some(*work);
         }
+        memo.fresh.invalidate();
         let bq: Vec<_> = rhs.iter().map(|&x| crate::f80::F80::from_f64(x)).collect();
         let work = memo.factor.ftran_dense_work(&bq);
         if memo.work_results.len() == 4 {
@@ -1647,6 +1652,7 @@ impl QuadRhs {
             || rows.len() > 100
             || vals.iter().any(|v| v.is_nan())
         {
+            memo.fresh.invalidate();
             return memo.factor.ftran_basic(rows, vals);
         }
         let mut buffer = [std::mem::MaybeUninit::<(usize, u64, u16)>::uninit(); 100];
@@ -1662,6 +1668,7 @@ impl QuadRhs {
         if let Some(entry) = memo.results.iter().find(|e| e.key == key) {
             return entry.out.clone();
         }
+        memo.fresh.invalidate();
         let out = memo.factor.ftran_basic(rows, vals);
         if out.len() <= 100 {
             if memo.results.len() == 4 {
@@ -3425,6 +3432,28 @@ impl<'a> Solver<'a> {
         // `P+0x18 == 0` and basic variables out of bounds: the input is the penalties alone (`0x108d70`, the path without the cost copy).
         let cf = self.costfree && sg.iter().any(|&c| c != 0);
         self.y_costfree = cf;
+        let cursor = if let Some(Mir::Q(main)) = &mut self.mirror {
+            quad_main::status().and_then(|flags| main.cursor().map(|state| (state, flags)))
+        } else {
+            None
+        };
+        if let Some((state, flags)) = &cursor {
+            #[cfg(test)]
+            let before = quad_fresh::audit::start_dual(self);
+            let Some(Mir::Q(main)) = &mut self.mirror else {
+                unreachable!()
+            };
+            if let Some(snapshot) = state.try_dual(main, &self.basic, &sg, cf, self.cleanup, *flags)
+            {
+                let factor_work = main.work;
+                self.book_dual_btran(site, factor_work);
+                snapshot.restore(self);
+                self.book_dual_products();
+                #[cfg(test)]
+                quad_fresh::audit::dual(self, site, before);
+                return;
+            }
+        }
         let mi = self.mirror.as_mut().unwrap();
         let inp: Vec<(usize, f64)> = self
             .basic
@@ -3474,6 +3503,33 @@ impl<'a> Solver<'a> {
                 serde_json::json!({"refactor": self.refactorizations, "site": site, "out": crate::dump::sparse(&out)}),
             );
         }
+        let factor_work = mi.work();
+        self.book_dual_btran(site, factor_work);
+        let mut y = vec![0.0; p.m];
+        for &(i, v) in &out {
+            y[i] = if self.cleanup && v.abs() < 1e-13 {
+                0.0
+            } else {
+                v
+            };
+        }
+        let mut rk = vec![usize::MAX; p.m];
+        for (k, &(i, _)) in out.iter().enumerate() {
+            rk[i] = k;
+        }
+        self.y_rank = rk;
+        self.y_ref = Some(y);
+        if let (Some((state, _)), Some(Mir::Q(main))) = (&cursor, &self.mirror) {
+            if state.may_record(main) {
+                if let Some(flags) = quad_main::status() {
+                    state.record_dual(quad_fresh::DualSnapshot::capture(self, sg, cf, flags));
+                }
+            }
+        }
+        self.book_dual_products();
+    }
+
+    fn book_dual_btran(&mut self, site: &str, factor_work: f64) {
         let caller = if self.cleanup {
             0xe53a7
         } else if self.p0.is_some() {
@@ -3496,21 +3552,10 @@ impl<'a> Solver<'a> {
             0x109289
         };
         self.work
-            .add_from(0x12de50, caller, mi.work(), crate::work::FAC);
-        let mut y = vec![0.0; p.m];
-        for &(i, v) in &out {
-            y[i] = if self.cleanup && v.abs() < 1e-13 {
-                0.0
-            } else {
-                v
-            };
-        }
-        let mut rk = vec![usize::MAX; p.m];
-        for (k, &(i, _)) in out.iter().enumerate() {
-            rk[i] = k;
-        }
-        self.y_rank = rk;
-        self.y_ref = Some(y);
+            .add_from(0x12de50, caller, factor_work, crate::work::FAC);
+    }
+
+    fn book_dual_products(&mut self) {
         // The reduced costs that follow (`0x1020a0`, site `0x1021b0`): a pass over all variables and the columns of the
         // nonbasic structurals that are not fixed.
         if self.cleanup || self.p0.is_some() {
@@ -3644,7 +3689,34 @@ impl<'a> Solver<'a> {
     }
 
     fn recompute_primal(&mut self) {
-        self.recompute_primal_x();
+        if let Some(provider) = quad_fresh::primal_provider(self) {
+            let holder = provider.lock().unwrap();
+            #[cfg(test)]
+            let before = quad_fresh::audit::start_primal(self);
+            if holder.fresh.restore(self) {
+                #[cfg(test)]
+                {
+                    drop(holder);
+                    quad_fresh::audit::primal(self, before);
+                }
+                return;
+            }
+            let generation = holder.fresh.generation;
+            drop(holder);
+            let work = self.recompute_primal_direct();
+            let mut holder = provider.lock().unwrap();
+            if generation == holder.fresh.generation {
+                if let Some(work) = work {
+                    holder.fresh.record(self, work);
+                }
+            }
+        } else {
+            self.recompute_primal_direct();
+        }
+    }
+
+    fn recompute_primal_direct(&mut self) -> Option<f64> {
+        let work = self.recompute_primal_x();
         for pos in 0..self.basic.len() {
             let j = self.basic[pos];
             self.dst[j] = self.dist_of(j, self.x[j]);
@@ -3665,6 +3737,7 @@ impl<'a> Solver<'a> {
             }
             d
         });
+        work
     }
 
     fn dist_of(&self, j: usize, x: f64) -> f64 {
@@ -3676,7 +3749,8 @@ impl<'a> Solver<'a> {
         }
     }
 
-    fn recompute_primal_x(&mut self) {
+    fn recompute_primal_x(&mut self) -> Option<f64> {
+        let mut work = None;
         self.x_q = None;
         let p = self.p;
         let mut r = p.rhs.clone();
@@ -3708,6 +3782,7 @@ impl<'a> Solver<'a> {
                 None
             };
             let est = cached.unwrap_or_else(|| mi.ftran_dense_work(&r0));
+            work = Some(est);
             self.work
                 .add_from(0x1219d6, 0x120673, est, crate::work::FAC);
         }
@@ -3776,7 +3851,7 @@ impl<'a> Solver<'a> {
                 }
             }
             self.x_q = Some(xq);
-            return;
+            return work;
         }
         if let Some(mi) = self.mirror.as_mut() {
             // The reference's FTRAN of the basic solution, value for value. The mirror's numeric factor is exact only where the
@@ -3834,13 +3909,14 @@ impl<'a> Solver<'a> {
                 for (pos, &j) in self.basic.iter().enumerate() {
                     self.x[j] = xb[pos];
                 }
-                return;
+                return work;
             }
         }
         self.factor.ftran(&mut r);
         for (pos, &j) in self.basic.iter().enumerate() {
             self.x[j] = r[pos];
         }
+        work
     }
 
     /// `d_j = c_j - sum y_i a_ij`, subtracting the terms in the column's stored order (`0x1020a0`).

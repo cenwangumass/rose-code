@@ -15,6 +15,7 @@ pub(crate) struct State {
     factor: Factor,
     edge: OnceCell<Edge>,
     depth: usize,
+    dual: OnceCell<super::quad_fresh::DualSnapshot>,
     #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
     costs: super::quad_cost::CompactCosts,
 }
@@ -101,7 +102,7 @@ impl Op<'_> {
 
 // Both exception units must retain all status flags observed after the original operation.
 // Nondefault controls or an active factor dump always run the original numerical kernels.
-fn status() -> Option<u32> {
+pub(super) fn status() -> Option<u32> {
     #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
     {
         let mut cw = 0u16;
@@ -134,6 +135,7 @@ impl QuadMain {
                 factor: f,
                 edge: OnceCell::new(),
                 depth: 0,
+                dual: OnceCell::new(),
                 #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
                 costs: Default::default(),
             }))
@@ -147,6 +149,13 @@ impl QuadMain {
         match self {
             Self::Shared(state) => Some(&state.costs),
             Self::Direct(_) => None,
+        }
+    }
+
+    pub(super) fn cursor(&self) -> Option<Rc<State>> {
+        match self {
+            Self::Shared(s) => Some(s.clone()),
+            _ => None,
         }
     }
 
@@ -187,6 +196,7 @@ impl QuadMain {
                     factor: next,
                     edge: OnceCell::new(),
                     depth: state.depth + 1,
+                    dual: OnceCell::new(),
                     #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
                     costs: Default::default(),
                 });
@@ -397,5 +407,38 @@ mod tests {
         set_controls(0x3f80);
         assert!(matches!(root.restart(), QuadMain::Direct(_)));
         set_controls(csr);
+    }
+}
+
+impl State {
+    pub(super) fn try_dual<'a>(
+        &'a self,
+        live: &mut QuadMain,
+        basic: &[usize],
+        classes: &[i8],
+        cf: bool,
+        cleanup: bool,
+        flags: u32,
+    ) -> Option<&'a super::quad_fresh::DualSnapshot> {
+        let data = self.dual.get()?;
+        if !data.matches(basic, classes, cf, cleanup, flags) {
+            return None;
+        }
+        let edge = self.edge.get()?;
+        if edge.flags & !flags != 0 {
+            return None;
+        }
+        *live = QuadMain::Shared(edge.next.clone());
+        Some(data)
+    }
+    pub(super) fn may_record(&self, post: &QuadMain) -> bool {
+        self.dual.get().is_none()
+            && self.edge.get().is_some_and(|edge| {
+                matches!(edge.input, Op::Transpose(_, false, true))
+                    && matches!(post,QuadMain::Shared(after) if Rc::ptr_eq(after,&edge.next))
+            })
+    }
+    pub(super) fn record_dual(&self, d: super::quad_fresh::DualSnapshot) {
+        let _ = self.dual.set(d);
     }
 }
