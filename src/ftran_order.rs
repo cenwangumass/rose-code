@@ -276,6 +276,288 @@ impl<R: Real> LevelWorkspace<R> {
     }
 }
 
+/// Scratch for independent BTRAN calls. An empty clone avoids copying dead work vectors.
+#[derive(Default)]
+struct BtranWork<R> {
+    x: Vec<R>,
+    tail: SparseBtranTail<R>,
+    input_order: Vec<usize>,
+    output_order: Vec<usize>,
+    marks: Vec<u32>,
+    generation: u32,
+    eta_heads: Vec<usize>,
+    eta_prev: Vec<usize>,
+    pending: BinaryHeap<usize>,
+}
+
+impl<R: Default> Clone for BtranWork<R> {
+    fn clone(&self) -> Self {
+        Self::default()
+    }
+}
+
+impl<R> BtranWork<R> {
+    fn next_generation(&mut self, m: usize) -> u32 {
+        self.marks.resize(m, 0);
+        if self.generation == u32::MAX {
+            self.marks.fill(0);
+            self.generation = 0;
+        }
+        self.generation += 1;
+        self.generation
+    }
+
+    fn index_etas(&mut self, etas: &[Eta<R>], m: usize) {
+        self.eta_heads.resize(m, usize::MAX);
+        for e in self.eta_prev.len()..etas.len() {
+            self.eta_prev
+                .push(std::mem::replace(&mut self.eta_heads[etas[e].idx], e));
+        }
+    }
+
+    fn schedule_row(&mut self, row: usize, before: usize) {
+        let mut e = self.eta_heads[row];
+        while e != usize::MAX && e >= before {
+            e = self.eta_prev[e];
+        }
+        if e != usize::MAX {
+            self.pending.push(e);
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "btran_oracle.rs"]
+mod btran_oracle;
+
+/// Working values are indexed by permutation slot. A clear occupancy bit represents +0,
+/// so writes from previous right-hand sides need no numeric-array clear.
+#[derive(Default)]
+struct SparseBtranTail<R> {
+    values: Vec<R>,
+    occupied: Vec<u64>,
+}
+
+trait BtranTail<R: Real> {
+    fn entry(&mut self, p: usize, slots: &[usize]) -> &mut R;
+    fn next_slot(&self, from: usize, end: usize) -> Option<usize>;
+    fn take(&mut self, p: usize, slot: usize) -> R;
+}
+
+impl<R: Real> BtranTail<R> for Vec<R> {
+    fn entry(&mut self, p: usize, _: &[usize]) -> &mut R {
+        &mut self[p]
+    }
+
+    fn next_slot(&self, from: usize, end: usize) -> Option<usize> {
+        (from < end).then_some(from)
+    }
+
+    fn take(&mut self, p: usize, _: usize) -> R {
+        std::mem::replace(&mut self[p], R::ZERO)
+    }
+}
+
+impl<R: Real> BtranTail<R> for SparseBtranTail<R> {
+    fn entry(&mut self, p: usize, slots: &[usize]) -> &mut R {
+        let slot = slots[p];
+        let word = &mut self.occupied[slot / 64];
+        let bit = 1u64 << (slot % 64);
+        if *word & bit == 0 {
+            self.values[slot] = R::ZERO;
+            *word |= bit;
+        }
+        &mut self.values[slot]
+    }
+
+    fn next_slot(&self, from: usize, _: usize) -> Option<usize> {
+        let (word, skip) = (from / 64, from % 64);
+        let words = self.occupied.get(word..)?;
+        let mut mask = u64::MAX << skip;
+        for (i, &bits) in words.iter().enumerate() {
+            let pending = bits & mask;
+            if pending != 0 {
+                return Some((word + i) * 64 + pending.trailing_zeros() as usize);
+            }
+            mask = u64::MAX;
+        }
+        None
+    }
+
+    fn take(&mut self, _: usize, slot: usize) -> R {
+        self.occupied[slot / 64] &= !(1 << (slot % 64));
+        self.values[slot]
+    }
+}
+
+impl<R: Real> SparseBtranTail<R> {
+    fn reset(&mut self, m: usize) {
+        self.values.resize(m, R::ZERO);
+        self.occupied.resize(m.div_ceil(64), 0);
+        self.occupied.fill(0);
+    }
+}
+
+#[cfg(test)]
+mod sparse_btran_tail_tests {
+    use super::*;
+
+    fn identity(m: usize) -> RefStruct {
+        let cols: Vec<_> = (0..m).map(|i| (true, vec![i], vec![1.0])).collect();
+        let st = crate::lu_order::factor_structure(m, &cols);
+        RefStruct::fresh(m, m, &st, &cols)
+    }
+
+    fn check(f: &RefStruct, w: &mut SparseBtranTail<f64>, inp: &[(usize, f64)]) {
+        let mut old_x = vec![0.0; f.m];
+        let mut new_x = vec![0.0; f.m];
+        let (old_order, old_e) = f.sparse_btran_u_scan(inp, &mut old_x);
+        w.reset(f.m);
+        let (new_order, new_e) = f.sparse_btran_u(inp, &mut new_x, w, Vec::new());
+        let mut dense_x = vec![0.0; f.m];
+        let (dense_order, dense_e) =
+            f.sparse_btran_u(inp, &mut dense_x, &mut vec![0.0; f.m], Vec::new());
+        assert_eq!(dense_order, old_order);
+        assert_eq!(dense_e.to_bits(), old_e.to_bits());
+        assert!(dense_x
+            .iter()
+            .zip(&old_x)
+            .all(|(a, b)| a.to_bits() == b.to_bits()));
+        assert_eq!(new_order, old_order);
+        assert_eq!(new_e.to_bits(), old_e.to_bits());
+        assert!(new_x
+            .iter()
+            .zip(old_x)
+            .all(|(a, b)| a.to_bits() == b.to_bits()));
+    }
+
+    #[test]
+    fn occupied_slots_match_scan_across_permutations_and_reused_right_hand_sides() {
+        let mut seed = 0x3a6d4315_u64;
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed as usize
+        };
+        let vals = [
+            1.0,
+            -1.0,
+            0.5,
+            0.0,
+            -0.0,
+            TOL,
+            -TOL,
+            f64::from_bits(1),
+            f64::MAX,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::from_bits(0x7ff8000000000123),
+            f64::from_bits(0x7ff8000000000456),
+        ];
+        for m in [1, 63, 64, 65, 127, 128, 129, 257] {
+            let mut f = identity(m);
+            let mut w = SparseBtranTail::default();
+            for pass in 0..8 {
+                for i in (1..m).rev() {
+                    f.at.swap(i, next() % (i + 1));
+                }
+                for (s, &p) in f.at.iter().enumerate() {
+                    f.slot[p] = s;
+                }
+                f.i21 = next() % m;
+                f.h33 = if pass % 2 == 0 { 5.0 } else { 5.25 };
+                let nval = if pass < 4 { 7 } else { vals.len() };
+                for p in 0..m {
+                    f.kind[p] = if f.slot[p] < f.i21 {
+                        (p % 2) as i64 - 1
+                    } else {
+                        -2
+                    };
+                    f.diag[p] = [1.0, -2.0, f64::MIN_POSITIVE, 0.5][next() % 4];
+                    let r = next() % m;
+                    // Self, backward, repeated and forward writes occur in the same scatter.
+                    f.ut[p] = [r, p, (p + m - 1) % m, r, (p + 1) % m]
+                        .into_iter()
+                        .map(|r| (r, vals[next() % nval]))
+                        .collect();
+                }
+                for n in [0, 1, 2, 3, m / 2, m + 1] {
+                    let inp: Vec<_> = (0..n).map(|_| (next() % m, vals[next() % nval])).collect();
+                    check(&f, &mut w, &inp);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn repeated_large_btran_preserves_results_and_observable_state() {
+        let mut f = identity(4096);
+        assert!(f.bt_occupied);
+        f.i21 = 8;
+        for p in f.i21..f.m {
+            f.kind[p] = -2;
+        }
+        f.ut[2] = vec![(63, 0.25), (127, -1.0), (63, 0.5)];
+        f.ut[63] = vec![(64, 1.0), (4051, -0.25)];
+        f.ut[64] = vec![(63, -1.0), (4095, 0.5), (64, 0.125)];
+        let mut scan = f.clone();
+        scan.bt_occupied = false;
+        let rhs = [
+            vec![(2, 1.0)],
+            vec![(64, -2.0)],
+            vec![],
+            vec![(2, 1.0), (2, -1.0)],
+        ];
+        for dense_in in [false, true] {
+            for input in &rhs {
+                let bits = |v: Vec<(usize, f64)>| {
+                    v.into_iter()
+                        .map(|(p, x)| (p, x.to_bits()))
+                        .collect::<Vec<_>>()
+                };
+                let expected = bits(scan.btran(input, true, dense_in));
+                assert_eq!(bits(f.btran(input, true, dense_in)), expected);
+                assert_eq!(f.work.to_bits(), scan.work.to_bits());
+                assert_eq!(f.bt_dense, scan.bt_dense);
+                assert_eq!(f.row_cached, scan.row_cached);
+            }
+        }
+        let clone = f.clone();
+        assert!(clone.bt_work.as_ref().unwrap().tail.values.is_empty());
+    }
+
+    #[test]
+    fn captured_sc50a_transpose_matches_original_tail() {
+        let records: serde_json::Value =
+            serde_json::from_str(include_str!("../tests/fixtures/ftran_dense_tail.json")).unwrap();
+        for rec in records.as_array().unwrap() {
+            let diag: Vec<f64> = serde_json::from_value(rec["diag"].clone()).unwrap();
+            let mut f = identity(diag.len());
+            f.diag = diag;
+            f.kind = serde_json::from_value(rec["kind"].clone()).unwrap();
+            f.slot = serde_json::from_value(rec["slot"].clone()).unwrap();
+            f.i21 = f.kind.iter().filter(|&&kind| kind != -2).count();
+            for (p, &s) in f.slot.iter().enumerate() {
+                f.at[s] = p;
+            }
+            let cols: Vec<Vec<(usize, f64)>> = serde_json::from_value(rec["uc"].clone()).unwrap();
+            for (c, col) in cols.iter().enumerate() {
+                for &(p, v) in col {
+                    f.ut[p].push((c, v));
+                }
+            }
+            let mut w = SparseBtranTail::default();
+            for h in [2.0, 7.0] {
+                f.h33 = h;
+                for p in 0..f.m {
+                    check(&f, &mut w, &[(p, 1.0), ((p + 1) % f.m, -0.25), (p, -0.5)]);
+                }
+            }
+        }
+    }
+}
+
 /// Direct numeric row lookup for tau dots. Stamps retain the first duplicate without clearing per row.
 #[derive(Clone, Default)]
 struct TauRow<R> {
@@ -428,6 +710,8 @@ pub struct RefStruct<R: Real = f64> {
     /// Reused counts for ordering dense lists of permutation slots.
     slot_counts: std::cell::RefCell<Vec<usize>>,
     etas: Vec<Eta<R>>,
+    bt_occupied: bool,
+    bt_work: Option<Box<BtranWork<R>>>,
     /// Immutable L transpose, in ascending source-column order, shared by all BTRAN calls of this factor.
     lt: Vec<Vec<(usize, R)>>,
     /// Immutable forward levels and their maximum for level-bucket L solves (`0x12a990`). Used only
@@ -1090,6 +1374,9 @@ impl<R: Real> RefStruct<R> {
             levels,
             level_cache: LevelCache::default(),
             lt_levels: Default::default(),
+            // Four or more occupancy words, and skipped zero divisions must always be exact.
+            bt_occupied: !R::QUAD && m >= 256 && st.diag.iter().all(|d| d.to_f64().is_normal()),
+            bt_work: None,
             lev_built,
             diag: st.diag.clone(),
             uc,
@@ -2550,14 +2837,154 @@ impl<R: Real> RefStruct<R> {
         (1.5 * self.sum_alpha + 2.0 * self.sum_eta) * m - d7 > 0.0
     }
 
+    /// Both sparse U-transpose schedules visit reached slots in the original order.
+    fn sparse_btran_u<W: BtranTail<R>>(
+        &self,
+        inp: &[(usize, R)],
+        x: &mut [R],
+        w: &mut W,
+        mut out: Vec<usize>,
+    ) -> (Vec<usize>, f64) {
+        let m = self.m;
+        let cnt = inp.len();
+        let ut = &self.ut;
+        out.clear();
+        let mut eu = 0.0f64;
+        let push = |w: &mut W, row: &[(usize, R)], d: R| {
+            for &(c, v) in row {
+                let value = w.entry(c, &self.slot);
+                *value = -(v * d) + *value;
+            }
+        };
+        let mut lowest = m;
+        if self.h33 > 5.0 {
+            eu = cnt as f64 * 3.0;
+        }
+        for &(p, v) in inp {
+            let d = v / self.diag[p];
+            let tail = if self.h33 > 5.0 {
+                self.kind[p] == -2
+            } else {
+                self.slot[p] >= self.i21
+            };
+            if tail {
+                if self.h33 <= 5.0 || d.abs() > R::c(TOL) {
+                    lowest = lowest.min(self.slot[p]);
+                    *w.entry(p, &self.slot) += v;
+                }
+            } else if d.abs() > R::c(TOL) {
+                out.push(p);
+                x[p] = d;
+                if self.h33 > 5.0 && self.kind[p] >= 0 {
+                    eu = ut[p].len() as f64 * 2.0 + eu;
+                }
+                push(w, &ut[p], d);
+                for &(c, _) in &ut[p] {
+                    lowest = lowest.min(self.slot[c]);
+                }
+            }
+        }
+        if self.h33 > 5.0 {
+            eu = (m - lowest) as f64 * 2.0 + eu;
+        }
+        // An untouched +0 divided by a normal diagonal is exact signed zero. With the
+        // occupancy schedule those slots cannot pass the threshold and need no division.
+        let mut next = lowest;
+        while let Some(t) = w.next_slot(next, m) {
+            next = t + 1;
+            let p = self.at[t];
+            let d = w.take(p, t) / self.diag[p];
+            if d.abs() > R::c(TOL) {
+                eu = ut[p].len() as f64 * 2.0 + eu;
+                out.push(p);
+                x[p] = d;
+                push(w, &ut[p], d);
+            }
+        }
+        (out, eu)
+    }
+
+    /// Original sparse U-transpose tail sweep, also used as the differential oracle.
+    #[cfg(test)]
+    fn sparse_btran_u_scan(&self, inp: &[(usize, R)], x: &mut [R]) -> (Vec<usize>, f64) {
+        let m = self.m;
+        let cnt = inp.len();
+        let ut = &self.ut;
+        let mut out: Vec<usize> = Vec::new();
+        let mut w = vec![R::ZERO; m];
+        let mut eu = 0.0f64;
+        let push = |w: &mut Vec<R>, row: &[(usize, R)], d: R| {
+            for &(c, v) in row {
+                w[c] = -(v * d) + w[c];
+            }
+        };
+        let mut lowest = m;
+        if self.h33 > 5.0 {
+            eu = cnt as f64 * 3.0;
+        }
+        for &(p, v) in inp {
+            let d = v / self.diag[p];
+            let tail = if self.h33 > 5.0 {
+                self.kind[p] == -2
+            } else {
+                self.slot[p] >= self.i21
+            };
+            if tail {
+                if self.h33 <= 5.0 || d.abs() > R::c(TOL) {
+                    lowest = lowest.min(self.slot[p]);
+                    w[p] += v;
+                }
+            } else if d.abs() > R::c(TOL) {
+                out.push(p);
+                x[p] = d;
+                if self.h33 > 5.0 && self.kind[p] >= 0 {
+                    eu = ut[p].len() as f64 * 2.0 + eu;
+                }
+                push(&mut w, &ut[p], d);
+                for &(c, _) in &ut[p] {
+                    lowest = lowest.min(self.slot[c]);
+                }
+            }
+        }
+        if self.h33 > 5.0 {
+            eu = (m - lowest) as f64 * 2.0 + eu;
+        }
+        for t in lowest..m {
+            let p = self.at[t];
+            let d = w[p] / self.diag[p];
+            w[p] = R::ZERO;
+            if d.abs() > R::c(TOL) {
+                eu = ut[p].len() as f64 * 2.0 + eu;
+                out.push(p);
+                x[p] = d;
+                push(&mut w, &ut[p], d);
+            }
+        }
+        (out, eu)
+    }
+
     /// The reference BTRAN (`0x12de60`) of a sparse input given by basis position: U^T solve (`0x130b70` or the dense loop), the row
     /// etas in reverse, the L^T solve, then the rows. Returns `(row, value)` with the reference's drops, and leaves its work
     /// estimate in `work`. `direct` is the update-saving entry (`0x131710`), which goes to the sparse U^T solve without the density
     /// test unless the first position's U^T row is empty. `dense_in` passes the input as a dense vector (count `-1`).
     pub fn btran(&mut self, inp: &[(usize, R)], direct: bool, dense_in: bool) -> Vec<(usize, R)> {
+        let mut ws = self.bt_work.take().unwrap_or_default();
+        let result = self.btran_with(inp, direct, dense_in, &mut ws);
+        self.bt_work = Some(ws);
+        result
+    }
+
+    fn btran_with(
+        &mut self,
+        inp: &[(usize, R)],
+        direct: bool,
+        dense_in: bool,
+        ws: &mut BtranWork<R>,
+    ) -> Vec<(usize, R)> {
         let m = self.m;
         let ut = &self.ut;
-        let mut x = vec![R::ZERO; m];
+        let mut x = std::mem::take(&mut ws.x);
+        x.resize(m, R::ZERO);
         let mut e = 0.0f64;
         let cnt = inp.len();
         self.bt_dense = false;
@@ -2569,58 +2996,17 @@ impl<R: Real> RefStruct<R> {
         // The current vector: a list (`Some`) or dense (`None`).
         let mut list: Option<Vec<usize>>;
         if !dense_in && (direct || hsum * cnt <= m) {
-            let mut out: Vec<usize> = Vec::new();
-            let mut w = vec![R::ZERO; m];
-            let mut eu = 0.0f64;
-            let push = |w: &mut Vec<R>, row: &[(usize, R)], d: R| {
-                for &(c, v) in row {
-                    w[c] = -(v * d) + w[c];
-                }
+            let order = std::mem::take(&mut ws.input_order);
+            let (out, eu) = if self.bt_occupied && cnt <= m / 64 {
+                ws.tail.reset(m);
+                self.sparse_btran_u(inp, &mut x, &mut ws.tail, order)
+            } else {
+                self.sparse_btran_u(inp, &mut x, &mut vec![R::ZERO; m], order)
             };
-            let mut lowest = m;
-            if self.h33 > 5.0 {
-                eu = cnt as f64 * 3.0;
-            }
-            for &(p, v) in inp {
-                let d = v / self.diag[p];
-                let tail = if self.h33 > 5.0 {
-                    self.kind[p] == -2
-                } else {
-                    self.slot[p] >= self.i21
-                };
-                if tail {
-                    if self.h33 <= 5.0 || d.abs() > R::c(TOL) {
-                        lowest = lowest.min(self.slot[p]);
-                        w[p] += v;
-                    }
-                } else if d.abs() > R::c(TOL) {
-                    out.push(p);
-                    x[p] = d;
-                    if self.h33 > 5.0 && self.kind[p] >= 0 {
-                        eu = ut[p].len() as f64 * 2.0 + eu;
-                    }
-                    push(&mut w, &ut[p], d);
-                    for &(c, _) in &ut[p] {
-                        lowest = lowest.min(self.slot[c]);
-                    }
-                }
-            }
-            if self.h33 > 5.0 {
-                eu = (m - lowest) as f64 * 2.0 + eu;
-            }
-            for t in lowest..m {
-                let p = self.at[t];
-                let d = w[p] / self.diag[p];
-                w[p] = R::ZERO;
-                if d.abs() > R::c(TOL) {
-                    eu = ut[p].len() as f64 * 2.0 + eu;
-                    out.push(p);
-                    x[p] = d;
-                    push(&mut w, &ut[p], d);
-                }
-            }
             e = eu + e;
             if out.is_empty() {
+                ws.x = x;
+                ws.input_order = out;
                 self.work = e;
                 return Vec::new();
             }
@@ -2655,12 +3041,37 @@ impl<R: Real> RefStruct<R> {
             match &mut list {
                 Some(l) if l.len() * self.dthr <= m => {
                     let c0 = l.len();
-                    let mut inl = vec![false; m];
+                    let stamp = ws.next_generation(m);
+                    // A sparse active list can schedule reverse eta visits by pivot row.
+                    // The heap is ordered by eta number, exactly as the original reverse scan.
+                    let indexed = self.bt_occupied && netas / 4 > c0;
+                    if indexed {
+                        ws.index_etas(&self.etas, m);
+                    }
                     for &p in l.iter() {
-                        inl[p] = true;
+                        if indexed && ws.marks[p] != stamp {
+                            ws.schedule_row(p, netas);
+                        }
+                        ws.marks[p] = stamp;
                     }
                     let mut es = netas as f64 + netas as f64 + c0 as f64 * 5.0;
-                    for eta in self.etas.iter().rev() {
+                    let mut cursor = netas;
+                    loop {
+                        let i = if indexed {
+                            let Some(e) = ws.pending.pop() else { break };
+                            let prev = ws.eta_prev[e];
+                            if prev != usize::MAX {
+                                ws.pending.push(prev);
+                            }
+                            e
+                        } else {
+                            if cursor == 0 {
+                                break;
+                            }
+                            cursor -= 1;
+                            cursor
+                        };
+                        let eta = &self.etas[i];
                         let xr = x[eta.idx];
                         if xr == R::ZERO {
                             continue;
@@ -2671,9 +3082,12 @@ impl<R: Real> RefStruct<R> {
                                 x[j] = eta.val[k] * xr;
                             } else {
                                 x[j] = eta.val[k] * xr + x[j];
-                                if !inl[j] {
-                                    inl[j] = true;
+                                if ws.marks[j] != stamp {
+                                    ws.marks[j] = stamp;
                                     l.push(j);
+                                    if indexed {
+                                        ws.schedule_row(j, i);
+                                    }
                                 }
                             }
                         }
@@ -2689,6 +3103,8 @@ impl<R: Real> RefStruct<R> {
                         }
                     });
                     if l.is_empty() {
+                        ws.input_order = std::mem::take(l);
+                        ws.x = x;
                         self.work = e;
                         return Vec::new();
                     }
@@ -2709,13 +3125,17 @@ impl<R: Real> RefStruct<R> {
                         }
                     }
                     e = self.sum_eta * 2.0 + e;
-                    list = None;
+                    if let Some(order) = list.take() {
+                        ws.input_order = order;
+                    }
                 }
             }
         }
         // L^T: row i of L pushes into the earlier nodes.
         let lt = &self.lt;
-        let mut res: Vec<usize> = Vec::new();
+        let mut res = std::mem::take(&mut ws.output_order);
+        res.clear();
+        let mut partial = false;
         let sparse_l = match &list {
             Some(l) => l.len() * self.dthr <= m && !self.lev_dense,
             None => false,
@@ -2779,11 +3199,12 @@ impl<R: Real> RefStruct<R> {
                     }
                 }
                 x = w;
+                partial = true;
                 e = el + e;
             } else {
                 // Level buckets of the transposed graph when the factor has levels (`0x12bd30`), else a max-heap on the node index; every
                 // reached node is kept when at least the tolerance.
-                let mut seen = vec![false; m];
+                let stamp = ws.next_generation(m);
                 if self.levels.is_some() {
                     // Level buckets of the transposed graph: a node comes after the nodes whose rows it appears in.
                     let (lev, maxlev) = self.lt_levels.get_or_init(|| {
@@ -2800,7 +3221,7 @@ impl<R: Real> RefStruct<R> {
                     let mut buckets: Vec<Vec<usize>> = vec![Vec::new(); maxlev + 1];
                     let mut lo = usize::MAX;
                     for &i in l {
-                        seen[i] = true;
+                        ws.marks[i] = stamp;
                         buckets[lev[i]].push(i);
                         lo = lo.min(lev[i]);
                     }
@@ -2818,8 +3239,8 @@ impl<R: Real> RefStruct<R> {
                                 }
                                 // The reference walks the row from its last entry.
                                 for &(j, _) in lt[i].iter().rev() {
-                                    if !seen[j] {
-                                        seen[j] = true;
+                                    if ws.marks[j] != stamp {
+                                        ws.marks[j] = stamp;
                                         buckets[lev[j]].push(j);
                                     }
                                 }
@@ -2832,7 +3253,7 @@ impl<R: Real> RefStruct<R> {
                 } else {
                     let mut heap: BinaryHeap<usize> = BinaryHeap::new();
                     for &i in l {
-                        seen[i] = true;
+                        ws.marks[i] = stamp;
                         heap.push(i);
                     }
                     while let Some(i) = heap.pop() {
@@ -2841,8 +3262,8 @@ impl<R: Real> RefStruct<R> {
                             res.push(i);
                             for &(j, lv) in &lt[i] {
                                 x[j] -= lv * v;
-                                if !seen[j] {
-                                    seen[j] = true;
+                                if ws.marks[j] != stamp {
+                                    ws.marks[j] = stamp;
                                     heap.push(j);
                                 }
                             }
@@ -2881,25 +3302,38 @@ impl<R: Real> RefStruct<R> {
             }
             row_of
         });
-        if self.bt_dense {
-            // The dense result keeps the sub-tolerance entries the L^T pass left in place.
-            // and lists them by ascending row.
-            if R::LANES {
-                return Self::dense_btran_output(&x, &self.perm[..m]);
-            }
-            let mut out = Vec::with_capacity(m);
-            for r in 0..m {
-                let i = self.perm[r];
-                if x[i] != R::ZERO {
-                    out.push((r, x[i]));
-                }
-            }
-            return out;
+        if let Some(order) = list {
+            ws.input_order = order;
         }
-        res.into_iter()
-            .filter(|&i| x[i] != R::ZERO)
-            .map(|i| (row_of[i], x[i]))
-            .collect()
+        let result = if self.bt_dense {
+            if R::LANES {
+                Self::dense_btran_output(&x, &self.perm[..m])
+            } else {
+                (0..m)
+                    .filter_map(|r| {
+                        let v = x[self.perm[r]];
+                        (v != R::ZERO).then_some((r, v))
+                    })
+                    .collect()
+            }
+        } else {
+            res.iter()
+                .copied()
+                .filter(|&i| x[i] != R::ZERO)
+                .map(|i| (row_of[i], x[i]))
+                .collect()
+        };
+        if self.bt_dense || partial {
+            x.fill(R::ZERO);
+        } else {
+            // Every reached L node was either filtered to +0 or emitted, including duplicate seeds.
+            for &i in &res {
+                x[i] = R::ZERO;
+            }
+        }
+        ws.x = x;
+        ws.output_order = res;
+        result
     }
 
     /// Density threshold of the solves (`F+0x104`).
@@ -3889,6 +4323,9 @@ impl<R: Real> RefStruct<R> {
                 "fillparts",
                 serde_json::json!({"n": n, "k": k, "old": old_rows.len(), "col": if k > old_rows.len() { k } else { 0 }, "fill_after_eta": fill_in, "rows": fp_rows}),
             );
+        }
+        if self.bt_occupied && !newdiag.to_f64().is_normal() {
+            self.bt_occupied = false;
         }
         self.diag[r] = newdiag;
         self.replace_u_column(r, self.spike.iter().copied().filter(|e| e.0 != r).collect());

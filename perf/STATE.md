@@ -4,37 +4,45 @@ Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (histo
 
 ## Numbers on AMD EPYC 9V74
 
+BTRAN reuses its sparse numeric workspace through the upper transpose, reverse row updates and lower transpose. On eligible ordinary factors the upper solve visits occupied slots in slot order, and the reverse eta index visits updates reached from active pivot rows in descending order. Dense and partial paths preserve their clearing rules. The unchanged full BTRAN kernel is the test oracle. A separate mode-switch instrumentation run measured 6.856 GB fewer large zero-allocation requests than the preceding solver.
+
+The full mode_switch.dual-r sweep took 1.097172 → 0.965360 seconds versus the preceding commit `8da37a69` (-12.0%). The prespecified randomized timing comparisons measured -19.06% and -19.66%. Frozen parity passed 987/987, 264 runnable release tests passed, and all full-length mode-switch WORK records matched. Full outputs and exit codes agreed on every benchmark. 3 reversed-role controls covered flagged regressions; none established a slowdown.
+
+The table gives same-CPU medians after one warm-up and three fresh-process timed solves for each of the four executables, with rotating order. All rose binaries use genuine TCMalloc. The patched Gurobi library hash is `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. Current rose wins **0/23**.
+
+| Run | Gurobi (s) | Uploaded rose (s) | Preceding rose (s) | Current rose (s) | Current / Gurobi |
+|---|---:|---:|---:|---:|---:|
+| degen2.primal-c | 0.018704 | 0.045515 | 0.045933 | 0.045151 | 2.41 |
+| degen2.dual-r | 0.014613 | 0.038589 | 0.037271 | 0.038957 | 2.67 |
+| degen3.primal-c | 0.211580 | 0.685921 | 0.626529 | 0.652470 | 3.08 |
+| degen3.primal-r | 0.243850 | 0.589274 | 0.608147 | 0.583820 | 2.39 |
+| perold.primal-c | 0.189042 | 0.614146 | 0.604484 | 0.537838 | 2.85 |
+| pilot4.primal-r | 0.024521 | 0.070625 | 0.072940 | 0.067954 | 2.77 |
+| 80bau3b.primal-c | 0.170657 | 0.811955 | 0.676484 | 0.751137 | 4.40 |
+| primal_5959.primal-r | 0.061622 | 0.129212 | 0.142972 | 0.144908 | 2.35 |
+| degen3.dual-c | 0.115147 | 0.344481 | 0.316153 | 0.329407 | 2.86 |
+| degen3.dual-r | 0.122048 | 0.340604 | 0.292500 | 0.316992 | 2.60 |
+| perold.dual-r | 0.054891 | 0.150805 | 0.179817 | 0.164349 | 2.99 |
+| 80bau3b.dual-r | 0.086364 | 0.344124 | 0.282325 | 0.299771 | 3.47 |
+| greenbea.dual-c | 0.257809 | 1.009781 | 0.894701 | 0.794112 | 3.08 |
+| greenbea.dual-r | 0.266938 | 0.956812 | 0.810623 | 0.798736 | 2.99 |
+| mode_switch.dual-r | 0.137150 | 1.901075 | 1.097172 | 0.965360 | 7.04 |
+| primal_5959.dual-r | 0.094900 | 0.241553 | 0.245466 | 0.170239 | 1.79 |
+| quad_2717.dual-r | 0.077466 | 0.209611 | 0.219810 | 0.195828 | 2.53 |
+| fx_quad_obj_5371.dual-r | 0.037455 | 0.074880 | 0.074643 | 0.074012 | 1.98 |
+| degen3.barrier-r | 0.093848 | 0.209655 | 0.198333 | 0.175386 | 1.87 |
+| 80bau3b.barrier-r | 0.131025 | 0.228638 | 0.295857 | 0.254037 | 1.94 |
+| greenbea.barrier-r | 0.582969 | 1.005720 | 0.952174 | 0.983509 | 1.69 |
+| 80bau3b.pdhg | 2.369815 | 5.000183 | 4.441365 | 5.154996 | 2.18 |
+| greenbea.pdhg | 1.062796 | 1.923174 | 1.895532 | 1.885652 | 1.77 |
+
+### Preceding factor-update change
+
 The factor update now retains its numerical workspace, snapshots just the referenced slots and maintains the set of empty tail columns that qualify for demotion. Selection preserves the reference slot order. On mode-switch, an allocation trace of the complete solve counted 45,520 fewer large zero-allocation requests (3.073 GB) and 11,380 fewer large copies (1.366 GB). The replacement issued 15 additional large fills totalling 1.8 MB.
 
 Against `6a5f7ade`, full 11,393-pivot mode-switch took 1.398917 → 1.119417 s, a -20.0% change. Two independently seeded 64-pair comparisons measured -13.34% and -12.29%, with 59 and 50 improving pairs and healthy controls. All 202,772 WORK records agreed with the uploaded solver. The fixed39 PGO executable passed 987/987 frozen runs and 260 runnable release tests. All 23 full output and exit comparisons agreed. The sweep flagged 4 additional reversed-role checks. None established a slowdown under the predeclared criteria.
 
 All four executables ran in fresh processes on logical CPU2, with one warm-up, three timed solves and rotating order. All rose builds used genuine TCMalloc. The Gurobi reference is the supplied patched library with SHA-256 `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. The new solver wins **0/23** against that reference.
-
-| Run | Gurobi (s) | Uploaded rose (s) | Preceding rose (s) | Current rose (s) | Current / Gurobi |
-|---|---:|---:|---:|---:|---:|
-| degen2.primal-c | 0.018764 | 0.040801 | 0.039971 | 0.045074 | 2.40 |
-| degen2.dual-r | 0.012956 | 0.035962 | 0.037390 | 0.036205 | 2.79 |
-| degen3.primal-c | 0.224734 | 0.578244 | 0.551587 | 0.632174 | 2.81 |
-| degen3.primal-r | 0.287163 | 0.729726 | 0.719669 | 0.654796 | 2.28 |
-| perold.primal-c | 0.233008 | 0.646060 | 0.691645 | 0.566306 | 2.43 |
-| pilot4.primal-r | 0.017345 | 0.065077 | 0.063220 | 0.055287 | 3.19 |
-| 80bau3b.primal-c | 0.124382 | 0.802361 | 0.759258 | 0.689349 | 5.54 |
-| primal_5959.primal-r | 0.081418 | 0.167988 | 0.148011 | 0.152518 | 1.87 |
-| degen3.dual-c | 0.093170 | 0.312874 | 0.328940 | 0.272485 | 2.92 |
-| degen3.dual-r | 0.117266 | 0.349291 | 0.364603 | 0.372172 | 3.17 |
-| perold.dual-r | 0.055418 | 0.178075 | 0.193356 | 0.190005 | 3.43 |
-| 80bau3b.dual-r | 0.115048 | 0.416127 | 0.351659 | 0.326189 | 2.84 |
-| greenbea.dual-c | 0.252654 | 0.925874 | 0.782973 | 0.786075 | 3.11 |
-| greenbea.dual-r | 0.281147 | 0.906836 | 0.732877 | 0.856072 | 3.04 |
-| mode_switch.dual-r | 0.102964 | 1.636627 | 1.398917 | 1.119417 | 10.87 |
-| primal_5959.dual-r | 0.082669 | 0.181132 | 0.238132 | 0.274641 | 3.32 |
-| quad_2717.dual-r | 0.115020 | 0.265580 | 0.241687 | 0.262950 | 2.29 |
-| fx_quad_obj_5371.dual-r | 0.043547 | 0.097048 | 0.078505 | 0.083862 | 1.93 |
-| degen3.barrier-r | 0.104832 | 0.244618 | 0.237459 | 0.186954 | 1.78 |
-| 80bau3b.barrier-r | 0.137575 | 0.275359 | 0.275103 | 0.278745 | 2.03 |
-| greenbea.barrier-r | 0.597544 | 0.990460 | 0.987276 | 0.918899 | 1.54 |
-| 80bau3b.pdhg | 2.674718 | 4.494542 | 4.755971 | 4.943250 | 1.85 |
-| greenbea.pdhg | 1.159376 | 1.909995 | 1.974511 | 2.126652 | 1.83 |
 
 ### Preceding forward-L change
 
@@ -844,7 +852,7 @@ projected effects, component source/binary/timings, dependency audit and restora
 
 ## In progress
 
-Independent source candidates cover whole sparse BTRAN workspace and reverse eta scheduling, the two-column dual handoff, packed sparse dual pivot rows, dense intervals and bound projection in PDHG, barrier final-state ownership and auxiliary LU validation. The full-length shared-product PDHG schedule was inconclusive on its independent confirmation and has been retained as negative evidence.
+Current independent experiments cover sharing immutable compact factor installations, component-local dual row products, prevalidated PDHG vector projections and exact bound certification, and preserving auxiliary LU singular decisions while deferring unused storage. The BTRAN change is included in the current release.
 
 ## Extended BTRAN feasibility
 
@@ -1154,6 +1162,14 @@ The remaining candidates below derive from the Ryzen measurements and their hist
 ## Tried, no gain
 
 ### EPYC structural trials
+
+- Removing the second dense FTRAN result expansion and aligning the two handed-off columns. Full frozen parity passed. The first fixed comparison measured -2.58%, interval [-8.65%, +0.85%], AA [-0.63%, +5.31%]. The predeclared timing test was inconclusive.
+
+- Keeping sparse dual pivot rows in packed first-touch order. Full frozen parity passed. The first fixed comparison measured -5.06%, interval [-7.98%, -0.67%], AA [-3.50%, +4.86%]. The predeclared timing test was inconclusive.
+
+- Replacing gathers with vector loads on contiguous PDHG matrix intervals. Full frozen parity passed. The first fixed comparison measured -4.27%, interval [-7.51%, -1.61%], AA [-4.77%, +0.87%]. The predeclared timing test was inconclusive.
+
+- Avoiding barrier iteration history in final-result-only solves. Full frozen parity passed. The first fixed comparison measured -2.88%, interval [-4.23%, -1.74%], AA [-3.13%, +0.23%]. The predeclared timing test was inconclusive.
 
 - Link live Markowitz coefficients in both row and column order, eliminating front shifts and stale-chain cleanup. PEROLD dual. The full frozen corpus passed. The first randomized timing comparison measured -2.54% with a 95% interval of [-5.83%, +0.09%]. Same-binary interval [-0.83%, +6.91%]. The predeclared screen was inconclusive.
 
