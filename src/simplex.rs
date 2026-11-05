@@ -1648,17 +1648,160 @@ impl QuadRhs {
 /// A compact factor's immutable starting point and isolated RHS provider.
 /// The solver's matrix and dimensions are immutable.
 struct QuadFactorCache {
-    rows: Vec<(bool, Vec<usize>, Vec<f64>)>,
+    rows: FactorInputRows,
     threshold: u64,
     factor: crate::ftran_order::RefStruct<crate::f80::F80>,
     rhs: QuadRhs,
 }
 
 impl QuadFactorCache {
-    fn matches(&self, rows: &[(bool, Vec<usize>, Vec<f64>)], threshold: u64) -> bool {
-        self.threshold == threshold
-            && self.rows.len() == rows.len()
-            && self.rows.iter().zip(rows).all(|(a, b)| {
+    fn matches(&self, rows: &[BasisInput], threshold: u64) -> bool {
+        self.threshold == threshold && self.rows.matches(rows)
+    }
+}
+
+/// Structural flag, ordered row indices, and corresponding coefficient bits.
+type BasisInput = (bool, Vec<usize>, Vec<f64>);
+
+struct InstalledOrder {
+    rows: Vec<BasisInput>,
+    structure: crate::lu_order::Structure,
+    work: [std::sync::OnceLock<(Vec<(u32, f64)>, u32)>; 2],
+}
+
+/// The ordered basis variables, immutable model and threshold determine both
+/// the pivot structure and its split input columns for the existing compact cache.
+struct OrderCache {
+    basic: Vec<usize>,
+    threshold: u64,
+    prepared: std::sync::Arc<InstalledOrder>,
+}
+
+enum OrderInstallation {
+    Fresh(InstalledOrder),
+    Cached(std::sync::Arc<InstalledOrder>),
+}
+
+impl std::ops::Deref for OrderInstallation {
+    type Target = InstalledOrder;
+    fn deref(&self) -> &InstalledOrder {
+        match self {
+            Self::Fresh(data) => data,
+            Self::Cached(data) => data,
+        }
+    }
+}
+
+type InstalledIdentity = std::sync::Arc<InstalledOrder>;
+
+struct AuxiliarySlot {
+    identity: InstalledIdentity,
+    required_flags: u32,
+}
+
+#[derive(Default)]
+struct AuxiliaryOwner {
+    live: Option<AuxiliarySlot>,
+    parked: Vec<(AuxiliarySlot, Factor)>,
+}
+
+impl AuxiliaryOwner {
+    /// A cached order belongs to one immutable model, incoming ordered basis and
+    /// factor threshold. Its pivot sequence fixes the exact auxiliary column order.
+    fn install(
+        &mut self,
+        identity: InstalledIdentity,
+        live: &mut Factor,
+        build: impl FnOnce() -> Result<Factor, usize>,
+    ) -> Result<(), usize> {
+        let controls = compact_fp_state();
+        if controls & !63 != 0x1f80 {
+            let fresh = build()?;
+            self.live = None;
+            *live = fresh;
+            return Ok(());
+        }
+        let matches = |slot: &AuxiliarySlot| {
+            std::sync::Arc::ptr_eq(&slot.identity, &identity)
+                && slot.required_flags & !controls == 0
+        };
+        if self.live.as_ref().is_some_and(matches) {
+            live.clear_updates();
+            return Ok(());
+        }
+        let (new_slot, fresh) =
+            if let Some(i) = self.parked.iter().position(|(slot, _)| matches(slot)) {
+                self.parked.swap_remove(i)
+            } else {
+                let factor = build()?;
+                let slot = AuxiliarySlot {
+                    identity,
+                    required_flags: compact_fp_state() & 63,
+                };
+                (slot, factor)
+            };
+        let mut previous = std::mem::replace(live, fresh);
+        if let Some(old_slot) = self.live.replace(new_slot) {
+            previous.clear_updates();
+            if self.parked.len() == 7 {
+                self.parked.remove(0);
+            }
+            self.parked.push((old_slot, previous));
+        }
+        Ok(())
+    }
+}
+
+fn compact_fp_state() -> u32 {
+    #[cfg(target_arch = "x86_64")]
+    {
+        let mut csr = 0u32;
+        unsafe {
+            std::arch::asm!("stmxcsr [{p}]",p=in(reg)&mut csr,options(nostack,preserves_flags));
+        }
+        csr
+    }
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        0
+    }
+}
+
+impl OrderInstallation {
+    /// The caller applies each unscaled increment to its current work context.
+    fn driver_work(&self, levels: bool) -> std::borrow::Cow<'_, [(u32, f64)]> {
+        #[cfg(target_arch = "x86_64")]
+        if let Self::Cached(base) = self {
+            if compact_fp_state() & !63 == 0x1f80 {
+                let (sites, flags) = base.work[levels as usize].get_or_init(|| {
+                    let sites = base.structure.work(&base.rows, levels);
+                    (sites, compact_fp_state() & 63)
+                });
+                if flags & !compact_fp_state() == 0 {
+                    return std::borrow::Cow::Borrowed(sites);
+                }
+            }
+        }
+        std::borrow::Cow::Owned(self.structure.work(&self.rows, levels))
+    }
+}
+
+enum FactorInputRows {
+    Separate(Vec<BasisInput>),
+    Prepared(std::sync::Arc<InstalledOrder>),
+}
+
+impl FactorInputRows {
+    fn matches(&self, rows: &[BasisInput]) -> bool {
+        let saved: &[BasisInput] = match self {
+            Self::Separate(rows) => rows,
+            Self::Prepared(data) => &data.rows,
+        };
+        if std::ptr::eq(saved, rows) {
+            return true;
+        }
+        saved.len() == rows.len()
+            && saved.iter().zip(rows).all(|(a, b)| {
                 a.0 == b.0
                     && a.1 == b.1
                     && a.2.len() == b.2.len()
@@ -1668,14 +1811,6 @@ impl QuadFactorCache {
                         .all(|(x, y)| x.to_bits() == y.to_bits())
             })
     }
-}
-
-/// Double structure of a compact quad basis, keyed by its ordered immutable columns.
-struct OrderCache {
-    basic: Vec<usize>,
-    threshold: u64,
-    rows: Vec<(bool, Vec<usize>, Vec<f64>)>,
-    structure: crate::lu_order::Structure,
 }
 
 struct Solver<'a> {
@@ -1783,6 +1918,7 @@ struct Solver<'a> {
     quad_cache: Vec<QuadFactorCache>,
     /// Four double structures for the same compact repeated quad bases.
     order_cache: Vec<OrderCache>,
+    auxiliary_owner: AuxiliaryOwner,
     /// Full precision solution at the last fresh x87 basic-solution recomputation.
     x_q: Option<Vec<crate::f80::F80>>,
     /// Maintained basic distances in the x87 primal, indexed by variable.
@@ -2274,8 +2410,7 @@ impl<'a> Solver<'a> {
         fac_no: usize,
     ) -> (
         Vec<usize>,
-        crate::lu_order::Structure,
-        Vec<(bool, Vec<usize>, Vec<f64>)>,
+        OrderInstallation,
         Option<crate::ftran_order::RefStruct>,
     ) {
         // Under 50 rows neither the pair pass nor a dense nucleus can run. With
@@ -2298,30 +2433,39 @@ impl<'a> Solver<'a> {
                 crate::lu_order::DENSE_N.with(|c| c.set(0));
                 return (
                     entry
+                        .prepared
                         .structure
                         .pivots
                         .iter()
                         .map(|&(_, pos)| self.basic[pos])
                         .collect(),
-                    entry.structure.clone(),
-                    entry.rows.clone(),
+                    OrderInstallation::Cached(entry.prepared.clone()),
                     None,
                 );
             }
         }
-        let result = reference_order_for(self.p, &self.basic, fac_no, self.growth_limit(), "luin");
-        if cacheable && result.0.len() == self.p.m {
+        let (order, structure, rows, growth) =
+            reference_order_for(self.p, &self.basic, fac_no, self.growth_limit(), "luin");
+        let installed = InstalledOrder {
+            structure,
+            rows,
+            work: Default::default(),
+        };
+        let installed = if cacheable && order.len() == self.p.m {
+            let prepared = std::sync::Arc::new(installed);
             if self.order_cache.len() == 4 {
                 self.order_cache.remove(0);
             }
             self.order_cache.push(OrderCache {
                 basic: self.basic.clone(),
                 threshold,
-                rows: result.2.clone(),
-                structure: result.1.clone(),
+                prepared: prepared.clone(),
             });
-        }
-        result
+            OrderInstallation::Cached(prepared)
+        } else {
+            OrderInstallation::Fresh(installed)
+        };
+        (order, installed, growth)
     }
 
     /// The growth check limit of the double driver (`0xf351d..0xf3629`), `None` for the x87 primal.
@@ -2338,7 +2482,8 @@ impl<'a> Solver<'a> {
         &mut self,
         gate0: (i64, i64),
         fac_no: usize,
-        rows: &[(bool, Vec<usize>, Vec<f64>)],
+        rows: &[BasisInput],
+        prepared: Option<&std::sync::Arc<InstalledOrder>>,
     ) -> (QuadRhs, crate::ftran_order::RefStruct<crate::f80::F80>) {
         let diagnostic = ["ROSE_GATE_LOG", "ROSE_DENSE_INFO", "ROSE_DENSE_DUMP"]
             .iter()
@@ -2356,7 +2501,17 @@ impl<'a> Solver<'a> {
             {
                 // The preceding double build already left DENSE_N = 0; retain the current factor number.
                 crate::lu_order::set_factorization_number(fac_no);
-                return (entry.rhs.clone(), entry.factor.clone());
+                let factor = match self.mirror.take() {
+                    Some(Mir::Q(mut live)) => {
+                        live.restore(&entry.factor);
+                        live
+                    }
+                    old => {
+                        self.mirror = old;
+                        entry.factor.clone()
+                    }
+                };
+                return (entry.rhs.clone(), factor);
             }
         }
         let build = || {
@@ -2384,7 +2539,10 @@ impl<'a> Solver<'a> {
                 self.quad_cache.remove(0);
             }
             self.quad_cache.push(QuadFactorCache {
-                rows: rows.to_vec(),
+                rows: match prepared {
+                    Some(data) => FactorInputRows::Prepared(data.clone()),
+                    None => FactorInputRows::Separate(rows.to_vec()),
+                },
                 threshold,
                 factor: second.clone(),
                 rhs: rhs.clone(),
@@ -2437,6 +2595,7 @@ impl<'a> Solver<'a> {
     fn refactor(&mut self) -> Result<(), SolveError> {
         let mut sw_avg = 0usize;
         let mut accepted_rows = None;
+        let mut compact_basis = None;
         if self.opts.faithful_positions {
             if (self.cleanup && !self.cleanup_keep_head) || self.restart {
                 self.basic.sort_unstable();
@@ -2448,7 +2607,7 @@ impl<'a> Solver<'a> {
                 self.refactorizations + 1
             };
             let mut gate0 = crate::lu_order::gate_get();
-            let (mut order, mut st, mut rows, mut growth_factor) = self.reference_order(fac_no);
+            let (mut order, mut installation, mut growth_factor) = self.reference_order(fac_no);
             if order.len() < self.basic.len()
                 && self.handoff.map_or(self.restarts, |h| h.retries) >= 5
                 && !self.repaired
@@ -2458,19 +2617,21 @@ impl<'a> Solver<'a> {
                 if crate::dump::on("luin") {
                     crate::dump::emit(
                         "luin",
-                        serde_json::json!({"n": self.refactorizations, "cols": self.basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "phase": st.phase, "singular": true}),
+                        serde_json::json!({"n": self.refactorizations, "cols": self.basic, "out": order, "prow": installation.structure.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "phase": installation.structure.phase, "singular": true}),
                     );
                 }
-                self.repair_in_place(&st);
+                self.repair_in_place(&installation.structure);
                 gate0 = crate::lu_order::gate_get();
-                (order, st, rows, growth_factor) = self.reference_order(fac_no);
+                (order, installation, growth_factor) = self.reference_order(fac_no);
             }
             if crate::dump::on("luin") {
                 crate::dump::emit(
                     "luin",
-                    serde_json::json!({"n": self.refactorizations, "cols": self.basic, "out": order, "prow": st.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "phase": st.phase, "thr": crate::lu_order::threshold()}),
+                    serde_json::json!({"n": self.refactorizations, "cols": self.basic, "out": order, "prow": installation.structure.pivots.iter().map(|p| p.0).collect::<Vec<_>>(), "phase": installation.structure.phase, "thr": crate::lu_order::threshold()}),
                 );
             }
+            let st = &installation.structure;
+            let rows = &installation.rows;
             if order.len() < self.basic.len() {
                 // A column without a pivot (`0xd4190` returns `p13` > 0): the driver restarts the dual, or the primal run by itself (status -1002, `0xf5921`);
                 // the controller reads the state from here.
@@ -2493,6 +2654,10 @@ impl<'a> Solver<'a> {
                 self.pos_of[j] = pos;
             }
             self.basic = order;
+            if let OrderInstallation::Cached(identity) = &installation {
+                compact_basis = Some(identity.clone());
+            }
+
             if self.opts.faithful_ftran {
                 if let Some(old) = self.mirror.as_ref() {
                     let (u, sum) = old.window_stats();
@@ -2523,7 +2688,11 @@ impl<'a> Solver<'a> {
                     }
                 }
                 let mi = if self.handoff.is_some_and(|h| h.quad) {
-                    let (rhs, main) = self.quad_mirrors(gate0, fac_no, &rows);
+                    let prepared = match &installation {
+                        OrderInstallation::Cached(data) => Some(data),
+                        _ => None,
+                    };
+                    let (rhs, main) = self.quad_mirrors(gate0, fac_no, rows, prepared);
                     self.mirror_q = Some(rhs);
                     Mir::Q(main)
                 } else {
@@ -2538,7 +2707,7 @@ impl<'a> Solver<'a> {
                         serde_json::json!({"n": self.refactorizations, "diag": diag, "l": l}),
                     );
                 }
-                let lu = st.work(&rows, mi.has_levels());
+                let lu = installation.driver_work(mi.has_levels());
                 if self.cleanup {
                     // The clean-up pass's setup (`0xe84b9`): two units per nonzero of the constraint matrix; the dual simplex install of the
                     // factor then books `3 m` (`0xf48ae`), `nnz(U)` (`0x1327dc`) and `3 m` (`0x1329c1`) at the factor object's scale.
@@ -2547,7 +2716,7 @@ impl<'a> Solver<'a> {
                 }
                 book_retried_attempts(&mut self.work);
                 self.work.factor_driver(&lu, crate::work::CTX);
-                for (site, est) in lu.into_iter().chain(mi.fresh_work()) {
+                for (site, est) in lu.iter().copied().chain(mi.fresh_work()) {
                     self.work.add(site, est, crate::work::CTX);
                 }
                 self.work.factor_done();
@@ -2560,7 +2729,7 @@ impl<'a> Solver<'a> {
                 self.mirror = Some(mi);
             }
         }
-        let cols: Vec<&Column> = self.basic.iter().map(|&j| &self.p.cols[j]).collect();
+
         // Once the driver has used its five restarts it refuses another one (`0xf3aba`): the primal then goes on with the basis that the reference's factorization accepts
         // (fx_midsing_1106: pivots of 3.6e-12 pass, the floor of the starting factorization is 1e-11).
         let floor = if self.handoff.as_ref().is_some_and(|h| h.quad) {
@@ -2570,10 +2739,26 @@ impl<'a> Solver<'a> {
         } else {
             1e-11
         };
-        self.factor = if let Some(rows) = accepted_rows {
-            Factor::with_pivot_rows(self.p.m, &cols, &rows)
+        if let Some(identity) = compact_basis {
+            // The order cache admits only compact quad installations. They use
+            // independent auxiliary pivots and the exact-zero floor.
+            debug_assert!(accepted_rows.is_none() && floor == 0.0);
+            let basis = &self.basic;
+            let matrix = self.p;
+            self.auxiliary_owner
+                .install(identity, &mut self.factor, || {
+                    let cols: Vec<&Column> = basis.iter().map(|&j| &matrix.cols[j]).collect();
+                    Factor::with_floor(matrix.m, &cols, 0.0)
+                })
         } else {
-            Factor::with_floor(self.p.m, &cols, floor)
+            self.auxiliary_owner.live = None;
+            let cols: Vec<&Column> = self.basic.iter().map(|&j| &self.p.cols[j]).collect();
+            let fresh = if let Some(rows) = accepted_rows {
+                Factor::with_pivot_rows(self.p.m, &cols, &rows)
+            } else {
+                Factor::with_floor(self.p.m, &cols, floor)
+            };
+            fresh.map(|factor| self.factor = factor)
         }
         .map_err(|_| {
             if self.handoff.is_some() {
@@ -6752,6 +6937,7 @@ fn solve_primal(
         mirror_q: None,
         quad_cache: Vec::new(),
         order_cache: Vec::new(),
+        auxiliary_owner: AuxiliaryOwner::default(),
         x_q: None,
         dst_q: None,
         work: start_work,
@@ -6878,7 +7064,7 @@ fn solve_primal(
         }
         s.basic = order;
         if handoff.is_some_and(|h| h.quad) {
-            let (rhs, main) = s.quad_mirrors(gate0, 1, &rows);
+            let (rhs, main) = s.quad_mirrors(gate0, 1, &rows, None);
             s.mirror_q = Some(rhs);
             s.mirror = Some(Mir::Q(main));
         } else {
@@ -11758,5 +11944,130 @@ mod row_mask_predicate_tests {
             );
         }
         println!("predicate_checks={checks} modes=16 unmasked_invalid_denormal=pass");
+    }
+}
+
+#[cfg(test)]
+mod compact_install_tests {
+    use super::*;
+    #[test]
+    fn auxiliary_lease_tracks_order_identity_and_clears_each_update() {
+        let mut ids = Vec::new();
+        let mut matrices = Vec::new();
+        for i in 0..10 {
+            let input = vec![
+                (false, vec![0, 1], vec![7.0 + i as f64, 0.25]),
+                (false, vec![1, 0], vec![5.0, -0.125]),
+            ];
+            let structure = crate::lu_order::factor_structure(2, &input);
+            matrices.push(vec![
+                vec![(0, 7.0 + i as f64), (1, 0.25)],
+                vec![(1, 5.0), (0, -0.125)],
+            ]);
+            ids.push(std::sync::Arc::new(InstalledOrder {
+                rows: input,
+                structure,
+                work: Default::default(),
+            }));
+        }
+        let count = std::cell::Cell::new(0usize);
+        let mut owner = AuxiliaryOwner::default();
+        let mut current = Factor::new(2, &matrices[0]).unwrap();
+        for i in [0, 0, 1, 2, 1, 0, 3, 4, 5, 6, 7, 8, 9, 2, 2] {
+            owner
+                .install(ids[i].clone(), &mut current, || {
+                    count.set(count.get() + 1);
+                    Factor::with_floor(2, &matrices[i], 0.0)
+                })
+                .unwrap();
+            let mut frozen = Factor::with_floor(2, &matrices[i], 0.0).unwrap();
+            assert_eq!(current.num_updates(), 0);
+            assert_eq!(current.nnz_eta, 0);
+            for rhs in [[0.0, -0.0], [-0.25, 1.0], [1e-308, 1e88]] {
+                let (mut x, mut y) = (rhs.to_vec(), rhs.to_vec());
+                current.ftran(&mut x);
+                frozen.ftran(&mut y);
+                assert!(x.iter().zip(&y).all(|(a, b)| a.to_bits() == b.to_bits()));
+                current.btran(&mut x);
+                frozen.btran(&mut y);
+                assert!(x.iter().zip(&y).all(|(a, b)| a.to_bits() == b.to_bits()));
+                current.update(1, vec![0.25, 0.75]);
+                frozen.update(1, vec![0.25, 0.75]);
+            }
+            let bad = std::sync::Arc::new(InstalledOrder {
+                rows: vec![],
+                structure: crate::lu_order::factor_structure(0, &[]),
+                work: Default::default(),
+            });
+            assert_eq!(owner.install(bad, &mut current, || Err(1)), Err(1));
+            assert_eq!(current.num_updates(), 3);
+        }
+        #[cfg(target_arch = "x86_64")]
+        if compact_fp_state() & !63 == 0x1f80 {
+            assert!(count.get() < 15);
+        }
+    }
+
+    #[test]
+    fn cached_driver_sites_preserve_both_levels_and_dynamic_scales() {
+        let rows = vec![
+            (false, vec![0, 1], vec![3.0, 0.125]),
+            (false, vec![1, 0], vec![2.0, -0.25]),
+        ];
+        let structure = crate::lu_order::factor_structure(2, &rows);
+        let exact = [structure.work(&rows, false), structure.work(&rows, true)];
+        let object = OrderInstallation::Cached(std::sync::Arc::new(InstalledOrder {
+            rows,
+            structure,
+            work: Default::default(),
+        }));
+        for scale in [0.0, 1.125, -2.75, 1e-288, 1e100] {
+            for choice in [false, true] {
+                let original = &exact[choice as usize];
+                let current = object.driver_work(choice);
+                assert_eq!(current.len(), original.len());
+                for (&(site, a), &(bsite, b)) in current.iter().zip(original) {
+                    assert_eq!(
+                        (site, a.to_bits(), (a * scale).to_bits()),
+                        (bsite, b.to_bits(), (b * scale).to_bits())
+                    );
+                }
+            }
+        }
+    }
+    #[test]
+    fn shared_basis_and_separate_rows_match_only_the_same_coefficient_bits() {
+        let input = vec![(
+            false,
+            vec![0, 1],
+            vec![-0.0, f64::from_bits(0x7ff8000000000251)],
+        )];
+        let structure = crate::lu_order::factor_structure(0, &[]);
+        let prepared = std::sync::Arc::new(InstalledOrder {
+            rows: input.clone(),
+            structure,
+            work: Default::default(),
+        });
+        let stored = [
+            FactorInputRows::Separate(input.clone()),
+            FactorInputRows::Prepared(prepared.clone()),
+        ];
+        for entry in stored {
+            assert!(entry.matches(&prepared.rows));
+            assert!(entry.matches(&input));
+            let mut wrong = input.clone();
+            wrong[0].2[0] = 0.0;
+            assert!(!entry.matches(&wrong));
+            wrong[0].2[0] = -0.0;
+            wrong[0].2[1] = f64::from_bits(0x7ff8000000000250);
+            assert!(!entry.matches(&wrong));
+            wrong = input.clone();
+            wrong[0].1.swap(0, 1);
+            assert!(!entry.matches(&wrong));
+            wrong = input.clone();
+            wrong[0].0 = true;
+            assert!(!entry.matches(&wrong));
+            assert!(!entry.matches(&[]));
+        }
     }
 }

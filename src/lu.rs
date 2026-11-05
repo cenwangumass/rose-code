@@ -186,6 +186,12 @@ impl Factor {
         })
     }
 
+    /// Reset the product-form updates when the same numeric base is reinstalled.
+    pub(crate) fn clear_updates(&mut self) {
+        self.etas.clear();
+        self.nnz_eta = 0;
+    }
+
     pub fn num_updates(&self) -> usize {
         self.etas.len()
     }

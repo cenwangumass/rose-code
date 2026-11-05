@@ -991,6 +991,90 @@ fn dot<R: Real>(x: &[R], c: &[R], peel: usize) -> R {
 }
 
 impl<R: Real> RefStruct<R> {
+    /// Install all fields of a cached factor into an exclusively owned slot.
+    /// Nested Vec::clone_from dispatch retains the old column and row buffers.
+    pub(crate) fn restore(&mut self, fresh: &Self) {
+        macro_rules! restore_fields {
+            ($($name:ident),* $(,)?) => {{
+                // Exhaustive destructuring keeps new fields from escaping restoration.
+                let Self { $($name),* } = self;
+                $( $name.clone_from(&fresh.$name); )*
+            }};
+        }
+        restore_fields!(
+            m,
+            row_cached,
+            kind,
+            nuc,
+            i21,
+            mark,
+            a,
+            b,
+            lstart,
+            lentries,
+            perm,
+            row_of,
+            dens,
+            dense_est,
+            dthr,
+            empty_tail,
+            slot,
+            at,
+            slot_counts,
+            etas,
+            bt_occupied,
+            bt_work,
+            lt,
+            levels,
+            level_cache,
+            lt_levels,
+            lev_built,
+            diag,
+            uc,
+            ut,
+            spike,
+            spike_used,
+            update_values,
+            update_seen,
+            lsnap,
+            upd,
+            sum_alpha,
+            before_last,
+            sum_eta,
+            last_alpha,
+            znz,
+            n1,
+            loff,
+            nnz_l,
+            nnz_l_tail,
+            first_eta,
+            work,
+            work_parts,
+            keep_work,
+            keep_dense,
+            tau_l,
+            tau_u,
+            tau_fin,
+            f2,
+            tau_terms,
+            tau_row,
+            fill,
+            row_cap,
+            row_par,
+            rowl,
+            scratch_peel,
+            upd_work,
+            h33,
+            h34,
+            lev_dense,
+            lev_dense_ft,
+            last_dense,
+            last_ordered,
+            bt_dense,
+            upd_limit,
+        );
+    }
+
     /// Fresh factor from the pivot sequence; `cols[pos]` is the basis column at incoming position `pos` as `(is_slack, rows, values)`.
     pub fn fresh(
         m: usize,
@@ -4718,6 +4802,58 @@ mod forward_l_tests {
                 assert_eq!(encode(old.0), encode(new.0));
                 assert_eq!(old.1, new.1);
                 assert_eq!(old.2.to_bits(), new.2.to_bits());
+            }
+        }
+    }
+
+    #[test]
+    fn restored_quad_factors_match_independent_installs_after_updates() {
+        type Q = crate::f80::F80;
+        let make = |m, shift| {
+            let cols: Vec<_> = (0..m)
+                .map(|i| {
+                    (
+                        false,
+                        vec![i, (i + 1) % m],
+                        vec![1.0 + (shift + i) as f64, 0.125],
+                    )
+                })
+                .collect();
+            let st = crate::lu_order::factor_structure_r::<Q>(m, &cols);
+            RefStruct::fresh(m, m, &st, &cols)
+        };
+        let bases = [make(7, 1), make(9, 3), make(5, 0)];
+        let mut live = bases[0].clone();
+        let encode = |v: Vec<(usize, Q)>| {
+            v.into_iter()
+                .map(|(j, x)| (j, x.repr()))
+                .collect::<Vec<_>>()
+        };
+        for &n in &[0, 0, 1, 2, 1, 0, 2, 2] {
+            let base = &bases[n];
+            live.restore(base);
+            let mut reference = base.clone();
+            for pass in 0..3 {
+                let r = (2 * pass + 1) % base.m;
+                for (rows, v) in [
+                    (vec![r], vec![Q::c(3.)]),
+                    (
+                        vec![r, (r + 2) % base.m, r],
+                        vec![Q::c(-0.0), Q::c(-0.125), Q::c(0.5)],
+                    ),
+                ] {
+                    let a = live.ftran(&rows, &v);
+                    let b = reference.ftran(&rows, &v);
+                    assert_eq!(encode(a), encode(b));
+                    assert_eq!(live.work.to_bits(), reference.work.to_bits());
+                    let a = live.btran(&[(r, Q::c(-0.75))], true, false);
+                    let b = reference.btran(&[(r, Q::c(-0.75))], true, false);
+                    assert_eq!(encode(a), encode(b));
+                    assert_eq!(live.work.to_bits(), reference.work.to_bits());
+                }
+                live.update(r);
+                reference.update(r);
+                assert_eq!(live.upd_work, reference.upd_work);
             }
         }
     }
