@@ -89,6 +89,7 @@ impl FtranTouched {
 /// Per-factor scratch and an index of the append-only row etas. A cloned
 /// factor builds its own scratch on demand; no caller can observe the cache.
 #[derive(Default)]
+#[cfg_attr(test, derive(Debug))]
 struct LevelCache<R>(std::cell::RefCell<Option<Box<LevelWorkspace<R>>>>);
 
 impl<R: Default> Clone for LevelCache<R> {
@@ -98,6 +99,7 @@ impl<R: Default> Clone for LevelCache<R> {
 }
 
 #[derive(Default)]
+#[cfg_attr(test, derive(Debug))]
 struct LevelWorkspace<R> {
     values: Vec<R>,
     // 0 = untouched, 1 = queued for L, 2 = member of the sparse result.
@@ -278,6 +280,7 @@ impl<R: Real> LevelWorkspace<R> {
 
 /// Scratch for independent BTRAN calls. An empty clone avoids copying dead work vectors.
 #[derive(Default)]
+#[cfg_attr(test, derive(Debug))]
 struct BtranWork<R> {
     x: Vec<R>,
     tail: SparseBtranTail<R>,
@@ -333,6 +336,7 @@ mod btran_oracle;
 /// Working values are indexed by permutation slot. A clear occupancy bit represents +0,
 /// so writes from previous right-hand sides need no numeric-array clear.
 #[derive(Default)]
+#[cfg_attr(test, derive(Debug))]
 struct SparseBtranTail<R> {
     values: Vec<R>,
     occupied: Vec<u64>,
@@ -560,6 +564,7 @@ mod sparse_btran_tail_tests {
 
 /// Direct numeric row lookup for tau dots. Stamps retain the first duplicate without clearing per row.
 #[derive(Clone, Default)]
+#[cfg_attr(test, derive(Debug))]
 struct TauRow<R> {
     values: Vec<R>,
     stamps: Vec<usize>,
@@ -682,6 +687,7 @@ mod tau_gather_tests {
 }
 
 #[derive(Clone)]
+#[cfg_attr(test, derive(Debug))]
 pub struct RefStruct<R: Real = f64> {
     m: usize,
     /// The pivot-row BTRAN of this position ran since the last update: the reference then finds the row-eta solve cached (`F+0x1d8`, `0xf193e`).
@@ -808,6 +814,7 @@ pub struct RefStruct<R: Real = f64> {
 /// The inputs of the joint U stages of the two-vector FTRAN: for the pivot column and for tau, the count of the L-stage list (`None`: dense, count -1)
 /// and the solved values (the tail entries are the values after the tail solve); for the column also the positions of the L-stage list.
 #[derive(Clone)]
+#[cfg_attr(test, derive(Debug))]
 struct F2<R> {
     col_n: Option<usize>,
     col_in: Vec<usize>,
@@ -836,6 +843,7 @@ impl<R> Default for F2<R> {
 }
 
 #[derive(Clone)]
+#[cfg_attr(test, derive(Debug))]
 struct Eta<R> {
     idx: usize,
     ind: Vec<usize>,

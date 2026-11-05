@@ -60,6 +60,10 @@ impl F80 {
         self.neg
     }
 
+    pub(crate) fn same_bits(self, other: Self) -> bool {
+        self.neg == other.neg && self.e == other.e && self.m == other.m
+    }
+
     /// The significand and the sign/exponent word as stored by `fstp tbyte` (biased exponent, sign in bit 15).
     pub fn repr(self) -> (u64, u16) {
         if self.is_nan() {

@@ -228,9 +228,13 @@ pub struct TraceEvent {
 /// What the dual controller hands to the primal it starts (`0x154f43..0x155190`): the pivot-check pair the dual's last iteration left in `ctx+0x300` / `ctx+0x308`
 /// (the primal's first pricing call reads it), the pivot threshold `ctx+0x390`, and the retry counter `ctx+0x184`.
 /// The primal's FTRAN/BTRAN mirror: the double one, or, after a quad dual, the x87 long double one (values rounded to a double where the primal stores them).
+#[path = "quad_main.rs"]
+mod quad_main;
+use quad_main::QuadMain;
+
 pub(crate) enum Mir {
     D(crate::ftran_order::RefStruct<f64>),
-    Q(crate::ftran_order::RefStruct<crate::f80::F80>),
+    Q(QuadMain),
 }
 
 macro_rules! mir {
@@ -249,10 +253,6 @@ impl Mir {
 
     fn bt_dense(&self) -> bool {
         mir!(self, m => m.bt_dense)
-    }
-
-    fn take_upd_work(&mut self) -> Vec<(u32, f64, f64)> {
-        mir!(self, m => std::mem::take(&mut m.upd_work))
     }
 
     fn window_stats(&self) -> (usize, f64) {
@@ -323,8 +323,14 @@ impl Mir {
         mir!(self, m => m.last_ordered())
     }
 
-    fn update(&mut self, r: usize) {
-        mir!(self, m => m.update(r))
+    fn update(&mut self, r: usize) -> Vec<(u32, f64, f64)> {
+        match self {
+            Mir::D(m) => {
+                m.update(r);
+                std::mem::take(&mut m.upd_work)
+            }
+            Mir::Q(m) => m.update(r),
+        }
     }
 
     fn numerics(&self) -> (Vec<f64>, Vec<Vec<(usize, f64)>>) {
@@ -1650,7 +1656,7 @@ impl QuadRhs {
 struct QuadFactorCache {
     rows: FactorInputRows,
     threshold: u64,
-    factor: crate::ftran_order::RefStruct<crate::f80::F80>,
+    factor: QuadMain,
     rhs: QuadRhs,
 }
 
@@ -2484,7 +2490,7 @@ impl<'a> Solver<'a> {
         fac_no: usize,
         rows: &[BasisInput],
         prepared: Option<&std::sync::Arc<InstalledOrder>>,
-    ) -> (QuadRhs, crate::ftran_order::RefStruct<crate::f80::F80>) {
+    ) -> (QuadRhs, QuadMain) {
         let diagnostic = ["ROSE_GATE_LOG", "ROSE_DENSE_INFO", "ROSE_DENSE_DUMP"]
             .iter()
             .any(|name| std::env::var_os(name).is_some());
@@ -2502,13 +2508,10 @@ impl<'a> Solver<'a> {
                 // The preceding double build already left DENSE_N = 0; retain the current factor number.
                 crate::lu_order::set_factorization_number(fac_no);
                 let factor = match self.mirror.take() {
-                    Some(Mir::Q(mut live)) => {
-                        live.restore(&entry.factor);
-                        live
-                    }
+                    Some(Mir::Q(live)) => live.reinstall(&entry.factor),
                     old => {
                         self.mirror = old;
-                        entry.factor.clone()
+                        entry.factor.restart()
                     }
                 };
                 return (entry.rhs.clone(), factor);
@@ -2534,6 +2537,10 @@ impl<'a> Solver<'a> {
             first.clone()
         };
         let rhs = QuadRhs::new(first, cacheable);
+        // Bound the stored factor coordinates as well as the recorded sequence.
+        let record =
+            cacheable && self.p.m <= 24 && rows.iter().map(|c| c.1.len()).sum::<usize>() <= 512;
+        let second = QuadMain::new(second, record);
         if cacheable {
             if self.quad_cache.len() == 4 {
                 self.quad_cache.remove(0);
@@ -8599,8 +8606,7 @@ fn solve_primal(
             s.pos_of[q] = r;
             s.factor.update(r, alpha);
             if let Some(mi) = s.mirror.as_mut() {
-                mi.update(r);
-                s.upd_work = mi.take_upd_work();
+                s.upd_work = mi.update(r);
             }
             s.leave_prev = Some(leave);
             let alpha_dense = s.mirror.as_ref().is_some_and(|mi| mi.last_dense());
@@ -9086,8 +9092,7 @@ fn solve_primal(
         }
         s.factor.update(r, alpha);
         if let Some(mi) = s.mirror.as_mut() {
-            mi.update(r);
-            s.upd_work = mi.take_upd_work();
+            s.upd_work = mi.update(r);
         }
         changed.push(leave);
         s.leave_prev = Some(leave);
