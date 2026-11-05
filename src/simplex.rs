@@ -228,6 +228,9 @@ pub struct TraceEvent {
 /// What the dual controller hands to the primal it starts (`0x154f43..0x155190`): the pivot-check pair the dual's last iteration left in `ctx+0x300` / `ctx+0x308`
 /// (the primal's first pricing call reads it), the pivot threshold `ctx+0x390`, and the retry counter `ctx+0x184`.
 /// The primal's FTRAN/BTRAN mirror: the double one, or, after a quad dual, the x87 long double one (values rounded to a double where the primal stores them).
+#[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+#[path = "quad_cost.rs"]
+mod quad_cost;
 #[path = "quad_main.rs"]
 mod quad_main;
 use quad_main::QuadMain;
@@ -935,8 +938,14 @@ impl Internal {
         if cw & 0x0f3f != 0x033f {
             return false;
         }
-        let packed: Vec<[u8; 16]> = y
-            .iter()
+        let packed = Self::pack_dual(y);
+        self.write_reduced_costs(&packed, pos, excluded, costfree, d, df, 0);
+        true
+    }
+
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    fn pack_dual(y: &[crate::f80::F80]) -> Vec<[u8; 16]> {
+        y.iter()
             .map(|v| {
                 let (m, se) = v.repr();
                 let mut b = [0; 16];
@@ -944,9 +953,26 @@ impl Internal {
                 b[8..10].copy_from_slice(&se.to_le_bytes());
                 b
             })
-            .collect();
+            .collect()
+    }
+
+    // Both a complete evaluation and replay's retained final active column
+    // execute this same native arithmetic and final extended store.
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    #[inline(never)]
+    fn write_reduced_costs(
+        &self,
+        packed: &[[u8; 16]],
+        pos: &[usize],
+        excluded: Option<usize>,
+        costfree: bool,
+        d: &mut [f64],
+        df: &mut [crate::f80::F80],
+        first: usize,
+    ) {
+        use std::arch::asm;
         let mut acc = [0u8; 16];
-        for j in 0..self.n + self.m {
+        for j in first..self.n + self.m {
             if pos[j] != NONE || excluded == Some(j) {
                 d[j] = 0.0;
                 continue;
@@ -989,7 +1015,6 @@ impl Internal {
             df[j] = value;
             d[j] = value.to_f64();
         }
-        true
     }
 
     fn rank_products(&self, v: &[f64], rank: &[usize]) -> Vec<f64> {
@@ -3845,6 +3870,21 @@ impl<'a> Solver<'a> {
                     })
                 {
                     return;
+                }
+                if let Some(Mir::Q(main)) = &self.mirror {
+                    if let Some(owner) = main.costs() {
+                        if owner.apply(
+                            p,
+                            yq,
+                            &self.pos_of,
+                            self.excluded,
+                            cf,
+                            &mut self.d,
+                            &mut self.df,
+                        ) {
+                            return;
+                        }
+                    }
                 }
                 if p.reduced_costs_q_native(
                     yq,

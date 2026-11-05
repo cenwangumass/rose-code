@@ -15,6 +15,8 @@ pub(crate) struct State {
     factor: Factor,
     edge: OnceCell<Edge>,
     depth: usize,
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    costs: super::quad_cost::CompactCosts,
 }
 
 struct Edge {
@@ -132,9 +134,19 @@ impl QuadMain {
                 factor: f,
                 edge: OnceCell::new(),
                 depth: 0,
+                #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+                costs: Default::default(),
             }))
         } else {
             Self::Direct(f)
+        }
+    }
+
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    pub(super) fn costs(&self) -> Option<&super::quad_cost::CompactCosts> {
+        match self {
+            Self::Shared(state) => Some(&state.costs),
+            Self::Direct(_) => None,
         }
     }
 
@@ -175,6 +187,8 @@ impl QuadMain {
                     factor: next,
                     edge: OnceCell::new(),
                     depth: state.depth + 1,
+                    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+                    costs: Default::default(),
                 });
                 state
                     .edge
