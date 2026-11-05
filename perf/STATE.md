@@ -1086,9 +1086,9 @@ Exact source reversal, raw streams, per-version/FIFO bounds, unchanged CLI resul
 projected effects, component source/binary/timings, dependency audit and restoration:
 `target/perf-version-stream/`.
 
-## In progress
+## Remaining performance gaps
 
-Connected ordinary dual pricing and ordinary primal step computation remain under investigation. Current paired profiles on the controlled GREENBEA dual run attribute 282 of 2,278 Rose CPU samples to pivot-row production. The previous disconnected mode-switch pivot representation and generated PDHG range-certificate trials are documented under structural trials.
+The current numerical solver is 1b414c4b. Its latest four-way comparison gives a lower Rose median on 5 of 23 rows. The largest four gaps are mode_switch.dual-r at 5.02 times patched Gurobi, 80bau3b.primal-c at 4.61, degen2.primal-c at 4.39 and greenbea.dual-r at 4.17. The tested shared-basis ordinary dual solver and the barrier factor/solve representation both missed their prespecified qualification criteria. The released solver remains the compact basis installation change measured above.
 
 ## Extended BTRAN feasibility
 
@@ -1398,6 +1398,17 @@ The remaining candidates below derive from the Ryzen measurements and their hist
 ## Tried, no gain
 
 ### EPYC structural trials
+
+- A shared incoming-basis representation supplied ordinary dual structural pivoting, pricing resets, singleton WORK counts and the independently pivoted auxiliary factor. The candidate passed the full 987 frozen runs, all eight ordinary dual outputs, 690,060 exact WORK records, 46 full LU input/output pairs and a 6,144-case auxiliary factor oracle. On 80BAU3B dual, time inside the complete refactor improved in all 16 matched pairs, saving a median 3.70% of parent full-solve time. The whole-solve median improved 8.56%. The required refactor contribution was 5.00%, so the candidate stopped at this pilot. Evidence in next/dual-basis-layout and next/dual-basis-layout-review.
+
+
+- A complete allocation-lifetime census of the released compact primal solver observed 572,651 same-pivot nonrefactor allocations on Quad and 481,739 on 5959 dual. The genuine TCMalloc checkout calibration used the actual size/site mix. Reusing the identifiable pivot arrays and their helpers projected 3.19% on Quad, 3.22% on 5959 dual, 2.33% on FX and 1.94% on 5959 primal. Even crediting every identified short-lived helper across the solve projected only 3.08–4.80% before filling the new buffers. No production arena was admitted. Evidence in next/compact-pivot-lifetimes.
+
+- A single barrier factor owner sent its original row-major coefficients to all outgoing Schur consumers and stored its solution coefficients in four-destination packets for both triangular directions. All 156 complete factors and 1,352 actual forward/backward vectors matched on the three original barrier rows. On the full 103-step GREENBEA solve, 5/9 pairs improved for a median child CPU saving of 2.50%. The independent 10% and seven-pair requirements failed. Evidence in next/barrier-factor-solve-owner.
+
+- Adding the current real rho, ordered numerical pivot row, threshold counts and each preceding local pivot's column, weight and tau to the installed component factor history still left 21 conflicting results among 6,007 exact cross-block matches. Adding the absolute live factor update count gave 10,554 unique keys in 10,554 post-install pivots. The shorter key would change answers; the longer key provided no reuse. Evidence in next/mode-history-inputs.
+
+- Controlled ordinary primal row updates and their Devex products ran in ordinary precision on all 7,271 accepted 80BAU3B and PEROLD pivots studied. Across 5.22 million active columns, 1,280 repeated the necessary numerical inputs for both products. Even treating all measured ranked products and Devex dots as free gives 8.34% and 7.07% gross bounds before validation. Evidence in next/ordinary-primal-owner.
 
 - On full DEGEN3 primal-r the entering FTRAN took 21.76% of solve time across 5,232 calls. Although 2,988 raw right-hand sides repeated, only one had a previously seen identical ordered output. PEROLD primal-c had nine such recurrences in 3,490 calls, with an optimistic 0.00953% whole-solve reuse bound. For DEGEN3 pricing0 the entire method took 12.50%, including its 5.55% numerical BTRAN. None of 3,694 pricing BTRANs repeated even an unordered input support within its live factor version. Evidence in next/primal-full-scope.
 
