@@ -36,6 +36,18 @@ The table gives same-CPU medians after one warm-up and three fresh-process timed
 | 80bau3b.pdhg | 3.173418 | 6.192722 | 3.273348 | 2.910711 | 0.92 |
 | greenbea.pdhg | 1.510589 | 2.682477 | 1.975066 | 1.384803 | 0.92 |
 
+### Randomized comparisons with patched Gurobi
+
+The same executable also ran 48 randomly ordered rose/Gurobi pairs and 48 Gurobi/Gurobi control pairs per PDHG row on CPU8. Each solver had a warm-up. Every observation used a fresh process, the exact bench arguments, and its own solve timer. Every rose output and exit matched the original full-row rose output after timing normalization, and every Gurobi output matched the original patched-library reference. All 388 samples are in the supplemental reference archive.
+
+| Run | Iterations | Rose vs Gurobi, paired median | 95% interval | Rose faster | Identical-Gurobi interval |
+|---|---:|---:|---:|---:|---:|
+| 80bau3b.pdhg | 42,154 | -23.48% | [-25.43%, -17.20%] | 45/48 | [-4.53%, +4.38%] |
+| greenbea.pdhg | 20,000 | -9.81% | [-14.21%, -6.37%] | 37/48 | [-6.14%, +0.75%] |
+
+
+Both order medians improved on both rows. The CPU2 four-way table also puts 80BAU3B barrier below the reference, but CPU3 measured 0.325849 s for rose and 0.202369 s for Gurobi on that row. Two of the 23 rows have a reproduced win against the patched library. The other 21 remain open.
+
 ### Preceding release 52a90742
 
 Short columns with the same number of terms share an instruction sequence for four independent transpose dots. Their results feed the box projection directly. Ordinary steps retain the primal vector, anchor and reflected vector in this order, while the forward matrix uses their remapped indices. Observation and restart boundaries restore the original coordinate order.
@@ -888,6 +900,12 @@ projected effects, component source/binary/timings, dependency audit and restora
 
 The independent CPU5 comparison on 80bau3b.pdhg measured 2.645657 s for this executable, 2.875764 s for its parent and 3.455131 s for patched Gurobi. The independent CPU5 comparison on greenbea.pdhg measured 1.086920 s for this executable, 1.640154 s for its parent and 1.201770 s for patched Gurobi. The additional CPU3 check on 80bau3b.barrier-r measured 0.325849 s for this solver and 0.202369 s for Gurobi. The CPU2 table result for this unaffected code path did not replicate. The predecessor experimental executable was superseded because AVX2 uses signed 32-bit gather offsets on the forward pass. Its preliminary two-row gain was rechecked on this executable with both dimensions bounded. The table above reports the current same-CPU four-way run.
 
+### Active research
+
+A compact LU installer passed full frozen parity and every WORK record on four complete compact models. Raw factor restoration eliminated 418,627 of 418,662 allocation calls on primal_5959 dual. The complete installer also reuses immutable ordered input rows and unscaled driver estimates. The current work scale remains live. On its original ordered-PDHG predecessor it passed two full timing comparisons of primal_5959 dual at −6.79% and −6.28%. On the current c82803ab parent its first comparison passed at −6.59%; the confirmation measured −7.71% but its identical-binary control was biased (p=0.0146). The prespecified protocol stopped without a new code commit. On the different executable's full exploratory CPU2 survey two of 23 target medians beat patched Gurobi, both PDHG. These results are separate from the official table.
+
+The scalar and width-two barrier factorization had 1,017,016 fewer allocations on the genuine 103-iteration GREENBEA benchmark. The original solver and candidate both ended suboptimal after 103 iterations with identical output. The patched reference's own endpoint is suboptimal at 93 iterations. The CPU4 primary comparison of 768 AB and 768 AA pairs measured −3.43%, interval [−4.76%, −2.08%]. All 3,074 samples matched the original full-row outputs. Its independently seeded confirmation is running with the same genuine endpoints. Another candidate bounds two rounded extended complementarity sums before selecting a certified binary64 result or falling back to the full original recurrence. It is under full numerical and timing validation.
+
 ## Extended BTRAN feasibility
 
 Feasibility-screen baseline CLI hash: `e28b651026b477f0e5741e881efce27d640e2bf3f330f85a4f76b0e53c8804fc`.
@@ -1196,6 +1214,12 @@ The remaining candidates below derive from the Ryzen measurements and their hist
 ## Tried, no gain
 
 ### EPYC structural trials
+
+- Retaining the previous auxiliary LU base by exclusive ownership and discarding its eta history on reinstall passed 987/987. The two full fx_quad_obj_5371 comparisons measured −5.36% and −3.72%. The latter interval [−5.01%, −1.37%] did not clear the identical-binary error band, so no commit followed.
+- Maintaining global primal pricing score buckets avoided 2,612,079 of 4,514,341 observed full/best/old-list score evaluations on 80BAU3B. Full parity and the 76,269-record target trace matched, but its 96-pair full medians were +1.13%, interval [−2.40%, +3.05%]. Both presentation orders were slower. No confirmation.
+- A direct-coordinate Markowitz producer passed 987/987 and its independent sparse/dense/duplicate oracle. On PEROLD primal the full 12-pair viability trial regressed 3.81% (3/12 wins). The four-RHS auxiliary panel also preserved its independent complete factors, but cost 9.22% more on the PEROLD dual constructor replay. Neither continued to formal timing.
+- An end-to-end barrier factor arena with direct child and solve views reduced allocation calls 68.9% on GREENBEA and 58.2% on 80BAU3B. It reproduced all recorded child updates and factors. The median whole-process CPU projection was 4.658% on GREENBEA and 2.045% on 80BAU3B, below the frozen 5% gate. No production integration.
+
 
 - Direct dense dual-row accumulation removed the membership scan and passed its f64/F80 oracle, full 987 and PEROLD WORK trace. Its 192-pair target comparison measured −1.63% [−4.19%, +1.28%]; the 107 improving pairs did not establish a gain.
 - Tracking ordinary basic feasibility classes through sparse pivots passed 987/987 and a per-observation complete-rescan oracle on two models. At 80BAU3B the full 96-pair median was −10.26%, interval [−17.19%, −5.08%], versus an identical-binary band reaching +6.30%. No independent second screen ran.
