@@ -1,0 +1,1578 @@
+{
+  "source": "09a8a14d",
+  "experiment": "Generate exact immutable dense forward-L and L-transpose SSE2 programs, with constant workspace displacements, RIP-relative coefficient/WORK literals and original per-column predicates. Leave etas, input/output handling and all factor mutation outside. Main-agent implementation, Astra-high read-only opportunity review.",
+  "configuration": "Pinned Rust1.98.1 ordinary ThinLTO release test binary/glibc/current EPYC host. Captured/small/initial replay probes unpinned. Final PILOT4/PEROLD direct-emitter replay pinned to CPU2. Not PGO, not a production solver benchmark.",
+  "numerical_checks": "8192 complete SC50A captured dense passes (2factors x2directions x16MXCSR modes x128inputs): full-bit/random/signed-zero/exact-TOL/large/tiny/Inf/two-NaN-payload input patterns; every value bit, WORK bit and full MXCSR agrees with independent extracted original loops. Each of4888 actual initial-dense forward or dense-transpose passes captured in8 bounded solver runs also matches its live flat-kernel output/WORK/MXCSR exactly. All8 complete SolveResult Debug objects match separate uninstrumented same-binary solves. These do not constitute full candidate qualification for arbitrary inputs.",
+  "emitter_revision": "Initial staging emitter builds code/data/relocations separately. Second emitter computes exact size and writes one mapped image in a single pass, without staging or relocation pass. Every one of182 observed geometry+direction images is byte-identical to the initial emitter. Both stages use RW mmap, then RX mprotect, then munmap on retirement. Original scalar-loop disassembly retained.",
+  "replay_scope": "Eight fixed alternating AB/BA batches replay actual dense input histories. Candidate batch includes generation,mmap,mprotect,all uses and munmap; same input-copy cost included in both. Reference uses extracted original numeric loops over Vec columns, so it is not accepted-release timing attribution. Histories group all identical coefficients/geometry within a solve, an optimistic sharing assumption rather than proven per-factor lifetimes; capture/grouping costs and a production owner/cache are excluded. No failed sample is removed.",
+  "captured_execution_only": [
+    {
+      "build_ns": 23895,
+      "bytes": 4192,
+      "factor": 0,
+      "m": 50,
+      "new_ns": [
+        328180,
+        354010,
+        343560,
+        338201,
+        257821,
+        228655,
+        263991,
+        282567
+      ],
+      "nnz": 29,
+      "old_ns": [
+        625576,
+        609416,
+        636366,
+        607753,
+        498689,
+        413300,
+        369259,
+        470027
+      ],
+      "repetitions": 4096,
+      "reverse": false
+    },
+    {
+      "build_ns": 48439,
+      "bytes": 4096,
+      "factor": 0,
+      "m": 50,
+      "new_ns": [
+        273200,
+        225610,
+        214330,
+        232574,
+        212286,
+        279060,
+        237723,
+        252220
+      ],
+      "nnz": 29,
+      "old_ns": [
+        478752,
+        429742,
+        387883,
+        461520,
+        483250,
+        415995,
+        485244,
+        450310
+      ],
+      "repetitions": 4096,
+      "reverse": true
+    },
+    {
+      "build_ns": 51506,
+      "bytes": 4192,
+      "factor": 1,
+      "m": 50,
+      "new_ns": [
+        232103,
+        241060,
+        278218,
+        276114,
+        243144,
+        257760,
+        221162,
+        245747
+      ],
+      "nnz": 29,
+      "old_ns": [
+        438487,
+        440682,
+        505212,
+        548272,
+        540125,
+        431314,
+        444679,
+        478973
+      ],
+      "repetitions": 4096,
+      "reverse": false
+    },
+    {
+      "build_ns": 44993,
+      "bytes": 4096,
+      "factor": 1,
+      "m": 50,
+      "new_ns": [
+        222915,
+        229737,
+        192719,
+        205984,
+        195815,
+        209030,
+        278159,
+        195665
+      ],
+      "nnz": 29,
+      "old_ns": [
+        337660,
+        364991,
+        347417,
+        315579,
+        410425,
+        321740,
+        389726,
+        332861
+      ],
+      "repetitions": 4096,
+      "reverse": true
+    }
+  ],
+  "initial_history_rows": [
+    {
+      "bytes": 17872,
+      "calls": 9,
+      "cap": 800,
+      "iterations": 10,
+      "method": "Dual",
+      "model": "afiro",
+      "refactorizations": 4,
+      "status": "Optimal",
+      "unique_geometry_direction": 8,
+      "old_samples_ns": [
+        2695,
+        1584,
+        1132,
+        1001,
+        731,
+        780,
+        683,
+        1091
+      ],
+      "inclusive_samples_ns": [
+        88093,
+        76622,
+        77665,
+        108573,
+        86692,
+        83805,
+        100493,
+        76030
+      ],
+      "median_old_ns": 1046.0,
+      "median_inclusive_ns": 85248.5,
+      "median_ratio": 88.56533349784954,
+      "directions": [
+        {
+          "reverse": false,
+          "groups": 4,
+          "calls": 4,
+          "old_samples_ns": [
+            1722,
+            842,
+            682,
+            511,
+            401,
+            400,
+            382,
+            670
+          ],
+          "inclusive_samples_ns": [
+            40575,
+            33952,
+            41808,
+            35265,
+            40055,
+            48049,
+            50000,
+            35537
+          ],
+          "median_ratio": 65.15689723444916,
+          "positive_group_medians": 0
+        },
+        {
+          "reverse": true,
+          "groups": 4,
+          "calls": 5,
+          "old_samples_ns": [
+            973,
+            742,
+            450,
+            490,
+            330,
+            380,
+            301,
+            421
+          ],
+          "inclusive_samples_ns": [
+            47518,
+            42670,
+            35857,
+            73308,
+            46637,
+            35756,
+            50493,
+            40493
+          ],
+          "median_ratio": 95.13881735216901,
+          "positive_group_medians": 0
+        }
+      ]
+    },
+    {
+      "bytes": 54848,
+      "calls": 26,
+      "cap": 800,
+      "iterations": 33,
+      "method": "Dual",
+      "model": "sc50a",
+      "refactorizations": 6,
+      "status": "Optimal",
+      "unique_geometry_direction": 12,
+      "old_samples_ns": [
+        9609,
+        6934,
+        4979,
+        5098,
+        4049,
+        4487,
+        3639,
+        5298
+      ],
+      "inclusive_samples_ns": [
+        176150,
+        164436,
+        176681,
+        185507,
+        200602,
+        160373,
+        192461,
+        176151
+      ],
+      "median_old_ns": 5038.5,
+      "median_inclusive_ns": 176416.0,
+      "median_ratio": 35.61346811947823,
+      "directions": [
+        {
+          "reverse": false,
+          "groups": 6,
+          "calls": 19,
+          "old_samples_ns": [
+            7014,
+            5141,
+            3596,
+            3266,
+            2905,
+            3085,
+            2566,
+            3967
+          ],
+          "inclusive_samples_ns": [
+            93385,
+            84518,
+            87816,
+            88535,
+            95967,
+            76434,
+            116449,
+            94537
+          ],
+          "median_ratio": 24.598240075863153,
+          "positive_group_medians": 0
+        },
+        {
+          "reverse": true,
+          "groups": 6,
+          "calls": 7,
+          "old_samples_ns": [
+            2595,
+            1793,
+            1383,
+            1832,
+            1144,
+            1402,
+            1073,
+            1331
+          ],
+          "inclusive_samples_ns": [
+            82765,
+            79918,
+            88865,
+            96972,
+            104635,
+            83939,
+            76012,
+            81614
+          ],
+          "median_ratio": 60.5943524384506,
+          "positive_group_medians": 0
+        }
+      ]
+    },
+    {
+      "bytes": 112560,
+      "calls": 167,
+      "cap": 800,
+      "iterations": 75,
+      "method": "Dual",
+      "model": "blend",
+      "refactorizations": 7,
+      "status": "Optimal",
+      "unique_geometry_direction": 14,
+      "old_samples_ns": [
+        64231,
+        40916,
+        31857,
+        32249,
+        29144,
+        32402,
+        30174,
+        32381
+      ],
+      "inclusive_samples_ns": [
+        296803,
+        276945,
+        269947,
+        270305,
+        272279,
+        258700,
+        261469,
+        241902
+      ],
+      "median_old_ns": 32315.0,
+      "median_inclusive_ns": 270126.0,
+      "median_ratio": 8.182942672893182,
+      "directions": [
+        {
+          "reverse": false,
+          "groups": 7,
+          "calls": 112,
+          "old_samples_ns": [
+            44204,
+            29316,
+            23442,
+            23494,
+            21731,
+            24176,
+            22792,
+            24105
+          ],
+          "inclusive_samples_ns": [
+            184806,
+            158905,
+            156534,
+            149950,
+            161942,
+            147545,
+            133520,
+            136887
+          ],
+          "median_ratio": 5.980574600176684,
+          "positive_group_medians": 0
+        },
+        {
+          "reverse": true,
+          "groups": 7,
+          "calls": 55,
+          "old_samples_ns": [
+            20027,
+            11600,
+            8415,
+            8755,
+            7413,
+            8226,
+            7382,
+            8276
+          ],
+          "inclusive_samples_ns": [
+            111997,
+            118040,
+            113413,
+            120355,
+            110337,
+            111155,
+            127949,
+            105015
+          ],
+          "median_ratio": 13.495061764510858,
+          "positive_group_medians": 0
+        }
+      ]
+    },
+    {
+      "bytes": 109952,
+      "calls": 110,
+      "cap": 800,
+      "iterations": 73,
+      "method": "Dual",
+      "model": "adlittle",
+      "refactorizations": 9,
+      "status": "Optimal",
+      "unique_geometry_direction": 18,
+      "old_samples_ns": [
+        40524,
+        25571,
+        19027,
+        21427,
+        18394,
+        38762,
+        17483,
+        22480
+      ],
+      "inclusive_samples_ns": [
+        289496,
+        278241,
+        278449,
+        264771,
+        280734,
+        284831,
+        264977,
+        338199
+      ],
+      "median_old_ns": 21953.5,
+      "median_inclusive_ns": 279591.5,
+      "median_ratio": 13.495650212540962,
+      "directions": [
+        {
+          "reverse": false,
+          "groups": 9,
+          "calls": 74,
+          "old_samples_ns": [
+            28363,
+            18652,
+            13825,
+            15929,
+            13533,
+            33161,
+            12954,
+            17301
+          ],
+          "inclusive_samples_ns": [
+            176619,
+            163818,
+            151483,
+            156731,
+            153226,
+            180697,
+            155873,
+            215451
+          ],
+          "median_ratio": 10.398264318709934,
+          "positive_group_medians": 0
+        },
+        {
+          "reverse": true,
+          "groups": 9,
+          "calls": 36,
+          "old_samples_ns": [
+            12161,
+            6919,
+            5202,
+            5498,
+            4861,
+            5601,
+            4529,
+            5179
+          ],
+          "inclusive_samples_ns": [
+            112877,
+            114423,
+            126966,
+            108040,
+            127508,
+            104134,
+            109104,
+            122748
+          ],
+          "median_ratio": 21.675941350576956,
+          "positive_group_medians": 0
+        }
+      ]
+    },
+    {
+      "bytes": 461152,
+      "calls": 188,
+      "cap": 800,
+      "iterations": 172,
+      "method": "Dual",
+      "model": "bore3d",
+      "refactorizations": 9,
+      "status": "Optimal",
+      "unique_geometry_direction": 18,
+      "old_samples_ns": [
+        180677,
+        131784,
+        108815,
+        133510,
+        99305,
+        126417,
+        92070,
+        129992
+      ],
+      "inclusive_samples_ns": [
+        797483,
+        712192,
+        783299,
+        780687,
+        877294,
+        825213,
+        739296,
+        729079
+      ],
+      "median_old_ns": 128204.5,
+      "median_inclusive_ns": 781993.0,
+      "median_ratio": 6.187555307207225,
+      "directions": [
+        {
+          "reverse": false,
+          "groups": 9,
+          "calls": 124,
+          "old_samples_ns": [
+            128460,
+            96269,
+            77856,
+            80531,
+            71052,
+            88947,
+            63478,
+            76482
+          ],
+          "inclusive_samples_ns": [
+            485793,
+            419823,
+            420143,
+            425775,
+            502649,
+            434486,
+            381692,
+            390500
+          ],
+          "median_ratio": 5.196435466714236,
+          "positive_group_medians": 0
+        },
+        {
+          "reverse": true,
+          "groups": 9,
+          "calls": 64,
+          "old_samples_ns": [
+            52217,
+            35515,
+            30959,
+            52979,
+            28253,
+            37470,
+            28592,
+            53510
+          ],
+          "inclusive_samples_ns": [
+            311690,
+            292369,
+            363156,
+            354912,
+            374645,
+            390727,
+            357604,
+            338579
+          ],
+          "median_ratio": 9.329998452748777,
+          "positive_group_medians": 0
+        }
+      ]
+    },
+    {
+      "bytes": 1991584,
+      "calls": 952,
+      "cap": 800,
+      "iterations": 634,
+      "method": "Dual",
+      "model": "degen2",
+      "refactorizations": 16,
+      "status": "Optimal",
+      "unique_geometry_direction": 32,
+      "old_samples_ns": [
+        2451377,
+        2214006,
+        2169083,
+        2154715,
+        1879163,
+        2031602,
+        1867174,
+        1931132
+      ],
+      "inclusive_samples_ns": [
+        4407579,
+        4141365,
+        4119687,
+        3955445,
+        3983686,
+        3933411,
+        4293793,
+        3947519
+      ],
+      "median_old_ns": 2093158.5,
+      "median_inclusive_ns": 4051686.5,
+      "median_ratio": 1.9176944239665743,
+      "directions": [
+        {
+          "reverse": false,
+          "groups": 16,
+          "calls": 592,
+          "old_samples_ns": [
+            1606884,
+            1453757,
+            1375884,
+            1434983,
+            1301987,
+            1377156,
+            1248832,
+            1299141
+          ],
+          "inclusive_samples_ns": [
+            2457075,
+            2228417,
+            2350192,
+            2136881,
+            2271314,
+            2149167,
+            2259420,
+            2201514
+          ],
+          "median_ratio": 1.6275877962098968,
+          "positive_group_medians": 0
+        },
+        {
+          "reverse": true,
+          "groups": 16,
+          "calls": 360,
+          "old_samples_ns": [
+            844493,
+            760249,
+            793199,
+            719732,
+            577176,
+            654446,
+            618342,
+            631991
+          ],
+          "inclusive_samples_ns": [
+            1950504,
+            1912948,
+            1769495,
+            1818564,
+            1712372,
+            1784244,
+            2034373,
+            1746005
+          ],
+          "median_ratio": 2.626533211018733,
+          "positive_group_medians": 0
+        }
+      ]
+    },
+    {
+      "bytes": 2572048,
+      "calls": 1276,
+      "cap": 800,
+      "iterations": 690,
+      "method": "Primal",
+      "model": "pilot4",
+      "refactorizations": 16,
+      "status": "Optimal",
+      "unique_geometry_direction": 32,
+      "old_samples_ns": [
+        2909264,
+        2871415,
+        2594390,
+        2911655,
+        2666772,
+        2754984,
+        2363190,
+        2738409
+      ],
+      "inclusive_samples_ns": [
+        5012449,
+        4754468,
+        5046002,
+        5223432,
+        5283105,
+        5041316,
+        4921688,
+        5089070
+      ],
+      "median_old_ns": 2746696.5,
+      "median_inclusive_ns": 5043659.0,
+      "median_ratio": 1.844146652911951,
+      "directions": [
+        {
+          "reverse": false,
+          "groups": 16,
+          "calls": 431,
+          "old_samples_ns": [
+            559395,
+            443890,
+            402065,
+            441395,
+            363446,
+            421436,
+            374250,
+            477841
+          ],
+          "inclusive_samples_ns": [
+            1886044,
+            1719012,
+            1918085,
+            2171706,
+            1956276,
+            1877347,
+            1936530,
+            2030786
+          ],
+          "median_ratio": 4.612613765321035,
+          "positive_group_medians": 0
+        },
+        {
+          "reverse": true,
+          "groups": 16,
+          "calls": 845,
+          "old_samples_ns": [
+            2349869,
+            2427525,
+            2192325,
+            2470260,
+            2303326,
+            2333548,
+            1988940,
+            2260568
+          ],
+          "inclusive_samples_ns": [
+            3126405,
+            3035456,
+            3127917,
+            3051726,
+            3326829,
+            3163969,
+            2985158,
+            3058284
+          ],
+          "median_ratio": 1.3543724836115671,
+          "positive_group_medians": 1
+        }
+      ]
+    },
+    {
+      "bytes": 5315696,
+      "calls": 2160,
+      "cap": 1300,
+      "iterations": 1273,
+      "method": "Dual",
+      "model": "perold",
+      "refactorizations": 27,
+      "status": "Optimal",
+      "unique_geometry_direction": 48,
+      "old_samples_ns": [
+        8968759,
+        8218488,
+        7894735,
+        8551364,
+        8153490,
+        8690616,
+        7849088,
+        8367960
+      ],
+      "inclusive_samples_ns": [
+        13283136,
+        13335140,
+        13356657,
+        12653889,
+        12717509,
+        12660740,
+        12710052,
+        12888826
+      ],
+      "median_old_ns": 8293224.0,
+      "median_inclusive_ns": 12803167.5,
+      "median_ratio": 1.5500108324547561,
+      "directions": [
+        {
+          "reverse": false,
+          "groups": 24,
+          "calls": 1237,
+          "old_samples_ns": [
+            4812239,
+            4336550,
+            4186274,
+            4433806,
+            4204499,
+            4630628,
+            4164414,
+            4255978
+          ],
+          "inclusive_samples_ns": [
+            6435493,
+            6485085,
+            6280312,
+            6168115,
+            6199161,
+            6002789,
+            6051310,
+            6577048
+          ],
+          "median_ratio": 1.4637556714438253,
+          "positive_group_medians": 0
+        },
+        {
+          "reverse": true,
+          "groups": 24,
+          "calls": 923,
+          "old_samples_ns": [
+            4156520,
+            3881938,
+            3708461,
+            4117558,
+            3948991,
+            4059988,
+            3684674,
+            4111982
+          ],
+          "inclusive_samples_ns": [
+            6847643,
+            6850055,
+            7076345,
+            6485774,
+            6518348,
+            6657951,
+            6658742,
+            6311778
+          ],
+          "median_ratio": 1.6490412540210575,
+          "positive_group_medians": 0
+        }
+      ]
+    }
+  ],
+  "direct_history_rows": [
+    {
+      "bytes": 17872,
+      "calls": 9,
+      "cap": 800,
+      "iterations": 10,
+      "method": "Dual",
+      "model": "afiro",
+      "refactorizations": 4,
+      "status": "Optimal",
+      "unique_geometry_direction": 8,
+      "old_samples_ns": [
+        2453,
+        1656,
+        1180,
+        1052,
+        771,
+        771,
+        691,
+        1012
+      ],
+      "inclusive_samples_ns": [
+        65382,
+        66934,
+        53502,
+        60713,
+        58408,
+        66533,
+        59342,
+        78977
+      ],
+      "median_old_ns": 1032.0,
+      "median_inclusive_ns": 63047.5,
+      "median_ratio": 66.73406900820129,
+      "directions": [
+        {
+          "reverse": false,
+          "groups": 4,
+          "calls": 4,
+          "old_samples_ns": [
+            1601,
+            923,
+            710,
+            562,
+            420,
+            361,
+            361,
+            451
+          ],
+          "inclusive_samples_ns": [
+            28775,
+            26558,
+            26019,
+            32551,
+            24485,
+            24785,
+            25879,
+            26350
+          ],
+          "median_ratio": 58.10877393662091,
+          "positive_group_medians": 0
+        },
+        {
+          "reverse": true,
+          "groups": 4,
+          "calls": 5,
+          "old_samples_ns": [
+            852,
+            733,
+            470,
+            490,
+            351,
+            410,
+            330,
+            561
+          ],
+          "inclusive_samples_ns": [
+            36607,
+            40376,
+            27483,
+            28162,
+            33923,
+            41748,
+            33463,
+            52627
+          ],
+          "median_ratio": 76.14186862365835,
+          "positive_group_medians": 0
+        }
+      ]
+    },
+    {
+      "bytes": 54848,
+      "calls": 26,
+      "cap": 800,
+      "iterations": 33,
+      "method": "Dual",
+      "model": "sc50a",
+      "refactorizations": 6,
+      "status": "Optimal",
+      "unique_geometry_direction": 12,
+      "old_samples_ns": [
+        9866,
+        5760,
+        4410,
+        4341,
+        3655,
+        4430,
+        3907,
+        4170
+      ],
+      "inclusive_samples_ns": [
+        123660,
+        115784,
+        116825,
+        134430,
+        119703,
+        174254,
+        110155,
+        112369
+      ],
+      "median_old_ns": 4375.5,
+      "median_inclusive_ns": 118264.0,
+      "median_ratio": 27.570634549437493,
+      "directions": [
+        {
+          "reverse": false,
+          "groups": 6,
+          "calls": 19,
+          "old_samples_ns": [
+            7192,
+            4057,
+            3137,
+            2937,
+            2534,
+            3198,
+            2906,
+            3066
+          ],
+          "inclusive_samples_ns": [
+            51716,
+            56573,
+            53919,
+            49021,
+            50104,
+            117269,
+            55073,
+            57047
+          ],
+          "median_ratio": 17.89720262190579,
+          "positive_group_medians": 0
+        },
+        {
+          "reverse": true,
+          "groups": 6,
+          "calls": 7,
+          "old_samples_ns": [
+            2674,
+            1703,
+            1273,
+            1404,
+            1121,
+            1232,
+            1001,
+            1104
+          ],
+          "inclusive_samples_ns": [
+            71944,
+            59211,
+            62906,
+            85409,
+            69599,
+            56985,
+            55082,
+            55322
+          ],
+          "median_ratio": 49.76303052813735,
+          "positive_group_medians": 0
+        }
+      ]
+    },
+    {
+      "bytes": 112560,
+      "calls": 167,
+      "cap": 800,
+      "iterations": 75,
+      "method": "Dual",
+      "model": "blend",
+      "refactorizations": 7,
+      "status": "Optimal",
+      "unique_geometry_direction": 14,
+      "old_samples_ns": [
+        64913,
+        39086,
+        29671,
+        27761,
+        25167,
+        30758,
+        27902,
+        29445
+      ],
+      "inclusive_samples_ns": [
+        234795,
+        177802,
+        185195,
+        189461,
+        179444,
+        216012,
+        214096,
+        165761
+      ],
+      "median_old_ns": 29558.0,
+      "median_inclusive_ns": 187328.0,
+      "median_ratio": 6.533167261430744,
+      "directions": [
+        {
+          "reverse": false,
+          "groups": 7,
+          "calls": 112,
+          "old_samples_ns": [
+            43612,
+            26622,
+            19864,
+            19376,
+            18024,
+            21300,
+            19586,
+            20691
+          ],
+          "inclusive_samples_ns": [
+            125284,
+            92754,
+            99646,
+            83913,
+            97963,
+            111288,
+            121014,
+            82776
+          ],
+          "median_ratio": 4.673590811822623,
+          "positive_group_medians": 0
+        },
+        {
+          "reverse": true,
+          "groups": 7,
+          "calls": 55,
+          "old_samples_ns": [
+            21301,
+            12464,
+            9807,
+            8385,
+            7143,
+            9458,
+            8316,
+            8754
+          ],
+          "inclusive_samples_ns": [
+            109511,
+            85048,
+            85549,
+            105548,
+            81481,
+            104724,
+            93082,
+            82985
+          ],
+          "median_ratio": 10.27609881436311,
+          "positive_group_medians": 0
+        }
+      ]
+    },
+    {
+      "bytes": 109952,
+      "calls": 110,
+      "cap": 800,
+      "iterations": 73,
+      "method": "Dual",
+      "model": "adlittle",
+      "refactorizations": 9,
+      "status": "Optimal",
+      "unique_geometry_direction": 18,
+      "old_samples_ns": [
+        34455,
+        19818,
+        16030,
+        15542,
+        14164,
+        15496,
+        13867,
+        14976
+      ],
+      "inclusive_samples_ns": [
+        194081,
+        186658,
+        167684,
+        165117,
+        182830,
+        207809,
+        200192,
+        171741
+      ],
+      "median_old_ns": 15519.0,
+      "median_inclusive_ns": 184744.0,
+      "median_ratio": 11.045835336280682,
+      "directions": [
+        {
+          "reverse": false,
+          "groups": 9,
+          "calls": 74,
+          "old_samples_ns": [
+            22801,
+            13126,
+            10701,
+            10301,
+            9586,
+            10498,
+            9390,
+            10038
+          ],
+          "inclusive_samples_ns": [
+            96790,
+            93963,
+            89097,
+            88274,
+            95248,
+            114525,
+            88746,
+            95007
+          ],
+          "median_ratio": 9.010288743330543,
+          "positive_group_medians": 0
+        },
+        {
+          "reverse": true,
+          "groups": 9,
+          "calls": 36,
+          "old_samples_ns": [
+            11654,
+            6692,
+            5329,
+            5241,
+            4578,
+            4998,
+            4477,
+            4938
+          ],
+          "inclusive_samples_ns": [
+            97291,
+            92695,
+            78587,
+            76843,
+            87582,
+            93284,
+            111446,
+            76734
+          ],
+          "median_ratio": 15.143267072783392,
+          "positive_group_medians": 0
+        }
+      ]
+    },
+    {
+      "bytes": 461152,
+      "calls": 188,
+      "cap": 800,
+      "iterations": 172,
+      "method": "Dual",
+      "model": "bore3d",
+      "refactorizations": 9,
+      "status": "Optimal",
+      "unique_geometry_direction": 18,
+      "old_samples_ns": [
+        153784,
+        109247,
+        87199,
+        99984,
+        84639,
+        83974,
+        78598,
+        89216
+      ],
+      "inclusive_samples_ns": [
+        484582,
+        430593,
+        496507,
+        474232,
+        471012,
+        474033,
+        508163,
+        465476
+      ],
+      "median_old_ns": 88207.5,
+      "median_inclusive_ns": 474132.5,
+      "median_ratio": 5.391178638363137,
+      "directions": [
+        {
+          "reverse": false,
+          "groups": 9,
+          "calls": 124,
+          "old_samples_ns": [
+            106637,
+            77697,
+            63115,
+            74568,
+            62155,
+            60611,
+            55925,
+            65664
+          ],
+          "inclusive_samples_ns": [
+            247602,
+            233924,
+            279782,
+            261187,
+            251721,
+            235089,
+            292211,
+            261807
+          ],
+          "median_ratio": 3.932861465382951,
+          "positive_group_medians": 0
+        },
+        {
+          "reverse": true,
+          "groups": 9,
+          "calls": 64,
+          "old_samples_ns": [
+            47147,
+            31550,
+            24084,
+            25416,
+            22484,
+            23363,
+            22673,
+            23552
+          ],
+          "inclusive_samples_ns": [
+            236980,
+            196669,
+            216725,
+            213045,
+            219291,
+            238944,
+            215952,
+            203669
+          ],
+          "median_ratio": 8.82317180642773,
+          "positive_group_medians": 0
+        }
+      ]
+    },
+    {
+      "bytes": 1991584,
+      "calls": 952,
+      "cap": 800,
+      "iterations": 634,
+      "method": "Dual",
+      "model": "degen2",
+      "refactorizations": 16,
+      "status": "Optimal",
+      "unique_geometry_direction": 32,
+      "old_samples_ns": [
+        2215788,
+        2012939,
+        1845472,
+        1863799,
+        1732050,
+        1766574,
+        1658589,
+        1728865
+      ],
+      "inclusive_samples_ns": [
+        3319273,
+        3032487,
+        3292741,
+        3036799,
+        3132664,
+        3008288,
+        2996963,
+        2936256
+      ],
+      "median_old_ns": 1806023.0,
+      "median_inclusive_ns": 3034643.0,
+      "median_ratio": 1.7006329516225895,
+      "directions": [
+        {
+          "reverse": false,
+          "groups": 16,
+          "calls": 592,
+          "old_samples_ns": [
+            1466562,
+            1330863,
+            1263110,
+            1266439,
+            1193948,
+            1188556,
+            1116390,
+            1176295
+          ],
+          "inclusive_samples_ns": [
+            1795818,
+            1604973,
+            1804469,
+            1607653,
+            1689405,
+            1653543,
+            1593329,
+            1627143
+          ],
+          "median_ratio": 1.387249053309231,
+          "positive_group_medians": 0
+        },
+        {
+          "reverse": true,
+          "groups": 16,
+          "calls": 360,
+          "old_samples_ns": [
+            749226,
+            682076,
+            582362,
+            597360,
+            538102,
+            578018,
+            542199,
+            552570
+          ],
+          "inclusive_samples_ns": [
+            1523455,
+            1427514,
+            1488272,
+            1429146,
+            1443259,
+            1354745,
+            1403634,
+            1309113
+          ],
+          "median_ratio": 2.3807859268876874,
+          "positive_group_medians": 0
+        }
+      ]
+    },
+    {
+      "bytes": 2572048,
+      "calls": 1276,
+      "cap": 800,
+      "iterations": 690,
+      "method": "Primal",
+      "model": "pilot4",
+      "refactorizations": 16,
+      "status": "Optimal",
+      "unique_geometry_direction": 32,
+      "old_samples_ns": [
+        3126185,
+        3002261,
+        2946945,
+        3111322,
+        2698266,
+        2942134,
+        2900905,
+        3025672
+      ],
+      "inclusive_samples_ns": [
+        4828268,
+        4844375,
+        4754480,
+        4799377,
+        4957933,
+        4556073,
+        4838235,
+        4876036
+      ],
+      "median_old_ns": 2974603.0,
+      "median_inclusive_ns": 4833251.5,
+      "median_ratio": 1.6124568207704055,
+      "directions": [
+        {
+          "reverse": false,
+          "groups": 16,
+          "calls": 431,
+          "old_samples_ns": [
+            667634,
+            575978,
+            535310,
+            542550,
+            524767,
+            519989,
+            582014,
+            545607
+          ],
+          "inclusive_samples_ns": [
+            1948520,
+            1959159,
+            1945966,
+            1875428,
+            1954784,
+            1836903,
+            1902376,
+            1935798
+          ],
+          "median_ratio": 3.494636023030551,
+          "positive_group_medians": 0
+        },
+        {
+          "reverse": true,
+          "groups": 16,
+          "calls": 845,
+          "old_samples_ns": [
+            2458551,
+            2426283,
+            2411635,
+            2568772,
+            2173499,
+            2422145,
+            2318891,
+            2480065
+          ],
+          "inclusive_samples_ns": [
+            2879748,
+            2885216,
+            2808514,
+            2923949,
+            3003149,
+            2719170,
+            2935859,
+            2940238
+          ],
+          "median_ratio": 1.1784339848657421,
+          "positive_group_medians": 1
+        }
+      ]
+    },
+    {
+      "bytes": 5315696,
+      "calls": 2160,
+      "cap": 1300,
+      "iterations": 1273,
+      "method": "Dual",
+      "model": "perold",
+      "refactorizations": 27,
+      "status": "Optimal",
+      "unique_geometry_direction": 48,
+      "old_samples_ns": [
+        7580450,
+        7418004,
+        6773970,
+        7190606,
+        6652140,
+        7259571,
+        6901595,
+        7253136
+      ],
+      "inclusive_samples_ns": [
+        9568883,
+        9527618,
+        9266129,
+        9240161,
+        9543176,
+        9038572,
+        9338851,
+        9046532
+      ],
+      "median_old_ns": 7221871.0,
+      "median_inclusive_ns": 9302490.0,
+      "median_ratio": 1.284711680932801,
+      "directions": [
+        {
+          "reverse": false,
+          "groups": 24,
+          "calls": 1237,
+          "old_samples_ns": [
+            4325371,
+            4292406,
+            3895520,
+            4174507,
+            3873109,
+            4200059,
+            3889082,
+            4209184
+          ],
+          "inclusive_samples_ns": [
+            5059259,
+            4997155,
+            4922046,
+            4742922,
+            5087125,
+            4908336,
+            4803910,
+            4695140
+          ],
+          "median_ratio": 1.1691527721700345,
+          "positive_group_medians": 2
+        },
+        {
+          "reverse": true,
+          "groups": 24,
+          "calls": 923,
+          "old_samples_ns": [
+            3255079,
+            3125598,
+            2878450,
+            3016099,
+            2779031,
+            3059512,
+            3012513,
+            3043952
+          ],
+          "inclusive_samples_ns": [
+            4509624,
+            4530463,
+            4344083,
+            4497239,
+            4456051,
+            4130236,
+            4534941,
+            4351392
+          ],
+          "median_ratio": 1.4702744170608706,
+          "positive_group_medians": 0
+        }
+      ]
+    }
+  ],
+  "decision": "Reject this per-LU-factor immutable generated-program prototype before solver integration/PGO/full gates. First emitter construction-inclusive ratios are ~1.92DEGEN2/1.84PILOT4/1.55PEROLD. One-pass generation helps but final CPU2 inclusive PILOT4/PEROLD still lose (~1.63/1.29). Static per-direction choices likewise lose in aggregate. Do not infer solver gain from execution-only SC50A improvements. Persisting topology across all barrier Newton factors would be a different unimplemented lifetime.",
+  "hashes": {
+    "original.rs": "57c86340f6959717954e2cb1c58f06c285ab7ce564a25d7d0e9e9c429d802ef1",
+    "instrumented.rs": "e5b89b21406c51b073694fd9530135ba6f3d7163a78416ecd7c2dc199ad7653b",
+    "initial-probe.rs": "84af8fec225c2a88eb46ee5ae9f54deb8653812ef47cecf13867a4d9591a551a",
+    "direct-probe.rs": "87de42d13470a29e885b39142ec0869a82aa62d041d0dd9051d28c8c42e6731c"
+  },
+  "artifacts": "target/perf-l-program/ (original/instrumented source, initial/direct complete probes, captured/live/history logs and original oracle disassembly)"
+}

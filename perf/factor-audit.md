@@ -32,6 +32,15 @@ prevent treating the replay as redundant by inspection.
 
 ## Cost evidence and limits
 
+An immutable dense L machine-code prototype removes index/inner-loop decoding
+without changing each scalar multiplication/subtraction, threshold or WORK
+addition. Captured and live comparisons pass, but construction-inclusive replay
+loses even with optimistic geometry sharing across each complete bounded solve.
+A single-pass mapped-image emitter reduces construction cost yet CPU2 replay
+remains about 63% slower on PILOT4 and 29% slower on PEROLD. No solver integration.
+This tests per-LU-factor program lifetimes, not a symbolic barrier program shared
+across all Newton factors. See [l-generated-program.json](evidence/l-generated-program.json).
+
 Saved `target/perf-native-families/summary.json` profiles predate sparse auxiliary
 etas and current primal dispatch. PEROLD factor/update self mass is about 243–246M
 instructions of 1050.5M whole-CLI instructions (23%). The session review attributes

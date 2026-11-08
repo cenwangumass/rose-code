@@ -304,6 +304,18 @@ measured.
   Current non-level sparse-L fallback census is complete: DEGEN2/PILOT4/PEROLD
   never enter Kahn replay; their L calls choose dense or level solvers. Do not
   implement numeric replay reuse on these targets from the unexecuted branch.
+  Generated immutable dense L forward/transpose programs are tested separately:
+  captured/live numeric, WORK and FP checks pass, but even a one-pass emitter
+  loses when actual uses include construction/retirement. CPU2 PILOT4/PEROLD
+  inclusive replay is about 63/29% slower. No per-LU-factor integration follows.
+  A code program whose topology persists across all barrier Newton factors is
+  a distinct unimplemented lifetime. CholSolver retains its Plan while Factor
+  numerical arrays change: use a refreshed pointer table, not embedded values
+  or allocation addresses. Forward needs both single/double peel schedules;
+  backward shares geometry. Preserve dsub8/dsub2 reduction trees, four-product
+  grouping and dynamic zero-diagonal rules. First measure the complete triangle
+  pair's current solve cost, since old solve shares include surrounding work;
+  then use cached small-model stage records and a whole-plan lifetime probe.
   PEROLD FTRAN/L/update and factor-production/installation ownership remain larger
   measured leads. The scalar prefilter and prior rank/layout trials remain
   rejected; do not infer further gains from isolated predicate costs.
