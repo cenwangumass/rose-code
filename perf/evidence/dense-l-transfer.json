@@ -1,0 +1,81 @@
+{
+  "source": "cad859ab",
+  "experiment": "Transfer the dense forward-L buffer to U; fuse positive-zero normalization into original spike compaction.",
+  "configuration": "Rust 1.98.1, ordinary ThinLTO release/glibc, CPU 2. No PGO.",
+  "oracle": "Existing independent frozen forward-L, full FTRAN and needed-FTRAN kernels; transfer reconstruction checked against expansion on captured and random f64/F80 inputs.",
+  "tests": "16 focused ftran_order release tests pass; fast parity 940/940.",
+  "result": "Rejected at initial instruction screen. No target instruction reduction. No formal timing screen, PGO qualification or full candidate gates.",
+  "timing_scope": "Counter screen overlapped fast parity; cycle and elapsed time data are diagnostic, not speed comparisons.",
+  "before_sha256": "fa615c020cf4eaf9b632ceeab247e68e4382b1782eaa89420911222b9a6ba70a",
+  "candidate_sha256": "36b33a0042aa24a1c20bb40a61adfdf107fa54d98c33622bf65f7ffb2e651907",
+  "restored_sha256": "fa615c020cf4eaf9b632ceeab247e68e4382b1782eaa89420911222b9a6ba70a",
+  "source_restored": true,
+  "canonical_results": "All 32 complete result/exit pairs match after removing only elapsed seconds.",
+  "rows": [
+    {
+      "model": "adlittle",
+      "method": "dual",
+      "max_iterations": 300,
+      "pairs": 4,
+      "instructions:u": {
+        "before": 13449004.0,
+        "after": 13451048.0,
+        "change_percent": 0.015198151476503163
+      },
+      "cycles:u": {
+        "before": 13367902.0,
+        "after": 13673707.5,
+        "change_percent": 2.28761027721478
+      }
+    },
+    {
+      "model": "degen2",
+      "method": "dual",
+      "max_iterations": 300,
+      "pairs": 4,
+      "instructions:u": {
+        "before": 79020657.5,
+        "after": 79234279.0,
+        "change_percent": 0.2703362725120284
+      },
+      "cycles:u": {
+        "before": 50915440.0,
+        "after": 58194637.0,
+        "change_percent": 14.296639683365209
+      }
+    },
+    {
+      "model": "perold",
+      "method": "dual",
+      "max_iterations": 1300,
+      "pairs": 4,
+      "instructions:u": {
+        "before": 1226350171.5,
+        "after": 1227482152.0,
+        "change_percent": 0.0923048348103972
+      },
+      "cycles:u": {
+        "before": 787531316.0,
+        "after": 802518676.5,
+        "change_percent": 1.9030812102969197
+      }
+    },
+    {
+      "model": "pilot4",
+      "method": "primal",
+      "max_iterations": 800,
+      "pairs": 4,
+      "instructions:u": {
+        "before": 551982875.0,
+        "after": 552710264.0,
+        "change_percent": 0.13177745776986605
+      },
+      "cycles:u": {
+        "before": 315881990.0,
+        "after": 303399330.0,
+        "change_percent": -3.9516846148778484
+      }
+    }
+  ],
+  "raw": "target/perf-dense-transfer/"
+}

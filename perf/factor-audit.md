@@ -93,9 +93,19 @@ AB/BA pairs matched complete no-dump results. Instructions rose 0.28% on ADLITTL
 and 0.82% on capped DEGEN2. On PEROLD, three alternating CPU-4 five-run pairs
 regressed solve time 1.69/2.46/1.56%, all beyond spread, with instructions +1.61%.
 The prototype was rejected and the accepted source/binary/PGO metadata restored.
-This rules out transfer plus a separate signed-zero normalization pass; it does
-not establish that removing the ordered spike or fusing compaction is safe or
-profitable. Evidence and exact candidate artifacts are linked in STATE.md.
+Transfer with a separate signed-zero normalization pass is rejected. Fusing
+normalization into the existing spike compaction has also been tested on the
+current virtual EPYC host: all 16 independent forward-L/full/needed-FTRAN
+release tests and fast parity 940/940 pass, including exact reconstructed-buffer
+checks on captured and random f64/F80 inputs. Four AB/BA pairs on each of
+ADLITTLE, capped DEGEN2, PEROLD and PILOT4 preserve every complete result and
+exit; instruction changes are +0.015/+0.270/+0.092/+0.132%. There is no initial
+counter benefit, so the variant is rejected before PGO qualification or timing
+screens. Both source and accepted CLI are restored exactly. Removing the ordered
+spike itself remains a separate representation question: its values and order
+feed updates and WORK consumers, so neither transfer trial proves it unnecessary.
+Evidence: [dense-l-transfer.json](evidence/dense-l-transfer.json); raw artifacts
+in `target/perf-dense-transfer/`. Do not repeat either transfer variant.
 
 A shared-column ownership prototype lazily split immutable model columns once,
 then selected Rc row/value slices for each basis and shared them with factor-cache
