@@ -1,7 +1,7 @@
 {
   "source": "18061fe9 (accepted zxtxvvvn)",
   "accepted_cli_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
-  "decision": "Independent-output complete dense LDL batching is a distinct conditional numerical lead; no candidate implemented or speedup claimed. Next measure actual dense-front geometry/eligible output coverage before freezing and changing the complete stage.",
+  "decision": "Reject complete independent-output LDL batching at fixed DEGEN3 cost pilot54109: median solve gain2.268% below predeclared5% minimum, with noisy AA. No formal54131/54197, extension/retry, path-width/snapshot tuning or full candidate gates. Accepted solver unchanged.",
   "distinction": "Prior rejected LDL chunk traversal vectorized terms inside one output. New lanes would represent different i>j output rows of a fixed pivot column, sharing temp[k] while retaining every original per-output chain/fold/tail and reciprocal multiply.",
   "source_proof": [
     "For fixed j, row i>j reads completed columns <j and temp, and writes only its own column-j element.",
@@ -96,9 +96,301 @@
     "complete_result": "Matches accepted target/perf-factor-engine/unrestricted-scatter/degen2-0-after.json after removing diagnostics.seconds only; exit0."
   },
   "excluded_new_lead": "Whole solve305 codegen adds routing/unrolling to settled triangular coefficient-sharing/in-place trials; no new substantial numerical boundary identified. Do not advance a descriptor/codegen composition from total solve scope.",
-  "artifacts": "target/perf-ldl-scope/: numeric-factor.asm, annotate.stderr, degen2-{instruction,cycle}-ips.txt, script stderr, attribute.py, cached-attribution.json, degen2-small*. Cached source recordings remain target/perf-gemm-routing/degen2-{lowrate,cycles}.data.",
+  "artifacts": "target/perf-ldl-output/: source/, baseline-source/, source-hashes.json, prepare.py, apply_candidate.py, ldl_output.rs, probe{,-final}.rs, frozen oracle, live/*.json, coverage.py, initial-small.log,candidate-tests.log,degen3-live.log,fast-parity.log, allbuildlogs,accepted/baseline/candidate/test-binary,native.asm,pilot-{small,large}.py and allplans/schedules/rawresults/counters/summaries. Earlier accepted-profile attribution stays target/perf-ldl-scope/.",
   "verification": {
-    "accepted_root": "Unchanged numerical source and accepted CLI; full987 and292release tests passed this turn, target/perf-btran-pair/accepted-{full-parity,release-tests}.log.",
-    "candidate": "None; no candidate gates/timing screen."
+    "accepted_root_source_matches_frozen_manifest": true,
+    "accepted_cli_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "release_tests_log": "target/perf-ldl-output/accepted-release-tests.log",
+    "full_parity_log": "target/perf-ldl-output/accepted-full-parity.log",
+    "source": "No tracked numerical source/test changes; candidate, oracle and all instrumentation remain isolated in target/.",
+    "candidate": "Rejected, not accepted. No full candidate tests/parity/benchmark sweep or formal reserved seeds.",
+    "accepted_full_parity": "987/987 (65.5s)",
+    "accepted_release_tests": {
+      "groups": 37,
+      "passed": 292,
+      "failed": 0,
+      "ignored": 22
+    }
+  },
+  "coverage": [
+    {
+      "model": "afiro",
+      "iterations": 7,
+      "status": "Optimal",
+      "totals": {
+        "calls": 24,
+        "all_dot_terms": 3408,
+        "offdiag_dot_terms": 2488,
+        "double_calls": 24,
+        "double_dot_terms": 3408
+      },
+      "width_single_histogram": {
+        "7/False": 8,
+        "12/False": 8,
+        "8/False": 8
+      }
+    },
+    {
+      "model": "sc50a",
+      "iterations": 7,
+      "status": "Optimal",
+      "totals": {
+        "calls": 32,
+        "all_dot_terms": 14168,
+        "offdiag_dot_terms": 11616,
+        "double_calls": 32,
+        "double_dot_terms": 14168,
+        "admitted_geometry_calls": 8,
+        "admitted_copy_elements": 2888,
+        "two_row_terms": 7104,
+        "long_two_row_terms": 4320,
+        "offdiag_dot_terms_admitted": 7752
+      },
+      "width_single_histogram": {
+        "7/False": 8,
+        "14/False": 8,
+        "9/False": 8,
+        "19/False": 8
+      }
+    },
+    {
+      "model": "blend",
+      "iterations": 8,
+      "status": "Optimal",
+      "totals": {
+        "calls": 72,
+        "all_dot_terms": 43848,
+        "offdiag_dot_terms": 38754,
+        "double_calls": 72,
+        "double_dot_terms": 43848,
+        "admitted_geometry_calls": 9,
+        "admitted_copy_elements": 8100,
+        "two_row_terms": 34650,
+        "long_two_row_terms": 28710,
+        "offdiag_dot_terms_admitted": 36540
+      },
+      "width_single_histogram": {
+        "7/False": 27,
+        "5/False": 18,
+        "3/False": 9,
+        "10/False": 9,
+        "30/False": 9
+      }
+    },
+    {
+      "model": "adlittle",
+      "iterations": 12,
+      "status": "Optimal",
+      "totals": {
+        "calls": 65,
+        "all_dot_terms": 25428,
+        "offdiag_dot_terms": 20852,
+        "double_calls": 65,
+        "double_dot_terms": 25428,
+        "admitted_geometry_calls": 13,
+        "admitted_copy_elements": 5200,
+        "two_row_terms": 13650,
+        "long_two_row_terms": 8710,
+        "offdiag_dot_terms_admitted": 14820
+      },
+      "width_single_histogram": {
+        "12/False": 13,
+        "4/False": 13,
+        "10/False": 26,
+        "20/False": 13
+      }
+    },
+    {
+      "model": "bore3d",
+      "iterations": 16,
+      "status": "Optimal",
+      "totals": {
+        "calls": 442,
+        "all_dot_terms": 257567,
+        "offdiag_dot_terms": 232458,
+        "double_calls": 442,
+        "double_dot_terms": 257567,
+        "admitted_geometry_calls": 17,
+        "admitted_copy_elements": 31433,
+        "two_row_terms": 202300,
+        "long_two_row_terms": 184960,
+        "offdiag_dot_terms_admitted": 209797
+      },
+      "width_single_histogram": {
+        "9/False": 68,
+        "8/False": 17,
+        "10/False": 51,
+        "6/False": 51,
+        "7/False": 51,
+        "5/False": 51,
+        "11/False": 17,
+        "2/False": 85,
+        "3/False": 17,
+        "12/False": 17,
+        "43/False": 17
+      }
+    },
+    {
+      "model": "degen2",
+      "iterations": 12,
+      "status": "Optimal",
+      "totals": {
+        "calls": 637,
+        "all_dot_terms": 3677635,
+        "offdiag_dot_terms": 3577314,
+        "double_calls": 637,
+        "double_dot_terms": 3677635,
+        "admitted_geometry_calls": 13,
+        "admitted_copy_elements": 184093,
+        "two_row_terms": 3514394,
+        "long_two_row_terms": 3473470,
+        "offdiag_dot_terms_admitted": 3559647
+      },
+      "width_single_histogram": {
+        "8/False": 26,
+        "4/False": 156,
+        "5/False": 91,
+        "2/False": 65,
+        "11/False": 13,
+        "6/False": 91,
+        "7/False": 65,
+        "3/False": 65,
+        "12/False": 26,
+        "9/False": 13,
+        "10/False": 13,
+        "119/False": 13
+      }
+    },
+    {
+      "model": "degen3",
+      "iterations": 14,
+      "status": "Optimal",
+      "totals": {
+        "calls": 2130,
+        "all_dot_terms": 19892625,
+        "offdiag_dot_terms": 19481490,
+        "double_calls": 2130,
+        "double_dot_terms": 19892625,
+        "admitted_geometry_calls": 195,
+        "admitted_copy_elements": 773850,
+        "two_row_terms": 19229160,
+        "long_two_row_terms": 19031940,
+        "offdiag_dot_terms_admitted": 19418490
+      },
+      "width_single_histogram": {
+        "5/False": 285,
+        "4/False": 270,
+        "2/False": 300,
+        "3/False": 405,
+        "8/False": 135,
+        "11/False": 30,
+        "7/False": 180,
+        "10/False": 75,
+        "12/False": 15,
+        "6/False": 150,
+        "14/False": 30,
+        "9/False": 30,
+        "19/False": 30,
+        "21/False": 15,
+        "13/False": 15,
+        "28/False": 30,
+        "31/False": 15,
+        "86/False": 15,
+        "15/False": 15,
+        "23/False": 15,
+        "22/False": 15,
+        "40/False": 15,
+        "25/False": 15,
+        "192/False": 15,
+        "20/False": 15
+      }
+    }
+  ],
+  "prototype": {
+    "source": "target/perf-ldl-output/source/src/{chol.rs,ldl_output.rs}; frozen ldl_output_oracle.rs copied before edits. Main implemented; Astra high performed read-only source review.",
+    "numerical_design": "Whole dense LDL stage: scalar diagonal/pivot first, SSE2 pair lanes representing two independent off-diagonal outputs, exact original short chain/eight long chains/fold/tail, separate reciprocal multiply, then unchanged next-temp boundary. Incomplete pair remains scalar.",
+    "admission": "x86_64, w>=16, complete valid extents, all masked exceptions; initial mm/orig finiteness via integer bits. Single and unsupported inputs retain original.",
+    "fallback": "Snapshot entire used matrix before first write. Validate every raw dot, scaled output, pivot/reciprocal and next-temp value via integer bits. On decline restore original matrix and entry MXCSR, then run original full scalar stage. Snapshot, allocation, admission and per-output validation are included in solver timings.",
+    "assembly": "Eight packed accumulator registers; original reduction and separate mul/add. No FMA or packed-accumulator stack spills in principal long loop0x284ed0..0x284ffa. Row gathers and temp broadcasts remain. Full native function disassembly archived native.asm.",
+    "baseline_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "candidate_sha256": "124b6980d174c2dc7304fb30598379bff94d17448fb6d02ffb16297ee98ab158",
+    "accepted_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410"
+  },
+  "differential_tests": {
+    "initial_frozen_oracle": "1272 actual complete original fronts across AFIRO/SC50A/BLEND/ADLITTLE/BORE3D/DEGEN2 pass matrix,d,rcp,MXCSR before candidate edits; all6 complete enabled/disabled SolveResults equal.",
+    "candidate_generated_cases": 2944,
+    "generated_scope": "15 widths0..33 around short/long and pair/admission boundaries; all16 rounding/flush modes, clean/incoming sticky flags, regularized/rejected pivots, signed zero, subnormals, overflow/cancellation, two NaN payloads, signaling NaN, full random-bit matrices, late decline after previous columns; scalar single-precision fallback. Opaque independent function pointers prevent FP test CSE.",
+    "observed_generated_admitted_calls": 1267,
+    "observed_generated_pairs": 151708,
+    "observed_generated_declines": 301,
+    "candidate_captured_fronts": 1272,
+    "observed_live_admitted_calls": 60,
+    "observed_live_pairs": 56458,
+    "observed_live_declines": 0,
+    "candidate_integrated_degen3_fronts": 2130,
+    "degen3_scope": "14 iterations, Optimal; every complete original stage output/CSR equal and complete instrumented/disabled SolveResults equal.",
+    "fast_parity": "940/940; fast-parity.log",
+    "candidate_full_gates": "Not run after rejected pilot; no platform/unmasked-trap qualification or acceptance claimed."
+  },
+  "pilots": {
+    "small": {
+      "plan": {
+        "seed": 54101,
+        "mixed_pairs_per_model": 4,
+        "AA_pairs_per_model": 2,
+        "models": {
+          "degen2": 100
+        },
+        "CPU": 2,
+        "timeout_seconds": 20,
+        "rule": "Fixed small-model counter discriminator: stop mechanism if DEGEN2 median instructions do not fall at least1% or median cycles do not fall. Timings diagnostic only. No extension/retry. Escalate to bounded DEGEN3 only if positive; no formal qualification or speedup claim.",
+        "binary_sha256": {
+          "A": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+          "B": "124b6980d174c2dc7304fb30598379bff94d17448fb6d02ffb16297ee98ab158"
+        }
+      },
+      "summary": {
+        "degen2": {
+          "solve_percent": 0.5092381903450072,
+          "instruction_percent": -9.68978129367889,
+          "cycle_percent": -0.4831353226533608,
+          "AA_median_percent": -3.5480534854165913,
+          "orders": {
+            "AB": 1.7260198075598865,
+            "BA": -5.8722668248134
+          }
+        }
+      }
+    },
+    "large": {
+      "plan": {
+        "seed": 54109,
+        "mixed_pairs_per_model": 4,
+        "AA_pairs_per_model": 2,
+        "models": {
+          "degen3": 100
+        },
+        "CPU": 2,
+        "timeout_seconds": 20,
+        "rule": "Fixed bounded cost pilot only. Stop mechanism if DEGEN3 median solve gain<5%, instructions/cycles do not fall, both orders do not improve, or AA shift comparable. No extension/retry. Only a promising pilot permits formal fixed32AB+32AA screens54131/54197, independent qualification and full gates/sweep.",
+        "binary_sha256": {
+          "A": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+          "B": "124b6980d174c2dc7304fb30598379bff94d17448fb6d02ffb16297ee98ab158"
+        }
+      },
+      "summary": {
+        "degen3": {
+          "solve_percent": -2.2677295452359303,
+          "instruction_percent": -5.7559196254131635,
+          "cycle_percent": -2.5131925716354697,
+          "AA_median_percent": 9.070486433395564,
+          "orders": {
+            "AB": -2.2342310730715798,
+            "BA": -2.2677295452359303
+          }
+        }
+      }
+    },
+    "qualification": "Fixed4mixed+2AA pairs per model, CPU2, cap100, 20sec per run. All28 warm/measured complete result objects and exits match accepted outputs after removing diagnostics.seconds only; direct counters100%running. Small timing noisy; only predeclared instruction/cycle discriminator admitted DEGEN3. Neither pilot is a formal positive timing screen."
   }
 }

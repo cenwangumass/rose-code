@@ -1627,19 +1627,27 @@ and rho-eligible column-order Devex dots remain separate. Evidence:
 [paired-btran-scope.json](evidence/paired-btran-scope.json); original row sequences,
 probe, analysis and accepted gates are in `target/perf-btran-pair/`.
 
-Independent-output dense LDL batching is a conditional numerical lead. Cached
-healthy recordings of the identical accepted DEGEN2 CLI put 520/1,916 instruction
-samples (27.14%) and 152/1,709 cycle samples (8.89%) in the inlined long-double
-dot region, including its checks, fold and tail. Coverage is about 95.5%; these
-whole-batch self fractions are not solve-time/removable bounds. This region
-also includes diagonal dots, so eligible independent i>j coverage is unmeasured.
-Rows of one pivot column share temp and are independent after the original
-pivot/reciprocal; every original eight-chain reduction and final scale must
-remain. This differs from the rejected within-output LDL chunk trial. No
-candidate exists. Whole solve305 code generation exposes routing/materialization
-rather than a fresh numerical sharing boundary beyond the settled triangular
-plan. Evidence: [ldl-output-batch-scope.json](evidence/ldl-output-batch-scope.json),
-accepted assembly/IP attribution in `target/perf-ldl-scope/`.
+Complete independent-output dense LDL batching is rejected at its fixed cost
+pilot. Two-row geometry covers 95.56% of DEGEN2 and 96.66% of DEGEN3 dot terms.
+The isolated whole-stage SSE2 executor retains scalar diagonal pivots, each
+row's original eight chains/fold/tail, separate reciprocal scaling, and the next
+temp boundary. All-masked/finite admission, full matrix snapshot, per-result
+checks and matrix/MXCSR restoration before scalar replay are included in costs.
+The frozen complete stage passes 2,944 generated cases across all 16 rounding/
+flush modes, 1,272 captured small fronts, and 2,130 actual DEGEN3 fronts with
+full matrix/d/rcp/FP-status equality. Real admission/pair/replay counts are
+asserted. Fast parity passes 940/940; the isolated baseline is byte-identical
+to the accepted CLI. The fixed small counter discriminator admits DEGEN3 after
+DEGEN2 instructions fall 9.690%, cycles 0.483%; its solve timing is noisy.
+DEGEN3 cost pilot 54109 (four mixed/two AA pairs) measures instructions -5.756%,
+cycles -2.513%, solve -2.268%, below the declared 5% minimum; AA median +9.070%.
+All 28 pilot complete results/exits match accepted outputs. Stop without
+54131/54197, extension, width/snapshot tuning, full candidate gates or sweep.
+No runtime change accepted. Root source/CLI remain unchanged; full parity987
+and all292 runnable release tests pass. Whole solve305 routing/codegen remains
+unqualified beyond the settled triangular plan. Evidence:
+[ldl-output-batch-scope.json](evidence/ldl-output-batch-scope.json); complete
+prototype/oracle/input/tests/assembly/pilot artifacts in `target/perf-ldl-output/`.
 
 The exact Plan census counts 1,008 wide GEMM calls/factor on DEGEN3, 799 zero-C;
 fifteen factors describe 83.2 MB of logical cn buffers, 37.4% unused cells whose

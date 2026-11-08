@@ -412,14 +412,21 @@ measured.
   direct BTRAN rank/layout ownership or rho/Devex matrix-product fusion.
   A fresh substantial execution phase must be identified before another
   ordinary primal/dual implementation; aggregate hot-function shares alone
-  do not qualify one. Next measure actual dense LDL independent-output coverage
-  on small fronts: cached identical-CLI DEGEN2 assembly attributes 27.14% batch
-  instruction / 8.89% cycle samples to long double dots, including diagonal
-  outputs, checks and tails. Whole-column i>j batching is distinct from the
-  rejected within-output chunk trial. Preserve pivot/reciprocal and next-temp
-  boundaries; freeze/test the complete stage before editing. No solve305
-  routing/codegen composition follows from the settled triangular-plan scope.
-  See evidence/ldl-output-batch-scope.json.
+  do not qualify one. Complete independent-output LDL batching is settled:
+  the full scalar oracle passes generated/actual fronts and fast940, but fixed
+  DEGEN3 pilot54109 saves only 2.268% solve time against required5%, with noisy
+  AA. No54131/54197, extension or packet-width/snapshot tuning. Costs include
+  admission, matrix snapshot, validation and full matrix/FP-status replay.
+  This is distinct from the earlier within-output chunk trial; neither gives
+  a qualified runtime gain. No solve305 routing/codegen composition follows
+  from settled triangular-plan scope. See evidence/ldl-output-batch-scope.json.
+  No current cached GREENBEA ordinary-dual reference phase profile survives.
+  Reconstruct the supplied reference from ../reverse-engineer/targets/README.md
+  and its hash-checked archive/patches before a current matched comparison.
+  Preserve required library SHA26a50517... and use Gurobi Runtime, not process
+  wall time. The existing native harness needs Runtime recording and parameter
+  provenance; --native currently drops ref_run.py --param overrides. Start
+  with AFIRO, then small models, before GREENBEA or a full23-row comparison.
   The scalar prefilter and prior rank/layout trials remain
   rejected; do not infer further gains from isolated predicate costs.
   Comparator alignment stays centralized; normal lunum's build/cache transport
