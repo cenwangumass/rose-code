@@ -185,6 +185,29 @@ arithmetic and instrumentation. They are not removable bounds or current PGO
 measurements. No composed triangular/route/packing/buffer prototype follows.
 [solve305-owner-review.json](evidence/solve305-owner-review.json).
 
+The same qualified optimized ELF now has solve-only mode-switch attribution.
+After healthy DEGEN2 qualification, eight mode-switch instruction recordings,
+eight cycle recordings and eight direct counter solves preserve all complete
+outputs/exits. Period32M yields 856 instruction and 811 cycle samples, zero
+loss/throttle; all instruction symbols resolve, while seven high cycle IPs
+remain explicit unmapped. Represented instructions are 99.992% of an independent
+counter batch; represented cycles are 90.545%, so cycle shares are coarse and
+sensitive to cross-batch variability. No timing gain follows from these probes.
+
+TCMalloc and libc memory respectively occupy 20.56% and 18.57% of instruction
+self; these totals do not reveal removable lifetimes. The newly isolated
+`empty_tail` maximum fold has 41/856 instruction but only 12/811 cycle samples
+(4.79%/1.48%). A maintained slot bitmap is distinct from the earlier dependency
+walk maximum and rejected reverse-slot scan, but must transport membership
+through every slot rotation/swap, transient demotion and final replacement.
+That maintenance has no demonstrated substantial whole-lifetime benefit; no
+prototype/census follows. Do not infer a new arena, workspace or cache trial
+from the memory shares. Evidence:
+[optimized-mode-scope.json](evidence/optimized-mode-scope.json), raw profiles,
+per-process maps, full validation and excluded throttled small probe in
+`target/perf-optimized-scope/`. Numerical source and both qualified CLIs remain
+unchanged; next evidence must identify a distinct substantial execution cost.
+
 Earlier small dual probes and PEROLD ancestry remain separately labeled in
 their evidence. The unthrottled PEROLD frame-pointer batch (24 full solves,
 cap 1300, all optimal 1273/27 refactors) has 3736 samples, 99.57% direct coverage,

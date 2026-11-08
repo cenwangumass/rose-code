@@ -455,7 +455,14 @@ measured.
   evidence/solve305-owner-review.json. Do not compose settled triangular, route,
   packing or buffer studies into another owner. Next identify a genuinely
   distinct substantial numerical execution mechanism with construction-inclusive
-  evidence before implementation.
+  evidence before implementation. The optimized mode-switch solve-only profile
+  is now healthy:856instruction/811cycle samples, all24mode outputs/exits agree,
+  zero loss/throttle. Instruction coverage is99.992%; cycle coverage90.545% of
+  an independent counter batch limits precise cycle attribution. Empty-tail
+  selection has4.79%instruction but1.48%cycle self, insufficient evidence for
+  a maintained slot hierarchy after all rotation/membership costs. No prototype
+  or another owner trial follows. See evidence/optimized-mode-scope.json;
+  allocation/memory totals alone do not qualify another settled storage trial.
   The scalar prefilter and prior rank/layout trials remain
   rejected; do not infer further gains from isolated predicate costs.
   Comparator alignment stays centralized; normal lunum's build/cache transport

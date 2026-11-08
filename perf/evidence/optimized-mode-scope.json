@@ -1,0 +1,2069 @@
+{
+  "source": "18061fe9",
+  "binary_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+  "configuration": "Pinned Rust1.98.1 fixed39 PGO/system-TCMalloc2.18.1-1,CPU2; exact previously qualified build, no recompilation/source mutation",
+  "scope": "Existing clock_gettime hook brackets only solve, requires exactly2monotonic calls/process. Acknowledged perf enable/disable FIFO; process maps saved before enable. API/CLI read and JSON output excluded, internal setup retained. Hook boundary costs uncalibrated. Small DEGEN2 first, then largest mode-switch gap. Iteration12000/external20s per process.",
+  "qualification": {
+    "full_parity": "987/987 existing same-ELF qualification",
+    "release_tests": 292,
+    "complete_profile_results": {
+      "degen2-record16m": {
+        "complete_result_exit_pairs": 8,
+        "digests": [
+          "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674",
+          "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674",
+          "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674",
+          "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674",
+          "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674",
+          "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674",
+          "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674",
+          "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+        ]
+      },
+      "degen2-stat": {
+        "complete_result_exit_pairs": 2,
+        "digests": [
+          "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674",
+          "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+        ]
+      },
+      "mode-record": {
+        "complete_result_exit_pairs": 8,
+        "digests": [
+          "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2",
+          "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2",
+          "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2",
+          "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2",
+          "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2",
+          "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2",
+          "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2",
+          "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2"
+        ]
+      },
+      "mode-stat": {
+        "complete_result_exit_pairs": 8,
+        "digests": [
+          "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2",
+          "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2",
+          "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2",
+          "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2",
+          "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2",
+          "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2",
+          "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2",
+          "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2"
+        ]
+      },
+      "mode-cycles": {
+        "complete_result_exit_pairs": 8,
+        "digests": [
+          "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2",
+          "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2",
+          "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2",
+          "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2",
+          "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2",
+          "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2",
+          "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2",
+          "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2"
+        ]
+      }
+    },
+    "comparison_rule": "Canonical sorted JSON complete outputs and exit0 match existing full optimized panel, removing only diagnostics.seconds; signed zeros retained. All34qualified results match.",
+    "source_and_loader_proof": "perf/evidence/optimized-build-qualification.json"
+  },
+  "profiles": {
+    "degen2-record16m": {
+      "manifest": {
+        "model": "degen2",
+        "solver": "rose",
+        "kind": "record",
+        "repetitions": 8,
+        "period": 16000000,
+        "event": "instructions:u",
+        "LD_LIBRARY_PATH": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/sysroot/usr/lib/x86_64-linux-gnu",
+        "CPU": 2,
+        "bounds": "external20s/case;iteration12000;referenceTimeLimit10",
+        "commands": [
+          [
+            "timeout",
+            "20s",
+            "taskset",
+            "-c",
+            "2",
+            "env",
+            "-u",
+            "ROSE_DUMP",
+            "-u",
+            "ROSE_WORK",
+            "-u",
+            "PARAMS",
+            "-u",
+            "ROSE_LOG",
+            "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+            "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/ctl",
+            "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/ack",
+            "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/0.maps",
+            "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen2.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "12000",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/0.json"
+          ],
+          [
+            "timeout",
+            "20s",
+            "taskset",
+            "-c",
+            "2",
+            "env",
+            "-u",
+            "ROSE_DUMP",
+            "-u",
+            "ROSE_WORK",
+            "-u",
+            "PARAMS",
+            "-u",
+            "ROSE_LOG",
+            "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+            "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/ctl",
+            "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/ack",
+            "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/1.maps",
+            "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen2.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "12000",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/1.json"
+          ],
+          [
+            "timeout",
+            "20s",
+            "taskset",
+            "-c",
+            "2",
+            "env",
+            "-u",
+            "ROSE_DUMP",
+            "-u",
+            "ROSE_WORK",
+            "-u",
+            "PARAMS",
+            "-u",
+            "ROSE_LOG",
+            "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+            "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/ctl",
+            "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/ack",
+            "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/2.maps",
+            "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen2.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "12000",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/2.json"
+          ],
+          [
+            "timeout",
+            "20s",
+            "taskset",
+            "-c",
+            "2",
+            "env",
+            "-u",
+            "ROSE_DUMP",
+            "-u",
+            "ROSE_WORK",
+            "-u",
+            "PARAMS",
+            "-u",
+            "ROSE_LOG",
+            "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+            "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/ctl",
+            "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/ack",
+            "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/3.maps",
+            "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen2.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "12000",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/3.json"
+          ],
+          [
+            "timeout",
+            "20s",
+            "taskset",
+            "-c",
+            "2",
+            "env",
+            "-u",
+            "ROSE_DUMP",
+            "-u",
+            "ROSE_WORK",
+            "-u",
+            "PARAMS",
+            "-u",
+            "ROSE_LOG",
+            "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+            "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/ctl",
+            "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/ack",
+            "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/4.maps",
+            "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen2.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "12000",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/4.json"
+          ],
+          [
+            "timeout",
+            "20s",
+            "taskset",
+            "-c",
+            "2",
+            "env",
+            "-u",
+            "ROSE_DUMP",
+            "-u",
+            "ROSE_WORK",
+            "-u",
+            "PARAMS",
+            "-u",
+            "ROSE_LOG",
+            "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+            "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/ctl",
+            "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/ack",
+            "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/5.maps",
+            "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen2.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "12000",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/5.json"
+          ],
+          [
+            "timeout",
+            "20s",
+            "taskset",
+            "-c",
+            "2",
+            "env",
+            "-u",
+            "ROSE_DUMP",
+            "-u",
+            "ROSE_WORK",
+            "-u",
+            "PARAMS",
+            "-u",
+            "ROSE_LOG",
+            "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+            "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/ctl",
+            "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/ack",
+            "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/6.maps",
+            "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen2.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "12000",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/6.json"
+          ],
+          [
+            "timeout",
+            "20s",
+            "taskset",
+            "-c",
+            "2",
+            "env",
+            "-u",
+            "ROSE_DUMP",
+            "-u",
+            "ROSE_WORK",
+            "-u",
+            "PARAMS",
+            "-u",
+            "ROSE_LOG",
+            "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+            "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/ctl",
+            "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/ack",
+            "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/7.maps",
+            "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen2.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "12000",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/7.json"
+          ]
+        ],
+        "hashes": {
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-reference/reconstructed/libgurobi130.so": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so": "7b85b23e441a3bec22893332d2fda6ba692ed13cfd723fc3a4f677b495f15e03",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/native_scope": "567f45588f7e8a1fc3212630f7852f15d1214d4de4165c6c12c9057961e6c760",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.c": "d81eebbd3c86aee5f978ce1f8f01c29883d21f0e267d0a1df4a8eacfcbdd2bdd",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/control.h": "369addfb3aa0162cbf24e2c82b9e8aadc51441d16418321f8e28dd7f5b0ff701",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/native_scope.c": "859acf2e9f28243a369e81e7b940cb56cb70a5d66e3f0d85c9701b659d15630e"
+        },
+        "perf_command": [
+          "perf",
+          "record",
+          "-D",
+          "-1",
+          "--control",
+          "fifo:/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/ctl,/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/ack",
+          "-e",
+          "instructions:u",
+          "-c",
+          "16000000",
+          "-o",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/samples.data",
+          "--",
+          "taskset",
+          "-c",
+          "2",
+          "bash",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-record16m/batch.sh"
+        ],
+        "callgraph": null
+      },
+      "analysis": {
+        "tag": "degen2-record16m",
+        "model": "degen2",
+        "solver": "rose",
+        "samples": 88,
+        "audit": {
+          "PERF_RECORD_SAMPLE": 88,
+          "PERF_RECORD_LOST": 0,
+          "PERF_RECORD_THROTTLE": 0,
+          "PERF_RECORD_UNTHROTTLE": 0
+        },
+        "resolved_symbol_samples": 88,
+        "independent_perf_address_checks": 11,
+        "unmapped_samples": [],
+        "families": {
+          "FTRAN/L/U": {
+            "samples": 46,
+            "percent": 52.27272727272727
+          },
+          "dual control/update other": {
+            "samples": 16,
+            "percent": 18.181818181818183
+          },
+          "TCMalloc": {
+            "samples": 10,
+            "percent": 11.363636363636363
+          },
+          "factor ordered construction": {
+            "samples": 6,
+            "percent": 6.818181818181818
+          },
+          "FTRAN output preparation": {
+            "samples": 4,
+            "percent": 4.545454545454546
+          },
+          "Rust allocation/containers": {
+            "samples": 3,
+            "percent": 3.409090909090909
+          },
+          "libc other": {
+            "samples": 2,
+            "percent": 2.272727272727273
+          },
+          "libc memory": {
+            "samples": 1,
+            "percent": 1.1363636363636365
+          }
+        },
+        "top_symbols": [
+          {
+            "family": "FTRAN/L/U",
+            "symbol": "<rose::ftran_order::RefStruct>::lstage_num",
+            "samples": 23,
+            "percent": 26.136363636363637
+          },
+          {
+            "family": "FTRAN/L/U",
+            "symbol": "<rose::ftran_order::RefStruct>::ftran_with",
+            "samples": 15,
+            "percent": 17.045454545454547
+          },
+          {
+            "family": "FTRAN/L/U",
+            "symbol": "<rose::ftran_order::RefStruct>::ftran_needed",
+            "samples": 8,
+            "percent": 9.090909090909092
+          },
+          {
+            "family": "dual control/update other",
+            "symbol": "<rose::dual::Dual>::post_inner",
+            "samples": 8,
+            "percent": 9.090909090909092
+          },
+          {
+            "family": "dual control/update other",
+            "symbol": "<rose::dual::Dual>::iteration",
+            "samples": 8,
+            "percent": 9.090909090909092
+          },
+          {
+            "family": "FTRAN output preparation",
+            "symbol": "<rose::ftran_order::RefStruct>::dense_spike",
+            "samples": 4,
+            "percent": 4.545454545454546
+          },
+          {
+            "family": "TCMalloc",
+            "symbol": "__libc_malloc | malloc | tc_malloc",
+            "samples": 4,
+            "percent": 4.545454545454546
+          },
+          {
+            "family": "TCMalloc",
+            "symbol": "operator delete[](void*) | operator delete(void*) | __libc_cfree | __libc_free | cfree | free | tc_cfree | tc_delete | tc_deletearray | tc_free",
+            "samples": 3,
+            "percent": 3.409090909090909
+          },
+          {
+            "family": "factor ordered construction",
+            "symbol": "rose::lu_order::factor_structure_r::<f64>",
+            "samples": 3,
+            "percent": 3.409090909090909
+          },
+          {
+            "family": "factor ordered construction",
+            "symbol": "rose::lu_order::nucleus::<f64>",
+            "samples": 3,
+            "percent": 3.409090909090909
+          },
+          {
+            "family": "Rust allocation/containers",
+            "symbol": "<hashbrown::map::HashMap<usize, alloc::vec::Vec<usize>, std::hash::random::RandomState> as core::clone::Clone>::clone",
+            "samples": 2,
+            "percent": 2.272727272727273
+          },
+          {
+            "family": "TCMalloc",
+            "symbol": "__libc_realloc | realloc | tc_realloc",
+            "samples": 2,
+            "percent": 2.272727272727273
+          },
+          {
+            "family": "libc memory",
+            "symbol": "__memcpy_avx_unaligned_erms | __memmove_avx_unaligned_erms",
+            "samples": 1,
+            "percent": 1.1363636363636365
+          },
+          {
+            "family": "libc other",
+            "symbol": "__GI_getenv | getenv | getenv@@GLIBC_2.2.5",
+            "samples": 1,
+            "percent": 1.1363636363636365
+          },
+          {
+            "family": "Rust allocation/containers",
+            "symbol": "core::ptr::drop_glue::<[alloc::vec::Vec<usize>]>",
+            "samples": 1,
+            "percent": 1.1363636363636365
+          },
+          {
+            "family": "libc other",
+            "symbol": "__strlen_avx2",
+            "samples": 1,
+            "percent": 1.1363636363636365
+          },
+          {
+            "family": "TCMalloc",
+            "symbol": "nallocx | tc_nallocx",
+            "samples": 1,
+            "percent": 1.1363636363636365
+          }
+        ],
+        "images": {
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc": {
+            "sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+            "debug": null
+          },
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/sysroot/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4.6.5": {
+            "sha256": "3e3c459710a7ce1511a3b289b95d52b56d8313afdb99eec23d2fc241c73e27e1",
+            "debug": null
+          },
+          "/usr/lib/x86_64-linux-gnu/libc.so.6": {
+            "sha256": "85e64f97e348786a8fb4d9f3d52fec289e2fb86bba20f0731dfe61990525e0f7",
+            "debug": "/usr/lib/debug/.build-id/06/6527e430a32768d82741e00b81eebb1a872294.debug"
+          }
+        },
+        "reference_anchor_ranges": [],
+        "event": "instructions:u",
+        "sampled_events": 1408000000
+      },
+      "direct_count_comparison": {
+        "stat_batch": "degen2-stat",
+        "stat_repetitions": 2,
+        "stat_counts": {
+          "instructions:u": 362387617,
+          "cycles:u": 273090513
+        },
+        "scaled_same_repetitions": 1449550468.0,
+        "represented_fraction": 0.9713356182366463,
+        "limitation": "Independent batches; cycle-rate/cache/run variation and short-process sampling tails affect coverage. Not simultaneous exact regional costs."
+      }
+    },
+    "mode-record": {
+      "manifest": {
+        "model": "mode_switch",
+        "solver": "rose",
+        "kind": "record",
+        "repetitions": 8,
+        "period": 32000000,
+        "event": "instructions:u",
+        "LD_LIBRARY_PATH": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/sysroot/usr/lib/x86_64-linux-gnu",
+        "CPU": 2,
+        "bounds": "external20s/case;iteration12000;referenceTimeLimit10",
+        "commands": [
+          [
+            "timeout",
+            "20s",
+            "taskset",
+            "-c",
+            "2",
+            "env",
+            "-u",
+            "ROSE_DUMP",
+            "-u",
+            "ROSE_WORK",
+            "-u",
+            "PARAMS",
+            "-u",
+            "ROSE_LOG",
+            "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+            "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/ctl",
+            "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/ack",
+            "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/0.maps",
+            "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/witness_dual_r2_mode_switch.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "12000",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/0.json"
+          ],
+          [
+            "timeout",
+            "20s",
+            "taskset",
+            "-c",
+            "2",
+            "env",
+            "-u",
+            "ROSE_DUMP",
+            "-u",
+            "ROSE_WORK",
+            "-u",
+            "PARAMS",
+            "-u",
+            "ROSE_LOG",
+            "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+            "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/ctl",
+            "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/ack",
+            "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/1.maps",
+            "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/witness_dual_r2_mode_switch.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "12000",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/1.json"
+          ],
+          [
+            "timeout",
+            "20s",
+            "taskset",
+            "-c",
+            "2",
+            "env",
+            "-u",
+            "ROSE_DUMP",
+            "-u",
+            "ROSE_WORK",
+            "-u",
+            "PARAMS",
+            "-u",
+            "ROSE_LOG",
+            "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+            "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/ctl",
+            "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/ack",
+            "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/2.maps",
+            "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/witness_dual_r2_mode_switch.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "12000",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/2.json"
+          ],
+          [
+            "timeout",
+            "20s",
+            "taskset",
+            "-c",
+            "2",
+            "env",
+            "-u",
+            "ROSE_DUMP",
+            "-u",
+            "ROSE_WORK",
+            "-u",
+            "PARAMS",
+            "-u",
+            "ROSE_LOG",
+            "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+            "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/ctl",
+            "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/ack",
+            "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/3.maps",
+            "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/witness_dual_r2_mode_switch.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "12000",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/3.json"
+          ],
+          [
+            "timeout",
+            "20s",
+            "taskset",
+            "-c",
+            "2",
+            "env",
+            "-u",
+            "ROSE_DUMP",
+            "-u",
+            "ROSE_WORK",
+            "-u",
+            "PARAMS",
+            "-u",
+            "ROSE_LOG",
+            "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+            "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/ctl",
+            "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/ack",
+            "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/4.maps",
+            "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/witness_dual_r2_mode_switch.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "12000",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/4.json"
+          ],
+          [
+            "timeout",
+            "20s",
+            "taskset",
+            "-c",
+            "2",
+            "env",
+            "-u",
+            "ROSE_DUMP",
+            "-u",
+            "ROSE_WORK",
+            "-u",
+            "PARAMS",
+            "-u",
+            "ROSE_LOG",
+            "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+            "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/ctl",
+            "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/ack",
+            "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/5.maps",
+            "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/witness_dual_r2_mode_switch.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "12000",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/5.json"
+          ],
+          [
+            "timeout",
+            "20s",
+            "taskset",
+            "-c",
+            "2",
+            "env",
+            "-u",
+            "ROSE_DUMP",
+            "-u",
+            "ROSE_WORK",
+            "-u",
+            "PARAMS",
+            "-u",
+            "ROSE_LOG",
+            "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+            "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/ctl",
+            "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/ack",
+            "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/6.maps",
+            "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/witness_dual_r2_mode_switch.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "12000",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/6.json"
+          ],
+          [
+            "timeout",
+            "20s",
+            "taskset",
+            "-c",
+            "2",
+            "env",
+            "-u",
+            "ROSE_DUMP",
+            "-u",
+            "ROSE_WORK",
+            "-u",
+            "PARAMS",
+            "-u",
+            "ROSE_LOG",
+            "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+            "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/ctl",
+            "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/ack",
+            "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/7.maps",
+            "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/witness_dual_r2_mode_switch.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "12000",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/7.json"
+          ]
+        ],
+        "hashes": {
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-reference/reconstructed/libgurobi130.so": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so": "7b85b23e441a3bec22893332d2fda6ba692ed13cfd723fc3a4f677b495f15e03",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/native_scope": "567f45588f7e8a1fc3212630f7852f15d1214d4de4165c6c12c9057961e6c760",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.c": "d81eebbd3c86aee5f978ce1f8f01c29883d21f0e267d0a1df4a8eacfcbdd2bdd",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/control.h": "369addfb3aa0162cbf24e2c82b9e8aadc51441d16418321f8e28dd7f5b0ff701",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/native_scope.c": "859acf2e9f28243a369e81e7b940cb56cb70a5d66e3f0d85c9701b659d15630e"
+        },
+        "perf_command": [
+          "perf",
+          "record",
+          "-D",
+          "-1",
+          "--control",
+          "fifo:/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/ctl,/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/ack",
+          "-e",
+          "instructions:u",
+          "-c",
+          "32000000",
+          "-o",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/samples.data",
+          "--",
+          "taskset",
+          "-c",
+          "2",
+          "bash",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-record/batch.sh"
+        ],
+        "callgraph": null
+      },
+      "analysis": {
+        "tag": "mode-record",
+        "model": "mode_switch",
+        "solver": "rose",
+        "samples": 856,
+        "audit": {
+          "PERF_RECORD_SAMPLE": 856,
+          "PERF_RECORD_LOST": 0,
+          "PERF_RECORD_THROTTLE": 0,
+          "PERF_RECORD_UNTHROTTLE": 0
+        },
+        "resolved_symbol_samples": 856,
+        "independent_perf_address_checks": 107,
+        "unmapped_samples": [],
+        "families": {
+          "TCMalloc": {
+            "samples": 176,
+            "percent": 20.560747663551403
+          },
+          "libc memory": {
+            "samples": 159,
+            "percent": 18.574766355140188
+          },
+          "factor ordered construction": {
+            "samples": 92,
+            "percent": 10.74766355140187
+          },
+          "FTRAN/L/U": {
+            "samples": 87,
+            "percent": 10.163551401869158
+          },
+          "dual control/update other": {
+            "samples": 84,
+            "percent": 9.813084112149532
+          },
+          "factor update/install": {
+            "samples": 81,
+            "percent": 9.462616822429906
+          },
+          "factor publication/retirement": {
+            "samples": 42,
+            "percent": 4.906542056074766
+          },
+          "BTRAN": {
+            "samples": 41,
+            "percent": 4.789719626168225
+          },
+          "auxiliary LU (all operations)": {
+            "samples": 32,
+            "percent": 3.7383177570093458
+          },
+          "Rose other": {
+            "samples": 22,
+            "percent": 2.5700934579439254
+          },
+          "factor driver self": {
+            "samples": 9,
+            "percent": 1.0514018691588785
+          },
+          "libc other": {
+            "samples": 9,
+            "percent": 1.0514018691588785
+          },
+          "libm": {
+            "samples": 7,
+            "percent": 0.8177570093457944
+          },
+          "Rust allocation/containers": {
+            "samples": 4,
+            "percent": 0.4672897196261682
+          },
+          "Rose ambiguous/unresolved": {
+            "samples": 4,
+            "percent": 0.4672897196261682
+          },
+          "Rust core generic": {
+            "samples": 4,
+            "percent": 0.4672897196261682
+          },
+          "Rose runtime/generic other": {
+            "samples": 2,
+            "percent": 0.2336448598130841
+          },
+          "factor other": {
+            "samples": 1,
+            "percent": 0.11682242990654206
+          }
+        },
+        "top_symbols": [
+          {
+            "family": "libc memory",
+            "symbol": "__memset_avx2_unaligned_erms",
+            "samples": 115,
+            "percent": 13.434579439252337
+          },
+          {
+            "family": "FTRAN/L/U",
+            "symbol": "<rose::ftran_order::RefStruct>::ftran_needed",
+            "samples": 62,
+            "percent": 7.242990654205608
+          },
+          {
+            "family": "TCMalloc",
+            "symbol": "__libc_malloc | malloc | tc_malloc",
+            "samples": 57,
+            "percent": 6.658878504672897
+          },
+          {
+            "family": "factor ordered construction",
+            "symbol": "rose::lu_order::nucleus::<f64>",
+            "samples": 55,
+            "percent": 6.425233644859813
+          },
+          {
+            "family": "factor publication/retirement",
+            "symbol": "<rose::ftran_order::RefStruct>::fresh",
+            "samples": 42,
+            "percent": 4.906542056074766
+          },
+          {
+            "family": "TCMalloc",
+            "symbol": "operator delete[](void*) | operator delete(void*) | __libc_cfree | __libc_free | cfree | free | tc_cfree | tc_delete | tc_deletearray | tc_free",
+            "samples": 41,
+            "percent": 4.789719626168225
+          },
+          {
+            "family": "BTRAN",
+            "symbol": "<rose::ftran_order::RefStruct>::btran",
+            "samples": 41,
+            "percent": 4.789719626168225
+          },
+          {
+            "family": "factor update/install",
+            "symbol": "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct<rose::f80::F80>>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}> | <core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>",
+            "samples": 41,
+            "percent": 4.789719626168225
+          },
+          {
+            "family": "factor update/install",
+            "symbol": "<rose::ftran_order::RefStruct>::update",
+            "samples": 36,
+            "percent": 4.205607476635514
+          },
+          {
+            "family": "dual control/update other",
+            "symbol": "<rose::dual::Dual>::iteration",
+            "samples": 27,
+            "percent": 3.1542056074766354
+          },
+          {
+            "family": "libc memory",
+            "symbol": "__memcpy_avx_unaligned_erms | __memmove_avx_unaligned_erms",
+            "samples": 26,
+            "percent": 3.0373831775700935
+          },
+          {
+            "family": "TCMalloc",
+            "symbol": "tcmalloc::CentralFreeList::ReleaseToSpans(void*)",
+            "samples": 23,
+            "percent": 2.6869158878504673
+          },
+          {
+            "family": "FTRAN/L/U",
+            "symbol": "<rose::ftran_order::RefStruct>::ftran_with",
+            "samples": 23,
+            "percent": 2.6869158878504673
+          },
+          {
+            "family": "factor ordered construction",
+            "symbol": "rose::lu_order::factor_structure_r::<f64>",
+            "samples": 20,
+            "percent": 2.336448598130841
+          },
+          {
+            "family": "auxiliary LU (all operations)",
+            "symbol": "<rose::lu::Factor>::factor::<&alloc::vec::Vec<(usize, f64)>>",
+            "samples": 18,
+            "percent": 2.102803738317757
+          },
+          {
+            "family": "libc memory",
+            "symbol": "__memcpy_avx_unaligned | __memmove_avx_unaligned",
+            "samples": 18,
+            "percent": 2.102803738317757
+          },
+          {
+            "family": "dual control/update other",
+            "symbol": "<rose::dual::Dual>::reset_pricing",
+            "samples": 16,
+            "percent": 1.8691588785046729
+          },
+          {
+            "family": "TCMalloc",
+            "symbol": "tcmalloc::ThreadCache::ReleaseToCentralCache(tcmalloc::ThreadCache::FreeList*, unsigned int, int)",
+            "samples": 14,
+            "percent": 1.6355140186915889
+          },
+          {
+            "family": "Rose other",
+            "symbol": "rose::lu_pairs::run::<f64>",
+            "samples": 13,
+            "percent": 1.5186915887850467
+          },
+          {
+            "family": "factor driver self",
+            "symbol": "<rose::dual::Dual>::refactor",
+            "samples": 9,
+            "percent": 1.0514018691588785
+          },
+          {
+            "family": "TCMalloc",
+            "symbol": "tcmalloc::CentralFreeList::Populate()",
+            "samples": 9,
+            "percent": 1.0514018691588785
+          },
+          {
+            "family": "dual control/update other",
+            "symbol": "rose::dual::solve_pass_callback::<f64>",
+            "samples": 8,
+            "percent": 0.9345794392523364
+          },
+          {
+            "family": "factor ordered construction",
+            "symbol": "<rose::lu_order::Structure>::work",
+            "samples": 8,
+            "percent": 0.9345794392523364
+          },
+          {
+            "family": "TCMalloc",
+            "symbol": "__libc_realloc | realloc | tc_realloc",
+            "samples": 8,
+            "percent": 0.9345794392523364
+          },
+          {
+            "family": "dual control/update other",
+            "symbol": "<rose::dual::Dual>::recompute_xb",
+            "samples": 8,
+            "percent": 0.9345794392523364
+          },
+          {
+            "family": "libc other",
+            "symbol": "__GI_getenv | getenv | getenv@@GLIBC_2.2.5",
+            "samples": 8,
+            "percent": 0.9345794392523364
+          },
+          {
+            "family": "factor ordered construction",
+            "symbol": "<alloc::vec::Vec<usize> as alloc::vec::spec_from_iter::SpecFromIter<usize, core::iter::adapters::filter::Filter<core::ops::range::Range<usize>, rose::lu_order::phases<f64>::{closure#3}>>>::from_iter",
+            "samples": 8,
+            "percent": 0.9345794392523364
+          },
+          {
+            "family": "TCMalloc",
+            "symbol": "tcmalloc::CentralFreeList::FetchFromOneSpans(int, void**, void**)",
+            "samples": 7,
+            "percent": 0.8177570093457944
+          },
+          {
+            "family": "libm",
+            "symbol": "__log2_fma",
+            "samples": 6,
+            "percent": 0.7009345794392523
+          },
+          {
+            "family": "auxiliary LU (all operations)",
+            "symbol": "<rose::lu::Factor>::factor::<alloc::vec::Vec<(usize, f64)>>",
+            "samples": 6,
+            "percent": 0.7009345794392523
+          },
+          {
+            "family": "TCMalloc",
+            "symbol": "tcmalloc::PageHeap::SearchFreeAndLargeLists(unsigned long)",
+            "samples": 5,
+            "percent": 0.5841121495327103
+          },
+          {
+            "family": "TCMalloc",
+            "symbol": "tcmalloc::CentralFreeList::ReleaseListToSpans(void*)",
+            "samples": 5,
+            "percent": 0.5841121495327103
+          },
+          {
+            "family": "dual control/update other",
+            "symbol": "<core::iter::adapters::map::Map<core::ops::range::Range<usize>, <rose::dual::Dual>::reset_pricing::{closure#0}> as core::iter::traits::iterator::Iterator>::fold::<(), core::iter::traits::iterator::Iterator::for_each::call<alloc::vec::Vec<usize>, <alloc::vec::Vec<alloc::vec::Vec<usize>>>::extend_trusted<core::iter::adapters::map::Map<core::ops::range::Range<usize>, <rose::dual::Dual>::reset_pricing::{closure#0}>>::{closure#0}>::{closure#0}>",
+            "samples": 5,
+            "percent": 0.5841121495327103
+          },
+          {
+            "family": "auxiliary LU (all operations)",
+            "symbol": "core::slice::sort::stable::quicksort::quicksort::<usize, <[usize]>::sort_by_key<(usize, usize), <rose::lu::Factor>::factor<&alloc::vec::Vec<(usize, f64)>>::{closure#1}>::{closure#0}>",
+            "samples": 5,
+            "percent": 0.5841121495327103
+          },
+          {
+            "family": "Rose ambiguous/unresolved",
+            "symbol": "<alloc::raw_vec::RawVec<core::cmp::Reverse<(usize, usize)>>>::grow_one | <alloc::raw_vec::RawVec<rose::f80::F80>>::grow_one | <alloc::raw_vec::RawVec<(usize, f64)>>::grow_one | <alloc::raw_vec::RawVec<(usize, usize)>>::grow_one | <alloc::raw_vec::RawVec<(u32, f64)>>::grow_one",
+            "samples": 4,
+            "percent": 0.4672897196261682
+          }
+        ],
+        "images": {
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc": {
+            "sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+            "debug": null
+          },
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/sysroot/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4.6.5": {
+            "sha256": "3e3c459710a7ce1511a3b289b95d52b56d8313afdb99eec23d2fc241c73e27e1",
+            "debug": null
+          },
+          "/usr/lib/x86_64-linux-gnu/libc.so.6": {
+            "sha256": "85e64f97e348786a8fb4d9f3d52fec289e2fb86bba20f0731dfe61990525e0f7",
+            "debug": "/usr/lib/debug/.build-id/06/6527e430a32768d82741e00b81eebb1a872294.debug"
+          },
+          "/usr/lib/x86_64-linux-gnu/libm.so.6": {
+            "sha256": "1c488db6f4fe8cecb72456bc018de000b7a9b539c2994864b0416b5e8371b3d8",
+            "debug": "/usr/lib/debug/.build-id/20/00a7e6c07f2ef41f3d22f773393360523edc21.debug"
+          }
+        },
+        "reference_anchor_ranges": [],
+        "event": "instructions:u",
+        "sampled_events": 27392000000
+      },
+      "direct_count_comparison": {
+        "stat_batch": "mode-stat",
+        "stat_repetitions": 8,
+        "stat_counts": {
+          "instructions:u": 27394135523,
+          "cycles:u": 28662005245
+        },
+        "scaled_same_repetitions": 27394135523.0,
+        "represented_fraction": 0.9999220445194116,
+        "limitation": "Independent batches; cycle-rate/cache/run variation and short-process sampling tails affect coverage. Not simultaneous exact regional costs."
+      }
+    },
+    "mode-cycles": {
+      "manifest": {
+        "model": "mode_switch",
+        "solver": "rose",
+        "kind": "record",
+        "repetitions": 8,
+        "period": 32000000,
+        "event": "cycles:u",
+        "LD_LIBRARY_PATH": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/sysroot/usr/lib/x86_64-linux-gnu",
+        "CPU": 2,
+        "bounds": "external20s/case;iteration12000;referenceTimeLimit10",
+        "commands": [
+          [
+            "timeout",
+            "20s",
+            "taskset",
+            "-c",
+            "2",
+            "env",
+            "-u",
+            "ROSE_DUMP",
+            "-u",
+            "ROSE_WORK",
+            "-u",
+            "PARAMS",
+            "-u",
+            "ROSE_LOG",
+            "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+            "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/ctl",
+            "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/ack",
+            "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/0.maps",
+            "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/witness_dual_r2_mode_switch.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "12000",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/0.json"
+          ],
+          [
+            "timeout",
+            "20s",
+            "taskset",
+            "-c",
+            "2",
+            "env",
+            "-u",
+            "ROSE_DUMP",
+            "-u",
+            "ROSE_WORK",
+            "-u",
+            "PARAMS",
+            "-u",
+            "ROSE_LOG",
+            "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+            "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/ctl",
+            "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/ack",
+            "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/1.maps",
+            "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/witness_dual_r2_mode_switch.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "12000",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/1.json"
+          ],
+          [
+            "timeout",
+            "20s",
+            "taskset",
+            "-c",
+            "2",
+            "env",
+            "-u",
+            "ROSE_DUMP",
+            "-u",
+            "ROSE_WORK",
+            "-u",
+            "PARAMS",
+            "-u",
+            "ROSE_LOG",
+            "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+            "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/ctl",
+            "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/ack",
+            "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/2.maps",
+            "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/witness_dual_r2_mode_switch.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "12000",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/2.json"
+          ],
+          [
+            "timeout",
+            "20s",
+            "taskset",
+            "-c",
+            "2",
+            "env",
+            "-u",
+            "ROSE_DUMP",
+            "-u",
+            "ROSE_WORK",
+            "-u",
+            "PARAMS",
+            "-u",
+            "ROSE_LOG",
+            "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+            "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/ctl",
+            "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/ack",
+            "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/3.maps",
+            "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/witness_dual_r2_mode_switch.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "12000",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/3.json"
+          ],
+          [
+            "timeout",
+            "20s",
+            "taskset",
+            "-c",
+            "2",
+            "env",
+            "-u",
+            "ROSE_DUMP",
+            "-u",
+            "ROSE_WORK",
+            "-u",
+            "PARAMS",
+            "-u",
+            "ROSE_LOG",
+            "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+            "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/ctl",
+            "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/ack",
+            "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/4.maps",
+            "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/witness_dual_r2_mode_switch.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "12000",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/4.json"
+          ],
+          [
+            "timeout",
+            "20s",
+            "taskset",
+            "-c",
+            "2",
+            "env",
+            "-u",
+            "ROSE_DUMP",
+            "-u",
+            "ROSE_WORK",
+            "-u",
+            "PARAMS",
+            "-u",
+            "ROSE_LOG",
+            "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+            "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/ctl",
+            "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/ack",
+            "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/5.maps",
+            "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/witness_dual_r2_mode_switch.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "12000",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/5.json"
+          ],
+          [
+            "timeout",
+            "20s",
+            "taskset",
+            "-c",
+            "2",
+            "env",
+            "-u",
+            "ROSE_DUMP",
+            "-u",
+            "ROSE_WORK",
+            "-u",
+            "PARAMS",
+            "-u",
+            "ROSE_LOG",
+            "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+            "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/ctl",
+            "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/ack",
+            "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/6.maps",
+            "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/witness_dual_r2_mode_switch.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "12000",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/6.json"
+          ],
+          [
+            "timeout",
+            "20s",
+            "taskset",
+            "-c",
+            "2",
+            "env",
+            "-u",
+            "ROSE_DUMP",
+            "-u",
+            "ROSE_WORK",
+            "-u",
+            "PARAMS",
+            "-u",
+            "ROSE_LOG",
+            "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+            "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/ctl",
+            "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/ack",
+            "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/7.maps",
+            "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/witness_dual_r2_mode_switch.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "12000",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/7.json"
+          ]
+        ],
+        "hashes": {
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-reference/reconstructed/libgurobi130.so": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so": "7b85b23e441a3bec22893332d2fda6ba692ed13cfd723fc3a4f677b495f15e03",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/native_scope": "567f45588f7e8a1fc3212630f7852f15d1214d4de4165c6c12c9057961e6c760",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.c": "d81eebbd3c86aee5f978ce1f8f01c29883d21f0e267d0a1df4a8eacfcbdd2bdd",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/control.h": "369addfb3aa0162cbf24e2c82b9e8aadc51441d16418321f8e28dd7f5b0ff701",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/native_scope.c": "859acf2e9f28243a369e81e7b940cb56cb70a5d66e3f0d85c9701b659d15630e"
+        },
+        "perf_command": [
+          "perf",
+          "record",
+          "-D",
+          "-1",
+          "--control",
+          "fifo:/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/ctl,/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/ack",
+          "-e",
+          "cycles:u",
+          "-c",
+          "32000000",
+          "-o",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/samples.data",
+          "--",
+          "taskset",
+          "-c",
+          "2",
+          "bash",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/mode-cycles/batch.sh"
+        ],
+        "callgraph": null
+      },
+      "analysis": {
+        "tag": "mode-cycles",
+        "model": "mode_switch",
+        "solver": "rose",
+        "samples": 811,
+        "audit": {
+          "PERF_RECORD_SAMPLE": 811,
+          "PERF_RECORD_LOST": 0,
+          "PERF_RECORD_THROTTLE": 0,
+          "PERF_RECORD_UNTHROTTLE": 0
+        },
+        "resolved_symbol_samples": 804,
+        "independent_perf_address_checks": 109,
+        "unmapped_samples": [
+          " 139776  ffffffff8f03b7dc [unknown] ([unknown])",
+          " 139776  ffffffff8f02e90e [unknown] ([unknown])",
+          " 139776  ffffffff8ff24a3e [unknown] ([unknown])",
+          " 139779  ffffffff8f036be1 [unknown] ([unknown])",
+          " 139795  ffffffff8e801627 [unknown] ([unknown])",
+          " 139797  ffffffff8f036be1 [unknown] ([unknown])"
+        ],
+        "families": {
+          "TCMalloc": {
+            "samples": 163,
+            "percent": 20.098643649815042
+          },
+          "libc memory": {
+            "samples": 125,
+            "percent": 15.413070283600494
+          },
+          "dual control/update other": {
+            "samples": 109,
+            "percent": 13.44019728729963
+          },
+          "FTRAN/L/U": {
+            "samples": 100,
+            "percent": 12.330456226880395
+          },
+          "factor ordered construction": {
+            "samples": 84,
+            "percent": 10.35758323057953
+          },
+          "BTRAN": {
+            "samples": 61,
+            "percent": 7.52157829839704
+          },
+          "auxiliary LU (all operations)": {
+            "samples": 41,
+            "percent": 5.055487053020962
+          },
+          "factor publication/retirement": {
+            "samples": 38,
+            "percent": 4.68557336621455
+          },
+          "factor update/install": {
+            "samples": 29,
+            "percent": 3.5758323057953145
+          },
+          "Rust allocation/containers": {
+            "samples": 16,
+            "percent": 1.972872996300863
+          },
+          "factor other": {
+            "samples": 9,
+            "percent": 1.1097410604192355
+          },
+          "Rose other": {
+            "samples": 9,
+            "percent": 1.1097410604192355
+          },
+          "external/unknown": {
+            "samples": 6,
+            "percent": 0.7398273736128237
+          },
+          "libc other": {
+            "samples": 5,
+            "percent": 0.6165228113440198
+          },
+          "simplex shared other": {
+            "samples": 5,
+            "percent": 0.6165228113440198
+          },
+          "Rose runtime/generic other": {
+            "samples": 4,
+            "percent": 0.4932182490752158
+          },
+          "factor driver self": {
+            "samples": 2,
+            "percent": 0.2466091245376079
+          },
+          "Rust core generic": {
+            "samples": 2,
+            "percent": 0.2466091245376079
+          },
+          "libm": {
+            "samples": 2,
+            "percent": 0.2466091245376079
+          },
+          "FTRAN output preparation": {
+            "samples": 1,
+            "percent": 0.12330456226880394
+          }
+        },
+        "top_symbols": [
+          {
+            "family": "libc memory",
+            "symbol": "__memset_avx2_unaligned_erms",
+            "samples": 95,
+            "percent": 11.713933415536374
+          },
+          {
+            "family": "factor ordered construction",
+            "symbol": "rose::lu_order::nucleus::<f64>",
+            "samples": 61,
+            "percent": 7.52157829839704
+          },
+          {
+            "family": "BTRAN",
+            "symbol": "<rose::ftran_order::RefStruct>::btran",
+            "samples": 54,
+            "percent": 6.658446362515413
+          },
+          {
+            "family": "TCMalloc",
+            "symbol": "operator delete[](void*) | operator delete(void*) | __libc_cfree | __libc_free | cfree | free | tc_cfree | tc_delete | tc_deletearray | tc_free",
+            "samples": 46,
+            "percent": 5.6720098643649814
+          },
+          {
+            "family": "TCMalloc",
+            "symbol": "__libc_malloc | malloc | tc_malloc",
+            "samples": 41,
+            "percent": 5.055487053020962
+          },
+          {
+            "family": "FTRAN/L/U",
+            "symbol": "<rose::ftran_order::RefStruct>::ftran_with",
+            "samples": 40,
+            "percent": 4.932182490752158
+          },
+          {
+            "family": "factor publication/retirement",
+            "symbol": "<rose::ftran_order::RefStruct>::fresh",
+            "samples": 34,
+            "percent": 4.192355117139334
+          },
+          {
+            "family": "dual control/update other",
+            "symbol": "<rose::dual::Dual>::iteration",
+            "samples": 33,
+            "percent": 4.06905055487053
+          },
+          {
+            "family": "TCMalloc",
+            "symbol": "tcmalloc::CentralFreeList::FetchFromOneSpans(int, void**, void**)",
+            "samples": 29,
+            "percent": 3.5758323057953145
+          },
+          {
+            "family": "FTRAN/L/U",
+            "symbol": "<rose::ftran_order::RefStruct>::lstage_num",
+            "samples": 28,
+            "percent": 3.4525277435265105
+          },
+          {
+            "family": "FTRAN/L/U",
+            "symbol": "<rose::ftran_order::RefStruct>::ftran_needed",
+            "samples": 25,
+            "percent": 3.082614056720099
+          },
+          {
+            "family": "libc memory",
+            "symbol": "__memcpy_avx_unaligned_erms | __memmove_avx_unaligned_erms",
+            "samples": 22,
+            "percent": 2.7127003699136867
+          },
+          {
+            "family": "auxiliary LU (all operations)",
+            "symbol": "<rose::lu::Factor>::factor::<&alloc::vec::Vec<(usize, f64)>>",
+            "samples": 21,
+            "percent": 2.5893958076448826
+          },
+          {
+            "family": "factor update/install",
+            "symbol": "<rose::ftran_order::RefStruct>::update",
+            "samples": 17,
+            "percent": 2.096177558569667
+          },
+          {
+            "family": "TCMalloc",
+            "symbol": "tcmalloc::ThreadCache::ReleaseToCentralCache(tcmalloc::ThreadCache::FreeList*, unsigned int, int)",
+            "samples": 15,
+            "percent": 1.8495684340320593
+          },
+          {
+            "family": "dual control/update other",
+            "symbol": "<rose::dual::Dual>::reset_pricing",
+            "samples": 13,
+            "percent": 1.6029593094944512
+          },
+          {
+            "family": "TCMalloc",
+            "symbol": "tcmalloc::CentralFreeList::ReleaseToSpans(void*)",
+            "samples": 13,
+            "percent": 1.6029593094944512
+          },
+          {
+            "family": "dual control/update other",
+            "symbol": "<rose::dual::Dual>::post_inner",
+            "samples": 12,
+            "percent": 1.4796547472256474
+          },
+          {
+            "family": "factor update/install",
+            "symbol": "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct<rose::f80::F80>>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}> | <core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>",
+            "samples": 12,
+            "percent": 1.4796547472256474
+          },
+          {
+            "family": "factor ordered construction",
+            "symbol": "rose::lu_order::factor_structure_r::<f64>",
+            "samples": 11,
+            "percent": 1.3563501849568433
+          },
+          {
+            "family": "dual control/update other",
+            "symbol": "<rose::dual::Dual>::framework_rhs",
+            "samples": 9,
+            "percent": 1.1097410604192355
+          },
+          {
+            "family": "Rust allocation/containers",
+            "symbol": "<alloc::raw_vec::RawVec<core::cmp::Reverse<usize>>>::grow_one | <alloc::raw_vec::RawVec<f64>>::grow_one | <alloc::raw_vec::RawVec<usize>>::grow_one | <alloc::raw_vec::RawVec<i64>>::grow_one",
+            "samples": 9,
+            "percent": 1.1097410604192355
+          },
+          {
+            "family": "dual control/update other",
+            "symbol": "<core::iter::adapters::map::Map<core::slice::iter::Iter<usize>, rose::dual::reference_order<f64>::{closure#0}> as core::iter::traits::iterator::Iterator>::fold::<(), core::iter::traits::iterator::Iterator::for_each::call<(bool, alloc::vec::Vec<usize>, alloc::vec::Vec<f64>), <alloc::vec::Vec<(bool, alloc::vec::Vec<usize>, alloc::vec::Vec<f64>)>>::extend_trusted<core::iter::adapters::map::Map<core::slice::iter::Iter<usize>, rose::dual::reference_order<f64>::{closure#0}>>::{closure#0}>::{closure#0}>",
+            "samples": 8,
+            "percent": 0.9864364981504316
+          },
+          {
+            "family": "dual control/update other",
+            "symbol": "<rose::dual::Dual>::recompute_xb",
+            "samples": 8,
+            "percent": 0.9864364981504316
+          },
+          {
+            "family": "libc memory",
+            "symbol": "__memcpy_avx_unaligned | __memmove_avx_unaligned",
+            "samples": 8,
+            "percent": 0.9864364981504316
+          },
+          {
+            "family": "TCMalloc",
+            "symbol": "__libc_realloc | realloc | tc_realloc",
+            "samples": 8,
+            "percent": 0.9864364981504316
+          },
+          {
+            "family": "FTRAN/L/U",
+            "symbol": "<rose::ftran_order::RefStruct>::ftran_dense_work",
+            "samples": 7,
+            "percent": 0.8631319358816276
+          },
+          {
+            "family": "factor ordered construction",
+            "symbol": "<rose::lu_order::Structure>::work",
+            "samples": 7,
+            "percent": 0.8631319358816276
+          },
+          {
+            "family": "dual control/update other",
+            "symbol": "<rose::dual::Dual>::touch_rows",
+            "samples": 5,
+            "percent": 0.6165228113440198
+          },
+          {
+            "family": "libc other",
+            "symbol": "__GI_getenv | getenv | getenv@@GLIBC_2.2.5",
+            "samples": 5,
+            "percent": 0.6165228113440198
+          },
+          {
+            "family": "dual control/update other",
+            "symbol": "<rose::dual::Dual>::true_d",
+            "samples": 5,
+            "percent": 0.6165228113440198
+          },
+          {
+            "family": "Rose other",
+            "symbol": "rose::lu_pairs::run::<f64>",
+            "samples": 5,
+            "percent": 0.6165228113440198
+          },
+          {
+            "family": "auxiliary LU (all operations)",
+            "symbol": "core::slice::sort::stable::quicksort::quicksort::<usize, <[usize]>::sort_by_key<(usize, usize), <rose::lu::Factor>::factor<&alloc::vec::Vec<(usize, f64)>>::{closure#1}>::{closure#0}>",
+            "samples": 5,
+            "percent": 0.6165228113440198
+          },
+          {
+            "family": "auxiliary LU (all operations)",
+            "symbol": "core::slice::sort::shared::smallsort::small_sort_general_with_scratch::<(usize, f64), <[(usize, f64)]>::sort_by_key<usize, <rose::lu::Factor>::update_column<f64>::{closure#3}>::{closure#0}>",
+            "samples": 5,
+            "percent": 0.6165228113440198
+          },
+          {
+            "family": "TCMalloc",
+            "symbol": "tcmalloc::CentralFreeList::Populate()",
+            "samples": 4,
+            "percent": 0.4932182490752158
+          }
+        ],
+        "images": {
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc": {
+            "sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+            "debug": null
+          },
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/sysroot/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4.6.5": {
+            "sha256": "3e3c459710a7ce1511a3b289b95d52b56d8313afdb99eec23d2fc241c73e27e1",
+            "debug": null
+          },
+          "/usr/lib/x86_64-linux-gnu/libc.so.6": {
+            "sha256": "85e64f97e348786a8fb4d9f3d52fec289e2fb86bba20f0731dfe61990525e0f7",
+            "debug": "/usr/lib/debug/.build-id/06/6527e430a32768d82741e00b81eebb1a872294.debug"
+          },
+          "/usr/lib/x86_64-linux-gnu/libm.so.6": {
+            "sha256": "1c488db6f4fe8cecb72456bc018de000b7a9b539c2994864b0416b5e8371b3d8",
+            "debug": "/usr/lib/debug/.build-id/20/00a7e6c07f2ef41f3d22f773393360523edc21.debug"
+          }
+        },
+        "reference_anchor_ranges": [],
+        "event": "cycles:u",
+        "sampled_events": 25952000000
+      },
+      "direct_count_comparison": {
+        "stat_batch": "mode-stat",
+        "stat_repetitions": 8,
+        "stat_counts": {
+          "instructions:u": 27394135523,
+          "cycles:u": 28662005245
+        },
+        "scaled_same_repetitions": 28662005245.0,
+        "represented_fraction": 0.9054495586810782,
+        "limitation": "Independent batches; cycle-rate/cache/run variation and short-process sampling tails affect coverage. Not simultaneous exact regional costs."
+      }
+    }
+  },
+  "empty_tail_selection": {
+    "source": "ftran_order.rs4116 empty_tail.iter().copied().max_by_key(slot); native d5d00 fold loads slot indexed by ascending tree identities; generic F80 alias is ICF, actual ordinary caller.",
+    "self_samples": {
+      "mode-record": {
+        "samples": 41,
+        "total_samples": 856,
+        "ips": [
+          {
+            "module": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "pc": "0xd5d64",
+            "family": "factor update/install",
+            "symbols": [
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct<rose::f80::F80>>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>",
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>"
+            ],
+            "samples": 13
+          },
+          {
+            "module": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "pc": "0xd5d6b",
+            "family": "factor update/install",
+            "symbols": [
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct<rose::f80::F80>>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>",
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>"
+            ],
+            "samples": 10
+          },
+          {
+            "module": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "pc": "0xd5d4b",
+            "family": "factor update/install",
+            "symbols": [
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct<rose::f80::F80>>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>",
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>"
+            ],
+            "samples": 4
+          },
+          {
+            "module": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "pc": "0xd5d6f",
+            "family": "factor update/install",
+            "symbols": [
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct<rose::f80::F80>>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>",
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>"
+            ],
+            "samples": 3
+          },
+          {
+            "module": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "pc": "0xd5d34",
+            "family": "factor update/install",
+            "symbols": [
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct<rose::f80::F80>>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>",
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>"
+            ],
+            "samples": 3
+          },
+          {
+            "module": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "pc": "0xd5dca",
+            "family": "factor update/install",
+            "symbols": [
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct<rose::f80::F80>>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>",
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>"
+            ],
+            "samples": 3
+          },
+          {
+            "module": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "pc": "0xd5d50",
+            "family": "factor update/install",
+            "symbols": [
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct<rose::f80::F80>>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>",
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>"
+            ],
+            "samples": 2
+          },
+          {
+            "module": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "pc": "0xd5d24",
+            "family": "factor update/install",
+            "symbols": [
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct<rose::f80::F80>>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>",
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>"
+            ],
+            "samples": 1
+          },
+          {
+            "module": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "pc": "0xd5d53",
+            "family": "factor update/install",
+            "symbols": [
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct<rose::f80::F80>>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>",
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>"
+            ],
+            "samples": 1
+          },
+          {
+            "module": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "pc": "0xd5dd3",
+            "family": "factor update/install",
+            "symbols": [
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct<rose::f80::F80>>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>",
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>"
+            ],
+            "samples": 1
+          }
+        ]
+      },
+      "mode-cycles": {
+        "samples": 12,
+        "total_samples": 811,
+        "ips": [
+          {
+            "module": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "pc": "0xd5d6b",
+            "family": "factor update/install",
+            "symbols": [
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct<rose::f80::F80>>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>",
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>"
+            ],
+            "samples": 3
+          },
+          {
+            "module": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "pc": "0xd5d24",
+            "family": "factor update/install",
+            "symbols": [
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct<rose::f80::F80>>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>",
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>"
+            ],
+            "samples": 2
+          },
+          {
+            "module": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "pc": "0xd5d64",
+            "family": "factor update/install",
+            "symbols": [
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct<rose::f80::F80>>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>",
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>"
+            ],
+            "samples": 1
+          },
+          {
+            "module": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "pc": "0xd5da0",
+            "family": "factor update/install",
+            "symbols": [
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct<rose::f80::F80>>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>",
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>"
+            ],
+            "samples": 1
+          },
+          {
+            "module": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "pc": "0xd5d5c",
+            "family": "factor update/install",
+            "symbols": [
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct<rose::f80::F80>>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>",
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>"
+            ],
+            "samples": 1
+          },
+          {
+            "module": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "pc": "0xd5db7",
+            "family": "factor update/install",
+            "symbols": [
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct<rose::f80::F80>>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>",
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>"
+            ],
+            "samples": 1
+          },
+          {
+            "module": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "pc": "0xd5d53",
+            "family": "factor update/install",
+            "symbols": [
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct<rose::f80::F80>>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>",
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>"
+            ],
+            "samples": 1
+          },
+          {
+            "module": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "pc": "0xd5d50",
+            "family": "factor update/install",
+            "symbols": [
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct<rose::f80::F80>>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>",
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>"
+            ],
+            "samples": 1
+          },
+          {
+            "module": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+            "pc": "0xd5dca",
+            "family": "factor update/install",
+            "symbols": [
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct<rose::f80::F80>>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>",
+              "<core::iter::adapters::copied::Copied<alloc::collections::btree::set::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(usize, usize), core::iter::adapters::map::map_fold<usize, (usize, usize), (usize, usize), core::iter::traits::iterator::Iterator::max_by_key::key<usize, usize, <rose::ftran_order::RefStruct>::update::{closure#6}>::{closure#0}, core::iter::traits::iterator::Iterator::max_by::fold<(usize, usize), core::iter::traits::iterator::Iterator::max_by_key::compare<usize, usize>>::{closure#0}>::{closure#0}>"
+            ],
+            "samples": 1
+          }
+        ]
+      }
+    },
+    "instruction_percent": 4.789719626168225,
+    "cycle_percent": 1.4796547472256474,
+    "decision": "Do not implement slot-indexed membership from this scope. Distinct from tested dependency-walk max, but reverse-slot selection already rejected. A hierarchy removes scan and tree churn but adds maintenance to every slot motion. No evidence of substantial whole-lifetime gain; sampled fractions are not removable bounds.",
+    "invariant_if_ever_reconsidered": "bits[slot[x]] must equal old empty_tail.contains(x) at all intermediate stages; cannot recompute from transient kind/A/B. Maintain walk range rotations/swaps, demotion/growing-tail slot swaps, conversion selection removal, eliminated-column insertion, final r membership and fresh/clone/restore."
+  },
+  "excluded": {
+    "degen2-record": "Initial period4M probe:90samples,4throttle/unthrottle pairs. All2completeoutputs match but excluded quantitatively. Retained raw."
+  },
+  "limitations": [
+    "No source optimization or formal timing screen; current2/23medians unchanged.",
+    "TCMalloc and libc memory masses do not establish new removable lifetimes; settled allocator/arena/ownership/workspace trials remain closed.",
+    "Zero loss/throttle does not prove unbiased attribution; cycle record represents90.5%ofindependentcounter batch, instructionrecord99.99%; seven cycle highIPsamples remain explicit unmapped.",
+    "Do not transfer source shares to reference or sum nested/other-build scopes."
+  ],
+  "artifacts": {
+    "target/perf-optimized-scope/collect.py": "b2e85c0d09e7581a146890b2dcab3dd62ecd871c23c7d3fb3572e58af0f414c6",
+    "target/perf-optimized-scope/analyze.py": "8fdb227fa5f8e7107831afa39e2222bf216d65fa3524d5d62110213c82081aea",
+    "target/perf-optimized-scope/validate.py": "cd9ae3e49ca186d78050bfeae151abafbec25d75564b5f9f07d46c49469de01f",
+    "target/perf-optimized-scope/degen2-record/samples.data": "af222cde86f76004cc447335779dabf1aa22fb5d1715b30e0a5e74aff2d25ac6",
+    "target/perf-optimized-scope/degen2-record16m/samples.data": "dec0f92993813a93cbb4c15c295bd913095d81c509daa2fef568be1846f89a7c",
+    "target/perf-optimized-scope/mode-record/samples.data": "06d0f4af89527c8d8a76f4c637583c0207471cf99107cf987a8bc940e41c0165",
+    "target/perf-optimized-scope/mode-cycles/samples.data": "fa5c16f4cc441b0f0b23e40ba2f5b10ad68c8c528f38137b63e2058762a72544"
+  }
+}
