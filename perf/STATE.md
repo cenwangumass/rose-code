@@ -61,17 +61,53 @@ The earlier single-binary host baseline in evidence/current-host.json remains
 separate from this paired solver comparison. Full frozen parity 987/987 and
 all 292 runnable release tests pass; numerical source and accepted CLI unchanged.
 
-Small dual probes proceed AFIRO, SC50A, ADLITTLE, BORE3D, DEGEN2 (cap 300).
-The DEGEN2 instruction profile is unthrottled. Higher-rate exploratory PEROLD,
-PILOT4, quad and barrier profiles were throttled and cannot provide quantitative
-cost bounds. A replacement PEROLD frame-pointer batch uses period 8M, 24 full
-solves capped at 1300, all optimal/1273 iterations/27 refactorizations, 3736
-samples with no lost or throttle events and 99.57% direct-instruction coverage.
-Refactorization is 27.03% inclusive;
-full and needed FTRAN are 14.53% and 14.13%, with their shared L stage 9.82%.
-These are whole-batch profiling-build instruction shares, not release solve-only
-costs. They keep whole forward solves and factor production/installation as the
-structural targets; they do not justify another small arithmetic or queue trial.
+### Current GREENBEA dual solve attribution
+
+Matched bounded release-profile solve scopes count 5.4666B Rose instructions
+versus 1.3461B reference (4.06x). Accepted Rose ELF is unchanged; a clock hook
+asserts its two solve-boundary calls. The reference brackets GRBoptimize.
+External read/setup/output is excluded; internal setup remains. API-call scope
+is not proven identical to Runtime's internal timer boundary. FIFO boundary
+work remains uncalibrated instrumentation cost. Every complete result/exit
+matches its own original full-panel output after removing only the timer.
+
+GREENBEA has 2,728 Rose and 2,688 reference samples at period 16M, zero loss/
+throttle, and 99.806%/99.843% matching direct-event coverage. Per-process maps
+and ELF PT_LOAD/symbol sizes recover samples missed by perf's disabled mmap
+tracking; independent offset checks agree. Six Rose high-address samples stay
+explicit unknown; no samples are dropped. Initial missing-mapping and ack
+framing probes are retained and excluded. Small DEGEN2 qualification resolves
+all 272 samples; its 90.23% reference coverage reflects short-process tails and is
+not a quantitative phase bound.
+
+Rose libc allocation has 536 samples (19.65%, approximately 1072M sampled
+instructions/solve), versus no reference libc allocation samples. This does
+not prove zero private/inlined reference allocation. At least 292 samples
+(10.70%) belong to pivot-row work: 226 inlined mainline samples plus 66 separate
+symbols. That accounts for 62.60% of iteration's 361 self samples, so the whole
+iteration self share cannot be called generic control overhead. Arithmetic,
+filtering/order and publication remain; skid prevents assigning individual
+checks or stack reloads as causes. FTRAN WORK (joint_u) and output publication
+(dense_spike) are separated from execution; broad support mass is 1138M versus
+502.5M known reference FTRAN/L/U. These are self estimates with different
+routine boundaries, not exact operation-equivalent excesses or removable time.
+
+No new rewrite is qualified. Existing dense-row, workspace, row-cell, outlining,
+FTRAN owner and whole pivot handoff trials remain settled. Allocator ownership
+is the remaining lead. Small DWARF checks with 8 KiB/65528-byte stacks reach a
+semantic caller for only 1/4 and 3/5 allocator leaves; do not escalate that unwind
+to GREENBEA or infer caller mass. Next qualify a separate frame-pointer build
+and label its own code/counter skew before allocator ancestry. Evidence:
+[greenbea-phase-profile.json](evidence/greenbea-phase-profile.json), all probes,
+raw results/events/maps/classifiers and accepted assembly under
+`target/perf-greenbea-phases/`. Numerical source and accepted CLI unchanged.
+
+Earlier small dual probes and PEROLD ancestry remain separately labeled in
+their evidence. The unthrottled PEROLD frame-pointer batch (24 full solves,
+cap 1300, all optimal 1273/27 refactors) has 3736 samples, 99.57% direct coverage,
+and refactor 27.03% inclusive; FTRAN/full-needed self families do not by themselves
+justify another ownership trial. Old throttled exploratory recordings remain
+excluded. The current GREENBEA solve-scope profile is the next attribution source.
 
 ### Current mode-switch and refactor attribution
 

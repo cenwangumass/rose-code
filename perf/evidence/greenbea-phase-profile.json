@@ -1,0 +1,652 @@
+{
+  "source": "18061fe9, accepted zxtxvvvn; documentation parent b88def70",
+  "decision": "No new structural rewrite yet. Qualify allocator ancestry before proposing a distinct complete producer/consumer transaction; known pivot-row/FTRAN/ownership trials remain settled.",
+  "configuration": {
+    "rose_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "CPU": 2,
+    "method": "dual-release",
+    "bounds": "Rose max_iterations10000; reference IterationLimit10000,TimeLimit10; external20s/case. Both finish optimally and match own original unbounded-panel complete outputs.",
+    "samples": "GREENBEA8Rose/32reference fresh-process solves plus matching8/32 direct-counter solves; fixed period16M. DEGEN2first,8each,period8M."
+  },
+  "scope": {
+    "reference": "Copy of current native_run.c with acknowledged perf-control enable/disable immediately around GRBoptimize. Read/environment/parameters and post-call attributes/vectorJSON excluded. API-call scope, not proven identical to internal Runtime timer interval. Setup inside GRBoptimize retained.",
+    "rose": "Accepted CLI ELF unchanged. LD_PRELOAD hook intercepts its two CLOCK_MONOTONIC calls around solve; counter enabled after first real clock and disabled before second real clock. Exactly2calls asserted per successful run. Input parsing/serialization excluded. Hook initialization outside scope.",
+    "boundary_cost": "FIFO command and acknowledgement user instructions remain measurement overhead, not separately calibrated/subtracted. Reference direct counter/time-window readings are not speed comparisons; Rose diagnostics.seconds also includes enable wait in profiling runs and is deliberately not used.",
+    "FP": "C control/mapping hooks do no numerical work and solver source unchanged. Complete results/exits are checked, not a claim of full internal FP-status/trajectory alignment between solvers."
+  },
+  "mapping": {
+    "issue": "perf with initially disabled counters omitted later-process mmap tracking; initial recordings retain87.5%unresolved Rose symbols and are excluded from quantitative phase claims.",
+    "solution": "Record /proc/self/maps and PID before enable for every fresh process. Reconstruct module-relative PCs from actual executable mapping offset and ELF PT_LOAD vaddr/file-offset difference. Use actual local FUNC/symbol sizes; local build-id debug symbols resolve libc. No guessed next-entry phase ranges.",
+    "verification": "Small DEGEN2 all272samples resolve; independent perfsymoff address checks28Rose/6reference. GREENBEA340Rose/84reference independent checks agree. Kernel-address-looking6Rose samples retained as explicitunmapped/external unknown; none reference. No samples dropped.",
+    "reference_anchor_ranges": [
+      [
+        "0xd4190",
+        "0xdf800",
+        "factor driver/nucleus"
+      ],
+      [
+        "0xdf800",
+        "0xe2fa0",
+        "singleton/pair factor"
+      ],
+      [
+        "0xf15c0",
+        "0xf5ea0",
+        "factor update/install"
+      ],
+      [
+        "0x120740",
+        "0x121ef0",
+        "FTRAN first"
+      ],
+      [
+        "0x125f50",
+        "0x129aa0",
+        "FTRAN needed"
+      ],
+      [
+        "0x12a990",
+        "0x12bd30",
+        "L stage"
+      ],
+      [
+        "0x12bd30",
+        "0x12c300",
+        "L stage"
+      ],
+      [
+        "0x121ef0",
+        "0x1223e0",
+        "U stage"
+      ],
+      [
+        "0x1223e0",
+        "0x123690",
+        "U stage"
+      ],
+      [
+        "0x123690",
+        "0x124940",
+        "U stage"
+      ],
+      [
+        "0x12c300",
+        "0x12de10",
+        "U stage"
+      ],
+      [
+        "0x12de60",
+        "0x130b70",
+        "BTRAN"
+      ],
+      [
+        "0x130b70",
+        "0x131710",
+        "BTRAN"
+      ],
+      [
+        "0xc4fe0",
+        "0xc6900",
+        "dual iteration/control"
+      ],
+      [
+        "0xf6a00",
+        "0xf9450",
+        "dual iteration/control"
+      ],
+      [
+        "0xc6900",
+        "0xc74a0",
+        "ratio"
+      ],
+      [
+        "0xc74a0",
+        "0xcc6a0",
+        "ratio"
+      ],
+      [
+        "0xcc6a0",
+        "0xccbc0",
+        "ratio"
+      ],
+      [
+        "0xccbc0",
+        "0xcd250",
+        "leaving pricing"
+      ],
+      [
+        "0x134d90",
+        "0x136b00",
+        "pivot-row product"
+      ],
+      [
+        "0x132460",
+        "0x132a10",
+        "pricing reset"
+      ],
+      [
+        "0x136b00",
+        "0x136e80",
+        "recompute row product"
+      ],
+      [
+        "0xe45c0",
+        "0xe7c50",
+        "reduced-cost update"
+      ],
+      [
+        "0xc0050",
+        "0xc3f80",
+        "basic-value/DSE update"
+      ]
+    ],
+    "source_identities": "reverse-engineer/specs/{dual-simplex,lu-factor}.md and replay/gdb_{dual_calls,ftran_parts,ftran_vec,btran_vec,call_rets}.py; pricing reset132460 and recompute row product136b00 source-checked. Astra high read-only audit."
+  },
+  "profiles": {
+    "degen2": {
+      "rose": {
+        "samples": 224,
+        "audit": {
+          "PERF_RECORD_SAMPLE": 224,
+          "PERF_RECORD_LOST": 0,
+          "PERF_RECORD_THROTTLE": 0,
+          "PERF_RECORD_UNTHROTTLE": 0
+        },
+        "resolved_symbol_samples": 224,
+        "independent_perf_address_checks": 28,
+        "sampled_instructions": 1792000000,
+        "represented_fraction": 0.9694523891347245,
+        "direct_counts": {
+          "instructions:u": 1848466227,
+          "cycles:u": 1363699012
+        },
+        "per_solve_counts": {
+          "instructions:u": 231058278.375,
+          "cycles:u": 170462376.5
+        },
+        "families": {
+          "FTRAN/L/U": {
+            "samples": 43,
+            "percent": 19.196428571428573
+          },
+          "libc allocation": {
+            "samples": 39,
+            "percent": 17.410714285714285
+          },
+          "dual control/update other": {
+            "samples": 35,
+            "percent": 15.625
+          },
+          "factor update/install": {
+            "samples": 16,
+            "percent": 7.142857142857143
+          },
+          "Rust allocation/containers": {
+            "samples": 14,
+            "percent": 6.25
+          },
+          "auxiliary LU (all operations)": {
+            "samples": 14,
+            "percent": 6.25
+          },
+          "FTRAN WORK": {
+            "samples": 11,
+            "percent": 4.910714285714286
+          },
+          "factor ordered construction": {
+            "samples": 11,
+            "percent": 4.910714285714286
+          },
+          "BTRAN": {
+            "samples": 11,
+            "percent": 4.910714285714286
+          },
+          "factor publication/retirement": {
+            "samples": 10,
+            "percent": 4.464285714285714
+          },
+          "factor other": {
+            "samples": 7,
+            "percent": 3.125
+          },
+          "factor driver self": {
+            "samples": 6,
+            "percent": 2.6785714285714284
+          },
+          "libc memory": {
+            "samples": 5,
+            "percent": 2.232142857142857
+          },
+          "libc other": {
+            "samples": 2,
+            "percent": 0.8928571428571429
+          }
+        },
+        "families_per_solve_millions": {
+          "FTRAN/L/U": 43.0,
+          "libc allocation": 39.0,
+          "dual control/update other": 35.0,
+          "factor update/install": 16.0,
+          "Rust allocation/containers": 14.0,
+          "auxiliary LU (all operations)": 14.0,
+          "FTRAN WORK": 11.0,
+          "factor ordered construction": 11.0,
+          "BTRAN": 11.0,
+          "factor publication/retirement": 10.0,
+          "factor other": 7.0,
+          "factor driver self": 6.0,
+          "libc memory": 5.0,
+          "libc other": 2.0
+        },
+        "unmapped_samples": []
+      },
+      "reference": {
+        "samples": 48,
+        "audit": {
+          "PERF_RECORD_SAMPLE": 48,
+          "PERF_RECORD_LOST": 0,
+          "PERF_RECORD_THROTTLE": 0,
+          "PERF_RECORD_UNTHROTTLE": 0
+        },
+        "resolved_symbol_samples": 48,
+        "independent_perf_address_checks": 6,
+        "sampled_instructions": 384000000,
+        "represented_fraction": 0.9022890594096159,
+        "direct_counts": {
+          "instructions:u": 425584236,
+          "cycles:u": 392948841
+        },
+        "per_solve_counts": {
+          "instructions:u": 53198029.5,
+          "cycles:u": 49118605.125
+        },
+        "families": {
+          "ratio": {
+            "samples": 16,
+            "percent": 33.333333333333336
+          },
+          "basic-value/DSE update": {
+            "samples": 14,
+            "percent": 29.166666666666668
+          },
+          "U stage": {
+            "samples": 8,
+            "percent": 16.666666666666668
+          },
+          "BTRAN": {
+            "samples": 8,
+            "percent": 16.666666666666668
+          },
+          "reduced-cost update": {
+            "samples": 2,
+            "percent": 4.166666666666667
+          }
+        },
+        "families_per_solve_millions": {
+          "ratio": 16.0,
+          "basic-value/DSE update": 14.0,
+          "U stage": 8.0,
+          "BTRAN": 8.0,
+          "reduced-cost update": 2.0
+        },
+        "unmapped_samples": []
+      }
+    },
+    "greenbea": {
+      "rose": {
+        "samples": 2728,
+        "audit": {
+          "PERF_RECORD_SAMPLE": 2728,
+          "PERF_RECORD_LOST": 0,
+          "PERF_RECORD_THROTTLE": 0,
+          "PERF_RECORD_UNTHROTTLE": 0
+        },
+        "resolved_symbol_samples": 2722,
+        "independent_perf_address_checks": 340,
+        "sampled_instructions": 43648000000,
+        "represented_fraction": 0.9980610312457474,
+        "direct_counts": {
+          "instructions:u": 43732796526,
+          "cycles:u": 32347292836
+        },
+        "per_solve_counts": {
+          "instructions:u": 5466599565.75,
+          "cycles:u": 4043411604.5
+        },
+        "families": {
+          "dual control/update other": {
+            "samples": 738,
+            "percent": 27.052785923753667
+          },
+          "libc allocation": {
+            "samples": 536,
+            "percent": 19.64809384164223
+          },
+          "FTRAN/L/U": {
+            "samples": 485,
+            "percent": 17.778592375366568
+          },
+          "BTRAN": {
+            "samples": 139,
+            "percent": 5.095307917888563
+          },
+          "factor ordered construction": {
+            "samples": 110,
+            "percent": 4.032258064516129
+          },
+          "factor other": {
+            "samples": 104,
+            "percent": 3.812316715542522
+          },
+          "libc memory": {
+            "samples": 99,
+            "percent": 3.629032258064516
+          },
+          "auxiliary LU (all operations)": {
+            "samples": 92,
+            "percent": 3.372434017595308
+          },
+          "factor publication/retirement": {
+            "samples": 69,
+            "percent": 2.529325513196481
+          },
+          "pivot-row product": {
+            "samples": 66,
+            "percent": 2.4193548387096775
+          },
+          "Rust allocation/containers": {
+            "samples": 62,
+            "percent": 2.272727272727273
+          },
+          "factor update/install": {
+            "samples": 47,
+            "percent": 1.7228739002932552
+          },
+          "FTRAN output preparation": {
+            "samples": 42,
+            "percent": 1.5395894428152492
+          },
+          "FTRAN WORK": {
+            "samples": 42,
+            "percent": 1.5395894428152492
+          },
+          "Rose ambiguous/unresolved": {
+            "samples": 27,
+            "percent": 0.9897360703812317
+          },
+          "Rose other": {
+            "samples": 20,
+            "percent": 0.7331378299120235
+          },
+          "simplex shared other": {
+            "samples": 12,
+            "percent": 0.4398826979472141
+          },
+          "Rust core generic": {
+            "samples": 9,
+            "percent": 0.32991202346041054
+          },
+          "factor driver self": {
+            "samples": 7,
+            "percent": 0.2565982404692082
+          },
+          "libc other": {
+            "samples": 7,
+            "percent": 0.2565982404692082
+          },
+          "external/unknown": {
+            "samples": 6,
+            "percent": 0.21994134897360704
+          },
+          "libm": {
+            "samples": 5,
+            "percent": 0.18328445747800587
+          },
+          "Rose runtime/generic other": {
+            "samples": 4,
+            "percent": 0.1466275659824047
+          }
+        },
+        "families_per_solve_millions": {
+          "dual control/update other": 1476.0,
+          "libc allocation": 1072.0,
+          "FTRAN/L/U": 970.0,
+          "BTRAN": 278.0,
+          "factor ordered construction": 220.0,
+          "factor other": 208.0,
+          "libc memory": 198.0,
+          "auxiliary LU (all operations)": 184.0,
+          "factor publication/retirement": 138.0,
+          "pivot-row product": 132.0,
+          "Rust allocation/containers": 124.0,
+          "factor update/install": 94.0,
+          "FTRAN output preparation": 84.0,
+          "FTRAN WORK": 84.0,
+          "Rose ambiguous/unresolved": 54.0,
+          "Rose other": 40.0,
+          "simplex shared other": 24.0,
+          "Rust core generic": 18.0,
+          "factor driver self": 14.0,
+          "libc other": 14.0,
+          "external/unknown": 12.0,
+          "libm": 10.0,
+          "Rose runtime/generic other": 8.0
+        },
+        "unmapped_samples": [
+          " 125716  ffffffff8f000345 [unknown] ([unknown])",
+          " 125722  ffffffff8f02e90e [unknown] ([unknown])",
+          " 125724  ffffffff8e800b90 [unknown] ([unknown])",
+          " 125724  ffffffff8ff3db80 [unknown] ([unknown])",
+          " 125726  ffffffff8efed995 [unknown] ([unknown])",
+          " 125730  ffffffff8f036be1 [unknown] ([unknown])"
+        ]
+      },
+      "reference": {
+        "samples": 2688,
+        "audit": {
+          "PERF_RECORD_SAMPLE": 2688,
+          "PERF_RECORD_LOST": 0,
+          "PERF_RECORD_THROTTLE": 0,
+          "PERF_RECORD_UNTHROTTLE": 0
+        },
+        "resolved_symbol_samples": 2688,
+        "independent_perf_address_checks": 84,
+        "sampled_instructions": 43008000000,
+        "represented_fraction": 0.9984277853680766,
+        "direct_counts": {
+          "instructions:u": 43075724284,
+          "cycles:u": 35119930934
+        },
+        "per_solve_counts": {
+          "instructions:u": 1346116383.875,
+          "cycles:u": 1097497841.6875
+        },
+        "families": {
+          "L stage": {
+            "samples": 548,
+            "percent": 20.386904761904763
+          },
+          "BTRAN": {
+            "samples": 284,
+            "percent": 10.56547619047619
+          },
+          "reference other": {
+            "samples": 279,
+            "percent": 10.379464285714286
+          },
+          "U stage": {
+            "samples": 253,
+            "percent": 9.412202380952381
+          },
+          "pivot-row product": {
+            "samples": 248,
+            "percent": 9.226190476190476
+          },
+          "FTRAN needed": {
+            "samples": 204,
+            "percent": 7.589285714285714
+          },
+          "factor driver/nucleus": {
+            "samples": 192,
+            "percent": 7.142857142857143
+          },
+          "reduced-cost update": {
+            "samples": 181,
+            "percent": 6.7336309523809526
+          },
+          "ratio": {
+            "samples": 160,
+            "percent": 5.9523809523809526
+          },
+          "basic-value/DSE update": {
+            "samples": 76,
+            "percent": 2.8273809523809526
+          },
+          "singleton/pair factor": {
+            "samples": 64,
+            "percent": 2.380952380952381
+          },
+          "factor update/install": {
+            "samples": 58,
+            "percent": 2.1577380952380953
+          },
+          "dual iteration/control": {
+            "samples": 56,
+            "percent": 2.0833333333333335
+          },
+          "pricing reset": {
+            "samples": 32,
+            "percent": 1.1904761904761905
+          },
+          "recompute row product": {
+            "samples": 32,
+            "percent": 1.1904761904761905
+          },
+          "libc memory": {
+            "samples": 14,
+            "percent": 0.5208333333333334
+          },
+          "leaving pricing": {
+            "samples": 7,
+            "percent": 0.2604166666666667
+          }
+        },
+        "families_per_solve_millions": {
+          "L stage": 274.0,
+          "BTRAN": 142.0,
+          "reference other": 139.5,
+          "U stage": 126.5,
+          "pivot-row product": 124.0,
+          "FTRAN needed": 102.0,
+          "factor driver/nucleus": 96.0,
+          "reduced-cost update": 90.5,
+          "ratio": 80.0,
+          "basic-value/DSE update": 38.0,
+          "singleton/pair factor": 32.0,
+          "factor update/install": 29.0,
+          "dual iteration/control": 28.0,
+          "pricing reset": 16.0,
+          "recompute row product": 16.0,
+          "libc memory": 7.0,
+          "leaving pricing": 3.5
+        },
+        "unmapped_samples": []
+      }
+    }
+  },
+  "row_attribution": {
+    "iteration_mainline_samples": 361,
+    "disjoint_row_ranges": [
+      {
+        "start": "0x103d2f",
+        "end_exclusive": "0x103e58",
+        "source": "row occurrence count/acc allocation",
+        "samples": 11
+      },
+      {
+        "start": "0x104034",
+        "end_exclusive": "0x104210",
+        "source": "row initialization/dense-order scatter",
+        "samples": 94
+      },
+      {
+        "start": "0x104355",
+        "end_exclusive": "0x104457",
+        "source": "row sparse-order scatter",
+        "samples": 43
+      },
+      {
+        "start": "0x104457",
+        "end_exclusive": "0x1047ce",
+        "source": "row order/filter/slack/publication",
+        "samples": 78
+      }
+    ],
+    "row_mainline_samples": 226,
+    "separate_row_symbols_samples": 66,
+    "known_total_row_samples": 292,
+    "whole_samples": 2728,
+    "excluded_interleaved_range": [
+      "0x104210",
+      "0x104355"
+    ],
+    "qualification": "Source and accepted-disassembly control-flow audit by Astra high; excludes allocator descendants/cold continuations. No per-instruction spill/branch causation inferred from sampling skid."
+  },
+  "interpretation": [
+    "GREENBEA direct solve scopes count5.4666B Rose versus1.3461B reference instructions (about4.06x). Healthy sampling represents99.806%/99.843% of matching direct counts, zero loss/throttle. These are sampled instruction self costs, not time/removable bounds.",
+    "Rose libc allocation occupies536/2728samples19.648%, approximately1072M sampled instructions/solve. Reference has0libc allocator samples; this is not proof of zero allocation cost or absence of private/inlined allocator work.",
+    "At least292/2728samples10.704% are pivot-row work:226inlined samples plus66separate row symbols. It is required arithmetic/publication and related controls, not proven removable overhead. Sampling skid prevents assigning cost to an individual bounds check or stack reload.",
+    "Broad FTRAN-support sampled mass is1138M Rose versus502.5M known reference FTRAN/L/U, with WORK/output publication separated. Different function boundaries and remaining unmapped semantic families prevent treating this as an exact operation-equivalent excess.",
+    "Current row/workspace/FTRAN ownership mechanisms were previously tested; this profile does not reopen them. Allocator ancestry must identify a substantial transaction outside those settled scopes."
+  ],
+  "dwarf_qualification": {
+    "degen2-rose-dwarf": {
+      "stacks": 28,
+      "allocator_leaves": 4,
+      "semantic_owner_reached": 1
+    },
+    "degen2-rose-dwarf64": {
+      "stacks": 28,
+      "allocator_leaves": 5,
+      "semantic_owner_reached": 3
+    }
+  },
+  "dwarf_decision": "Do not escalate unreliable DWARF ancestry to GREENBEA. Single DEGEN2 checks with8KiB/65528byte stacks preserve complete outputs but reach semantic owners in only1/4 and3/5allocator-leaf samples. Next qualify a separate frame-pointer build with its own parity/counter/source labels before allocator-owner claims.",
+  "validation": {
+    "complete_result_exit_pairs": 116,
+    "detail": "34DEGEN2scoped normal pairs,80GREENBEAscoped pairs,2DEGEN2DWARF pairs; each compared to its solver original full-bench-v2 result with only timer removed. No cross-solver vector alignment invented.",
+    "counter_running": "All matching direct instructions/cycles events100%running.",
+    "failed_probe_cases": "Ack NUL framing bug and initial missing-mapping recordings retained/excluded. Corrected control reads ack newline and tolerates perf trailingNUL; per-process mappings are captured before measurement."
+  },
+  "artifacts": "target/perf-greenbea-phases/: Ccontrol/header/clockhook/native_scope sources+ELFs; originalsourcehashes; collect.py,validate.py,analyze.py,mass.py,dwarf_audit.py; alljobmanifests/commands/rawresults+exits; per-case maps; samples.data/ips/events/normalized-ips/analysis; phase-mass.json,row-attribution.json,iteration{,-annotated}.asm; DWARFstacks/audit; excludedack/mappingdebug evidence.",
+  "artifact_source_hashes": {
+    "mass.py": "1a82721a02c277ca317aa3c79dfce61f8d54c4ebd0f69d8376f5c8de6cc2be28",
+    "control-before-maps.h": "d7e49967cd6c568d50138594829c50374bd5822981e7d3433885305dd369e666",
+    "dwarf_audit.py": "200b67d710f8bbd29e988f44fc295ce30f091b9d8bd52cc52304717586180cb6",
+    "clock_hook.so": "7b85b23e441a3bec22893332d2fda6ba692ed13cfd723fc3a4f677b495f15e03",
+    "collect.py": "48919eb4e6ab2b6887e2cb547b999384d1b14358275c1517054bab7b2a90315e",
+    "validate.py": "2f011e8d00d40988c6199137be64ba49cd9b409eba2b6708f35f73c5893fa106",
+    "clock_hook.c": "d81eebbd3c86aee5f978ce1f8f01c29883d21f0e267d0a1df4a8eacfcbdd2bdd",
+    "control-failed.h": "8b95d1600e273f0ba3c9d3922a16ff2fd2b2bda042eea4053a89801debdf06d4",
+    "analyze.py": "7e3762658a4f2908bce4c00c415c9a50e0ee02544759d747fdddffdb402141c1",
+    "evidence.py": "7a58b14be92d9bd1190d29f4f43815cb72a931d8428e0deb83c13d19600fe7d1",
+    "native_scope": "567f45588f7e8a1fc3212630f7852f15d1214d4de4165c6c12c9057961e6c760",
+    "clock_hook-before-maps.so": "45eedcaae985354545828f6ffe36075b692cda2adfac80606097a712c4778d37",
+    "control.h": "369addfb3aa0162cbf24e2c82b9e8aadc51441d16418321f8e28dd7f5b0ff701",
+    "native_scope.c": "859acf2e9f28243a369e81e7b940cb56cb70a5d66e3f0d85c9701b659d15630e"
+  },
+  "verification": {
+    "accepted_cli_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "release_tests_log": "target/perf-greenbea-phases/accepted-release-tests.log",
+    "full_parity_log": "target/perf-greenbea-phases/accepted-full-parity.log",
+    "scope": "Unchanged accepted numeric source/CLI; no candidate runtime patch/full optimization sweep.",
+    "full_parity": "987/987 (63.7s)",
+    "release_tests": {
+      "groups": 37,
+      "passed": 292,
+      "failed": 0,
+      "ignored": 22
+    }
+  }
+}

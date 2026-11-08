@@ -430,12 +430,16 @@ measured.
   the full current-host fixed 23-row comparison is complete with 0/23 Rose wins.
   See evidence/current-reference-comparison.json and perf/compare_reference.py.
   Mode-switch dual is 8.21x slower, GREENBEA dual-release 3.97x, controlled 80BAU
-  primal 4.88x. Next collect matched GREENBEA ordinary-dual phase attribution
-  before choosing another substantive numerical boundary: factorization,
-  FTRAN/L, BTRAN, pivot/ratio/control and allocation. Establish setup/solve
-  scopes explicitly and keep raw sampling/event-coverage provenance. Start
-  with small DEGEN2 qualifications; source-only hot-function totals do not
-  justify reviving the rejected mechanisms above.
+  primal 4.88x. The GREENBEA solve-scope comparison is now qualified: 5.4666B
+  versus 1.3461B instructions, healthy 2728/2688 samples and 99.8% direct coverage.
+  At least 10.70% Rose self is pivot-row work already covered by settled trials;
+  the 19.65% libc allocator mass still needs its owner. Do not reinterpret the
+  whole 13.23% iteration self as generic overhead or reopen row/workspace/FTRAN
+  schemes from these totals. DEGEN2 DWARF checks remain unreliable even with
+  a larger stack; next qualify frame-pointer source/parity/direct-count skew
+  and then allocator ancestry before another substantial implementation.
+  See evidence/greenbea-phase-profile.json. Keep self/inclusive scopes separate,
+  explicit unknown families and process-map/PT_LOAD mapping provenance.
   The scalar prefilter and prior rank/layout trials remain
   rejected; do not infer further gains from isolated predicate costs.
   Comparator alignment stays centralized; normal lunum's build/cache transport
