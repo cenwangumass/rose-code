@@ -1,0 +1,367 @@
+{
+  "source": "3ee41127",
+  "host": "x86_64",
+  "configuration": "pinned Rust 1.98.1, ordinary ThinLTO release, glibc allocator, CPU 2; no PGO or TCMalloc",
+  "release_sha256": "fa615c020cf4eaf9b632ceeab247e68e4382b1782eaa89420911222b9a6ba70a",
+  "profiling_sha256": "68dc54d95c6ecc721ef97b6f9a5d51cf4a7344e285c1faec93954b115875b7a7",
+  "scope": "Whole process including startup and Python launcher. Instruction profiles only; elapsed times are not comparisons. Each batch checks full results and exit codes after removing diagnostics.seconds.",
+  "profiles": [
+    {
+      "id": "degen2",
+      "model": "degen2",
+      "method": "dual",
+      "profile": "release",
+      "max_iterations": 300,
+      "repetitions": 32,
+      "instruction_period": 500000,
+      "status": "iteration_limit",
+      "diagnostics": {
+        "check": "status IterationLimit",
+        "iterations": 300,
+        "refactorizations": 8,
+        "seconds": 0.017251676
+      },
+      "self_samples_over_two_percent": [],
+      "event_audit": [
+        "SAMPLE events:       5275  (94.5%)",
+        "SAMPLE events:       5275"
+      ],
+      "qualification": "No lost or throttle events in perf --stats; direct-counter coverage not yet checked."
+    },
+    {
+      "id": "perold",
+      "model": "perold",
+      "method": "dual",
+      "profile": "release",
+      "max_iterations": 1300,
+      "repetitions": 12,
+      "instruction_period": 2000000,
+      "status": "optimal",
+      "diagnostics": {
+        "check": null,
+        "iterations": 1273,
+        "refactorizations": 27,
+        "seconds": 0.30201444
+      },
+      "self_samples_over_two_percent": [],
+      "event_audit": [
+        "THROTTLE events:         35  ( 0.5%)",
+        "UNTHROTTLE events:         35  ( 0.5%)",
+        "SAMPLE events:       7449  (97.4%)",
+        "SAMPLE events:       7449"
+      ],
+      "qualification": "Exploratory: instruction sampling throttled; refresh at lower rate before quantitative cost claims."
+    },
+    {
+      "id": "pilot4",
+      "model": "pilot4",
+      "method": "primal",
+      "profile": "release",
+      "max_iterations": 800,
+      "repetitions": 16,
+      "instruction_period": 2000000,
+      "status": "optimal",
+      "diagnostics": {
+        "check": null,
+        "iterations": 690,
+        "refactorizations": 16,
+        "seconds": 0.104685408
+      },
+      "self_samples_over_two_percent": [],
+      "event_audit": [
+        "THROTTLE events:         66  ( 1.4%)",
+        "UNTHROTTLE events:         66  ( 1.4%)",
+        "SAMPLE events:       4494  (93.8%)",
+        "SAMPLE events:       4494"
+      ],
+      "qualification": "Exploratory: instruction sampling throttled; refresh at lower rate before quantitative cost claims."
+    },
+    {
+      "id": "fx",
+      "model": "fx_quad_obj_5371",
+      "method": "dual",
+      "profile": "release",
+      "max_iterations": 5500,
+      "repetitions": 16,
+      "instruction_period": 1000000,
+      "status": "infeasible",
+      "diagnostics": {
+        "check": "missing or invalid Farkas certificate",
+        "iterations": 5319,
+        "refactorizations": 5,
+        "seconds": 0.067784436
+      },
+      "self_samples_over_two_percent": [],
+      "event_audit": [
+        "THROTTLE events:        239  ( 4.6%)",
+        "UNTHROTTLE events:        239  ( 4.6%)",
+        "SAMPLE events:       4503  (87.5%)",
+        "SAMPLE events:       4503"
+      ],
+      "qualification": "Exploratory: instruction sampling throttled; refresh at lower rate before quantitative cost claims."
+    },
+    {
+      "id": "bore3d-bar",
+      "model": "bore3d",
+      "method": "barrier",
+      "profile": "release",
+      "max_iterations": 300,
+      "repetitions": 32,
+      "instruction_period": 500000,
+      "status": "optimal",
+      "diagnostics": {
+        "aat_nnz": 4384,
+        "complementarity": 1.358696789883182e-08,
+        "dual_violation": 0.0,
+        "duality_gap": 9.287668945034966e-08,
+        "factor_nnz": 4297,
+        "factor_ops": 117181.0,
+        "iterations": 16,
+        "primal_violation": 1.1823431123048067e-11,
+        "seconds": 0.023178054
+      },
+      "self_samples_over_two_percent": [],
+      "event_audit": [
+        "THROTTLE events:        490  (14.4%)",
+        "UNTHROTTLE events:        483  (14.2%)",
+        "SAMPLE events:       2125  (62.4%)",
+        "SAMPLE events:       2125"
+      ],
+      "qualification": "Exploratory: instruction sampling throttled; refresh at lower rate before quantitative cost claims."
+    }
+  ],
+  "profiling_perold": {
+    "repetitions": 24,
+    "period": 8000000,
+    "samples": 3736,
+    "lost_events": 0,
+    "throttle_events": 0,
+    "scope": "Separate frame-pointer profiling build, not a release cost bound",
+    "inclusive_percent": {
+      "iteration": 50.24,
+      "refactor": 27.03,
+      "ftran_with": 14.53,
+      "ftran_needed": 14.13,
+      "lstage_num": 9.82,
+      "fresh": 7.15
+    },
+    "qualification": "Full batch outputs and exit codes agree; profiling fast parity 940/940; no lost or throttle events. Represented instructions checked against a separate identical direct-counter batch.",
+    "direct_batch_instructions": 30016972831,
+    "represented_instruction_fraction": 0.9957033365181047
+  },
+  "benchmarks": [
+    {
+      "id": "degen2.primal-c",
+      "wall_median": 0.094,
+      "wall_min": 0.084,
+      "wall_max": 0.118,
+      "solve_median": 0.088992,
+      "solve_min": 0.079226,
+      "solve_max": 0.109948
+    },
+    {
+      "id": "degen2.dual-r",
+      "wall_median": 0.073,
+      "wall_min": 0.07,
+      "wall_max": 0.092,
+      "solve_median": 0.068235,
+      "solve_min": 0.064786,
+      "solve_max": 0.085303
+    },
+    {
+      "id": "degen3.primal-c",
+      "wall_median": 1.063,
+      "wall_min": 0.996,
+      "wall_max": 1.094,
+      "solve_median": 1.042873,
+      "solve_min": 0.979345,
+      "solve_max": 1.074777
+    },
+    {
+      "id": "degen3.primal-r",
+      "wall_median": 1.199,
+      "wall_min": 1.198,
+      "wall_max": 1.24,
+      "solve_median": 1.180298,
+      "solve_min": 1.179197,
+      "solve_max": 1.225639
+    },
+    {
+      "id": "perold.primal-c",
+      "wall_median": 0.996,
+      "wall_min": 0.995,
+      "wall_max": 1.152,
+      "solve_median": 0.98951,
+      "solve_min": 0.988698,
+      "solve_max": 1.145645
+    },
+    {
+      "id": "pilot4.primal-r",
+      "wall_median": 0.106,
+      "wall_min": 0.097,
+      "wall_max": 0.112,
+      "solve_median": 0.100868,
+      "solve_min": 0.09262,
+      "solve_max": 0.107003
+    },
+    {
+      "id": "80bau3b.primal-c",
+      "wall_median": 1.028,
+      "wall_min": 1.002,
+      "wall_max": 1.185,
+      "solve_median": 1.002402,
+      "solve_min": 0.973779,
+      "solve_max": 1.138003
+    },
+    {
+      "id": "primal_5959.primal-r",
+      "wall_median": 0.096,
+      "wall_min": 0.095,
+      "wall_max": 0.106,
+      "solve_median": 0.092983,
+      "solve_min": 0.092224,
+      "solve_max": 0.104235
+    },
+    {
+      "id": "degen3.dual-c",
+      "wall_median": 0.503,
+      "wall_min": 0.459,
+      "wall_max": 0.898,
+      "solve_median": 0.485708,
+      "solve_min": 0.445052,
+      "solve_max": 0.868944
+    },
+    {
+      "id": "degen3.dual-r",
+      "wall_median": 0.958,
+      "wall_min": 0.633,
+      "wall_max": 1.165,
+      "solve_median": 0.930532,
+      "solve_min": 0.609577,
+      "solve_max": 1.13021
+    },
+    {
+      "id": "perold.dual-r",
+      "wall_median": 0.285,
+      "wall_min": 0.285,
+      "wall_max": 0.29,
+      "solve_median": 0.278445,
+      "solve_min": 0.278441,
+      "solve_max": 0.282832
+    },
+    {
+      "id": "80bau3b.dual-r",
+      "wall_median": 0.57,
+      "wall_min": 0.553,
+      "wall_max": 0.617,
+      "solve_median": 0.545329,
+      "solve_min": 0.528592,
+      "solve_max": 0.591303
+    },
+    {
+      "id": "greenbea.dual-c",
+      "wall_median": 1.346,
+      "wall_min": 1.341,
+      "wall_max": 1.529,
+      "solve_median": 1.327022,
+      "solve_min": 1.317837,
+      "solve_max": 1.506079
+    },
+    {
+      "id": "greenbea.dual-r",
+      "wall_median": 1.291,
+      "wall_min": 1.28,
+      "wall_max": 1.362,
+      "solve_median": 1.273497,
+      "solve_min": 1.261269,
+      "solve_max": 1.338837
+    },
+    {
+      "id": "mode_switch.dual-r",
+      "wall_median": 1.311,
+      "wall_min": 1.258,
+      "wall_max": 1.362,
+      "solve_median": 1.264991,
+      "solve_min": 1.207601,
+      "solve_max": 1.309504
+    },
+    {
+      "id": "primal_5959.dual-r",
+      "wall_median": 0.143,
+      "wall_min": 0.136,
+      "wall_max": 0.143,
+      "solve_median": 0.140426,
+      "solve_min": 0.133798,
+      "solve_max": 0.140673
+    },
+    {
+      "id": "quad_2717.dual-r",
+      "wall_median": 0.142,
+      "wall_min": 0.136,
+      "wall_max": 0.169,
+      "solve_median": 0.140311,
+      "solve_min": 0.134302,
+      "solve_max": 0.167108
+    },
+    {
+      "id": "fx_quad_obj_5371.dual-r",
+      "wall_median": 0.053,
+      "wall_min": 0.049,
+      "wall_max": 0.053,
+      "solve_median": 0.051414,
+      "solve_min": 0.047337,
+      "solve_max": 0.051508
+    },
+    {
+      "id": "degen3.barrier-r",
+      "wall_median": 0.363,
+      "wall_min": 0.346,
+      "wall_max": 0.365,
+      "solve_median": 0.309923,
+      "solve_min": 0.295793,
+      "solve_max": 0.313305
+    },
+    {
+      "id": "80bau3b.barrier-r",
+      "wall_median": 0.481,
+      "wall_min": 0.447,
+      "wall_max": 0.491,
+      "solve_median": 0.435016,
+      "solve_min": 0.407773,
+      "solve_max": 0.449477
+    },
+    {
+      "id": "greenbea.barrier-r",
+      "wall_median": 1.857,
+      "wall_min": 1.634,
+      "wall_max": 1.9,
+      "solve_median": 1.809031,
+      "solve_min": 1.589431,
+      "solve_max": 1.844459
+    },
+    {
+      "id": "80bau3b.pdhg",
+      "wall_median": 3.941,
+      "wall_min": 3.839,
+      "wall_max": 4.027,
+      "solve_median": 3.917732,
+      "solve_min": 3.816149,
+      "solve_max": 4.004246
+    },
+    {
+      "id": "greenbea.pdhg",
+      "wall_median": 4.299,
+      "wall_min": 4.196,
+      "wall_max": 4.376,
+      "solve_median": 4.248615,
+      "solve_min": 4.154848,
+      "solve_max": 4.324632
+    }
+  ],
+  "benchmark_scope": "CPU 2, one warm-up and three timed fresh-process solves per row; no old/new comparison. Profiles and full parity overlapped some early rows; timings are diagnostic only.",
+  "parity": {
+    "release_fast": "940/940",
+    "release_full": "987/987",
+    "profiling_fast": "940/940"
+  }
+}

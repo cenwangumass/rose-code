@@ -2,7 +2,35 @@
 
 Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (history is `jj log`).
 
-## Numbers on AMD EPYC 9V74
+## Current host: AMD EPYC virtual CPU, family 23
+
+Source `3ee41127`, pinned Rust 1.98.1, ordinary ThinLTO release and glibc,
+CPU 2. This checkout has no preceding PGO artifacts or TCMalloc library;
+the historical EPYC 9V74 timing table is not a current-host comparison.
+The unchanged release passes fast 940/940 and full 987/987 parity. The
+frame-pointer profiling build passes fast 940/940.
+
+`perf/bench.sh` now appends solve samples inside Python: Hyperfine 1.19 applies
+`-N` to hooks, so its former shell redirection left an empty sample file.
+The corrected harness completed all 23 rows, one warm-up and three measured
+runs each. These are diagnostic single-binary host baselines; profiling/parity overlapped
+some early rows, and no speedup or reference comparison is claimed. Numbers, binary hashes and profile qualification are in
+[evidence/current-host.json](evidence/current-host.json); raw results and
+commands remain in `target/perf-refresh/`.
+
+Small dual probes proceed AFIRO, SC50A, ADLITTLE, BORE3D, DEGEN2 (cap 300).
+The DEGEN2 instruction profile is unthrottled. Higher-rate exploratory PEROLD,
+PILOT4, quad and barrier profiles were throttled and cannot provide quantitative
+cost bounds. A replacement PEROLD frame-pointer batch uses period 8M, 24 full
+solves capped at 1300, all optimal/1273 iterations/27 refactorizations, 3736
+samples with no lost or throttle events and 99.57% direct-instruction coverage.
+Refactorization is 27.03% inclusive;
+full and needed FTRAN are 14.53% and 14.13%, with their shared L stage 9.82%.
+These are whole-batch profiling-build instruction shares, not release solve-only
+costs. They keep whole forward solves and factor production/installation as the
+structural targets; they do not justify another small arithmetic or queue trial.
+
+## Historical AMD EPYC 9V74 measurements
 
 A recurring compact primal basis now restores its accepted variable order into the live buffer and installs its two factor handles directly. Fresh, singular and diagnostic factorizations retain the original work and pivot rules.
 
@@ -1375,7 +1403,7 @@ no new solver speedup or reference timing ratio.
 
 ## Candidates
 
-The full forward U solve now carries its numeric column and dirty blocks across calls. Reprofile FTRAN/L, pricing and factor updates on the qualified binary before choosing the next large pass. The occupied-slot BTRAN, touched-only pivot-row and PDHG packet/fused-step experiments below have completed their prescribed screens. Initial unit-weight setup is about 3.3% of full mode-switch time in the recorded baseline sample.
+The full forward U solve carries its numeric column and dirty blocks across calls. The current-host PEROLD profile above refreshes whole FTRAN/L and refactorization attribution. Inspect a whole representation or ownership boundary there before another local kernel trial; reproduce PGO/TCMalloc qualification separately when those builds are available. The occupied-slot BTRAN, touched-only pivot-row and PDHG packet/fused-step experiments below have completed their prescribed screens. Initial unit-weight setup is about 3.3% of full mode-switch time in the recorded baseline sample.
 
 The remaining candidates below derive from the Ryzen measurements and their historical profiles.
 
