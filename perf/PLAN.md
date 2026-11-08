@@ -332,9 +332,24 @@ measured.
   reciprocal scaling. Current census gives99.42% four-double term coverage on
   DEGEN3, with13.28% diagnostic rectangle scope and no single-mode fronts.
   Freeze full factor_block and compare complete outputs/flags on real fronts;
-  prototype complete four-double packets before adding unobserved float work. Prior
-  ordinary auxiliary four-RHS and local LDL/dispatch trials are separate and
+  Complete four-double packets are now numerically verified (5,624rectangle /
+  1,488full-block oracle cases, full987,285release tests), but timing remains
+  unqualified: first44217 median-10.103%, conservative CI upper-4.208 versus
+  AA error4.300. Stop without44289/extension/retry. Exact source is preserved
+  on experiments/barrier-rhs-packets; accepted solver is restored unchanged.
+  Ordinary auxiliary four-RHS and local LDL/dispatch trials are separate and
   remain rejected; do not restart them as a small buffer experiment.
+  A genuinely larger next boundary is a complete factor owner with logical
+  GEMM destination views: assemble/update/solve R in its eventual packed suffix,
+  reuse mm/child/RHS scratch, and eliminate child cm/cn materialization. First
+  census bytes/calls from actual Plan geometry. Recycle old Factor only after
+  the early return check; keep current/previous generations disjoint and par
+  from logical lengths. Private destination-aware GEMM must preserve exact
+  logical C extents/finite scans, k partitions, zero-product-then-parent-add
+  semantics, single conversion and computations of unused outputs/FP flags.
+  Passing strided parent slices directly to current public DGEMM is invalid.
+  Prior arena/owner experiments do not establish this broader numerical scope;
+  do not credit copies or add past gains without measurement.
   PEROLD FTRAN/L/update and factor-production/installation ownership remain larger
   measured leads. The scalar prefilter and prior rank/layout trials remain
   rejected; do not infer further gains from isolated predicate costs.

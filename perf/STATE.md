@@ -1412,6 +1412,21 @@ no new solver speedup or reference timing ratio.
 
 ## Candidates
 
+The complete four-double-RHS rectangle prototype is numerically verified and
+preserved on `experiments/barrier-rhs-packets`, but remains unqualified for
+acceptance. Independent checks cover5,624rectangles and1,488complete blocks;
+full frozen parity passes987/987 and285release tests pass (22ignored). Original
+G4 schedules, live coefficients, separate nonfused operations, scalar tails,
+nonfinite replay and unmasked-environment fallback are retained. DEGEN3
+instructions/cycles fall9.224/14.029%. First fixed screen44217 (CPU2,cap100,
+32AB+32AA) measures-10.103%, interval[-13.000,-4.208],27/32improving,p5.65e-5,
+bothordersimprove; healthy AA[-4.300,+2.931] defeats conservative separation.
+No44289,extension or same-source retry. The accepted solver remains unchanged.
+[rectangular-rhs-packet.json](evidence/rectangular-rhs-packet.json), exact
+implementation/proofs/full checks and every timing result in
+`target/perf-rhs-packet/`. Further factor-engine work needs an additional
+ownership/destination boundary; do not add the separate historical gains.
+
 Current rectangular-RHS census covers99.42% of DEGEN3 triangular terms with
 natural four-double packets; the complete rectangle scope is13.28% of its
 instrumented test solve. All measured fronts are double precision. DEGEN2's

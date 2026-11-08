@@ -1,0 +1,185 @@
+{
+  "source": "07e3e71b",
+  "experiment": "Complete rectangular double-precision substitution over four independent RHS lanes. Shares each live lower-triangle coefficient and loop/dispatch among original G4 RHSs, reuses coefficient-major scratch across all groups in one front, and preserves original total RHS count/column index for tails and exceptional replays. LDL, pivots, precision and reciprocal scaling unchanged.",
+  "configuration": "Rust1.98.1 ordinary ThinLTO/glibc release, current EPYC virtual host, CPU2 for counters/screen. Runtime AVX2/FMA detection; no global target-cpu/fast-math/build flags. Single-precision, n<4, unsupported CPUs and unmasked MXCSR retain original ordered path. No PGO/TCMalloc or current-reference speed claim.",
+  "oracle": "Complete original factor_block copied before rewrite; source reconstruction verified. Original public dtrsm_llu_col and acc_terms/tile_mode/col_kernel remain unchanged. Opaque original/packet tests compare every rectangle value and complete factor-block mm/r/diag/rcp bits and full MXCSR.",
+  "focused_checks": {
+    "rectangle_cases": 5624,
+    "complete_factor_block_cases": 1488,
+    "coverage": "All existing kernel width/class/tile boundaries through192 and n1/2/3/4/5/7/8/9/12/17; full representations, finite overflow, mixed NaN payloads, signed zeros, subnormals, normal inputs; all16MXCSR modes on selected small shapes and explicit finite zero/denormal cases at widths2/3/12/13/16/25/88/89; unmasked invalid/denormal entry declines without touching data. Complete blocks include regularization, both precisions and100original bit-encoded real fronts from7models. Native packet entry explicitly exercised on supported host."
+  },
+  "full_gates": {
+    "parity": "987/987 all dump tags/results; baseline untouched",
+    "release_tests": {
+      "groups": 37,
+      "passed": 285,
+      "ignored": 22,
+      "failed": 0
+    },
+    "benchmark": "Not run after the first inconclusive timing screen; no optimization accepted."
+  },
+  "whole_results": "All42alternating bounded counter result/exit objects agree after removing only diagnostics.seconds; paired runner validates all130original complete objects (128timed+2warmups).",
+  "counter_rows": [
+    {
+      "model": "afiro",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 3257964,
+        "after": 3229861,
+        "change_percent": -0.862593939036771
+      },
+      "cycles:u": {
+        "before": 3561128,
+        "after": 3335578,
+        "change_percent": -6.333667309908542
+      }
+    },
+    {
+      "model": "sc50a",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 5406377,
+        "after": 5355586,
+        "change_percent": -0.9394646359290104
+      },
+      "cycles:u": {
+        "before": 4313374,
+        "after": 4303302,
+        "change_percent": -0.2335062992450898
+      }
+    },
+    {
+      "model": "blend",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 13478678,
+        "after": 13172115,
+        "change_percent": -2.274429287501345
+      },
+      "cycles:u": {
+        "before": 8296415,
+        "after": 8337740,
+        "change_percent": 0.4981067123570826
+      }
+    },
+    {
+      "model": "adlittle",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 11649005,
+        "after": 11501846,
+        "change_percent": -1.2632752754419774
+      },
+      "cycles:u": {
+        "before": 7528050,
+        "after": 7738266,
+        "change_percent": 2.79243628828183
+      }
+    },
+    {
+      "model": "bore3d",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 72842124,
+        "after": 70592961,
+        "change_percent": -3.0877229774354142
+      },
+      "cycles:u": {
+        "before": 38555991,
+        "after": 36884289,
+        "change_percent": -4.335777544921616
+      }
+    },
+    {
+      "model": "degen2",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 258910578,
+        "after": 250895346,
+        "change_percent": -3.0957530055029214
+      },
+      "cycles:u": {
+        "before": 111973332,
+        "after": 106826699,
+        "change_percent": -4.596302448157918
+      }
+    },
+    {
+      "model": "degen3",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 2554974076,
+        "after": 2319293273,
+        "change_percent": -9.22439116756032
+      },
+      "cycles:u": {
+        "before": 1101151422,
+        "after": 946673657,
+        "change_percent": -14.028748627452615
+      }
+    }
+  ],
+  "timing_screen": {
+    "arguments": {
+      "before": "target/perf-rhs-packet/before",
+      "after": "target/perf-rhs-packet/after",
+      "run": "degen3.barrier-r",
+      "output": "target/perf-rhs-packet/screen44217.json",
+      "pairs": 32,
+      "seed": 44217,
+      "cpu": 2,
+      "max_iterations": 100,
+      "timeout": 10
+    },
+    "binary_sha256": {
+      "A": "fa615c020cf4eaf9b632ceeab247e68e4382b1782eaa89420911222b9a6ba70a",
+      "B": "136a4909d3354403c1b0f8986b5ca3bc908d61b40f6f3a982d081476924f46b8"
+    },
+    "rule": "one-sided sign p<=.01; AA two-sided sign p>.05; median gain>=0.5%; AB 95% median upper bound < negative max absolute AA 95% bound; both orders improve",
+    "status": "complete",
+    "binary_end_sha256": {
+      "A": "fa615c020cf4eaf9b632ceeab247e68e4382b1782eaa89420911222b9a6ba70a",
+      "B": "136a4909d3354403c1b0f8986b5ca3bc908d61b40f6f3a982d081476924f46b8"
+    },
+    "summary": {
+      "ab_median_percent": -10.103166295405476,
+      "ab_ci_percent": [
+        -13.000089628379975,
+        -4.2081048355100625
+      ],
+      "aa_median_percent": 0.25858080914971493,
+      "aa_ci_percent": [
+        -4.29989502152578,
+        2.930801452149767
+      ],
+      "improving_pairs": 27,
+      "pairs_per_kind": 32,
+      "ab_sign_p": 5.653710104525089e-05,
+      "aa_sign_p": 0.860050065908581,
+      "order_median_percent": {
+        "AB": -11.060339800176566,
+        "BA": -9.588538556118422
+      },
+      "criteria": {
+        "sign_p_at_most_001": true,
+        "aa_not_biased_at_005": true,
+        "median_gain_at_least_half_percent": true,
+        "ab_upper_ci_below_aa_error": false,
+        "both_orders_improve": true
+      },
+      "positive_screen": false
+    }
+  },
+  "decision": "Inconclusive first44217: median-10.103%,CI[-13.000,-4.208],AA[-4.300,+2.931],27/32better,p5.65e-5,bothordersimprove; conservative noise separation fails. No44289,extension or same-source retry. Numerically verified source preserved on jj bookmark experiments/barrier-rhs-packets, explicitly unqualified; accepted source/CLI restored. Broader whole-factor engine needs a genuinely additional ownership/destination boundary, not another screen of these same packets.",
+  "assembly": "Native solve11,320bytes;72packed negative-FMA sites plus5vmulpd/2vsubpd/11vaddpd sites. Separate rounded multiply/add/subtract remains in the original nonfused schedule. Complete disassembly retained.",
+  "fixture": "tests/fixtures/barrier_rect_blocks.json contains100original pre-factor fronts, exact u64 float bits, from the census captures (up to32distinct dense (w,n,precision) geometries/model). No frozen parity data changed.",
+  "hashes": {
+    "before": "fa615c020cf4eaf9b632ceeab247e68e4382b1782eaa89420911222b9a6ba70a",
+    "after": "136a4909d3354403c1b0f8986b5ca3bc908d61b40f6f3a982d081476924f46b8",
+    "chol": "ee9a72e377b55deb38058e2933aab7aff9a01b04247db17de4e532c51f4b8056",
+    "packets": "d00c064a281b321d5018a58337496226d3beb29c3050cbb27eec9b5e6f5403a7",
+    "oracle": "f2acbde88b2fe00906e52941a36867a40b6a910aaad307481bbb5885352b4f09",
+    "fixture": "54545fe48fa417b0c765a626b2cc4edd957bba38a6c0fd88b3a0e68fa23c0657"
+  },
+  "artifacts": "target/perf-rhs-packet/ (original/final source,proof,all targeted/full tests,build/parity logs,counters/full results,native disassembly,complete fixed screen schedule/raw/results)"
+}
