@@ -257,7 +257,7 @@ measured.
   overwrite. Do not treat sparse matches as a global proof or bypass the overlay.
   The strictly-lower-L contiguous-suffix dependency cut is now numerically
   verified with an independent complete constructor, dense mismatch, last-write
-  duplicates/extremes/fallbacks and all SSE modes. Matching fixed39 PGO reduces
+  duplicates/extremes/fallbacks and all SSE modes. Matching fixed 39 PGO reduces
   PILOT4 instructions 1.068%, but screen32217 is inconclusive; stop without
   seed32289 or full candidate gates. It remains unapplied. Do not repeat either
   this screen or the earlier arithmetic-only guarded-replay screen.
@@ -298,7 +298,7 @@ measured.
   Packed ordinary whole-row drop scanning is qualified: raw-bit bias/shift
   mapping makes positive-normal surrogate comparisons exact and exception-safe;
   ascending filtered indices retain the original body. Short (<128 columns),
-  extended and nonprecomputed cases keep the range loop. Matching fixed39 PGO,
+  extended and nonprecomputed cases keep the range loop. Matching fixed 39 PGO,
   full987, all255 release tests and both DEGEN2-controlled screens36217/36289
   pass; all23 full result/exit pairs and the three extra regression controls
   qualify. No screen/control is extended or repeated.
@@ -432,14 +432,20 @@ measured.
   Mode-switch dual is 8.21x slower, GREENBEA dual-release 3.97x, controlled 80BAU
   primal 4.88x. The GREENBEA solve-scope comparison is now qualified: 5.4666B
   versus 1.3461B instructions, healthy 2728/2688 samples and 99.8% direct coverage.
-  At least 10.70% Rose self is pivot-row work already covered by settled trials;
-  the 19.65% libc allocator mass still needs its owner. Do not reinterpret the
-  whole 13.23% iteration self as generic overhead or reopen row/workspace/FTRAN
-  schemes from these totals. DEGEN2 DWARF checks remain unreliable even with
-  a larger stack; next qualify frame-pointer source/parity/direct-count skew
-  and then allocator ancestry before another substantial implementation.
-  See evidence/greenbea-phase-profile.json. Keep self/inclusive scopes separate,
-  explicit unknown families and process-map/PT_LOAD mapping provenance.
+  At least 10.70% Rose self is pivot-row work already covered by settled trials.
+  The allocator-owner lead is now closed: full 987-qualified cached FP source
+  has +.586% GREENBEA instruction skew, healthy 2736 samples and 99.515% coverage;
+  its 542 allocator leaves reach Rose caller context. Leading sites are outgoing
+  mirror, Structure retirement and true_d; all overlap settled owners. Do not
+  reopen buffer/cache/arena work from the 19.65% accepted-release allocator mass.
+  See evidence/greenbea-allocation-owners.json for disjoint physical ancestry,
+  explicit other contexts and immediate-callee/return-address proof.
+  Next finish isolated qualification of the existing fixed 39 PGO/system-TCMalloc
+  configuration with matching compiler tools, full parity and release tests,
+  then measure it separately on this host. Preserve the ordinary accepted CLI,
+  source/dependency hashes and baseline; no architecture or speedup claim from
+  build/training alone. Continue searching for genuinely distinct whole-stage
+  numerical work, not a different name for the settled owners.
   The scalar prefilter and prior rank/layout trials remain
   rejected; do not infer further gains from isolated predicate costs.
   Comparator alignment stays centralized; normal lunum's build/cache transport

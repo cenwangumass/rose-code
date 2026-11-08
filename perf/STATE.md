@@ -92,15 +92,44 @@ checks or stack reloads as causes. FTRAN WORK (joint_u) and output publication
 502.5M known reference FTRAN/L/U. These are self estimates with different
 routine boundaries, not exact operation-equivalent excesses or removable time.
 
-No new rewrite is qualified. Existing dense-row, workspace, row-cell, outlining,
-FTRAN owner and whole pivot handoff trials remain settled. Allocator ownership
-is the remaining lead. Small DWARF checks with 8 KiB/65528-byte stacks reach a
-semantic caller for only 1/4 and 3/5 allocator leaves; do not escalate that unwind
-to GREENBEA or infer caller mass. Next qualify a separate frame-pointer build
-and label its own code/counter skew before allocator ancestry. Evidence:
-[greenbea-phase-profile.json](evidence/greenbea-phase-profile.json), all probes,
-raw results/events/maps/classifiers and accepted assembly under
-`target/perf-greenbea-phases/`. Numerical source and accepted CLI unchanged.
+The allocation-owner lead is closed without implementation. The cached
+frame-pointer ELF 68dc54d9 passes fast 940 and full 987 parity; nine ordinary/CLI
+source files match current source exactly, while only older chol files differ.
+Its own instruction skew is +0.789% on DEGEN2 and +0.586% on GREENBEA. This
+qualifies owner discovery, not transferring its cost shares to accepted release.
+
+The healthy GREENBEA FP profile has 2736 samples, zero loss/throttle and 99.515% direct
+event coverage. All 542 libc allocator leaves reach a Rose-context caller;
+14 remain Rose other rather than a specific buffer. Physical ancestry partitions
+296 under refactor, 220 iteration/post and 26 driver-context leaves. The last group
+contains 23 startup/end and 3 iteration/post return sites; it is not all lifecycle
+work. Leading returns are e72b2 (61 leaves): outgoing RefStruct retirement at
+mirror replacement; e76e3 (54): local Structure retirement; 10b0d1 (32):
+recompute_d returning from true_d, before dual_residual_check. Disassembly
+confirms callees because line attribution can name the following statement.
+F80-looking aliases do not establish extended execution. Those 147 samples are
+5.37% of FP self, not a removable-time bound.
+
+All leading owners overlap settled cross-epoch banks/generation arenas,
+Structure publication/retirement and reduced-cost rebuild/presorted-column
+studies. Remaining construction/pricing, row/framework and triangular-storage
+owners supply no distinct lifetime. Existing dense-row, workspace, row-cell,
+outlining, FTRAN owner and whole pivot handoff trials remain settled. No new
+buffer/cache/arena trial follows. Evidence:
+[greenbea-allocation-owners.json](evidence/greenbea-allocation-owners.json),
+all FP/provenance/parity/counters/frames/source-site proofs in
+`target/perf-greenbea-owners/`. Release solve scopes remain separately recorded
+in [greenbea-phase-profile.json](evidence/greenbea-phase-profile.json).
+
+The existing fixed 39 PGO/system-TCMalloc configuration is being qualified in
+an isolated source copy under `target/perf-optimized-build/`. Matching LLVM
+22.1.8 profile tools and Ubuntu gperftools 2.18.1 are available; the latter is
+hash-checked and extracted to a task sysroot. No system package was installed.
+Build/training/full-parity/release-test logs and exact dependency/source/command
+metadata are retained there. This restores a supported build configuration;
+it is not a new numerical architecture or accepted speedup. The ordinary
+accepted binary and current 0/23 comparison remain unchanged pending all gates
+and fresh measurements.
 
 Earlier small dual probes and PEROLD ancestry remain separately labeled in
 their evidence. The unthrottled PEROLD frame-pointer batch (24 full solves,

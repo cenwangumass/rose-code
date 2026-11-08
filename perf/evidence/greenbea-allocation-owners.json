@@ -1,0 +1,176 @@
+{
+  "source": "18061fe9 accepted ordinary CLI; documentation parent6091e822",
+  "decision": "Close allocation lead without implementation: resolved owners fall in settled complete transaction/storage studies; no new qualified allocation architecture. No buffer/cache/arena revival.",
+  "build_qualification": {
+    "fp_sha256": "68dc54d95c6ecc721ef97b6f9a5d51cf4a7344e285c1faec93954b115875b7a7",
+    "accepted_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "preceding_source": "3ee41127",
+    "ordinary_source_hashes": {
+      "src/dual.rs": "dce94c76006809b9befabb79f04b658bd31213b86f07193341b0791c2e09eccd",
+      "src/ftran_order.rs": "57c86340f6959717954e2cb1c58f06c285ab7ce564a25d7d0e9e9c429d802ef1",
+      "src/lu_order.rs": "530ff158c6d8c1263ed4317ad6d67d3bd6a8509bbc4e55b4c5a3e00bdfa89123",
+      "src/lu.rs": "7104adbfcae0f73030fcf7136c1624715d33e6f686383fa7a41bd95fa4a074e4",
+      "src/lu_pairs.rs": "8549f681e432888ffbde8ccaf9113e24fa1760c2962db852d069b7729e2ae2b9",
+      "src/simplex.rs": "4ff9697cd5627beccce151d2eb03a84852a149dcb39a7249606a6e363c155ac6",
+      "src/real.rs": "9399212fbe9de003ae4e70b44c850fa7a0459b8c2f8d19ec538c15286cb23918",
+      "src/f80.rs": "2a20a41d94ff36934fb84375886b1ac0fbf1b35dd7bb29f3d009e0b95e35aa70",
+      "src/bin/rose.rs": "63d282ccf37597706b28ecbf0cc6d18a0a37b41e9c9b06defd7cf643b6902962"
+    },
+    "source_difference": "jjdiff3ee41127..current src contains only chol*barrier changes. All nine ordinary/CLI sourcefiles compared byteforbyte. Cached FP ELF retained separately; not described as current whole-source release.",
+    "flags": "force-frame-pointers=yes, profiling line tables, noPGO/glibc; Cargo fingerprints preserved source-proof.json",
+    "fast_parity": "940/940 fp-fast-parity.log",
+    "full_parity": "987/987 (58.5s) fp-full-parity.log"
+  },
+  "measurement": {
+    "scope": "Same two-clock accepted-solver scope hook and acknowledged perf-control intervals as previous release profile. Source gates and process maps retained; profiling binary changed and measured separately.",
+    "CPU": 2,
+    "bounds": "max_iterations10000 and external20s/case; both optimal within limits",
+    "small_first": "DEGEN2:8counter+8recorded solves,period8M;58allocator leaves allreach a Rose-context caller before GREENBEA escalation.",
+    "large": "GREENBEA:16counter+16recorded fresh-process solves,period32M. All2736samples,0loss/throttle,99.515%direct-event coverage; all542allocatorleavesreach Rose-context frames.",
+    "qualification": "Nearest Rose-containing frame is owner discovery, not proof of a particular buffer.14GREENBEA allocator leaves stay in Roseother; generic RawVec/drop wrappers skipped before classifying semantic context. Unknown/private/inlined work is not invented.",
+    "skew": "FP direct instructions+.789%DEGEN2,+.586%GREENBEA vsrelease. Small aggregate skew does not prove unchanged inlining/allocation distribution; never project FP shares as exact accepted-release removable cost."
+  },
+  "profiles": {
+    "degen2": {
+      "samples": 232,
+      "audit": {
+        "PERF_RECORD_SAMPLE": 232,
+        "PERF_RECORD_LOST": 0,
+        "PERF_RECORD_THROTTLE": 0,
+        "PERF_RECORD_UNTHROTTLE": 0
+      },
+      "direct_counts": {
+        "instructions:u": 1863054066,
+        "cycles:u": 1324305699
+      },
+      "per_solve_counts": {
+        "instructions:u": 232881758.25,
+        "cycles:u": 165538212.375
+      },
+      "represented_fraction": 0.9962137083787669,
+      "release_instruction_skew_percent": 0.7891861256061672,
+      "allocator_leaf_samples": 58,
+      "allocator_rose_caller_samples": 58,
+      "caller_coverage": 1.0,
+      "nearest_owner": {
+        "dual other": 15,
+        "ordered factor construction": 12,
+        "Rose other": 4,
+        "factor publication": 8,
+        "iteration (inlined/remaining)": 7,
+        "FTRAN L": 2,
+        "refactor": 7,
+        "FTRAN first": 3
+      },
+      "disjoint_main_branch": {
+        "[no main stage]": 10,
+        "refactor": 34,
+        "iteration/post": 14
+      }
+    },
+    "greenbea": {
+      "samples": 2736,
+      "audit": {
+        "PERF_RECORD_SAMPLE": 2736,
+        "PERF_RECORD_LOST": 0,
+        "PERF_RECORD_THROTTLE": 0,
+        "PERF_RECORD_UNTHROTTLE": 0
+      },
+      "direct_counts": {
+        "instructions:u": 87978519029,
+        "cycles:u": 64447561884
+      },
+      "per_solve_counts": {
+        "instructions:u": 5498657439.3125,
+        "cycles:u": 4027972617.75
+      },
+      "represented_fraction": 0.9951520094483586,
+      "release_instruction_skew_percent": 0.5864317145772402,
+      "allocator_leaf_samples": 542,
+      "allocator_rose_caller_samples": 542,
+      "caller_coverage": 1.0,
+      "nearest_owner": {
+        "factor publication": 29,
+        "iteration (inlined/remaining)": 47,
+        "refactor": 127,
+        "post (inlined/remaining)": 44,
+        "FTRAN needed": 16,
+        "FTRAN first": 27,
+        "ordered factor construction": 95,
+        "reset_pricing": 28,
+        "auxiliary LU": 29,
+        "Rose other": 14,
+        "BTRAN": 20,
+        "dual other": 22,
+        "factor update": 20,
+        "pivot row": 6,
+        "FTRAN L": 12,
+        "framework RHS": 6
+      },
+      "disjoint_main_branch": {
+        "[no main stage]": 26,
+        "iteration/post": 220,
+        "refactor": 296
+      }
+    }
+  },
+  "leading_sites": [
+    {
+      "pc": "0xe72b2",
+      "allocator_samples": 61,
+      "callee_call": "0xe72ad calls drop_glue<RefStruct>",
+      "identity": "outgoing mirror retirement at self.mirror = mi, dual.rs1200",
+      "covered_by": "cross-epoch storage banks, retired-slot census, whole-generation arena"
+    },
+    {
+      "pc": "0xe76e3",
+      "allocator_samples": 54,
+      "callee_call": "0xe76de calls drop_glue<Structure>",
+      "identity": "local st retirement at successful refactor completion, dual.rs1214",
+      "covered_by": "Structure formation/publication/retirement, incoming representation and storage studies"
+    },
+    {
+      "pc": "0x10b0d1",
+      "allocator_samples": 32,
+      "callee_call": "0x10b0cc calls true_d; next0x10b0d4 calls dual_residual_check",
+      "identity": "recompute_d -> true_d; source line1585 is the following statement, not the allocating callee",
+      "covered_by": "complete reduced-cost rebuild owner; borrowing presorted columns instead of clone/sort"
+    }
+  ],
+  "disjoint_ancestry": "Of542GREENBEA allocator leaves,296have a physical refactor ancestor,220have iteration/post ancestry without refactor,26are driver-context cases. These are disjoint physical stack labels; tail calls/inlining can hide a finer phase. Driver-return source audit finds23startup/end and3iteration/post return sites, so26must not all be called startup/shutdown.",
+  "scope_limits": [
+    "The three leading sites total147/2736=5.373%ofFPinstruction samples, not removable time. Required numerical/self work, copying and publication remain separate.",
+    "F80-looking drop/generic names reflect identical-code folding in ordinary execution, not evidence of extended arithmetic. Caller/source/disassembly identities decide roles.",
+    "Return addresses and addr2line may point after the allocating call. Immediate callee confirmation is retained for the leading sites.",
+    "No solver speedup, timing acceptance, or newreference comparison follows from owner sampling. The current0/23fixed-reference panel remains separate."
+  ],
+  "review": "Astra high factor_destination_review audited source/callsite identities and coverage; independent Astra high architecture review also found no qualified new allocation lifetime across allfourmethods. Main implemented probes/classifiers; neither reviewer edited or ran solvers.",
+  "validation": {
+    "complete_result_exit_pairs": 49,
+    "detail": "16DEGEN2counter/record pairs +1GREENBEAsmall +32GREENBEAcounter/record pairs, each compared to own original full-bench-v2 complete output with only timer removed; exactly2monotonic calls asserted.",
+    "counter_running": "All direct instructions/cycles100%running.",
+    "unwind": "FPstack depth histograms and all raw/normalized frames retained; all542allocatorleaves reach Rosecaller context. Does not relabel14Roseother frames as known buffers."
+  },
+  "artifacts": "target/perf-greenbea-owners/: rose-fp,source-proof.json,Cargo fingerprints,fp-{fast,full}-parity.log,collect.py,validate.py,symbols.py,owners.py,summary.py; allmanifests/rawoutputs+exits/maps/samples/stacks/events; owner-analysis andnormalized-stacks; return-lines.json,driver-return-lines.json,refactor-hot.asm,recompute-hot.asm.",
+  "artifact_source_hashes": {
+    "summary.py": "d28b32243cc2ea74e76f415cf0ba945a102de58fcbd0f91fe3416378cb3194e7",
+    "symbols.py": "8e24ffdb7d71dfd5c113d05844e79b6f3821ebe7f28c1460a2470dbcada7bdc0",
+    "collect.py": "e65f810fe63778ce527dbc6d6913b4f88b6458be87506e9a6e1bdd8a92721f19",
+    "owners.py": "6491059ce29e46aa20fae7ca492cfd00adf046db429dc44ed0830086ecef76d8",
+    "validate.py": "02427d4e9c903c681ba79e899efbd20c03562f1324559cb019d2ec69db1d82df",
+    "evidence.py": "3605c568a34993aa061e7c630fc8598ceafaefab8ada7ee1aa91bdc85d30275f"
+  },
+  "verification": {
+    "accepted_cli_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "accepted_release_tests_log": "target/perf-greenbea-owners/accepted-release-tests.log",
+    "accepted_full_parity": "unchanged accepted SHA;987/987,target/perf-greenbea-phases/accepted-full-parity.log",
+    "fp_full_parity": "987/987,target/perf-greenbea-owners/fp-full-parity.log",
+    "runtime_change": "None; accepted ordinary CLI/root build cache untouched.",
+    "accepted_release_tests": {
+      "groups": 37,
+      "passed": 292,
+      "failed": 0,
+      "ignored": 22
+    }
+  }
+}
