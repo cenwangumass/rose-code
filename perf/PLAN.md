@@ -329,8 +329,10 @@ measured.
   sharing live L coefficients while retaining each RHS's original kernel class,
   total n/column index and tile schedule. Preserve original RHS inputs for native
   nonfinite fallback, LL0 external-update/substitution boundaries and final
-  reciprocal scaling. First census shared-schedule RHS coverage, then freeze
-  full factor_block and compare complete outputs/flags on real fronts. Prior
+  reciprocal scaling. Current census gives99.42% four-double term coverage on
+  DEGEN3, with13.28% diagnostic rectangle scope and no single-mode fronts.
+  Freeze full factor_block and compare complete outputs/flags on real fronts;
+  prototype complete four-double packets before adding unobserved float work. Prior
   ordinary auxiliary four-RHS and local LDL/dispatch trials are separate and
   remain rejected; do not restart them as a small buffer experiment.
   PEROLD FTRAN/L/update and factor-production/installation ownership remain larger

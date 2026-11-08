@@ -1412,6 +1412,15 @@ no new solver speedup or reference timing ratio.
 
 ## Candidates
 
+Current rectangular-RHS census covers99.42% of DEGEN3 triangular terms with
+natural four-double packets; the complete rectangle scope is13.28% of its
+instrumented test solve. All measured fronts are double precision. DEGEN2's
+coverage is96.55%, rectangle scope5.23%; smaller witnesses include LL0 and left
+kernels. These single-run test scopes are diagnostic, not accepted-release or
+removable-cost bounds. All7 complete uninstrumented/measured solve results
+agree. [rectangular-rhs-census.json](evidence/rectangular-rhs-census.json), raw
+original front inputs/logs/probe in `target/perf-rhs-census/`.
+
 Current barrier release-test scope measurements (three bounded full pairs per
 row; DEGEN3 CPU2, cap100) put the complete forward/backward pair near7%, normal
 solve11%, numeric factor71%, child updates35% including DGEMM19%, assembly9%
