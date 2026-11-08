@@ -4,26 +4,62 @@ Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (histo
 
 ## Current host: AMD EPYC virtual CPU, family 23
 
-Source `zxtxvvvn`, pinned Rust 1.98.1, ordinary ThinLTO release and glibc,
-CPU 2. This checkout has no preceding PGO artifacts or TCMalloc library;
-the historical EPYC 9V74 timing table is not a current-host comparison.
-The supplied reference is now reconstructed locally at
-`target/perf-reference/reconstructed/libgurobi130.so`, exact required SHA256
-`26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`.
-Its environment initializes successfully with the bundled license. This proves
-availability only; the native harness still needs Runtime/effective-parameter
-recording before fresh current-host comparisons. No current reference win claim.
-[reference-availability.json](evidence/reference-availability.json).
-The current release passes fast 940/940 and full 987/987 parity. The
-preceding frame-pointer profiling build passes fast 940/940.
+Source `zxtxvvvn` (`18061fe9`), pinned Rust 1.98.1, ordinary ThinLTO release,
+glibc, CPU 2. Accepted CLI SHA256
+`8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410`.
+This host has no preceding PGO artifacts or TCMalloc library. Historical
+EPYC 9V74/TCMalloc tables below are separate configurations.
 
-`perf/bench.sh` now appends solve samples inside Python: Hyperfine 1.19 applies
-`-N` to hooks, so its former shell redirection left an empty sample file.
-The corrected harness completed all 23 rows, one warm-up and three measured
-runs each. These are diagnostic single-binary host baselines; profiling/parity overlapped
-some early rows, and no speedup or reference comparison is claimed. Numbers, binary hashes and profile qualification are in
-[evidence/current-host.json](evidence/current-host.json); raw results and
-commands remain in `target/perf-refresh/`.
+The current fixed 23-row reference comparison is complete: Rose is faster on
+**0/23**. Each solver has one warmup and three measured fresh-process runs per
+row, rotating order on the same CPU. Timers are Rose `diagnostics.seconds` and
+Gurobi `Runtime`; all 184 complete results/exits are retained and stable within
+each solver. Valid nonoptimal statuses and Rose exit 3 are preserved. Barrier
+uses its normal 1000 iteration limit; GREENBEA PDHG uses the specified 20000.
+Reference logging is explicitly off. Three-sample medians are descriptive,
+not an optimization acceptance screen or cross-solver numerical-alignment proof.
+
+| Row | Rose ms | Gurobi ms | Rose / Gurobi |
+|---|---:|---:|---:|
+| degen2.primal-c | 71.128 | 21.668 | 3.283 |
+| degen2.dual-r | 58.745 | 16.805 | 3.496 |
+| degen3.primal-c | 883.168 | 311.364 | 2.836 |
+| degen3.primal-r | 1216.082 | 333.747 | 3.644 |
+| perold.primal-c | 1024.754 | 309.258 | 3.314 |
+| pilot4.primal-r | 93.306 | 28.592 | 3.263 |
+| 80bau3b.primal-c | 922.550 | 189.233 | 4.875 |
+| primal_5959.primal-r | 99.369 | 73.598 | 1.350 |
+| degen3.dual-c | 489.323 | 155.954 | 3.138 |
+| degen3.dual-r | 462.506 | 151.071 | 3.062 |
+| perold.dual-r | 259.579 | 70.153 | 3.700 |
+| 80bau3b.dual-r | 565.991 | 137.443 | 4.118 |
+| greenbea.dual-c | 1331.731 | 361.102 | 3.688 |
+| greenbea.dual-r | 1394.194 | 350.943 | 3.973 |
+| mode_switch.dual-r | 1343.815 | 163.622 | 8.213 |
+| primal_5959.dual-r | 127.878 | 97.885 | 1.306 |
+| quad_2717.dual-r | 153.781 | 105.567 | 1.457 |
+| fx_quad_obj_5371.dual-r | 47.779 | 39.065 | 1.223 |
+| degen3.barrier-r | 271.010 | 128.775 | 2.105 |
+| 80bau3b.barrier-r | 405.132 | 169.034 | 2.397 |
+| greenbea.barrier-r | 1651.639 | 704.060 | 2.346 |
+| 80bau3b.pdhg | 3744.162 | 3239.033 | 1.156 |
+| greenbea.pdhg | 1898.783 | 1516.258 | 1.252 |
+
+The reference was reconstructed from the supplied archive and hash-checked
+patches at `target/perf-reference/reconstructed/libgurobi130.so`, exact SHA256
+`26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`.
+Environment initialization and AFIRO profiles are qualified. The native harness
+now checks Runtime/status/iteration reads, honours parameter precedence, records
+effective overrides and preserves failures/timeouts. Parent harness commits:
+`7e089564`, `a86024e2`. The first sweep prefix stopped on an incorrect harness
+exit check and is excluded; the corrected complete panel is used exclusively.
+Evidence: [current-reference-comparison.json](evidence/current-reference-comparison.json),
+all manifests, raw output, source/runner/library/model hashes and qualified
+small/error witnesses in `target/perf-reference/`.
+[reference-availability.json](evidence/reference-availability.json) records reconstruction.
+The earlier single-binary host baseline in evidence/current-host.json remains
+separate from this paired solver comparison. Full frozen parity 987/987 and
+all 292 runnable release tests pass; numerical source and accepted CLI unchanged.
 
 Small dual probes proceed AFIRO, SC50A, ADLITTLE, BORE3D, DEGEN2 (cap 300).
 The DEGEN2 instruction profile is unthrottled. Higher-rate exploratory PEROLD,

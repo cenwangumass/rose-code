@@ -1,0 +1,778 @@
+{
+  "source": "18061fe9 (accepted zxtxvvvn), ordinary ThinLTO/glibc/Rust1.98.1",
+  "goal_status": "Not achieved: current-host full fixed-row comparison complete; no new runtime optimization.",
+  "measurement": "One warmup and3 measured fresh processes per solver per fixed row, CPU2 affinity, rotating order; Gurobi Runtime versus Rose diagnostics.seconds. External70s per-process deadline; original row-specific limits preserved.",
+  "manifest": {
+    "schema": "rose.reference-bench/1",
+    "cpu": 2,
+    "affinity": [
+      2
+    ],
+    "host": {
+      "cpu": "AMD EPYC Processor (with IBPB)",
+      "kernel": "7.0.0-38-generic"
+    },
+    "rose_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "library_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "runner_sha256": "6b5a4fa63bfb684e218784a6c45fa925368da69a97b86ada0a405644830807c0",
+    "source_sha256": {
+      "/home/derekwang/rose-reverse-engineer/rose/perf/compare_reference.py": "526bfabb7fdc51a78cc59ebdd01f8eefda3e8e7d87427be730b896456d9d5eee",
+      "/home/derekwang/rose-reverse-engineer/reverse-engineer/tools/ref_run.py": "fab291de7f813e249654545e09fd6e851fd4571c5de5e2c7a547d501468ab45b",
+      "/home/derekwang/rose-reverse-engineer/reverse-engineer/tools/native_run.c": "c43884168b29bb78283ee80967aef4653e50a95dc311c40e61bfd2b632beb4fe",
+      "/home/derekwang/rose-reverse-engineer/rose/perf/bench.txt": "4e5270f494ca09c0157d6dc1a468496ae75555d714471e190b99df5896077602"
+    },
+    "warmups_per_solver": 1,
+    "samples_per_solver": 3,
+    "timeout_seconds_per_process": 70,
+    "timers": {
+      "rose": "diagnostics.seconds",
+      "reference": "GRB Runtime"
+    },
+    "rows": [
+      {
+        "id": "degen2.primal-c",
+        "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen2.mps",
+        "rose_args": [
+          "--method",
+          "primal",
+          "--profile",
+          "controlled"
+        ],
+        "reference_profile": "controlled",
+        "reference_extra": {
+          "OutputFlag": 0
+        }
+      },
+      {
+        "id": "degen2.dual-r",
+        "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen2.mps",
+        "rose_args": [
+          "--method",
+          "dual",
+          "--profile",
+          "release"
+        ],
+        "reference_profile": "dual-release",
+        "reference_extra": {
+          "OutputFlag": 0
+        }
+      },
+      {
+        "id": "degen3.primal-c",
+        "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen3.mps",
+        "rose_args": [
+          "--method",
+          "primal",
+          "--profile",
+          "controlled"
+        ],
+        "reference_profile": "controlled",
+        "reference_extra": {
+          "OutputFlag": 0
+        }
+      },
+      {
+        "id": "degen3.primal-r",
+        "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen3.mps",
+        "rose_args": [
+          "--method",
+          "primal",
+          "--profile",
+          "release"
+        ],
+        "reference_profile": "release",
+        "reference_extra": {
+          "OutputFlag": 0
+        }
+      },
+      {
+        "id": "perold.primal-c",
+        "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/perold.mps",
+        "rose_args": [
+          "--method",
+          "primal",
+          "--profile",
+          "controlled"
+        ],
+        "reference_profile": "controlled",
+        "reference_extra": {
+          "OutputFlag": 0
+        }
+      },
+      {
+        "id": "pilot4.primal-r",
+        "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/pilot4.mps",
+        "rose_args": [
+          "--method",
+          "primal",
+          "--profile",
+          "release"
+        ],
+        "reference_profile": "release",
+        "reference_extra": {
+          "OutputFlag": 0
+        }
+      },
+      {
+        "id": "80bau3b.primal-c",
+        "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/80bau3b.mps",
+        "rose_args": [
+          "--method",
+          "primal",
+          "--profile",
+          "controlled"
+        ],
+        "reference_profile": "controlled",
+        "reference_extra": {
+          "OutputFlag": 0
+        }
+      },
+      {
+        "id": "primal_5959.primal-r",
+        "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/primal_5959.mps",
+        "rose_args": [
+          "--method",
+          "primal",
+          "--profile",
+          "release"
+        ],
+        "reference_profile": "release",
+        "reference_extra": {
+          "OutputFlag": 0
+        }
+      },
+      {
+        "id": "degen3.dual-c",
+        "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen3.mps",
+        "rose_args": [
+          "--method",
+          "dual",
+          "--profile",
+          "controlled"
+        ],
+        "reference_profile": "dual-controlled",
+        "reference_extra": {
+          "OutputFlag": 0
+        }
+      },
+      {
+        "id": "degen3.dual-r",
+        "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen3.mps",
+        "rose_args": [
+          "--method",
+          "dual",
+          "--profile",
+          "release"
+        ],
+        "reference_profile": "dual-release",
+        "reference_extra": {
+          "OutputFlag": 0
+        }
+      },
+      {
+        "id": "perold.dual-r",
+        "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/perold.mps",
+        "rose_args": [
+          "--method",
+          "dual",
+          "--profile",
+          "release"
+        ],
+        "reference_profile": "dual-release",
+        "reference_extra": {
+          "OutputFlag": 0
+        }
+      },
+      {
+        "id": "80bau3b.dual-r",
+        "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/80bau3b.mps",
+        "rose_args": [
+          "--method",
+          "dual",
+          "--profile",
+          "release"
+        ],
+        "reference_profile": "dual-release",
+        "reference_extra": {
+          "OutputFlag": 0
+        }
+      },
+      {
+        "id": "greenbea.dual-c",
+        "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/greenbea.mps",
+        "rose_args": [
+          "--method",
+          "dual",
+          "--profile",
+          "controlled"
+        ],
+        "reference_profile": "dual-controlled",
+        "reference_extra": {
+          "OutputFlag": 0
+        }
+      },
+      {
+        "id": "greenbea.dual-r",
+        "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/greenbea.mps",
+        "rose_args": [
+          "--method",
+          "dual",
+          "--profile",
+          "release"
+        ],
+        "reference_profile": "dual-release",
+        "reference_extra": {
+          "OutputFlag": 0
+        }
+      },
+      {
+        "id": "mode_switch.dual-r",
+        "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/witness_dual_r2_mode_switch.mps",
+        "rose_args": [
+          "--method",
+          "dual",
+          "--profile",
+          "release"
+        ],
+        "reference_profile": "dual-release",
+        "reference_extra": {
+          "OutputFlag": 0
+        }
+      },
+      {
+        "id": "primal_5959.dual-r",
+        "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/primal_5959.mps",
+        "rose_args": [
+          "--method",
+          "dual",
+          "--profile",
+          "release"
+        ],
+        "reference_profile": "dual-release",
+        "reference_extra": {
+          "OutputFlag": 0
+        }
+      },
+      {
+        "id": "quad_2717.dual-r",
+        "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/quad_2717.mps",
+        "rose_args": [
+          "--method",
+          "dual",
+          "--profile",
+          "release"
+        ],
+        "reference_profile": "dual-release",
+        "reference_extra": {
+          "OutputFlag": 0
+        }
+      },
+      {
+        "id": "fx_quad_obj_5371.dual-r",
+        "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/fx_quad_obj_5371.mps",
+        "rose_args": [
+          "--method",
+          "dual",
+          "--profile",
+          "release"
+        ],
+        "reference_profile": "dual-release",
+        "reference_extra": {
+          "OutputFlag": 0
+        }
+      },
+      {
+        "id": "degen3.barrier-r",
+        "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen3.mps",
+        "rose_args": [
+          "--method",
+          "barrier",
+          "--barrier-profile",
+          "release"
+        ],
+        "reference_profile": "barrier-release",
+        "reference_extra": {
+          "OutputFlag": 0,
+          "BarIterLimit": 1000
+        }
+      },
+      {
+        "id": "80bau3b.barrier-r",
+        "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/80bau3b.mps",
+        "rose_args": [
+          "--method",
+          "barrier",
+          "--barrier-profile",
+          "release"
+        ],
+        "reference_profile": "barrier-release",
+        "reference_extra": {
+          "OutputFlag": 0,
+          "BarIterLimit": 1000
+        }
+      },
+      {
+        "id": "greenbea.barrier-r",
+        "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/greenbea.mps",
+        "rose_args": [
+          "--method",
+          "barrier",
+          "--barrier-profile",
+          "release"
+        ],
+        "reference_profile": "barrier-release",
+        "reference_extra": {
+          "OutputFlag": 0,
+          "BarIterLimit": 1000
+        }
+      },
+      {
+        "id": "80bau3b.pdhg",
+        "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/80bau3b.mps",
+        "rose_args": [
+          "--method",
+          "pdhg"
+        ],
+        "reference_profile": "pdhg-release",
+        "reference_extra": {
+          "OutputFlag": 0
+        }
+      },
+      {
+        "id": "greenbea.pdhg",
+        "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/greenbea.mps",
+        "rose_args": [
+          "--method",
+          "pdhg",
+          "--pdhg-iter-limit",
+          "20000"
+        ],
+        "reference_profile": "pdhg-release",
+        "reference_extra": {
+          "OutputFlag": 0,
+          "PDHGIterLimit": 20000.0
+        }
+      }
+    ],
+    "only": null,
+    "started_utc": "2026-11-08T22:30:50Z"
+  },
+  "completion": {
+    "completed_rows": 23,
+    "rose_faster_rows": 0,
+    "all_results_stable": true
+  },
+  "summary": [
+    {
+      "id": "degen2.primal-c",
+      "rose_seconds": 0.071128285,
+      "reference_seconds": 0.021667957305908203,
+      "ratio": 3.2826483823929933,
+      "rose_faster": false,
+      "rose_status": "optimal",
+      "reference_status": 2
+    },
+    {
+      "id": "degen2.dual-r",
+      "rose_seconds": 0.058744535,
+      "reference_seconds": 0.016804933547973633,
+      "ratio": 3.4956719603978152,
+      "rose_faster": false,
+      "rose_status": "optimal",
+      "reference_status": 2
+    },
+    {
+      "id": "degen3.primal-c",
+      "rose_seconds": 0.883168303,
+      "reference_seconds": 0.31136393547058105,
+      "ratio": 2.8364502191469936,
+      "rose_faster": false,
+      "rose_status": "optimal",
+      "reference_status": 2
+    },
+    {
+      "id": "degen3.primal-r",
+      "rose_seconds": 1.216082298,
+      "reference_seconds": 0.33374714851379395,
+      "ratio": 3.6437234098188513,
+      "rose_faster": false,
+      "rose_status": "optimal",
+      "reference_status": 2
+    },
+    {
+      "id": "perold.primal-c",
+      "rose_seconds": 1.024754101,
+      "reference_seconds": 0.30925822257995605,
+      "ratio": 3.3135872425673623,
+      "rose_faster": false,
+      "rose_status": "optimal",
+      "reference_status": 2
+    },
+    {
+      "id": "pilot4.primal-r",
+      "rose_seconds": 0.093305968,
+      "reference_seconds": 0.02859210968017578,
+      "ratio": 3.2633467429894933,
+      "rose_faster": false,
+      "rose_status": "optimal",
+      "reference_status": 2
+    },
+    {
+      "id": "80bau3b.primal-c",
+      "rose_seconds": 0.92254998,
+      "reference_seconds": 0.18923282623291016,
+      "ratio": 4.87521112676568,
+      "rose_faster": false,
+      "rose_status": "optimal",
+      "reference_status": 2
+    },
+    {
+      "id": "primal_5959.primal-r",
+      "rose_seconds": 0.099368627,
+      "reference_seconds": 0.07359790802001953,
+      "ratio": 1.3501555910117788,
+      "rose_faster": false,
+      "rose_status": "numerical_failure",
+      "reference_status": 12
+    },
+    {
+      "id": "degen3.dual-c",
+      "rose_seconds": 0.489323259,
+      "reference_seconds": 0.15595388412475586,
+      "ratio": 3.1376150824724838,
+      "rose_faster": false,
+      "rose_status": "optimal",
+      "reference_status": 2
+    },
+    {
+      "id": "degen3.dual-r",
+      "rose_seconds": 0.46250636,
+      "reference_seconds": 0.15107083320617676,
+      "ratio": 3.061519885633951,
+      "rose_faster": false,
+      "rose_status": "optimal",
+      "reference_status": 2
+    },
+    {
+      "id": "perold.dual-r",
+      "rose_seconds": 0.259579307,
+      "reference_seconds": 0.07015299797058105,
+      "ratio": 3.700188366986905,
+      "rose_faster": false,
+      "rose_status": "optimal",
+      "reference_status": 2
+    },
+    {
+      "id": "80bau3b.dual-r",
+      "rose_seconds": 0.565990818,
+      "reference_seconds": 0.13744282722473145,
+      "ratio": 4.118009134624056,
+      "rose_faster": false,
+      "rose_status": "optimal",
+      "reference_status": 2
+    },
+    {
+      "id": "greenbea.dual-c",
+      "rose_seconds": 1.331730696,
+      "reference_seconds": 0.3611021041870117,
+      "ratio": 3.6879616057576556,
+      "rose_faster": false,
+      "rose_status": "optimal",
+      "reference_status": 2
+    },
+    {
+      "id": "greenbea.dual-r",
+      "rose_seconds": 1.394194422,
+      "reference_seconds": 0.35094308853149414,
+      "ratio": 3.9727080189381847,
+      "rose_faster": false,
+      "rose_status": "optimal",
+      "reference_status": 2
+    },
+    {
+      "id": "mode_switch.dual-r",
+      "rose_seconds": 1.343814827,
+      "reference_seconds": 0.1636219024658203,
+      "ratio": 8.212927528334511,
+      "rose_faster": false,
+      "rose_status": "optimal",
+      "reference_status": 2
+    },
+    {
+      "id": "primal_5959.dual-r",
+      "rose_seconds": 0.127878372,
+      "reference_seconds": 0.0978851318359375,
+      "ratio": 1.3064126246908807,
+      "rose_faster": false,
+      "rose_status": "numerical_failure",
+      "reference_status": 12
+    },
+    {
+      "id": "quad_2717.dual-r",
+      "rose_seconds": 0.153781458,
+      "reference_seconds": 0.10556697845458984,
+      "ratio": 1.4567193288207057,
+      "rose_faster": false,
+      "rose_status": "optimal",
+      "reference_status": 2
+    },
+    {
+      "id": "fx_quad_obj_5371.dual-r",
+      "rose_seconds": 0.047778587,
+      "reference_seconds": 0.039064884185791016,
+      "ratio": 1.2230571777140555,
+      "rose_faster": false,
+      "rose_status": "infeasible",
+      "reference_status": 3
+    },
+    {
+      "id": "degen3.barrier-r",
+      "rose_seconds": 0.271010352,
+      "reference_seconds": 0.12877511978149414,
+      "ratio": 2.1045241694191463,
+      "rose_faster": false,
+      "rose_status": "optimal",
+      "reference_status": 2
+    },
+    {
+      "id": "80bau3b.barrier-r",
+      "rose_seconds": 0.405131769,
+      "reference_seconds": 0.16903400421142578,
+      "ratio": 2.3967471568221614,
+      "rose_faster": false,
+      "rose_status": "optimal",
+      "reference_status": 2
+    },
+    {
+      "id": "greenbea.barrier-r",
+      "rose_seconds": 1.6516392610000001,
+      "reference_seconds": 0.7040600776672363,
+      "ratio": 2.3458783041248124,
+      "rose_faster": false,
+      "rose_status": "suboptimal",
+      "reference_status": 13
+    },
+    {
+      "id": "80bau3b.pdhg",
+      "rose_seconds": 3.74416177,
+      "reference_seconds": 3.2390329837799072,
+      "ratio": 1.1559504916280952,
+      "rose_faster": false,
+      "rose_status": "optimal",
+      "reference_status": 2
+    },
+    {
+      "id": "greenbea.pdhg",
+      "rose_seconds": 1.8987827309999998,
+      "reference_seconds": 1.5162580013275146,
+      "ratio": 1.2522820848019116,
+      "rose_faster": false,
+      "rose_status": "iteration_limit",
+      "reference_status": 7
+    }
+  ],
+  "qualification": {
+    "override": "Inherited IterationLimit1,explicit0 yields status7/0iterations and records0.",
+    "invalid_parameter": "Exit2 and raw error preserved; no Runtime fabricated.",
+    "tests": "21 reference-tool tests passed, including3 native-recording tests;2 benchmark status/limit tests passed.",
+    "nonoptimal": "Rose status/exit pairing validated; complete exit/result pairs stable within each solver. Valid nonoptimal outcomes retained.",
+    "aborted_prefix": "First full-bench attempt stopped on harness incorrectly rejecting documented Rose numerical-failure exit3; prefix,script and runner retained target/perf-reference/full-bench/. Corrected dedicated nonoptimal witness passes. Fresh full-bench-v2 is used exclusively.",
+    "native_AFIRO_profiles": {
+      "afiro-barrier-release.json": {
+        "status": 2,
+        "runtime": 0.0005450248718261719,
+        "params": {
+          "Method": 2,
+          "Presolve": 0,
+          "Threads": 1,
+          "Seed": 0,
+          "Crossover": 0,
+          "NetworkAlg": 0,
+          "OutputFlag": 0,
+          "TimeLimit": 5,
+          "BarIterLimit": 1000
+        },
+        "iteration_counts": {
+          "bar_iter_count": 7
+        }
+      },
+      "afiro-cap0-final.json": {
+        "status": 7,
+        "runtime": 7.319450378417969e-05,
+        "params": {
+          "Method": 0,
+          "Presolve": 0,
+          "NetworkAlg": 0,
+          "Threads": 1,
+          "Seed": 0,
+          "ScaleFlag": 0,
+          "SimplexPricing": 1,
+          "PerturbValue": 0,
+          "Quad": 0,
+          "OutputFlag": 0,
+          "IterationLimit": 0,
+          "TimeLimit": 5
+        },
+        "iteration_counts": {
+          "iter_count": 0
+        }
+      },
+      "afiro-cap0.json": {
+        "status": 7,
+        "runtime": 0.00012111663818359375,
+        "params": {
+          "Method": 0,
+          "Presolve": 0,
+          "NetworkAlg": 0,
+          "Threads": 1,
+          "Seed": 0,
+          "ScaleFlag": 0,
+          "SimplexPricing": 1,
+          "PerturbValue": 0,
+          "Quad": 0,
+          "OutputFlag": 0,
+          "IterationLimit": 0,
+          "TimeLimit": 5
+        },
+        "iteration_counts": {
+          "iter_count": 0
+        }
+      },
+      "afiro-checked-getters.json": {
+        "status": 2,
+        "runtime": 0.00019407272338867188,
+        "params": {
+          "Method": 1,
+          "Presolve": 0,
+          "NetworkAlg": 0,
+          "Threads": 1,
+          "Seed": 0,
+          "OutputFlag": 0,
+          "IterationLimit": 100
+        },
+        "iteration_counts": {
+          "iter_count": 10
+        }
+      },
+      "afiro-controlled.json": {
+        "status": 2,
+        "runtime": 0.00013208389282226562,
+        "params": {
+          "Method": 0,
+          "Presolve": 0,
+          "NetworkAlg": 0,
+          "Threads": 1,
+          "Seed": 0,
+          "ScaleFlag": 0,
+          "SimplexPricing": 1,
+          "PerturbValue": 0,
+          "Quad": 0,
+          "OutputFlag": 0,
+          "TimeLimit": 5,
+          "IterationLimit": 1000
+        },
+        "iteration_counts": {
+          "iter_count": 10
+        }
+      },
+      "afiro-dual-controlled.json": {
+        "status": 2,
+        "runtime": 0.0001862049102783203,
+        "params": {
+          "Method": 1,
+          "Presolve": 0,
+          "NetworkAlg": 0,
+          "Threads": 1,
+          "Seed": 0,
+          "ScaleFlag": 0,
+          "SimplexPricing": 1,
+          "PerturbValue": 0,
+          "Quad": 0,
+          "OutputFlag": 0,
+          "TimeLimit": 5,
+          "IterationLimit": 1000
+        },
+        "iteration_counts": {
+          "iter_count": 10
+        }
+      },
+      "afiro-dual-release.json": {
+        "status": 2,
+        "runtime": 0.00017213821411132812,
+        "params": {
+          "Method": 1,
+          "Presolve": 0,
+          "NetworkAlg": 0,
+          "Threads": 1,
+          "Seed": 0,
+          "OutputFlag": 0,
+          "TimeLimit": 5,
+          "IterationLimit": 1000
+        },
+        "iteration_counts": {
+          "iter_count": 10
+        }
+      },
+      "afiro-pdhg-release.json": {
+        "status": 2,
+        "runtime": 0.0007350444793701172,
+        "params": {
+          "Method": 6,
+          "Presolve": 0,
+          "Threads": 1,
+          "Seed": 0,
+          "PDHGGPU": 0,
+          "Crossover": 0,
+          "NetworkAlg": 0,
+          "OutputFlag": 0,
+          "TimeLimit": 5,
+          "PDHGIterLimit": 2000
+        },
+        "iteration_counts": {
+          "pdhg_iter_count": 593
+        }
+      },
+      "afiro-release.json": {
+        "status": 2,
+        "runtime": 0.00015997886657714844,
+        "params": {
+          "Method": 0,
+          "Presolve": 0,
+          "NetworkAlg": 0,
+          "Threads": 1,
+          "Seed": 0,
+          "OutputFlag": 0,
+          "TimeLimit": 5,
+          "IterationLimit": 1000
+        },
+        "iteration_counts": {
+          "iter_count": 14
+        }
+      }
+    }
+  },
+  "limits_and_caveats": [
+    "Three-sample descriptive host medians, not an optimization acceptance screen. No PGO/TCMalloc or historical-host numbers mixed.",
+    "Repeated complete outputs/exits agree within each solver; cross-solver numerical alignment is not inferred from timing or handled by ad hoc index maps. Frozen Rose parity gate remains separate.",
+    "All184 full-run raw records (92reference,92Rose), reference stdout/stderr and Rose executions retained. Nonoptimal statuses are solver outcomes, not process failures.",
+    "Reference logging explicitly OutputFlag0. Barrier BarIterLimit1000 and GREENBEA PDHG PDHGIterLimit20000 are recorded; no exploratory caps.",
+    "No zero timers in this completed panel; a zero timer would be reported unrankable, not a win."
+  ],
+  "observed_environment_subset": {
+    "LD_PRELOAD": null,
+    "RUSTFLAGS": null
+  },
+  "artifacts": "target/perf-reference/{qualification/,small-bench/,nonoptimal-check/,full-bench/,full-bench-v2/,all corresponding logs}; source perf/compare_reference.py; reference harness ../reverse-engineer/tools/{native_run.c,ref_run.py},parent commits7e089564/a86024e2.",
+  "verification": {
+    "accepted_cli_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "full_parity_log": "target/perf-reference/accepted-full-parity.log",
+    "release_tests_log": "target/perf-reference/accepted-release-tests.log",
+    "full_parity": "987/987 (64.8s)",
+    "release_tests": {
+      "groups": 37,
+      "passed": 292,
+      "failed": 0,
+      "ignored": 22
+    }
+  }
+}

@@ -16,6 +16,6 @@
   "environment_check": "Restricted license - for non-production use only - expires 2027-11-29\nGRBloadenv returned 0; environment present\n\n",
   "license_path": "../reverse-engineer/targets/gurobi.lic",
   "qualification": "Successful exact reconstruction and environment initialization only. No solver/runtime comparison yet. Original archive unchanged.",
-  "remaining": "native_run.c does not record Runtime, and ref_run.py --native drops --param; fix timer and effective-parameter provenance, qualify AFIRO before larger comparisons.",
+  "remaining": "No reconstruction prerequisite remains. Timer, override/error provenance and small profiles are qualified; current complete23-row evidence is perf/evidence/current-reference-comparison.json.",
   "artifacts": "target/perf-reference/reconstructed/: original.so,interface.so,variables.so,libgurobi130.so,check-env,environment-check.log,provenance.json. Reconstruction instructions ../reverse-engineer/targets/README.md."
 }

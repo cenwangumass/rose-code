@@ -7,9 +7,9 @@ standing plan and the working loop. The current numbers, hotspots and the ideas 
 
 ## Goal
 
-Make rose faster on every fixed row of `bench.txt`. Compare solve times on the same machine and logical CPU. The reference is the supplied `gurobi/patched-lp-size-limits/libgurobi130.so`, SHA-256 `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. Every row has a measured reference, including 80BAU3B, GREENBEA and the mode-switch witness.
+Make rose faster on every fixed row of `bench.txt`. Compare solve times on the same machine and logical CPU. The reference is the supplied reference reconstructed at `target/perf-reference/reconstructed/libgurobi130.so`, SHA-256 `26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`. Every row has a measured reference, including 80BAU3B, GREENBEA and the mode-switch witness.
 
-Use Gurobi's `Runtime` with the single-threaded profile parameters in `ref_run.py` and the iteration limit supplied by the bench row. Compare with rose's `diagnostics.seconds`. Take the median of three measurements after one warm-up per solver. Preserve each result, exit code, timing and the library hash. Keep measurements from different hosts, allocators and build configurations labeled separately. The paired host runner and current results are linked from STATE.md.
+Use Gurobi's `Runtime` with the single-threaded profile parameters in `ref_run.py` and the iteration limit supplied by the bench row. Compare with rose's `diagnostics.seconds`. Take the median of three measurements after one warm-up per solver. Preserve each result, exit code, timing and the library hash. Keep measurements from different hosts, allocators and build configurations labeled separately. The current-host runner is `perf/compare_reference.py`; full results and provenance are linked from STATE.md.
 
 The goal is met when rose's median solve time is strictly below Gurobi's on every row and full numerical parity passes. Keep any measured gaps and work constrained by the numerical invariant in STATE.md.
 
@@ -44,7 +44,7 @@ baseline. No exceptions, no "within a ULP", no re-recording.
 - `python3 perf/build_pgo.py --check --test`: opt-in PGO release CLI, trained on 39 bounded small-model
   runs across all methods and recovery exits. Uses the pinned compiler and matching `llvm-profdata`;
   override the latter with `LLVM_PROFDATA`. Generated profiles, training log and exact build flags stay
-  in `target/perf-pgo/`; no training data is committed. The current performance table uses this build.
+  in `target/perf-pgo/`; no training data is committed. Historical performance tables used this build; the current-host configuration is explicit in STATE.md.
   Ordinary Cargo builds remain the ThinLTO baseline and can overwrite the optimized CLI; rebuild with
   the script before comparing PGO candidates. Save the preceding binary before rebuilding as usual.
   The script uses controlled Rust flags for both stages; it does not inherit `RUSTFLAGS`.
@@ -89,6 +89,12 @@ baseline. No exceptions, no "within a ULP", no re-recording.
   at least 0.5% median improvement, a conservative 95% paired-median bound beyond
   the AA uncertainty, and improvement in both execution orders. It is a screening
   tool, not a replacement for parity, independent confirmation or the full benchmark.
+- `python3 perf/compare_reference.py --library target/perf-reference/reconstructed/libgurobi130.so --output target/NAME`:
+  full fixed 23-row current-host comparison, one warmup/three samples per solver,
+  CPU 2 and external 70s process deadlines. It records Gurobi Runtime, effective
+  parameters, complete raw outputs/exits and stable repeated results. Uses the
+  qualified `../reverse-engineer/tools/ref_run.py` native harness; no gurobipy
+  install is required. Descriptive medians do not qualify optimization commits.
 - `cargo test --release` (about 35 s): the reference-derived tests. Run before each commit.
 - Format with `RUSTFMT=~/.local/bin/rustfmt-custom cargo fmt -- --config blank_line_between_items=true`
   (never plain `cargo fmt`). Version control is `jj`, run from `rose/`.
@@ -420,13 +426,16 @@ measured.
   This is distinct from the earlier within-output chunk trial; neither gives
   a qualified runtime gain. No solve305 routing/codegen composition follows
   from settled triangular-plan scope. See evidence/ldl-output-batch-scope.json.
-  No current cached GREENBEA ordinary-dual reference phase profile survives.
-  The supplied reference is reconstructed at target/perf-reference/reconstructed/
-  libgurobi130.so, with required SHA26a50517... and successful environment init;
-  see evidence/reference-availability.json. Use Gurobi Runtime, not process
-  wall time. Next fix the existing native harness Runtime recording and parameter
-  provenance; --native currently drops ref_run.py --param overrides. Start
-  with AFIRO, then small models, before GREENBEA or a full23-row comparison.
+  The reconstructed reference and native timer/parameter harness are qualified;
+  the full current-host fixed 23-row comparison is complete with 0/23 Rose wins.
+  See evidence/current-reference-comparison.json and perf/compare_reference.py.
+  Mode-switch dual is 8.21x slower, GREENBEA dual-release 3.97x, controlled 80BAU
+  primal 4.88x. Next collect matched GREENBEA ordinary-dual phase attribution
+  before choosing another substantive numerical boundary: factorization,
+  FTRAN/L, BTRAN, pivot/ratio/control and allocation. Establish setup/solve
+  scopes explicitly and keep raw sampling/event-coverage provenance. Start
+  with small DEGEN2 qualifications; source-only hot-function totals do not
+  justify reviving the rejected mechanisms above.
   The scalar prefilter and prior rank/layout trials remain
   rejected; do not infer further gains from isolated predicate costs.
   Comparator alignment stays centralized; normal lunum's build/cache transport
