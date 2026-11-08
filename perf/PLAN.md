@@ -301,6 +301,9 @@ measured.
   the proposed normal result is exponent_bits-1003-(fraction==0), capped58.
   This is an unimplemented hypothesis, not a verified rule or runtime gain.
   Measure bounded small-model counters before own-PGO qualification/timing.
+  Current non-level sparse-L fallback census is complete: DEGEN2/PILOT4/PEROLD
+  never enter Kahn replay; their L calls choose dense or level solvers. Do not
+  implement numeric replay reuse on these targets from the unexecuted branch.
   PEROLD FTRAN/L/update and factor-production/installation ownership remain larger
   measured leads. The scalar prefilter and prior rank/layout trials remain
   rejected; do not infer further gains from isolated predicate costs.

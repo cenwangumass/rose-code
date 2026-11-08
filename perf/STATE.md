@@ -1412,6 +1412,16 @@ no new solver speedup or reference timing ratio.
 
 ## Candidates
 
+Current non-level sparse-L replay census rules out that duplication on the
+measured targets. DEGEN2, PILOT4 and PEROLD have no Kahn calls and no dense
+fallback replay. PEROLD's 2,687 L entries split into 1,237 initially dense and
+1,450 level-based calls; PILOT4's 707 split into 431 and 276. All twelve small
+primal/dual runs and both larger bounded runs match complete uninstrumented
+SolveResult objects. These are branch/product counts, not cost shares. Do not
+implement a replay-removal certificate for these models from the code path
+alone. [l-replay-census.json](evidence/l-replay-census.json), raw source/probe
+and outputs in `target/perf-l-replay-census/`.
+
 The full forward U solve carries its numeric column and dirty blocks across calls. The current-host PEROLD profile above refreshes whole FTRAN/L and refactorization attribution. Inspect a whole representation or ownership boundary there before another local kernel trial; reproduce PGO/TCMalloc qualification separately when those builds are available. The occupied-slot BTRAN, touched-only pivot-row and PDHG packet/fused-step experiments below have completed their prescribed screens. Initial unit-weight setup is about 3.3% of full mode-switch time in the recorded baseline sample.
 
 The remaining candidates below derive from the Ryzen measurements and their historical profiles.
