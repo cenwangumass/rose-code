@@ -1,0 +1,654 @@
+{
+  "source": "18061fe9",
+  "configuration": "accepted ordinary ThinLTO/glibc release CLI, CPU2, cap1000 barrier-release; cached symbolic geometry only for census",
+  "cli_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+  "decision": "No production rewrite: routing proxy construction-inclusive saving too small; current small-model admission/tile samples do not justify a large validation or persistent-packing implementation. No solver speedup claimed.",
+  "qualification": [
+    "Routing proxy removes numerical work/inlining context and is not a solver-time/removable bound. Ordered action checksum/count matches independently enumerated Python input for every shape. Five alternating pairs, not a qualifying timing screen.",
+    "Packing census optimistic: geometry only, includes potentially ineligible calls; records are four-value packs, not scalar elements, bytes or cost. Cross-batch reuse scoped to a single parent-child apply, never across parents or Newton factors.",
+    "Profiles are whole-batch self fractions including Python launcher/parsing/startup; tails per short process reduce represented events. Neither is near-complete attribution. No nested/additive removable-cost claim.",
+    "Initial parser-only no-inherit recording and throttled period2M instruction recording retained and excluded. Healthy recordings have zero lost/throttle events.",
+    "All complete results/exits agree within every batch and against other final batches after removing diagnostics.seconds only. Runtime source and accepted CLI unchanged. Full parity987/987 passes (136.1s under concurrent release-test compilation); no solver benchmark or speedup claim for this measurement-only commit."
+  ],
+  "models": [
+    {
+      "model": "afiro",
+      "factor_calls": 8,
+      "gemm_calls_per_factor": 4,
+      "unique_shapes": 4,
+      "source_calls": {
+        "triangle": 3,
+        "rectangle": 1
+      },
+      "validation_elements_per_factor": {
+        "producer_R_elements": 76,
+        "producer_D_elements": 19,
+        "formed_temp_elements": 76,
+        "repeated_A_scan_elements": 83,
+        "B_scan_elements": 97
+      },
+      "optimistic_S4x4_packing_per_factor": {
+        "per_grid_records": 0,
+        "per_child_apply_records": 0,
+        "old_vector_assembly_records": 0,
+        "groups": 0,
+        "groups_reused_across_batches": 0
+      },
+      "packing_batch_reuse_histogram": {},
+      "actions_per_factor": {
+        "MVM_1": 2,
+        "MVM_2": 2,
+        "Elem_A": 25
+      },
+      "source_classification_evaluations_per_factor": {
+        "gemm_kind": 31
+      },
+      "product_terms_per_factor": 283
+    },
+    {
+      "model": "sc50a",
+      "factor_calls": 8,
+      "gemm_calls_per_factor": 9,
+      "unique_shapes": 8,
+      "source_calls": {
+        "triangle": 6,
+        "rectangle": 3
+      },
+      "validation_elements_per_factor": {
+        "producer_R_elements": 150,
+        "producer_D_elements": 30,
+        "formed_temp_elements": 150,
+        "repeated_A_scan_elements": 206,
+        "B_scan_elements": 220
+      },
+      "optimistic_S4x4_packing_per_factor": {
+        "per_grid_records": 9,
+        "per_child_apply_records": 9,
+        "old_vector_assembly_records": 9,
+        "groups": 1,
+        "groups_reused_across_batches": 0,
+        "S4x4_product_terms": 144
+      },
+      "packing_batch_reuse_histogram": {
+        "1": 1
+      },
+      "actions_per_factor": {
+        "Elem_N": 12,
+        "Elem_A": 21,
+        "MVN_2": 2,
+        "MVM_1": 1,
+        "S4x4": 1,
+        "Elem_S": 5,
+        "S4": 1
+      },
+      "source_classification_evaluations_per_factor": {
+        "gemm_kind": 53
+      },
+      "product_terms_per_factor": 610
+    },
+    {
+      "model": "blend",
+      "factor_calls": 9,
+      "gemm_calls_per_factor": 17,
+      "unique_shapes": 15,
+      "source_calls": {
+        "triangle": 12,
+        "rectangle": 5
+      },
+      "validation_elements_per_factor": {
+        "producer_R_elements": 648,
+        "producer_D_elements": 44,
+        "formed_temp_elements": 648,
+        "repeated_A_scan_elements": 743,
+        "B_scan_elements": 1012
+      },
+      "optimistic_S4x4_packing_per_factor": {
+        "per_grid_records": 124,
+        "per_child_apply_records": 124,
+        "old_vector_assembly_records": 389,
+        "groups": 18,
+        "groups_reused_across_batches": 0,
+        "S4x4_product_terms": 6224
+      },
+      "packing_batch_reuse_histogram": {
+        "1": 18
+      },
+      "actions_per_factor": {
+        "Elem_N": 48,
+        "Elem_A": 336,
+        "MVM_1": 3,
+        "S4x4": 55,
+        "S4x2": 9,
+        "Elem_S": 54
+      },
+      "source_classification_evaluations_per_factor": {
+        "gemm_kind": 707
+      },
+      "product_terms_per_factor": 9697
+    },
+    {
+      "model": "adlittle",
+      "factor_calls": 13,
+      "gemm_calls_per_factor": 6,
+      "unique_shapes": 5,
+      "source_calls": {
+        "triangle": 5,
+        "rectangle": 1
+      },
+      "validation_elements_per_factor": {
+        "producer_R_elements": 284,
+        "producer_D_elements": 36,
+        "formed_temp_elements": 284,
+        "repeated_A_scan_elements": 296,
+        "B_scan_elements": 292
+      },
+      "optimistic_S4x4_packing_per_factor": {
+        "per_grid_records": 44,
+        "per_child_apply_records": 44,
+        "old_vector_assembly_records": 92,
+        "groups": 4,
+        "groups_reused_across_batches": 0,
+        "S4x4_product_terms": 1472
+      },
+      "packing_batch_reuse_histogram": {
+        "1": 4
+      },
+      "actions_per_factor": {
+        "Elem_A": 57,
+        "Elem_N": 10,
+        "S4x4": 8,
+        "Elem_S": 24,
+        "S4x2": 2
+      },
+      "source_classification_evaluations_per_factor": {
+        "gemm_kind": 132
+      },
+      "product_terms_per_factor": 2524
+    },
+    {
+      "model": "bore3d",
+      "factor_calls": 17,
+      "gemm_calls_per_factor": 71,
+      "unique_shapes": 56,
+      "source_calls": {
+        "triangle": 49,
+        "rectangle": 22
+      },
+      "validation_elements_per_factor": {
+        "producer_R_elements": 2571,
+        "producer_D_elements": 159,
+        "formed_temp_elements": 2571,
+        "repeated_A_scan_elements": 3997,
+        "B_scan_elements": 3763
+      },
+      "optimistic_S4x4_packing_per_factor": {
+        "per_grid_records": 714,
+        "per_child_apply_records": 510,
+        "old_vector_assembly_records": 2653,
+        "groups": 59,
+        "groups_reused_across_batches": 20,
+        "S4x4_product_terms": 42448
+      },
+      "packing_batch_reuse_histogram": {
+        "1": 39,
+        "2": 20
+      },
+      "actions_per_factor": {
+        "MVM_1": 17,
+        "MVM_4": 24,
+        "MVM_2": 6,
+        "Elem_A": 590,
+        "Elem_N": 60,
+        "MVN_2": 4,
+        "MVN_1": 1,
+        "S4x4": 282,
+        "Elem_S": 397,
+        "S4": 26,
+        "S4x2": 36,
+        "S2": 3
+      },
+      "source_classification_evaluations_per_factor": {
+        "gemm_kind": 2016
+      },
+      "product_terms_per_factor": 54259
+    },
+    {
+      "model": "degen2",
+      "factor_calls": 13,
+      "gemm_calls_per_factor": 216,
+      "unique_shapes": 162,
+      "source_calls": {
+        "triangle": 150,
+        "rectangle": 66
+      },
+      "validation_elements_per_factor": {
+        "producer_R_elements": 10321,
+        "producer_D_elements": 255,
+        "formed_temp_elements": 10321,
+        "repeated_A_scan_elements": 24925,
+        "B_scan_elements": 19258
+      },
+      "optimistic_S4x4_packing_per_factor": {
+        "per_grid_records": 5491,
+        "per_child_apply_records": 2287,
+        "old_vector_assembly_records": 27870,
+        "groups": 380,
+        "groups_reused_across_batches": 303,
+        "S4x4_product_terms": 445920
+      },
+      "packing_batch_reuse_histogram": {
+        "2": 194,
+        "1": 77,
+        "3": 44,
+        "4": 65
+      },
+      "actions_per_factor": {
+        "Elem_N": 818,
+        "Elem_A": 5683,
+        "MVM_1": 14,
+        "MVM_4": 112,
+        "S4x4": 4210,
+        "Elem_S": 1770,
+        "S4": 58,
+        "S4x2": 130,
+        "MVM_2": 10,
+        "S2": 4,
+        "MVN_4": 24,
+        "MVN_1": 1
+      },
+      "source_classification_evaluations_per_factor": {
+        "gemm_kind": 20216
+      },
+      "product_terms_per_factor": 499425
+    },
+    {
+      "model": "degen3",
+      "factor_calls": 15,
+      "gemm_calls_per_factor": 1008,
+      "unique_shapes": 660,
+      "source_calls": {
+        "triangle": 686,
+        "rectangle": 322
+      },
+      "validation_elements_per_factor": {
+        "producer_R_elements": 100544,
+        "producer_D_elements": 1196,
+        "formed_temp_elements": 100544,
+        "repeated_A_scan_elements": 445842,
+        "B_scan_elements": 213102
+      },
+      "optimistic_S4x4_packing_per_factor": {
+        "per_grid_records": 102680,
+        "per_child_apply_records": 23175,
+        "old_vector_assembly_records": 586190,
+        "groups": 2065,
+        "groups_reused_across_batches": 1819,
+        "S4x4_product_terms": 9379040
+      },
+      "packing_batch_reuse_histogram": {
+        "2": 666,
+        "3": 275,
+        "1": 246,
+        "5": 339,
+        "6": 267,
+        "4": 128,
+        "7": 102,
+        "8": 42
+      },
+      "actions_per_factor": {
+        "Elem_N": 10551,
+        "Elem_A": 32724,
+        "S4x4": 39582,
+        "Elem_S": 13045,
+        "S4x2": 1701,
+        "S4": 421,
+        "MVM_1": 54,
+        "MVM_4": 912,
+        "S2": 11,
+        "MVM_2": 34,
+        "MVN_4": 556,
+        "MVN_1": 9,
+        "Copy_Chain": 9228,
+        "Copy_Par": 347,
+        "Copy_Lane4": 32,
+        "MVN_2": 6
+      },
+      "source_classification_evaluations_per_factor": {
+        "gemm_kind": 155781,
+        "col_kernel": 106,
+        "k0_row_tile": 9607,
+        "tile_mode": 9607
+      },
+      "product_terms_per_factor": 10252946
+    }
+  ],
+  "routing_proxies": {
+    "afiro": {
+      "build_unique_shapes_ns": 4689,
+      "factor_reuse": 8,
+      "model": "afiro",
+      "pairs": [
+        {
+          "cached_ns": 341,
+          "checksum": 2032028488445672136,
+          "dynamic_ns": 1342
+        },
+        {
+          "cached_ns": 300,
+          "checksum": 2032028488445672136,
+          "dynamic_ns": 2034
+        },
+        {
+          "cached_ns": 421,
+          "checksum": 2032028488445672136,
+          "dynamic_ns": 1833
+        },
+        {
+          "cached_ns": 451,
+          "checksum": 2032028488445672136,
+          "dynamic_ns": 1673
+        },
+        {
+          "cached_ns": 360,
+          "checksum": 2032028488445672136,
+          "dynamic_ns": 1714
+        }
+      ],
+      "private_per_call_descriptor_bytes": 232,
+      "median_dynamic_minus_cached_ns": 1354,
+      "construction_inclusive_proxy_saving_ns": -3335
+    },
+    "sc50a": {
+      "build_unique_shapes_ns": 6823,
+      "factor_reuse": 8,
+      "model": "sc50a",
+      "pairs": [
+        {
+          "cached_ns": 531,
+          "checksum": 6171678832527625912,
+          "dynamic_ns": 4389
+        },
+        {
+          "cached_ns": 511,
+          "checksum": 6171678832527625912,
+          "dynamic_ns": 4188
+        },
+        {
+          "cached_ns": 592,
+          "checksum": 6171678832527625912,
+          "dynamic_ns": 4348
+        },
+        {
+          "cached_ns": 591,
+          "checksum": 6171678832527625912,
+          "dynamic_ns": 4489
+        },
+        {
+          "cached_ns": 681,
+          "checksum": 6171678832527625912,
+          "dynamic_ns": 4809
+        }
+      ],
+      "private_per_call_descriptor_bytes": 344,
+      "median_dynamic_minus_cached_ns": 3858,
+      "construction_inclusive_proxy_saving_ns": -2965
+    },
+    "blend": {
+      "build_unique_shapes_ns": 15909,
+      "factor_reuse": 9,
+      "model": "blend",
+      "pairs": [
+        {
+          "cached_ns": 9788,
+          "checksum": 9254309182322995789,
+          "dynamic_ns": 22572
+        },
+        {
+          "cached_ns": 5861,
+          "checksum": 9254309182322995789,
+          "dynamic_ns": 15980
+        },
+        {
+          "cached_ns": 5060,
+          "checksum": 9254309182322995789,
+          "dynamic_ns": 15769
+        },
+        {
+          "cached_ns": 5080,
+          "checksum": 9254309182322995789,
+          "dynamic_ns": 15898
+        },
+        {
+          "cached_ns": 5470,
+          "checksum": 9254309182322995789,
+          "dynamic_ns": 15639
+        }
+      ],
+      "private_per_call_descriptor_bytes": 4040,
+      "median_dynamic_minus_cached_ns": 10709,
+      "construction_inclusive_proxy_saving_ns": -5200
+    },
+    "adlittle": {
+      "build_unique_shapes_ns": 4418,
+      "factor_reuse": 13,
+      "model": "adlittle",
+      "pairs": [
+        {
+          "cached_ns": 1373,
+          "checksum": 9914760986368321133,
+          "dynamic_ns": 5300
+        },
+        {
+          "cached_ns": 1383,
+          "checksum": 9914760986368321133,
+          "dynamic_ns": 5280
+        },
+        {
+          "cached_ns": 1333,
+          "checksum": 9914760986368321133,
+          "dynamic_ns": 5290
+        },
+        {
+          "cached_ns": 1363,
+          "checksum": 9914760986368321133,
+          "dynamic_ns": 5330
+        },
+        {
+          "cached_ns": 1333,
+          "checksum": 9914760986368321133,
+          "dynamic_ns": 5320
+        }
+      ],
+      "private_per_call_descriptor_bytes": 808,
+      "median_dynamic_minus_cached_ns": 3957,
+      "construction_inclusive_proxy_saving_ns": -461
+    },
+    "bore3d": {
+      "build_unique_shapes_ns": 34645,
+      "factor_reuse": 17,
+      "model": "bore3d",
+      "pairs": [
+        {
+          "cached_ns": 27612,
+          "checksum": 6103941365503851544,
+          "dynamic_ns": 95578
+        },
+        {
+          "cached_ns": 35686,
+          "checksum": 6103941365503851544,
+          "dynamic_ns": 88505
+        },
+        {
+          "cached_ns": 32141,
+          "checksum": 6103941365503851544,
+          "dynamic_ns": 111428
+        },
+        {
+          "cached_ns": 33493,
+          "checksum": 6103941365503851544,
+          "dynamic_ns": 114001
+        },
+        {
+          "cached_ns": 33152,
+          "checksum": 6103941365503851544,
+          "dynamic_ns": 129932
+        }
+      ],
+      "private_per_call_descriptor_bytes": 11568,
+      "median_dynamic_minus_cached_ns": 79287,
+      "construction_inclusive_proxy_saving_ns": 44642
+    },
+    "degen2": {
+      "build_unique_shapes_ns": 234516,
+      "factor_reuse": 13,
+      "model": "degen2",
+      "pairs": [
+        {
+          "cached_ns": 245757,
+          "checksum": 10995498139118224940,
+          "dynamic_ns": 579860
+        },
+        {
+          "cached_ns": 228106,
+          "checksum": 10995498139118224940,
+          "dynamic_ns": 709773
+        },
+        {
+          "cached_ns": 245498,
+          "checksum": 10995498139118224940,
+          "dynamic_ns": 501034
+        },
+        {
+          "cached_ns": 271536,
+          "checksum": 10995498139118224940,
+          "dynamic_ns": 592173
+        },
+        {
+          "cached_ns": 231141,
+          "checksum": 10995498139118224940,
+          "dynamic_ns": 525710
+        }
+      ],
+      "private_per_call_descriptor_bytes": 102672,
+      "median_dynamic_minus_cached_ns": 320637,
+      "construction_inclusive_proxy_saving_ns": 86121
+    },
+    "degen3": {
+      "build_unique_shapes_ns": 1342252,
+      "factor_reuse": 15,
+      "model": "degen3",
+      "pairs": [
+        {
+          "cached_ns": 2418778,
+          "checksum": 483823422171815701,
+          "dynamic_ns": 5304135
+        },
+        {
+          "cached_ns": 2228763,
+          "checksum": 483823422171815701,
+          "dynamic_ns": 5083344
+        },
+        {
+          "cached_ns": 2593132,
+          "checksum": 483823422171815701,
+          "dynamic_ns": 4982576
+        },
+        {
+          "cached_ns": 5364888,
+          "checksum": 483823422171815701,
+          "dynamic_ns": 7012770
+        },
+        {
+          "cached_ns": 2497575,
+          "checksum": 483823422171815701,
+          "dynamic_ns": 6349073
+        }
+      ],
+      "private_per_call_descriptor_bytes": 873704,
+      "median_dynamic_minus_cached_ns": 2854581,
+      "construction_inclusive_proxy_saving_ns": 1512329
+    }
+  },
+  "profiles": {
+    "degen2-lowrate": {
+      "event": "instructions:u",
+      "period": 16000000,
+      "repetitions": 128,
+      "event_audit": {
+        "PERF_RECORD_SAMPLE": 1916,
+        "PERF_RECORD_LOST": 0,
+        "PERF_RECORD_THROTTLE": 0,
+        "PERF_RECORD_UNTHROTTLE": 0
+      },
+      "represented_events": 30656000000,
+      "direct_batch_events": 32093180881,
+      "represented_fraction": 0.9552184968411515
+    },
+    "degen2-cycle": {
+      "event": "cycles:u",
+      "period": 2000000,
+      "repetitions": 32,
+      "event_audit": {
+        "PERF_RECORD_SAMPLE": 1709,
+        "PERF_RECORD_LOST": 0,
+        "PERF_RECORD_THROTTLE": 0,
+        "PERF_RECORD_UNTHROTTLE": 0
+      },
+      "represented_events": 3418000000,
+      "direct_batch_events": 3578768100,
+      "represented_fraction": 0.9550772513033186
+    }
+  },
+  "profile_self_percent": {
+    "instructions": {
+      "scatter_native": 5.85,
+      "scatter_try_update": 1.67,
+      "S4x4": 3.76,
+      "scatter_destination_bounded": 0.52
+    },
+    "cycles": {
+      "scatter_native": 7.67,
+      "scatter_try_update": 1.64,
+      "S4x4": 3.92,
+      "scatter_destination_bounded": 0.53
+    }
+  },
+  "producer_certificate": "Potential per-factor R/D exponent certificate must preserve all temp operations, live C/CPU/MXCSR checks, and fall back to old scans when false. No implementation or live hit-rate measured.",
+  "artifacts": "target/perf-gemm-routing/ (census.py, helpers.rs, make_probe.py, probe.rs, probe-input.json, proxy.log, *.data, reports/event audits/direct counters, all result objects)",
+  "source_hashes": {
+    "src/chol.rs": "158e393ca8dc6aef7f98482ca9f4609b49d2df00b03978310873e333ebf51bea",
+    "src/chol_gemm_destination.rs": "412987255d14117b4605d601975a99ba5bbdd8d5b50953585cf2cce1601ef86f",
+    "src/chol_child_program.rs": "ceea4df4a8f9dfb25b11a1cfaddd9744eb372c1b6d9b4df0814bba37ef1fa2cb"
+  },
+  "validated_batches_digest": "2733113177881d5ff910ff053b4848222e31bb4aba221464697b0914152c7cb0",
+  "next_boundary_audit": {
+    "candidate": "Complete predictor/HSD solve transaction with independent refinement lanes",
+    "cached_greenbea_counts": {
+      "normal": 522,
+      "direction": 317,
+      "HSD": 72,
+      "initial": 2,
+      "attempted_corrections": 131,
+      "factor_dispatch": 104,
+      "iterations": 103
+    },
+    "classification": "104 factor dispatches = initial+103 iteration factors; restart_start would require extra factor dispatch, excluding restarts in this run. 522=317+72+2+131. No first-HSD iteration or lane refinement split retained.",
+    "side_effects": [
+      "Only exact CholSolver early=false has independent numeric lanes; generic trait implementations/error order remain sequential.",
+      "Keep norms/raw_norms separate and count every attempted correction, including rejected ones. Preserve predictor/HSD extra drains and original distinct WORK formulas/order.",
+      "Early CG shares rng/q290 and requires sequential fallback. Preserve dump ordinals and predictor-all-corrections before HSD-all-corrections ordering; dumping can use sequential fallback.",
+      "No inactive-lane FP arithmetic; preserve single-mode schedules and account for FP exception masks before reordering."
+    ],
+    "next_measurement": "Use cached evidence first; then bounded per-factor transaction/refinement overlap census, with default option1000 and first-HSD stop hook if needed. No paired production executor implemented."
+  },
+  "verification": {
+    "full_parity": "987/987, target/perf-gemm-routing/full-parity.log",
+    "release_tests": {
+      "groups": 37,
+      "passed": 292,
+      "failed": 0,
+      "ignored": 22,
+      "log": "target/perf-gemm-routing/release-tests.log"
+    }
+  }
+}

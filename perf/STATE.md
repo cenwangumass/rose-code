@@ -1479,15 +1479,43 @@ branches and reaches iteration_limit/150 rather than the benchmark's exit.
 [barrier-normal-scope.json](evidence/barrier-normal-scope.json), raw probes,
 source, outputs and earlier observations in `target/perf-barrier-normal/`.
 
-The next structural measurement is a complete inner GEMM action-plan lifetime
-inside the existing solver-owned child program. Reuse cached small-model Plan
-captures to weight DGEMV, S4x4/S4x2/S4/S2/scalar/copy routes and actual shapes,
-then attribute current child GEMM work to routing, validation, numerical kernels
-and stores. Admitted nocopy has one K partition and triangular batches one
-N block: their enumeration is not a large boundary. No implementation follows
-without a large measured routing share; descriptor execution and construction
-still cost. Existing local tile/packing and outer-map trials remain settled.
-Avoid clocks around individual tiles or adding independent historical gains.
+The complete inner GEMM action census does not justify a routing rewrite.
+Cached AFIRO through DEGEN3 geometry agrees with all prior call counts. DEGEN2
+has 12,834 ordered actions/factor; DEGEN3 has 109,213, requiring 0.87 MB even
+with optimistic eight-byte descriptors. The arithmetic-free release proxy,
+including one construction per unique shape, saves only about 0.086 ms over
+DEGEN2's factor history and 1.512 ms over DEGEN3's. This proxy is not a solver
+speedup or removable bound: arithmetic, inlining and descriptor loads matter.
+Healthy accepted-release DEGEN2 self samples place scatter admission at
+1.67% instructions/1.64% cycles and S4x4 at 3.76%/3.92%; whole native scatter
+is 5.85%/7.67%. These include launcher/parsing/startup. Both recordings have
+zero lost/throttle events but represent only about 95.5% of matching direct
+batch counts; short-process sampling tails limit attribution.
+
+The optimistic four-row packing census distinguishes per-GEMM and per-child
+lifetimes: DEGEN2 needs 5,491 versus 2,287 four-value records/factor; DEGEN3
+102,680 versus 23,175. BLEND/ADLITTLE have no cross-batch reuse and BORE3D has
+714 versus 510 records. Geometry reuse alone does not establish packing cost
+or eligibility; the current small-model S4x4 scope includes required arithmetic
+and B loads. Repeated A/B scans exceed producer R/D elements by 4.18x on
+DEGEN2 and 6.48x on DEGEN3, but admission's measured scope is small. No
+producer certificate, persistent packing or descriptor executor is implemented.
+Keep original temp arithmetic, full logical validation, flags and fallbacks.
+All final profiling/direct-counter batches agree on complete results/exits;
+full parity987/987 and release tests pass. Source and accepted CLI are unchanged.
+Parser-only and throttled exploratory
+recordings are retained and excluded. [gemm-routing-scope.json](evidence/gemm-routing-scope.json),
+source/proxy/census and all raw evidence in `target/perf-gemm-routing/`.
+
+In progress: audit complete predictor/HSD normal-solve ownership and independent
+refinement lanes. Cached GREENBEA counts classify all72 raw calls as HSD:
+104 factor dispatches equal one initial plus103 iteration factors, leaving no
+restart factor. The522normal calls equal317direction+72HSD+2initial+131corrections.
+Aggregate scopes retain neither first-HSD iteration nor per-lane correction
+counts and do not establish pairable or removable work.
+No implementation or timing claim. The factor, D, zx and threshold are shared,
+but norms, extra-correction accounting, dump/WORK order and early-CG RNG state
+need explicit lane ownership. Small measured models have no raw solves.
 
 The exact Plan census counts 1,008 wide GEMM calls/factor on DEGEN3, 799 zero-C;
 fifteen factors describe 83.2 MB of logical cn buffers, 37.4% unused cells whose

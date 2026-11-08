@@ -361,18 +361,27 @@ measured.
   Post-U output ordering is larger but natural traversal reuse is an existing
   timing-inconclusive trial and must not be repeated. Exact scopes and caveats:
   evidence/forward-owner-scope.json.
-  Next discriminate a complete inner GEMM action plan retained by ChildProgram
-  across Newton factors. Reuse cached target/perf-factor-boundaries/*.dump
-  (do not rerun its capture-launching census.py) to count actual batch shapes,
-  routes and ordered actions, starting AFIRO/SC50A then BORE3D. Attribute current
-  GEMM geometry/routing versus validation, arithmetic and stores before coding.
-  On admitted direct nocopy k<=192, ps has exactly one entry; triangular n<=24
-  has one N block. Those allocations alone cannot justify a rewrite. Preserve
-  exact action/accumulation order, K-boundary C additions, full logical finite
-  scans, unused outputs/flags and single/extreme fallbacks. Do not extend zero-C
-  direct scatter to multiple K pieces. Existing local tile/packing trials and
-  outer child maps/schedules are distinct but remain settled; no per-tile timers
-  or additive scope claims. Descriptor execution/construction must be included.
+  Complete inner GEMM routing measurement is settled without implementation:
+  construction-inclusive route-only proxies save about 0.086 ms on DEGEN2 and
+  1.512 ms on DEGEN3, not solver speedups. Accepted-release DEGEN2 admission
+  is about 1.67% instructions/1.64% cycles; S4x4 is 3.76%/3.92%, including
+  required arithmetic/B loads. Healthy samples represent about 95.5% of direct
+  batch counts. Geometry-only per-child packing reuse and repeated-validation
+  counts do not establish a large removable cost; no certificate, descriptor
+  executor or persistent packing rewrite follows. Keep exact accumulation
+  order, K-boundary additions, full logical scans, unused outputs/flags and
+  single/extreme fallbacks. No multi-K direct scatter. Raw evidence and excluded
+  parser-only/throttled recordings: evidence/gemm-routing-scope.json.
+  Next discriminate complete predictor/HSD normal-solve pairing with independent
+  refinement lanes. GREENBEA has72 HSD solves and131 correction solves: cached104 factor
+  dispatches equal one initial plus103 iteration factors, excluding restart raw
+  solves. These aggregates do not measure pairable work. Classify
+  transactions by factor generation, initial solve and overlapping refinement
+  rounds before implementation. Inspect cached evidence first; all measured
+  small models have zero raw calls. Preserve per-lane norms, correction counts,
+  WORK/dump order and sequential early-CG RNG state; shared immutable factors
+  alone are insufficient. Keep the normal default limit: a nondefault cap can
+  change GREENBEA termination. No paired executor is implemented.
   Factor-production/installation ownership remains another measured lead.
   The scalar prefilter and prior rank/layout trials remain
   rejected; do not infer further gains from isolated predicate costs.
