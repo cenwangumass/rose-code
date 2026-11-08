@@ -1,0 +1,172 @@
+{
+  "source": "18061fe9",
+  "measurement_parent": "c230c80a",
+  "experiment": "Complete trial-weight executor. AVX256 carries primal/dual recurrences for two weights, AVX128 carries an odd final weight. No padded lanes. Shares coordinate and direction loads, flags and loop geometry; preserves original weights, each lane recurrence, true homogeneous-list length and trial winner order.",
+  "status": "Timing-inconclusive. Stop after first fixed screen48811; no48883,extension/retry, full candidate gates or optimization acceptance. Source and accepted CLI restored.",
+  "configuration": "Rust1.98.1 ordinary ThinLTO/glibc, current EPYC virtual host, AVX guard and default masked nearest/no-flush MXCSR only; original execution for other environments and unsupported shapes.",
+  "proof": "Default masked nearest/no-flush MXCSR and AVX only; other environments/shapes and nonfinite scalar inputs retain original. Immutable inputs; exceptional outputs restore entry MXCSR before original replay. Entry shape validation covers unchecked array accesses. Zero-weight bypass executes no direction arithmetic. Lower recurrence uses quiet compare and branch-only arithmetic; inactive operands are neutralized before arithmetic. Register-only impure AVX assembly prevents LLVM removing these masks. Upper/homogeneous loops preserve accepted CLI unconditional speculative add/div/sub and signaling comparisons, including rejected updates. Final clipping retains signaling LE; original winner order and expressions retained.",
+  "oracle": "Complete original ratio/step_pair/select frozen independently; original and integrated production dispatch called opaquely. Captured12original inputs fromAFIRO/SC50A/BORE3D before rewrite, tested under16MXCSR modes (192checks); 9,936synthetic full-representation/flag/range/weight/tail cases, 2,712native cases; mixed active/inactive exact-flag witness; upper-range-hole speculative ZE regression; unsupported/unmasked/unequal-tail/nonfinite scalar declines. All4focused release tests pass.",
+  "development_findings": "First tests exposed an erroneous upper flag2 filter, plus LLVM removing neutral masks. After disassembly-guided fixes, mixed-mask test passed but baseline upper/tail speculative status needed its own unconditional executor. Directed constant-input test initially optimized its frozen reference; opaque complete calls retain actual original code. All intermediate sources/failures/disassembly remain archived.",
+  "accepted_instruction_evidence": {
+    "select_base": "0x27bea0 in before84830499",
+    "lower": "ucomisd + branch at0x27c238/23d and0x27c4d3/4d7",
+    "upper": "unconditional numerator add/div/sub then signaling cmpltsd imm1 at0x27c30e/313/31d/322 and0x27c59e/5a3/5ad/5b2",
+    "homogeneous": "unconditional numerator/div/sub then signaling compare at0x27c38c/3a5/3af/3b4 and0x27c61b/634/63e/643",
+    "clip_winner": "clip signaling LE imm2 at0x27c698/6a7; packed winnerLT imm1 at0x27c0b7"
+  },
+  "fast_parity": "940/940 all baseline tags/results; baseline untouched",
+  "canonical_results": "All42bounded counter process outcomes/exit objects agree within each model after removing only diagnostics.seconds; all130fixed-screen outcomes/exits agree including warmups.",
+  "counter_rows": [
+    {
+      "model": "afiro",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 3229109,
+        "after": 3162115,
+        "change_percent": -2.074689953172837
+      },
+      "cycles:u": {
+        "before": 3571445,
+        "after": 4002953,
+        "change_percent": 12.082168422025251
+      }
+    },
+    {
+      "model": "sc50a",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 5334268,
+        "after": 5194762,
+        "change_percent": -2.615279172325047
+      },
+      "cycles:u": {
+        "before": 4751876,
+        "after": 4348016,
+        "change_percent": -8.498959147923891
+      }
+    },
+    {
+      "model": "blend",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 12940877,
+        "after": 12721702,
+        "change_percent": -1.693664192929123
+      },
+      "cycles:u": {
+        "before": 8636241,
+        "after": 8321198,
+        "change_percent": -3.6479181162267227
+      }
+    },
+    {
+      "model": "adlittle",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 11469701,
+        "after": 11204950,
+        "change_percent": -2.3082641823008343
+      },
+      "cycles:u": {
+        "before": 8251011,
+        "after": 7836632,
+        "change_percent": -5.022160314657198
+      }
+    },
+    {
+      "model": "bore3d",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 69030160,
+        "after": 67764028,
+        "change_percent": -1.8341721937193856
+      },
+      "cycles:u": {
+        "before": 37249046,
+        "after": 33718623,
+        "change_percent": -9.477888373302235
+      }
+    },
+    {
+      "model": "degen2",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 234893290,
+        "after": 232859237,
+        "change_percent": -0.8659476820304213
+      },
+      "cycles:u": {
+        "before": 103707552,
+        "after": 99593412,
+        "change_percent": -3.9670592166711205
+      }
+    },
+    {
+      "model": "80bau3b",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 2611061131,
+        "after": 2457827968,
+        "change_percent": -5.868616447954011
+      },
+      "cycles:u": {
+        "before": 1187755415,
+        "after": 1188246738,
+        "change_percent": 0.04136567123123047
+      }
+    }
+  ],
+  "fixed_screen": {
+    "ab_median_percent": -3.343722118144068,
+    "ab_ci_percent": [
+      -8.732477506485814,
+      -1.221801798478106
+    ],
+    "aa_median_percent": 0.8554975108586685,
+    "aa_ci_percent": [
+      -2.1569641952281615,
+      4.461872724621796
+    ],
+    "improving_pairs": 24,
+    "pairs_per_kind": 32,
+    "ab_sign_p": 0.0035001833457499743,
+    "aa_sign_p": 0.37708558747544885,
+    "order_median_percent": {
+      "AB": -3.697725998242595,
+      "BA": -2.780682632777026
+    },
+    "criteria": {
+      "sign_p_at_most_001": true,
+      "aa_not_biased_at_005": true,
+      "median_gain_at_least_half_percent": true,
+      "ab_upper_ci_below_aa_error": false,
+      "both_orders_improve": true
+    },
+    "positive_screen": false
+  },
+  "protocol": {
+    "candidate": "Complete corrector trial executor, two weights and primal/dual lanes per AVX256 group; odd weight uses AVX128 primal/dual, no padded lanes",
+    "run": "80bau3b.barrier-r",
+    "pairs": 32,
+    "aa_pairs": 32,
+    "cpu": 2,
+    "max_iterations": 1000,
+    "seed": 48811,
+    "confirmation_seed": 48883,
+    "stop": "One fixed screen; stop inconclusive without extension or replacement seed. Confirmation only after positive first session. Full parity/release tests/full23benchmark and regression controls required before acceptance.",
+    "configuration": "Rust1.98.1 ordinary ThinLTO/glibc, current EPYC virtual host, AVX guard and default masked nearest/no-flush MXCSR only; original execution for other environments and unsupported shapes.",
+    "binary_sha256": {
+      "before": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+      "after": "2a5b556f0df5cd9b1d028e9dd04015693c7b79eee36ae307b4f188b9da8a1af2"
+    },
+    "source_sha256": {
+      "src/barrier.rs": "76ac3d0ffc8a04f95d5050b5cdccf1daec79489c2b603d743f342dc500b2f743",
+      "src/barrier/trial.rs": "afd26e4abe43346c2c576be7e4f8bb4017dfc46a2278bfb4a9cdbb2017d28061",
+      "src/barrier/trial_oracle.rs": "a5a7060edf3d426d983498ffb18bc61ced60e1c3172401b23898e03f8ece2b92",
+      "tests/fixtures/barrier_trial_inputs.json": "50d926e813429b3493442ecb6726554eee4a1a1eabde0bf8203fd55880e3fe73"
+    }
+  },
+  "candidate_full_gates": "Not run after the inconclusive first screen. Accepted baseline retains its preceding987/987 and292passing release tests; no new full candidate claim.",
+  "restored_cli_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+  "raw": "target/perf-trial-executor"
+}

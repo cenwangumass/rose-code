@@ -1464,18 +1464,30 @@ and accepted CLI are restored byte for byte.
 [forward-owner-scope.json](evidence/forward-owner-scope.json), raw source,
 calibration and both exploratory/final measurements in `target/perf-forward-owner/`.
 
-Next measure the complete normal-solve/refinement path on 80BAU3B, separating
-factorization, triangular solves, matrix products, residual construction and
-correction iterations. Start with small models and use the cheaper 36-iteration
-80BAU3B solve before GREENBEA's 103 iterations. Current broad-model diagnostics
-rule out default single precision but do not locate their remaining time.
+Accepted-source complete normal/controller scopes cover all six small models,
+then default-limit 80BAU3B (optimal/36) and GREENBEA (suboptimal/103). Numeric
+factorization is about 44.82%/50.77%, with child updates 19.95%/26.37% and
+assembly 9.96%/10.41%; normal solves are 15.50%/24.84%, including complete
+forward/backward 7.39%/13.55%. Refinement is 2.34%/9.38%, including correction
+solves 0%/5.58%. 80BAU3B has no HSD raw or correction solves; GREENBEA has
+72 raw and 131 correction solves. Trial selection occupies 8.76%/6.58%; the
+complete packet executor tested against this scope is inconclusive below.
+These are nested release-test wall scopes, not removable accepted-release
+bounds. All 48 final paired complete solve objects agree. Earlier GREENBEA
+cap 150 observations are excluded: a nondefault limit bypasses later termination
+branches and reaches iteration_limit/150 rather than the benchmark's exit.
+[barrier-normal-scope.json](evidence/barrier-normal-scope.json), raw probes,
+source, outputs and earlier observations in `target/perf-barrier-normal/`.
 
-The complete child/direct-destination/rectangular-RHS factor executor is
-qualified above. Refresh its accepted-release factor/solve attribution before
-choosing another barrier structural change. Pre-executor nested test scopes
-(numeric factor 71%, child 35% including GEMM 19%, factor blocks 23%, complete
-forward/backward 7%) describe the predecessor and are not current removable
-bounds. [barrier-current-scope.json](evidence/barrier-current-scope.json).
+The next structural measurement is a complete inner GEMM action-plan lifetime
+inside the existing solver-owned child program. Reuse cached small-model Plan
+captures to weight DGEMV, S4x4/S4x2/S4/S2/scalar/copy routes and actual shapes,
+then attribute current child GEMM work to routing, validation, numerical kernels
+and stores. Admitted nocopy has one K partition and triangular batches one
+N block: their enumeration is not a large boundary. No implementation follows
+without a large measured routing share; descriptor execution and construction
+still cost. Existing local tile/packing and outer-map trials remain settled.
+Avoid clocks around individual tiles or adding independent historical gains.
 
 The exact Plan census counts 1,008 wide GEMM calls/factor on DEGEN3, 799 zero-C;
 fifteen factors describe 83.2 MB of logical cn buffers, 37.4% unused cells whose
@@ -1518,6 +1530,24 @@ The remaining candidates below derive from the Ryzen measurements and their hist
 ## Tried, no gain
 
 ### EPYC structural trials
+
+- Complete corrector trial executor: AVX256 holds primal/dual recurrences for two
+  weights; an odd weight uses AVX128 without padded lanes. Original coordinate,
+  upper and homogeneous order, exact weight/winner expressions and speculative
+  FP-status effects are preserved. The complete original selector is frozen.
+  Four release tests pass: 9,936 full-representation/mode cases, 192 captured
+  checks from 12 original small-model inputs, opaque integrated dispatch and
+  exact inactive/upper-hole/decline regressions. Fast parity passes 940/940;
+  every bounded counter and fixed-screen full result/exit object agrees.
+  80BAU3B instructions fall 5.869%. Fixed CPU 2 screen 48811 (32 AB + 32 AA,
+  default cap 1000) is inconclusive: median -3.344%, CI[-8.732%,-1.222%],
+  24/32 improving, p 0.00350 and both orders favorable, but healthy AA
+  [-2.157%,+4.462%] defeats conservative separation. Stop without 48883,
+  extension/retry or candidate full gates. Accepted source/CLI are restored
+  exactly. [barrier-trial-executor.json](evidence/barrier-trial-executor.json),
+  all source, fixtures, failed/corrected tests, instruction proofs and raw timing
+  in `target/perf-trial-executor/`.
+
 
 - Transfer the dense forward-L buffer through U with positive-zero normalization fused into spike compaction (current virtual EPYC host, ordinary ThinLTO/glibc). All 16 independent FTRAN/L/needed-FTRAN release tests and fast parity 940/940 pass; transfer arrays match expansion bit for bit on random and captured f64/F80 inputs. Four AB/BA pairs per model preserve all 32 complete results and exits. Instructions ADLITTLE +0.015%, DEGEN2 cap300 +0.270%, PEROLD dual +0.092%, PILOT4 primal +0.132%: no initial reduction. Counter collection overlapped fast parity, so cycle/timing changes are diagnostic. Rejected before matching-PGO, formal timing or full candidate gates; source and accepted CLI restored exactly. This closes the fused-normalization variant left by the earlier separate-pass transfer trial. Do not repeat either variant. [Evidence](evidence/dense-l-transfer.json); candidate, independent test extension and raw counters/results in `target/perf-dense-transfer/`.
 

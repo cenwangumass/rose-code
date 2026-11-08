@@ -1,0 +1,1412 @@
+{
+  "source": "18061fe9",
+  "measurement_parent": "c230c80a",
+  "configuration": "Rust1.98.1 ordinary ThinLTO/glibc release tests; CPU2 pinned; three alternating enabled/disabled diagnostic pairs per model. Original numerical bodies unchanged.",
+  "qualification": "All48final complete Debug SolveResult objects agree within each enabled/disabled pair. Scopes are nested instrumented test wall times, affected by timer overhead, inlining and code generation; not accepted-release removable bounds. Do not add nested percentages.",
+  "models": [
+    {
+      "model": "afiro",
+      "cap": 1000,
+      "pairs": 3,
+      "status": "Optimal",
+      "iterations": 7,
+      "fields": {
+        "normal_solve": {
+          "calls": 22,
+          "median_ns": 66285,
+          "median_whole_solve_percent": 17.23988962903091
+        },
+        "early_CG": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "normal305": {
+          "calls": 22,
+          "median_ns": 64291,
+          "median_whole_solve_percent": 16.65031374253022
+        },
+        "forward": {
+          "calls": 22,
+          "median_ns": 11654,
+          "median_whole_solve_percent": 2.9981918338169127
+        },
+        "backward": {
+          "calls": 22,
+          "median_ns": 8274,
+          "median_whole_solve_percent": 2.208534240084729
+        },
+        "Aw": {
+          "calls": 22,
+          "median_ns": 13316,
+          "median_whole_solve_percent": 3.4000390200395776
+        },
+        "ATy": {
+          "calls": 22,
+          "median_ns": 13614,
+          "median_whole_solve_percent": 3.7233479193957466
+        },
+        "residual": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "residual_Ax": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "residual_ATy": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "refine": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "correction_solve": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "factor_dispatch": {
+          "calls": 8,
+          "median_ns": 85189,
+          "median_whole_solve_percent": 19.90127506085624
+        },
+        "numeric_factor": {
+          "calls": 8,
+          "median_ns": 83184,
+          "median_whole_solve_percent": 19.432880590947956
+        },
+        "assembly": {
+          "calls": 24,
+          "median_ns": 21440,
+          "median_whole_solve_percent": 5.008667049792318
+        },
+        "child_update": {
+          "calls": 24,
+          "median_ns": 15088,
+          "median_whole_solve_percent": 3.777335486374504
+        },
+        "factor_block": {
+          "calls": 24,
+          "median_ns": 21627,
+          "median_whole_solve_percent": 5.380812880497503
+        },
+        "direction": {
+          "calls": 20,
+          "median_ns": 78316,
+          "median_whole_solve_percent": 19.606694455918987
+        },
+        "raw_solve": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "early_decision": {
+          "calls": 8,
+          "median_ns": 380,
+          "median_whole_solve_percent": 0.09601502600114938
+        },
+        "barrier_run": {
+          "calls": 1,
+          "median_ns": 313825,
+          "median_whole_solve_percent": 78.56722620701741
+        },
+        "trial_select": {
+          "calls": 13,
+          "median_ns": 29106,
+          "median_whole_solve_percent": 7.641955062164472
+        },
+        "ratio": {
+          "calls": 94,
+          "median_ns": 28292,
+          "median_whole_solve_percent": 7.470107862537975
+        },
+        "complementarity": {
+          "calls": 9,
+          "median_ns": 24345,
+          "median_whole_solve_percent": 6.094858988321004
+        },
+        "iterate_residuals": {
+          "calls": 9,
+          "median_ns": 38409,
+          "median_whole_solve_percent": 9.615832363213038
+        },
+        "corrector_rhs": {
+          "calls": 13,
+          "median_ns": 7564,
+          "median_whole_solve_percent": 1.935251764947741
+        },
+        "normal_diag": {
+          "calls": 7,
+          "median_ns": 2657,
+          "median_whole_solve_percent": 0.6651895802821485
+        },
+        "save_iterate": {
+          "calls": 9,
+          "median_ns": 1903,
+          "median_whole_solve_percent": 0.47642294741322117
+        },
+        "termination": {
+          "calls": 8,
+          "median_ns": 1062,
+          "median_whole_solve_percent": 0.26812341481089214
+        },
+        "std_form": {
+          "calls": 1,
+          "median_ns": 15399,
+          "median_whole_solve_percent": 3.5974096968167864
+        },
+        "solution": {
+          "calls": 1,
+          "median_ns": 711,
+          "median_whole_solve_percent": 0.16609898658592995
+        },
+        "affine_mu": {
+          "calls": 7,
+          "median_ns": 1794,
+          "median_whole_solve_percent": 0.48524206360266453
+        },
+        "setup": {
+          "calls": 1,
+          "median_ns": 79478,
+          "median_whole_solve_percent": 19.897605367581708
+        }
+      }
+    },
+    {
+      "model": "sc50a",
+      "cap": 1000,
+      "pairs": 3,
+      "status": "Optimal",
+      "iterations": 7,
+      "fields": {
+        "normal_solve": {
+          "calls": 25,
+          "median_ns": 129993,
+          "median_whole_solve_percent": 18.063339035171214
+        },
+        "early_CG": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "normal305": {
+          "calls": 25,
+          "median_ns": 127547,
+          "median_whole_solve_percent": 17.72345206218014
+        },
+        "forward": {
+          "calls": 25,
+          "median_ns": 28563,
+          "median_whole_solve_percent": 3.8551162289921352
+        },
+        "backward": {
+          "calls": 25,
+          "median_ns": 20730,
+          "median_whole_solve_percent": 2.877782676906986
+        },
+        "Aw": {
+          "calls": 25,
+          "median_ns": 23854,
+          "median_whole_solve_percent": 3.314662246005355
+        },
+        "ATy": {
+          "calls": 25,
+          "median_ns": 25267,
+          "median_whole_solve_percent": 3.4930221588753425
+        },
+        "residual": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "residual_Ax": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "residual_ATy": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "refine": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "correction_solve": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "factor_dispatch": {
+          "calls": 8,
+          "median_ns": 210822,
+          "median_whole_solve_percent": 27.43852732175999
+        },
+        "numeric_factor": {
+          "calls": 8,
+          "median_ns": 207718,
+          "median_whole_solve_percent": 26.88981060877947
+        },
+        "assembly": {
+          "calls": 40,
+          "median_ns": 63294,
+          "median_whole_solve_percent": 8.615403545830215
+        },
+        "child_update": {
+          "calls": 48,
+          "median_ns": 36119,
+          "median_whole_solve_percent": 4.629548926919804
+        },
+        "factor_block": {
+          "calls": 40,
+          "median_ns": 62674,
+          "median_whole_solve_percent": 8.131286978456364
+        },
+        "direction": {
+          "calls": 23,
+          "median_ns": 171051,
+          "median_whole_solve_percent": 21.924443464618605
+        },
+        "raw_solve": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "early_decision": {
+          "calls": 8,
+          "median_ns": 442,
+          "median_whole_solve_percent": 0.060242199276068206
+        },
+        "barrier_run": {
+          "calls": 1,
+          "median_ns": 576225,
+          "median_whole_solve_percent": 80.6448153322628
+        },
+        "trial_select": {
+          "calls": 16,
+          "median_ns": 55414,
+          "median_whole_solve_percent": 7.643196989428135
+        },
+        "ratio": {
+          "calls": 124,
+          "median_ns": 55248,
+          "median_whole_solve_percent": 7.540016201306359
+        },
+        "complementarity": {
+          "calls": 9,
+          "median_ns": 40815,
+          "median_whole_solve_percent": 5.3100307827871465
+        },
+        "iterate_residuals": {
+          "calls": 9,
+          "median_ns": 63537,
+          "median_whole_solve_percent": 8.350466043907591
+        },
+        "corrector_rhs": {
+          "calls": 16,
+          "median_ns": 16180,
+          "median_whole_solve_percent": 2.111424997180152
+        },
+        "normal_diag": {
+          "calls": 7,
+          "median_ns": 3747,
+          "median_whole_solve_percent": 0.5206690465239401
+        },
+        "save_iterate": {
+          "calls": 9,
+          "median_ns": 2397,
+          "median_whole_solve_percent": 0.33307811703172785
+        },
+        "termination": {
+          "calls": 8,
+          "median_ns": 1183,
+          "median_whole_solve_percent": 0.1643852367328052
+        },
+        "std_form": {
+          "calls": 1,
+          "median_ns": 18795,
+          "median_whole_solve_percent": 2.6717546188673555
+        },
+        "solution": {
+          "calls": 1,
+          "median_ns": 972,
+          "median_whole_solve_percent": 0.1322863443530267
+        },
+        "affine_mu": {
+          "calls": 7,
+          "median_ns": 2976,
+          "median_whole_solve_percent": 0.3814484788203808
+        },
+        "setup": {
+          "calls": 1,
+          "median_ns": 122910,
+          "median_whole_solve_percent": 17.813146742879667
+        }
+      }
+    },
+    {
+      "model": "blend",
+      "cap": 1000,
+      "pairs": 3,
+      "status": "Optimal",
+      "iterations": 8,
+      "fields": {
+        "normal_solve": {
+          "calls": 27,
+          "median_ns": 292876,
+          "median_whole_solve_percent": 18.379937844937615
+        },
+        "early_CG": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "normal305": {
+          "calls": 27,
+          "median_ns": 290172,
+          "median_whole_solve_percent": 18.21843367828568
+        },
+        "forward": {
+          "calls": 27,
+          "median_ns": 58776,
+          "median_whole_solve_percent": 3.450277717869757
+        },
+        "backward": {
+          "calls": 27,
+          "median_ns": 46109,
+          "median_whole_solve_percent": 2.7725117645603006
+        },
+        "Aw": {
+          "calls": 27,
+          "median_ns": 70921,
+          "median_whole_solve_percent": 4.514298190963976
+        },
+        "ATy": {
+          "calls": 27,
+          "median_ns": 73605,
+          "median_whole_solve_percent": 4.480892091316322
+        },
+        "residual": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "residual_Ax": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "residual_ATy": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "refine": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "correction_solve": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "factor_dispatch": {
+          "calls": 9,
+          "median_ns": 547351,
+          "median_whole_solve_percent": 35.04681544221272
+        },
+        "numeric_factor": {
+          "calls": 9,
+          "median_ns": 542671,
+          "median_whole_solve_percent": 34.747155632932106
+        },
+        "assembly": {
+          "calls": 72,
+          "median_ns": 128036,
+          "median_whole_solve_percent": 7.3422294604405245
+        },
+        "child_update": {
+          "calls": 108,
+          "median_ns": 168348,
+          "median_whole_solve_percent": 11.78138954394872
+        },
+        "factor_block": {
+          "calls": 72,
+          "median_ns": 135811,
+          "median_whole_solve_percent": 8.69596118765171
+        },
+        "direction": {
+          "calls": 25,
+          "median_ns": 307456,
+          "median_whole_solve_percent": 18.27471971885264
+        },
+        "raw_solve": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "early_decision": {
+          "calls": 9,
+          "median_ns": 471,
+          "median_whole_solve_percent": 0.030158070549395528
+        },
+        "barrier_run": {
+          "calls": 1,
+          "median_ns": 1224792,
+          "median_whole_solve_percent": 78.42327716419373
+        },
+        "trial_select": {
+          "calls": 17,
+          "median_ns": 80309,
+          "median_whole_solve_percent": 5.112907958888563
+        },
+        "ratio": {
+          "calls": 132,
+          "median_ns": 83376,
+          "median_whole_solve_percent": 5.368104341308368
+        },
+        "complementarity": {
+          "calls": 10,
+          "median_ns": 63380,
+          "median_whole_solve_percent": 4.0582134000439245
+        },
+        "iterate_residuals": {
+          "calls": 10,
+          "median_ns": 104727,
+          "median_whole_solve_percent": 6.815419263826674
+        },
+        "corrector_rhs": {
+          "calls": 17,
+          "median_ns": 26025,
+          "median_whole_solve_percent": 1.6032329117772883
+        },
+        "normal_diag": {
+          "calls": 8,
+          "median_ns": 5971,
+          "median_whole_solve_percent": 0.3823223763278995
+        },
+        "save_iterate": {
+          "calls": 10,
+          "median_ns": 4298,
+          "median_whole_solve_percent": 0.2563984712258831
+        },
+        "termination": {
+          "calls": 9,
+          "median_ns": 1504,
+          "median_whole_solve_percent": 0.09599559590097659
+        },
+        "std_form": {
+          "calls": 1,
+          "median_ns": 48110,
+          "median_whole_solve_percent": 3.0804772274552414
+        },
+        "solution": {
+          "calls": 1,
+          "median_ns": 1192,
+          "median_whole_solve_percent": 0.07632360954326851
+        },
+        "affine_mu": {
+          "calls": 8,
+          "median_ns": 4390,
+          "median_whole_solve_percent": 0.28109114588502415
+        },
+        "setup": {
+          "calls": 1,
+          "median_ns": 321650,
+          "median_whole_solve_percent": 20.595208900664694
+        }
+      }
+    },
+    {
+      "model": "adlittle",
+      "cap": 1000,
+      "pairs": 3,
+      "status": "Optimal",
+      "iterations": 12,
+      "fields": {
+        "normal_solve": {
+          "calls": 36,
+          "median_ns": 280081,
+          "median_whole_solve_percent": 21.563337505913825
+        },
+        "early_CG": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "normal305": {
+          "calls": 36,
+          "median_ns": 277034,
+          "median_whole_solve_percent": 21.323419849718437
+        },
+        "forward": {
+          "calls": 36,
+          "median_ns": 42737,
+          "median_whole_solve_percent": 3.3030577401712593
+        },
+        "backward": {
+          "calls": 36,
+          "median_ns": 30402,
+          "median_whole_solve_percent": 2.3362324275392945
+        },
+        "Aw": {
+          "calls": 36,
+          "median_ns": 76891,
+          "median_whole_solve_percent": 6.077387520573935
+        },
+        "ATy": {
+          "calls": 36,
+          "median_ns": 88974,
+          "median_whole_solve_percent": 6.109454362429472
+        },
+        "residual": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "residual_Ax": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "residual_ATy": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "refine": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "correction_solve": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "factor_dispatch": {
+          "calls": 13,
+          "median_ns": 302826,
+          "median_whole_solve_percent": 23.812938248346484
+        },
+        "numeric_factor": {
+          "calls": 13,
+          "median_ns": 298346,
+          "median_whole_solve_percent": 23.431360209181747
+        },
+        "assembly": {
+          "calls": 65,
+          "median_ns": 82395,
+          "median_whole_solve_percent": 6.331618672031452
+        },
+        "child_update": {
+          "calls": 65,
+          "median_ns": 61818,
+          "median_whole_solve_percent": 4.750385376147099
+        },
+        "factor_block": {
+          "calls": 65,
+          "median_ns": 98061,
+          "median_whole_solve_percent": 7.641873703272119
+        },
+        "direction": {
+          "calls": 34,
+          "median_ns": 300778,
+          "median_whole_solve_percent": 23.010808654339357
+        },
+        "raw_solve": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "early_decision": {
+          "calls": 13,
+          "median_ns": 561,
+          "median_whole_solve_percent": 0.04385021092763497
+        },
+        "barrier_run": {
+          "calls": 1,
+          "median_ns": 1027405,
+          "median_whole_solve_percent": 81.18493014417787
+        },
+        "trial_select": {
+          "calls": 22,
+          "median_ns": 88924,
+          "median_whole_solve_percent": 7.220992882461133
+        },
+        "ratio": {
+          "calls": 152,
+          "median_ns": 95717,
+          "median_whole_solve_percent": 7.772612295111919
+        },
+        "complementarity": {
+          "calls": 14,
+          "median_ns": 92711,
+          "median_whole_solve_percent": 7.124348549095308
+        },
+        "iterate_residuals": {
+          "calls": 14,
+          "median_ns": 136545,
+          "median_whole_solve_percent": 10.492758924358693
+        },
+        "corrector_rhs": {
+          "calls": 22,
+          "median_ns": 27873,
+          "median_whole_solve_percent": 2.141892193040022
+        },
+        "normal_diag": {
+          "calls": 12,
+          "median_ns": 8517,
+          "median_whole_solve_percent": 0.6481347329216601
+        },
+        "save_iterate": {
+          "calls": 14,
+          "median_ns": 4638,
+          "median_whole_solve_percent": 0.3564056969583333
+        },
+        "termination": {
+          "calls": 13,
+          "median_ns": 1544,
+          "median_whole_solve_percent": 0.12537912161531184
+        },
+        "std_form": {
+          "calls": 1,
+          "median_ns": 39434,
+          "median_whole_solve_percent": 3.202202255037699
+        },
+        "solution": {
+          "calls": 1,
+          "median_ns": 1182,
+          "median_whole_solve_percent": 0.09083042988459464
+        },
+        "affine_mu": {
+          "calls": 12,
+          "median_ns": 6253,
+          "median_whole_solve_percent": 0.480509879922479
+        },
+        "setup": {
+          "calls": 1,
+          "median_ns": 221953,
+          "median_whole_solve_percent": 18.02349234448401
+        }
+      }
+    },
+    {
+      "model": "bore3d",
+      "cap": 1000,
+      "pairs": 3,
+      "status": "Optimal",
+      "iterations": 16,
+      "fields": {
+        "normal_solve": {
+          "calls": 49,
+          "median_ns": 1790578,
+          "median_whole_solve_percent": 17.85640634771424
+        },
+        "early_CG": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "normal305": {
+          "calls": 49,
+          "median_ns": 1784669,
+          "median_whole_solve_percent": 17.79058662652094
+        },
+        "forward": {
+          "calls": 49,
+          "median_ns": 410125,
+          "median_whole_solve_percent": 4.095333217144159
+        },
+        "backward": {
+          "calls": 49,
+          "median_ns": 312674,
+          "median_whole_solve_percent": 3.1415628552091728
+        },
+        "Aw": {
+          "calls": 49,
+          "median_ns": 385372,
+          "median_whole_solve_percent": 3.798873385607947
+        },
+        "ATy": {
+          "calls": 49,
+          "median_ns": 459001,
+          "median_whole_solve_percent": 4.515043606427838
+        },
+        "residual": {
+          "calls": 47,
+          "median_ns": 457514,
+          "median_whole_solve_percent": 4.750540402862573
+        },
+        "residual_Ax": {
+          "calls": 47,
+          "median_ns": 150685,
+          "median_whole_solve_percent": 1.5456938898952484
+        },
+        "residual_ATy": {
+          "calls": 47,
+          "median_ns": 150467,
+          "median_whole_solve_percent": 1.492008226126695
+        },
+        "refine": {
+          "calls": 47,
+          "median_ns": 493696,
+          "median_whole_solve_percent": 5.126231754070129
+        },
+        "correction_solve": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "factor_dispatch": {
+          "calls": 17,
+          "median_ns": 4178859,
+          "median_whole_solve_percent": 41.193849675918955
+        },
+        "numeric_factor": {
+          "calls": 17,
+          "median_ns": 4136721,
+          "median_whole_solve_percent": 40.77846680761833
+        },
+        "assembly": {
+          "calls": 884,
+          "median_ns": 934016,
+          "median_whole_solve_percent": 9.304171338916783
+        },
+        "child_update": {
+          "calls": 952,
+          "median_ns": 1437183,
+          "median_whole_solve_percent": 14.167288357608196
+        },
+        "factor_block": {
+          "calls": 884,
+          "median_ns": 996512,
+          "median_whole_solve_percent": 9.697684658949374
+        },
+        "direction": {
+          "calls": 47,
+          "median_ns": 2355016,
+          "median_whole_solve_percent": 24.313038081396037
+        },
+        "raw_solve": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "early_decision": {
+          "calls": 17,
+          "median_ns": 1121,
+          "median_whole_solve_percent": 0.011639765759318717
+        },
+        "barrier_run": {
+          "calls": 1,
+          "median_ns": 8531168,
+          "median_whole_solve_percent": 85.07920053436506
+        },
+        "trial_select": {
+          "calls": 31,
+          "median_ns": 406248,
+          "median_whole_solve_percent": 4.013943629476248
+        },
+        "ratio": {
+          "calls": 230,
+          "median_ns": 460186,
+          "median_whole_solve_percent": 4.471209230705555
+        },
+        "complementarity": {
+          "calls": 18,
+          "median_ns": 385266,
+          "median_whole_solve_percent": 3.741566880681914
+        },
+        "iterate_residuals": {
+          "calls": 18,
+          "median_ns": 653904,
+          "median_whole_solve_percent": 6.346382400258836
+        },
+        "corrector_rhs": {
+          "calls": 31,
+          "median_ns": 114123,
+          "median_whole_solve_percent": 1.175533274674175
+        },
+        "normal_diag": {
+          "calls": 16,
+          "median_ns": 36015,
+          "median_whole_solve_percent": 0.3570947227731758
+        },
+        "save_iterate": {
+          "calls": 18,
+          "median_ns": 19385,
+          "median_whole_solve_percent": 0.1866412038570508
+        },
+        "termination": {
+          "calls": 17,
+          "median_ns": 4719,
+          "median_whole_solve_percent": 0.04521192406772802
+        },
+        "std_form": {
+          "calls": 1,
+          "median_ns": 213568,
+          "median_whole_solve_percent": 2.2175570862499376
+        },
+        "solution": {
+          "calls": 1,
+          "median_ns": 4628,
+          "median_whole_solve_percent": 0.046222655784840784
+        },
+        "affine_mu": {
+          "calls": 16,
+          "median_ns": 28386,
+          "median_whole_solve_percent": 0.28641507466997995
+        },
+        "setup": {
+          "calls": 1,
+          "median_ns": 1428602,
+          "median_whole_solve_percent": 14.082699616023698
+        }
+      }
+    },
+    {
+      "model": "degen2",
+      "cap": 1000,
+      "pairs": 3,
+      "status": "Optimal",
+      "iterations": 12,
+      "fields": {
+        "normal_solve": {
+          "calls": 40,
+          "median_ns": 5533912,
+          "median_whole_solve_percent": 16.26954173111206
+        },
+        "early_CG": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "normal305": {
+          "calls": 40,
+          "median_ns": 5526364,
+          "median_whole_solve_percent": 16.247350828729363
+        },
+        "forward": {
+          "calls": 40,
+          "median_ns": 1741727,
+          "median_whole_solve_percent": 5.244085325991168
+        },
+        "backward": {
+          "calls": 40,
+          "median_ns": 1365873,
+          "median_whole_solve_percent": 4.088736753268199
+        },
+        "Aw": {
+          "calls": 40,
+          "median_ns": 957205,
+          "median_whole_solve_percent": 2.89176181455755
+        },
+        "ATy": {
+          "calls": 40,
+          "median_ns": 1077353,
+          "median_whole_solve_percent": 3.3348226263749856
+        },
+        "residual": {
+          "calls": 38,
+          "median_ns": 1069580,
+          "median_whole_solve_percent": 3.180199153058986
+        },
+        "residual_Ax": {
+          "calls": 38,
+          "median_ns": 391157,
+          "median_whole_solve_percent": 1.1525304375950107
+        },
+        "residual_ATy": {
+          "calls": 38,
+          "median_ns": 406382,
+          "median_whole_solve_percent": 1.194751363551278
+        },
+        "refine": {
+          "calls": 38,
+          "median_ns": 1123992,
+          "median_whole_solve_percent": 3.351834669898126
+        },
+        "correction_solve": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "factor_dispatch": {
+          "calls": 13,
+          "median_ns": 18488946,
+          "median_whole_solve_percent": 56.12239441012697
+        },
+        "numeric_factor": {
+          "calls": 13,
+          "median_ns": 18334178,
+          "median_whole_solve_percent": 55.65541820957579
+        },
+        "assembly": {
+          "calls": 1547,
+          "median_ns": 2943058,
+          "median_whole_solve_percent": 8.798263558948582
+        },
+        "child_update": {
+          "calls": 2977,
+          "median_ns": 7845368,
+          "median_whole_solve_percent": 24.1580950915286
+        },
+        "factor_block": {
+          "calls": 1547,
+          "median_ns": 5572827,
+          "median_whole_solve_percent": 17.019900496897954
+        },
+        "direction": {
+          "calls": 38,
+          "median_ns": 6657854,
+          "median_whole_solve_percent": 19.573898806603964
+        },
+        "raw_solve": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "early_decision": {
+          "calls": 13,
+          "median_ns": 1211,
+          "median_whole_solve_percent": 0.003739301922044417
+        },
+        "barrier_run": {
+          "calls": 1,
+          "median_ns": 28252251,
+          "median_whole_solve_percent": 86.83195410422198
+        },
+        "trial_select": {
+          "calls": 26,
+          "median_ns": 732714,
+          "median_whole_solve_percent": 2.2624598418735364
+        },
+        "ratio": {
+          "calls": 190,
+          "median_ns": 808194,
+          "median_whole_solve_percent": 2.4955254975927046
+        },
+        "complementarity": {
+          "calls": 14,
+          "median_ns": 635008,
+          "median_whole_solve_percent": 1.965594421075661
+        },
+        "iterate_residuals": {
+          "calls": 14,
+          "median_ns": 1150101,
+          "median_whole_solve_percent": 3.560005715319396
+        },
+        "corrector_rhs": {
+          "calls": 26,
+          "median_ns": 246908,
+          "median_whole_solve_percent": 0.7623976539786481
+        },
+        "normal_diag": {
+          "calls": 12,
+          "median_ns": 64720,
+          "median_whole_solve_percent": 0.19223593704435943
+        },
+        "save_iterate": {
+          "calls": 14,
+          "median_ns": 28393,
+          "median_whole_solve_percent": 0.08751273286738293
+        },
+        "termination": {
+          "calls": 13,
+          "median_ns": 8987,
+          "median_whole_solve_percent": 0.026768437492640886
+        },
+        "std_form": {
+          "calls": 1,
+          "median_ns": 483151,
+          "median_whole_solve_percent": 1.454556615745092
+        },
+        "solution": {
+          "calls": 1,
+          "median_ns": 6862,
+          "median_whole_solve_percent": 0.020570792241667964
+        },
+        "affine_mu": {
+          "calls": 12,
+          "median_ns": 40418,
+          "median_whole_solve_percent": 0.1229270359494333
+        },
+        "setup": {
+          "calls": 1,
+          "median_ns": 4036602,
+          "median_whole_solve_percent": 12.464140063689792
+        }
+      }
+    },
+    {
+      "model": "80bau3b",
+      "cap": 1000,
+      "pairs": 3,
+      "status": "Optimal",
+      "iterations": 36,
+      "fields": {
+        "normal_solve": {
+          "calls": 99,
+          "median_ns": 72627277,
+          "median_whole_solve_percent": 15.502896630487609
+        },
+        "early_CG": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "normal305": {
+          "calls": 99,
+          "median_ns": 72591573,
+          "median_whole_solve_percent": 15.495275314583187
+        },
+        "forward": {
+          "calls": 99,
+          "median_ns": 24046248,
+          "median_whole_solve_percent": 4.913238813708174
+        },
+        "backward": {
+          "calls": 99,
+          "median_ns": 11633869,
+          "median_whole_solve_percent": 2.471867234121554
+        },
+        "Aw": {
+          "calls": 99,
+          "median_ns": 12275363,
+          "median_whole_solve_percent": 2.659109951453551
+        },
+        "ATy": {
+          "calls": 99,
+          "median_ns": 17632388,
+          "median_whole_solve_percent": 3.763779943348973
+        },
+        "residual": {
+          "calls": 57,
+          "median_ns": 10356099,
+          "median_whole_solve_percent": 2.205801816022405
+        },
+        "residual_Ax": {
+          "calls": 57,
+          "median_ns": 3215099,
+          "median_whole_solve_percent": 0.6862896354187157
+        },
+        "residual_ATy": {
+          "calls": 57,
+          "median_ns": 4293896,
+          "median_whole_solve_percent": 0.9040023111984142
+        },
+        "refine": {
+          "calls": 57,
+          "median_ns": 10972321,
+          "median_whole_solve_percent": 2.342133221647955
+        },
+        "correction_solve": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "factor_dispatch": {
+          "calls": 37,
+          "median_ns": 212583103,
+          "median_whole_solve_percent": 45.532731135019596
+        },
+        "numeric_factor": {
+          "calls": 37,
+          "median_ns": 208929198,
+          "median_whole_solve_percent": 44.817235582863574
+        },
+        "assembly": {
+          "calls": 20609,
+          "median_ns": 46732944,
+          "median_whole_solve_percent": 9.96012997533247
+        },
+        "child_update": {
+          "calls": 54908,
+          "median_ns": 92447260,
+          "median_whole_solve_percent": 19.951864928551586
+        },
+        "factor_block": {
+          "calls": 20609,
+          "median_ns": 40551443,
+          "median_whole_solve_percent": 8.656042949897603
+        },
+        "direction": {
+          "calls": 97,
+          "median_ns": 94192056,
+          "median_whole_solve_percent": 20.10607815547181
+        },
+        "raw_solve": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "early_decision": {
+          "calls": 37,
+          "median_ns": 4786,
+          "median_whole_solve_percent": 0.0011330868134798997
+        },
+        "barrier_run": {
+          "calls": 1,
+          "median_ns": 434772940,
+          "median_whole_solve_percent": 93.05792476519846
+        },
+        "trial_select": {
+          "calls": 61,
+          "median_ns": 41035897,
+          "median_whole_solve_percent": 8.759453687494528
+        },
+        "ratio": {
+          "calls": 424,
+          "median_ns": 48150312,
+          "median_whole_solve_percent": 10.278084770570802
+        },
+        "complementarity": {
+          "calls": 38,
+          "median_ns": 33909900,
+          "median_whole_solve_percent": 7.551639461958211
+        },
+        "iterate_residuals": {
+          "calls": 38,
+          "median_ns": 45486939,
+          "median_whole_solve_percent": 10.018130393174939
+        },
+        "corrector_rhs": {
+          "calls": 61,
+          "median_ns": 5936633,
+          "median_whole_solve_percent": 1.267223714474956
+        },
+        "normal_diag": {
+          "calls": 36,
+          "median_ns": 2719378,
+          "median_whole_solve_percent": 0.5804738629154736
+        },
+        "save_iterate": {
+          "calls": 38,
+          "median_ns": 1299121,
+          "median_whole_solve_percent": 0.2829928115466821
+        },
+        "termination": {
+          "calls": 37,
+          "median_ns": 34495,
+          "median_whole_solve_percent": 0.007502233011015189
+        },
+        "std_form": {
+          "calls": 1,
+          "median_ns": 5118048,
+          "median_whole_solve_percent": 1.0739115558836452
+        },
+        "solution": {
+          "calls": 1,
+          "median_ns": 102621,
+          "median_whole_solve_percent": 0.022976653706921795
+        },
+        "affine_mu": {
+          "calls": 36,
+          "median_ns": 2226708,
+          "median_whole_solve_percent": 0.481794670779358
+        },
+        "setup": {
+          "calls": 1,
+          "median_ns": 31644774,
+          "median_whole_solve_percent": 6.525284097976523
+        }
+      }
+    },
+    {
+      "model": "greenbea",
+      "cap": 1000,
+      "pairs": 3,
+      "status": "Suboptimal",
+      "iterations": 103,
+      "fields": {
+        "normal_solve": {
+          "calls": 522,
+          "median_ns": 420442321,
+          "median_whole_solve_percent": 24.837817153592663
+        },
+        "early_CG": {
+          "calls": 0,
+          "median_ns": 0,
+          "median_whole_solve_percent": 0.0
+        },
+        "normal305": {
+          "calls": 522,
+          "median_ns": 420192270,
+          "median_whole_solve_percent": 24.82304527952846
+        },
+        "forward": {
+          "calls": 522,
+          "median_ns": 143982483,
+          "median_whole_solve_percent": 8.505829236144532
+        },
+        "backward": {
+          "calls": 522,
+          "median_ns": 85354473,
+          "median_whole_solve_percent": 5.028739576350535
+        },
+        "Aw": {
+          "calls": 522,
+          "median_ns": 77393774,
+          "median_whole_solve_percent": 4.572071628913099
+        },
+        "ATy": {
+          "calls": 522,
+          "median_ns": 90583858,
+          "median_whole_solve_percent": 5.306859192229274
+        },
+        "residual": {
+          "calls": 386,
+          "median_ns": 60487771,
+          "median_whole_solve_percent": 3.5733419807811995
+        },
+        "residual_Ax": {
+          "calls": 386,
+          "median_ns": 23072447,
+          "median_whole_solve_percent": 1.3630150706735291
+        },
+        "residual_ATy": {
+          "calls": 386,
+          "median_ns": 24410480,
+          "median_whole_solve_percent": 1.4420599653939943
+        },
+        "refine": {
+          "calls": 255,
+          "median_ns": 158819408,
+          "median_whole_solve_percent": 9.382327180963859
+        },
+        "correction_solve": {
+          "calls": 131,
+          "median_ns": 94413628,
+          "median_whole_solve_percent": 5.577527075518443
+        },
+        "factor_dispatch": {
+          "calls": 104,
+          "median_ns": 871291495,
+          "median_whole_solve_percent": 51.47193267513713
+        },
+        "numeric_factor": {
+          "calls": 104,
+          "median_ns": 859396246,
+          "median_whole_solve_percent": 50.769215548669614
+        },
+        "assembly": {
+          "calls": 77064,
+          "median_ns": 176170248,
+          "median_whole_solve_percent": 10.40733577276364
+        },
+        "child_update": {
+          "calls": 267072,
+          "median_ns": 446357746,
+          "median_whole_solve_percent": 26.36878241436061
+        },
+        "factor_block": {
+          "calls": 77064,
+          "median_ns": 132049972,
+          "median_whole_solve_percent": 7.720579526824631
+        },
+        "direction": {
+          "calls": 317,
+          "median_ns": 355363084,
+          "median_whole_solve_percent": 20.99323227627409
+        },
+        "raw_solve": {
+          "calls": 72,
+          "median_ns": 149498001,
+          "median_whole_solve_percent": 8.831660915661278
+        },
+        "early_decision": {
+          "calls": 104,
+          "median_ns": 10932,
+          "median_whole_solve_percent": 0.0006458127632757384
+        },
+        "barrier_run": {
+          "calls": 1,
+          "median_ns": 1647218304,
+          "median_whole_solve_percent": 97.3101541003124
+        },
+        "trial_select": {
+          "calls": 214,
+          "median_ns": 111458012,
+          "median_whole_solve_percent": 6.5844316427863525
+        },
+        "ratio": {
+          "calls": 2074,
+          "median_ns": 122138728,
+          "median_whole_solve_percent": 7.215399691974368
+        },
+        "complementarity": {
+          "calls": 107,
+          "median_ns": 48126298,
+          "median_whole_solve_percent": 2.8430824641064434
+        },
+        "iterate_residuals": {
+          "calls": 107,
+          "median_ns": 73546830,
+          "median_whole_solve_percent": 4.344811700738289
+        },
+        "corrector_rhs": {
+          "calls": 214,
+          "median_ns": 11753810,
+          "median_whole_solve_percent": 0.6943615546211128
+        },
+        "normal_diag": {
+          "calls": 103,
+          "median_ns": 4026614,
+          "median_whole_solve_percent": 0.23787401335389446
+        },
+        "save_iterate": {
+          "calls": 36,
+          "median_ns": 657648,
+          "median_whole_solve_percent": 0.0422083805704972
+        },
+        "termination": {
+          "calls": 104,
+          "median_ns": 126666,
+          "median_whole_solve_percent": 0.007149133111355656
+        },
+        "std_form": {
+          "calls": 1,
+          "median_ns": 4493624,
+          "median_whole_solve_percent": 0.26546283686079186
+        },
+        "solution": {
+          "calls": 1,
+          "median_ns": 66223,
+          "median_whole_solve_percent": 0.003996242130523266
+        },
+        "affine_mu": {
+          "calls": 103,
+          "median_ns": 3729969,
+          "median_whole_solve_percent": 0.22034957801160288
+        },
+        "setup": {
+          "calls": 1,
+          "median_ns": 43253127,
+          "median_whole_solve_percent": 2.555197719373074
+        }
+      }
+    }
+  ],
+  "earlier_runs": "Initial cap150 small/80BAU and GREENBEA observations are retained separately. GREENBEA cap150 reaches iteration_limit150 because TermIn.p2bbc!=1000 bypasses later termination tests. Those results are excluded from fixed-row attribution. Final default1000 GREENBEA ends suboptimal103 and80BAU optimal36.",
+  "decisions": "No predictor/HSD pairing scope on80BAU (raw_solve0) or refinement correction scope there (0corrections). Whole trial selection is8.76%80BAU/6.58%GREENBEA, motivating the separately recorded complete trial executor. Factorization remains44.82/50.77%, child updates19.95/26.37%, assembly9.96/10.41%.",
+  "raw": "target/perf-barrier-normal",
+  "source_sha256": {
+    "original.rs": "158e393ca8dc6aef7f98482ca9f4609b49d2df00b03978310873e333ebf51bea",
+    "barrier-original.rs": "05291d4b59fa02c7bab4802e20db42be517f529f34ac8c5ef112344f6d8dd0cf",
+    "final-chol.rs": "a27c6eda7fc091eadb0a234052b11485001303e00b8ed5557bed223ebe0fa8e0",
+    "final-barrier.rs": "d1b6f718a515dd339b52695d14e5ca1428a953314ed2d3900a7f9b510c1d0308",
+    "final-probe.rs": "649ea21532bd2fef71529d10989ea6268a031ef46b91c81a914c0821a0121d2d"
+  },
+  "restored_source": true,
+  "accepted_cli_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410"
+}

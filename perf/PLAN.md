@@ -332,8 +332,19 @@ measured.
   Exact qualification and predecessor controls are in
   evidence/barrier-factor-executor.json; prior isolated 43117/44217 screens
   remain inconclusive and must not be repeated.
-  Refresh accepted-release factor/solve attribution before choosing another
-  barrier scope; predecessor nested scope percentages are not current bounds.
+  Accepted-source normal/controller attribution is now refreshed on the six
+  small models, 80BAU3B and GREENBEA at default 1000 limits. Broad numeric factor
+  scopes are 44.82/50.77%, child 19.95/26.37%, normal solves 15.50/24.84%.
+  These nested test scopes are not removable bounds. A complete trial executor
+  targets the measured 8.76/6.58% selection scope, passes its full original
+  selector oracle and fast 940, and lowers 80BAU instructions 5.869%. Its first
+  fixed screen 48811 fails conservative AA separation; stop without 48883 or
+  same-source extension/retry. Source/accepted CLI restored. Evidence:
+  evidence/barrier-normal-scope.json and evidence/barrier-trial-executor.json.
+  Preserve actual compiled FP semantics when replacing conditional kernels:
+  lower ratios branch around arithmetic, while upper/tail loops speculatively
+  divide before signaling comparisons. LLVM can erase neutralizing masks unless
+  the instructions are protected; opaque reference calls and status tests matter.
   Packed-R assembly/updates/solve ownership and disjoint factor recycling remain
   unimplemented. Recycle only after the early return check and preserve par from
   logical lengths. The exact Plan census counts 13.0 MB R packing on DEGEN3,
@@ -350,12 +361,18 @@ measured.
   Post-U output ordering is larger but natural traversal reuse is an existing
   timing-inconclusive trial and must not be repeated. Exact scopes and caveats:
   evidence/forward-owner-scope.json.
-  Next measure the complete 80BAU3B normal-solve/refinement path after the factor
-  executor, separating factorization, triangular solves, matrix products,
-  residual construction and correction solves. Use small models first, then
-  80BAU3B (36iterations) before GREENBEA (103). Default single precision does not
-  explain their unchanged time; prior triangular-only ownership trials remain
-  rejected. Choose the next structural change from this fresh attribution.
+  Next discriminate a complete inner GEMM action plan retained by ChildProgram
+  across Newton factors. Reuse cached target/perf-factor-boundaries/*.dump
+  (do not rerun its capture-launching census.py) to count actual batch shapes,
+  routes and ordered actions, starting AFIRO/SC50A then BORE3D. Attribute current
+  GEMM geometry/routing versus validation, arithmetic and stores before coding.
+  On admitted direct nocopy k<=192, ps has exactly one entry; triangular n<=24
+  has one N block. Those allocations alone cannot justify a rewrite. Preserve
+  exact action/accumulation order, K-boundary C additions, full logical finite
+  scans, unused outputs/flags and single/extreme fallbacks. Do not extend zero-C
+  direct scatter to multiple K pieces. Existing local tile/packing trials and
+  outer child maps/schedules are distinct but remain settled; no per-tile timers
+  or additive scope claims. Descriptor execution/construction must be included.
   Factor-production/installation ownership remains another measured lead.
   The scalar prefilter and prior rank/layout trials remain
   rejected; do not infer further gains from isolated predicate costs.
