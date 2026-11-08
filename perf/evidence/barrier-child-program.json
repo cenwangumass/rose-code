@@ -1,0 +1,172 @@
+{
+  "source": "4f45735b",
+  "experiment": "Solver-owned child execution plan spans all original width-one groups, wide GEMM batches, 24column/block/rectangular-extension schedules, exact gather/store versus zero/add semantics, borrowed packed B and persistent temp/product scratch across Newton factors. Public mutable Plan/numeric_factor keep original path. Coefficients,D and single mode remain live.",
+  "configuration": "Pinned Rust1.98.1 ordinary ThinLTO/glibc release, current EPYC virtual host, CPU2. No PGO or reference speed claim.",
+  "protection": "Complete original child kernels copied before change; exact source reconstruction verified. 7200 generated shape/input/precision/mode cases compare complete parent M/R bits including untouched/upper cells and full MXCSR: widths1/2/4/9, parent width4/5 boundary, m1/2/3/24/25, contiguous/gapped/mixed rectangle maps, extension beyond initial block, changed data, signed zeros/subnormals/extremes/Inf/twoNaNpayloads, oversized poisoned scratch and single-to-double reuse. All16MXCSR modes exercised on small m families; large m24/25 use default mode. Complete small real-model factors and callback streams compare30changing D/coefficient/precision cases acrossAFIRO/SC50A/BLEND/ADLITTLE/BORE3D, including diag/rcp/par/minratio.",
+  "development_variants": "Initial per-cell scalar address metadata lowers DEGEN3 instructions3.675% but raises cycles0.902% in preliminary three-pair counters. Compact row schedules and shared column maps remove O(m*n) scalar metadata. One intermediate zipped-value scatter changes NaN priority atwc2,m1,single on synthetic exceptional data; retaining the original indexed add expression fixes all7200checks. Both complete old/new release tests pass on final source. First counter JSON paths were reused by the final variant; preliminary counters survive in log/source/binary artifacts, not separate full raw JSON. All final counter/paired raw results are retained.",
+  "parity": "Final fast940/940passes. Full candidate parity/tests/benchmark sweep not run after the inconclusive first screen. No baseline changes.",
+  "whole_results": "All42final alternating bounded counter runs agree on complete JSON result/exit after removing only diagnostics.seconds. Paired runner verifies all130complete result/exit objects (128timed+2warmups).",
+  "final_counters": [
+    {
+      "model": "afiro",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 3257694,
+        "after": 3247744,
+        "change_percent": -0.30543077403831775
+      },
+      "cycles:u": {
+        "before": 3575970,
+        "after": 3680456,
+        "change_percent": 2.9218925214697045
+      }
+    },
+    {
+      "model": "sc50a",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 5397624,
+        "after": 5368734,
+        "change_percent": -0.5352355036215894
+      },
+      "cycles:u": {
+        "before": 5176071,
+        "after": 5261651,
+        "change_percent": 1.6533776294799685
+      }
+    },
+    {
+      "model": "blend",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 13479453,
+        "after": 13256631,
+        "change_percent": -1.653049274328866
+      },
+      "cycles:u": {
+        "before": 9211440,
+        "after": 9029403,
+        "change_percent": -1.976205674682785
+      }
+    },
+    {
+      "model": "adlittle",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 11655355,
+        "after": 11575740,
+        "change_percent": -0.6830765772471104
+      },
+      "cycles:u": {
+        "before": 7782504,
+        "after": 7615063,
+        "change_percent": -2.1515054794703614
+      }
+    },
+    {
+      "model": "bore3d",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 72836418,
+        "after": 71032517,
+        "change_percent": -2.476647053126635
+      },
+      "cycles:u": {
+        "before": 35308882,
+        "after": 34522205,
+        "change_percent": -2.227986148074579
+      }
+    },
+    {
+      "model": "degen2",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 258891250,
+        "after": 246457576,
+        "change_percent": -4.802662894168885
+      },
+      "cycles:u": {
+        "before": 116044641,
+        "after": 103971402,
+        "change_percent": -10.403960834348226
+      }
+    },
+    {
+      "model": "degen3",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 2554830199,
+        "after": 2420794643,
+        "change_percent": -5.246358683738106
+      },
+      "cycles:u": {
+        "before": 1089172385,
+        "after": 1047441348,
+        "change_percent": -3.83144464317281
+      }
+    }
+  ],
+  "timing_screen": {
+    "arguments": {
+      "before": "target/perf-child-program/before",
+      "after": "target/perf-child-program/after",
+      "run": "degen3.barrier-r",
+      "output": "target/perf-child-program/screen43117.json",
+      "pairs": 32,
+      "seed": 43117,
+      "cpu": 2,
+      "max_iterations": 100,
+      "timeout": 10
+    },
+    "binary_sha256": {
+      "A": "fa615c020cf4eaf9b632ceeab247e68e4382b1782eaa89420911222b9a6ba70a",
+      "B": "7fc90bcf2e5fce029a46ebd3783fd69ca029dff07ed93d4e0e9c5ce5492c9e45"
+    },
+    "rule": "one-sided sign p<=.01; AA two-sided sign p>.05; median gain>=0.5%; AB 95% median upper bound < negative max absolute AA 95% bound; both orders improve",
+    "status": "complete",
+    "binary_end_sha256": {
+      "A": "fa615c020cf4eaf9b632ceeab247e68e4382b1782eaa89420911222b9a6ba70a",
+      "B": "7fc90bcf2e5fce029a46ebd3783fd69ca029dff07ed93d4e0e9c5ce5492c9e45"
+    },
+    "summary": {
+      "ab_median_percent": -6.561337969917528,
+      "ab_ci_percent": [
+        -9.204595576712126,
+        -2.9913597394662483
+      ],
+      "aa_median_percent": 2.3589685011138464,
+      "aa_ci_percent": [
+        -1.9487424947769116,
+        4.326372150481506
+      ],
+      "improving_pairs": 26,
+      "pairs_per_kind": 32,
+      "ab_sign_p": 0.0002675263676792383,
+      "aa_sign_p": 0.37708558747544885,
+      "order_median_percent": {
+        "AB": -5.205482873370148,
+        "BA": -6.765120341933202
+      },
+      "criteria": {
+        "sign_p_at_most_001": true,
+        "aa_not_biased_at_005": true,
+        "median_gain_at_least_half_percent": true,
+        "ab_upper_ci_below_aa_error": false,
+        "both_orders_improve": true
+      },
+      "positive_screen": false
+    }
+  },
+  "decision": "First prespecified screen43117 is inconclusive under required conservative noise separation: median-6.561%,CI[-9.205,-2.991],AA[-1.949,+4.326],26/32better,p.0002675,bothordersimprove,healthyAA. Stop without43189,extension or full candidate gates. Do not repeat this screen. Source/acceptedCLI restored; no optimization accepted. Broader whole-factor execution planning would require genuinely additional work beyond this tested child boundary.",
+  "hashes": {
+    "before": "fa615c020cf4eaf9b632ceeab247e68e4382b1782eaa89420911222b9a6ba70a",
+    "after": "7fc90bcf2e5fce029a46ebd3783fd69ca029dff07ed93d4e0e9c5ce5492c9e45",
+    "original.rs": "154938695595cdb2a591a3caada92cf0c50f8914125229c0f8b573ce3675ecda",
+    "scalar-map-program.rs": "457b17fb4a5f86012679ba1251b6222d232b03f91eaac8d23695d9f09b29e957",
+    "scalar-map-binary": "1f8661faa473a15e3efb7919b1fcfe7218e1a976425a9d23747624c46f611f2c",
+    "final-chol.rs": "4c3740c9f8e8d68cf1d9b1253abb093565ff90f760b03ae58024e5096ecf4a6c",
+    "final-program.rs": "b4822b29e8bff761ac9aa188ae3a1e551238cabf89590ea60263d3b8cd8f3b2e",
+    "final-oracle.rs": "461b859ceb95785d6c3f0e79f04933958e3dc423f9e855e37a2efbbf7032f082"
+  },
+  "artifacts": "target/perf-child-program/ (original/final/scalar-map source,binaries,independent oracle,initial/fixed failing/passing tests,all builds/parity/counters,complete fixed screen schedule/raw/results)"
+}

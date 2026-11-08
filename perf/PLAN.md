@@ -313,16 +313,26 @@ measured.
   numerical arrays change: use a refreshed pointer table, not embedded values
   or allocation addresses. Forward needs both single/double peel schedules;
   backward shares geometry. Preserve dsub8/dsub2 reduction trees, four-product
-  grouping and dynamic zero-diagonal rules. First measure the complete triangle
-  pair's current solve cost, since old solve shares include surrounding work;
-  then use cached small-model stage records and a whole-plan lifetime probe.
+  grouping and dynamic zero-diagonal rules. Current scope is measured below;
+  triangular code generation remains unimplemented and lower priority.
   Current scoped DEGEN3 measurements put complete forward/backward near7%,
   versus numeric factor71% and child updates35% (including DGEMM19%). These
-  nested release-test scopes are not accepted-release removable bounds. First
-  test a solver-owned child execution plan spanning complete block schedules,
-  destination geometry and scratch lifetime across Newton factors. Keep exact
-  child/GEMM order and live coefficients/precision; public mutable Plan keeps
-  the original path. Prior single-map/panel/scratch trials remain rejected.
+  nested release-test scopes are not accepted-release removable bounds.
+  A complete solver-owned child row schedule/scratch program now passes its
+  independent child/full-factor oracles and fast940, lowering DEGEN3 instructions
+  5.246%. Fixed screen43117 measures -6.561% but fails conservative AA separation;
+  stop without43189/extension/full gates and restore. Do not repeat this screen.
+  A larger whole-factor plan would need additional work such as retained block
+  solves/LDL orchestration; factor blocks occupy23% of scoped DEGEN3, including
+  DTRSM14% and LDL6%. Prior individual map/panel/scratch trials remain rejected.
+  The distinct next hypothesis is a complete rectangular multi-RHS block solve,
+  sharing live L coefficients while retaining each RHS's original kernel class,
+  total n/column index and tile schedule. Preserve original RHS inputs for native
+  nonfinite fallback, LL0 external-update/substitution boundaries and final
+  reciprocal scaling. First census shared-schedule RHS coverage, then freeze
+  full factor_block and compare complete outputs/flags on real fronts. Prior
+  ordinary auxiliary four-RHS and local LDL/dispatch trials are separate and
+  remain rejected; do not restart them as a small buffer experiment.
   PEROLD FTRAN/L/update and factor-production/installation ownership remain larger
   measured leads. The scalar prefilter and prior rank/layout trials remain
   rejected; do not infer further gains from isolated predicate costs.
