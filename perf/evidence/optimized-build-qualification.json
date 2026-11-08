@@ -1,0 +1,2349 @@
+{
+  "scope": "Existing opt-in fixed39 PGO/system-TCMalloc configuration; no solver source change or default promotion",
+  "source_revision": "18061fe9",
+  "qualification": {
+    "build_result": {
+      "exit_code": 0,
+      "elapsed_seconds": 736.9011287689209
+    },
+    "tests": {
+      "groups": 37,
+      "passed": 292,
+      "failed": 0,
+      "ignored": 22
+    },
+    "full_parity": "987/987 (62.2s)",
+    "candidate_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "ordinary_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "source_build_metadata": {
+      "compiler": "rustc 1.98.1 (48a229cea 2026-09-01)\nbinary: rustc\ncommit-hash: 48a229ceaefd4985c50990b14116b6d856af0985\ncommit-date: 2026-09-01\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.1\nLLVM version: 22.1.8\n",
+      "profile": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/source/target/perf-pgo/a018c80fcf31c7a35a87d9f7be872b8f6174a92969af2c801ed4dc8a2581e46b.profdata",
+      "sha256": "a018c80fcf31c7a35a87d9f7be872b8f6174a92969af2c801ed4dc8a2581e46b",
+      "rustflags": [
+        "-Cllvm-args=--align-loops=64",
+        "-Cprofile-use=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/source/target/perf-pgo/a018c80fcf31c7a35a87d9f7be872b8f6174a92969af2c801ed4dc8a2581e46b.profdata"
+      ],
+      "features": [
+        "system-tcmalloc"
+      ],
+      "training": [
+        [
+          "solve",
+          "tests/fixtures/afiro.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/afiro.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/afiro.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/afiro.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/afiro.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/afiro.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/afiro.mps",
+          "--method",
+          "pdhg",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--pdhg-iter-limit",
+          "2000"
+        ],
+        [
+          "solve",
+          "tests/fixtures/sc50a.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/sc50a.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/sc50a.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/sc50a.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/sc50a.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/sc50a.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/sc50a.mps",
+          "--method",
+          "pdhg",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--pdhg-iter-limit",
+          "2000"
+        ],
+        [
+          "solve",
+          "tests/fixtures/blend.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/blend.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/blend.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/blend.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/blend.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/blend.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/blend.mps",
+          "--method",
+          "pdhg",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--pdhg-iter-limit",
+          "2000"
+        ],
+        [
+          "solve",
+          "tests/fixtures/adlittle.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/adlittle.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/adlittle.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/adlittle.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/adlittle.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/adlittle.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/adlittle.mps",
+          "--method",
+          "pdhg",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--pdhg-iter-limit",
+          "2000"
+        ],
+        [
+          "solve",
+          "tests/fixtures/bore3d.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/bore3d.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/bore3d.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/bore3d.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/bore3d.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/bore3d.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/bore3d.mps",
+          "--method",
+          "pdhg",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--pdhg-iter-limit",
+          "2000"
+        ],
+        [
+          "solve",
+          "tests/fixtures/inf_itest6.mps",
+          "--method",
+          "primal",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null"
+        ],
+        [
+          "solve",
+          "tests/fixtures/inf_itest6.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null"
+        ],
+        [
+          "solve",
+          "tests/fixtures/fx_midsing_1106.mps",
+          "--method",
+          "primal",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null"
+        ],
+        [
+          "solve",
+          "tests/fixtures/fx_midsing_1106.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null"
+        ]
+      ]
+    },
+    "dependency": {
+      "package": "libtcmalloc-minimal4t64",
+      "version": "2.18.1-1",
+      "package_sha256": "b1b769749befa42696d8368c8124afe1f2c522282b9520224304a43fdf7155d9",
+      "library": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/sysroot/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4.6.5",
+      "library_sha256": "3e3c459710a7ce1511a3b289b95d52b56d8313afdb99eec23d2fc241c73e27e1",
+      "link_directory": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/sysroot/usr/lib/x86_64-linux-gnu",
+      "source": "Ubuntu apt metadata, extracted under task target/sysroot; no system package installed"
+    },
+    "loader_environment": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/sysroot/usr/lib/x86_64-linux-gnu"
+  },
+  "comparison": {
+    "manifest": {
+      "schema": "rose.reference-bench/1",
+      "cpu": 2,
+      "affinity": [
+        2
+      ],
+      "host": {
+        "cpu": "AMD EPYC Processor (with IBPB)",
+        "kernel": "7.0.0-38-generic"
+      },
+      "rose_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+      "library_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+      "runner_sha256": "6b5a4fa63bfb684e218784a6c45fa925368da69a97b86ada0a405644830807c0",
+      "source_sha256": {
+        "/home/derekwang/rose-reverse-engineer/rose/perf/compare_reference.py": "526bfabb7fdc51a78cc59ebdd01f8eefda3e8e7d87427be730b896456d9d5eee",
+        "/home/derekwang/rose-reverse-engineer/reverse-engineer/tools/ref_run.py": "fab291de7f813e249654545e09fd6e851fd4571c5de5e2c7a547d501468ab45b",
+        "/home/derekwang/rose-reverse-engineer/reverse-engineer/tools/native_run.c": "c43884168b29bb78283ee80967aef4653e50a95dc311c40e61bfd2b632beb4fe",
+        "/home/derekwang/rose-reverse-engineer/rose/perf/bench.txt": "4e5270f494ca09c0157d6dc1a468496ae75555d714471e190b99df5896077602"
+      },
+      "warmups_per_solver": 1,
+      "samples_per_solver": 3,
+      "timeout_seconds_per_process": 70,
+      "timers": {
+        "rose": "diagnostics.seconds",
+        "reference": "GRB Runtime"
+      },
+      "rows": [
+        {
+          "id": "degen2.primal-c",
+          "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen2.mps",
+          "rose_args": [
+            "--method",
+            "primal",
+            "--profile",
+            "controlled"
+          ],
+          "reference_profile": "controlled",
+          "reference_extra": {
+            "OutputFlag": 0
+          }
+        },
+        {
+          "id": "degen2.dual-r",
+          "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen2.mps",
+          "rose_args": [
+            "--method",
+            "dual",
+            "--profile",
+            "release"
+          ],
+          "reference_profile": "dual-release",
+          "reference_extra": {
+            "OutputFlag": 0
+          }
+        },
+        {
+          "id": "degen3.primal-c",
+          "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen3.mps",
+          "rose_args": [
+            "--method",
+            "primal",
+            "--profile",
+            "controlled"
+          ],
+          "reference_profile": "controlled",
+          "reference_extra": {
+            "OutputFlag": 0
+          }
+        },
+        {
+          "id": "degen3.primal-r",
+          "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen3.mps",
+          "rose_args": [
+            "--method",
+            "primal",
+            "--profile",
+            "release"
+          ],
+          "reference_profile": "release",
+          "reference_extra": {
+            "OutputFlag": 0
+          }
+        },
+        {
+          "id": "perold.primal-c",
+          "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/perold.mps",
+          "rose_args": [
+            "--method",
+            "primal",
+            "--profile",
+            "controlled"
+          ],
+          "reference_profile": "controlled",
+          "reference_extra": {
+            "OutputFlag": 0
+          }
+        },
+        {
+          "id": "pilot4.primal-r",
+          "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/pilot4.mps",
+          "rose_args": [
+            "--method",
+            "primal",
+            "--profile",
+            "release"
+          ],
+          "reference_profile": "release",
+          "reference_extra": {
+            "OutputFlag": 0
+          }
+        },
+        {
+          "id": "80bau3b.primal-c",
+          "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/80bau3b.mps",
+          "rose_args": [
+            "--method",
+            "primal",
+            "--profile",
+            "controlled"
+          ],
+          "reference_profile": "controlled",
+          "reference_extra": {
+            "OutputFlag": 0
+          }
+        },
+        {
+          "id": "primal_5959.primal-r",
+          "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/primal_5959.mps",
+          "rose_args": [
+            "--method",
+            "primal",
+            "--profile",
+            "release"
+          ],
+          "reference_profile": "release",
+          "reference_extra": {
+            "OutputFlag": 0
+          }
+        },
+        {
+          "id": "degen3.dual-c",
+          "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen3.mps",
+          "rose_args": [
+            "--method",
+            "dual",
+            "--profile",
+            "controlled"
+          ],
+          "reference_profile": "dual-controlled",
+          "reference_extra": {
+            "OutputFlag": 0
+          }
+        },
+        {
+          "id": "degen3.dual-r",
+          "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen3.mps",
+          "rose_args": [
+            "--method",
+            "dual",
+            "--profile",
+            "release"
+          ],
+          "reference_profile": "dual-release",
+          "reference_extra": {
+            "OutputFlag": 0
+          }
+        },
+        {
+          "id": "perold.dual-r",
+          "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/perold.mps",
+          "rose_args": [
+            "--method",
+            "dual",
+            "--profile",
+            "release"
+          ],
+          "reference_profile": "dual-release",
+          "reference_extra": {
+            "OutputFlag": 0
+          }
+        },
+        {
+          "id": "80bau3b.dual-r",
+          "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/80bau3b.mps",
+          "rose_args": [
+            "--method",
+            "dual",
+            "--profile",
+            "release"
+          ],
+          "reference_profile": "dual-release",
+          "reference_extra": {
+            "OutputFlag": 0
+          }
+        },
+        {
+          "id": "greenbea.dual-c",
+          "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/greenbea.mps",
+          "rose_args": [
+            "--method",
+            "dual",
+            "--profile",
+            "controlled"
+          ],
+          "reference_profile": "dual-controlled",
+          "reference_extra": {
+            "OutputFlag": 0
+          }
+        },
+        {
+          "id": "greenbea.dual-r",
+          "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/greenbea.mps",
+          "rose_args": [
+            "--method",
+            "dual",
+            "--profile",
+            "release"
+          ],
+          "reference_profile": "dual-release",
+          "reference_extra": {
+            "OutputFlag": 0
+          }
+        },
+        {
+          "id": "mode_switch.dual-r",
+          "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/witness_dual_r2_mode_switch.mps",
+          "rose_args": [
+            "--method",
+            "dual",
+            "--profile",
+            "release"
+          ],
+          "reference_profile": "dual-release",
+          "reference_extra": {
+            "OutputFlag": 0
+          }
+        },
+        {
+          "id": "primal_5959.dual-r",
+          "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/primal_5959.mps",
+          "rose_args": [
+            "--method",
+            "dual",
+            "--profile",
+            "release"
+          ],
+          "reference_profile": "dual-release",
+          "reference_extra": {
+            "OutputFlag": 0
+          }
+        },
+        {
+          "id": "quad_2717.dual-r",
+          "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/quad_2717.mps",
+          "rose_args": [
+            "--method",
+            "dual",
+            "--profile",
+            "release"
+          ],
+          "reference_profile": "dual-release",
+          "reference_extra": {
+            "OutputFlag": 0
+          }
+        },
+        {
+          "id": "fx_quad_obj_5371.dual-r",
+          "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/fx_quad_obj_5371.mps",
+          "rose_args": [
+            "--method",
+            "dual",
+            "--profile",
+            "release"
+          ],
+          "reference_profile": "dual-release",
+          "reference_extra": {
+            "OutputFlag": 0
+          }
+        },
+        {
+          "id": "degen3.barrier-r",
+          "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen3.mps",
+          "rose_args": [
+            "--method",
+            "barrier",
+            "--barrier-profile",
+            "release"
+          ],
+          "reference_profile": "barrier-release",
+          "reference_extra": {
+            "OutputFlag": 0,
+            "BarIterLimit": 1000
+          }
+        },
+        {
+          "id": "80bau3b.barrier-r",
+          "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/80bau3b.mps",
+          "rose_args": [
+            "--method",
+            "barrier",
+            "--barrier-profile",
+            "release"
+          ],
+          "reference_profile": "barrier-release",
+          "reference_extra": {
+            "OutputFlag": 0,
+            "BarIterLimit": 1000
+          }
+        },
+        {
+          "id": "greenbea.barrier-r",
+          "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/greenbea.mps",
+          "rose_args": [
+            "--method",
+            "barrier",
+            "--barrier-profile",
+            "release"
+          ],
+          "reference_profile": "barrier-release",
+          "reference_extra": {
+            "OutputFlag": 0,
+            "BarIterLimit": 1000
+          }
+        },
+        {
+          "id": "80bau3b.pdhg",
+          "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/80bau3b.mps",
+          "rose_args": [
+            "--method",
+            "pdhg"
+          ],
+          "reference_profile": "pdhg-release",
+          "reference_extra": {
+            "OutputFlag": 0
+          }
+        },
+        {
+          "id": "greenbea.pdhg",
+          "model": "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/greenbea.mps",
+          "rose_args": [
+            "--method",
+            "pdhg",
+            "--pdhg-iter-limit",
+            "20000"
+          ],
+          "reference_profile": "pdhg-release",
+          "reference_extra": {
+            "OutputFlag": 0,
+            "PDHGIterLimit": 20000.0
+          }
+        }
+      ],
+      "only": null,
+      "started_utc": "2026-11-08T23:28:57Z"
+    },
+    "complete": {
+      "completed_rows": 23,
+      "rose_faster_rows": 2,
+      "all_results_stable": true
+    },
+    "rows": [
+      {
+        "id": "degen2.primal-c",
+        "rose_seconds": 0.0534303,
+        "reference_seconds": 0.022084951400756836,
+        "ratio": 2.419308017955112,
+        "rose_faster": false,
+        "rose_status": "optimal",
+        "reference_status": 2,
+        "samples": {
+          "rose": [
+            {
+              "seconds": 0.050727473,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "fa2a006a6190ddf2f424344d1a6985194766adb7594b2fc9e53e23e6db29aeb1"
+            },
+            {
+              "seconds": 0.0534303,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "fa2a006a6190ddf2f424344d1a6985194766adb7594b2fc9e53e23e6db29aeb1"
+            },
+            {
+              "seconds": 0.054027172,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "fa2a006a6190ddf2f424344d1a6985194766adb7594b2fc9e53e23e6db29aeb1"
+            }
+          ],
+          "reference": [
+            {
+              "seconds": 0.022084951400756836,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "3e0880967026713d5da4ae29275780a792cf1dde219460dd33eb98b7a6e38dc7"
+            },
+            {
+              "seconds": 0.022558927536010742,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "3e0880967026713d5da4ae29275780a792cf1dde219460dd33eb98b7a6e38dc7"
+            },
+            {
+              "seconds": 0.01963019371032715,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "3e0880967026713d5da4ae29275780a792cf1dde219460dd33eb98b7a6e38dc7"
+            }
+          ]
+        }
+      },
+      {
+        "id": "degen2.dual-r",
+        "rose_seconds": 0.048166189,
+        "reference_seconds": 0.016649961471557617,
+        "ratio": 2.8928708983669504,
+        "rose_faster": false,
+        "rose_status": "optimal",
+        "reference_status": 2,
+        "samples": {
+          "rose": [
+            {
+              "seconds": 0.048461931,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "1fa54a79696c7852580cae6518858bafdf46203374a8700a569e933cde7bdbd6"
+            },
+            {
+              "seconds": 0.045116867,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "1fa54a79696c7852580cae6518858bafdf46203374a8700a569e933cde7bdbd6"
+            },
+            {
+              "seconds": 0.048166189,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "1fa54a79696c7852580cae6518858bafdf46203374a8700a569e933cde7bdbd6"
+            }
+          ],
+          "reference": [
+            {
+              "seconds": 0.016649961471557617,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "a6194ea21b2341dbf773000717e15551911d6920bf50cda1b1ae3edd931a1e7b"
+            },
+            {
+              "seconds": 0.018056869506835938,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "a6194ea21b2341dbf773000717e15551911d6920bf50cda1b1ae3edd931a1e7b"
+            },
+            {
+              "seconds": 0.0163271427154541,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "a6194ea21b2341dbf773000717e15551911d6920bf50cda1b1ae3edd931a1e7b"
+            }
+          ]
+        }
+      },
+      {
+        "id": "degen3.primal-c",
+        "rose_seconds": 0.836768231,
+        "reference_seconds": 0.32332682609558105,
+        "ratio": 2.5879950671109384,
+        "rose_faster": false,
+        "rose_status": "optimal",
+        "reference_status": 2,
+        "samples": {
+          "rose": [
+            {
+              "seconds": 0.836768231,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "003ac89e18b48fb524d90861535da31cc88c48fe0d2e791e9db0edfceb81a4f5"
+            },
+            {
+              "seconds": 0.867046841,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "003ac89e18b48fb524d90861535da31cc88c48fe0d2e791e9db0edfceb81a4f5"
+            },
+            {
+              "seconds": 0.822538969,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "003ac89e18b48fb524d90861535da31cc88c48fe0d2e791e9db0edfceb81a4f5"
+            }
+          ],
+          "reference": [
+            {
+              "seconds": 0.32332682609558105,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "08d4f3baa6fc8f1de902868163b52b6cab4cde4829cc0521c6119395877bf024"
+            },
+            {
+              "seconds": 0.3372931480407715,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "08d4f3baa6fc8f1de902868163b52b6cab4cde4829cc0521c6119395877bf024"
+            },
+            {
+              "seconds": 0.3192789554595947,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "08d4f3baa6fc8f1de902868163b52b6cab4cde4829cc0521c6119395877bf024"
+            }
+          ]
+        }
+      },
+      {
+        "id": "degen3.primal-r",
+        "rose_seconds": 0.881970955,
+        "reference_seconds": 0.3388209342956543,
+        "ratio": 2.603059214252666,
+        "rose_faster": false,
+        "rose_status": "optimal",
+        "reference_status": 2,
+        "samples": {
+          "rose": [
+            {
+              "seconds": 0.90295265,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "81ae04c7b941521c50306c926d4de394f2373d9d074bde62e26d9312657fc2d5"
+            },
+            {
+              "seconds": 0.881970955,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "81ae04c7b941521c50306c926d4de394f2373d9d074bde62e26d9312657fc2d5"
+            },
+            {
+              "seconds": 0.847398562,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "81ae04c7b941521c50306c926d4de394f2373d9d074bde62e26d9312657fc2d5"
+            }
+          ],
+          "reference": [
+            {
+              "seconds": 0.3388209342956543,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "6d42df455ad033b1928680169e661d4ebd68da7fd1fb97bc1d8f131beb42de14"
+            },
+            {
+              "seconds": 0.34206414222717285,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "6d42df455ad033b1928680169e661d4ebd68da7fd1fb97bc1d8f131beb42de14"
+            },
+            {
+              "seconds": 0.33228397369384766,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "6d42df455ad033b1928680169e661d4ebd68da7fd1fb97bc1d8f131beb42de14"
+            }
+          ]
+        }
+      },
+      {
+        "id": "perold.primal-c",
+        "rose_seconds": 0.783889105,
+        "reference_seconds": 0.28924083709716797,
+        "ratio": 2.7101605460250386,
+        "rose_faster": false,
+        "rose_status": "optimal",
+        "reference_status": 2,
+        "samples": {
+          "rose": [
+            {
+              "seconds": 0.783889105,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "744217f9db72d4fb03aab25bd358da78bb4a8ca66f373de08661947b78e7f668"
+            },
+            {
+              "seconds": 0.789445131,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "744217f9db72d4fb03aab25bd358da78bb4a8ca66f373de08661947b78e7f668"
+            },
+            {
+              "seconds": 0.740615917,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "744217f9db72d4fb03aab25bd358da78bb4a8ca66f373de08661947b78e7f668"
+            }
+          ],
+          "reference": [
+            {
+              "seconds": 0.28924083709716797,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "e7911f050c49984371e08757234b8e808368979ba77cefa1198229b918f24d2d"
+            },
+            {
+              "seconds": 0.28569984436035156,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "e7911f050c49984371e08757234b8e808368979ba77cefa1198229b918f24d2d"
+            },
+            {
+              "seconds": 0.29340600967407227,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "e7911f050c49984371e08757234b8e808368979ba77cefa1198229b918f24d2d"
+            }
+          ]
+        }
+      },
+      {
+        "id": "pilot4.primal-r",
+        "rose_seconds": 0.074208305,
+        "reference_seconds": 0.025503873825073242,
+        "ratio": 2.9096875835013227,
+        "rose_faster": false,
+        "rose_status": "optimal",
+        "reference_status": 2,
+        "samples": {
+          "rose": [
+            {
+              "seconds": 0.07797732,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "0398c02787552beb71d659a77703f890e4be716425221968296d8483e28417d1"
+            },
+            {
+              "seconds": 0.073201148,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "0398c02787552beb71d659a77703f890e4be716425221968296d8483e28417d1"
+            },
+            {
+              "seconds": 0.074208305,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "0398c02787552beb71d659a77703f890e4be716425221968296d8483e28417d1"
+            }
+          ],
+          "reference": [
+            {
+              "seconds": 0.025503873825073242,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "d7adcfeb62db13f4a55d6237e7e889cfb173fb29d49a6f46f4a93eb847dde365"
+            },
+            {
+              "seconds": 0.02573990821838379,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "d7adcfeb62db13f4a55d6237e7e889cfb173fb29d49a6f46f4a93eb847dde365"
+            },
+            {
+              "seconds": 0.024918079376220703,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "d7adcfeb62db13f4a55d6237e7e889cfb173fb29d49a6f46f4a93eb847dde365"
+            }
+          ]
+        }
+      },
+      {
+        "id": "80bau3b.primal-c",
+        "rose_seconds": 0.71639217,
+        "reference_seconds": 0.1771070957183838,
+        "ratio": 4.044965940490199,
+        "rose_faster": false,
+        "rose_status": "optimal",
+        "reference_status": 2,
+        "samples": {
+          "rose": [
+            {
+              "seconds": 0.739975363,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "486c3a96e19b958e49e2fba2cdd3a8f57a2ca1e998e781d0a7565559483c58d7"
+            },
+            {
+              "seconds": 0.71639217,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "486c3a96e19b958e49e2fba2cdd3a8f57a2ca1e998e781d0a7565559483c58d7"
+            },
+            {
+              "seconds": 0.70100959,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "486c3a96e19b958e49e2fba2cdd3a8f57a2ca1e998e781d0a7565559483c58d7"
+            }
+          ],
+          "reference": [
+            {
+              "seconds": 0.1739521026611328,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "d2cf6e30891eead987b5950f16c5cdd6aa69de073e5cc1cbe4ba9227c7c21f36"
+            },
+            {
+              "seconds": 0.19215989112854004,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "d2cf6e30891eead987b5950f16c5cdd6aa69de073e5cc1cbe4ba9227c7c21f36"
+            },
+            {
+              "seconds": 0.1771070957183838,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "d2cf6e30891eead987b5950f16c5cdd6aa69de073e5cc1cbe4ba9227c7c21f36"
+            }
+          ]
+        }
+      },
+      {
+        "id": "primal_5959.primal-r",
+        "rose_seconds": 0.083765117,
+        "reference_seconds": 0.06911182403564453,
+        "ratio": 1.2120229522056603,
+        "rose_faster": false,
+        "rose_status": "numerical_failure",
+        "reference_status": 12,
+        "samples": {
+          "rose": [
+            {
+              "seconds": 0.08566663,
+              "status": "numerical_failure",
+              "exit_code": 3,
+              "result_sha256": "7031c889f11a284a29d613be330e83e53ec4872d195ff9bd2b8f6e4ed83b3c84"
+            },
+            {
+              "seconds": 0.077002933,
+              "status": "numerical_failure",
+              "exit_code": 3,
+              "result_sha256": "7031c889f11a284a29d613be330e83e53ec4872d195ff9bd2b8f6e4ed83b3c84"
+            },
+            {
+              "seconds": 0.083765117,
+              "status": "numerical_failure",
+              "exit_code": 3,
+              "result_sha256": "7031c889f11a284a29d613be330e83e53ec4872d195ff9bd2b8f6e4ed83b3c84"
+            }
+          ],
+          "reference": [
+            {
+              "seconds": 0.06243085861206055,
+              "status": 12,
+              "exit_code": 0,
+              "result_sha256": "d485b717532ea53dc937b52d082a2b579c7ac7c399bf18bb1198ce0d918b8365"
+            },
+            {
+              "seconds": 0.06911182403564453,
+              "status": 12,
+              "exit_code": 0,
+              "result_sha256": "d485b717532ea53dc937b52d082a2b579c7ac7c399bf18bb1198ce0d918b8365"
+            },
+            {
+              "seconds": 0.07241415977478027,
+              "status": 12,
+              "exit_code": 0,
+              "result_sha256": "d485b717532ea53dc937b52d082a2b579c7ac7c399bf18bb1198ce0d918b8365"
+            }
+          ]
+        }
+      },
+      {
+        "id": "degen3.dual-c",
+        "rose_seconds": 0.401438799,
+        "reference_seconds": 0.14855599403381348,
+        "ratio": 2.7022726454822603,
+        "rose_faster": false,
+        "rose_status": "optimal",
+        "reference_status": 2,
+        "samples": {
+          "rose": [
+            {
+              "seconds": 0.378445473,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "bc417a70abfa1759321cc4eaa8f44ec6bf9b8c79a8272f45172179afbe36b5b6"
+            },
+            {
+              "seconds": 0.414751669,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "bc417a70abfa1759321cc4eaa8f44ec6bf9b8c79a8272f45172179afbe36b5b6"
+            },
+            {
+              "seconds": 0.401438799,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "bc417a70abfa1759321cc4eaa8f44ec6bf9b8c79a8272f45172179afbe36b5b6"
+            }
+          ],
+          "reference": [
+            {
+              "seconds": 0.14914679527282715,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "98b000555c53196cfe14ef2824920c20d15c8841c056a974a546072def61857b"
+            },
+            {
+              "seconds": 0.14855599403381348,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "98b000555c53196cfe14ef2824920c20d15c8841c056a974a546072def61857b"
+            },
+            {
+              "seconds": 0.14362788200378418,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "98b000555c53196cfe14ef2824920c20d15c8841c056a974a546072def61857b"
+            }
+          ]
+        }
+      },
+      {
+        "id": "degen3.dual-r",
+        "rose_seconds": 0.398572004,
+        "reference_seconds": 0.14458799362182617,
+        "ratio": 2.7566051233996363,
+        "rose_faster": false,
+        "rose_status": "optimal",
+        "reference_status": 2,
+        "samples": {
+          "rose": [
+            {
+              "seconds": 0.388886704,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "bc417a70abfa1759321cc4eaa8f44ec6bf9b8c79a8272f45172179afbe36b5b6"
+            },
+            {
+              "seconds": 0.416954696,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "bc417a70abfa1759321cc4eaa8f44ec6bf9b8c79a8272f45172179afbe36b5b6"
+            },
+            {
+              "seconds": 0.398572004,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "bc417a70abfa1759321cc4eaa8f44ec6bf9b8c79a8272f45172179afbe36b5b6"
+            }
+          ],
+          "reference": [
+            {
+              "seconds": 0.1439359188079834,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "98b000555c53196cfe14ef2824920c20d15c8841c056a974a546072def61857b"
+            },
+            {
+              "seconds": 0.14458799362182617,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "98b000555c53196cfe14ef2824920c20d15c8841c056a974a546072def61857b"
+            },
+            {
+              "seconds": 0.15648603439331055,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "98b000555c53196cfe14ef2824920c20d15c8841c056a974a546072def61857b"
+            }
+          ]
+        }
+      },
+      {
+        "id": "perold.dual-r",
+        "rose_seconds": 0.201585264,
+        "reference_seconds": 0.0657949447631836,
+        "ratio": 3.0638412225372003,
+        "rose_faster": false,
+        "rose_status": "optimal",
+        "reference_status": 2,
+        "samples": {
+          "rose": [
+            {
+              "seconds": 0.201585264,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "1dbc96272b8a76e9fc79720a0703baa31cf70d356b36df672e23cd3400b0c6a2"
+            },
+            {
+              "seconds": 0.198499151,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "1dbc96272b8a76e9fc79720a0703baa31cf70d356b36df672e23cd3400b0c6a2"
+            },
+            {
+              "seconds": 0.21467593,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "1dbc96272b8a76e9fc79720a0703baa31cf70d356b36df672e23cd3400b0c6a2"
+            }
+          ],
+          "reference": [
+            {
+              "seconds": 0.06280899047851562,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "f6fb8d67d3de7295b7dc6e7375f130e85896f6fcba8e39ed1a1ed6f805fa0d66"
+            },
+            {
+              "seconds": 0.0657949447631836,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "f6fb8d67d3de7295b7dc6e7375f130e85896f6fcba8e39ed1a1ed6f805fa0d66"
+            },
+            {
+              "seconds": 0.07099509239196777,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "f6fb8d67d3de7295b7dc6e7375f130e85896f6fcba8e39ed1a1ed6f805fa0d66"
+            }
+          ]
+        }
+      },
+      {
+        "id": "80bau3b.dual-r",
+        "rose_seconds": 0.434473556,
+        "reference_seconds": 0.13570189476013184,
+        "ratio": 3.2016764155576474,
+        "rose_faster": false,
+        "rose_status": "optimal",
+        "reference_status": 2,
+        "samples": {
+          "rose": [
+            {
+              "seconds": 0.456895324,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "6a2872017e244c73510d7594c14f0696031ab107fdaf91528f58c00f863c1348"
+            },
+            {
+              "seconds": 0.412400577,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "6a2872017e244c73510d7594c14f0696031ab107fdaf91528f58c00f863c1348"
+            },
+            {
+              "seconds": 0.434473556,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "6a2872017e244c73510d7594c14f0696031ab107fdaf91528f58c00f863c1348"
+            }
+          ],
+          "reference": [
+            {
+              "seconds": 0.1427619457244873,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "2e78e7da701924cc893a23bc74263b308d91eb7bcc0ee0090764989be3071165"
+            },
+            {
+              "seconds": 0.13570189476013184,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "2e78e7da701924cc893a23bc74263b308d91eb7bcc0ee0090764989be3071165"
+            },
+            {
+              "seconds": 0.12711000442504883,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "2e78e7da701924cc893a23bc74263b308d91eb7bcc0ee0090764989be3071165"
+            }
+          ]
+        }
+      },
+      {
+        "id": "greenbea.dual-c",
+        "rose_seconds": 1.084460464,
+        "reference_seconds": 0.37609100341796875,
+        "ratio": 2.883505465816168,
+        "rose_faster": false,
+        "rose_status": "optimal",
+        "reference_status": 2,
+        "samples": {
+          "rose": [
+            {
+              "seconds": 1.084460464,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "b9d056d6efef176d69d39f43def8945ffbe9b5cc5ad6186a1b33ce6bf370f890"
+            },
+            {
+              "seconds": 1.071023631,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "b9d056d6efef176d69d39f43def8945ffbe9b5cc5ad6186a1b33ce6bf370f890"
+            },
+            {
+              "seconds": 1.107653079,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "b9d056d6efef176d69d39f43def8945ffbe9b5cc5ad6186a1b33ce6bf370f890"
+            }
+          ],
+          "reference": [
+            {
+              "seconds": 0.3622450828552246,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "de8ae74eb732b08cbf8338eaafb9a24a4c58b3cb0451112cf887a6f7df7a232a"
+            },
+            {
+              "seconds": 0.37609100341796875,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "de8ae74eb732b08cbf8338eaafb9a24a4c58b3cb0451112cf887a6f7df7a232a"
+            },
+            {
+              "seconds": 0.39337611198425293,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "de8ae74eb732b08cbf8338eaafb9a24a4c58b3cb0451112cf887a6f7df7a232a"
+            }
+          ]
+        }
+      },
+      {
+        "id": "greenbea.dual-r",
+        "rose_seconds": 1.06799173,
+        "reference_seconds": 0.3550729751586914,
+        "ratio": 3.007809111697916,
+        "rose_faster": false,
+        "rose_status": "optimal",
+        "reference_status": 2,
+        "samples": {
+          "rose": [
+            {
+              "seconds": 1.058098892,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "9dec3e767f79810a73ce47df3d4f5ab9083d8ac066852412e7db000df2f9fb70"
+            },
+            {
+              "seconds": 1.150796046,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "9dec3e767f79810a73ce47df3d4f5ab9083d8ac066852412e7db000df2f9fb70"
+            },
+            {
+              "seconds": 1.06799173,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "9dec3e767f79810a73ce47df3d4f5ab9083d8ac066852412e7db000df2f9fb70"
+            }
+          ],
+          "reference": [
+            {
+              "seconds": 0.3550729751586914,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "a4079b6bee8ee02c7ed6a9cd8e4b0380c7f54ec3796eb5c778ee0b7f9c68e7e2"
+            },
+            {
+              "seconds": 0.3440251350402832,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "a4079b6bee8ee02c7ed6a9cd8e4b0380c7f54ec3796eb5c778ee0b7f9c68e7e2"
+            },
+            {
+              "seconds": 0.3564109802246094,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "a4079b6bee8ee02c7ed6a9cd8e4b0380c7f54ec3796eb5c778ee0b7f9c68e7e2"
+            }
+          ]
+        }
+      },
+      {
+        "id": "mode_switch.dual-r",
+        "rose_seconds": 1.047012509,
+        "reference_seconds": 0.16029596328735352,
+        "ratio": 6.53174594997804,
+        "rose_faster": false,
+        "rose_status": "optimal",
+        "reference_status": 2,
+        "samples": {
+          "rose": [
+            {
+              "seconds": 1.03442425,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "981addde1d58658d6edece1bd517180432719c2dddcae7c3a5df6cb501a6e3a3"
+            },
+            {
+              "seconds": 1.047012509,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "981addde1d58658d6edece1bd517180432719c2dddcae7c3a5df6cb501a6e3a3"
+            },
+            {
+              "seconds": 1.063508184,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "981addde1d58658d6edece1bd517180432719c2dddcae7c3a5df6cb501a6e3a3"
+            }
+          ],
+          "reference": [
+            {
+              "seconds": 0.16202688217163086,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "707b45a0eb2def145d1d275b69caa9f6df50cd9b8351b9f5c7494e97314d4f3a"
+            },
+            {
+              "seconds": 0.14159107208251953,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "707b45a0eb2def145d1d275b69caa9f6df50cd9b8351b9f5c7494e97314d4f3a"
+            },
+            {
+              "seconds": 0.16029596328735352,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "707b45a0eb2def145d1d275b69caa9f6df50cd9b8351b9f5c7494e97314d4f3a"
+            }
+          ]
+        }
+      },
+      {
+        "id": "primal_5959.dual-r",
+        "rose_seconds": 0.111957551,
+        "reference_seconds": 0.0984959602355957,
+        "ratio": 1.1366715013712754,
+        "rose_faster": false,
+        "rose_status": "numerical_failure",
+        "reference_status": 12,
+        "samples": {
+          "rose": [
+            {
+              "seconds": 0.116811987,
+              "status": "numerical_failure",
+              "exit_code": 3,
+              "result_sha256": "5e6234ef90b137e4e9d720d301fc48c7ffd008cf2f722124ff2e20edd5cc76a6"
+            },
+            {
+              "seconds": 0.111957551,
+              "status": "numerical_failure",
+              "exit_code": 3,
+              "result_sha256": "5e6234ef90b137e4e9d720d301fc48c7ffd008cf2f722124ff2e20edd5cc76a6"
+            },
+            {
+              "seconds": 0.104448115,
+              "status": "numerical_failure",
+              "exit_code": 3,
+              "result_sha256": "5e6234ef90b137e4e9d720d301fc48c7ffd008cf2f722124ff2e20edd5cc76a6"
+            }
+          ],
+          "reference": [
+            {
+              "seconds": 0.08790898323059082,
+              "status": 12,
+              "exit_code": 0,
+              "result_sha256": "6d3677e80728545850fc0c0603d89cbc9be050ca5c083f3b67c4d28587737114"
+            },
+            {
+              "seconds": 0.0984959602355957,
+              "status": 12,
+              "exit_code": 0,
+              "result_sha256": "6d3677e80728545850fc0c0603d89cbc9be050ca5c083f3b67c4d28587737114"
+            },
+            {
+              "seconds": 0.10986518859863281,
+              "status": 12,
+              "exit_code": 0,
+              "result_sha256": "6d3677e80728545850fc0c0603d89cbc9be050ca5c083f3b67c4d28587737114"
+            }
+          ]
+        }
+      },
+      {
+        "id": "quad_2717.dual-r",
+        "rose_seconds": 0.110623573,
+        "reference_seconds": 0.09881114959716797,
+        "ratio": 1.1195454505993379,
+        "rose_faster": false,
+        "rose_status": "optimal",
+        "reference_status": 2,
+        "samples": {
+          "rose": [
+            {
+              "seconds": 0.118825791,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "81b34e4b1a3c4f9c2c4506d7222d589472158074c818f68af01feb2efce6cf47"
+            },
+            {
+              "seconds": 0.108927954,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "81b34e4b1a3c4f9c2c4506d7222d589472158074c818f68af01feb2efce6cf47"
+            },
+            {
+              "seconds": 0.110623573,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "81b34e4b1a3c4f9c2c4506d7222d589472158074c818f68af01feb2efce6cf47"
+            }
+          ],
+          "reference": [
+            {
+              "seconds": 0.10216307640075684,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "5890a1b2e4b18e61af571df3cae028dde1a7cf20a1ab4858395166ca578d7438"
+            },
+            {
+              "seconds": 0.09255194664001465,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "5890a1b2e4b18e61af571df3cae028dde1a7cf20a1ab4858395166ca578d7438"
+            },
+            {
+              "seconds": 0.09881114959716797,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "5890a1b2e4b18e61af571df3cae028dde1a7cf20a1ab4858395166ca578d7438"
+            }
+          ]
+        }
+      },
+      {
+        "id": "fx_quad_obj_5371.dual-r",
+        "rose_seconds": 0.038709745,
+        "reference_seconds": 0.03687095642089844,
+        "ratio": 1.0498709216574413,
+        "rose_faster": false,
+        "rose_status": "infeasible",
+        "reference_status": 3,
+        "samples": {
+          "rose": [
+            {
+              "seconds": 0.039891407,
+              "status": "infeasible",
+              "exit_code": 0,
+              "result_sha256": "f32f96a387fe25f65db6ec07589a080bb6513b82f605d99e410f37c0671c39b5"
+            },
+            {
+              "seconds": 0.036751616,
+              "status": "infeasible",
+              "exit_code": 0,
+              "result_sha256": "f32f96a387fe25f65db6ec07589a080bb6513b82f605d99e410f37c0671c39b5"
+            },
+            {
+              "seconds": 0.038709745,
+              "status": "infeasible",
+              "exit_code": 0,
+              "result_sha256": "f32f96a387fe25f65db6ec07589a080bb6513b82f605d99e410f37c0671c39b5"
+            }
+          ],
+          "reference": [
+            {
+              "seconds": 0.0364069938659668,
+              "status": 3,
+              "exit_code": 0,
+              "result_sha256": "497846eaec6752b8ba64b14a6caa3a1951d9789c3cc0d5837a8829c61ad307cd"
+            },
+            {
+              "seconds": 0.03687095642089844,
+              "status": 3,
+              "exit_code": 0,
+              "result_sha256": "497846eaec6752b8ba64b14a6caa3a1951d9789c3cc0d5837a8829c61ad307cd"
+            },
+            {
+              "seconds": 0.04176187515258789,
+              "status": 3,
+              "exit_code": 0,
+              "result_sha256": "497846eaec6752b8ba64b14a6caa3a1951d9789c3cc0d5837a8829c61ad307cd"
+            }
+          ]
+        }
+      },
+      {
+        "id": "degen3.barrier-r",
+        "rose_seconds": 0.244120107,
+        "reference_seconds": 0.11849188804626465,
+        "ratio": 2.060226324562272,
+        "rose_faster": false,
+        "rose_status": "optimal",
+        "reference_status": 2,
+        "samples": {
+          "rose": [
+            {
+              "seconds": 0.247045579,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "808c7e3e18540d556e3149fb686e5171347af3fa90a91147956b69715ee6a256"
+            },
+            {
+              "seconds": 0.243765546,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "808c7e3e18540d556e3149fb686e5171347af3fa90a91147956b69715ee6a256"
+            },
+            {
+              "seconds": 0.244120107,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "808c7e3e18540d556e3149fb686e5171347af3fa90a91147956b69715ee6a256"
+            }
+          ],
+          "reference": [
+            {
+              "seconds": 0.1272730827331543,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "7177806c5f07b37ca2f4c511eb9a322b059b754b6e0b599403861d5605baef0a"
+            },
+            {
+              "seconds": 0.11393189430236816,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "7177806c5f07b37ca2f4c511eb9a322b059b754b6e0b599403861d5605baef0a"
+            },
+            {
+              "seconds": 0.11849188804626465,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "7177806c5f07b37ca2f4c511eb9a322b059b754b6e0b599403861d5605baef0a"
+            }
+          ]
+        }
+      },
+      {
+        "id": "80bau3b.barrier-r",
+        "rose_seconds": 0.308503762,
+        "reference_seconds": 0.18320202827453613,
+        "ratio": 1.6839538563279104,
+        "rose_faster": false,
+        "rose_status": "optimal",
+        "reference_status": 2,
+        "samples": {
+          "rose": [
+            {
+              "seconds": 0.31635284,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "a73f60af6c81a29d3fd59561e4bed8f10c9abe1fed6773bfe19aa658d140a88e"
+            },
+            {
+              "seconds": 0.308503762,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "a73f60af6c81a29d3fd59561e4bed8f10c9abe1fed6773bfe19aa658d140a88e"
+            },
+            {
+              "seconds": 0.302897222,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "a73f60af6c81a29d3fd59561e4bed8f10c9abe1fed6773bfe19aa658d140a88e"
+            }
+          ],
+          "reference": [
+            {
+              "seconds": 0.18320202827453613,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "7df4f32a41d1b8ad49cd91ba474db1a900e503ceb0fa95eeb2e1d6c4cd31f079"
+            },
+            {
+              "seconds": 0.16181707382202148,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "7df4f32a41d1b8ad49cd91ba474db1a900e503ceb0fa95eeb2e1d6c4cd31f079"
+            },
+            {
+              "seconds": 0.18328595161437988,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "7df4f32a41d1b8ad49cd91ba474db1a900e503ceb0fa95eeb2e1d6c4cd31f079"
+            }
+          ]
+        }
+      },
+      {
+        "id": "greenbea.barrier-r",
+        "rose_seconds": 1.341209377,
+        "reference_seconds": 0.7632360458374023,
+        "ratio": 1.7572668171462744,
+        "rose_faster": false,
+        "rose_status": "suboptimal",
+        "reference_status": 13,
+        "samples": {
+          "rose": [
+            {
+              "seconds": 1.282767908,
+              "status": "suboptimal",
+              "exit_code": 3,
+              "result_sha256": "f8d7c0fa91a65dab69a1ece1d6359bec0451859678591ce079f34599a8d0f86d"
+            },
+            {
+              "seconds": 1.736735335,
+              "status": "suboptimal",
+              "exit_code": 3,
+              "result_sha256": "f8d7c0fa91a65dab69a1ece1d6359bec0451859678591ce079f34599a8d0f86d"
+            },
+            {
+              "seconds": 1.341209377,
+              "status": "suboptimal",
+              "exit_code": 3,
+              "result_sha256": "f8d7c0fa91a65dab69a1ece1d6359bec0451859678591ce079f34599a8d0f86d"
+            }
+          ],
+          "reference": [
+            {
+              "seconds": 0.6471011638641357,
+              "status": 13,
+              "exit_code": 0,
+              "result_sha256": "86abcd35e550c62c4d2cf98ac809471f8c8d83c1b2d40bb86f11954083d0489f"
+            },
+            {
+              "seconds": 1.0701251029968262,
+              "status": 13,
+              "exit_code": 0,
+              "result_sha256": "86abcd35e550c62c4d2cf98ac809471f8c8d83c1b2d40bb86f11954083d0489f"
+            },
+            {
+              "seconds": 0.7632360458374023,
+              "status": 13,
+              "exit_code": 0,
+              "result_sha256": "86abcd35e550c62c4d2cf98ac809471f8c8d83c1b2d40bb86f11954083d0489f"
+            }
+          ]
+        }
+      },
+      {
+        "id": "80bau3b.pdhg",
+        "rose_seconds": 3.141775767,
+        "reference_seconds": 3.3816909790039062,
+        "ratio": 0.9290546612645918,
+        "rose_faster": true,
+        "rose_status": "optimal",
+        "reference_status": 2,
+        "samples": {
+          "rose": [
+            {
+              "seconds": 3.141775767,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "f4ae67ad0d2cb6d8ba32227fefcf7ac1f857dd5e64165df6cadb797bf6f08fe2"
+            },
+            {
+              "seconds": 3.02441138,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "f4ae67ad0d2cb6d8ba32227fefcf7ac1f857dd5e64165df6cadb797bf6f08fe2"
+            },
+            {
+              "seconds": 3.152714805,
+              "status": "optimal",
+              "exit_code": 0,
+              "result_sha256": "f4ae67ad0d2cb6d8ba32227fefcf7ac1f857dd5e64165df6cadb797bf6f08fe2"
+            }
+          ],
+          "reference": [
+            {
+              "seconds": 3.3816909790039062,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "8e3044f364c2993c6cb1fdbdafc05261a6d3ad02e03de0c12d4f370bc8f70792"
+            },
+            {
+              "seconds": 3.2622950077056885,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "8e3044f364c2993c6cb1fdbdafc05261a6d3ad02e03de0c12d4f370bc8f70792"
+            },
+            {
+              "seconds": 3.4391868114471436,
+              "status": 2,
+              "exit_code": 0,
+              "result_sha256": "8e3044f364c2993c6cb1fdbdafc05261a6d3ad02e03de0c12d4f370bc8f70792"
+            }
+          ]
+        }
+      },
+      {
+        "id": "greenbea.pdhg",
+        "rose_seconds": 1.596285232,
+        "reference_seconds": 1.6677110195159912,
+        "ratio": 0.9571713644149689,
+        "rose_faster": true,
+        "rose_status": "iteration_limit",
+        "reference_status": 7,
+        "samples": {
+          "rose": [
+            {
+              "seconds": 1.596285232,
+              "status": "iteration_limit",
+              "exit_code": 3,
+              "result_sha256": "53dcdba099848ee500a7cdb9574e1c4bfa98aaf5ee393dae8693255d3d290f4c"
+            },
+            {
+              "seconds": 1.5509932100000001,
+              "status": "iteration_limit",
+              "exit_code": 3,
+              "result_sha256": "53dcdba099848ee500a7cdb9574e1c4bfa98aaf5ee393dae8693255d3d290f4c"
+            },
+            {
+              "seconds": 1.6265969359999999,
+              "status": "iteration_limit",
+              "exit_code": 3,
+              "result_sha256": "53dcdba099848ee500a7cdb9574e1c4bfa98aaf5ee393dae8693255d3d290f4c"
+            }
+          ],
+          "reference": [
+            {
+              "seconds": 1.5641038417816162,
+              "status": 7,
+              "exit_code": 0,
+              "result_sha256": "8565f63907bcf9d54deaa17ffffc8fef822c0ec51031d0ac84e4a35e1c0e3e2e"
+            },
+            {
+              "seconds": 1.6686408519744873,
+              "status": 7,
+              "exit_code": 0,
+              "result_sha256": "8565f63907bcf9d54deaa17ffffc8fef822c0ec51031d0ac84e4a35e1c0e3e2e"
+            },
+            {
+              "seconds": 1.6677110195159912,
+              "status": 7,
+              "exit_code": 0,
+              "result_sha256": "8565f63907bcf9d54deaa17ffffc8fef822c0ec51031d0ac84e4a35e1c0e3e2e"
+            }
+          ]
+        }
+      }
+    ],
+    "cross_build": {
+      "counts": {
+        "rose": 92,
+        "reference": 92
+      },
+      "rows": [
+        {
+          "row": "degen2.primal-c",
+          "solver": "rose",
+          "validated": 4,
+          "result_exit_sha256": "8604c689ed0e55aa0b91abea35c82003337cf0634e4c6c7dec8b83faf015d9c0"
+        },
+        {
+          "row": "degen2.primal-c",
+          "solver": "reference",
+          "validated": 4,
+          "result_exit_sha256": "61b5e3e1b0a0f312218cb05fd1ecde22351a8ea7da1a70aa0287220a6cf5a0f7"
+        },
+        {
+          "row": "degen2.dual-r",
+          "solver": "rose",
+          "validated": 4,
+          "result_exit_sha256": "9f23aefffd87e74091751ecac4f927715358ca2a83ebec5cf858cd2b264712b4"
+        },
+        {
+          "row": "degen2.dual-r",
+          "solver": "reference",
+          "validated": 4,
+          "result_exit_sha256": "04267ce928cc64cc6a52ce72e0e1aadb04a1c3074163635e1dd92c7548eb57b5"
+        },
+        {
+          "row": "degen3.primal-c",
+          "solver": "rose",
+          "validated": 4,
+          "result_exit_sha256": "9a47afd5f45f5d5d8567f8fbafc0f6eeb28c8333e75abc832354cb1026b1f96b"
+        },
+        {
+          "row": "degen3.primal-c",
+          "solver": "reference",
+          "validated": 4,
+          "result_exit_sha256": "042daebbcac381a869f421d0703abf9d28194dc86422abb498485c9aef314d2b"
+        },
+        {
+          "row": "degen3.primal-r",
+          "solver": "rose",
+          "validated": 4,
+          "result_exit_sha256": "143e5519fd16cabe5b2caf6032f5ee40c425dcdd2f66c672fa7027d3066397a0"
+        },
+        {
+          "row": "degen3.primal-r",
+          "solver": "reference",
+          "validated": 4,
+          "result_exit_sha256": "fa5de5912a175b2debf97b9047077bd6af7a313bdffedc5a5205cbdd2df4ca98"
+        },
+        {
+          "row": "perold.primal-c",
+          "solver": "rose",
+          "validated": 4,
+          "result_exit_sha256": "4aba4bbe69ebb3cddb2caf34b7f875a8cff3ada112464337bfa569791ddcc4f9"
+        },
+        {
+          "row": "perold.primal-c",
+          "solver": "reference",
+          "validated": 4,
+          "result_exit_sha256": "347554458f22005a6a26cd71aa0cd03d97a97d0eddd186b45aa2e842bee0cfa9"
+        },
+        {
+          "row": "pilot4.primal-r",
+          "solver": "rose",
+          "validated": 4,
+          "result_exit_sha256": "0d80310bc11e4102879b12c3778a41450612751734439a8fa3eaf66cddeac9da"
+        },
+        {
+          "row": "pilot4.primal-r",
+          "solver": "reference",
+          "validated": 4,
+          "result_exit_sha256": "94ce838a8b1ef8f8ca4297b1870f3db36ca141be666bccee49ffa6aadc1f2e7b"
+        },
+        {
+          "row": "80bau3b.primal-c",
+          "solver": "rose",
+          "validated": 4,
+          "result_exit_sha256": "3d2a723934802f5ed88a59ed82b66fc84805245dd0991e325939f2b3b2ad8dff"
+        },
+        {
+          "row": "80bau3b.primal-c",
+          "solver": "reference",
+          "validated": 4,
+          "result_exit_sha256": "e24fed7b8ab86f3e242573b42e6868a74f9806971f65290cb2e7fc345cacc201"
+        },
+        {
+          "row": "primal_5959.primal-r",
+          "solver": "rose",
+          "validated": 4,
+          "result_exit_sha256": "81dbbe800b8e2480279a63288315ec1eb12f4663e7e0545c3e8c1cd11080bc35"
+        },
+        {
+          "row": "primal_5959.primal-r",
+          "solver": "reference",
+          "validated": 4,
+          "result_exit_sha256": "bc449f1a5a3bc6000170eb737df8cebe67083543ee7e3316672dd7c99f527f96"
+        },
+        {
+          "row": "degen3.dual-c",
+          "solver": "rose",
+          "validated": 4,
+          "result_exit_sha256": "0623715d10dd70632f0cea8b8b98f81f1bc1a0268e26bc9f1012dd1f5932f36f"
+        },
+        {
+          "row": "degen3.dual-c",
+          "solver": "reference",
+          "validated": 4,
+          "result_exit_sha256": "a49d8cbd867957a02c8a0fe62289ae5766b5259f97c6e5166f70ef62d3e4460f"
+        },
+        {
+          "row": "degen3.dual-r",
+          "solver": "rose",
+          "validated": 4,
+          "result_exit_sha256": "0623715d10dd70632f0cea8b8b98f81f1bc1a0268e26bc9f1012dd1f5932f36f"
+        },
+        {
+          "row": "degen3.dual-r",
+          "solver": "reference",
+          "validated": 4,
+          "result_exit_sha256": "a49d8cbd867957a02c8a0fe62289ae5766b5259f97c6e5166f70ef62d3e4460f"
+        },
+        {
+          "row": "perold.dual-r",
+          "solver": "rose",
+          "validated": 4,
+          "result_exit_sha256": "3302598e0f2369b57183439bd841795060347ca6c371755648db2b73d7143cd6"
+        },
+        {
+          "row": "perold.dual-r",
+          "solver": "reference",
+          "validated": 4,
+          "result_exit_sha256": "d364f35f82e0c262ec3a894643d3840ff8576c2db49cc0d7b474cbc732311f9a"
+        },
+        {
+          "row": "80bau3b.dual-r",
+          "solver": "rose",
+          "validated": 4,
+          "result_exit_sha256": "1772e27ed2566bf03c7a327a7190fd4a3a6a371e41c67c09138b9530f09c0382"
+        },
+        {
+          "row": "80bau3b.dual-r",
+          "solver": "reference",
+          "validated": 4,
+          "result_exit_sha256": "adb30b7f777f0f0416c88326aff0731036f19280b337511f6af04530cc91916b"
+        },
+        {
+          "row": "greenbea.dual-c",
+          "solver": "rose",
+          "validated": 4,
+          "result_exit_sha256": "d143fd9b88ba5edb691a1de2563db2999e8301ffcbe2d778cfd2ccc1b6b069f4"
+        },
+        {
+          "row": "greenbea.dual-c",
+          "solver": "reference",
+          "validated": 4,
+          "result_exit_sha256": "84111f914e86fc3dde6c6fcc4d7556439c45db8ae8d22144d8fe59a9415a3f87"
+        },
+        {
+          "row": "greenbea.dual-r",
+          "solver": "rose",
+          "validated": 4,
+          "result_exit_sha256": "a102e61e574de3b28e00c4c8c18604cbc5599d3f280612fd31cdc1dad96f80fc"
+        },
+        {
+          "row": "greenbea.dual-r",
+          "solver": "reference",
+          "validated": 4,
+          "result_exit_sha256": "b6a5ffb5033f9622804b15b91b59fbf5c2a012b8abb0cd1418823a8879b25564"
+        },
+        {
+          "row": "mode_switch.dual-r",
+          "solver": "rose",
+          "validated": 4,
+          "result_exit_sha256": "ab8ad4f24d48caadbc8fe57524a4beec007f6985d19b70cd3698a3fdea79ba23"
+        },
+        {
+          "row": "mode_switch.dual-r",
+          "solver": "reference",
+          "validated": 4,
+          "result_exit_sha256": "2d2aaf9b27b617b91394fe753f654d6aa80c2ebd0b046821e4b9f12dc213c374"
+        },
+        {
+          "row": "primal_5959.dual-r",
+          "solver": "rose",
+          "validated": 4,
+          "result_exit_sha256": "a5643a77f1bad4df62644aa63f1c2878232c94da38690120e17886488705b650"
+        },
+        {
+          "row": "primal_5959.dual-r",
+          "solver": "reference",
+          "validated": 4,
+          "result_exit_sha256": "6140d49e15702af73c7c072bc3c4beed55ce2cf840763a91af234dca35541290"
+        },
+        {
+          "row": "quad_2717.dual-r",
+          "solver": "rose",
+          "validated": 4,
+          "result_exit_sha256": "714409783f99adce30795a3d6207f6afe878b44f2c8586559e5ebf27d411fdbb"
+        },
+        {
+          "row": "quad_2717.dual-r",
+          "solver": "reference",
+          "validated": 4,
+          "result_exit_sha256": "b8f323f00eef4bcb33518396d36a9d98b00ded20abef28d12055d402bf6b7bd6"
+        },
+        {
+          "row": "fx_quad_obj_5371.dual-r",
+          "solver": "rose",
+          "validated": 4,
+          "result_exit_sha256": "eecf0a817af80d18b6029e9befb14e6311f4ce62259f4ba9ef7c44af5f66a580"
+        },
+        {
+          "row": "fx_quad_obj_5371.dual-r",
+          "solver": "reference",
+          "validated": 4,
+          "result_exit_sha256": "d66f0d63e98de77638f696f77680270117e79bbf390a83ac3728353a7ab23177"
+        },
+        {
+          "row": "degen3.barrier-r",
+          "solver": "rose",
+          "validated": 4,
+          "result_exit_sha256": "65d4ae98ef128bf20b452a4febe7de1db3477ac95bff936f769707265fbe9c6f"
+        },
+        {
+          "row": "degen3.barrier-r",
+          "solver": "reference",
+          "validated": 4,
+          "result_exit_sha256": "4d23e334b74101c5743a626d1ab9658b28680541615fdb5ef6d38c45d6e9110d"
+        },
+        {
+          "row": "80bau3b.barrier-r",
+          "solver": "rose",
+          "validated": 4,
+          "result_exit_sha256": "9e26ae521f2e4fc5b8ee79de9a4bc91a6657c7121940ed24506101958a17ada1"
+        },
+        {
+          "row": "80bau3b.barrier-r",
+          "solver": "reference",
+          "validated": 4,
+          "result_exit_sha256": "e941ce078a4911aabbbc291ce68c53ac7ad1a00f6bd04a9843d035d0ebf5da2e"
+        },
+        {
+          "row": "greenbea.barrier-r",
+          "solver": "rose",
+          "validated": 4,
+          "result_exit_sha256": "0333c0d72a7ea744fae2fe73eea9e4240dd48e7b62a0a078fa35d12d95f04567"
+        },
+        {
+          "row": "greenbea.barrier-r",
+          "solver": "reference",
+          "validated": 4,
+          "result_exit_sha256": "1add5173e542208a4e2c143ae51df542267bad7c06c02599652b5f4a605d7c49"
+        },
+        {
+          "row": "80bau3b.pdhg",
+          "solver": "rose",
+          "validated": 4,
+          "result_exit_sha256": "13c2a49df361dda815adf0a19d617aa2a918899e61f7301f9a3e3b281e77d8dc"
+        },
+        {
+          "row": "80bau3b.pdhg",
+          "solver": "reference",
+          "validated": 4,
+          "result_exit_sha256": "9fc2087c8e0d4d858122825149b970b2e37b8d8eb7a79a6b9605c6fa5afd42b2"
+        },
+        {
+          "row": "greenbea.pdhg",
+          "solver": "rose",
+          "validated": 4,
+          "result_exit_sha256": "83cbec8b15ad4324866044cd30d4fa05d159f92f6248b65d455fe1eafef8c1e0"
+        },
+        {
+          "row": "greenbea.pdhg",
+          "solver": "reference",
+          "validated": 4,
+          "result_exit_sha256": "ebba5d3ab8634c2ef89b85214472de1de2f59aa2e9e41615c709e993d02dc031"
+        }
+      ],
+      "rule": "Complete canonical serialized result+exit equality; only solver timer removed. Signed zeros retained; no cross-solver alignment or exclusions."
+    },
+    "interpretation": "One warmup and three fresh-process measured samples per solver/row, same CPU and rotating order. Descriptive medians only; no two-screen optimization acceptance claim. Reference remains glibc; no LD_PRELOAD. GREENBEA PDHG is iteration-limited for both solvers."
+  },
+  "link_proof": "DT_NEEDED/ldd and LD_DEBUG bindings confirm malloc/calloc/realloc/free/tc_free use the exact task-sysroot TCMalloc. See target/perf-optimized-build/link-check/.",
+  "artifacts": {
+    "target/perf-optimized-build/build.log": "8cc50b185dea3a7408d5202e7263f60399916fa55a90510aba754edd7c5e3af2",
+    "target/perf-optimized-build/build-command.json": "26bcbc2529ab8d033b44171ee0fb0bd4f10b458cb278ff64ed6625f11d92c72a",
+    "target/perf-optimized-build/source-hashes.json": "42aa2c0c579227564583a49a598055d4887d2a40699f0f073f723c09065deea3",
+    "target/perf-optimized-build/dependency.json": "7e70087673502fe209798b4a02172f583e524497d4055717618bac0245eef658",
+    "target/perf-optimized-build/qualification.json": "c3331c6f23760cbb8b4fb9d10d457599e5affd6efd512ec461dbc66a14a5b44c",
+    "target/perf-optimized-build/compare_completed.py": "22155c4576113e58714f6823ef9746ba9f4596b8b1b64552c28086202e26b65b",
+    "target/perf-optimized-build/cross-build-results.json": "f7f43052be37c2f0d09328d28e97de3f92af84eee80199575e7cf36df384f0d5",
+    "target/perf-optimized-build/full-bench/manifest.json": "d400e0fb7b8a97f18021beb7eeeb5df19a5385d1d07654d916261711ba595454",
+    "target/perf-optimized-build/full-bench/summary.json": "d70694ec9b8229f40f2062ecdb3d99906b7b8f8cdbef1bf14f2a17095d8002e3",
+    "target/perf-optimized-build/full-bench/complete.json": "7dee0530c473d637ee78cc7c020caaef05c9ce13b2f08553ebf4714b97dcb665"
+  },
+  "excluded": "Initial small-bench failed before solves because copied binary lacked execute permission; small-bench-v2 corrected only mode, same ELF. Neither is included in full-panel timing.",
+  "next": "No architecture is qualified by this configuration measurement. Keep ordinary baseline intact; identify a distinct substantial complete numerical execution phase before implementation."
+}

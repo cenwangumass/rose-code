@@ -7,8 +7,9 @@ Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (histo
 Source `zxtxvvvn` (`18061fe9`), pinned Rust 1.98.1, ordinary ThinLTO release,
 glibc, CPU 2. Accepted CLI SHA256
 `8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410`.
-This host has no preceding PGO artifacts or TCMalloc library. Historical
-EPYC 9V74/TCMalloc tables below are separate configurations.
+The ordinary baseline remains intact. The separately qualified fixed39
+PGO/system-TCMalloc configuration below has its own ELF and table. Historical
+EPYC 9V74/TCMalloc tables remain separate configurations.
 
 The current fixed 23-row reference comparison is complete: Rose is faster on
 **0/23**. Each solver has one warmup and three measured fresh-process runs per
@@ -121,15 +122,60 @@ all FP/provenance/parity/counters/frames/source-site proofs in
 `target/perf-greenbea-owners/`. Release solve scopes remain separately recorded
 in [greenbea-phase-profile.json](evidence/greenbea-phase-profile.json).
 
-The existing fixed 39 PGO/system-TCMalloc configuration is being qualified in
-an isolated source copy under `target/perf-optimized-build/`. Matching LLVM
-22.1.8 profile tools and Ubuntu gperftools 2.18.1 are available; the latter is
-hash-checked and extracted to a task sysroot. No system package was installed.
-Build/training/full-parity/release-test logs and exact dependency/source/command
-metadata are retained there. This restores a supported build configuration;
-it is not a new numerical architecture or accepted speedup. The ordinary
-accepted binary and current 0/23 comparison remain unchanged pending all gates
-and fresh measurements.
+### Current host: existing PGO/system-TCMalloc configuration
+
+The existing fixed39 build passes full frozen parity **987/987**, all **292**
+runnable release tests (22 ignored), and complete cross-build comparison of
+92 Rose plus 92 reference results/exits. Only timer fields are removed;
+canonical JSON comparison preserves signed zero. Source is unchanged. Its CLI
+SHA256 is `55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb`.
+Pinned Rust 1.98.1 and matching LLVM 22.1.8 profile tools use the existing
+39 bounded training cases, 64-byte loop alignment and system-tcmalloc feature.
+Profile SHA256 is `a018c80fcf31c7a35a87d9f7be872b8f6174a92969af2c801ed4dc8a2581e46b`.
+Ubuntu gperftools 2.18.1-1 is hash-checked and extracted into the task sysroot;
+no system package was installed. Loader bindings confirm genuine TCMalloc.
+
+The fixed 23-row current-host comparison is complete: **2/23** descriptive
+median wins, both PDHG. Same CPU 2, one warmup plus three measured fresh-process
+runs per solver/row, rotating order, identical parameters and timer definitions.
+GREENBEA PDHG remains iteration-limited in both solvers. These measurements are
+not two independent 32AB+32AA optimization acceptance screens. The ordinary
+accepted CLI is unchanged; this opt-in configuration is not promoted as a new
+runtime fix. The build/training/test workflow took 737 seconds in isolation.
+
+| Row | Rose ms | Gurobi ms | Rose / Gurobi |
+|---|---:|---:|---:|
+| degen2.primal-c | 53.430 | 22.085 | 2.419 |
+| degen2.dual-r | 48.166 | 16.650 | 2.893 |
+| degen3.primal-c | 836.768 | 323.327 | 2.588 |
+| degen3.primal-r | 881.971 | 338.821 | 2.603 |
+| perold.primal-c | 783.889 | 289.241 | 2.710 |
+| pilot4.primal-r | 74.208 | 25.504 | 2.910 |
+| 80bau3b.primal-c | 716.392 | 177.107 | 4.045 |
+| primal_5959.primal-r | 83.765 | 69.112 | 1.212 |
+| degen3.dual-c | 401.439 | 148.556 | 2.702 |
+| degen3.dual-r | 398.572 | 144.588 | 2.757 |
+| perold.dual-r | 201.585 | 65.795 | 3.064 |
+| 80bau3b.dual-r | 434.474 | 135.702 | 3.202 |
+| greenbea.dual-c | 1084.460 | 376.091 | 2.884 |
+| greenbea.dual-r | 1067.992 | 355.073 | 3.008 |
+| mode_switch.dual-r | 1047.013 | 160.296 | 6.532 |
+| primal_5959.dual-r | 111.958 | 98.496 | 1.137 |
+| quad_2717.dual-r | 110.624 | 98.811 | 1.120 |
+| fx_quad_obj_5371.dual-r | 38.710 | 36.871 | 1.050 |
+| degen3.barrier-r | 244.120 | 118.492 | 2.060 |
+| 80bau3b.barrier-r | 308.504 | 183.202 | 1.684 |
+| greenbea.barrier-r | 1341.209 | 763.236 | 1.757 |
+| 80bau3b.pdhg | 3141.776 | 3381.691 | 0.929 |
+| greenbea.pdhg | 1596.285 | 1667.711 | 0.957 |
+
+Evidence: [optimized-build-qualification.json](evidence/optimized-build-qualification.json).
+All source/dependency/profile hashes, logs, loader proof and raw outputs are in
+`target/perf-optimized-build/`. Run the saved `rose-pgo-tcmalloc` with
+`LD_LIBRARY_PATH=$PWD/target/perf-optimized-build/sysroot/usr/lib/x86_64-linux-gnu`.
+The isolated build command and environment are in `build-command.json` there.
+The reference remains glibc and uses the same reconstructed library. No
+numerical architecture or individual optimization gain follows from this sweep.
 
 Earlier small dual probes and PEROLD ancestry remain separately labeled in
 their evidence. The unthrottled PEROLD frame-pointer batch (24 full solves,

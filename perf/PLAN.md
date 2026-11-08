@@ -440,12 +440,17 @@ measured.
   reopen buffer/cache/arena work from the 19.65% accepted-release allocator mass.
   See evidence/greenbea-allocation-owners.json for disjoint physical ancestry,
   explicit other contexts and immediate-callee/return-address proof.
-  Next finish isolated qualification of the existing fixed 39 PGO/system-TCMalloc
-  configuration with matching compiler tools, full parity and release tests,
-  then measure it separately on this host. Preserve the ordinary accepted CLI,
-  source/dependency hashes and baseline; no architecture or speedup claim from
-  build/training alone. Continue searching for genuinely distinct whole-stage
-  numerical work, not a different name for the settled owners.
+  The existing fixed39 PGO/system-TCMalloc configuration is now separately
+  qualified: full987, all292 release tests and all184 cross-build full-panel
+  results/exits agree, including signed zero after removing only timers.
+  Its current-host panel has 2/23 descriptive wins, both PDHG; ordinary remains
+  0/23. Preserve the ordinary accepted CLI and configuration-specific provenance.
+  See evidence/optimized-build-qualification.json. This is a supported build
+  configuration, not a new architecture or a two-screen accepted runtime fix.
+  Next identify genuinely distinct whole-stage numerical work. Complete solve305
+  is only a conditional scope question: existing triangular/route/owner studies
+  do not establish a removable whole-stage cost or qualify their composition.
+  Require construction-inclusive evidence before any implementation.
   The scalar prefilter and prior rank/layout trials remain
   rejected; do not infer further gains from isolated predicate costs.
   Comparator alignment stays centralized; normal lunum's build/cache transport
