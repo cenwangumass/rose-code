@@ -350,6 +350,11 @@ measured.
   Passing strided parent slices directly to current public DGEMM is invalid.
   Prior arena/owner experiments do not establish this broader numerical scope;
   do not credit copies or add past gains without measurement.
+  The exact Plan census is complete: DEGEN3 has1008wide GEMM calls/factor,
+  799zero-product; fifteen factors materialize83.2MB of cn buffers,37.4%unused
+  cells (compute/flags still required), versus13.0MB R packing and5.46MB
+  contiguous C copies. These counts favor the zero-product destination boundary,
+  not a contiguous-only or allocation-only rewrite; they are not time bounds.
   PEROLD FTRAN/L/update and factor-production/installation ownership remain larger
   measured leads. The scalar prefilter and prior rank/layout trials remain
   rejected; do not infer further gains from isolated predicate costs.

@@ -1,0 +1,238 @@
+{
+  "source": "d0a01bea",
+  "method": "Existing release barrier_struct example with ROSE_DUMP=barrier_struct AUTO=1; captures all SYM geometry once/model,20s timeout. Reconstruct exact Plan chunks/child ordering/sym80 and original24column/rectangle-extension batches. Numeric factor count from prior original bounded RHS census: observed block count is exactly nodes*factor calls.",
+  "limits": "Logical elements/transfer sizes and buffer populations, not measured allocator/cache traffic or removable runtime. C_gather_store counts both copy directions; C_zero_buffer is allocated/zeroed extent; C_consumed/C_unused partition that extent. Unused arithmetic and FP flags must remain. Do not add previous timing gains.",
+  "provenance": {
+    "example_sha256": "b8868b0e4ad065c0636fd37be9b1c954ec5f89fb39757d83d8e050ffc77ab674",
+    "source": "d0a01bea",
+    "method": "Existing Rose barrier_struct example, AUTO=1 matches solve_release structure_order; fixed20s timeout per model. Plan chunks/upd/sym80 and original child batches reconstructed from SYM. Element counts are logical copy/materialization volume, not cache traffic or runtime cost."
+  },
+  "rows": [
+    {
+      "model": "afiro",
+      "structure_seconds": 0.00366708399997151,
+      "per_factor": {
+        "nodes": 3,
+        "n": 27,
+        "children": 3,
+        "width_one": 0,
+        "wide": 3,
+        "gemm_calls": 4,
+        "gather_calls": 1,
+        "zero_calls": 3,
+        "packed_R_elements": 76,
+        "B_copy_elements": 97,
+        "temp_elements": 76,
+        "C_gather_store_elements": 2,
+        "C_zero_buffer_elements": 28,
+        "C_consumed_elements": 19,
+        "C_unused_elements": 9,
+        "C_gather_k_le192_elements": 1,
+        "C_zero_k_le192_elements": 28
+      },
+      "numeric_factor_calls": 8,
+      "whole_run_copy_bytes": {
+        "packed_R_elements": 4864,
+        "B_copy_elements": 6208,
+        "C_gather_store_elements": 128,
+        "C_zero_buffer_elements": 1792,
+        "C_consumed_elements": 1216,
+        "C_unused_elements": 576
+      }
+    },
+    {
+      "model": "sc50a",
+      "structure_seconds": 0.00325741099914012,
+      "per_factor": {
+        "nodes": 5,
+        "n": 50,
+        "children": 6,
+        "width_one": 0,
+        "wide": 6,
+        "gemm_calls": 9,
+        "gather_calls": 8,
+        "zero_calls": 1,
+        "packed_R_elements": 150,
+        "B_copy_elements": 220,
+        "temp_elements": 150,
+        "C_gather_store_elements": 72,
+        "C_zero_buffer_elements": 25,
+        "C_consumed_elements": 15,
+        "C_unused_elements": 10,
+        "C_gather_k_le192_elements": 36,
+        "C_zero_k_le192_elements": 25
+      },
+      "numeric_factor_calls": 8,
+      "whole_run_copy_bytes": {
+        "packed_R_elements": 9600,
+        "B_copy_elements": 14080,
+        "C_gather_store_elements": 4608,
+        "C_zero_buffer_elements": 1600,
+        "C_consumed_elements": 960,
+        "C_unused_elements": 640
+      }
+    },
+    {
+      "model": "blend",
+      "structure_seconds": 0.0031213170004775748,
+      "per_factor": {
+        "nodes": 8,
+        "n": 74,
+        "children": 12,
+        "width_one": 0,
+        "wide": 12,
+        "gemm_calls": 17,
+        "gather_calls": 7,
+        "zero_calls": 10,
+        "packed_R_elements": 648,
+        "B_copy_elements": 1012,
+        "temp_elements": 648,
+        "C_gather_store_elements": 86,
+        "C_zero_buffer_elements": 1350,
+        "C_consumed_elements": 793,
+        "C_unused_elements": 557,
+        "C_gather_k_le192_elements": 43,
+        "C_zero_k_le192_elements": 1350
+      },
+      "numeric_factor_calls": 9,
+      "whole_run_copy_bytes": {
+        "packed_R_elements": 46656,
+        "B_copy_elements": 72864,
+        "C_gather_store_elements": 6192,
+        "C_zero_buffer_elements": 97200,
+        "C_consumed_elements": 57096,
+        "C_unused_elements": 40104
+      }
+    },
+    {
+      "model": "adlittle",
+      "structure_seconds": 0.0025935440007742727,
+      "per_factor": {
+        "nodes": 5,
+        "n": 56,
+        "children": 5,
+        "width_one": 0,
+        "wide": 5,
+        "gemm_calls": 6,
+        "gather_calls": 1,
+        "zero_calls": 5,
+        "packed_R_elements": 284,
+        "B_copy_elements": 292,
+        "temp_elements": 284,
+        "C_gather_store_elements": 18,
+        "C_zero_buffer_elements": 226,
+        "C_consumed_elements": 129,
+        "C_unused_elements": 97,
+        "C_gather_k_le192_elements": 9,
+        "C_zero_k_le192_elements": 226
+      },
+      "numeric_factor_calls": 13,
+      "whole_run_copy_bytes": {
+        "packed_R_elements": 29536,
+        "B_copy_elements": 30368,
+        "C_gather_store_elements": 1872,
+        "C_zero_buffer_elements": 23504,
+        "C_consumed_elements": 13416,
+        "C_unused_elements": 10088
+      }
+    },
+    {
+      "model": "bore3d",
+      "structure_seconds": 0.005331805999958306,
+      "per_factor": {
+        "nodes": 52,
+        "n": 233,
+        "children": 56,
+        "width_one": 10,
+        "wide": 46,
+        "gemm_calls": 71,
+        "gather_calls": 20,
+        "zero_calls": 51,
+        "packed_R_elements": 2587,
+        "B_copy_elements": 3763,
+        "temp_elements": 2571,
+        "C_gather_store_elements": 202,
+        "C_zero_buffer_elements": 5908,
+        "C_consumed_elements": 3421,
+        "C_unused_elements": 2487,
+        "C_gather_k_le192_elements": 101,
+        "C_zero_k_le192_elements": 5908
+      },
+      "numeric_factor_calls": 17,
+      "whole_run_copy_bytes": {
+        "packed_R_elements": 351832,
+        "B_copy_elements": 511768,
+        "C_gather_store_elements": 27472,
+        "C_zero_buffer_elements": 803488,
+        "C_consumed_elements": 465256,
+        "C_unused_elements": 338232
+      }
+    },
+    {
+      "model": "degen2",
+      "structure_seconds": 0.012345137000011164,
+      "per_factor": {
+        "nodes": 119,
+        "n": 444,
+        "children": 229,
+        "width_one": 115,
+        "wide": 114,
+        "gemm_calls": 216,
+        "gather_calls": 42,
+        "zero_calls": 174,
+        "packed_R_elements": 11382,
+        "B_copy_elements": 19258,
+        "temp_elements": 10321,
+        "C_gather_store_elements": 1168,
+        "C_zero_buffer_elements": 76488,
+        "C_consumed_elements": 41935,
+        "C_unused_elements": 34553,
+        "C_gather_k_le192_elements": 584,
+        "C_zero_k_le192_elements": 76488
+      },
+      "numeric_factor_calls": 13,
+      "whole_run_copy_bytes": {
+        "packed_R_elements": 1183728,
+        "B_copy_elements": 2002832,
+        "C_gather_store_elements": 121472,
+        "C_zero_buffer_elements": 7954752,
+        "C_consumed_elements": 4361240,
+        "C_unused_elements": 3593512
+      }
+    },
+    {
+      "model": "degen3",
+      "structure_seconds": 0.09875952999936999,
+      "per_factor": {
+        "nodes": 429,
+        "n": 1503,
+        "children": 1194,
+        "width_one": 731,
+        "wide": 463,
+        "gemm_calls": 1008,
+        "gather_calls": 209,
+        "zero_calls": 799,
+        "packed_R_elements": 108737,
+        "B_copy_elements": 213102,
+        "temp_elements": 100544,
+        "C_gather_store_elements": 45488,
+        "C_zero_buffer_elements": 693380,
+        "C_consumed_elements": 433856,
+        "C_unused_elements": 259524,
+        "C_gather_k_le192_elements": 22744,
+        "C_zero_k_le192_elements": 693380
+      },
+      "numeric_factor_calls": 15,
+      "whole_run_copy_bytes": {
+        "packed_R_elements": 13048440,
+        "B_copy_elements": 25572240,
+        "C_gather_store_elements": 5458560,
+        "C_zero_buffer_elements": 83205600,
+        "C_consumed_elements": 52062720,
+        "C_unused_elements": 31142880
+      }
+    }
+  ],
+  "decision": "DEGEN3 has1008wide GEMM calls/factor,799zero-product calls. Per15factors cn logical buffers total83.2MB;37.4%of their cells are unconsumed but their arithmetic/flags remain required. R packing is13.0MB; contiguous Ccopies5.46MB. A genuinely larger factor executor should target zero-product destination materialization, not just small contiguous copies or arena allocation.",
+  "artifacts": "target/perf-factor-boundaries/ (census.py,all SYM/stdout captures,geometry/provenance/log)"
+}

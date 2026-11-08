@@ -1412,6 +1412,17 @@ no new solver speedup or reference timing ratio.
 
 ## Candidates
 
+Barrier geometry/materialization census matches all7original full-run block
+counts exactly (Plan nodes times numeric factors). DEGEN3 has1,008wide GEMM
+calls/factor,799zero-product calls. Across15factors, logical cn buffers cover
+83.2MB;37.4%of cells are unconsumed but their arithmetic/flags must remain.
+R-packing copies cover13.0MB, contiguous-C gather/store5.46MB. These are logical
+volume counts, not allocator/cache traffic or removable time. Target complete
+zero-product destination materialization as part of a factor executor rather
+than only contiguous copies or arena allocation.
+[factor-materialization.json](evidence/factor-materialization.json), exact
+SYM captures and reconstruction in `target/perf-factor-boundaries/`.
+
 The complete four-double-RHS rectangle prototype is numerically verified and
 preserved on `experiments/barrier-rhs-packets`, but remains unqualified for
 acceptance. Independent checks cover5,624rectangles and1,488complete blocks;
