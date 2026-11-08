@@ -341,13 +341,21 @@ measured.
   destinations. These are logical byte counts, not removable time. Prior arena
   and owner trials remain rejected; do not restart them without larger measured
   scope or assume that the independent historical gains add.
-  The next whole-column boundary census covers L/eta tuple production, full/
-  needed U reconstruction, replacement reconstruction and installed U storage.
-  Start with cached SC50A and DEGEN2 cap 300; reach PEROLD only if representation
-  work across the complete chain has a plausible whole-solve payoff. Reused U
-  workspace is already accepted. Preserve pre-U numerical values, support order,
-  omitted zeros, sub-tolerance residues, WORK and keep/basic restoration. Do not
-  repeat rejected dense-buffer-transfer or partial normalization/storage trials.
+  The complete pre-U forward-column chain measures 2.72–3.64% on SC50A through
+  DEGEN2, including required filtering and clock overhead. Tiny AFIRO measures
+  7.25% with particularly material clock sensitivity. Do not implement the owner
+  rewrite or escalate it to PEROLD.
+  Preserve pending pre-U values through replacement, keep/basic and diagnostic
+  consumers; retaining the overwritten U vector cannot substitute for them.
+  Post-U output ordering is larger but natural traversal reuse is an existing
+  timing-inconclusive trial and must not be repeated. Exact scopes and caveats:
+  evidence/forward-owner-scope.json.
+  Next measure the complete 80BAU3B normal-solve/refinement path after the factor
+  executor, separating factorization, triangular solves, matrix products,
+  residual construction and correction solves. Use small models first, then
+  80BAU3B (36iterations) before GREENBEA (103). Default single precision does not
+  explain their unchanged time; prior triangular-only ownership trials remain
+  rejected. Choose the next structural change from this fresh attribution.
   Factor-production/installation ownership remains another measured lead.
   The scalar prefilter and prior rank/layout trials remain
   rejected; do not infer further gains from isolated predicate costs.

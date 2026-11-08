@@ -1448,15 +1448,27 @@ no new solver speedup or reference timing ratio.
 
 ## Candidates
 
-Next structural measurement: the complete forward-column representation
-boundary from L/eta tuple production through U expansion, replacement expansion
-and installed U storage. Use cached SC50A for correctness, DEGEN2 capped at 300
-for the first boundary census, then PEROLD only if the complete chain has a
-plausible whole-solve payoff. The accepted dirty-block U workspace is already
-reused; earlier dense-buffer transfers and partial normalization/storage trials
-remain rejected. Preserve ordered support, pre-U values, omitted zeros,
-sub-tolerance residues, WORK and keep/basic restoration. Surrounding FTRAN/L
-inclusive profile shares overlap and are not a removable-cost bound.
+The complete pre-U forward-column publication/expansion/replacement chain is
+2.72–3.64% on SC50A through DEGEN2 in bounded release-test solves, including
+required filtering and clock overhead. Tiny AFIRO measures 7.25%; its short
+call intervals are particularly sensitive to instrumentation overhead.
+DEGEN2 cap300 has 405 full FTRAN, 300 needed FTRAN
+and 294 updates; actual producer tuples total 390,992 logical bytes. The clock
+control's empty scoped interval is about 39 ns (94 ns total scope overhead),
+material at this scale. No owner rewrite or PEROLD escalation is justified.
+Post-U publication is 7.24% on DEGEN2, with output ordering alone 4.71%; natural
+traversal reuse there was already timing-inconclusive below and is not retried.
+All 36 final pinned enabled/disabled solve results agree. These diagnostic
+nested test scopes are not accepted-release removable bounds. Numerical source
+and accepted CLI are restored byte for byte.
+[forward-owner-scope.json](evidence/forward-owner-scope.json), raw source,
+calibration and both exploratory/final measurements in `target/perf-forward-owner/`.
+
+Next measure the complete normal-solve/refinement path on 80BAU3B, separating
+factorization, triangular solves, matrix products, residual construction and
+correction iterations. Start with small models and use the cheaper 36-iteration
+80BAU3B solve before GREENBEA's 103 iterations. Current broad-model diagnostics
+rule out default single precision but do not locate their remaining time.
 
 The complete child/direct-destination/rectangular-RHS factor executor is
 qualified above. Refresh its accepted-release factor/solve attribution before

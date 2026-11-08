@@ -1,0 +1,1041 @@
+{
+  "source": "18061fe9",
+  "candidate": "Complete pre-U forward-column storage owner, from L/eta tuple publication to full/needed U expansion and replacement expansion/column installation",
+  "decision": "Do not implement or escalate this owner trial to PEROLD. Measured complete boundary is too small for a large structural speedup and includes required filtering, storage and clock overhead. Output-order reuse is a separate already-inconclusive experiment and is not retried.",
+  "configuration": "Rust1.98.1 release-test ThinLTO/glibc, CPU2 pinned final measurements, caps300; three alternating measured/unmeasured solve pairs per small model. Initial unpinned exploration retained separately. No ordinary release source or CLI changes.",
+  "method": "Test-only Instant scopes, original numerical bodies unchanged. Complete Debug SolveResult objects agree in every enabled/disabled pair (36solves final, 36initial). Timer/probe code affects inlining and total timing: percentages are diagnostic instrumentation scopes, not accepted-release removable bounds. Do not subtract clock estimates or add nested scopes.",
+  "boundary_chain_fields": [
+    "level_publish",
+    "ordinary_publish",
+    "full_U_expand",
+    "needed_U_expand",
+    "input_indices",
+    "pending_spike_prepare",
+    "replacement_expand",
+    "replacement_clear",
+    "new_U_column_copy"
+  ],
+  "excluded_from_chain": [
+    "existing_U_reset",
+    "transpose_install",
+    "post_U_publish",
+    "full_FTRAN",
+    "needed_FTRAN",
+    "L_eta_stage",
+    "whole_update",
+    "post_U_tau_snapshot",
+    "keep_FTRAN",
+    "basic_FTRAN",
+    "U_output_order",
+    "dense_U_emit",
+    "sparse_U_emit"
+  ],
+  "logical_volume": "Items/bytes are source cardinalities at scope entry with actual size_of(R) or size_of((usize,R)); ordinary publication counts candidate source slots. producer_tuple_bytes counts actual subsequent full/needed expansion tuples. These are not DRAM traffic or eliminated-byte claims.",
+  "clock_control": {
+    "calls": 100000,
+    "elapsed_ns": 9397974,
+    "inside_ns": 3922379
+  },
+  "rows": [
+    {
+      "model": "afiro",
+      "cap": 300,
+      "status": "Optimal",
+      "iterations": 10,
+      "pairs": 3,
+      "boundary_chain_percent_median": 7.251010688607468,
+      "fields": {
+        "level_publish": {
+          "calls": 0,
+          "logical_input_items": 0,
+          "logical_input_bytes": 0,
+          "median_ns": 0,
+          "median_solve_percent": 0.0
+        },
+        "ordinary_publish": {
+          "calls": 25,
+          "logical_input_items": 256,
+          "logical_input_bytes": 4096,
+          "median_ns": 19347,
+          "median_solve_percent": 5.397872322616825
+        },
+        "existing_U_reset": {
+          "calls": 15,
+          "logical_input_items": 405,
+          "logical_input_bytes": 3240,
+          "median_ns": 1011,
+          "median_solve_percent": 0.2898671790159552
+        },
+        "full_U_expand": {
+          "calls": 15,
+          "logical_input_items": 149,
+          "logical_input_bytes": 2384,
+          "median_ns": 852,
+          "median_solve_percent": 0.23723999665859158
+        },
+        "needed_U_expand": {
+          "calls": 10,
+          "logical_input_items": 63,
+          "logical_input_bytes": 1008,
+          "median_ns": 1214,
+          "median_solve_percent": 0.35697379778910143
+        },
+        "input_indices": {
+          "calls": 15,
+          "logical_input_items": 149,
+          "logical_input_bytes": 1192,
+          "median_ns": 1075,
+          "median_solve_percent": 0.3065742210341659
+        },
+        "pending_spike_prepare": {
+          "calls": 15,
+          "logical_input_items": 149,
+          "logical_input_bytes": 2384,
+          "median_ns": 1111,
+          "median_solve_percent": 0.309358728037201
+        },
+        "replacement_expand": {
+          "calls": 9,
+          "logical_input_items": 71,
+          "logical_input_bytes": 1136,
+          "median_ns": 683,
+          "median_solve_percent": 0.19018182830729818
+        },
+        "replacement_clear": {
+          "calls": 9,
+          "logical_input_items": 71,
+          "logical_input_bytes": 568,
+          "median_ns": 562,
+          "median_solve_percent": 0.15648929357057334
+        },
+        "new_U_column_copy": {
+          "calls": 9,
+          "logical_input_items": 63,
+          "logical_input_bytes": 1008,
+          "median_ns": 1711,
+          "median_solve_percent": 0.4835123138003287
+        },
+        "transpose_install": {
+          "calls": 9,
+          "logical_input_items": 63,
+          "logical_input_bytes": 1008,
+          "median_ns": 1994,
+          "median_solve_percent": 0.5552306964052014
+        },
+        "post_U_publish": {
+          "calls": 15,
+          "logical_input_items": 405,
+          "logical_input_bytes": 0,
+          "median_ns": 17804,
+          "median_solve_percent": 5.431012656297186
+        },
+        "full_FTRAN": {
+          "calls": 15,
+          "logical_input_items": 405,
+          "logical_input_bytes": 0,
+          "median_ns": 70688,
+          "median_solve_percent": 19.683123103054605
+        },
+        "needed_FTRAN": {
+          "calls": 10,
+          "logical_input_items": 270,
+          "logical_input_bytes": 0,
+          "median_ns": 32360,
+          "median_solve_percent": 9.06663325258263
+        },
+        "L_eta_stage": {
+          "calls": 25,
+          "logical_input_items": 675,
+          "logical_input_bytes": 0,
+          "median_ns": 41726,
+          "median_solve_percent": 12.72828769358888
+        },
+        "whole_update": {
+          "calls": 9,
+          "logical_input_items": 243,
+          "logical_input_bytes": 0,
+          "median_ns": 20879,
+          "median_solve_percent": 5.897307381728066
+        },
+        "post_U_tau_snapshot": {
+          "calls": 10,
+          "logical_input_items": 270,
+          "logical_input_bytes": 2160,
+          "median_ns": 570,
+          "median_solve_percent": 0.1587168991730014
+        },
+        "keep_FTRAN": {
+          "calls": 1,
+          "logical_input_items": 27,
+          "logical_input_bytes": 0,
+          "median_ns": 4108,
+          "median_solve_percent": 1.1461445961291115
+        },
+        "basic_FTRAN": {
+          "calls": 4,
+          "logical_input_items": 108,
+          "logical_input_bytes": 0,
+          "median_ns": 13534,
+          "median_solve_percent": 3.7685517779077213
+        },
+        "U_output_order": {
+          "calls": 14,
+          "logical_input_items": 132,
+          "logical_input_bytes": 1056,
+          "median_ns": 10630,
+          "median_solve_percent": 2.994927109611648
+        },
+        "dense_U_emit": {
+          "calls": 1,
+          "logical_input_items": 27,
+          "logical_input_bytes": 216,
+          "median_ns": 541,
+          "median_solve_percent": 0.15282730514518594
+        },
+        "sparse_U_emit": {
+          "calls": 14,
+          "logical_input_items": 145,
+          "logical_input_bytes": 1160,
+          "median_ns": 4619,
+          "median_solve_percent": 1.2861637847019187
+        }
+      },
+      "producer_tuple_bytes": 3392
+    },
+    {
+      "model": "sc50a",
+      "cap": 300,
+      "status": "Optimal",
+      "iterations": 33,
+      "pairs": 3,
+      "boundary_chain_percent_median": 2.954724006495393,
+      "fields": {
+        "level_publish": {
+          "calls": 0,
+          "logical_input_items": 0,
+          "logical_input_bytes": 0,
+          "median_ns": 0,
+          "median_solve_percent": 0.0
+        },
+        "ordinary_publish": {
+          "calls": 76,
+          "logical_input_items": 1522,
+          "logical_input_bytes": 24352,
+          "median_ns": 14785,
+          "median_solve_percent": 1.1962428992040959
+        },
+        "existing_U_reset": {
+          "calls": 43,
+          "logical_input_items": 2150,
+          "logical_input_bytes": 17200,
+          "median_ns": 2741,
+          "median_solve_percent": 0.22177218713009314
+        },
+        "full_U_expand": {
+          "calls": 43,
+          "logical_input_items": 410,
+          "logical_input_bytes": 6560,
+          "median_ns": 2235,
+          "median_solve_percent": 0.1808321190207071
+        },
+        "needed_U_expand": {
+          "calls": 33,
+          "logical_input_items": 828,
+          "logical_input_bytes": 13248,
+          "median_ns": 4768,
+          "median_solve_percent": 0.3793833584286781
+        },
+        "input_indices": {
+          "calls": 43,
+          "logical_input_items": 410,
+          "logical_input_bytes": 3280,
+          "median_ns": 2574,
+          "median_solve_percent": 0.2082603464694855
+        },
+        "pending_spike_prepare": {
+          "calls": 43,
+          "logical_input_items": 410,
+          "logical_input_bytes": 6560,
+          "median_ns": 3578,
+          "median_solve_percent": 0.28204795852235903
+        },
+        "replacement_expand": {
+          "calls": 30,
+          "logical_input_items": 234,
+          "logical_input_bytes": 3744,
+          "median_ns": 2058,
+          "median_solve_percent": 0.16651118610497326
+        },
+        "replacement_clear": {
+          "calls": 30,
+          "logical_input_items": 234,
+          "logical_input_bytes": 1872,
+          "median_ns": 1662,
+          "median_solve_percent": 0.13447113280197548
+        },
+        "new_U_column_copy": {
+          "calls": 30,
+          "logical_input_items": 214,
+          "logical_input_bytes": 3424,
+          "median_ns": 5101,
+          "median_solve_percent": 0.4044810665679104
+        },
+        "transpose_install": {
+          "calls": 31,
+          "logical_input_items": 214,
+          "logical_input_bytes": 3424,
+          "median_ns": 7515,
+          "median_solve_percent": 0.5987593741320248
+        },
+        "post_U_publish": {
+          "calls": 43,
+          "logical_input_items": 2150,
+          "logical_input_bytes": 0,
+          "median_ns": 58750,
+          "median_solve_percent": 4.753416998866462
+        },
+        "full_FTRAN": {
+          "calls": 43,
+          "logical_input_items": 2150,
+          "logical_input_bytes": 0,
+          "median_ns": 168223,
+          "median_solve_percent": 13.61079264340958
+        },
+        "needed_FTRAN": {
+          "calls": 33,
+          "logical_input_items": 1650,
+          "logical_input_bytes": 0,
+          "median_ns": 82892,
+          "median_solve_percent": 6.706727521192149
+        },
+        "L_eta_stage": {
+          "calls": 76,
+          "logical_input_items": 3800,
+          "logical_input_bytes": 0,
+          "median_ns": 96189,
+          "median_solve_percent": 7.782577492833466
+        },
+        "whole_update": {
+          "calls": 30,
+          "logical_input_items": 1500,
+          "logical_input_bytes": 0,
+          "median_ns": 93363,
+          "median_solve_percent": 7.437337827571112
+        },
+        "post_U_tau_snapshot": {
+          "calls": 33,
+          "logical_input_items": 1650,
+          "logical_input_bytes": 13200,
+          "median_ns": 1805,
+          "median_solve_percent": 0.14604115205028023
+        },
+        "keep_FTRAN": {
+          "calls": 4,
+          "logical_input_items": 200,
+          "logical_input_bytes": 0,
+          "median_ns": 7885,
+          "median_solve_percent": 0.6253821890200812
+        },
+        "basic_FTRAN": {
+          "calls": 6,
+          "logical_input_items": 300,
+          "logical_input_bytes": 0,
+          "median_ns": 29426,
+          "median_solve_percent": 2.3808348699343744
+        },
+        "U_output_order": {
+          "calls": 36,
+          "logical_input_items": 288,
+          "logical_input_bytes": 2304,
+          "median_ns": 37508,
+          "median_solve_percent": 3.0347432305273743
+        },
+        "dense_U_emit": {
+          "calls": 7,
+          "logical_input_items": 350,
+          "logical_input_bytes": 2800,
+          "median_ns": 5442,
+          "median_solve_percent": 0.4316207828341512
+        },
+        "sparse_U_emit": {
+          "calls": 36,
+          "logical_input_items": 483,
+          "logical_input_bytes": 3864,
+          "median_ns": 10505,
+          "median_solve_percent": 0.8486568664018778
+        }
+      },
+      "producer_tuple_bytes": 19808
+    },
+    {
+      "model": "blend",
+      "cap": 300,
+      "status": "Optimal",
+      "iterations": 75,
+      "pairs": 3,
+      "boundary_chain_percent_median": 3.3810254420181893,
+      "fields": {
+        "level_publish": {
+          "calls": 0,
+          "logical_input_items": 0,
+          "logical_input_bytes": 0,
+          "median_ns": 0,
+          "median_solve_percent": 0.0
+        },
+        "ordinary_publish": {
+          "calls": 172,
+          "logical_input_items": 9069,
+          "logical_input_bytes": 145104,
+          "median_ns": 34789,
+          "median_solve_percent": 1.0923963672084414
+        },
+        "existing_U_reset": {
+          "calls": 97,
+          "logical_input_items": 7178,
+          "logical_input_bytes": 57424,
+          "median_ns": 6953,
+          "median_solve_percent": 0.22641468208629248
+        },
+        "full_U_expand": {
+          "calls": 97,
+          "logical_input_items": 1405,
+          "logical_input_bytes": 22480,
+          "median_ns": 6205,
+          "median_solve_percent": 0.20005942568564233
+        },
+        "needed_U_expand": {
+          "calls": 75,
+          "logical_input_items": 2625,
+          "logical_input_bytes": 42000,
+          "median_ns": 12731,
+          "median_solve_percent": 0.41955105960452593
+        },
+        "input_indices": {
+          "calls": 97,
+          "logical_input_items": 1405,
+          "logical_input_bytes": 11240,
+          "median_ns": 7609,
+          "median_solve_percent": 0.24348317699725464
+        },
+        "pending_spike_prepare": {
+          "calls": 97,
+          "logical_input_items": 1405,
+          "logical_input_bytes": 22480,
+          "median_ns": 12551,
+          "median_solve_percent": 0.41361914610764317
+        },
+        "replacement_expand": {
+          "calls": 71,
+          "logical_input_items": 802,
+          "logical_input_bytes": 12832,
+          "median_ns": 6244,
+          "median_solve_percent": 0.20192749290927503
+        },
+        "replacement_clear": {
+          "calls": 71,
+          "logical_input_items": 802,
+          "logical_input_bytes": 6416,
+          "median_ns": 4849,
+          "median_solve_percent": 0.15979915859102553
+        },
+        "new_U_column_copy": {
+          "calls": 71,
+          "logical_input_items": 753,
+          "logical_input_bytes": 12048,
+          "median_ns": 17697,
+          "median_solve_percent": 0.5969141933571067
+        },
+        "transpose_install": {
+          "calls": 87,
+          "logical_input_items": 753,
+          "logical_input_bytes": 12048,
+          "median_ns": 34746,
+          "median_solve_percent": 1.1342807258289356
+        },
+        "post_U_publish": {
+          "calls": 97,
+          "logical_input_items": 7178,
+          "logical_input_bytes": 0,
+          "median_ns": 124081,
+          "median_solve_percent": 3.908595823213167
+        },
+        "full_FTRAN": {
+          "calls": 97,
+          "logical_input_items": 7178,
+          "logical_input_bytes": 0,
+          "median_ns": 433621,
+          "median_solve_percent": 14.063691223291485
+        },
+        "needed_FTRAN": {
+          "calls": 75,
+          "logical_input_items": 5550,
+          "logical_input_bytes": 0,
+          "median_ns": 244070,
+          "median_solve_percent": 8.225155912348598
+        },
+        "L_eta_stage": {
+          "calls": 172,
+          "logical_input_items": 12728,
+          "logical_input_bytes": 0,
+          "median_ns": 227489,
+          "median_solve_percent": 7.335899987205502
+        },
+        "whole_update": {
+          "calls": 71,
+          "logical_input_items": 5254,
+          "logical_input_bytes": 0,
+          "median_ns": 363860,
+          "median_solve_percent": 11.824054854912857
+        },
+        "post_U_tau_snapshot": {
+          "calls": 75,
+          "logical_input_items": 5550,
+          "logical_input_bytes": 44400,
+          "median_ns": 5061,
+          "median_solve_percent": 0.16905993752884807
+        },
+        "keep_FTRAN": {
+          "calls": 15,
+          "logical_input_items": 1110,
+          "logical_input_bytes": 0,
+          "median_ns": 71637,
+          "median_solve_percent": 2.215774453088074
+        },
+        "basic_FTRAN": {
+          "calls": 7,
+          "logical_input_items": 518,
+          "logical_input_bytes": 0,
+          "median_ns": 36189,
+          "median_solve_percent": 1.23059809520587
+        },
+        "U_output_order": {
+          "calls": 35,
+          "logical_input_items": 235,
+          "logical_input_bytes": 1880,
+          "median_ns": 52293,
+          "median_solve_percent": 1.5953419450420163
+        },
+        "dense_U_emit": {
+          "calls": 62,
+          "logical_input_items": 4588,
+          "logical_input_bytes": 36704,
+          "median_ns": 46774,
+          "median_solve_percent": 1.541440677239973
+        },
+        "sparse_U_emit": {
+          "calls": 35,
+          "logical_input_items": 484,
+          "logical_input_bytes": 3872,
+          "median_ns": 13272,
+          "median_solve_percent": 0.4154122212946331
+        }
+      },
+      "producer_tuple_bytes": 64480
+    },
+    {
+      "model": "adlittle",
+      "cap": 300,
+      "status": "Optimal",
+      "iterations": 73,
+      "pairs": 3,
+      "boundary_chain_percent_median": 2.719984110695488,
+      "fields": {
+        "level_publish": {
+          "calls": 0,
+          "logical_input_items": 0,
+          "logical_input_bytes": 0,
+          "median_ns": 0,
+          "median_solve_percent": 0.0
+        },
+        "ordinary_publish": {
+          "calls": 166,
+          "logical_input_items": 5803,
+          "logical_input_bytes": 92848,
+          "median_ns": 26379,
+          "median_solve_percent": 0.8821727940457149
+        },
+        "existing_U_reset": {
+          "calls": 93,
+          "logical_input_items": 5208,
+          "logical_input_bytes": 41664,
+          "median_ns": 6015,
+          "median_solve_percent": 0.2036289927228179
+        },
+        "full_U_expand": {
+          "calls": 93,
+          "logical_input_items": 1202,
+          "logical_input_bytes": 19232,
+          "median_ns": 5347,
+          "median_solve_percent": 0.17710458768999265
+        },
+        "needed_U_expand": {
+          "calls": 73,
+          "logical_input_items": 1908,
+          "logical_input_bytes": 30528,
+          "median_ns": 10002,
+          "median_solve_percent": 0.33287912587891466
+        },
+        "input_indices": {
+          "calls": 93,
+          "logical_input_items": 1202,
+          "logical_input_bytes": 9616,
+          "median_ns": 6393,
+          "median_solve_percent": 0.21573870812042423
+        },
+        "pending_spike_prepare": {
+          "calls": 93,
+          "logical_input_items": 1202,
+          "logical_input_bytes": 19232,
+          "median_ns": 10423,
+          "median_solve_percent": 0.34739746046883174
+        },
+        "replacement_expand": {
+          "calls": 67,
+          "logical_input_items": 512,
+          "logical_input_bytes": 8192,
+          "median_ns": 4749,
+          "median_solve_percent": 0.15887120939246038
+        },
+        "replacement_clear": {
+          "calls": 67,
+          "logical_input_items": 512,
+          "logical_input_bytes": 4096,
+          "median_ns": 4129,
+          "median_solve_percent": 0.1366811215200768
+        },
+        "new_U_column_copy": {
+          "calls": 67,
+          "logical_input_items": 484,
+          "logical_input_bytes": 7744,
+          "median_ns": 12656,
+          "median_solve_percent": 0.4196969732141407
+        },
+        "transpose_install": {
+          "calls": 85,
+          "logical_input_items": 484,
+          "logical_input_bytes": 7744,
+          "median_ns": 23600,
+          "median_solve_percent": 0.7826207781173924
+        },
+        "post_U_publish": {
+          "calls": 93,
+          "logical_input_items": 5208,
+          "logical_input_bytes": 0,
+          "median_ns": 131608,
+          "median_solve_percent": 4.356582475421232
+        },
+        "full_FTRAN": {
+          "calls": 93,
+          "logical_input_items": 5208,
+          "logical_input_bytes": 0,
+          "median_ns": 407692,
+          "median_solve_percent": 13.495713198053561
+        },
+        "needed_FTRAN": {
+          "calls": 73,
+          "logical_input_items": 4088,
+          "logical_input_bytes": 0,
+          "median_ns": 208642,
+          "median_solve_percent": 6.906617233274852
+        },
+        "L_eta_stage": {
+          "calls": 166,
+          "logical_input_items": 9296,
+          "logical_input_bytes": 0,
+          "median_ns": 219152,
+          "median_solve_percent": 7.263868290331803
+        },
+        "whole_update": {
+          "calls": 67,
+          "logical_input_items": 3752,
+          "logical_input_bytes": 0,
+          "median_ns": 274886,
+          "median_solve_percent": 9.099473666788043
+        },
+        "post_U_tau_snapshot": {
+          "calls": 73,
+          "logical_input_items": 4088,
+          "logical_input_bytes": 32704,
+          "median_ns": 4556,
+          "median_solve_percent": 0.15673824815765472
+        },
+        "keep_FTRAN": {
+          "calls": 10,
+          "logical_input_items": 560,
+          "logical_input_bytes": 0,
+          "median_ns": 34423,
+          "median_solve_percent": 1.1743327701627622
+        },
+        "basic_FTRAN": {
+          "calls": 10,
+          "logical_input_items": 560,
+          "logical_input_bytes": 0,
+          "median_ns": 42886,
+          "median_solve_percent": 1.4675805373479793
+        },
+        "U_output_order": {
+          "calls": 51,
+          "logical_input_items": 378,
+          "logical_input_bytes": 3024,
+          "median_ns": 77213,
+          "median_solve_percent": 2.555960144327849
+        },
+        "dense_U_emit": {
+          "calls": 42,
+          "logical_input_items": 2352,
+          "logical_input_bytes": 18816,
+          "median_ns": 25974,
+          "median_solve_percent": 0.8727879770877819
+        },
+        "sparse_U_emit": {
+          "calls": 51,
+          "logical_input_items": 951,
+          "logical_input_bytes": 7608,
+          "median_ns": 17494,
+          "median_solve_percent": 0.5790989440233043
+        }
+      },
+      "producer_tuple_bytes": 49760
+    },
+    {
+      "model": "bore3d",
+      "cap": 300,
+      "status": "Optimal",
+      "iterations": 172,
+      "pairs": 3,
+      "boundary_chain_percent_median": 3.207542926424637,
+      "fields": {
+        "level_publish": {
+          "calls": 0,
+          "logical_input_items": 0,
+          "logical_input_bytes": 0,
+          "median_ns": 0,
+          "median_solve_percent": 0.0
+        },
+        "ordinary_publish": {
+          "calls": 354,
+          "logical_input_items": 42978,
+          "logical_input_bytes": 687648,
+          "median_ns": 135337,
+          "median_solve_percent": 1.2179810352688039
+        },
+        "existing_U_reset": {
+          "calls": 182,
+          "logical_input_items": 42406,
+          "logical_input_bytes": 339248,
+          "median_ns": 20900,
+          "median_solve_percent": 0.18377935698195416
+        },
+        "full_U_expand": {
+          "calls": 182,
+          "logical_input_items": 2737,
+          "logical_input_bytes": 43792,
+          "median_ns": 13230,
+          "median_solve_percent": 0.12439373377329888
+        },
+        "needed_U_expand": {
+          "calls": 172,
+          "logical_input_items": 10450,
+          "logical_input_bytes": 167200,
+          "median_ns": 55391,
+          "median_solve_percent": 0.524603396833334
+        },
+        "input_indices": {
+          "calls": 182,
+          "logical_input_items": 2737,
+          "logical_input_bytes": 21896,
+          "median_ns": 15868,
+          "median_solve_percent": 0.15316918708552474
+        },
+        "pending_spike_prepare": {
+          "calls": 182,
+          "logical_input_items": 2737,
+          "logical_input_bytes": 43792,
+          "median_ns": 24676,
+          "median_solve_percent": 0.23277097653791745
+        },
+        "replacement_expand": {
+          "calls": 165,
+          "logical_input_items": 2314,
+          "logical_input_bytes": 37024,
+          "median_ns": 17525,
+          "median_solve_percent": 0.1722398293815149
+        },
+        "replacement_clear": {
+          "calls": 165,
+          "logical_input_items": 2314,
+          "logical_input_bytes": 18512,
+          "median_ns": 13349,
+          "median_solve_percent": 0.12731134883370362
+        },
+        "new_U_column_copy": {
+          "calls": 165,
+          "logical_input_items": 2206,
+          "logical_input_bytes": 35296,
+          "median_ns": 55557,
+          "median_solve_percent": 0.49508280556243317
+        },
+        "transpose_install": {
+          "calls": 185,
+          "logical_input_items": 2206,
+          "logical_input_bytes": 35296,
+          "median_ns": 120737,
+          "median_solve_percent": 1.0708232776236883
+        },
+        "post_U_publish": {
+          "calls": 182,
+          "logical_input_items": 42406,
+          "logical_input_bytes": 0,
+          "median_ns": 596235,
+          "median_solve_percent": 5.73843874712991
+        },
+        "full_FTRAN": {
+          "calls": 182,
+          "logical_input_items": 42406,
+          "logical_input_bytes": 0,
+          "median_ns": 1630286,
+          "median_solve_percent": 15.607092884301569
+        },
+        "needed_FTRAN": {
+          "calls": 172,
+          "logical_input_items": 40076,
+          "logical_input_bytes": 0,
+          "median_ns": 1110864,
+          "median_solve_percent": 11.236201605579776
+        },
+        "L_eta_stage": {
+          "calls": 354,
+          "logical_input_items": 82482,
+          "logical_input_bytes": 0,
+          "median_ns": 1027039,
+          "median_solve_percent": 9.835219043437899
+        },
+        "whole_update": {
+          "calls": 165,
+          "logical_input_items": 38445,
+          "logical_input_bytes": 0,
+          "median_ns": 962103,
+          "median_solve_percent": 8.935783697744805
+        },
+        "post_U_tau_snapshot": {
+          "calls": 172,
+          "logical_input_items": 40076,
+          "logical_input_bytes": 320608,
+          "median_ns": 25611,
+          "median_solve_percent": 0.24168452900474974
+        },
+        "keep_FTRAN": {
+          "calls": 1,
+          "logical_input_items": 233,
+          "logical_input_bytes": 0,
+          "median_ns": 7053,
+          "median_solve_percent": 0.06489516289236091
+        },
+        "basic_FTRAN": {
+          "calls": 9,
+          "logical_input_items": 2097,
+          "logical_input_bytes": 0,
+          "median_ns": 141892,
+          "median_solve_percent": 1.2224005337168964
+        },
+        "U_output_order": {
+          "calls": 121,
+          "logical_input_items": 1200,
+          "logical_input_bytes": 9600,
+          "median_ns": 403115,
+          "median_solve_percent": 3.5897354607116063
+        },
+        "dense_U_emit": {
+          "calls": 61,
+          "logical_input_items": 14213,
+          "logical_input_bytes": 113704,
+          "median_ns": 79127,
+          "median_solve_percent": 0.8016046072383598
+        },
+        "sparse_U_emit": {
+          "calls": 121,
+          "logical_input_items": 5111,
+          "logical_input_bytes": 40888,
+          "median_ns": 89960,
+          "median_solve_percent": 0.8683577054583946
+        }
+      },
+      "producer_tuple_bytes": 210992
+    },
+    {
+      "model": "degen2",
+      "cap": 300,
+      "status": "IterationLimit",
+      "iterations": 300,
+      "pairs": 3,
+      "boundary_chain_percent_median": 3.6433406750763986,
+      "fields": {
+        "level_publish": {
+          "calls": 497,
+          "logical_input_items": 4413,
+          "logical_input_bytes": 70608,
+          "median_ns": 143825,
+          "median_solve_percent": 0.8440470926927734
+        },
+        "ordinary_publish": {
+          "calls": 208,
+          "logical_input_items": 92352,
+          "logical_input_bytes": 1477632,
+          "median_ns": 125421,
+          "median_solve_percent": 0.6799926229470349
+        },
+        "existing_U_reset": {
+          "calls": 405,
+          "logical_input_items": 179820,
+          "logical_input_bytes": 1438560,
+          "median_ns": 56326,
+          "median_solve_percent": 0.3087689465318101
+        },
+        "full_U_expand": {
+          "calls": 405,
+          "logical_input_items": 8605,
+          "logical_input_bytes": 137680,
+          "median_ns": 31417,
+          "median_solve_percent": 0.17218384633829983
+        },
+        "needed_U_expand": {
+          "calls": 300,
+          "logical_input_items": 15832,
+          "logical_input_bytes": 253312,
+          "median_ns": 108379,
+          "median_solve_percent": 0.5887464089152609
+        },
+        "input_indices": {
+          "calls": 405,
+          "logical_input_items": 8605,
+          "logical_input_bytes": 68840,
+          "median_ns": 40447,
+          "median_solve_percent": 0.21971992730506423
+        },
+        "pending_spike_prepare": {
+          "calls": 405,
+          "logical_input_items": 8605,
+          "logical_input_bytes": 137680,
+          "median_ns": 54722,
+          "median_solve_percent": 0.29726590011589793
+        },
+        "replacement_expand": {
+          "calls": 294,
+          "logical_input_items": 3801,
+          "logical_input_bytes": 60816,
+          "median_ns": 32132,
+          "median_solve_percent": 0.17455041669756283
+        },
+        "replacement_clear": {
+          "calls": 294,
+          "logical_input_items": 3801,
+          "logical_input_bytes": 30408,
+          "median_ns": 24133,
+          "median_solve_percent": 0.13109751046191598
+        },
+        "new_U_column_copy": {
+          "calls": 294,
+          "logical_input_items": 3615,
+          "logical_input_bytes": 57840,
+          "median_ns": 95769,
+          "median_solve_percent": 0.5203755778261433
+        },
+        "transpose_install": {
+          "calls": 326,
+          "logical_input_items": 3615,
+          "logical_input_bytes": 57840,
+          "median_ns": 189060,
+          "median_solve_percent": 1.025509148337851
+        },
+        "post_U_publish": {
+          "calls": 405,
+          "logical_input_items": 179820,
+          "logical_input_bytes": 0,
+          "median_ns": 1335399,
+          "median_solve_percent": 7.235089549605857
+        },
+        "full_FTRAN": {
+          "calls": 405,
+          "logical_input_items": 179820,
+          "logical_input_bytes": 0,
+          "median_ns": 3394690,
+          "median_solve_percent": 18.44094840218628
+        },
+        "needed_FTRAN": {
+          "calls": 300,
+          "logical_input_items": 133200,
+          "logical_input_bytes": 0,
+          "median_ns": 1762771,
+          "median_solve_percent": 9.575887358159454
+        },
+        "L_eta_stage": {
+          "calls": 705,
+          "logical_input_items": 313020,
+          "logical_input_bytes": 0,
+          "median_ns": 1617105,
+          "median_solve_percent": 9.279782083560692
+        },
+        "whole_update": {
+          "calls": 294,
+          "logical_input_items": 130536,
+          "logical_input_bytes": 0,
+          "median_ns": 1530633,
+          "median_solve_percent": 8.443370000550471
+        },
+        "post_U_tau_snapshot": {
+          "calls": 300,
+          "logical_input_items": 133200,
+          "logical_input_bytes": 1065600,
+          "median_ns": 70413,
+          "median_solve_percent": 0.3814922434840802
+        },
+        "keep_FTRAN": {
+          "calls": 97,
+          "logical_input_items": 43068,
+          "logical_input_bytes": 0,
+          "median_ns": 510293,
+          "median_solve_percent": 2.884824734567509
+        },
+        "basic_FTRAN": {
+          "calls": 8,
+          "logical_input_items": 3552,
+          "logical_input_bytes": 0,
+          "median_ns": 135712,
+          "median_solve_percent": 0.7837240607735033
+        },
+        "U_output_order": {
+          "calls": 322,
+          "logical_input_items": 4048,
+          "logical_input_bytes": 32384,
+          "median_ns": 868844,
+          "median_solve_percent": 4.707330277046599
+        },
+        "dense_U_emit": {
+          "calls": 83,
+          "logical_input_items": 36852,
+          "logical_input_bytes": 294816,
+          "median_ns": 161998,
+          "median_solve_percent": 0.9218936748903722
+        },
+        "sparse_U_emit": {
+          "calls": 322,
+          "logical_input_items": 11173,
+          "logical_input_bytes": 89384,
+          "median_ns": 217242,
+          "median_solve_percent": 1.1801220473114635
+        }
+      },
+      "producer_tuple_bytes": 390992
+    }
+  ],
+  "raw": "target/perf-forward-owner",
+  "source_and_probe_sha256": {
+    "original.rs": "57c86340f6959717954e2cb1c58f06c285ab7ce564a25d7d0e9e9c429d802ef1",
+    "instrumented.rs": "2ae626665c431454cf974cec74344464bf6a4b2541e383efc9f0c63eeea5693d",
+    "probe.rs": "ffed13b62276a1a8fdb7adae30d77fcaf9d11672fbd891ff869ef13e38661efe",
+    "instrument.py": "3d2f805a417de24d4c23597d2bb26f5ee717d707460489777766f47a81d6c854"
+  },
+  "accepted_cli_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+  "restore_verified": true,
+  "next_measurement": "Complete 80BAU3B barrier normal solve/refinement path: factorization, forward/backward, matrix products, residual construction and correction solves, small models first. Its36iterations are cheaper than GREENBEA103. Prior isolated triangular-owner and output-order trials remain rejected/inconclusive."
+}
