@@ -463,6 +463,16 @@ measured.
   a maintained slot hierarchy after all rotation/membership costs. No prototype
   or another owner trial follows. See evidence/optimized-mode-scope.json;
   allocation/memory totals alone do not qualify another settled storage trial.
+  The complete ordered primal scoring batch is now rejected at small-model
+  component cost: all12live small histories match frozen full-pass/list/WORK/FP
+  state and complete SolveResults, but DEGEN2 ratios1.172/1.267 show no useful
+  preliminary saving. These initial component tests were unpinned, so they do
+  not establish a controlled regression. No80BAUcandidate replay, matchingPGO,
+  formal screen, packet-width/mask rescue or full candidate gates follows.
+  CurrentPGO80BAU cycle samples inline scoring into price/update_list; their
+  combined11.25%self includes necessary transitions, not removable scope.
+  See evidence/primal-score-batch.json. Preserve both qualified binaries and
+  seek another distinct substantial complete numerical execution mechanism.
   The scalar prefilter and prior rank/layout trials remain
   rejected; do not infer further gains from isolated predicate costs.
   Comparator alignment stays centralized; normal lunum's build/cache transport

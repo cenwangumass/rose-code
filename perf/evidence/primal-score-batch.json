@@ -1,0 +1,1473 @@
+{
+  "source": "18061fe9",
+  "decision": "Reject complete four-lane ordered pricing/score executor at small-model component cost. No80BAUprototype trial, matchingPGOqualification, formal timing screens or full candidate gates. No packet-width/gather-mask rescue variants.",
+  "scope": "Distinct from score memoization, global pricing buckets and feasibility classification. Entire price/best-list/changed+old update passes execute packed independent d*d/w, then original scalar transitions. No retained cache or factor mutation.",
+  "configuration": "Isolated pinnedRust1.98.1 ordinary ThinLTO/glibc release-test component. Parent and candidate same compile context; not matching fixed39PGO, not a solver speedup claim. CPU not pinned during initial cheap small-model numerical/cost discriminator, each original/batch replay compares actual same pass input on the same thread; first-role alternates per round. Timers include complete methods with env admission/gather/tails/list transitions, exclude state snapshots/restoration and FP oracle.",
+  "frozen_original_methods": {
+    "score": {
+      "literal_body_restoration": true,
+      "sha256": "76a735d06b85d465826b81f430d7b6b1adab1027fcfa949b3ba1f2d20e4b8e0b"
+    },
+    "price": {
+      "literal_body_restoration": true,
+      "sha256": "21073e1b2693b57c0d14fba4dec8a4363adf7b522c319c2c9e50485d92a79c82"
+    },
+    "best_in_list": {
+      "literal_body_restoration": true,
+      "sha256": "c76953085832933f7e5895f412760ead2c72cd119210657a2e3b7dde5a75d006"
+    },
+    "scanned": {
+      "literal_body_restoration": true,
+      "sha256": "2ab757a8757750c36d446fa184f425d038c81d06b35d8952028e1002417911ab"
+    },
+    "update_list": {
+      "literal_body_restoration": true,
+      "sha256": "bae78c65d7b647e8595bb5ab02f7d2e9b16e6425a9659a15bfc057e64a54022d"
+    }
+  },
+  "qualification": [
+    "Complete original methods frozen before edits, literal body reconstruction proof passes. Original bodies retained independently; no baseline rerecording.",
+    "Every live price/update pass is shadowed on each actual small-model history; ordered list, level, list_failed, result, WORKw bits and finalMXCSR agree. Inputs and complete savedWork state are restored between roles. No production runtime edits.",
+    "All12complete library SolveResults match plain execution, six small models and bothrole orders. Fast940/full987 are not run for this rejected component. Random/exceptional/all-control differential qualification would be required before integration; live-normal matching does not establish it.",
+    "Component percentages are preliminary paired pass-time ratios, not fixed formal screens or projected whole-solve gains."
+  ],
+  "small_history_rows": [
+    {
+      "batch_first": false,
+      "batch_ns": "25786",
+      "cap": 1000,
+      "iterations": 10,
+      "model": "afiro",
+      "original_ns": "10899",
+      "price_calls": 11,
+      "round": 0,
+      "status": "Optimal",
+      "update_calls": 10,
+      "stage_ratio": 2.365905128910909
+    },
+    {
+      "batch_first": true,
+      "batch_ns": "11963",
+      "cap": 1000,
+      "iterations": 10,
+      "model": "afiro",
+      "original_ns": "8698",
+      "price_calls": 11,
+      "round": 1,
+      "status": "Optimal",
+      "update_calls": 10,
+      "stage_ratio": 1.375373649114739
+    },
+    {
+      "batch_first": false,
+      "batch_ns": "36841",
+      "cap": 1000,
+      "iterations": 25,
+      "model": "sc50a",
+      "original_ns": "25267",
+      "price_calls": 26,
+      "round": 0,
+      "status": "Optimal",
+      "update_calls": 25,
+      "stage_ratio": 1.4580678355166818
+    },
+    {
+      "batch_first": true,
+      "batch_ns": "39805",
+      "cap": 1000,
+      "iterations": 25,
+      "model": "sc50a",
+      "original_ns": "25936",
+      "price_calls": 26,
+      "round": 1,
+      "status": "Optimal",
+      "update_calls": 25,
+      "stage_ratio": 1.5347393584207278
+    },
+    {
+      "batch_first": false,
+      "batch_ns": "98619",
+      "cap": 1000,
+      "iterations": 43,
+      "model": "blend",
+      "original_ns": "71617",
+      "price_calls": 44,
+      "round": 0,
+      "status": "Optimal",
+      "update_calls": 43,
+      "stage_ratio": 1.3770333859279222
+    },
+    {
+      "batch_first": true,
+      "batch_ns": "129474",
+      "cap": 1000,
+      "iterations": 43,
+      "model": "blend",
+      "original_ns": "61493",
+      "price_calls": 44,
+      "round": 1,
+      "status": "Optimal",
+      "update_calls": 43,
+      "stage_ratio": 2.1055079439936253
+    },
+    {
+      "batch_first": false,
+      "batch_ns": "189692",
+      "cap": 1000,
+      "iterations": 63,
+      "model": "adlittle",
+      "original_ns": "191201",
+      "price_calls": 64,
+      "round": 0,
+      "status": "Optimal",
+      "update_calls": 67,
+      "stage_ratio": 0.9921077818630656
+    },
+    {
+      "batch_first": true,
+      "batch_ns": "220760",
+      "cap": 1000,
+      "iterations": 63,
+      "model": "adlittle",
+      "original_ns": "136301",
+      "price_calls": 64,
+      "round": 1,
+      "status": "Optimal",
+      "update_calls": 67,
+      "stage_ratio": 1.619650626187629
+    },
+    {
+      "batch_first": false,
+      "batch_ns": "329815",
+      "cap": 1000,
+      "iterations": 62,
+      "model": "bore3d",
+      "original_ns": "239273",
+      "price_calls": 63,
+      "round": 0,
+      "status": "Optimal",
+      "update_calls": 72,
+      "stage_ratio": 1.3784045838853527
+    },
+    {
+      "batch_first": true,
+      "batch_ns": "341682",
+      "cap": 1000,
+      "iterations": 62,
+      "model": "bore3d",
+      "original_ns": "229496",
+      "price_calls": 63,
+      "round": 1,
+      "status": "Optimal",
+      "update_calls": 72,
+      "stage_ratio": 1.488836406734758
+    },
+    {
+      "batch_first": false,
+      "batch_ns": "4669058",
+      "cap": 1000,
+      "iterations": 531,
+      "model": "degen2",
+      "original_ns": "3984301",
+      "price_calls": 533,
+      "round": 0,
+      "status": "Optimal",
+      "update_calls": 610,
+      "stage_ratio": 1.1718637723404934
+    },
+    {
+      "batch_first": true,
+      "batch_ns": "4703653",
+      "cap": 1000,
+      "iterations": 531,
+      "model": "degen2",
+      "original_ns": "3711435",
+      "price_calls": 533,
+      "round": 1,
+      "status": "Optimal",
+      "update_calls": 610,
+      "stage_ratio": 1.2673407994481918
+    }
+  ],
+  "current_optimized_attribution": {
+    "profiles": {
+      "degen2-primal-cycles": {
+        "manifest": {
+          "model": "degen2",
+          "solver": "rose",
+          "kind": "record",
+          "repetitions": 8,
+          "period": 16000000,
+          "event": "cycles:u",
+          "LD_LIBRARY_PATH": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/sysroot/usr/lib/x86_64-linux-gnu",
+          "CPU": 2,
+          "bounds": "external20s/case;iteration6000;referenceTimeLimit10",
+          "commands": [
+            [
+              "timeout",
+              "20s",
+              "taskset",
+              "-c",
+              "2",
+              "env",
+              "-u",
+              "ROSE_DUMP",
+              "-u",
+              "ROSE_WORK",
+              "-u",
+              "PARAMS",
+              "-u",
+              "ROSE_LOG",
+              "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+              "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/ctl",
+              "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/ack",
+              "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/0.maps",
+              "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+              "solve",
+              "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen2.mps",
+              "--method",
+              "primal",
+              "--profile",
+              "controlled",
+              "--max-iterations",
+              "6000",
+              "--output",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/0.json"
+            ],
+            [
+              "timeout",
+              "20s",
+              "taskset",
+              "-c",
+              "2",
+              "env",
+              "-u",
+              "ROSE_DUMP",
+              "-u",
+              "ROSE_WORK",
+              "-u",
+              "PARAMS",
+              "-u",
+              "ROSE_LOG",
+              "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+              "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/ctl",
+              "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/ack",
+              "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/1.maps",
+              "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+              "solve",
+              "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen2.mps",
+              "--method",
+              "primal",
+              "--profile",
+              "controlled",
+              "--max-iterations",
+              "6000",
+              "--output",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/1.json"
+            ],
+            [
+              "timeout",
+              "20s",
+              "taskset",
+              "-c",
+              "2",
+              "env",
+              "-u",
+              "ROSE_DUMP",
+              "-u",
+              "ROSE_WORK",
+              "-u",
+              "PARAMS",
+              "-u",
+              "ROSE_LOG",
+              "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+              "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/ctl",
+              "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/ack",
+              "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/2.maps",
+              "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+              "solve",
+              "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen2.mps",
+              "--method",
+              "primal",
+              "--profile",
+              "controlled",
+              "--max-iterations",
+              "6000",
+              "--output",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/2.json"
+            ],
+            [
+              "timeout",
+              "20s",
+              "taskset",
+              "-c",
+              "2",
+              "env",
+              "-u",
+              "ROSE_DUMP",
+              "-u",
+              "ROSE_WORK",
+              "-u",
+              "PARAMS",
+              "-u",
+              "ROSE_LOG",
+              "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+              "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/ctl",
+              "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/ack",
+              "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/3.maps",
+              "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+              "solve",
+              "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen2.mps",
+              "--method",
+              "primal",
+              "--profile",
+              "controlled",
+              "--max-iterations",
+              "6000",
+              "--output",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/3.json"
+            ],
+            [
+              "timeout",
+              "20s",
+              "taskset",
+              "-c",
+              "2",
+              "env",
+              "-u",
+              "ROSE_DUMP",
+              "-u",
+              "ROSE_WORK",
+              "-u",
+              "PARAMS",
+              "-u",
+              "ROSE_LOG",
+              "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+              "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/ctl",
+              "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/ack",
+              "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/4.maps",
+              "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+              "solve",
+              "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen2.mps",
+              "--method",
+              "primal",
+              "--profile",
+              "controlled",
+              "--max-iterations",
+              "6000",
+              "--output",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/4.json"
+            ],
+            [
+              "timeout",
+              "20s",
+              "taskset",
+              "-c",
+              "2",
+              "env",
+              "-u",
+              "ROSE_DUMP",
+              "-u",
+              "ROSE_WORK",
+              "-u",
+              "PARAMS",
+              "-u",
+              "ROSE_LOG",
+              "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+              "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/ctl",
+              "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/ack",
+              "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/5.maps",
+              "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+              "solve",
+              "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen2.mps",
+              "--method",
+              "primal",
+              "--profile",
+              "controlled",
+              "--max-iterations",
+              "6000",
+              "--output",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/5.json"
+            ],
+            [
+              "timeout",
+              "20s",
+              "taskset",
+              "-c",
+              "2",
+              "env",
+              "-u",
+              "ROSE_DUMP",
+              "-u",
+              "ROSE_WORK",
+              "-u",
+              "PARAMS",
+              "-u",
+              "ROSE_LOG",
+              "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+              "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/ctl",
+              "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/ack",
+              "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/6.maps",
+              "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+              "solve",
+              "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen2.mps",
+              "--method",
+              "primal",
+              "--profile",
+              "controlled",
+              "--max-iterations",
+              "6000",
+              "--output",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/6.json"
+            ],
+            [
+              "timeout",
+              "20s",
+              "taskset",
+              "-c",
+              "2",
+              "env",
+              "-u",
+              "ROSE_DUMP",
+              "-u",
+              "ROSE_WORK",
+              "-u",
+              "PARAMS",
+              "-u",
+              "ROSE_LOG",
+              "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+              "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/ctl",
+              "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/ack",
+              "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/7.maps",
+              "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+              "solve",
+              "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen2.mps",
+              "--method",
+              "primal",
+              "--profile",
+              "controlled",
+              "--max-iterations",
+              "6000",
+              "--output",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/7.json"
+            ]
+          ],
+          "hashes": {
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-reference/reconstructed/libgurobi130.so": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so": "7b85b23e441a3bec22893332d2fda6ba692ed13cfd723fc3a4f677b495f15e03",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/native_scope": "567f45588f7e8a1fc3212630f7852f15d1214d4de4165c6c12c9057961e6c760",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.c": "d81eebbd3c86aee5f978ce1f8f01c29883d21f0e267d0a1df4a8eacfcbdd2bdd",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/control.h": "369addfb3aa0162cbf24e2c82b9e8aadc51441d16418321f8e28dd7f5b0ff701",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/native_scope.c": "859acf2e9f28243a369e81e7b940cb56cb70a5d66e3f0d85c9701b659d15630e"
+          },
+          "perf_command": [
+            "perf",
+            "record",
+            "-D",
+            "-1",
+            "--control",
+            "fifo:/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/ctl,/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/ack",
+            "-e",
+            "cycles:u",
+            "-c",
+            "16000000",
+            "-o",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/samples.data",
+            "--",
+            "taskset",
+            "-c",
+            "2",
+            "bash",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/degen2-primal-cycles/batch.sh"
+          ],
+          "callgraph": null
+        },
+        "analysis": {
+          "tag": "degen2-primal-cycles",
+          "model": "degen2",
+          "solver": "rose",
+          "samples": 74,
+          "audit": {
+            "PERF_RECORD_SAMPLE": 74,
+            "PERF_RECORD_LOST": 0,
+            "PERF_RECORD_THROTTLE": 0,
+            "PERF_RECORD_UNTHROTTLE": 0
+          },
+          "resolved_symbol_samples": 74,
+          "independent_perf_address_checks": 9,
+          "event": "cycles:u",
+          "sampled_events": 1184000000,
+          "unmapped_samples": [],
+          "families": {
+            "simplex shared other": {
+              "samples": 28,
+              "percent": 37.83783783783784
+            },
+            "FTRAN/L/U": {
+              "samples": 14,
+              "percent": 18.91891891891892
+            },
+            "TCMalloc": {
+              "samples": 8,
+              "percent": 10.81081081081081
+            },
+            "factor ordered construction": {
+              "samples": 5,
+              "percent": 6.756756756756757
+            },
+            "BTRAN": {
+              "samples": 5,
+              "percent": 6.756756756756757
+            },
+            "libc memory": {
+              "samples": 4,
+              "percent": 5.405405405405405
+            },
+            "factor publication/retirement": {
+              "samples": 3,
+              "percent": 4.054054054054054
+            },
+            "factor update/install": {
+              "samples": 2,
+              "percent": 2.7027027027027026
+            },
+            "libc other": {
+              "samples": 1,
+              "percent": 1.3513513513513513
+            },
+            "factor other": {
+              "samples": 1,
+              "percent": 1.3513513513513513
+            },
+            "Rose other": {
+              "samples": 1,
+              "percent": 1.3513513513513513
+            },
+            "Rust core generic": {
+              "samples": 1,
+              "percent": 1.3513513513513513
+            },
+            "auxiliary LU (all operations)": {
+              "samples": 1,
+              "percent": 1.3513513513513513
+            }
+          },
+          "top_symbols": [
+            {
+              "family": "simplex shared other",
+              "symbol": "rose::simplex::solve_primal",
+              "samples": 8,
+              "percent": 10.81081081081081
+            },
+            {
+              "family": "FTRAN/L/U",
+              "symbol": "<rose::ftran_order::RefStruct>::ftran_with",
+              "samples": 8,
+              "percent": 10.81081081081081
+            },
+            {
+              "family": "FTRAN/L/U",
+              "symbol": "<rose::ftran_order::RefStruct>::lstage_num",
+              "samples": 5,
+              "percent": 6.756756756756757
+            },
+            {
+              "family": "factor ordered construction",
+              "symbol": "rose::lu_order::nucleus::<f64>",
+              "samples": 5,
+              "percent": 6.756756756756757
+            },
+            {
+              "family": "BTRAN",
+              "symbol": "<rose::ftran_order::RefStruct>::btran",
+              "samples": 5,
+              "percent": 6.756756756756757
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "<rose::simplex::Solver>::update_list",
+              "samples": 5,
+              "percent": 6.756756756756757
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "rose::simplex::primal_row_update_by::<false, rose::simplex::RowMaskIndices>",
+              "samples": 5,
+              "percent": 6.756756756756757
+            },
+            {
+              "family": "factor publication/retirement",
+              "symbol": "<rose::ftran_order::RefStruct>::fresh",
+              "samples": 3,
+              "percent": 4.054054054054054
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "<rose::simplex::Solver>::price",
+              "samples": 3,
+              "percent": 4.054054054054054
+            },
+            {
+              "family": "TCMalloc",
+              "symbol": "operator delete[](void*) | operator delete(void*) | __libc_cfree | __libc_free | cfree | free | tc_cfree | tc_delete | tc_deletearray | tc_free",
+              "samples": 3,
+              "percent": 4.054054054054054
+            },
+            {
+              "family": "TCMalloc",
+              "symbol": "__libc_malloc | malloc | tc_malloc",
+              "samples": 3,
+              "percent": 4.054054054054054
+            },
+            {
+              "family": "TCMalloc",
+              "symbol": "__libc_realloc | realloc | tc_realloc",
+              "samples": 2,
+              "percent": 2.7027027027027026
+            },
+            {
+              "family": "factor update/install",
+              "symbol": "<rose::ftran_order::RefStruct>::update",
+              "samples": 2,
+              "percent": 2.7027027027027026
+            },
+            {
+              "family": "libc memory",
+              "symbol": "__memset_avx2_unaligned_erms",
+              "samples": 2,
+              "percent": 2.7027027027027026
+            },
+            {
+              "family": "libc memory",
+              "symbol": "__memcpy_avx_unaligned_erms | __memmove_avx_unaligned_erms",
+              "samples": 2,
+              "percent": 2.7027027027027026
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "<rose::simplex::Solver>::update_dual_infeas_sum",
+              "samples": 1,
+              "percent": 1.3513513513513513
+            },
+            {
+              "family": "libc other",
+              "symbol": "__strlen_avx2",
+              "samples": 1,
+              "percent": 1.3513513513513513
+            },
+            {
+              "family": "factor other",
+              "symbol": "core::slice::sort::shared::smallsort::small_sort_network::<usize, <[usize]>::sort_unstable_by_key<i64, <rose::ftran_order::RefStruct>::uorder::{closure#4}::{closure#0}>::{closure#0}>",
+              "samples": 1,
+              "percent": 1.3513513513513513
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "<rose::simplex::Solver>::row_product_counts",
+              "samples": 1,
+              "percent": 1.3513513513513513
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "<core::iter::adapters::map::Map<core::slice::iter::Iter<usize>, <rose::simplex::Solver>::sig::{closure#0}> as core::iter::traits::iterator::Iterator>::fold::<(), core::iter::traits::iterator::Iterator::for_each::call<i8, <alloc::vec::Vec<i8>>::extend_trusted<core::iter::adapters::map::Map<core::slice::iter::Iter<usize>, <rose::simplex::Solver>::sig::{closure#0}>>::{closure#0}>::{closure#0}>",
+              "samples": 1,
+              "percent": 1.3513513513513513
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "<rose::simplex::Solver>::recompute_primal_x",
+              "samples": 1,
+              "percent": 1.3513513513513513
+            },
+            {
+              "family": "Rose other",
+              "symbol": "rose::lu_pairs::run::<f64>",
+              "samples": 1,
+              "percent": 1.3513513513513513
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "<rose::simplex::Solver>::recompute_primal_direct",
+              "samples": 1,
+              "percent": 1.3513513513513513
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "<rose::simplex::Solver>::pivot_row_order_by",
+              "samples": 1,
+              "percent": 1.3513513513513513
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "<alloc::vec::Vec<(usize, usize)> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<(usize, usize), core::iter::adapters::map::Map<core::iter::adapters::filter::Filter<core::ops::range::Range<usize>, <rose::simplex::Internal>::rank_products::{closure#0}>, <rose::simplex::Internal>::rank_products::{closure#1}>>>::from_iter",
+              "samples": 1,
+              "percent": 1.3513513513513513
+            },
+            {
+              "family": "Rust core generic",
+              "symbol": "<core::iter::adapters::copied::Copied<core::slice::iter::Iter<usize>> as core::iter::traits::iterator::Iterator>::fold::<(), core::iter::adapters::map::map_fold<usize, (usize, ()), (), <hashbrown::set::HashSet<usize, std::hash::random::RandomState> as core::iter::traits::collect::Extend<usize>>::extend<core::iter::adapters::copied::Copied<core::slice::iter::Iter<usize>>>::{closure#0}, core::iter::traits::iterator::Iterator::for_each::call<(usize, ()), <hashbrown::map::HashMap<usize, (), std::hash::random::RandomState> as core::iter::traits::collect::Extend<(usize, ())>>::extend<core::iter::adapters::map::Map<core::iter::adapters::copied::Copied<core::slice::iter::Iter<usize>>, <hashbrown::set::HashSet<usize, std::hash::random::RandomState> as core::iter::traits::collect::Extend<usize>>::extend<core::iter::adapters::copied::Copied<core::slice::iter::Iter<usize>>>::{closure#0}>>::{closure#0}>::{closure#0}>::{closure#0}>",
+              "samples": 1,
+              "percent": 1.3513513513513513
+            },
+            {
+              "family": "FTRAN/L/U",
+              "symbol": "<rose::ftran_order::RefStruct>::ftran_dense_work",
+              "samples": 1,
+              "percent": 1.3513513513513513
+            },
+            {
+              "family": "auxiliary LU (all operations)",
+              "symbol": "<rose::lu::Factor>::factor::<&alloc::vec::Vec<(usize, f64)>>",
+              "samples": 1,
+              "percent": 1.3513513513513513
+            }
+          ],
+          "images": {
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc": {
+              "sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+              "debug": null
+            },
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/sysroot/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4.6.5": {
+              "sha256": "3e3c459710a7ce1511a3b289b95d52b56d8313afdb99eec23d2fc241c73e27e1",
+              "debug": null
+            },
+            "/usr/lib/x86_64-linux-gnu/libc.so.6": {
+              "sha256": "85e64f97e348786a8fb4d9f3d52fec289e2fb86bba20f0731dfe61990525e0f7",
+              "debug": "/usr/lib/debug/.build-id/06/6527e430a32768d82741e00b81eebb1a872294.debug"
+            }
+          },
+          "reference_anchor_ranges": []
+        },
+        "validation": {
+          "complete_result_exit_pairs": 8,
+          "digests": [
+            "f18e2a823f68d5797ff551e239a1102f7d3163536f00e14880ae55d87bb0a15a",
+            "f18e2a823f68d5797ff551e239a1102f7d3163536f00e14880ae55d87bb0a15a",
+            "f18e2a823f68d5797ff551e239a1102f7d3163536f00e14880ae55d87bb0a15a",
+            "f18e2a823f68d5797ff551e239a1102f7d3163536f00e14880ae55d87bb0a15a",
+            "f18e2a823f68d5797ff551e239a1102f7d3163536f00e14880ae55d87bb0a15a",
+            "f18e2a823f68d5797ff551e239a1102f7d3163536f00e14880ae55d87bb0a15a",
+            "f18e2a823f68d5797ff551e239a1102f7d3163536f00e14880ae55d87bb0a15a",
+            "f18e2a823f68d5797ff551e239a1102f7d3163536f00e14880ae55d87bb0a15a"
+          ]
+        }
+      },
+      "80bau-primal-cycles": {
+        "manifest": {
+          "model": "80bau3b",
+          "solver": "rose",
+          "kind": "record",
+          "repetitions": 8,
+          "period": 32000000,
+          "event": "cycles:u",
+          "LD_LIBRARY_PATH": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/sysroot/usr/lib/x86_64-linux-gnu",
+          "CPU": 2,
+          "bounds": "external20s/case;iteration6000;referenceTimeLimit10",
+          "commands": [
+            [
+              "timeout",
+              "20s",
+              "taskset",
+              "-c",
+              "2",
+              "env",
+              "-u",
+              "ROSE_DUMP",
+              "-u",
+              "ROSE_WORK",
+              "-u",
+              "PARAMS",
+              "-u",
+              "ROSE_LOG",
+              "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+              "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/ctl",
+              "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/ack",
+              "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/0.maps",
+              "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+              "solve",
+              "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/80bau3b.mps",
+              "--method",
+              "primal",
+              "--profile",
+              "controlled",
+              "--max-iterations",
+              "6000",
+              "--output",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/0.json"
+            ],
+            [
+              "timeout",
+              "20s",
+              "taskset",
+              "-c",
+              "2",
+              "env",
+              "-u",
+              "ROSE_DUMP",
+              "-u",
+              "ROSE_WORK",
+              "-u",
+              "PARAMS",
+              "-u",
+              "ROSE_LOG",
+              "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+              "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/ctl",
+              "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/ack",
+              "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/1.maps",
+              "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+              "solve",
+              "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/80bau3b.mps",
+              "--method",
+              "primal",
+              "--profile",
+              "controlled",
+              "--max-iterations",
+              "6000",
+              "--output",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/1.json"
+            ],
+            [
+              "timeout",
+              "20s",
+              "taskset",
+              "-c",
+              "2",
+              "env",
+              "-u",
+              "ROSE_DUMP",
+              "-u",
+              "ROSE_WORK",
+              "-u",
+              "PARAMS",
+              "-u",
+              "ROSE_LOG",
+              "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+              "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/ctl",
+              "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/ack",
+              "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/2.maps",
+              "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+              "solve",
+              "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/80bau3b.mps",
+              "--method",
+              "primal",
+              "--profile",
+              "controlled",
+              "--max-iterations",
+              "6000",
+              "--output",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/2.json"
+            ],
+            [
+              "timeout",
+              "20s",
+              "taskset",
+              "-c",
+              "2",
+              "env",
+              "-u",
+              "ROSE_DUMP",
+              "-u",
+              "ROSE_WORK",
+              "-u",
+              "PARAMS",
+              "-u",
+              "ROSE_LOG",
+              "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+              "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/ctl",
+              "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/ack",
+              "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/3.maps",
+              "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+              "solve",
+              "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/80bau3b.mps",
+              "--method",
+              "primal",
+              "--profile",
+              "controlled",
+              "--max-iterations",
+              "6000",
+              "--output",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/3.json"
+            ],
+            [
+              "timeout",
+              "20s",
+              "taskset",
+              "-c",
+              "2",
+              "env",
+              "-u",
+              "ROSE_DUMP",
+              "-u",
+              "ROSE_WORK",
+              "-u",
+              "PARAMS",
+              "-u",
+              "ROSE_LOG",
+              "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+              "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/ctl",
+              "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/ack",
+              "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/4.maps",
+              "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+              "solve",
+              "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/80bau3b.mps",
+              "--method",
+              "primal",
+              "--profile",
+              "controlled",
+              "--max-iterations",
+              "6000",
+              "--output",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/4.json"
+            ],
+            [
+              "timeout",
+              "20s",
+              "taskset",
+              "-c",
+              "2",
+              "env",
+              "-u",
+              "ROSE_DUMP",
+              "-u",
+              "ROSE_WORK",
+              "-u",
+              "PARAMS",
+              "-u",
+              "ROSE_LOG",
+              "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+              "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/ctl",
+              "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/ack",
+              "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/5.maps",
+              "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+              "solve",
+              "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/80bau3b.mps",
+              "--method",
+              "primal",
+              "--profile",
+              "controlled",
+              "--max-iterations",
+              "6000",
+              "--output",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/5.json"
+            ],
+            [
+              "timeout",
+              "20s",
+              "taskset",
+              "-c",
+              "2",
+              "env",
+              "-u",
+              "ROSE_DUMP",
+              "-u",
+              "ROSE_WORK",
+              "-u",
+              "PARAMS",
+              "-u",
+              "ROSE_LOG",
+              "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+              "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/ctl",
+              "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/ack",
+              "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/6.maps",
+              "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+              "solve",
+              "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/80bau3b.mps",
+              "--method",
+              "primal",
+              "--profile",
+              "controlled",
+              "--max-iterations",
+              "6000",
+              "--output",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/6.json"
+            ],
+            [
+              "timeout",
+              "20s",
+              "taskset",
+              "-c",
+              "2",
+              "env",
+              "-u",
+              "ROSE_DUMP",
+              "-u",
+              "ROSE_WORK",
+              "-u",
+              "PARAMS",
+              "-u",
+              "ROSE_LOG",
+              "GRB_LICENSE_FILE=/home/derekwang/rose-reverse-engineer/reverse-engineer/targets/gurobi.lic",
+              "SOLVE_PERF_CTL=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/ctl",
+              "SOLVE_PERF_ACK=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/ack",
+              "SOLVE_PERF_MAPS=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/7.maps",
+              "LD_PRELOAD=/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+              "solve",
+              "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/80bau3b.mps",
+              "--method",
+              "primal",
+              "--profile",
+              "controlled",
+              "--max-iterations",
+              "6000",
+              "--output",
+              "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/7.json"
+            ]
+          ],
+          "hashes": {
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-reference/reconstructed/libgurobi130.so": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.so": "7b85b23e441a3bec22893332d2fda6ba692ed13cfd723fc3a4f677b495f15e03",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/native_scope": "567f45588f7e8a1fc3212630f7852f15d1214d4de4165c6c12c9057961e6c760",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/clock_hook.c": "d81eebbd3c86aee5f978ce1f8f01c29883d21f0e267d0a1df4a8eacfcbdd2bdd",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/control.h": "369addfb3aa0162cbf24e2c82b9e8aadc51441d16418321f8e28dd7f5b0ff701",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-greenbea-phases/native_scope.c": "859acf2e9f28243a369e81e7b940cb56cb70a5d66e3f0d85c9701b659d15630e"
+          },
+          "perf_command": [
+            "perf",
+            "record",
+            "-D",
+            "-1",
+            "--control",
+            "fifo:/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/ctl,/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/ack",
+            "-e",
+            "cycles:u",
+            "-c",
+            "32000000",
+            "-o",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/samples.data",
+            "--",
+            "taskset",
+            "-c",
+            "2",
+            "bash",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-scope/80bau-primal-cycles/batch.sh"
+          ],
+          "callgraph": null
+        },
+        "analysis": {
+          "tag": "80bau-primal-cycles",
+          "model": "80bau3b",
+          "solver": "rose",
+          "samples": 569,
+          "audit": {
+            "PERF_RECORD_SAMPLE": 569,
+            "PERF_RECORD_LOST": 0,
+            "PERF_RECORD_THROTTLE": 0,
+            "PERF_RECORD_UNTHROTTLE": 0
+          },
+          "resolved_symbol_samples": 568,
+          "independent_perf_address_checks": 75,
+          "event": "cycles:u",
+          "sampled_events": 18208000000,
+          "unmapped_samples": [
+            " 140544  ffffffff8e800ef0 [unknown] ([unknown])"
+          ],
+          "families": {
+            "simplex shared other": {
+              "samples": 317,
+              "percent": 55.71177504393673
+            },
+            "BTRAN": {
+              "samples": 58,
+              "percent": 10.193321616871705
+            },
+            "TCMalloc": {
+              "samples": 51,
+              "percent": 8.963093145869948
+            },
+            "libc memory": {
+              "samples": 34,
+              "percent": 5.975395430579965
+            },
+            "FTRAN/L/U": {
+              "samples": 33,
+              "percent": 5.799648506151143
+            },
+            "auxiliary LU (all operations)": {
+              "samples": 15,
+              "percent": 2.6362038664323375
+            },
+            "factor update/install": {
+              "samples": 13,
+              "percent": 2.2847100175746924
+            },
+            "factor publication/retirement": {
+              "samples": 11,
+              "percent": 1.9332161687170475
+            },
+            "factor ordered construction": {
+              "samples": 11,
+              "percent": 1.9332161687170475
+            },
+            "Rust core generic": {
+              "samples": 10,
+              "percent": 1.757469244288225
+            },
+            "factor other": {
+              "samples": 7,
+              "percent": 1.2302284710017575
+            },
+            "Rust allocation/containers": {
+              "samples": 5,
+              "percent": 0.8787346221441125
+            },
+            "Rose other": {
+              "samples": 1,
+              "percent": 0.1757469244288225
+            },
+            "Rose ambiguous/unresolved": {
+              "samples": 1,
+              "percent": 0.1757469244288225
+            },
+            "external/unknown": {
+              "samples": 1,
+              "percent": 0.1757469244288225
+            },
+            "libm": {
+              "samples": 1,
+              "percent": 0.1757469244288225
+            }
+          },
+          "top_symbols": [
+            {
+              "family": "simplex shared other",
+              "symbol": "rose::simplex::solve_primal",
+              "samples": 93,
+              "percent": 16.344463971880494
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "rose::simplex::primal_row_update_by::<false, rose::simplex::RowMaskIndices>",
+              "samples": 71,
+              "percent": 12.478031634446397
+            },
+            {
+              "family": "BTRAN",
+              "symbol": "<rose::ftran_order::RefStruct>::btran",
+              "samples": 52,
+              "percent": 9.13884007029877
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "<rose::simplex::Solver>::update_list",
+              "samples": 41,
+              "percent": 7.205623901581722
+            },
+            {
+              "family": "FTRAN/L/U",
+              "symbol": "<rose::ftran_order::RefStruct>::ftran_with",
+              "samples": 27,
+              "percent": 4.745166959578207
+            },
+            {
+              "family": "TCMalloc",
+              "symbol": "__libc_malloc | malloc | tc_malloc",
+              "samples": 26,
+              "percent": 4.569420035149385
+            },
+            {
+              "family": "libc memory",
+              "symbol": "__memset_avx2_unaligned_erms",
+              "samples": 25,
+              "percent": 4.393673110720562
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "<rose::simplex::Solver>::price",
+              "samples": 23,
+              "percent": 4.042179261862917
+            },
+            {
+              "family": "auxiliary LU (all operations)",
+              "symbol": "<rose::lu::Factor>::factor::<&alloc::vec::Vec<(usize, f64)>>",
+              "samples": 13,
+              "percent": 2.2847100175746924
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "<core::iter::adapters::map::Map<core::slice::iter::Iter<usize>, <rose::simplex::Solver>::sig::{closure#0}> as core::iter::traits::iterator::Iterator>::fold::<(), core::iter::traits::iterator::Iterator::for_each::call<i8, <alloc::vec::Vec<i8>>::extend_trusted<core::iter::adapters::map::Map<core::slice::iter::Iter<usize>, <rose::simplex::Solver>::sig::{closure#0}>>::{closure#0}>::{closure#0}>",
+              "samples": 13,
+              "percent": 2.2847100175746924
+            },
+            {
+              "family": "TCMalloc",
+              "symbol": "__libc_realloc | realloc | tc_realloc",
+              "samples": 13,
+              "percent": 2.2847100175746924
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "<rose::simplex::Solver>::pivot_row_order_by",
+              "samples": 12,
+              "percent": 2.10896309314587
+            },
+            {
+              "family": "factor update/install",
+              "symbol": "<rose::ftran_order::RefStruct>::update",
+              "samples": 12,
+              "percent": 2.10896309314587
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "<alloc::vec::Vec<usize> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<usize, core::iter::adapters::filter::Filter<core::ops::range::Range<usize>, <rose::simplex::Solver>::row_product_work::{closure#0}>>>::from_iter",
+              "samples": 11,
+              "percent": 1.9332161687170475
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "<rose::simplex::Solver>::set_d_from_y",
+              "samples": 11,
+              "percent": 1.9332161687170475
+            },
+            {
+              "family": "factor publication/retirement",
+              "symbol": "<rose::ftran_order::RefStruct>::fresh",
+              "samples": 10,
+              "percent": 1.757469244288225
+            },
+            {
+              "family": "factor ordered construction",
+              "symbol": "rose::lu_order::factor_structure_r::<f64>",
+              "samples": 9,
+              "percent": 1.5817223198594024
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "<rose::simplex::Solver>::row_product_counts",
+              "samples": 8,
+              "percent": 1.40597539543058
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "<rose::simplex::Solver>::cost_change_original",
+              "samples": 7,
+              "percent": 1.2302284710017575
+            },
+            {
+              "family": "TCMalloc",
+              "symbol": "operator delete[](void*) | operator delete(void*) | __libc_cfree | __libc_free | cfree | free | tc_cfree | tc_delete | tc_deletearray | tc_free",
+              "samples": 7,
+              "percent": 1.2302284710017575
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "<alloc::vec::Vec<(usize, usize)> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<(usize, usize), core::iter::adapters::map::Map<core::iter::adapters::filter::Filter<core::ops::range::Range<usize>, <rose::simplex::Internal>::rank_products::{closure#0}>, <rose::simplex::Internal>::rank_products::{closure#1}>>>::from_iter",
+              "samples": 6,
+              "percent": 1.054481546572935
+            },
+            {
+              "family": "libc memory",
+              "symbol": "__memcpy_avx_unaligned_erms | __memmove_avx_unaligned_erms",
+              "samples": 6,
+              "percent": 1.054481546572935
+            },
+            {
+              "family": "Rust core generic",
+              "symbol": "core::slice::sort::shared::smallsort::small_sort_general::<(usize, usize), <(usize, usize) as core::cmp::PartialOrd>::lt>",
+              "samples": 5,
+              "percent": 0.8787346221441125
+            },
+            {
+              "family": "BTRAN",
+              "symbol": "<rose::ftran_order::RefStruct>::dense_btran_output",
+              "samples": 5,
+              "percent": 0.8787346221441125
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "<rose::simplex::Solver>::primal_full_work",
+              "samples": 4,
+              "percent": 0.70298769771529
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "<alloc::vec::Vec<(usize, i8)> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<(usize, i8), core::iter::adapters::map::Map<core::iter::adapters::zip::Zip<core::slice::iter::Iter<usize>, alloc::vec::into_iter::IntoIter<i8>>, rose::simplex::solve_primal::{closure#65}>>>::from_iter",
+              "samples": 4,
+              "percent": 0.70298769771529
+            },
+            {
+              "family": "Rust core generic",
+              "symbol": "core::slice::sort::unstable::quicksort::quicksort::<(usize, usize), <(usize, usize) as core::cmp::PartialOrd>::lt>",
+              "samples": 3,
+              "percent": 0.5272407732864675
+            },
+            {
+              "family": "FTRAN/L/U",
+              "symbol": "<rose::ftran_order::RefStruct>::lstage_num",
+              "samples": 3,
+              "percent": 0.5272407732864675
+            },
+            {
+              "family": "libc memory",
+              "symbol": "__memcpy_avx_unaligned | __memmove_avx_unaligned",
+              "samples": 3,
+              "percent": 0.5272407732864675
+            },
+            {
+              "family": "FTRAN/L/U",
+              "symbol": "<rose::ftran_order::RefStruct>::ftran_dense_work",
+              "samples": 3,
+              "percent": 0.5272407732864675
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "<rose::simplex::Solver>::update_dual_infeas_sum",
+              "samples": 3,
+              "percent": 0.5272407732864675
+            },
+            {
+              "family": "auxiliary LU (all operations)",
+              "symbol": "core::ptr::drop_glue::<rose::lu::Factor>",
+              "samples": 2,
+              "percent": 0.351493848857645
+            },
+            {
+              "family": "Rust allocation/containers",
+              "symbol": "<alloc::vec::Vec<(usize, f64)> as alloc::vec::spec_from_elem::SpecFromElem>::from_elem::<alloc::alloc::Global>",
+              "samples": 2,
+              "percent": 0.351493848857645
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "<rose::simplex::Solver>::recompute_primal_x",
+              "samples": 2,
+              "percent": 0.351493848857645
+            },
+            {
+              "family": "simplex shared other",
+              "symbol": "<rose::simplex::Solver>::reduced_cost_work",
+              "samples": 2,
+              "percent": 0.351493848857645
+            }
+          ],
+          "images": {
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc": {
+              "sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+              "debug": null
+            },
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/sysroot/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4.6.5": {
+              "sha256": "3e3c459710a7ce1511a3b289b95d52b56d8313afdb99eec23d2fc241c73e27e1",
+              "debug": null
+            },
+            "/usr/lib/x86_64-linux-gnu/libc.so.6": {
+              "sha256": "85e64f97e348786a8fb4d9f3d52fec289e2fb86bba20f0731dfe61990525e0f7",
+              "debug": "/usr/lib/debug/.build-id/06/6527e430a32768d82741e00b81eebb1a872294.debug"
+            },
+            "/usr/lib/x86_64-linux-gnu/libm.so.6": {
+              "sha256": "1c488db6f4fe8cecb72456bc018de000b7a9b539c2994864b0416b5e8371b3d8",
+              "debug": "/usr/lib/debug/.build-id/20/00a7e6c07f2ef41f3d22f773393360523edc21.debug"
+            }
+          },
+          "reference_anchor_ranges": []
+        },
+        "validation": {
+          "complete_result_exit_pairs": 8,
+          "digests": [
+            "6c40a52d7a65435c2252384c03279907ee988b00d3e1b2c8a3668b838efc0bcb",
+            "6c40a52d7a65435c2252384c03279907ee988b00d3e1b2c8a3668b838efc0bcb",
+            "6c40a52d7a65435c2252384c03279907ee988b00d3e1b2c8a3668b838efc0bcb",
+            "6c40a52d7a65435c2252384c03279907ee988b00d3e1b2c8a3668b838efc0bcb",
+            "6c40a52d7a65435c2252384c03279907ee988b00d3e1b2c8a3668b838efc0bcb",
+            "6c40a52d7a65435c2252384c03279907ee988b00d3e1b2c8a3668b838efc0bcb",
+            "6c40a52d7a65435c2252384c03279907ee988b00d3e1b2c8a3668b838efc0bcb",
+            "6c40a52d7a65435c2252384c03279907ee988b00d3e1b2c8a3668b838efc0bcb"
+          ]
+        }
+      }
+    },
+    "80bau_direct_counts": {
+      "instructions:u": 32057044409,
+      "cycles:u": 18431869503
+    },
+    "80bau_direct_validation": {
+      "complete_result_exit_pairs": 8,
+      "digests": [
+        "6c40a52d7a65435c2252384c03279907ee988b00d3e1b2c8a3668b838efc0bcb",
+        "6c40a52d7a65435c2252384c03279907ee988b00d3e1b2c8a3668b838efc0bcb",
+        "6c40a52d7a65435c2252384c03279907ee988b00d3e1b2c8a3668b838efc0bcb",
+        "6c40a52d7a65435c2252384c03279907ee988b00d3e1b2c8a3668b838efc0bcb",
+        "6c40a52d7a65435c2252384c03279907ee988b00d3e1b2c8a3668b838efc0bcb",
+        "6c40a52d7a65435c2252384c03279907ee988b00d3e1b2c8a3668b838efc0bcb",
+        "6c40a52d7a65435c2252384c03279907ee988b00d3e1b2c8a3668b838efc0bcb",
+        "6c40a52d7a65435c2252384c03279907ee988b00d3e1b2c8a3668b838efc0bcb"
+      ]
+    },
+    "80bau_represented_cycle_fraction": 0.9878542161464651,
+    "pricing_update_samples": 64,
+    "total_samples": 569,
+    "pricing_update_self_percent": 11.24780316344464,
+    "score_out_of_line_samples": 0,
+    "limitation": "CurrentPGO inlines score into price/update; historical11.87%scalar instruction share cannot be transferred.64samples include necessary list/bucket transitions. Zero loss/throttle does not certify unbiased regional attribution. One cycle highIPunmapped retained. InitialDEGEN2has74resolvedsamples; small tails not audited with matching counter.",
+    "artifacts": "target/perf-optimized-scope/{collect_primal.py,validate_primal.py,80bau-*-cycles.asm,*primal*} retains raw maps/ELF offsets/results/counters."
+  },
+  "artifacts": {
+    "target/perf-score-batch/prepare.py": "328f4de7c54768cf8d0d099ef4f2c66ab8f69d658cd72353556ba26a51332636",
+    "target/perf-score-batch/write_probe.py": "05b8c1a3760770d228f342805cc964488cfd43c7fd14c03467792de5a93be1d5",
+    "target/perf-score-batch/original-simplex.rs": "4ff9697cd5627beccce151d2eb03a84852a149dcb39a7249606a6e363c155ac6",
+    "target/perf-score-batch/frozen.rs": "3bc6d0d6809291c27e8cd76fce692f5343bdf00855f34b8a900c9c6f2b279479",
+    "target/perf-score-batch/candidate-methods.rs": "6109fcae9a578b099db8d28660c0c3dfd2563756432d75e4e5d3ab530b0ffdd3",
+    "target/perf-score-batch/source/src/score_batch_probe.rs": "7b67c3bb3bfe6ec330805a11ccbea99455195bf283f9b3ced43aa81fe992b66b",
+    "target/perf-score-batch/source/src/simplex.rs": "2dce326ccdb3f7ff62d6d438cd3f7af2072f7c4e860ac44e33e6264f4d9afe56",
+    "target/perf-score-batch/source/src/work.rs": "5e3746df510882bff5314dab3d8ec73df9a5bda2cd69359d8230721ee1206e93",
+    "target/perf-score-batch/build-small.log": "440981d6ebb958848923d909fb77e0269955112e24e88a3a02cd3409c332f4d1",
+    "target/perf-score-batch/component-tests": "7bed0fec150047f94de4f8d25b9bb9b80b9ab111fd42221f87b0d887114def2b",
+    "target/perf-score-batch/source-hashes.json": "fc6b64b7e22520f6bd82622b82b05ae395cfc25d0c419867caec411465fc7c1c"
+  },
+  "root_source_hashes": {
+    "src/quad_row_audit.rs": "b3860aa59ae7664a0632af9d7087ee851e58f3efd511626c8c67dc6014b5a16e",
+    "src/quad_change.rs": "a0d6b5d3eae9db4fbfc93a4432c21c142eb67c6aacde8c570f3a97395a599ad0",
+    "src/chol_child_oracle.rs": "461b859ceb95785d6c3f0e79f04933958e3dc423f9e855e37a2efbbf7032f082",
+    "src/verify.rs": "628c76c64368c93d32902ccf83464cfe7a9f89448f148a940453d22723cee8a2",
+    "src/barrier.rs": "05291d4b59fa02c7bab4802e20db42be517f529f34ac8c5ef112344f6d8dd0cf",
+    "src/chol_rect_oracle.rs": "f2acbde88b2fe00906e52941a36867a40b6a910aaad307481bbb5885352b4f09",
+    "src/work.rs": "6d1f1ff38e6b7af5d833713190c275b46b110efd6242315676eb378d01e5ed24",
+    "src/lib.rs": "26a909d8664f4222e166f08a22125e82f48f88aaf0ffd8ebdccbf55593381ba0",
+    "src/early.rs": "80e17a00737161a5eb8eed6210ab8577b2d408945b3e8db7c5e6f9a49692b3ed",
+    "src/sgemm32.rs": "9b729ec25481c1ec2d22ded132863f5921d7d0a0451594f776d42e006c3d6dfc",
+    "src/ftran_order.rs": "57c86340f6959717954e2cb1c58f06c285ab7ce564a25d7d0e9e9c429d802ef1",
+    "src/simplex.rs": "4ff9697cd5627beccce151d2eb03a84852a149dcb39a7249606a6e363c155ac6",
+    "src/chol.rs": "158e393ca8dc6aef7f98482ca9f4609b49d2df00b03978310873e333ebf51bea",
+    "src/quad_cost.rs": "00116dcb8a6b6e4112717f111f3b865beb9857e4ab4d71436dd37fc7dd0a7521",
+    "src/primal_rhs_perturb.rs": "ff692cc51479e3d825c70b1d15861c275cdda7c73221df7949a52dfe2e6275ff",
+    "src/f80.rs": "2a20a41d94ff36934fb84375886b1ac0fbf1b35dd7bb29f3d009e0b95e35aa70",
+    "src/scale.rs": "1e0deac05e78ac048d1fdd8cb3421ae45d88b57768901bba759a99fd52dc63f1",
+    "src/lu_pairs.rs": "8549f681e432888ffbde8ccaf9113e24fa1760c2962db852d069b7729e2ae2b9",
+    "src/pdhg.rs": "bd2944b7011736e3f3e9a1bf6fc47468a997ae3c505f051a6687a76e8e2682e0",
+    "src/quad_fresh.rs": "8adca530373406e9e48de19d179f7cc0b232d0ed1b964c4ef131b90a1a3b9079",
+    "src/lu.rs": "7104adbfcae0f73030fcf7136c1624715d33e6f686383fa7a41bd95fa4a074e4",
+    "src/mps.rs": "970ab51460301ca4d1e06aee0d268c96882bd2d58de37aaacea6484735c3b0ba",
+    "src/chol_rect_packet.rs": "d00c064a281b321d5018a58337496226d3beb29c3050cbb27eec9b5e6f5403a7",
+    "src/order.rs": "a4746d44a9022b37884852f37d52b8dd9a710dd8c2b96e32734044a99025b857",
+    "src/lu_order.rs": "530ff158c6d8c1263ed4317ad6d67d3bd6a8509bbc4e55b4c5a3e00bdfa89123",
+    "src/chol_factor_oracle.rs": "ebdbb1d57b60c7084b81ea923056b09e0344b182a37bf5690ef886d24c495f81",
+    "src/quad_row.rs": "ff49da21c8788d4cb03936fd61e60011cff4af048c94373295feb9a568029910",
+    "src/real.rs": "9399212fbe9de003ae4e70b44c850fa7a0459b8c2f8d19ec538c15286cb23918",
+    "src/quad_main.rs": "812880569bab4a597f916d2b75fd75e9512262646b91cc2dbae4475746cbd545",
+    "src/model.rs": "2116c56536cc2a46923734a42afa79de087083dd265b0b8915fcc52d1c028654",
+    "src/chol_child_program.rs": "ceea4df4a8f9dfb25b11a1cfaddd9744eb372c1b6d9b4df0814bba37ef1fa2cb",
+    "src/dual.rs": "dce94c76006809b9befabb79f04b658bd31213b86f07193341b0791c2e09eccd",
+    "src/chol_gemm_destination.rs": "412987255d14117b4605d601975a99ba5bbdd8d5b50953585cf2cce1601ef86f",
+    "src/btran_oracle.rs": "bd92e94286dd5da076f5e94fe3f857a6637fa19d10b1f109efbfdea6af7f79d1",
+    "src/method.rs": "e70e94e648cd3913e269340388a7a891160ab42165883c48dcc6c98a66b14fa6",
+    "src/dump.rs": "1cb1ab3b535c4a0648ed126f061f719e3b33a3c845af28819203a3f1051415ce",
+    "src/basis.rs": "babc01e8dde812261d2096c271f8db5d8d5fd436a569facdc2592272d8897a4e"
+  },
+  "next": "Require a genuinely distinct substantial complete numerical execution mechanism; do not repeat rejected cache/bucket/scoring batch mechanisms from old scalar hot shares."
+}

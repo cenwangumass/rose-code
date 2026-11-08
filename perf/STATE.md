@@ -1381,7 +1381,16 @@ projected effects, component source/binary/timings, dependency audit and restora
 
 ## Remaining performance gaps
 
-The current numerical solver is 1b414c4b. Its latest four-way comparison gives a lower Rose median on 5 of 23 rows. The largest four gaps are mode_switch.dual-r at 5.02 times patched Gurobi, 80bau3b.primal-c at 4.61, degen2.primal-c at 4.39 and greenbea.dual-r at 4.17. The tested shared-basis ordinary dual solver and the barrier factor/solve representation both missed their prespecified qualification criteria. The released solver remains the compact basis installation change measured above.
+The numerical source is `18061fe9`, including the accepted barrier factor
+executor. Current-host fixed23 medians show ordinary ThinLTO/glibc **0/23**
+wins and separately qualified fixed39 PGO/system-TCMalloc **2/23**, both PDHG.
+The latter's largest gaps are mode-switch dual 6.532x, controlled 80BAU primal
+4.045x, PEROLD dual 3.064x and GREENBEA dual-release 3.008x. These three-sample
+medians are descriptive, not optimization acceptance screens. Current exact
+configuration tables and raw evidence are at the top; older host/allocator
+results are historical. Full frozen parity and all runnable release tests pass
+for both unchanged qualified binaries. No current large structural candidate
+has qualified; closed experiments below must not be retried under new names.
 
 ## Extended BTRAN feasibility
 
@@ -1794,6 +1803,31 @@ The accepted source/CLI are unchanged. The initial FP oracle's optimized-away
 call and its opaque-call correction are retained with the other evidence.
 [score-query-reuse.json](evidence/score-query-reuse.json), complete count/prototype/
 frozen-oracle/pilot artifacts are in `target/perf-score-{reuse,candidate}/`.
+
+The distinct complete batched pricing executor is also rejected at the cheap
+small-model component gate. Four independent AVX lanes compute eligible scores;
+original ordered full/list/changed/old-list transitions and WORK remain. Frozen
+complete score/price/best/scanned/update methods precede edits and reconstruct
+literally. All12small-model histories across AFIRO through DEGEN2 match each
+original complete pass's result, list/level/failure state, WORKw bits and final
+MXCSR, plus the complete plain SolveResult. No exceptional/generated full oracle
+or full987 candidate qualification follows because no useful cost is shown.
+The two DEGEN2 complete-pass replay ratios are1.172/1.267; CPU was unpinned in
+this initial cheap discriminator, so this is not a controlled regression claim.
+No80BAU prototype replay, matchingPGO build, formal screen, packet-width or mask
+rescue follows. Runtime source and qualified binaries remain unchanged.
+
+Current optimized solve-only80BAU cycle attribution has569samples, zero loss/
+throttle,568resolved symbols and98.785%of the independent direct count. All24
+DEGEN2/80BAU profiling/counter complete outputs match the optimized full panel.
+Scoring is inlined into price/update_list:23+41samples(11.25%) include necessary
+list/bucket work; the old separate11.87%instruction share cannot be transferred.
+Evidence: [primal-score-batch.json](evidence/primal-score-batch.json), independent
+originals/candidate/release-test ELF and all component data in
+`target/perf-score-batch/`; current raw maps/offset annotations/counters are in
+`target/perf-optimized-scope/`. Require a distinct substantial execution mechanism
+before another primal implementation; neither arithmetic-only packed division
+nor old scalar shares establish its economics.
 
 Ordinary-primal rho/tau BTRAN traversal pairing is rejected at scope. Ordered
 coefficient-load overlap is 40.65% on SC50A, 34.13% on BLEND and 26.97% on
