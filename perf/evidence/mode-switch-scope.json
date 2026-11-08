@@ -1,0 +1,607 @@
+{
+  "source": "18061fe9",
+  "measurement_parent": "f0a34c73",
+  "configuration": "accepted ordinary ThinLTO/glibc release CLI;preceding frame-pointer profiling ELF68dc54d9;CPU2;release8M/profiling32M instruction periods;bash/timeoutlaunchers measured, JSON parsing/fulloutcome validation outside PMU process. Ordinary source unchanged from3ee41127 by jjdiff.",
+  "decision": "No production rewrite yet. Healthy source-region attribution identifies9.58%ofbatch in intermediate-output formation/conversion/pricing geometry/Structure retirement;subtracting101explicit shared-geometry overlap samples leaves5.48%,including necessarywork and further unquantified overlap. This is not a hard residual/removable bound. Measure actual disjoint lifetime costs before a consuming-output implementation;do not retry prior arena/bank/pivot-frame/shared-L/U trials.",
+  "qualification": [
+    "Whole-batch instruction attribution includes startup,CLIoutputserialization and bash/timeout wrappers;not solve-only time or removable bounds. Do not combine release self fractions with profiling-build fractions.",
+    "Profiling ELF is old current-host ordinary code,hash/buildID verified;fast940parity only,not new full profiling parity. AllmodeFPcomplete outputs/exits agree with acceptedrelease sweep.",
+    "Nearest physical Rose-containing frames can skip allocating callees. Controller6171 is a call to iteration;3760 is a call to ftran_needed. Those are enclosing calls,not namedbuffer costs.",
+    "Identical-code folding can produce F80-namedgeneric/drop symbols in ordinary execution;names alone do not prove extended arithmetic.",
+    "Output-region/source-line ranges and explicit shared-trial subtraction are approximations,not a hard residual bound. RequirednumericUreplay,pricingrecurrences and finalmutablefactorstorage excluded from selected regions.",
+    "Original8MFP recording had6throttle/6unthrottle events and is excluded quantitatively;retained with allfirstpassclassification/region maps.32Mrecording collected independently for attribution,not a timing screen.",
+    "No newsolverimplementation, benchmark speedup or reference comparison claimed. Previous bank17families,pivottransfer97.8%,shared-L/pricing andfresh-U trials remain settled.",
+    "Fixed-period samples on repeated short processes can align with deterministic phases. Regional percentages are diagnostic;direct event coverage does not certify unbiased regional attribution."
+  ],
+  "profiles": {
+    "mode": {
+      "period": 8000000,
+      "audit": {
+        "PERF_RECORD_SAMPLE": 4896,
+        "PERF_RECORD_LOST": 0,
+        "PERF_RECORD_THROTTLE": 0,
+        "PERF_RECORD_UNTHROTTLE": 0
+      },
+      "represented_instructions": 39168000000,
+      "direct_batch_instructions": 39194534657,
+      "represented_fraction": 0.9993230010961424,
+      "top_self_symbols": [
+        {
+          "self_percent": 7.41,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "__memset_avx2_unaligned_erms"
+        },
+        {
+          "self_percent": 6.47,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "_int_malloc"
+        },
+        {
+          "self_percent": 5.25,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "_int_free_merge_chunk"
+        },
+        {
+          "self_percent": 5.07,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "cfree@GLIBC_2.2.5"
+        },
+        {
+          "self_percent": 4.92,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::ftran_order::RefStruct>::fresh"
+        },
+        {
+          "self_percent": 4.62,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "rose::lu_order::nucleus::<f64>"
+        },
+        {
+          "self_percent": 3.96,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::ftran_order::RefStruct>::ftran_needed"
+        },
+        {
+          "self_percent": 3.68,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "unlink_chunk.isra.0"
+        },
+        {
+          "self_percent": 3.33,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "__memmove_avx_unaligned_erms"
+        },
+        {
+          "self_percent": 3.27,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::ftran_order::RefStruct>::update"
+        },
+        {
+          "self_percent": 3.23,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<alloc::collections::btree::map::Iter<usize, alloc::collections::btree::set_val::SetValZST> as core::iter::traits::iterator::Iterator>::next"
+        },
+        {
+          "self_percent": 2.49,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::ftran_order::RefStruct>::ftran_with"
+        },
+        {
+          "self_percent": 2.49,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::lu::Factor>::factor::<&alloc::vec::Vec<(usize, f64)>>"
+        },
+        {
+          "self_percent": 2.39,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "rose::lu_order::factor_structure_r::<f64>"
+        },
+        {
+          "self_percent": 2.37,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "malloc"
+        },
+        {
+          "self_percent": 2.21,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::dual::Dual>::iteration"
+        },
+        {
+          "self_percent": 2.12,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::ftran_order::RefStruct>::btran"
+        },
+        {
+          "self_percent": 1.86,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::dual::Dual>::reset_pricing"
+        },
+        {
+          "self_percent": 1.55,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "_int_free_maybe_trim"
+        },
+        {
+          "self_percent": 1.49,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<core::iter::adapters::map::Map<core::slice::iter::Iter<usize>, rose::dual::reference_order<rose::f80::F80>::{closure#0}> as core::iter::traits::iterator::Iterator>::fold::<(), core::iter::traits::iterator::Iterator::for_each::call<(bool, alloc::vec::Vec<usize>, alloc::vec::Vec<f64>), <alloc::vec::Vec<(bool, alloc::vec::Vec<usize>, alloc::vec::Vec<f64>)>>::extend_trusted<core::iter::adapters::map::Map<core::slice::iter::Iter<usize>, rose::dual::reference_order<rose::f80::F80>::{closure#0}>>::{closure#0}>::{closure#0}>"
+        }
+      ]
+    },
+    "fx": {
+      "period": 8000000,
+      "audit": {
+        "PERF_RECORD_SAMPLE": 2304,
+        "PERF_RECORD_LOST": 0,
+        "PERF_RECORD_THROTTLE": 0,
+        "PERF_RECORD_UNTHROTTLE": 0
+      },
+      "represented_instructions": 18432000000,
+      "direct_batch_instructions": 18614985260,
+      "represented_fraction": 0.9901700024230908,
+      "top_self_symbols": [
+        {
+          "self_percent": 11.55,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "rose::simplex::solve_primal"
+        },
+        {
+          "self_percent": 6.03,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::simplex::Solver>::score"
+        },
+        {
+          "self_percent": 4.64,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "malloc"
+        },
+        {
+          "self_percent": 4.38,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::f80::F80>::add_signed"
+        },
+        {
+          "self_percent": 2.99,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "cfree@GLIBC_2.2.5"
+        },
+        {
+          "self_percent": 2.91,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "__memmove_avx_unaligned_erms"
+        },
+        {
+          "self_percent": 2.78,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "_int_malloc"
+        },
+        {
+          "self_percent": 2.78,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::f80::F80>::to_f64"
+        },
+        {
+          "self_percent": 2.21,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "rose::simplex::phase1_ratio"
+        },
+        {
+          "self_percent": 1.91,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "__udivti3"
+        },
+        {
+          "self_percent": 1.82,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::simplex::Solver>::sig_class"
+        },
+        {
+          "self_percent": 1.82,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::simplex::quad_main::QuadMain>::apply"
+        },
+        {
+          "self_percent": 1.78,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::f80::F80 as core::ops::arith::Mul>::mul"
+        },
+        {
+          "self_percent": 1.65,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::simplex::quad_row::PricingRows>::apply::<<rose::simplex::QuadRhs>::update_row::{closure#0}>"
+        },
+        {
+          "self_percent": 1.61,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "__memcmp_avx2_movbe"
+        },
+        {
+          "self_percent": 1.56,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::simplex::QuadRhs>::rank_products_observed"
+        },
+        {
+          "self_percent": 1.48,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::simplex::Solver>::update_list"
+        },
+        {
+          "self_percent": 1.43,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::simplex::Solver>::price"
+        },
+        {
+          "self_percent": 1.39,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::simplex::Solver>::set_d_from_y"
+        },
+        {
+          "self_percent": 1.3,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::work::Work>::add"
+        }
+      ]
+    },
+    "mode-fp-lowrate": {
+      "period": 32000000,
+      "audit": {
+        "PERF_RECORD_SAMPLE": 2464,
+        "PERF_RECORD_LOST": 0,
+        "PERF_RECORD_THROTTLE": 0,
+        "PERF_RECORD_UNTHROTTLE": 0
+      },
+      "represented_instructions": 78848000000,
+      "direct_batch_instructions": 79242646294,
+      "represented_fraction": 0.9950197739164867
+    }
+  },
+  "excluded_profiling_8M_audit": {
+    "PERF_RECORD_SAMPLE": 4944,
+    "PERF_RECORD_LOST": 0,
+    "PERF_RECORD_THROTTLE": 6,
+    "PERF_RECORD_UNTHROTTLE": 6
+  },
+  "validated_batches": [
+    {
+      "name": "fx_quad_obj_5371",
+      "repetitions": 64,
+      "cap": 5500,
+      "model": "fx_quad_obj_5371",
+      "script": "target/perf-mode-scope/fx-record.sh",
+      "validated_count": 64,
+      "complete_result_digest": "f2a98ba9448254056118276894cc2e8cf51e77f16a51062cbc7c00075268c2dc"
+    },
+    {
+      "name": "mode_switch",
+      "repetitions": 8,
+      "cap": 12000,
+      "model": "witness_dual_r2_mode_switch",
+      "script": "target/perf-mode-scope/mode-fp-record.sh",
+      "binary": "target/profiling/rose",
+      "binary_sha256": "68dc54d95c6ecc721ef97b6f9a5d51cf4a7344e285c1faec93954b115875b7a7",
+      "qualification": "preceding current-host profiling build; ordinary simplex/dual/factor source unchanged by jjdiff from3ee41127 tocurrentaccepted; fast940parity only; whole outcomes checked against accepted release",
+      "validated_count": 8,
+      "complete_result_digest": "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2"
+    },
+    {
+      "name": "mode_switch",
+      "repetitions": 8,
+      "cap": 12000,
+      "model": "witness_dual_r2_mode_switch",
+      "script": "target/perf-mode-scope/mode-counter.sh",
+      "validated_count": 8,
+      "complete_result_digest": "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2"
+    },
+    {
+      "name": "mode_switch",
+      "repetitions": 16,
+      "cap": 12000,
+      "model": "witness_dual_r2_mode_switch",
+      "script": "target/perf-mode-scope/mode-fp-lowrate-record.sh",
+      "binary": "target/profiling/rose",
+      "binary_sha256": "68dc54d95c6ecc721ef97b6f9a5d51cf4a7344e285c1faec93954b115875b7a7",
+      "qualification": "preceding current-host profiling build;ordinarysource unchanged;fast940parity only;fulloutcomes checkedagainstacceptedrelease",
+      "validated_count": 16,
+      "complete_result_digest": "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2"
+    },
+    {
+      "name": "fx_quad_obj_5371",
+      "repetitions": 1,
+      "cap": 5500,
+      "model": "fx_quad_obj_5371",
+      "script": "target/perf-mode-scope/fx-small-counter.sh",
+      "validated_count": 1,
+      "complete_result_digest": "f2a98ba9448254056118276894cc2e8cf51e77f16a51062cbc7c00075268c2dc"
+    },
+    {
+      "name": "fx_quad_obj_5371",
+      "repetitions": 64,
+      "cap": 5500,
+      "model": "fx_quad_obj_5371",
+      "script": "target/perf-mode-scope/fx-counter.sh",
+      "validated_count": 64,
+      "complete_result_digest": "f2a98ba9448254056118276894cc2e8cf51e77f16a51062cbc7c00075268c2dc"
+    },
+    {
+      "name": "mode_switch",
+      "repetitions": 16,
+      "cap": 12000,
+      "model": "witness_dual_r2_mode_switch",
+      "script": "target/perf-mode-scope/mode-fp-lowrate-counter.sh",
+      "binary": "target/profiling/rose",
+      "binary_sha256": "68dc54d95c6ecc721ef97b6f9a5d51cf4a7344e285c1faec93954b115875b7a7",
+      "qualification": "preceding current-host profiling build;ordinarysource unchanged;fast940parity only;fulloutcomes checkedagainstacceptedrelease",
+      "validated_count": 16,
+      "complete_result_digest": "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2"
+    },
+    {
+      "name": "mode_switch",
+      "repetitions": 8,
+      "cap": 12000,
+      "model": "witness_dual_r2_mode_switch",
+      "script": "target/perf-mode-scope/mode-record.sh",
+      "validated_count": 8,
+      "complete_result_digest": "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2"
+    },
+    {
+      "name": "mode_switch",
+      "repetitions": 8,
+      "cap": 12000,
+      "model": "witness_dual_r2_mode_switch",
+      "script": "target/perf-mode-scope/mode-fp-counter.sh",
+      "binary": "target/profiling/rose",
+      "binary_sha256": "68dc54d95c6ecc721ef97b6f9a5d51cf4a7344e285c1faec93954b115875b7a7",
+      "qualification": "preceding current-host profiling build; ordinary simplex/dual/factor source unchanged by jjdiff from3ee41127 tocurrentaccepted; fast940parity only; whole outcomes checked against accepted release",
+      "validated_count": 8,
+      "complete_result_digest": "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2"
+    },
+    {
+      "name": "mode_switch",
+      "repetitions": 1,
+      "cap": 12000,
+      "model": "witness_dual_r2_mode_switch",
+      "script": "target/perf-mode-scope/mode-small-counter.sh",
+      "validated_count": 1,
+      "complete_result_digest": "a5c13ae9de833401639fc2162b37ce7f4f2d86701c90574a592f55f30b7252b2"
+    }
+  ],
+  "validated_complete_objects": 194,
+  "mode_switch_disjoint_refactor": {
+    "source": "target/perf-mode-scope/mode-fp-lowrate.data",
+    "samples": 2464,
+    "refactor_samples": 1118,
+    "refactor_batch_percent": 45.37337662337662,
+    "rows": [
+      {
+        "stage": "nucleus",
+        "samples": 218,
+        "batch_percent": 8.847402597402597,
+        "refactor_percent": 19.499105545617173,
+        "native_allocator_leaf_samples": 60
+      },
+      {
+        "stage": "refactor remainder",
+        "samples": 200,
+        "batch_percent": 8.116883116883116,
+        "refactor_percent": 17.88908765652952,
+        "native_allocator_leaf_samples": 188
+      },
+      {
+        "stage": "fresh",
+        "samples": 200,
+        "batch_percent": 8.116883116883116,
+        "refactor_percent": 17.88908765652952,
+        "native_allocator_leaf_samples": 73
+      },
+      {
+        "stage": "reset_pricing",
+        "samples": 148,
+        "batch_percent": 6.0064935064935066,
+        "refactor_percent": 13.237924865831843,
+        "native_allocator_leaf_samples": 54
+      },
+      {
+        "stage": "structure remainder",
+        "samples": 128,
+        "batch_percent": 5.194805194805195,
+        "refactor_percent": 11.449016100178891,
+        "native_allocator_leaf_samples": 25
+      },
+      {
+        "stage": "auxiliary LU",
+        "samples": 91,
+        "batch_percent": 3.6931818181818183,
+        "refactor_percent": 8.13953488372093,
+        "native_allocator_leaf_samples": 23
+      },
+      {
+        "stage": "phases/pair",
+        "samples": 66,
+        "batch_percent": 2.6785714285714284,
+        "refactor_percent": 5.903398926654741,
+        "native_allocator_leaf_samples": 17
+      },
+      {
+        "stage": "input/reference_order",
+        "samples": 43,
+        "batch_percent": 1.74512987012987,
+        "refactor_percent": 3.8461538461538463,
+        "native_allocator_leaf_samples": 23
+      },
+      {
+        "stage": "lu_attempt remainder",
+        "samples": 24,
+        "batch_percent": 0.974025974025974,
+        "refactor_percent": 2.146690518783542,
+        "native_allocator_leaf_samples": 22
+      }
+    ],
+    "native_allocator_leaf_under_refactor": 485,
+    "native_allocator_leaf_outside_refactor": 221,
+    "unknown_leaf_under_refactor": 18,
+    "max_observed_refactor_stack_depth": 36
+  },
+  "mode_switch_output_regions": {
+    "samples": 2464,
+    "selected_addresses": 181,
+    "unresolved_selected_samples": 0,
+    "exclusive_region_samples": {
+      "Structure_output_formation": 42,
+      "pricing_geometry": 106,
+      "Structure_retirement": 67,
+      "fresh_initial_conversion": 21
+    },
+    "total_selected_region_samples": 236,
+    "total_selected_region_percent": 9.577922077922079,
+    "explicit_shared_geometry_overlap_samples": 101,
+    "remaining_after_explicit_overlap_samples": 135,
+    "remaining_after_explicit_overlap_percent": 5.478896103896104,
+    "qualification": "Source-line attribution of selected nearest physical Rose-containing frames,not timings or complete phase scopes. Native/helper samples can skip allocating callees;region counts identify enclosing source blocks only. Region boundaries and shared-trial subtraction are conservative source approximations. Final mutable-factor storage,numericUreplay,pricingrecurrences excluded; Structure retirement includes any lifecycle under its dropglue. No implementation or removable-cost claim."
+  },
+  "cached_PEROLD_disjoint_refactor": {
+    "source": "target/perf-refresh/perold-fp8m.data",
+    "samples": 3736,
+    "refactor_samples": 1010,
+    "refactor_batch_percent": 27.03426124197002,
+    "rows": [
+      {
+        "stage": "nucleus",
+        "samples": 279,
+        "batch_percent": 7.467880085653105,
+        "refactor_percent": 27.623762376237625,
+        "native_allocator_leaf_samples": 49
+      },
+      {
+        "stage": "fresh",
+        "samples": 246,
+        "batch_percent": 6.584582441113491,
+        "refactor_percent": 24.356435643564357,
+        "native_allocator_leaf_samples": 66
+      },
+      {
+        "stage": "auxiliary LU",
+        "samples": 142,
+        "batch_percent": 3.8008565310492504,
+        "refactor_percent": 14.05940594059406,
+        "native_allocator_leaf_samples": 26
+      },
+      {
+        "stage": "refactor remainder",
+        "samples": 140,
+        "batch_percent": 3.747323340471092,
+        "refactor_percent": 13.861386138613861,
+        "native_allocator_leaf_samples": 122
+      },
+      {
+        "stage": "reset_pricing",
+        "samples": 69,
+        "batch_percent": 1.8468950749464668,
+        "refactor_percent": 6.8316831683168315,
+        "native_allocator_leaf_samples": 30
+      },
+      {
+        "stage": "structure remainder",
+        "samples": 61,
+        "batch_percent": 1.6327623126338329,
+        "refactor_percent": 6.03960396039604,
+        "native_allocator_leaf_samples": 26
+      },
+      {
+        "stage": "phases/pair",
+        "samples": 33,
+        "batch_percent": 0.8832976445396146,
+        "refactor_percent": 3.267326732673267,
+        "native_allocator_leaf_samples": 14
+      },
+      {
+        "stage": "input/reference_order",
+        "samples": 17,
+        "batch_percent": 0.4550321199143469,
+        "refactor_percent": 1.683168316831683,
+        "native_allocator_leaf_samples": 9
+      },
+      {
+        "stage": "lu_attempt remainder",
+        "samples": 15,
+        "batch_percent": 0.4014989293361884,
+        "refactor_percent": 1.4851485148514851,
+        "native_allocator_leaf_samples": 5
+      },
+      {
+        "stage": "factor_work",
+        "samples": 8,
+        "batch_percent": 0.21413276231263384,
+        "refactor_percent": 0.7920792079207921,
+        "native_allocator_leaf_samples": 0
+      }
+    ],
+    "native_allocator_leaf_under_refactor": 347,
+    "native_allocator_leaf_outside_refactor": 326,
+    "unknown_leaf_under_refactor": 3,
+    "max_observed_refactor_stack_depth": 37
+  },
+  "source_hashes": {
+    "src/dual.rs": "dce94c76006809b9befabb79f04b658bd31213b86f07193341b0791c2e09eccd",
+    "src/ftran_order.rs": "57c86340f6959717954e2cb1c58f06c285ab7ce564a25d7d0e9e9c429d802ef1",
+    "src/simplex.rs": "4ff9697cd5627beccce151d2eb03a84852a149dcb39a7249606a6e363c155ac6",
+    "src/lu_order.rs": "530ff158c6d8c1263ed4317ad6d67d3bd6a8509bbc4e55b4c5a3e00bdfa89123",
+    "src/lu.rs": "7104adbfcae0f73030fcf7136c1624715d33e6f686383fa7a41bd95fa4a074e4",
+    "src/real.rs": "9399212fbe9de003ae4e70b44c850fa7a0459b8c2f8d19ec538c15286cb23918",
+    "src/f80.rs": "2a20a41d94ff36934fb84375886b1ac0fbf1b35dd7bb29f3d009e0b95e35aa70"
+  },
+  "release_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+  "profiling_sha256": "68dc54d95c6ecc721ef97b6f9a5d51cf4a7344e285c1faec93954b115875b7a7",
+  "artifacts": "target/perf-mode-scope/:prepare.py,validate.py,evidence.py,allbashscripts,rawoutcomes+exits,manifests,*.data,eventaudits,reports,directcounters,memory_sites*.py,output_regions*.py,exactsource/offsetmaps;target/perf-refactor-stages/:classify.py,perold.json/log;original healthy cached target/perf-refresh/perold-fp8m.data",
+  "verification": {
+    "release_tests": {
+      "groups": 37,
+      "passed": 292,
+      "failed": 0,
+      "ignored": 22,
+      "log": "target/perf-hsd-pair/release-tests.log"
+    },
+    "full_parity": "987/987,target/perf-hsd-pair/full-parity.log",
+    "runtime_source": "restored byteforbyte; no productionchanges",
+    "accepted_CLI_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410"
+  }
+}

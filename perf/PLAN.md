@@ -372,17 +372,31 @@ measured.
   order, K-boundary additions, full logical scans, unused outputs/flags and
   single/extreme fallbacks. No multi-K direct scatter. Raw evidence and excluded
   parser-only/throttled recordings: evidence/gemm-routing-scope.json.
-  Next discriminate complete predictor/HSD normal-solve pairing with independent
-  refinement lanes. GREENBEA has72 HSD solves and131 correction solves: cached104 factor
-  dispatches equal one initial plus103 iteration factors, excluding restart raw
-  solves. These aggregates do not measure pairable work. Classify
-  transactions by factor generation, initial solve and overlapping refinement
-  rounds before implementation. Inspect cached evidence first; all measured
-  small models have zero raw calls. Preserve per-lane norms, correction counts,
-  WORK/dump order and sequential early-CG RNG state; shared immutable factors
-  alone are insufficient. Keep the normal default limit: a nondefault cap can
-  change GREENBEA termination. No paired executor is implemented.
-  Factor-production/installation ownership remains another measured lead.
+  Complete predictor/HSD pairing is measured without implementation. GREENBEA
+  has 72 pairs but zero overlapping correction rounds: predictors take none,
+  HSD takes 97. Initial solves occupy 7.65% of the instrumented solve, or 8.70%
+  with initial residuals; whole transactions include unmatched tails. Small
+  models have no HSD calls. See evidence/hsd-pair-scope.json. No paired executor
+  follows; do not repeat triangular-only repacking as a whole-pair experiment.
+  Immutable-L prefix reuse has no entering-column lead on AFIRO through DEGEN2
+  (cap 300): no same-column/support recurrences within LUOUT epochs. An optimistic
+  support-only key gives one possible SC50A hit, two BLEND hits, and zero elsewhere.
+  Other L calls and cross-epoch owner sharing remain unmeasured, without a high
+  reuse invariant. No cache or large-model escalation. See evidence/l-prefix-reuse-scope.json.
+  Next discriminate intermediate outgoing factor materialization: Structure
+  formation (lu_order.rs:102), initial packed-L/transpose/Markowitz conversions
+  (ftran_order.rs:1114), pricing geometry (dual.rs:1865), and Structure retirement.
+  Healthy mode-switch source regions identify 9.58% of batch samples; removing
+  explicit shared-geometry regions leaves 5.48%, including necessary work and
+  further overlap. This is approximate instruction attribution, not an eligible
+  time bound. Use existing source/assembly maps first, then only a disjoint
+  whole-region/lifetime scope if needed. Subtract prior shared-L/pricing and
+  fresh-U trials before a consuming producer/installer prototype. Exclude
+  required numerical replay, pricing recurrences, and final mutable storage.
+  Do not relabel prior banks, arenas, or pivot frames. Cached PEROLD stages and
+  healthy mode-switch/extended-witness profiles are in evidence/mode-switch-scope.json;
+  all 194 full outcomes agree. The first 8M stack recording throttled and is
+  excluded; 32M stacks are clean. Periodic bias and skipped callees limit attribution.
   The scalar prefilter and prior rank/layout trials remain
   rejected; do not infer further gains from isolated predicate costs.
   Comparator alignment stays centralized; normal lunum's build/cache transport

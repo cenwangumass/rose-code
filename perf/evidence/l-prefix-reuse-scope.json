@@ -1,0 +1,280 @@
+{
+  "cli_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+  "rows": [
+    {
+      "model": "afiro",
+      "cap": 300,
+      "command": [
+        "taskset",
+        "-c",
+        "2",
+        "target/release/rose",
+        "solve",
+        "tests/fixtures/afiro.mps",
+        "--method",
+        "primal",
+        "--profile",
+        "release",
+        "--max-iterations",
+        "300"
+      ],
+      "exit": 0,
+      "calls": 14,
+      "LUOUT_events": 3,
+      "same_entering_column_and_input_support_hits": {
+        "1": 0,
+        "2": 0,
+        "4": 0,
+        "8": 0,
+        "16": 0,
+        "64": 0,
+        "1000000": 0
+      },
+      "qualification": "Entering-only census; ordered support equality with values omitted is optimistic, not exact RHS reuse. LUOUT epochs approximate installed immutable-L lifetimes. Other L calls and cross-epoch immutable-owner sharing unmeasured; source L immutability alone cannot prove high reuse.",
+      "optimistic_same_epoch_ordered_support_hits": 0,
+      "same_entering_column_support_hits_across_epochs": 0,
+      "result_sha256": "1bf5bcfbd70bfb3cad9125cd079788c50b27d17ef36fa381bc85cf518bc8cfc7",
+      "result_summary": {
+        "objective": -464.75314285714285,
+        "status": "optimal"
+      },
+      "diagnostics_summary": {
+        "iterations": 14,
+        "refactorizations": 4
+      }
+    },
+    {
+      "model": "sc50a",
+      "cap": 300,
+      "command": [
+        "taskset",
+        "-c",
+        "2",
+        "target/release/rose",
+        "solve",
+        "tests/fixtures/sc50a.mps",
+        "--method",
+        "primal",
+        "--profile",
+        "release",
+        "--max-iterations",
+        "300"
+      ],
+      "exit": 0,
+      "calls": 32,
+      "LUOUT_events": 6,
+      "same_entering_column_and_input_support_hits": {
+        "1": 0,
+        "2": 0,
+        "4": 0,
+        "8": 0,
+        "16": 0,
+        "64": 0,
+        "1000000": 0
+      },
+      "qualification": "Entering-only census; ordered support equality with values omitted is optimistic, not exact RHS reuse. LUOUT epochs approximate installed immutable-L lifetimes. Other L calls and cross-epoch immutable-owner sharing unmeasured; source L immutability alone cannot prove high reuse.",
+      "optimistic_same_epoch_ordered_support_hits": 1,
+      "same_entering_column_support_hits_across_epochs": 2,
+      "result_sha256": "882c8f1e83de3eaa420140d76927b8c23c015b1be1543c78122fa3122eceb71a",
+      "result_summary": {
+        "objective": -64.57507705856452,
+        "status": "optimal"
+      },
+      "diagnostics_summary": {
+        "iterations": 32,
+        "refactorizations": 7
+      }
+    },
+    {
+      "model": "blend",
+      "cap": 300,
+      "command": [
+        "taskset",
+        "-c",
+        "2",
+        "target/release/rose",
+        "solve",
+        "tests/fixtures/blend.mps",
+        "--method",
+        "primal",
+        "--profile",
+        "release",
+        "--max-iterations",
+        "300"
+      ],
+      "exit": 0,
+      "calls": 64,
+      "LUOUT_events": 5,
+      "same_entering_column_and_input_support_hits": {
+        "1": 0,
+        "2": 0,
+        "4": 0,
+        "8": 0,
+        "16": 0,
+        "64": 0,
+        "1000000": 0
+      },
+      "qualification": "Entering-only census; ordered support equality with values omitted is optimistic, not exact RHS reuse. LUOUT epochs approximate installed immutable-L lifetimes. Other L calls and cross-epoch immutable-owner sharing unmeasured; source L immutability alone cannot prove high reuse.",
+      "optimistic_same_epoch_ordered_support_hits": 2,
+      "same_entering_column_support_hits_across_epochs": 8,
+      "result_sha256": "9d0a6c454b5c1d39afe96822e9c82f13cc166ca5ad841acb857bf88159ed62bd",
+      "result_summary": {
+        "objective": -30.812149845828216,
+        "status": "optimal"
+      },
+      "diagnostics_summary": {
+        "iterations": 64,
+        "refactorizations": 6
+      }
+    },
+    {
+      "model": "adlittle",
+      "cap": 300,
+      "command": [
+        "taskset",
+        "-c",
+        "2",
+        "target/release/rose",
+        "solve",
+        "tests/fixtures/adlittle.mps",
+        "--method",
+        "primal",
+        "--profile",
+        "release",
+        "--max-iterations",
+        "300"
+      ],
+      "exit": 0,
+      "calls": 104,
+      "LUOUT_events": 11,
+      "same_entering_column_and_input_support_hits": {
+        "1": 0,
+        "2": 0,
+        "4": 0,
+        "8": 0,
+        "16": 0,
+        "64": 0,
+        "1000000": 0
+      },
+      "qualification": "Entering-only census; ordered support equality with values omitted is optimistic, not exact RHS reuse. LUOUT epochs approximate installed immutable-L lifetimes. Other L calls and cross-epoch immutable-owner sharing unmeasured; source L immutability alone cannot prove high reuse.",
+      "optimistic_same_epoch_ordered_support_hits": 0,
+      "same_entering_column_support_hits_across_epochs": 22,
+      "result_sha256": "a7a6e45dec527ce1d05c5203b4be189a59ea9018e11849a336867651599c229b",
+      "result_summary": {
+        "objective": 225494.96316238036,
+        "status": "optimal"
+      },
+      "diagnostics_summary": {
+        "iterations": 104,
+        "refactorizations": 12
+      }
+    },
+    {
+      "model": "bore3d",
+      "cap": 300,
+      "command": [
+        "taskset",
+        "-c",
+        "2",
+        "target/release/rose",
+        "solve",
+        "tests/fixtures/bore3d.mps",
+        "--method",
+        "primal",
+        "--profile",
+        "release",
+        "--max-iterations",
+        "300"
+      ],
+      "exit": 0,
+      "calls": 101,
+      "LUOUT_events": 7,
+      "same_entering_column_and_input_support_hits": {
+        "1": 0,
+        "2": 0,
+        "4": 0,
+        "8": 0,
+        "16": 0,
+        "64": 0,
+        "1000000": 0
+      },
+      "qualification": "Entering-only census; ordered support equality with values omitted is optimistic, not exact RHS reuse. LUOUT epochs approximate installed immutable-L lifetimes. Other L calls and cross-epoch immutable-owner sharing unmeasured; source L immutability alone cannot prove high reuse.",
+      "optimistic_same_epoch_ordered_support_hits": 0,
+      "same_entering_column_support_hits_across_epochs": 15,
+      "result_sha256": "b549e6a2f4538f33ddfbd9d417558faa22a50ea10aa889c8b0f9b2d44185453e",
+      "result_summary": {
+        "objective": 1373.0803942084924,
+        "status": "optimal"
+      },
+      "diagnostics_summary": {
+        "iterations": 101,
+        "refactorizations": 8
+      }
+    },
+    {
+      "model": "degen2",
+      "cap": 300,
+      "command": [
+        "taskset",
+        "-c",
+        "2",
+        "target/release/rose",
+        "solve",
+        "tests/fixtures/degen2.mps",
+        "--method",
+        "primal",
+        "--profile",
+        "release",
+        "--max-iterations",
+        "300"
+      ],
+      "exit": 3,
+      "calls": 300,
+      "LUOUT_events": 6,
+      "same_entering_column_and_input_support_hits": {
+        "1": 0,
+        "2": 0,
+        "4": 0,
+        "8": 0,
+        "16": 0,
+        "64": 0,
+        "1000000": 0
+      },
+      "qualification": "Entering-only census; ordered support equality with values omitted is optimistic, not exact RHS reuse. LUOUT epochs approximate installed immutable-L lifetimes. Other L calls and cross-epoch immutable-owner sharing unmeasured; source L immutability alone cannot prove high reuse.",
+      "optimistic_same_epoch_ordered_support_hits": 0,
+      "same_entering_column_support_hits_across_epochs": 15,
+      "result_sha256": "55ca93b9a8625bd33c0be005191e1037929bda378ece0f75891a3032a0a2736b",
+      "result_summary": {
+        "objective": null,
+        "status": "iteration_limit"
+      },
+      "diagnostics_summary": {
+        "iterations": 300,
+        "refactorizations": 7
+      }
+    }
+  ],
+  "source": "18061fe9",
+  "measurement_parent": "f0a34c73",
+  "decision": "No immutable-L prefix reuse implementation or large-model escalation from this entering-only census; no high-reuse source invariant or cached evidence for other L calls.",
+  "qualification": [
+    "All12complete dumped/plain output objects and exits agree,removing diagnostics.seconds only. Accepted CLI and numerical source unchanged.",
+    "Existing ftran/luout/lustart/luin dumps only,CPU2,primalrelease,max_iterations300,10sperprocess limit. No new dumpkind or runtime instrumentation.",
+    "LUOUT epochs are a conservative scope proxy,not exact L owner identities or equality across refactorizations. Unknown coefficient values and dispatch/FP controls would further restrict support-only hits.",
+    "Calls are counts,not cost shares. No exact cache hit rate, solver speedup, prefix-output equality or removable-time bound claimed.",
+    "Existing current-host inclusive L profile9.82% contains mutable eta suffixes; it does not establish prefix cost. Needed/correction/other L inputs are outside this entering-only dump census."
+  ],
+  "artifacts": "target/perf-l-prefix/:entering_census.py,analyze.py,entering-census.json/log,all6dumpfiles,plain/dumpedresults,orderedenteringevents",
+  "verification": {
+    "release_tests": {
+      "groups": 37,
+      "passed": 292,
+      "failed": 0,
+      "ignored": 22,
+      "log": "target/perf-hsd-pair/release-tests.log"
+    },
+    "full_parity": "987/987,target/perf-hsd-pair/full-parity.log",
+    "runtime_source": "restored byteforbyte; no productionchanges",
+    "accepted_CLI_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410"
+  }
+}

@@ -1,0 +1,200 @@
+{
+  "source": "18061fe9",
+  "measurement_parent": "f0a34c73",
+  "configuration": "ordinary ThinLTO/glibc release-test probe,CPU2 pinned,default max_iterations1000,three alternating probe-enabled/disabled pairs per model",
+  "decision": "Do not implement paired predictor/HSD whole-solve/refinement executor: zero overlapping correction rounds; eligible initial solves7.65%whole,initial solves+residuals8.70%. Whole transaction14.90%contains unmatched tails and cannot be credited as paired work.",
+  "qualification": [
+    "Nested instrumented release-test scopes affected by clock overhead/codegen; not accepted-release removable bounds. No solver speedup claimed.",
+    "Entire enabled/disabled Debug SolveResult objects agree in all21pairs(42results),not merely aggregate counters. Numerical bodies unchanged;accepted CLI unchanged.",
+    "All six small models have no HSD calls;GREENBEAdefault exits Suboptimal103. Counts and lane eligibility identical over allthree measurements.",
+    "Each correction round is an attempted correction including rejected candidates. No arithmetic or branch changes; no per-tile timers.",
+    "Same factor generation and iteration key defines a pair; early/precision/refining eligibility checked between lanes. Globalnormal522=317direction+72HSD+2initial+131corrections; restart classification independently established in previous evidence."
+  ],
+  "greenbea": {
+    "pairs": 72,
+    "first_HSD_iteration": 31,
+    "last_HSD_iteration": 102,
+    "overlapping_corrections": 0,
+    "HSD_corrections": 97,
+    "predictor_corrections": 0,
+    "correction_histogram": [
+      {
+        "predictor": 0,
+        "HSD": 0,
+        "pairs": 34
+      },
+      {
+        "predictor": 0,
+        "HSD": 1,
+        "pairs": 9
+      },
+      {
+        "predictor": 0,
+        "HSD": 2,
+        "pairs": 9
+      },
+      {
+        "predictor": 0,
+        "HSD": 3,
+        "pairs": 13
+      },
+      {
+        "predictor": 0,
+        "HSD": 4,
+        "pairs": 4
+      },
+      {
+        "predictor": 0,
+        "HSD": 5,
+        "pairs": 3
+      }
+    ],
+    "modes": [
+      {
+        "single": false,
+        "refining": false,
+        "pairs": 20
+      },
+      {
+        "single": false,
+        "refining": true,
+        "pairs": 52
+      }
+    ],
+    "scope_median_percent": {
+      "paired_solve_percent": 7.654356814315081,
+      "paired_solve_and_residual_percent": 8.69801188245549,
+      "paired_transaction_percent": 14.89651501401806
+    },
+    "scope_records": [
+      {
+        "model": "greenbea",
+        "pair": 0,
+        "status": "Suboptimal",
+        "iterations": 103,
+        "measured_ns": 1406884953,
+        "plain_ns": 1560250262,
+        "global_calls": {
+          "solve": 522,
+          "forward": 522,
+          "backward": 522,
+          "Aw": 522,
+          "ATy": 522,
+          "residual": 386,
+          "refine": 255,
+          "normal305": 522
+        },
+        "predictors": 103,
+        "raw": 72,
+        "paired_solve_percent": 7.922675252323919,
+        "paired_solve_and_residual_percent": 8.96916679156494,
+        "paired_transaction_percent": 15.18921035755793
+      },
+      {
+        "model": "greenbea",
+        "pair": 1,
+        "status": "Suboptimal",
+        "iterations": 103,
+        "measured_ns": 1370237484,
+        "plain_ns": 1484611493,
+        "global_calls": {
+          "solve": 522,
+          "forward": 522,
+          "backward": 522,
+          "Aw": 522,
+          "ATy": 522,
+          "residual": 386,
+          "refine": 255,
+          "normal305": 522
+        },
+        "predictors": 103,
+        "raw": 72,
+        "paired_solve_percent": 7.3403907114250275,
+        "paired_solve_and_residual_percent": 8.375369477193487,
+        "paired_transaction_percent": 14.211534297802059
+      },
+      {
+        "model": "greenbea",
+        "pair": 2,
+        "status": "Suboptimal",
+        "iterations": 103,
+        "measured_ns": 1484348754,
+        "plain_ns": 1468510175,
+        "global_calls": {
+          "solve": 522,
+          "forward": 522,
+          "backward": 522,
+          "Aw": 522,
+          "ATy": 522,
+          "residual": 386,
+          "refine": 255,
+          "normal305": 522
+        },
+        "predictors": 103,
+        "raw": 72,
+        "paired_solve_percent": 7.654356814315081,
+        "paired_solve_and_residual_percent": 8.69801188245549,
+        "paired_transaction_percent": 14.89651501401806
+      }
+    ]
+  },
+  "small_models": [
+    {
+      "model": "afiro",
+      "paired_transactions": 0,
+      "pairs": 3,
+      "raw_calls": 0,
+      "iterations": 7
+    },
+    {
+      "model": "sc50a",
+      "paired_transactions": 0,
+      "pairs": 3,
+      "raw_calls": 0,
+      "iterations": 7
+    },
+    {
+      "model": "blend",
+      "paired_transactions": 0,
+      "pairs": 3,
+      "raw_calls": 0,
+      "iterations": 8
+    },
+    {
+      "model": "adlittle",
+      "paired_transactions": 0,
+      "pairs": 3,
+      "raw_calls": 0,
+      "iterations": 12
+    },
+    {
+      "model": "bore3d",
+      "paired_transactions": 0,
+      "pairs": 3,
+      "raw_calls": 0,
+      "iterations": 16
+    },
+    {
+      "model": "degen2",
+      "paired_transactions": 0,
+      "pairs": 3,
+      "raw_calls": 0,
+      "iterations": 12
+    }
+  ],
+  "artifacts": "target/perf-hsd-pair/:original/instrumented-chol.rs,probe.rs,instrument.py,build.log,small.log,greenbea.log,analyze.py,analysis.json,accepted",
+  "accepted_cli_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+  "restored_chol_sha256": "158e393ca8dc6aef7f98482ca9f4609b49d2df00b03978310873e333ebf51bea",
+  "verification": {
+    "release_tests": {
+      "groups": 37,
+      "passed": 292,
+      "failed": 0,
+      "ignored": 22,
+      "log": "target/perf-hsd-pair/release-tests.log"
+    },
+    "full_parity": "987/987,target/perf-hsd-pair/full-parity.log",
+    "runtime_source": "restored byteforbyte; no productionchanges",
+    "accepted_CLI_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410"
+  }
+}

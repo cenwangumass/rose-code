@@ -30,6 +30,41 @@ These are whole-batch profiling-build instruction shares, not release solve-only
 costs. They keep whole forward solves and factor production/installation as the
 structural targets; they do not justify another small arithmetic or queue trial.
 
+### Current mode-switch and refactor attribution
+
+The accepted release CLI now has a healthy full mode-switch profile (cap 12000,
+optimal after 11,393 iterations, 17 refactorizations): 4,896 instruction samples
+at period 8M, zero loss/throttle events, and 99.932% direct-event coverage.
+Release self samples put memset at 7.41%, fresh at 4.92%, nucleus at 4.62%,
+needed FTRAN at 3.96%, update at 3.27%, and ordinary FTRAN at 2.49%. Substantial
+native allocator/copy work is separate. These whole-batch instruction fractions
+include startup, serialization, and bash/timeout launchers. JSON validation is
+outside PMU measurement. These are not solve-time or removable bounds.
+
+The preceding frame-pointer ELF has unchanged ordinary source and matches all
+mode-switch outputs. Its healthy period-32M recording has 2,464 samples, zero
+loss/throttle events, and 99.502% direct-event coverage. Refactorization is
+45.37% inclusive. Disjoint nearest physical stages include nucleus at 8.85%,
+fresh at 8.12%, refactor remainder at 8.12%, pricing reset at 6.01%, structure
+remainder at 5.19%, and auxiliary LU at 3.69%. These totals contain necessary
+numerical work and allocation. The original period-8M stack recording has six
+throttle/unthrottle pairs and is retained but excluded quantitatively.
+
+Cached healthy PEROLD stacks reproduce 1,010/3,736 refactor samples (27.03% of
+the batch): nucleus 7.47%, fresh 6.58%, auxiliary LU 3.80%, refactor remainder
+3.75%, and pricing reset 1.85%. Several mode-switch memory samples resolve only
+to ancestor calls into iteration, needed FTRAN, or framework RHS; those return
+addresses do not identify particular buffers. Identical-code folding can give
+ordinary drop/generic code F80 names. Source-line attribution and fixed-period
+sampling are approximate. Do not combine different builds' fractions.
+
+All 194 current profiling/counter output objects and exits agree with the
+accepted sweep. The profiling ELF has fast parity 940/940; release full parity
+987/987 and all 292 runnable release tests pass. Numerical source and accepted
+CLI are unchanged. [mode-switch-scope.json](evidence/mode-switch-scope.json), all
+recordings, excluded samples, source/offset maps, and raw outcomes are in
+`target/perf-mode-scope/`; PEROLD reproduction is in `target/perf-refactor-stages/`.
+
 ### Barrier factor executor
 
 The solver compiles child-update geometry once and retains its scratch across
@@ -1507,15 +1542,43 @@ Parser-only and throttled exploratory
 recordings are retained and excluded. [gemm-routing-scope.json](evidence/gemm-routing-scope.json),
 source/proxy/census and all raw evidence in `target/perf-gemm-routing/`.
 
-In progress: audit complete predictor/HSD normal-solve ownership and independent
-refinement lanes. Cached GREENBEA counts classify all72 raw calls as HSD:
-104 factor dispatches equal one initial plus103 iteration factors, leaving no
-restart factor. The522normal calls equal317direction+72HSD+2initial+131corrections.
-Aggregate scopes retain neither first-HSD iteration nor per-lane correction
-counts and do not establish pairable or removable work.
-No implementation or timing claim. The factor, D, zx and threshold are shared,
-but norms, extra-correction accounting, dump/WORK order and early-CG RNG state
-need explicit lane ownership. Small measured models have no raw solves.
+Complete predictor/HSD pairing has no overlapping correction rounds on
+GREENBEA. Its 72 pairs occur at iterations 31–102. Every predictor takes zero
+corrections; HSD takes 97 attempted corrections across the pairs. Of the pairs,
+52 refine and 20 do not; all are double, with early CG off. Other calls account
+for the remaining 34 of 131 corrections. Pairable initial solves occupy 7.65%
+of the instrumented whole solve, or 8.70% with initial residuals. Whole paired
+transactions occupy 14.90% but contain unmatched HSD tails. No paired executor
+follows from this scope. All six small models have no HSD calls. All 21
+enabled/disabled diagnostic pairs agree on complete SolveResult objects.
+These nested release-test scopes are not removable accepted-release bounds.
+Source and CLI are restored byte for byte. [hsd-pair-scope.json](evidence/hsd-pair-scope.json),
+per-round counts, scopes, source, and outputs are in `target/perf-hsd-pair/`.
+
+An entering-only immutable-L prefix census gives no cache implementation lead.
+AFIRO, SC50A, BLEND, ADLITTLE, BORE3D, and DEGEN2 primal release (cap 300) have
+14/32/64/104/101/300 entering FTRAN calls. None repeats the same entering column
+and ordered input support within a LUOUT epoch. Omitting values and entering
+identity gives one possible support hit on SC50A, two on BLEND, and zero
+elsewhere. Across epochs, the same column/support repeats 0/2/8/22/15/15 times;
+these do not establish reuse within one immutable L lifetime. All 12 dumped/plain
+complete output objects and exits agree. LUOUT epochs approximate owners; other
+L calls and cross-epoch owner sharing are unmeasured. Counts are not cost shares
+or exact cache hit rates. The inclusive L profile also contains mutable etas.
+No cache or larger-model escalation follows. [l-prefix-reuse-scope.json](evidence/l-prefix-reuse-scope.json),
+raw evidence and scripts are in `target/perf-l-prefix/`.
+
+In progress: intermediate outgoing factor materialization across producer and
+installer. Healthy mode-switch source regions identify 236/2,464 samples (9.58%
+of the batch) in Structure output formation, initial fresh conversion, pricing
+geometry, and Structure retirement. Excluding 101 samples in explicitly shared
+L/transpose/predecessor regions leaves 135 (5.48%), still including required
+work and unquantified overlap. This is not an exclusive-time or removable-cost
+bound. Required fresh-U numerical replay, pricing recurrences, and final mutable
+factor storage are outside this proposed lifetime. No consuming producer/installer
+is implemented. Prior banks/arenas, shared geometry, fresh-U producers, and pivot
+frames are not reopened by allocator mass. Source regions and limitations:
+[mode-switch-scope.json](evidence/mode-switch-scope.json).
 
 The exact Plan census counts 1,008 wide GEMM calls/factor on DEGEN3, 799 zero-C;
 fifteen factors describe 83.2 MB of logical cn buffers, 37.4% unused cells whose
