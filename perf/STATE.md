@@ -536,7 +536,7 @@ SC50A8, DEGEN2181 and PILOT4367 calls, but its inlining/reset boundaries differ
 from the solver and are not qualification evidence.
 
 Matching fixed39 PGO/TCMalloc target counters lower DEGEN2 controlled instructions
-3.59% and cycles3.17%. Two independent32AB+32AA screens (CPU4, cap800,
+3.59% and cycles3.17%. Two independent32AB+32AA screens (CPU4, cap 800,
 seeds36217/36289) qualify: median -3.242/-4.510%, CI[-5.244,-1.919]% /
 [-5.850,-3.329]%,27/32 and30/32 improving, sign p5.65e-5/1.23e-7. AA is healthy
 (p .215/.860), intervals[-1.840,+1.714]% /[-1.570,+1.607]%; both execution
@@ -834,7 +834,7 @@ Ordinary ranked-product working sets are now measured with test-only monotonic
 immutable-model owner IDs, spanning each bounded solve. ADLITTLE/BORE3D primal
 release at cap300 have no ordinary rank_products calls; DEGEN2 release's cap300
 prefix also has none. This does not describe their controlled profile or later
-DEGEN2 work. PILOT4 primal release at cap800 has367 calls under one model owner,
+DEGEN2 work. PILOT4 primal release at cap 800 has367 calls under one model owner,
 1,401,403 terms and359 distinct exact ordered numeric keys. FIFO1..16 hits none;
 32/64/128/512 hit1/3/6/8 calls, saving only5/19/47/57 terms. Full-result reuse
 has negligible measured scope. The canonical key is the sorted (rank,row) order
@@ -936,7 +936,7 @@ nontriangular fallbacks, the dense51 mismatch and all 16 SSE modes. All ten
 FTRAN/L tests and fast940 parity pass under matching fixed39 PGO/TCMalloc.
 Eight bounded ADLITTLE/BORE3D/DEGEN2 and three PILOT4/PEROLD result/exit pairs
 agree. PILOT4 instructions/cycles change -1.068/-0.700%; PEROLD -0.494/-1.108%.
-The predeclared PILOT4 primal-release screen (CPU4, cap800, seed32217,
+The predeclared PILOT4 primal-release screen (CPU4, cap 800, seed32217,
 32AB+32AA) gives median -0.189%, CI [-2.199%, +1.965%], 17/32 improving,
 sign p .430; order medians +1.105/-0.318%. Healthy AA spans
 [-1.380%, +0.641%], p .597. Gain/sign/order/noise separation fail: stop without
@@ -1020,7 +1020,16 @@ the unchanged constructor. PGO flags match the accepted source; libtcmalloc is
 explicitly retained like the CLI. These isolated component timings include the
 inactive test-only capture check and are feasibility evidence, not solver gains.
 Source mutation audit shows that fresh numeric fields remain read-only; only
-etas and nnz_eta change through updates. Immutable-base sharing is unimplemented.
+etas and nnz_eta change through updates. These historical repeat counts predate
+the accepted AuxiliaryOwner and do not justify another constructor cache.
+Current-source exact-key measurements after that owner find zero repeats in
+twelve small primal/dual solves (AFIRO through DEGEN2, cap 800). Full bounded
+fx/Quad have only 57/140 remaining constructor calls, 25/18 unique keys and 31/122
+eight-entry FIFO hits. Their hit constructors total 0.158/0.362 ms in a single
+release-test diagnostic; this excludes lookup/storage/ownership overhead and is
+not a solver speedup or accepted-release cost bound. All 14 complete SolveResult
+objects match uninstrumented solves. No shared-base cache is implemented from
+these stale historical counts. Evidence: [auxiliary-current-reuse.json](evidence/auxiliary-current-reuse.json).
 All input streams, costs, simulations, allocator linkage, exact source proof,
 complete results, bounded timings and probe code: `target/perf-aux-inputs/`.
 
@@ -1345,7 +1354,7 @@ Matching fixed39 PGO/TCMalloc and fast940 parity pass. Eight bounded SC50A/
 DEGEN2 and three PILOT4 complete result/exit pairs agree. Instructions change
 -0.059/-0.243/-0.738%; cycles -1.840/+0.372/-0.314%.
 
-The fixed PILOT4 screen35217 (32AB+32AA, CPU4, cap800) is inconclusive: median
+The fixed PILOT4 screen35217 (32AB+32AA, CPU4, cap 800) is inconclusive: median
 +0.729%, CI [-2.617%, +3.146%],14/32 improving, sign p .811; order medians
 +1.793/+0.592%. AA is biased (median+1.411%, CI[+0.288%, +2.244%], p .007).
 Stop without35289, extension or full candidate gates. Source, accepted CLI/
@@ -1633,7 +1642,7 @@ The independent release-lib shadow also passed on the three complete 5959, quad 
 
 - Packed ordinary immutable L-entry indices: fitting ordinary factors store checked32-bit row indices with unchanged numeric values in12-byte packed entries instead of16-byte usize/f64 tuples; extended and out-of-range inputs retain wide storage. Logical entry counts, order, snapshots/dumps and WORK are unchanged. Column views expose exact Copy values; source reversal preserves fresh arithmetic and complete L-stage/FTRAN/needed/Kahn bodies apart from field installation and iteration binding. Existing complete L tests now read independent wide storage for the frozen oracle. All8 matching fixed39-PGO FTRAN/L tests pass, including exact payload/index encoding, clone/large-index/extended fallback, full/needed solves and captured SC50A L arrays. Fast940 and eight bounded ADLITTLE/DEGEN2 plus three PEROLD complete result/exit pairs agree. Instructions rise0.453/0.739/0.501%; PEROLD cycles+0.600%. Stop at counters without timing seeds27217/27289 or full candidate gates; no compression variant is accepted. Original source/accepted CLI/metadata/profile restored exactly; restored formatting, fast940 and full987 pass. Source/proof, codec and wide-storage oracles, matching builds/tests/freezes, all outputs/counters and native assembly: `target/perf-lpacked/`. This tests logical stream compression, not an allocator-footprint claim or direct numerical producer-U reuse.
 
-- Ordinary positive weight-floor specialization: the floor is always finite and strictly positive (W_MIN or1), allowing register-only SSE2 maximum with original NaN selection; the extended path keeps its existing max. The independent complete row oracle is byte-identical; reversal changes only the one ordinary floor selection. A frozen runtime primitive passes2,097,696 full-bit/boundary/quiet-and-signaling-NaN comparisons across all16 MXCSR modes; the complete captured/random full-row test and fast940 pass with matching fixed39 PGO. Eight controlled ADLITTLE/BORE3D and three release PILOT4 complete result/exit pairs agree. Instructions fall0.143/0.050/0.381%; PILOT4 cycles+0.221% are effectively flat. Its predeclared32-AB/32-AA PILOT4 screen (CPU4, cap800, seed26217) is inconclusive: median-0.952%, interval[-3.249%,+2.688%],17/32 improving, sign p.430, healthy AA[-2.561%,+1.320%], execution orders-1.820%/+1.342%. Stop without confirmation26289 or full candidate gates. No qualifying runtime gain. Source/accepted CLI/metadata/profile restored exactly; restored formatting, fast940 and full987 pass. Native accepted-row annotation, complete source/oracle/proof, builds/tests/freezes, bounded results/counters and controlled screen: `target/perf-weight-floor/`; accepted annotation is also retained in `target/perf-rank-reuse/primal-row.asm`.
+- Ordinary positive weight-floor specialization: the floor is always finite and strictly positive (W_MIN or1), allowing register-only SSE2 maximum with original NaN selection; the extended path keeps its existing max. The independent complete row oracle is byte-identical; reversal changes only the one ordinary floor selection. A frozen runtime primitive passes2,097,696 full-bit/boundary/quiet-and-signaling-NaN comparisons across all16 MXCSR modes; the complete captured/random full-row test and fast940 pass with matching fixed39 PGO. Eight controlled ADLITTLE/BORE3D and three release PILOT4 complete result/exit pairs agree. Instructions fall0.143/0.050/0.381%; PILOT4 cycles+0.221% are effectively flat. Its predeclared32-AB/32-AA PILOT4 screen (CPU4, cap 800, seed26217) is inconclusive: median-0.952%, interval[-3.249%,+2.688%],17/32 improving, sign p.430, healthy AA[-2.561%,+1.320%], execution orders-1.820%/+1.342%. Stop without confirmation26289 or full candidate gates. No qualifying runtime gain. Source/accepted CLI/metadata/profile restored exactly; restored formatting, fast940 and full987 pass. Native accepted-row annotation, complete source/oracle/proof, builds/tests/freezes, bounded results/counters and controlled screen: `target/perf-weight-floor/`; accepted annotation is also retained in `target/perf-rank-reuse/primal-row.asm`.
 
 - Consecutive-destination SSE2 ordinary ranked-row products. Static fixed-pair coverage on scaled ADLITTLE/BORE3D/DEGEN2/PILOT4 is86/209,379/770,177/2122,1539/2647 pairs (no duplicate pairs in those models). Immutable model metadata admits only finite-coefficient rows with at least8 entries and two-thirds consecutive pairs; nonfinite input values retain the original scalar loop. Each packed lane updates a distinct output with the same multiply/add and per-output term order; gaps, duplicate destinations, rank ties and exceptional inputs retain their scalar behavior. The independently frozen complete original product, captured AFIRO rho fixture, random finite/extreme/duplicate/rank-tie inputs, existing nonfinite payloads and all16 MXCSR rounding/flush combinations pass; matching fixed39 PGO and fast940 pass for both variants. Eight bounded ADLITTLE/BORE3D pairs and three PILOT4 pairs preserve complete result/exit objects. V1 checks pairs and two-element slices dynamically: PILOT4 instructions+0.944%, cycles+0.495%; small instructions+0.057/+0.078%. V2 stores flat ordered consecutive-run ranges once per immutable model row, validates one destination slice per run and packs its independent pairs. Independent plan tests verify complete ordered partitioning, including duplicates and unsorted gaps. It still loses: PILOT4 instructions+0.814%, cycles+1.396%; small instructions+0.022/+0.119%. Native code confirms packed arithmetic, V1 pair/slice checks and V2 planned-run loops; no exclusive cause is assigned to whole-program counter changes. Neither enters official timing: seeds25217/25289 unused, no full candidate gates. Accepted source/CLI/metadata/profile restored exactly; formatting, fast940 and full987 pass. Static measurement, original/candidate source/proofs, tests/builds/freezes, complete result/counter pairs, native assembly and decisions: `target/perf-rank-pairs/` and `v2/`. This rejects the tested pair/run metadata traversal, not every independent-destination implementation.
 

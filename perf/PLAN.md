@@ -219,8 +219,9 @@ measured.
   repeats. Full key/lookup/copy feasibility is favorable; matching-PGO integration
   reduces target instructions. Fixed fx screen 30217 remains inconclusive under
   conservative AA separation; do not repeat or extend it. Deep-copy cache remains
-  unapplied. Fresh auxiliary numeric fields are read-only after construction;
-  immutable-base ownership sharing would be a distinct, unimplemented experiment.
+  unapplied. Fresh auxiliary numeric fields are read-only after construction,
+  but the current owner already removes most of those historical repeats;
+  see the current constructor census before proposing shared ownership.
   Full FTRAN/BTRAN dependency and version-aware input measurement is complete
   across 18 bounded cases: 132,997 nonfresh calls have only two repeated full-FTRAN
   keys and no needed/BTRAN repeats. Do not implement a general mutable-version
@@ -235,8 +236,10 @@ measured.
   Fixed fx screen 31217 is inconclusive, including opposite order medians; do
   not repeat or extend it. This cache remains unapplied. Next pursue larger
   factor-production/installation ownership savings, with exact numerical and
-  allocation evidence. Auxiliary immutable-base sharing remains unimplemented;
-  general producer/pre-overlay numerical identity is now disproven. The paired
+  allocation evidence. Current post-owner auxiliary-constructor measurements
+  show only 31/122 eight-entry hits on fx/Quad (0.158/0.362 ms of observed work);
+  do not implement shared-base caching from the stale pre-owner repeat counts.
+  General producer/pre-overlay numerical identity is now disproven. The paired
   SC50A k1 supplied subset matches, as do 880 small/DEGEN2 supplied values, but a
   deterministic 51x51 dense handoff differs by one ULP before the mandatory
   overwrite. Do not treat sparse matches as a global proof or bypass the overlay.
@@ -259,7 +262,8 @@ measured.
   fast940 parity, and lowers instructions, but fixed screen34217 establishes a
   Quad slowdown beyond AA uncertainty. Reject; no34289 or extension. Do not
   repeat the tested native dense U/eta/L variants from zero counts or isolated
-  component improvements. Auxiliary immutable-base sharing remains unimplemented.
+  component improvements. Current post-owner auxiliary reuse does not justify
+  sharing from historical repeat counts; use the current census in STATE.md.
   The ordinary-primal ranked-row consumer audit and maintained eligibility
   component are complete. Ordinary pivot streams need only nonbasics, all slacks,
   q and leave; the cost-change consumer must retain the full product. PILOT4 can
