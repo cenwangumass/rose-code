@@ -1,0 +1,106 @@
+{
+  "source": "5447f64d",
+  "experiment": "Compile standard barrier front assembly into ordered contribution destinations, retaining triple/single product grouping, operand order, live D/A/scale values and each float rounding. Include construction in whole solve.",
+  "configuration": "Pinned Rust 1.98.1, ordinary ThinLTO/glibc, CPU 2; no PGO.",
+  "before_sha256": "fa615c020cf4eaf9b632ceeab247e68e4382b1782eaa89420911222b9a6ba70a",
+  "candidate_sha256": "8103274f745607471d949c8d5447885a238d54e90d53495a879fb4979de55e06",
+  "independent_oracle": "Full original standard assemble function copied before rewriting; source-identical reconstruction verified.",
+  "differential_tests": "Every front of AFIRO, SC50A, BLEND, ADLITTLE and BORE3D, scaled and unscaled, single/double rounding, live coefficient changes including signed zero, subnormal, huge/tiny, infinity and NaN inputs. Component test passes.",
+  "component_probe": {
+    "all_five_models_build_seconds": 0.000653251,
+    "original_100_repetitions_seconds": 0.004577679,
+    "compiled_100_repetitions_seconds": 0.003928077,
+    "writes": 12090,
+    "scope": "Diagnostic one-process all-front probe, including generic-dispatch fronts. Construction is separate here; this is not a whole-solve speedup."
+  },
+  "whole_solve_results": "All 40 complete result/exit objects agree, after removing only diagnostics.seconds. Timing and counters sequential, with no parity/test job overlap.",
+  "rows": [
+    {
+      "model": "afiro",
+      "method": "barrier",
+      "profile": "release",
+      "max_iterations": 100,
+      "pairs": 4,
+      "instructions:u": {
+        "before": 3259281.5,
+        "after": 3301817.0,
+        "change_percent": 1.305057571737822
+      },
+      "cycles:u": {
+        "before": 3469910.5,
+        "after": 3840048.0,
+        "change_percent": 10.667061873786077
+      }
+    },
+    {
+      "model": "adlittle",
+      "method": "barrier",
+      "profile": "release",
+      "max_iterations": 100,
+      "pairs": 4,
+      "instructions:u": {
+        "before": 11654807.5,
+        "after": 11828588.0,
+        "change_percent": 1.491062808201682
+      },
+      "cycles:u": {
+        "before": 8085655.5,
+        "after": 7900197.0,
+        "change_percent": -2.2936730361564406
+      }
+    },
+    {
+      "model": "bore3d",
+      "method": "barrier",
+      "profile": "release",
+      "max_iterations": 100,
+      "pairs": 4,
+      "instructions:u": {
+        "before": 72845415.5,
+        "after": 73802048.0,
+        "change_percent": 1.313236383420735
+      },
+      "cycles:u": {
+        "before": 36931627.0,
+        "after": 37633918.0,
+        "change_percent": 1.9015977823018781
+      }
+    },
+    {
+      "model": "degen2",
+      "method": "barrier",
+      "profile": "release",
+      "max_iterations": 100,
+      "pairs": 4,
+      "instructions:u": {
+        "before": 258861229.0,
+        "after": 261098559.0,
+        "change_percent": 0.8642970631959734
+      },
+      "cycles:u": {
+        "before": 102709823.0,
+        "after": 112604000.5,
+        "change_percent": 9.633136550142819
+      }
+    },
+    {
+      "model": "degen3",
+      "method": "barrier",
+      "profile": "release",
+      "max_iterations": 100,
+      "pairs": 4,
+      "instructions:u": {
+        "before": 2555018023.0,
+        "after": 2561017718.0,
+        "change_percent": 0.23482006569000013
+      },
+      "cycles:u": {
+        "before": 1095532174.0,
+        "after": 1094983841.0,
+        "change_percent": -0.05005174772713117
+      }
+    }
+  ],
+  "result": "Rejected at initial whole-solver instruction screen: no model reduces instructions. No matching-PGO build, formal timing screen or full candidate gates.",
+  "raw_artifacts": "target/perf-compiled-assembly/"
+}

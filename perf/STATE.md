@@ -1912,6 +1912,8 @@ restoration: `target/perf-eta-long/`.
 
 - Borrow nucleus elimination row/column chains instead of cloning them: fast parity 940/940 passes, but CPU-2 three-run PEROLD solve 0.130605 -> 0.129989 s (-0.47%) stays within the old 0.001630 s spread despite instructions -0.24%. DEGEN2/DEGEN3 dual-release timing also stays within spread, with instructions only -0.05/-0.03%. Reverted (`target/perf-elimborrow-target-{before,after}.txt`, `target/perf-elimborrow-target-summary.json`).
 
+- Compiled standard barrier assembly into ordered scalar contribution destinations preserves the complete frozen assembly oracle on all fronts of AFIRO/SC50A/BLEND/ADLITTLE/BORE3D, including live coefficients/scaling and single/double rounding. Construction costs 0.653 ms across the small models versus 0.650 ms saved by 100 repeated assemblies. Whole-solver instructions increase on all five measured models (+0.235% to +1.491%); DEGEN2 cycles increase 9.63%. All 40 complete result/exit objects agree. Rejected before formal timing/PGO integration. Production source restored; full parity passes 987/987. Evidence: [compiled-assembly.json](evidence/compiled-assembly.json), raw candidate/oracle/results in `target/perf-compiled-assembly/`.
+
 ## Tried, breaks parity
 
 None.
