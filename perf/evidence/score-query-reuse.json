@@ -1,0 +1,713 @@
+{
+  "source": "18061fe9",
+  "measurement_parent": "81f0d723",
+  "configuration": "isolated source copy,release tests,CPU2;primalcontrolled;original scalar score executed on every query;no per-query timers. Per-Solver last-key simulation reset at actual Solver construction.",
+  "decision": "Reject the query-time whole-score cache: fixed preliminary pilot53101 adds8.677%targetinstructions and has5.861%slower80BAU solve median,withbothordersslower. No formal53131/53197screen,noextension,no candidatefullgates/sweep. High exact-key repeat rate does not establish profitable lookup.",
+  "qualification": [
+    "All7observed/plain complete Debug SolveResult pairs agree;every repeated complete key also reproduces None/Some and exact result bits. Contexts outside nearest/masked/gradual remain unsupported for admission.",
+    "Categories distinguish early rejection,tolerance rejection,faithful-free infinity,and actual d*d/w. Cheap rejected-query hits are not division savings.",
+    "Complete keys include eligibility/side flags,raw d/w/tolerance controls,immutable bounds and MXCSRcontrols. Hits require recorded original exit sticky flags to be present at current query entry;no eager tolerance arithmetic.",
+    "This count does not measure lookup,setup,generation or retained-memory costs. The entire score self sample share is not removable;prior global-bucket skipped-call counts do not establish division reuse.",
+    "Existing feasibility-class tracking is a separate settled trial. Runtime and acceptedCLI untouched. No timing gain or referencecomparison claimed."
+  ],
+  "models": [
+    {
+      "admitted": [
+        [
+          240,
+          144,
+          0,
+          47
+        ],
+        [
+          1,
+          8,
+          0,
+          4
+        ],
+        [
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "cap": 1000,
+      "categories": [
+        "early_None",
+        "tolerance_None",
+        "faithful_free_Inf",
+        "division_Some"
+      ],
+      "exact": [
+        [
+          240,
+          144,
+          0,
+          47
+        ],
+        [
+          1,
+          8,
+          0,
+          4
+        ],
+        [
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "families": [
+        "price",
+        "update_list",
+        "other"
+      ],
+      "iterations": 10,
+      "model": "afiro",
+      "refactorizations": 3,
+      "solvers": 1,
+      "status": "Optimal",
+      "total": [
+        [
+          280,
+          167,
+          0,
+          57
+        ],
+        [
+          22,
+          52,
+          0,
+          22
+        ],
+        [
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "unsupported": 0,
+      "totals_by_category": [
+        302,
+        219,
+        0,
+        79
+      ],
+      "admitted_by_category": [
+        241,
+        152,
+        0,
+        51
+      ],
+      "division_repeat_percent": 64.55696202531645
+    },
+    {
+      "admitted": [
+        [
+          788,
+          275,
+          0,
+          75
+        ],
+        [
+          0,
+          6,
+          0,
+          5
+        ],
+        [
+          103,
+          11,
+          0,
+          0
+        ]
+      ],
+      "cap": 1000,
+      "categories": [
+        "early_None",
+        "tolerance_None",
+        "faithful_free_Inf",
+        "division_Some"
+      ],
+      "exact": [
+        [
+          788,
+          275,
+          0,
+          75
+        ],
+        [
+          0,
+          6,
+          0,
+          5
+        ],
+        [
+          103,
+          11,
+          0,
+          0
+        ]
+      ],
+      "families": [
+        "price",
+        "update_list",
+        "other"
+      ],
+      "iterations": 25,
+      "model": "sc50a",
+      "refactorizations": 6,
+      "solvers": 1,
+      "status": "Optimal",
+      "total": [
+        [
+          906,
+          344,
+          0,
+          85
+        ],
+        [
+          221,
+          195,
+          0,
+          50
+        ],
+        [
+          140,
+          56,
+          0,
+          0
+        ]
+      ],
+      "unsupported": 0,
+      "totals_by_category": [
+        1267,
+        595,
+        0,
+        135
+      ],
+      "admitted_by_category": [
+        891,
+        292,
+        0,
+        80
+      ],
+      "division_repeat_percent": 59.25925925925926
+    },
+    {
+      "admitted": [
+        [
+          1767,
+          414,
+          0,
+          293
+        ],
+        [
+          0,
+          13,
+          0,
+          43
+        ],
+        [
+          172,
+          7,
+          0,
+          0
+        ]
+      ],
+      "cap": 1000,
+      "categories": [
+        "early_None",
+        "tolerance_None",
+        "faithful_free_Inf",
+        "division_Some"
+      ],
+      "exact": [
+        [
+          1767,
+          414,
+          0,
+          293
+        ],
+        [
+          0,
+          13,
+          0,
+          43
+        ],
+        [
+          172,
+          7,
+          0,
+          0
+        ]
+      ],
+      "families": [
+        "price",
+        "update_list",
+        "other"
+      ],
+      "iterations": 43,
+      "model": "blend",
+      "refactorizations": 5,
+      "solvers": 1,
+      "status": "Optimal",
+      "total": [
+        [
+          1985,
+          487,
+          0,
+          354
+        ],
+        [
+          999,
+          640,
+          0,
+          371
+        ],
+        [
+          234,
+          80,
+          0,
+          0
+        ]
+      ],
+      "unsupported": 0,
+      "totals_by_category": [
+        3218,
+        1207,
+        0,
+        725
+      ],
+      "admitted_by_category": [
+        1939,
+        434,
+        0,
+        336
+      ],
+      "division_repeat_percent": 46.3448275862069
+    },
+    {
+      "admitted": [
+        [
+          1845,
+          1140,
+          0,
+          855
+        ],
+        [
+          6,
+          55,
+          0,
+          71
+        ],
+        [
+          119,
+          26,
+          0,
+          0
+        ]
+      ],
+      "cap": 1000,
+      "categories": [
+        "early_None",
+        "tolerance_None",
+        "faithful_free_Inf",
+        "division_Some"
+      ],
+      "exact": [
+        [
+          1845,
+          1140,
+          0,
+          855
+        ],
+        [
+          6,
+          55,
+          0,
+          71
+        ],
+        [
+          119,
+          26,
+          0,
+          0
+        ]
+      ],
+      "families": [
+        "price",
+        "update_list",
+        "other"
+      ],
+      "iterations": 63,
+      "model": "adlittle",
+      "refactorizations": 9,
+      "solvers": 1,
+      "status": "Optimal",
+      "total": [
+        [
+          2058,
+          1546,
+          0,
+          1104
+        ],
+        [
+          360,
+          1509,
+          0,
+          1186
+        ],
+        [
+          142,
+          164,
+          0,
+          0
+        ]
+      ],
+      "unsupported": 0,
+      "totals_by_category": [
+        2560,
+        3219,
+        0,
+        2290
+      ],
+      "admitted_by_category": [
+        1970,
+        1221,
+        0,
+        926
+      ],
+      "division_repeat_percent": 40.43668122270742
+    },
+    {
+      "admitted": [
+        [
+          13711,
+          2611,
+          0,
+          883
+        ],
+        [
+          39,
+          33,
+          0,
+          40
+        ],
+        [
+          731,
+          56,
+          0,
+          0
+        ]
+      ],
+      "cap": 1000,
+      "categories": [
+        "early_None",
+        "tolerance_None",
+        "faithful_free_Inf",
+        "division_Some"
+      ],
+      "exact": [
+        [
+          13711,
+          2611,
+          0,
+          883
+        ],
+        [
+          39,
+          33,
+          0,
+          40
+        ],
+        [
+          731,
+          56,
+          0,
+          0
+        ]
+      ],
+      "families": [
+        "price",
+        "update_list",
+        "other"
+      ],
+      "iterations": 62,
+      "model": "bore3d",
+      "refactorizations": 6,
+      "solvers": 1,
+      "status": "Optimal",
+      "total": [
+        [
+          14825,
+          2989,
+          0,
+          1016
+        ],
+        [
+          999,
+          1337,
+          0,
+          617
+        ],
+        [
+          880,
+          216,
+          0,
+          0
+        ]
+      ],
+      "unsupported": 0,
+      "totals_by_category": [
+        16704,
+        4542,
+        0,
+        1633
+      ],
+      "admitted_by_category": [
+        14481,
+        2700,
+        0,
+        923
+      ],
+      "division_repeat_percent": 56.52173913043478
+    },
+    {
+      "admitted": [
+        [
+          52113,
+          16158,
+          0,
+          26466
+        ],
+        [
+          1338,
+          3636,
+          0,
+          20114
+        ],
+        [
+          904,
+          32,
+          0,
+          0
+        ]
+      ],
+      "cap": 1000,
+      "categories": [
+        "early_None",
+        "tolerance_None",
+        "faithful_free_Inf",
+        "division_Some"
+      ],
+      "exact": [
+        [
+          52113,
+          16158,
+          0,
+          26466
+        ],
+        [
+          1338,
+          3636,
+          0,
+          20114
+        ],
+        [
+          904,
+          32,
+          0,
+          0
+        ]
+      ],
+      "families": [
+        "price",
+        "update_list",
+        "other"
+      ],
+      "iterations": 531,
+      "model": "degen2",
+      "refactorizations": 16,
+      "solvers": 1,
+      "status": "Optimal",
+      "total": [
+        [
+          56015,
+          18889,
+          0,
+          28463
+        ],
+        [
+          40680,
+          41212,
+          0,
+          47034
+        ],
+        [
+          1324,
+          632,
+          0,
+          0
+        ]
+      ],
+      "unsupported": 0,
+      "totals_by_category": [
+        98019,
+        60733,
+        0,
+        75497
+      ],
+      "admitted_by_category": [
+        54355,
+        19826,
+        0,
+        46580
+      ],
+      "division_repeat_percent": 61.69781580725062
+    },
+    {
+      "admitted": [
+        [
+          747732,
+          1655731,
+          0,
+          1581892
+        ],
+        [
+          1083,
+          72601,
+          0,
+          1065828
+        ],
+        [
+          5115,
+          7687,
+          0,
+          0
+        ]
+      ],
+      "cap": 6000,
+      "categories": [
+        "early_None",
+        "tolerance_None",
+        "faithful_free_Inf",
+        "division_Some"
+      ],
+      "exact": [
+        [
+          747732,
+          1655731,
+          0,
+          1581892
+        ],
+        [
+          1083,
+          72601,
+          0,
+          1065828
+        ],
+        [
+          5115,
+          7687,
+          0,
+          0
+        ]
+      ],
+      "families": [
+        "price",
+        "update_list",
+        "other"
+      ],
+      "iterations": 5022,
+      "model": "80bau3b",
+      "refactorizations": 56,
+      "solvers": 1,
+      "status": "Optimal",
+      "total": [
+        [
+          770040,
+          2036703,
+          0,
+          1695628
+        ],
+        [
+          82335,
+          1776709,
+          0,
+          1714719
+        ],
+        [
+          5520,
+          18602,
+          0,
+          0
+        ]
+      ],
+      "unsupported": 0,
+      "totals_by_category": [
+        857895,
+        3832014,
+        0,
+        3410347
+      ],
+      "admitted_by_category": [
+        753930,
+        1736019,
+        0,
+        2647720
+      ],
+      "division_repeat_percent": 77.63784740966241
+    }
+  ],
+  "accepted_source_hashes": "target/perf-score-reuse/source-hashes.json",
+  "artifacts": "target/perf-score-reuse/:prepare_probe.py,probe.rs,source/,build.log,count-binary,small.log,80bau.log;isolated prototype/frozen scalar/tests in target/perf-score-candidate/",
+  "baseline_isolated_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+  "verification": {
+    "release_tests": "37groups,292passed,0failed,22ignored;target/perf-factor-output/release-tests.log",
+    "full_parity": "987/987;target/perf-factor-output/full-parity.log",
+    "accepted_cli_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "scope": "unchanged accepted runtime passes fullgates;isolated cache rejected at preliminarycostpilot"
+  },
+  "prototype": {
+    "source": "target/perf-score-candidate/source/src/{simplex.rs,primal_scores.rs,primal_score_oracle.rs}",
+    "baseline_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "candidate_sha256": "843e6428eaf9b48e05d90e413e9c2da418960c4272b837f042477428dc8d1530",
+    "source_qualification": "isolated source copy;scalar score body remains literal original;frozen opaque score copied beforeediting;publicrootruntime untouched",
+    "tests": {
+      "unit_and_small_live": "2passed,1ignored;tests-opaque.log",
+      "full_80bau_live": "1passed;live-80bau-opaque.log;every cache-return path checked againstfrozen scalar values/FPstatus and>1000integratedhits asserted",
+      "cache_protocol": "16rounding/flush configurations,signedzeros,subnormals,overflow,NaNpayloads,4096rawbitrandomcases,stickyflags,control/generation invalidation",
+      "fast_parity": "940/940,fast-parity.log",
+      "qualification": "cache protocol and measured live paths only;not full candidate qualification or all-platform support"
+    },
+    "oracle_correction": "Initial pure numeric test helper was optimized across explicit MXCSRchanges,invalidating its expected FPstatus read. Disassembly retained (failed-fp-test.asm;ldmxcsr0x932e3b followed bystmxcsr0x932e45 withno interveningnumericcall);opaque function-pointer helper fixes it. Original failedtest executable/source/log and finaltests retained.",
+    "pilot_plan": "target/perf-score-candidate/pilot/plan.json;4AB+2AApermodel,CPU2,boundedfullsolves;preliminary5%targetgate",
+    "pilot": {
+      "degen2": {
+        "solve_percent": 5.813951563068054,
+        "instruction_percent": 2.9822226503232407,
+        "cycle_percent": 4.158594322177578,
+        "AA_median_percent": -5.908903752475847,
+        "orders": {
+          "AB": -1.2418759782340971,
+          "BA": 9.963880362210364
+        }
+      },
+      "80bau3b": {
+        "solve_percent": 5.861162154308008,
+        "instruction_percent": 8.676835730693998,
+        "cycle_percent": 5.820874132922693,
+        "AA_median_percent": 0.5131888247277727,
+        "orders": {
+          "AB": 2.5256300687153788,
+          "BA": 8.546651478386313
+        }
+      }
+    },
+    "artifacts": "target/perf-score-candidate/:baseline/candidatebinaries,allbuilds,sourceversions,apply/fixscripts,frozenoracle,failedandfinalFPtests/disassembly,fastparity,allpilotrawresults/counters/order/AAcontrols"
+  }
+}

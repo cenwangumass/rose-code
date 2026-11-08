@@ -95,6 +95,12 @@ baseline. No exceptions, no "within a ULP", no re-recording.
 
 ## Measuring
 
+- Put temporary diagnostic probes in an isolated source copy/workspace with a
+  separate Cargo target directory. Preserve source hashes and fixtures, and
+  validate complete results. This avoids invalidating the accepted build and
+  relinking all integration tests after restoring diagnostic edits. The isolated
+  baseline for score reuse is byte-identical to the accepted CLI; retain that
+  check when using copied builds for comparisons.
 - A probe built with a preceding source's PGO profile is preliminary. For a changed
   representation or constructor, verify important codegen conclusions with the matching
   fixed 39-case profile; preliminary counts can change even outside the changed runtime
@@ -383,20 +389,29 @@ measured.
   support-only key gives one possible SC50A hit, two BLEND hits, and zero elsewhere.
   Other L calls and cross-epoch owner sharing remain unmeasured, without a high
   reuse invariant. No cache or large-model escalation. See evidence/l-prefix-reuse-scope.json.
-  Next discriminate intermediate outgoing factor materialization: Structure
-  formation (lu_order.rs:102), initial packed-L/transpose/Markowitz conversions
-  (ftran_order.rs:1114), pricing geometry (dual.rs:1865), and Structure retirement.
-  Healthy mode-switch source regions identify 9.58% of batch samples; removing
-  explicit shared-geometry regions leaves 5.48%, including necessary work and
-  further overlap. This is approximate instruction attribution, not an eligible
-  time bound. Use existing source/assembly maps first, then only a disjoint
-  whole-region/lifetime scope if needed. Subtract prior shared-L/pricing and
-  fresh-U trials before a consuming producer/installer prototype. Exclude
-  required numerical replay, pricing recurrences, and final mutable storage.
-  Do not relabel prior banks, arenas, or pivot frames. Cached PEROLD stages and
-  healthy mode-switch/extended-witness profiles are in evidence/mode-switch-scope.json;
-  all 194 full outcomes agree. The first 8M stack recording throttled and is
-  excluded; 32M stacks are clean. Periodic bias and skipped callees limit attribution.
+  Direct outgoing-factor scopes reject a consuming installer: formation plus
+  all Structure retirement is 3.109% of mode-switch, including required numeric
+  work. Fresh metadata outside shared-L/transpose and Markowitz conversion is
+  about 0.08%. Original lifetimes and all complete results are preserved.
+  See evidence/factor-output-scope.json. Do not credit the sampled 9.58% union
+  or 5.48% approximate residual as removable time.
+  Healthy accepted-release primal-controlled profiles now cover DEGEN2 and
+  80BAU3B. The latter's classification/score/row-update families are substantial,
+  but old feasibility tracking and global buckets remain settled. Whole-score
+  exact query reuse is separately rejected: 77.64% division repeats still yield
+  +8.677% target instructions and +5.861% solve median in fixed pilot 53101.
+  No formal 53131/53197 screen or pilot extension. Evidence:
+  primal-controlled-scope.json and score-query-reuse.json under evidence/.
+  Next measure actual ordinary-primal rho/tau BTRAN pairs: both RHS exist before
+  rho and use the same factor before replacement. Start with SC50A (8/8 frozen
+  BTR/BTT records), then BLEND (40/40) and DEGEN2 (181/181); these tag counts
+  are not path-overlap evidence. Count common U/eta/L-transpose coefficient
+  visits compatible with both original traversal orders, separating sparse,
+  dense and partial paths, before implementing a paired executor. Preserve the
+  current pivot swap-removal, row_cached, final work/bt_dense and dump order.
+  Do not fuse rank_products with Devex file-order dots: their accumulation
+  orders and skipped arithmetic differ. Do not tune keys/masks to rescue the
+  failed query cache or repeat prior direct BTRAN rank/layout ownership trials.
   The scalar prefilter and prior rank/layout trials remain
   rejected; do not infer further gains from isolated predicate costs.
   Comparator alignment stays centralized; normal lunum's build/cache transport

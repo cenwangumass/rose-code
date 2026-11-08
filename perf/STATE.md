@@ -1568,17 +1568,59 @@ or exact cache hit rates. The inclusive L profile also contains mutable etas.
 No cache or larger-model escalation follows. [l-prefix-reuse-scope.json](evidence/l-prefix-reuse-scope.json),
 raw evidence and scripts are in `target/perf-l-prefix/`.
 
-In progress: intermediate outgoing factor materialization across producer and
-installer. Healthy mode-switch source regions identify 236/2,464 samples (9.58%
-of the batch) in Structure output formation, initial fresh conversion, pricing
-geometry, and Structure retirement. Excluding 101 samples in explicitly shared
-L/transpose/predecessor regions leaves 135 (5.48%), still including required
-work and unquantified overlap. This is not an exclusive-time or removable-cost
-bound. Required fresh-U numerical replay, pricing recurrences, and final mutable
-factor storage are outside this proposed lifetime. No consuming producer/installer
-is implemented. Prior banks/arenas, shared geometry, fresh-U producers, and pivot
-frames are not reopened by allocator mass. Source regions and limitations:
-[mode-switch-scope.json](evidence/mode-switch-scope.json).
+Direct output-lifetime scopes rule out the consuming factor producer/installer.
+Formation plus all Structure retirement is 3.109% of the full mode-switch solve,
+including required singleton arithmetic. Fresh-prefix metadata outside the
+previously shared L/transpose and Markowitz conversion scopes is about 0.08%.
+SC50A through DEGEN2 formation/retirement scopes are 3.2–4.0%; tiny AFIRO is
+5.85% with more material instrumentation overhead. All 21 enabled/disabled
+pairs agree on complete SolveResult objects. Formation/retirement counts balance;
+mode-switch has 17 formations, 15 successful-refactor retirements, two startup/
+other retirements, and no retry/error retirement. Test-only zero-sized first/last
+fields bracket existing field destruction without moving retirement earlier.
+These are nested release-test wall scopes, not accepted-release removable bounds;
+marker overhead is included. No consuming installer follows. Source and accepted
+CLI are restored byte for byte. [factor-output-scope.json](evidence/factor-output-scope.json),
+source, calibration, marker limits, and raw data are in `target/perf-factor-output/`.
+
+The current accepted-release controlled-primal profiles cover DEGEN2 first, then
+80BAU3B. Healthy 80BAU period-32M self samples put feasibility classification at
+13.76%, score at 11.87%, ordinary row update at 7.21%, BTRAN at 6.21%, dot_lanes
+at 4.82%, and candidate-list update at 3.78%. DEGEN2 has 2,434 healthy samples
+and 97.64% direct-event coverage; 80BAU has 2,384 samples and 99.70% coverage.
+The original 80BAU period-8M recording throttled and is retained but excluded.
+All 178 profiling/counter complete outputs and exits match the accepted sweep.
+These are whole-batch instruction fractions, not solve-time or removable bounds.
+[primal-controlled-scope.json](evidence/primal-controlled-scope.json), all raw
+recordings, outcomes, counters, and scorer annotation are in `target/perf-primal-scope/`.
+The prior feasibility-tracking and global pricing-bucket trials remain settled.
+
+Query-time exact whole-score reuse was tested independently of global buckets.
+On 80BAU, 2,647,720 of 3,410,347 division-producing queries repeat complete keys
+and satisfy conservative FP-status admission (77.64%). The isolated prototype
+retains original list traversal, scalar fallback, and WORK. Cache-protocol tests
+cover all 16 rounding/flush modes and special/random values; every live small/
+80BAU query is checked against the frozen scalar, with real cache hits asserted.
+Fast parity passes 940/940. The fixed cost pilot (seed 53101, four mixed and two
+AA pairs per model) rejects it: 80BAU instructions +8.677%, cycles +5.821%, solve
+median +5.861%, both orders slower. DEGEN2 instructions rise 2.982%.
+No formal 53131/53197 screen, extension, full candidate gates, or sweep follows.
+The accepted source/CLI are unchanged. The initial FP oracle's optimized-away
+call and its opaque-call correction are retained with the other evidence.
+[score-query-reuse.json](evidence/score-query-reuse.json), complete count/prototype/
+frozen-oracle/pilot artifacts are in `target/perf-score-{reuse,candidate}/`.
+
+Ordinary-primal rho/tau BTRAN pairing remains a conditional, unimplemented lead.
+Both RHS can be formed before rho using the same pre-replacement factor; their
+actual compatible coefficient traversal overlap is unmeasured. Frozen release
+BTR/BTT tag counts are SC50A 8/8, BLEND 40/40, and DEGEN2 181/181. Controlled
+80BAU has 3,949/3,225; its capped release corpus run has neither. These are tag
+counts, not paired-path or removable-time estimates. Preserve the existing
+pivot swap-removal (alpha_ordered is still false there), row_cached, final
+work/bt_dense, rho-then-tau dump/WORK publication, and separate scalar paths.
+The following rank_products and Devex dot loops have different row order and
+conditional arithmetic, so a common matrix-product pass is not qualified.
+Cached tag-count extraction: `target/perf-primal-scope/paired-btran-tag-counts.json`.
 
 The exact Plan census counts 1,008 wide GEMM calls/factor on DEGEN3, 799 zero-C;
 fifteen factors describe 83.2 MB of logical cn buffers, 37.4% unused cells whose

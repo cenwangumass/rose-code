@@ -1,0 +1,435 @@
+{
+  "source": "18061fe9",
+  "measurement_parent": "81f0d723",
+  "configuration": "accepted ordinary ThinLTO/glibc release CLI,CPU2;primal controlled,DEGEN2cap1000/full531iterations,80BAUcap6000/full5022iterations. Bash/timeout launchers measured;JSON parsing and validation outside PMU process.",
+  "qualification": [
+    "Whole-batch instruction self attribution includes startup,CLIserialization and launchers;not solve-time or removable bounds. Fixed-period phase aliasing limits regional accuracy;short-process tails reduce represented events.",
+    "All full result objects and exit codes match the accepted executor sweep after removing diagnostics.seconds only. All native counters report100%running.",
+    "First80BAU8Mrecording had6throttle/6unthrottle events and is excluded quantitatively;all data,queries and outputs retained.32Mreplacement haszero lost/throttle events.",
+    "Feasibility-class lifetime matches a prior inconclusive tracking trial,which remains settled. Global pricing-bucket maintenance was separately rejected;query-only score-result reuse needs its own count and whole-solve cost evidence.",
+    "Runtime source and acceptedCLI unchanged;no speedup or referencecomparison claimed."
+  ],
+  "profiles": {
+    "degen2": {
+      "period": 8000000,
+      "audit": {
+        "PERF_RECORD_SAMPLE": 2434,
+        "PERF_RECORD_LOST": 0,
+        "PERF_RECORD_THROTTLE": 0,
+        "PERF_RECORD_UNTHROTTLE": 0
+      },
+      "direct_batch_instructions": 19941765981,
+      "represented_instructions": 19472000000,
+      "represented_fraction": 0.9764431103319746,
+      "top_symbols": [
+        {
+          "self_percent": 8.09,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::ftran_order::RefStruct>::btran"
+        },
+        {
+          "self_percent": 6.82,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::ftran_order::RefStruct>::ftran_with"
+        },
+        {
+          "self_percent": 6.74,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "_int_malloc"
+        },
+        {
+          "self_percent": 3.41,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::simplex::Solver>::score"
+        },
+        {
+          "self_percent": 3.25,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::ftran_order::RefStruct>::fresh"
+        },
+        {
+          "self_percent": 3.12,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "rose::lu_order::nucleus::<f64>"
+        },
+        {
+          "self_percent": 3.08,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "_int_free_merge_chunk"
+        },
+        {
+          "self_percent": 3.08,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "rose::simplex::primal_row_update_by::<false, rose::simplex::RowMaskIndices>"
+        },
+        {
+          "self_percent": 2.63,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "rose::simplex::solve_primal"
+        },
+        {
+          "self_percent": 2.47,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::ftran_order::RefStruct>::lstage_num"
+        },
+        {
+          "self_percent": 2.47,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::simplex::Solver>::cost_change_original"
+        },
+        {
+          "self_percent": 2.42,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::simplex::Internal>::rank_products"
+        },
+        {
+          "self_percent": 2.38,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "malloc"
+        },
+        {
+          "self_percent": 2.26,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "cfree@GLIBC_2.2.5"
+        },
+        {
+          "self_percent": 2.26,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::simplex::Solver>::update_list"
+        },
+        {
+          "self_percent": 2.18,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::simplex::Solver>::sig_class"
+        },
+        {
+          "self_percent": 2.14,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::lu::Factor>::factor::<&alloc::vec::Vec<(usize, f64)>>"
+        },
+        {
+          "self_percent": 2.1,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::ftran_order::RefStruct>::update"
+        },
+        {
+          "self_percent": 1.81,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<core::iter::adapters::map::Map<core::slice::iter::Iter<usize>, <rose::simplex::Solver>::sig::{closure#0}> as core::iter::traits::iterator::Iterator>::fold::<(), core::iter::traits::iterator::Iterator::for_each::call<i8, <alloc::vec::Vec<i8>>::extend_trusted<core::iter::adapters::map::Map<core::slice::iter::Iter<usize>, <rose::simplex::Solver>::sig::{closure#0}>>::{closure#0}>::{closure#0}>"
+        },
+        {
+          "self_percent": 1.77,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "__memmove_avx_unaligned_erms"
+        },
+        {
+          "self_percent": 1.77,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "unlink_chunk.isra.0"
+        },
+        {
+          "self_percent": 1.64,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "rose::simplex::phase1_ratio"
+        },
+        {
+          "self_percent": 1.52,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "_int_realloc"
+        },
+        {
+          "self_percent": 1.48,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "rose::simplex::dot_lanes"
+        }
+      ]
+    },
+    "80bau-lowrate": {
+      "period": 32000000,
+      "audit": {
+        "PERF_RECORD_SAMPLE": 2384,
+        "PERF_RECORD_LOST": 0,
+        "PERF_RECORD_THROTTLE": 0,
+        "PERF_RECORD_UNTHROTTLE": 0
+      },
+      "direct_batch_instructions": 76517628944,
+      "represented_instructions": 76288000000,
+      "represented_fraction": 0.9969990060177105,
+      "top_symbols": [
+        {
+          "self_percent": 13.76,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::simplex::Solver>::sig_class"
+        },
+        {
+          "self_percent": 11.87,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::simplex::Solver>::score"
+        },
+        {
+          "self_percent": 7.21,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "rose::simplex::primal_row_update_by::<false, rose::simplex::RowMaskIndices>"
+        },
+        {
+          "self_percent": 6.21,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::ftran_order::RefStruct>::btran"
+        },
+        {
+          "self_percent": 4.82,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "rose::simplex::dot_lanes"
+        },
+        {
+          "self_percent": 3.94,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "_int_malloc"
+        },
+        {
+          "self_percent": 3.78,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::simplex::Solver>::update_list"
+        },
+        {
+          "self_percent": 2.52,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "_int_free_merge_chunk"
+        },
+        {
+          "self_percent": 2.47,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<core::iter::adapters::map::Map<core::slice::iter::Iter<usize>, <rose::simplex::Solver>::sig::{closure#0}> as core::iter::traits::iterator::Iterator>::fold::<(), core::iter::traits::iterator::Iterator::for_each::call<i8, <alloc::vec::Vec<i8>>::extend_trusted<core::iter::adapters::map::Map<core::slice::iter::Iter<usize>, <rose::simplex::Solver>::sig::{closure#0}>>::{closure#0}>::{closure#0}>"
+        },
+        {
+          "self_percent": 2.35,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "rose::simplex::solve_primal"
+        },
+        {
+          "self_percent": 2.31,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<alloc::vec::Vec<usize> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<usize, core::iter::adapters::filter::Filter<core::ops::range::Range<usize>, <rose::simplex::Solver>::row_product_work::{closure#0}>>>::from_iter"
+        },
+        {
+          "self_percent": 2.14,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "__memset_avx2_unaligned_erms"
+        },
+        {
+          "self_percent": 1.8,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "unlink_chunk.isra.0"
+        },
+        {
+          "self_percent": 1.76,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::ftran_order::RefStruct>::ftran_with"
+        },
+        {
+          "self_percent": 1.59,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::simplex::Solver>::cost_change_original"
+        },
+        {
+          "self_percent": 1.38,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::simplex::Solver>::pivot_row_order_by"
+        },
+        {
+          "self_percent": 1.34,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::simplex::Solver>::set_d_from_y"
+        },
+        {
+          "self_percent": 1.3,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "cfree@GLIBC_2.2.5"
+        },
+        {
+          "self_percent": 1.26,
+          "command": "rose",
+          "DSO": "libc.so.6",
+          "symbol": "__memmove_avx_unaligned_erms"
+        },
+        {
+          "self_percent": 1.26,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<alloc::vec::Vec<(usize, usize)> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<(usize, usize), core::iter::adapters::map::Map<core::iter::adapters::filter::Filter<core::ops::range::Range<usize>, <rose::simplex::Internal>::rank_products::{closure#0}>, <rose::simplex::Internal>::rank_products::{closure#1}>>>::from_iter"
+        },
+        {
+          "self_percent": 1.13,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::simplex::Solver>::price"
+        },
+        {
+          "self_percent": 1.09,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::simplex::Solver>::recompute_primal_x"
+        },
+        {
+          "self_percent": 1.09,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "rose::lu_order::factor_structure_r::<f64>"
+        },
+        {
+          "self_percent": 1.01,
+          "command": "rose",
+          "DSO": "rose",
+          "symbol": "<rose::ftran_order::RefStruct>::fresh"
+        }
+      ]
+    }
+  },
+  "excluded_80bau_8M_audit": {
+    "PERF_RECORD_SAMPLE": 4776,
+    "PERF_RECORD_LOST": 0,
+    "PERF_RECORD_THROTTLE": 6,
+    "PERF_RECORD_UNTHROTTLE": 6
+  },
+  "batches": [
+    {
+      "model": "80bau3b",
+      "repetitions": 16,
+      "cap": 6000,
+      "method": "primal",
+      "profile": "controlled",
+      "binary_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+      "tag": "80bau-lowrate-record",
+      "validated": 16,
+      "result_digest": "6c40a52d7a65435c2252384c03279907ee988b00d3e1b2c8a3668b838efc0bcb"
+    },
+    {
+      "model": "degen2",
+      "repetitions": 64,
+      "cap": 1000,
+      "method": "primal",
+      "profile": "controlled",
+      "binary_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+      "tag": "degen2-record",
+      "validated": 64,
+      "result_digest": "f18e2a823f68d5797ff551e239a1102f7d3163536f00e14880ae55d87bb0a15a"
+    },
+    {
+      "model": "80bau3b",
+      "repetitions": 16,
+      "cap": 6000,
+      "method": "primal",
+      "profile": "controlled",
+      "binary_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+      "tag": "80bau-lowrate-counter",
+      "validated": 16,
+      "result_digest": "6c40a52d7a65435c2252384c03279907ee988b00d3e1b2c8a3668b838efc0bcb"
+    },
+    {
+      "model": "degen2",
+      "repetitions": 1,
+      "cap": 1000,
+      "method": "primal",
+      "profile": "controlled",
+      "binary_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+      "tag": "degen2-small-counter",
+      "validated": 1,
+      "result_digest": "f18e2a823f68d5797ff551e239a1102f7d3163536f00e14880ae55d87bb0a15a"
+    },
+    {
+      "model": "80bau3b",
+      "repetitions": 1,
+      "cap": 6000,
+      "method": "primal",
+      "profile": "controlled",
+      "binary_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+      "tag": "80bau-small-counter",
+      "validated": 1,
+      "result_digest": "6c40a52d7a65435c2252384c03279907ee988b00d3e1b2c8a3668b838efc0bcb"
+    },
+    {
+      "model": "degen2",
+      "repetitions": 64,
+      "cap": 1000,
+      "method": "primal",
+      "profile": "controlled",
+      "binary_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+      "tag": "degen2-counter",
+      "validated": 64,
+      "result_digest": "f18e2a823f68d5797ff551e239a1102f7d3163536f00e14880ae55d87bb0a15a"
+    },
+    {
+      "model": "80bau3b",
+      "repetitions": 8,
+      "cap": 6000,
+      "method": "primal",
+      "profile": "controlled",
+      "binary_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+      "tag": "80bau-counter",
+      "validated": 8,
+      "result_digest": "6c40a52d7a65435c2252384c03279907ee988b00d3e1b2c8a3668b838efc0bcb"
+    },
+    {
+      "model": "80bau3b",
+      "repetitions": 8,
+      "cap": 6000,
+      "method": "primal",
+      "profile": "controlled",
+      "binary_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+      "tag": "80bau-record",
+      "validated": 8,
+      "result_digest": "6c40a52d7a65435c2252384c03279907ee988b00d3e1b2c8a3668b838efc0bcb"
+    }
+  ],
+  "validated_complete_objects": 178,
+  "accepted_cli_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+  "artifacts": "target/perf-primal-scope/:prepare.py,validate.py,evidence.py,allbashscripts/manifests/rawresults+exits,*.data,reports,eventaudits,directcounters,score.asm",
+  "verification": {
+    "release_tests": "37groups,292passed,0failed,22ignored;target/perf-factor-output/release-tests.log",
+    "full_parity": "987/987;target/perf-factor-output/full-parity.log",
+    "accepted_cli_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "scope": "accepted unchanged runtime;isolated cache prototype remains unqualified"
+  }
+}
