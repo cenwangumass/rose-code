@@ -35,7 +35,9 @@ grep -v '^\s*#' perf/bench.txt | grep -v '^\s*$' | while read -r id model args; 
     cmd="$bin solve $model $args --output $tmp/result.json"
     : > "$tmp/solve.txt"
     # The conclude hook also runs after warm-ups on some hyperfine versions; summarize only the last N samples.
-    collect="python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))[\"diagnostics\"][\"seconds\"])' '$tmp/result.json' >> '$tmp/solve.txt'"
+    # -N applies to hooks too: append in Python, since shell redirection would
+    # otherwise become unused command arguments and leave the sample file empty.
+    collect="python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))[\"diagnostics\"][\"seconds\"], file=open(sys.argv[2], \"a\"))' '$tmp/result.json' '$tmp/solve.txt'"
     hyperfine -N -w 1 -r "$runs" -i --style none --prepare "rm -f '$tmp/result.json'" --conclude "$collect" --export-json "$tmp/h.json" "$cmd" > /dev/null 2>&1
     read -r med mn mx < <(python3 -c 'import json,sys; r=json.load(open(sys.argv[1]))["results"][0]; s=r["summary"]["time_wall_clock"] if "summary" in r else r; print(s["median"], s["min"], s["max"])' "$tmp/h.json")
     read -r solve solve_min solve_max < <(python3 - "$tmp/solve.txt" "$runs" <<'PY'
