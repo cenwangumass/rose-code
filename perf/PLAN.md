@@ -402,16 +402,18 @@ measured.
   +8.677% target instructions and +5.861% solve median in fixed pilot 53101.
   No formal 53131/53197 screen or pilot extension. Evidence:
   primal-controlled-scope.json and score-query-reuse.json under evidence/.
-  Next measure actual ordinary-primal rho/tau BTRAN pairs: both RHS exist before
-  rho and use the same factor before replacement. Start with SC50A (8/8 frozen
-  BTR/BTT records), then BLEND (40/40) and DEGEN2 (181/181); these tag counts
-  are not path-overlap evidence. Count common U/eta/L-transpose coefficient
-  visits compatible with both original traversal orders, separating sparse,
-  dense and partial paths, before implementing a paired executor. Preserve the
-  current pivot swap-removal, row_cached, final work/bt_dense and dump order.
-  Do not fuse rank_products with Devex file-order dots: their accumulation
-  orders and skipped arithmetic differ. Do not tune keys/masks to rescue the
-  failed query cache or repeat prior direct BTRAN rank/layout ownership trials.
+  Ordinary-primal paired BTRAN is also settled without implementation:
+  controlled 80BAU offers only 4.281% shared coefficient loads under explicit
+  monotone U-tail/eta/LT merges; even offline weighted row-LCS reaches 10.872%.
+  Most LT pairs use level buckets, and 724 rho calls have no tau partner.
+  Numeric divisions, controls, WORK and output remain. Small-model overlap
+  does not justify an executor or another path-specific packet trial. See
+  evidence/paired-btran-scope.json. Do not revive query-cache key/mask tuning,
+  direct BTRAN rank/layout ownership or rho/Devex matrix-product fusion.
+  A fresh substantial execution phase must be identified before another
+  ordinary primal/dual implementation; aggregate hot-function shares alone
+  do not qualify one. Review remaining barrier numerical stages against the
+  accepted factor executor and settled triangular-program/LDL-chunk trials.
   The scalar prefilter and prior rank/layout trials remain
   rejected; do not infer further gains from isolated predicate costs.
   Comparator alignment stays centralized; normal lunum's build/cache transport

@@ -1,0 +1,378 @@
+{
+  "source": "18061fe9 (zxtxvvvn); documentation parent 43998327",
+  "decision": "Reject paired ordinary-primal BTRAN executor for insufficient substantial target scope; no implementation or timing screen.",
+  "method": {
+    "probe": "Isolated source copy and Cargo target. Test-only pair guard around existing primal rho/tau block; record original active U/eta/LT row identity, subphase, coefficient count, and original sequence. Original numerical operations still execute. No capture/replay of results.",
+    "pairing": "One transaction per original primal rho block. A call records direct/dense_in/native and row visits. First call must be direct rho, second nondirect tau. Preserve repeated/empty rows. Method-2/empty-input transactions can contain rho only.",
+    "practical_overlap": "Share row coefficients in monotone original U tail/dense slot order (after separate original sparse seed prefixes), descending eta-index merge, and descending heap/dense LT node order. Verify uniqueness and equal projected shared-row order. No level-bucket/partial LT schedule assumed.",
+    "offline_upper_bound": "Weighted whole-row LCS separately for each stage, physical row identity and coefficient count. Retains each original RHS sequence, including repetitions. Assumes foreknowledge of future value-dependent visits; not an implementation or runtime saving.",
+    "fraction": "S/(Vrho+Vtau) counts potentially removed duplicate coefficient loads in paired transactions; 2S/(Vrho+Vtau) would count arithmetic participating in pairs and is not a removable fraction.",
+    "unshared": "Divisions, threshold/skip decisions, sparse markers/heaps, list maintenance, WORK arithmetic, final output/clearing, and required one-lane arithmetic remain uncounted and unshared.",
+    "qualification": "Four instrumented/disabled complete Debug SolveResult objects agree, including vectors/status/iteration/refactorization counts. This is scope evidence, not a candidate numerical qualification or accepted-release cost measurement."
+  },
+  "models": [
+    {
+      "model": "sc50a",
+      "release": true,
+      "status": "Optimal",
+      "iterations": 32,
+      "refactorizations": 7,
+      "transactions": 8,
+      "call_counts": {
+        "2": 8
+      },
+      "excluded_nonnative": 0,
+      "stages": {
+        "u": {
+          "pair_calls": 8,
+          "rows": 138,
+          "coefficient_visits": 247,
+          "offline_weighted_row_lcs": 42,
+          "online_merge_shared_coefficients": 42,
+          "online_merge_shared_rows": 27
+        },
+        "eta": {
+          "pair_calls": 8,
+          "rows": 29,
+          "coefficient_visits": 334,
+          "offline_weighted_row_lcs": 149,
+          "online_merge_shared_coefficients": 149,
+          "online_merge_shared_rows": 13
+        },
+        "lt": {
+          "pair_calls": 8,
+          "rows": 627,
+          "coefficient_visits": 713,
+          "offline_weighted_row_lcs": 335,
+          "online_merge_shared_coefficients": 335,
+          "online_merge_shared_rows": 290
+        }
+      },
+      "path_pairs": {
+        "u": {
+          "sparse-seed,sparse-tail/none": 1,
+          "sparse-seed,sparse-tail/dense": 7
+        },
+        "eta": {
+          "none/none": 2,
+          "sparse/dense": 5,
+          "dense/dense": 1
+        },
+        "lt": {
+          "heap/none": 1,
+          "heap/dense": 5,
+          "dense/dense": 2
+        }
+      },
+      "total": {
+        "coefficient_visits": 1294,
+        "offline_weighted_row_lcs": 526,
+        "online_merge_shared_coefficients": 526,
+        "online_merge_shared_rows": 330,
+        "potential_duplicate_load_fraction": 0.40649149922720246
+      },
+      "all_transaction_coefficient_visits": 1294,
+      "unpaired_coefficient_visits": 0
+    },
+    {
+      "model": "blend",
+      "release": true,
+      "status": "Optimal",
+      "iterations": 64,
+      "refactorizations": 6,
+      "transactions": 40,
+      "call_counts": {
+        "2": 40
+      },
+      "excluded_nonnative": 0,
+      "stages": {
+        "u": {
+          "pair_calls": 40,
+          "rows": 1458,
+          "coefficient_visits": 4033,
+          "offline_weighted_row_lcs": 906,
+          "online_merge_shared_coefficients": 874,
+          "online_merge_shared_rows": 387
+        },
+        "eta": {
+          "pair_calls": 40,
+          "rows": 404,
+          "coefficient_visits": 5586,
+          "offline_weighted_row_lcs": 2188,
+          "online_merge_shared_coefficients": 2188,
+          "online_merge_shared_rows": 165
+        },
+        "lt": {
+          "pair_calls": 40,
+          "rows": 2991,
+          "coefficient_visits": 3567,
+          "offline_weighted_row_lcs": 1438,
+          "online_merge_shared_coefficients": 1438,
+          "online_merge_shared_rows": 1224
+        }
+      },
+      "path_pairs": {
+        "u": {
+          "sparse-seed,sparse-tail/none": 1,
+          "sparse-seed,sparse-tail/dense": 23,
+          "sparse-seed,sparse-tail/sparse-tail": 1,
+          "sparse-tail/sparse-tail": 2,
+          "sparse-tail/dense": 13
+        },
+        "eta": {
+          "none/none": 3,
+          "sparse/dense": 21,
+          "sparse/sparse": 3,
+          "none/dense": 1,
+          "dense/dense": 12
+        },
+        "lt": {
+          "heap/none": 1,
+          "heap/dense": 18,
+          "heap/heap": 3,
+          "dense/dense": 18
+        }
+      },
+      "total": {
+        "coefficient_visits": 13186,
+        "offline_weighted_row_lcs": 4532,
+        "online_merge_shared_coefficients": 4500,
+        "online_merge_shared_rows": 1776,
+        "potential_duplicate_load_fraction": 0.34127104504777794
+      },
+      "all_transaction_coefficient_visits": 13186,
+      "unpaired_coefficient_visits": 0
+    },
+    {
+      "model": "degen2",
+      "release": true,
+      "status": "Optimal",
+      "iterations": 690,
+      "refactorizations": 17,
+      "transactions": 181,
+      "call_counts": {
+        "2": 181
+      },
+      "excluded_nonnative": 0,
+      "stages": {
+        "u": {
+          "pair_calls": 181,
+          "rows": 13854,
+          "coefficient_visits": 56839,
+          "offline_weighted_row_lcs": 8477,
+          "online_merge_shared_coefficients": 8359,
+          "online_merge_shared_rows": 1803
+        },
+        "eta": {
+          "pair_calls": 181,
+          "rows": 3581,
+          "coefficient_visits": 51053,
+          "offline_weighted_row_lcs": 14453,
+          "online_merge_shared_coefficients": 14453,
+          "online_merge_shared_rows": 992
+        },
+        "lt": {
+          "pair_calls": 181,
+          "rows": 84507,
+          "coefficient_visits": 339999,
+          "offline_weighted_row_lcs": 98359,
+          "online_merge_shared_coefficients": 97987,
+          "online_merge_shared_rows": 24904
+        }
+      },
+      "path_pairs": {
+        "u": {
+          "sparse-tail/none": 2,
+          "sparse-seed,sparse-tail/none": 2,
+          "sparse-seed,sparse-tail/dense": 81,
+          "sparse-tail/dense": 74,
+          "sparse-seed/dense": 22
+        },
+        "eta": {
+          "none/none": 11,
+          "dense/none": 2,
+          "none/dense": 51,
+          "dense/dense": 106,
+          "sparse/dense": 11
+        },
+        "lt": {
+          "dense/none": 4,
+          "levels/dense": 39,
+          "dense/dense": 138
+        }
+      },
+      "total": {
+        "coefficient_visits": 447891,
+        "offline_weighted_row_lcs": 121289,
+        "online_merge_shared_coefficients": 120799,
+        "online_merge_shared_rows": 27699,
+        "potential_duplicate_load_fraction": 0.269706245492765
+      },
+      "all_transaction_coefficient_visits": 447891,
+      "unpaired_coefficient_visits": 0
+    },
+    {
+      "model": "80bau3b",
+      "release": false,
+      "status": "Optimal",
+      "iterations": 5022,
+      "refactorizations": 56,
+      "transactions": 3949,
+      "call_counts": {
+        "1": 724,
+        "2": 3225
+      },
+      "excluded_nonnative": 0,
+      "stages": {
+        "u": {
+          "pair_calls": 3225,
+          "rows": 218226,
+          "coefficient_visits": 406373,
+          "offline_weighted_row_lcs": 23164,
+          "online_merge_shared_coefficients": 22197,
+          "online_merge_shared_rows": 11834
+        },
+        "eta": {
+          "pair_calls": 3225,
+          "rows": 26878,
+          "coefficient_visits": 299359,
+          "offline_weighted_row_lcs": 76933,
+          "online_merge_shared_coefficients": 76933,
+          "online_merge_shared_rows": 6827
+        },
+        "lt": {
+          "pair_calls": 3225,
+          "rows": 2085577,
+          "coefficient_visits": 3547026,
+          "offline_weighted_row_lcs": 362251,
+          "online_merge_shared_coefficients": 82938,
+          "online_merge_shared_rows": 50703
+        }
+      },
+      "path_pairs": {
+        "u": {
+          "sparse-seed,sparse-tail/sparse-tail": 21,
+          "sparse-seed/sparse-seed": 300,
+          "sparse-seed/sparse-seed,sparse-tail": 1236,
+          "sparse-seed,sparse-tail/sparse-seed,sparse-tail": 601,
+          "sparse-seed,sparse-tail/sparse-seed": 21,
+          "sparse-seed/sparse-tail": 55,
+          "sparse-tail/sparse-tail": 9,
+          "sparse-tail/sparse-seed,sparse-tail": 371,
+          "sparse-tail/dense": 259,
+          "sparse-seed/dense": 193,
+          "sparse-seed,sparse-tail/dense": 159
+        },
+        "eta": {
+          "none/none": 1005,
+          "none/sparse": 659,
+          "sparse/none": 11,
+          "sparse/sparse": 377,
+          "sparse/dense": 653,
+          "none/dense": 516,
+          "dense/dense": 4
+        },
+        "lt": {
+          "levels/levels": 1836,
+          "levels/dense": 1330,
+          "dense/dense": 59
+        }
+      },
+      "total": {
+        "coefficient_visits": 4252758,
+        "offline_weighted_row_lcs": 462348,
+        "online_merge_shared_coefficients": 182068,
+        "online_merge_shared_rows": 69364,
+        "potential_duplicate_load_fraction": 0.04281174710623083
+      },
+      "all_transaction_coefficient_visits": 4256698,
+      "unpaired_coefficient_visits": 3940
+    }
+  ],
+  "target_conclusion": {
+    "model": "80bau3b controlled, cap6000; Optimal5022/56refactorizations",
+    "transactions": 3949,
+    "paired": 3225,
+    "rho_only": 724,
+    "practical_shared_coefficient_visits": 182068,
+    "paired_coefficient_visits": 4252758,
+    "practical_duplicate_load_percent": 4.281174710623083,
+    "offline_weighted_lcs": 462348,
+    "offline_duplicate_load_percent": 10.87172136293671,
+    "lt_paths": "1836 levels/levels, 1330 levels/dense, 59 dense/dense. Level-bucket order does not provide the monotone descending merge.",
+    "all_transaction_coefficient_visits": 4256698,
+    "scope_limit": "Paired calls are only part of BTRAN; healthy current accepted profile has BTRAN self6.21% of whole-batch instructions. Counts cannot be multiplied into a reliable time/removable bound. Old dot/row-update families are outside this sharing.",
+    "stop": "Do not implement an executor, offline scheduler, path-specific packed variant, or larger-model escalation from this census."
+  },
+  "source_invariants": [
+    "Both RHS available before rho, same pre-replacement factor.",
+    "Preserve current pivot swap-removal: alpha_ordered is false during tau input construction.",
+    "Preserve row_cached set by rho through tau, final work/bt_dense, independent sparse/extended fallbacks.",
+    "Publish separate rho then tau dump/WORK in original order.",
+    "Do not fuse dynamic-rank rho products with column-order and rho-eligible Devex dots."
+  ],
+  "review": "Existing Astra high read-only factor_destination_review; source-only review of compatible merge schedules and distinct settled trials. Main implemented all probes.",
+  "artifacts": "target/perf-btran-pair/: prepare.py, probe.rs, source/, source-hashes.json, build.log, build/release/deps/rose-1647c29dde43abc1, all four test logs, records/*.json, analyze.py, analysis.log. Failed annotate of inlined btran_with retained; no profile claim derived from it.",
+  "verification": {
+    "accepted_cli_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "root_source_matches_probe_manifest": true,
+    "release_tests": {
+      "groups": 37,
+      "passed": 292,
+      "failed": 0,
+      "ignored": 22,
+      "log": "target/perf-btran-pair/accepted-release-tests.log"
+    },
+    "full_parity_log": "target/perf-btran-pair/accepted-full-parity.log",
+    "full_parity": "987/987; unchanged accepted source and CLI",
+    "probe_binary_sha256": "264f8a2a7f6ce8e1ceecdf2a3ef5e1d83389c517c23045154113fe7fc105d33f",
+    "probe_source_sha256": {
+      "src/quad_row_audit.rs": "b3860aa59ae7664a0632af9d7087ee851e58f3efd511626c8c67dc6014b5a16e",
+      "src/quad_change.rs": "a0d6b5d3eae9db4fbfc93a4432c21c142eb67c6aacde8c570f3a97395a599ad0",
+      "src/chol_child_oracle.rs": "461b859ceb95785d6c3f0e79f04933958e3dc423f9e855e37a2efbbf7032f082",
+      "src/verify.rs": "628c76c64368c93d32902ccf83464cfe7a9f89448f148a940453d22723cee8a2",
+      "src/barrier.rs": "05291d4b59fa02c7bab4802e20db42be517f529f34ac8c5ef112344f6d8dd0cf",
+      "src/chol_rect_oracle.rs": "f2acbde88b2fe00906e52941a36867a40b6a910aaad307481bbb5885352b4f09",
+      "src/work.rs": "6d1f1ff38e6b7af5d833713190c275b46b110efd6242315676eb378d01e5ed24",
+      "src/lib.rs": "c2cab6b000c5ba63b534435ff9740cfb73cf62d53d55a3c8b41319da4c7fbef4",
+      "src/early.rs": "80e17a00737161a5eb8eed6210ab8577b2d408945b3e8db7c5e6f9a49692b3ed",
+      "src/sgemm32.rs": "9b729ec25481c1ec2d22ded132863f5921d7d0a0451594f776d42e006c3d6dfc",
+      "src/ftran_order.rs": "4110d0e6a654ddf5ac459a416a2ecf53858f4de23ba3ecc95a1c6b5b612c9a85",
+      "src/simplex.rs": "b83851ede4a6bbec43bac02047f36a765565cf78ed876e54b8e2f26c235f2352",
+      "src/chol.rs": "158e393ca8dc6aef7f98482ca9f4609b49d2df00b03978310873e333ebf51bea",
+      "src/quad_cost.rs": "00116dcb8a6b6e4112717f111f3b865beb9857e4ab4d71436dd37fc7dd0a7521",
+      "src/primal_rhs_perturb.rs": "ff692cc51479e3d825c70b1d15861c275cdda7c73221df7949a52dfe2e6275ff",
+      "src/f80.rs": "2a20a41d94ff36934fb84375886b1ac0fbf1b35dd7bb29f3d009e0b95e35aa70",
+      "src/scale.rs": "1e0deac05e78ac048d1fdd8cb3421ae45d88b57768901bba759a99fd52dc63f1",
+      "src/lu_pairs.rs": "8549f681e432888ffbde8ccaf9113e24fa1760c2962db852d069b7729e2ae2b9",
+      "src/pdhg.rs": "bd2944b7011736e3f3e9a1bf6fc47468a997ae3c505f051a6687a76e8e2682e0",
+      "src/quad_fresh.rs": "8adca530373406e9e48de19d179f7cc0b232d0ed1b964c4ef131b90a1a3b9079",
+      "src/lu.rs": "7104adbfcae0f73030fcf7136c1624715d33e6f686383fa7a41bd95fa4a074e4",
+      "src/mps.rs": "970ab51460301ca4d1e06aee0d268c96882bd2d58de37aaacea6484735c3b0ba",
+      "src/chol_rect_packet.rs": "d00c064a281b321d5018a58337496226d3beb29c3050cbb27eec9b5e6f5403a7",
+      "src/order.rs": "a4746d44a9022b37884852f37d52b8dd9a710dd8c2b96e32734044a99025b857",
+      "src/lu_order.rs": "530ff158c6d8c1263ed4317ad6d67d3bd6a8509bbc4e55b4c5a3e00bdfa89123",
+      "src/chol_factor_oracle.rs": "ebdbb1d57b60c7084b81ea923056b09e0344b182a37bf5690ef886d24c495f81",
+      "src/quad_row.rs": "ff49da21c8788d4cb03936fd61e60011cff4af048c94373295feb9a568029910",
+      "src/real.rs": "9399212fbe9de003ae4e70b44c850fa7a0459b8c2f8d19ec538c15286cb23918",
+      "src/quad_main.rs": "812880569bab4a597f916d2b75fd75e9512262646b91cc2dbae4475746cbd545",
+      "src/model.rs": "2116c56536cc2a46923734a42afa79de087083dd265b0b8915fcc52d1c028654",
+      "src/chol_child_program.rs": "ceea4df4a8f9dfb25b11a1cfaddd9744eb372c1b6d9b4df0814bba37ef1fa2cb",
+      "src/dual.rs": "dce94c76006809b9befabb79f04b658bd31213b86f07193341b0791c2e09eccd",
+      "src/btran_pair_probe.rs": "1f349f2e163573e22191c4c83d5c9dd6974cc5416698fdc1183e8494e2992f74",
+      "src/chol_gemm_destination.rs": "412987255d14117b4605d601975a99ba5bbdd8d5b50953585cf2cce1601ef86f",
+      "src/btran_oracle.rs": "bd92e94286dd5da076f5e94fe3f857a6637fa19d10b1f109efbfdea6af7f79d1",
+      "src/method.rs": "e70e94e648cd3913e269340388a7a891160ab42165883c48dcc6c98a66b14fa6",
+      "src/dump.rs": "1cb1ab3b535c4a0648ed126f061f719e3b33a3c845af28819203a3f1051415ce",
+      "src/basis.rs": "babc01e8dde812261d2096c271f8db5d8d5fd436a569facdc2592272d8897a4e",
+      "src/bin/rose-parity.rs": "41d3fe0a35bbddfc64fa99b0499af85075654715f8d02c8abce8c728b73d2993",
+      "src/bin/rose.rs": "63d282ccf37597706b28ecbf0cc6d18a0a37b41e9c9b06defd7cf643b6902962",
+      "src/barrier/extended.rs": "34c076e795029c46d920b43b960c37cab8f1e9939af03df750ae65d1769b3393",
+      "src/pdhg/ordered.rs": "42a080cb036d7fdfd603110b1a1f24d89b596242687adc8c82f40db036a9f853",
+      "src/pdhg/forward.rs": "d6aa78f846da0f8864fc4b7a0d2bb750ea30a2657d82b799f7b656ad7638bbd1",
+      "src/fixtures/primal_quad_perturb_injected.json": "ab40a6430fd130a5ebb70825b6851bc5a7b5108cc9858d896725b69fd99a6390",
+      "src/fixtures/primal_quad_perturb_capture.json": "15f85e1079f22d7e6c49bee85dcea212301f86445bee1c232fa38a5b5a8fb995",
+      "src/fixtures/primal_double_perturb_injected.json": "4d4be309dda1b01b334578afe95a8752fcb3ac060954e7c215e0fcc9702f4d52"
+    }
+  }
+}

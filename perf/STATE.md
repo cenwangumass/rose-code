@@ -1610,17 +1610,22 @@ call and its opaque-call correction are retained with the other evidence.
 [score-query-reuse.json](evidence/score-query-reuse.json), complete count/prototype/
 frozen-oracle/pilot artifacts are in `target/perf-score-{reuse,candidate}/`.
 
-Ordinary-primal rho/tau BTRAN pairing remains a conditional, unimplemented lead.
-Both RHS can be formed before rho using the same pre-replacement factor; their
-actual compatible coefficient traversal overlap is unmeasured. Frozen release
-BTR/BTT tag counts are SC50A 8/8, BLEND 40/40, and DEGEN2 181/181. Controlled
-80BAU has 3,949/3,225; its capped release corpus run has neither. These are tag
-counts, not paired-path or removable-time estimates. Preserve the existing
-pivot swap-removal (alpha_ordered is still false there), row_cached, final
-work/bt_dense, rho-then-tau dump/WORK publication, and separate scalar paths.
-The following rank_products and Devex dot loops have different row order and
-conditional arithmetic, so a common matrix-product pass is not qualified.
-Cached tag-count extraction: `target/perf-primal-scope/paired-btran-tag-counts.json`.
+Ordinary-primal rho/tau BTRAN traversal pairing is rejected at scope. Ordered
+coefficient-load overlap is 40.65% on SC50A, 34.13% on BLEND and 26.97% on
+DEGEN2 release, but only 4.281% on controlled 80BAU. The latter has 3,225 pairs
+and 724 rho-only transactions; its pairs perform 4,252,758 coefficient visits,
+with 182,068 shared under monotone U-tail, reverse-eta and descending LT merges.
+Even the offline weighted row-LCS upper bound shares only 462,348 (10.872%).
+LT has 1,836 level/level pairs, 1,330 level/dense and 59 dense/dense; common
+physical support does not supply a cheap order-preserving bucket schedule.
+Divisions, predicates, sparse scheduling, WORK, output/clearing and one-lane
+arithmetic remain. These are active-row counts, not removable time bounds.
+All four enabled/disabled complete SolveResult objects agree; root source and
+accepted CLI are unchanged. No paired executor, path-specific packed trial,
+timing screen or larger-model escalation follows. Dynamic-rank rho products
+and rho-eligible column-order Devex dots remain separate. Evidence:
+[paired-btran-scope.json](evidence/paired-btran-scope.json); original row sequences,
+probe, analysis and accepted gates are in `target/perf-btran-pair/`.
 
 The exact Plan census counts 1,008 wide GEMM calls/factor on DEGEN3, 799 zero-C;
 fifteen factors describe 83.2 MB of logical cn buffers, 37.4% unused cells whose
