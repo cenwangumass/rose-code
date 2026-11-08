@@ -7,6 +7,13 @@ Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (histo
 Source `zxtxvvvn`, pinned Rust 1.98.1, ordinary ThinLTO release and glibc,
 CPU 2. This checkout has no preceding PGO artifacts or TCMalloc library;
 the historical EPYC 9V74 timing table is not a current-host comparison.
+The supplied reference is now reconstructed locally at
+`target/perf-reference/reconstructed/libgurobi130.so`, exact required SHA256
+`26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30`.
+Its environment initializes successfully with the bundled license. This proves
+availability only; the native harness still needs Runtime/effective-parameter
+recording before fresh current-host comparisons. No current reference win claim.
+[reference-availability.json](evidence/reference-availability.json).
 The current release passes fast 940/940 and full 987/987 parity. The
 preceding frame-pointer profiling build passes fast 940/940.
 

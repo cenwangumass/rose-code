@@ -1,0 +1,21 @@
+{
+  "archive": "reverse-engineer/targets/gurobipy-13.0.3-cpython-313-linux-x86_64.tar.gz",
+  "archive_sha256": "3e48639fffb03fb5b6986e7e09d721332be8ee685ed645d6b547e04990a08833",
+  "original_sha256": "8e87fca221fdffc922331c8619426031b3e72dfd419446422f88af0cb0e98f9c",
+  "library_path": "target/perf-reference/reconstructed/libgurobi130.so",
+  "library_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+  "patch_stages": {
+    "interface.so": "2f479d5f27796a56c98ac63a9d988e950e04b47c969de13c29520b7b4bc6f90d",
+    "variables.so": "b012188967df3ec846df3355fa32432b48c0652d6bd2a129e9cf05af24c9783d"
+  },
+  "patch_sources": {
+    "../reverse-engineer/patches/apply-lp-constraint-limit.py": "1db62f8f1c6050dbdc783366aea70dc62205aa4504afe1a2627a3b0399d3a9d5",
+    "../reverse-engineer/patches/apply-pip-interface.py": "99db7fd51a30cd6d3b5d10a399585c48e95abdf11bd5e70a9c9811caa9d357df",
+    "../reverse-engineer/patches/apply-lp-variable-limit.py": "da5c5276f071e6c2d20f53c1a68ab995c163dbba2f38b90aa121c73eb79437c0"
+  },
+  "environment_check": "Restricted license - for non-production use only - expires 2027-11-29\nGRBloadenv returned 0; environment present\n\n",
+  "license_path": "../reverse-engineer/targets/gurobi.lic",
+  "qualification": "Successful exact reconstruction and environment initialization only. No solver/runtime comparison yet. Original archive unchanged.",
+  "remaining": "native_run.c does not record Runtime, and ref_run.py --native drops --param; fix timer and effective-parameter provenance, qualify AFIRO before larger comparisons.",
+  "artifacts": "target/perf-reference/reconstructed/: original.so,interface.so,variables.so,libgurobi130.so,check-env,environment-check.log,provenance.json. Reconstruction instructions ../reverse-engineer/targets/README.md."
+}

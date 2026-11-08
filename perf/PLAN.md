@@ -421,10 +421,10 @@ measured.
   a qualified runtime gain. No solve305 routing/codegen composition follows
   from settled triangular-plan scope. See evidence/ldl-output-batch-scope.json.
   No current cached GREENBEA ordinary-dual reference phase profile survives.
-  Reconstruct the supplied reference from ../reverse-engineer/targets/README.md
-  and its hash-checked archive/patches before a current matched comparison.
-  Preserve required library SHA26a50517... and use Gurobi Runtime, not process
-  wall time. The existing native harness needs Runtime recording and parameter
+  The supplied reference is reconstructed at target/perf-reference/reconstructed/
+  libgurobi130.so, with required SHA26a50517... and successful environment init;
+  see evidence/reference-availability.json. Use Gurobi Runtime, not process
+  wall time. Next fix the existing native harness Runtime recording and parameter
   provenance; --native currently drops ref_run.py --param overrides. Start
   with AFIRO, then small models, before GREENBEA or a full23-row comparison.
   The scalar prefilter and prior rank/layout trials remain
