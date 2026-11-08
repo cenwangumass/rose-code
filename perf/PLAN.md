@@ -447,10 +447,15 @@ measured.
   0/23. Preserve the ordinary accepted CLI and configuration-specific provenance.
   See evidence/optimized-build-qualification.json. This is a supported build
   configuration, not a new architecture or a two-screen accepted runtime fix.
-  Next identify genuinely distinct whole-stage numerical work. Complete solve305
-  is only a conditional scope question: existing triangular/route/owner studies
-  do not establish a removable whole-stage cost or qualify their composition.
-  Require construction-inclusive evidence before any implementation.
+  Complete solve305 ownership is closed without implementation: source audit
+  leaves only dense-mask metadata, temporary reuse and output-publication fusion
+  outside existing kernels. Cached per-record residual scopes are 1.562% of whole
+  80BAU and 1.352% GREENBEA, including required arithmetic and instrumentation.
+  These are not removable bounds or current PGO timings. See
+  evidence/solve305-owner-review.json. Do not compose settled triangular, route,
+  packing or buffer studies into another owner. Next identify a genuinely
+  distinct substantial numerical execution mechanism with construction-inclusive
+  evidence before implementation.
   The scalar prefilter and prior rank/layout trials remain
   rejected; do not infer further gains from isolated predicate costs.
   Comparator alignment stays centralized; normal lunum's build/cache transport

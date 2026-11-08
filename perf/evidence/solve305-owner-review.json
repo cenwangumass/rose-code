@@ -1,0 +1,74 @@
+{
+  "source": "18061fe9",
+  "scope": "Source/lifetime audit of complete solve305 owner; cached diagnostic scopes only, no new solver runs",
+  "decision": "Reject without implementation: owner only removes metadata/temporary publication work; triangles and ordered matrix arithmetic remain. A different arithmetic execution mechanism would need independent evidence. Do not compose settled triangular, packing, buffer or route studies as a new owner.",
+  "limitations": "These ordinary ThinLTO/glibc nested release-test scopes include clock/codegen overhead and required arithmetic. Residuals are not removable-cost bounds, not PGO timings and not percentages subtracted across medians.",
+  "source_audit": {
+    "solve305": "is_dense construction; w scaling; Aw; t to x addition/publication; forward; reciprocal scaling; backward; ATy; s to dx arithmetic/publication; dense overrides; truncate x",
+    "possible_owner_changes": [
+      "persistent dense-mask metadata",
+      "temporary Vec reuse",
+      "t to x publication fusion",
+      "s to dx publication fusion"
+    ],
+    "retained_work": [
+      "original dot8 peel/lane/fold for Aw and ATy",
+      "forward and backward dependency/order and FP behavior",
+      "w, reciprocal and dx arithmetic",
+      "dense-column overrides",
+      "stage dump values and ordering"
+    ]
+  },
+  "models": {
+    "80bau3b": {
+      "raw": "target/perf-barrier-normal/final-80bau3b.log",
+      "raw_sha256": "6080acbb65a56a2e52325243fc8df8cce4e433abc7dca989b6ef8e7000439d64",
+      "records": [
+        {
+          "normal305_ns": 79465592,
+          "remaining_ns": 7963512,
+          "measured_whole_ns": 509941506,
+          "remaining_whole_percent": 1.5616520534808163
+        },
+        {
+          "normal305_ns": 72591573,
+          "remaining_ns": 7003705,
+          "measured_whole_ns": 468475529,
+          "remaining_whole_percent": 1.4949991123228978
+        },
+        {
+          "normal305_ns": 63993212,
+          "remaining_ns": 6639682,
+          "measured_whole_ns": 422385994,
+          "remaining_whole_percent": 1.571946535708284
+        }
+      ],
+      "median_remaining_whole_percent": 1.5616520534808163
+    },
+    "greenbea": {
+      "raw": "target/perf-barrier-normal/final-greenbea.log",
+      "raw_sha256": "13ede8862d55f1ab5889640568bb599a23348a6aff3fd2575ec71741e5bdde80",
+      "records": [
+        {
+          "normal305_ns": 420192270,
+          "remaining_ns": 22877682,
+          "measured_whole_ns": 1692750689,
+          "remaining_whole_percent": 1.3515092416541914
+        },
+        {
+          "normal305_ns": 378660202,
+          "remaining_ns": 20852990,
+          "measured_whole_ns": 1553634589,
+          "remaining_whole_percent": 1.3422068578829767
+        },
+        {
+          "normal305_ns": 547811233,
+          "remaining_ns": 29792497,
+          "measured_whole_ns": 2175408198,
+          "remaining_whole_percent": 1.3695129505988926
+        }
+      ],
+      "median_remaining_whole_percent": 1.3515092416541914
+    }
+  }
+}

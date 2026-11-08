@@ -177,6 +177,14 @@ The isolated build command and environment are in `build-command.json` there.
 The reference remains glibc and uses the same reconstructed library. No
 numerical architecture or individual optimization gain follows from this sweep.
 
+Complete `solve305` ownership is rejected without implementation. The remaining
+owner work is dense-mask metadata, temporary reuse and output publication;
+original triangular/matrix arithmetic remains. Cached per-record diagnostic
+residual scopes are 1.562% of whole 80BAU and 1.352% GREENBEA, including required
+arithmetic and instrumentation. They are not removable bounds or current PGO
+measurements. No composed triangular/route/packing/buffer prototype follows.
+[solve305-owner-review.json](evidence/solve305-owner-review.json).
+
 Earlier small dual probes and PEROLD ancestry remain separately labeled in
 their evidence. The unthrottled PEROLD frame-pointer batch (24 full solves,
 cap 1300, all optimal 1273/27 refactors) has 3736 samples, 99.57% direct coverage,
