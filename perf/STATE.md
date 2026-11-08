@@ -1412,6 +1412,17 @@ no new solver speedup or reference timing ratio.
 
 ## Candidates
 
+Current barrier release-test scope measurements (three bounded full pairs per
+row; DEGEN3 CPU2, cap100) put the complete forward/backward pair near7%, normal
+solve11%, numeric factor71%, child updates35% including DGEMM19%, assembly9%
+and factor blocks23%. Diagnostic setup is only0.75%. These are nested inclusive
+instrumented-test scopes, affected by inlining/timer overhead; they are not
+accepted-release cost bounds and must not be added. All27 complete instrumented
+versus uninstrumented SolveResult pairs agree. Prioritize a retained complete
+child execution plan over triangular JIT or a diagnostic-only local change.
+[barrier-current-scope.json](evidence/barrier-current-scope.json), raw probes
+and logs in `target/perf-barrier-scope/`.
+
 Current non-level sparse-L replay census rules out that duplication on the
 measured targets. DEGEN2, PILOT4 and PEROLD have no Kahn calls and no dense
 fallback replay. PEROLD's 2,687 L entries split into 1,237 initially dense and

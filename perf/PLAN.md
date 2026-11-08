@@ -316,6 +316,13 @@ measured.
   grouping and dynamic zero-diagonal rules. First measure the complete triangle
   pair's current solve cost, since old solve shares include surrounding work;
   then use cached small-model stage records and a whole-plan lifetime probe.
+  Current scoped DEGEN3 measurements put complete forward/backward near7%,
+  versus numeric factor71% and child updates35% (including DGEMM19%). These
+  nested release-test scopes are not accepted-release removable bounds. First
+  test a solver-owned child execution plan spanning complete block schedules,
+  destination geometry and scratch lifetime across Newton factors. Keep exact
+  child/GEMM order and live coefficients/precision; public mutable Plan keeps
+  the original path. Prior single-map/panel/scratch trials remain rejected.
   PEROLD FTRAN/L/update and factor-production/installation ownership remain larger
   measured leads. The scalar prefilter and prior rank/layout trials remain
   rejected; do not infer further gains from isolated predicate costs.

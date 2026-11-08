@@ -1,0 +1,604 @@
+{
+  "source": "889606e1",
+  "experiment": "Measure complete forward/backward, normal solve, numeric factorization and its component scopes before planning barrier execution. Original numeric bodies remain unchanged; temporary test-only Instant guards.",
+  "configuration": "Rust1.98.1 ordinary ThinLTO release test binary/glibc/current EPYC host. Small models unpinned; DEGEN3 pinned CPU2. Three separate uninstrumented and instrumented full bounded solves per row; cap100.",
+  "validation": "All27 complete SolveResult Debug pairs agree (6small+DEGEN3+2refined rows,three each). No reference comparison. Source restored afterward.",
+  "limits": "Nested inclusive clock scopes are not additive. Test instrumentation, inlining, per-row TRSM guard overhead and allocator/cache noise affect scope shares. No accepted-release removable-cost bound or solver-speedup claim. Numeric bodies and all WORK behavior unchanged.",
+  "results": {
+    "small.log": [
+      {
+        "cap": 100,
+        "model": "afiro",
+        "records": [
+          {
+            "backward_ns": 9310,
+            "calls": [
+              22,
+              22,
+              22,
+              8
+            ],
+            "forward_ns": 13545,
+            "measured_solve_ns": 491055,
+            "normal_solve_ns": 73369,
+            "numeric_factor_ns": 117710,
+            "plain_solve_ns": 1519853
+          },
+          {
+            "backward_ns": 9151,
+            "calls": [
+              22,
+              22,
+              22,
+              8
+            ],
+            "forward_ns": 13085,
+            "measured_solve_ns": 688072,
+            "normal_solve_ns": 66447,
+            "numeric_factor_ns": 191117,
+            "plain_solve_ns": 1387406
+          },
+          {
+            "backward_ns": 8625,
+            "calls": [
+              22,
+              22,
+              22,
+              8
+            ],
+            "forward_ns": 11725,
+            "measured_solve_ns": 376271,
+            "normal_solve_ns": 61371,
+            "numeric_factor_ns": 64080,
+            "plain_solve_ns": 1093389
+          }
+        ],
+        "median_fraction_percent": {
+          "backward_ns": 1.8959179725285356,
+          "forward_ns": 2.7583468246937715,
+          "normal_solve_ns": 14.941096211218701,
+          "numeric_factor_ns": 23.970838297135757
+        }
+      },
+      {
+        "cap": 100,
+        "model": "sc50a",
+        "records": [
+          {
+            "backward_ns": 34756,
+            "calls": [
+              25,
+              25,
+              25,
+              8
+            ],
+            "forward_ns": 22853,
+            "measured_solve_ns": 554133,
+            "normal_solve_ns": 118392,
+            "numeric_factor_ns": 150801,
+            "plain_solve_ns": 944500
+          },
+          {
+            "backward_ns": 17529,
+            "calls": [
+              25,
+              25,
+              25,
+              8
+            ],
+            "forward_ns": 22143,
+            "measured_solve_ns": 518084,
+            "normal_solve_ns": 97635,
+            "numeric_factor_ns": 146283,
+            "plain_solve_ns": 487168
+          },
+          {
+            "backward_ns": 19020,
+            "calls": [
+              25,
+              25,
+              25,
+              8
+            ],
+            "forward_ns": 23702,
+            "measured_solve_ns": 574030,
+            "normal_solve_ns": 107511,
+            "numeric_factor_ns": 127488,
+            "plain_solve_ns": 463493
+          }
+        ],
+        "median_fraction_percent": {
+          "backward_ns": 3.383428169949275,
+          "forward_ns": 4.129052488545895,
+          "normal_solve_ns": 18.845399587711643,
+          "numeric_factor_ns": 27.213863819696716
+        }
+      },
+      {
+        "cap": 100,
+        "model": "blend",
+        "records": [
+          {
+            "backward_ns": 47811,
+            "calls": [
+              27,
+              27,
+              27,
+              9
+            ],
+            "forward_ns": 62959,
+            "measured_solve_ns": 1646710,
+            "normal_solve_ns": 299806,
+            "numeric_factor_ns": 672856,
+            "plain_solve_ns": 1693045
+          },
+          {
+            "backward_ns": 81233,
+            "calls": [
+              27,
+              27,
+              27,
+              9
+            ],
+            "forward_ns": 97383,
+            "measured_solve_ns": 3785886,
+            "normal_solve_ns": 439848,
+            "numeric_factor_ns": 1140125,
+            "plain_solve_ns": 3356845
+          },
+          {
+            "backward_ns": 52053,
+            "calls": [
+              27,
+              27,
+              27,
+              9
+            ],
+            "forward_ns": 76164,
+            "measured_solve_ns": 4199867,
+            "normal_solve_ns": 552980,
+            "numeric_factor_ns": 2131082,
+            "plain_solve_ns": 2550654
+          }
+        ],
+        "median_fraction_percent": {
+          "backward_ns": 2.145680033683001,
+          "forward_ns": 2.572264458042318,
+          "normal_solve_ns": 13.166607418758735,
+          "numeric_factor_ns": 40.86062512524974
+        }
+      },
+      {
+        "cap": 100,
+        "model": "adlittle",
+        "records": [
+          {
+            "backward_ns": 33132,
+            "calls": [
+              36,
+              36,
+              36,
+              13
+            ],
+            "forward_ns": 45101,
+            "measured_solve_ns": 1855338,
+            "normal_solve_ns": 276518,
+            "numeric_factor_ns": 352207,
+            "plain_solve_ns": 4206369
+          },
+          {
+            "backward_ns": 34424,
+            "calls": [
+              36,
+              36,
+              36,
+              13
+            ],
+            "forward_ns": 47674,
+            "measured_solve_ns": 1336642,
+            "normal_solve_ns": 286083,
+            "numeric_factor_ns": 355314,
+            "plain_solve_ns": 1236865
+          },
+          {
+            "backward_ns": 37112,
+            "calls": [
+              36,
+              36,
+              36,
+              13
+            ],
+            "forward_ns": 56274,
+            "measured_solve_ns": 1503873,
+            "normal_solve_ns": 330562,
+            "numeric_factor_ns": 387081,
+            "plain_solve_ns": 1526064
+          }
+        ],
+        "median_fraction_percent": {
+          "backward_ns": 2.467761572951971,
+          "forward_ns": 3.5666992358462477,
+          "normal_solve_ns": 21.403113174657086,
+          "numeric_factor_ns": 25.73894205162271
+        }
+      },
+      {
+        "cap": 100,
+        "model": "bore3d",
+        "records": [
+          {
+            "backward_ns": 277998,
+            "calls": [
+              49,
+              49,
+              49,
+              17
+            ],
+            "forward_ns": 373686,
+            "measured_solve_ns": 9439632,
+            "normal_solve_ns": 1733177,
+            "numeric_factor_ns": 3995918,
+            "plain_solve_ns": 12970702
+          },
+          {
+            "backward_ns": 317124,
+            "calls": [
+              49,
+              49,
+              49,
+              17
+            ],
+            "forward_ns": 439352,
+            "measured_solve_ns": 10644358,
+            "normal_solve_ns": 1917993,
+            "numeric_factor_ns": 4192305,
+            "plain_solve_ns": 9917663
+          },
+          {
+            "backward_ns": 313984,
+            "calls": [
+              49,
+              49,
+              49,
+              17
+            ],
+            "forward_ns": 411609,
+            "measured_solve_ns": 10316257,
+            "normal_solve_ns": 2049801,
+            "numeric_factor_ns": 4544896,
+            "plain_solve_ns": 10756716
+          }
+        ],
+        "median_fraction_percent": {
+          "backward_ns": 2.9792684537667746,
+          "forward_ns": 3.9899064166392906,
+          "normal_solve_ns": 18.36064160128276,
+          "numeric_factor_ns": 42.33129003334029
+        }
+      },
+      {
+        "cap": 100,
+        "model": "degen2",
+        "records": [
+          {
+            "backward_ns": 1159562,
+            "calls": [
+              40,
+              40,
+              40,
+              13
+            ],
+            "forward_ns": 1455792,
+            "measured_solve_ns": 30121636,
+            "normal_solve_ns": 4626093,
+            "numeric_factor_ns": 17810448,
+            "plain_solve_ns": 32212072
+          },
+          {
+            "backward_ns": 1212761,
+            "calls": [
+              40,
+              40,
+              40,
+              13
+            ],
+            "forward_ns": 1469221,
+            "measured_solve_ns": 30185476,
+            "normal_solve_ns": 4793424,
+            "numeric_factor_ns": 17899668,
+            "plain_solve_ns": 28035397
+          },
+          {
+            "backward_ns": 1169297,
+            "calls": [
+              40,
+              40,
+              40,
+              13
+            ],
+            "forward_ns": 1443552,
+            "measured_solve_ns": 30923630,
+            "normal_solve_ns": 4644853,
+            "numeric_factor_ns": 18102857,
+            "plain_solve_ns": 30797205
+          }
+        ],
+        "median_fraction_percent": {
+          "backward_ns": 3.8495983418696116,
+          "forward_ns": 4.8330442609425335,
+          "normal_solve_ns": 15.358040313613778,
+          "numeric_factor_ns": 59.12842184269142
+        }
+      }
+    ],
+    "degen3.log": [
+      {
+        "cap": 100,
+        "model": "degen3",
+        "records": [
+          {
+            "backward_ns": 10945958,
+            "calls": [
+              55,
+              55,
+              55,
+              15
+            ],
+            "forward_ns": 17252549,
+            "measured_solve_ns": 409229390,
+            "normal_solve_ns": 45580194,
+            "numeric_factor_ns": 284892101,
+            "plain_solve_ns": 419601790
+          },
+          {
+            "backward_ns": 10794067,
+            "calls": [
+              55,
+              55,
+              55,
+              15
+            ],
+            "forward_ns": 16307080,
+            "measured_solve_ns": 356048500,
+            "normal_solve_ns": 42316124,
+            "numeric_factor_ns": 241913475,
+            "plain_solve_ns": 367186127
+          },
+          {
+            "backward_ns": 10102551,
+            "calls": [
+              55,
+              55,
+              55,
+              15
+            ],
+            "forward_ns": 15413339,
+            "measured_solve_ns": 367462893,
+            "normal_solve_ns": 40984410,
+            "numeric_factor_ns": 254810023,
+            "plain_solve_ns": 341688118
+          }
+        ],
+        "median_fraction_percent": {
+          "backward_ns": 2.749271067214942,
+          "forward_ns": 4.215862648574678,
+          "normal_solve_ns": 11.153346577500548,
+          "numeric_factor_ns": 69.34306234833893
+        }
+      }
+    ],
+    "numeric-degen2.log": [
+      {
+        "cap": 100,
+        "model": "degen2",
+        "records": [
+          {
+            "assembly_ns": 2276985,
+            "backward_ns": 1111856,
+            "calls": [
+              40,
+              40,
+              40,
+              13,
+              1547,
+              2977,
+              1547,
+              1547,
+              2808,
+              22854,
+              637
+            ],
+            "child_update_ns": 8755121,
+            "diagnostic_setup_ns": 473666,
+            "factor_block_ns": 7394598,
+            "forward_ns": 1297380,
+            "gemm_ns": 4333253,
+            "ldl_ns": 3556748,
+            "measured_solve_ns": 31841390,
+            "normal_solve_ns": 4276296,
+            "numeric_factor_ns": 20202282,
+            "plain_solve_ns": 32452830,
+            "trsm_ns": 1994793
+          },
+          {
+            "assembly_ns": 2450171,
+            "backward_ns": 1246429,
+            "calls": [
+              40,
+              40,
+              40,
+              13,
+              1547,
+              2977,
+              1547,
+              1547,
+              2808,
+              22854,
+              637
+            ],
+            "child_update_ns": 9159370,
+            "diagnostic_setup_ns": 573238,
+            "factor_block_ns": 8585686,
+            "forward_ns": 1604100,
+            "gemm_ns": 4650628,
+            "ldl_ns": 4224219,
+            "measured_solve_ns": 34947529,
+            "normal_solve_ns": 5074657,
+            "numeric_factor_ns": 22199891,
+            "plain_solve_ns": 32776052,
+            "trsm_ns": 2032141
+          },
+          {
+            "assembly_ns": 2528372,
+            "backward_ns": 1252065,
+            "calls": [
+              40,
+              40,
+              40,
+              13,
+              1547,
+              2977,
+              1547,
+              1547,
+              2808,
+              22854,
+              637
+            ],
+            "child_update_ns": 9124018,
+            "diagnostic_setup_ns": 568181,
+            "factor_block_ns": 7973148,
+            "forward_ns": 1526016,
+            "gemm_ns": 4619712,
+            "ldl_ns": 3773555,
+            "measured_solve_ns": 34551051,
+            "normal_solve_ns": 4963977,
+            "numeric_factor_ns": 21554041,
+            "plain_solve_ns": 32017268,
+            "trsm_ns": 2136381
+          }
+        ],
+        "median_fraction_percent": {
+          "assembly_ns": 7.151022615532803,
+          "backward_ns": 3.566572618052624,
+          "child_update_ns": 26.407352991953847,
+          "diagnostic_setup_ns": 1.6402819209335229,
+          "factor_block_ns": 23.223226121723958,
+          "forward_ns": 4.416699219945581,
+          "gemm_ns": 13.370684440250457,
+          "ldl_ns": 11.170203310847924,
+          "normal_solve_ns": 14.367079600559762,
+          "numeric_factor_ns": 63.446608329598675,
+          "trsm_ns": 6.183259085230143
+        }
+      }
+    ],
+    "numeric-degen3.log": [
+      {
+        "cap": 100,
+        "model": "degen3",
+        "records": [
+          {
+            "assembly_ns": 31922131,
+            "backward_ns": 9128094,
+            "calls": [
+              55,
+              55,
+              55,
+              15,
+              6435,
+              17910,
+              6435,
+              6435,
+              15120,
+              138660,
+              2130
+            ],
+            "child_update_ns": 117508406,
+            "diagnostic_setup_ns": 2550171,
+            "factor_block_ns": 79167998,
+            "forward_ns": 13043335,
+            "gemm_ns": 64752547,
+            "ldl_ns": 19706187,
+            "measured_solve_ns": 340177022,
+            "normal_solve_ns": 36319809,
+            "numeric_factor_ns": 238838544,
+            "plain_solve_ns": 310028287,
+            "trsm_ns": 46525526
+          },
+          {
+            "assembly_ns": 31093781,
+            "backward_ns": 8187784,
+            "calls": [
+              55,
+              55,
+              55,
+              15,
+              6435,
+              17910,
+              6435,
+              6435,
+              15120,
+              138660,
+              2130
+            ],
+            "child_update_ns": 114814553,
+            "diagnostic_setup_ns": 2477046,
+            "factor_block_ns": 76948849,
+            "forward_ns": 12128037,
+            "gemm_ns": 62954422,
+            "ldl_ns": 18423567,
+            "measured_solve_ns": 329564885,
+            "normal_solve_ns": 33511643,
+            "numeric_factor_ns": 233088561,
+            "plain_solve_ns": 336260284,
+            "trsm_ns": 45946527
+          },
+          {
+            "assembly_ns": 30628398,
+            "backward_ns": 8612613,
+            "calls": [
+              55,
+              55,
+              55,
+              15,
+              6435,
+              17910,
+              6435,
+              6435,
+              15120,
+              138660,
+              2130
+            ],
+            "child_update_ns": 113972495,
+            "diagnostic_setup_ns": 2501502,
+            "factor_block_ns": 75498310,
+            "forward_ns": 12111190,
+            "gemm_ns": 62533261,
+            "ldl_ns": 18253488,
+            "measured_solve_ns": 325159325,
+            "normal_solve_ns": 34327078,
+            "numeric_factor_ns": 230025128,
+            "plain_solve_ns": 313521857,
+            "trsm_ns": 44533429
+          }
+        ],
+        "median_fraction_percent": {
+          "assembly_ns": 9.419504730488661,
+          "backward_ns": 2.648736277208104,
+          "child_update_ns": 34.8382240419819,
+          "diagnostic_setup_ns": 0.751611021908478,
+          "factor_block_ns": 23.272588352543107,
+          "forward_ns": 3.7246940403754376,
+          "gemm_ns": 19.102284516750018,
+          "ldl_ns": 5.613705834824205,
+          "normal_solve_ns": 10.557002478707938,
+          "numeric_factor_ns": 70.72615184715447,
+          "trsm_ns": 13.69587939696947
+        }
+      }
+    ]
+  },
+  "decision": "Do not prioritize a generated triangular program from old solve shares: complete pair is ~7% of the DEGEN3 scoped solve. Numeric factor is~71%; child update~35% includes DGEMM~19%. Retained whole child execution plans are the larger next feasibility target; diagnostic setup~0.75% does not justify a separate tiny optimization.",
+  "artifacts": "target/perf-barrier-scope/ (original/triangular/numeric instrumented source and probes,all logs)",
+  "original_chol_sha256": "154938695595cdb2a591a3caada92cf0c50f8914125229c0f8b573ce3675ecda"
+}
