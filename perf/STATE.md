@@ -1627,6 +1627,20 @@ and rho-eligible column-order Devex dots remain separate. Evidence:
 [paired-btran-scope.json](evidence/paired-btran-scope.json); original row sequences,
 probe, analysis and accepted gates are in `target/perf-btran-pair/`.
 
+Independent-output dense LDL batching is a conditional numerical lead. Cached
+healthy recordings of the identical accepted DEGEN2 CLI put 520/1,916 instruction
+samples (27.14%) and 152/1,709 cycle samples (8.89%) in the inlined long-double
+dot region, including its checks, fold and tail. Coverage is about 95.5%; these
+whole-batch self fractions are not solve-time/removable bounds. This region
+also includes diagonal dots, so eligible independent i>j coverage is unmeasured.
+Rows of one pivot column share temp and are independent after the original
+pivot/reciprocal; every original eight-chain reduction and final scale must
+remain. This differs from the rejected within-output LDL chunk trial. No
+candidate exists. Whole solve305 code generation exposes routing/materialization
+rather than a fresh numerical sharing boundary beyond the settled triangular
+plan. Evidence: [ldl-output-batch-scope.json](evidence/ldl-output-batch-scope.json),
+accepted assembly/IP attribution in `target/perf-ldl-scope/`.
+
 The exact Plan census counts 1,008 wide GEMM calls/factor on DEGEN3, 799 zero-C;
 fifteen factors describe 83.2 MB of logical cn buffers, 37.4% unused cells whose
 arithmetic is retained. Original R-packing copies cover 13.0 MB; contiguous-C

@@ -1,0 +1,104 @@
+{
+  "source": "18061fe9 (accepted zxtxvvvn)",
+  "accepted_cli_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+  "decision": "Independent-output complete dense LDL batching is a distinct conditional numerical lead; no candidate implemented or speedup claimed. Next measure actual dense-front geometry/eligible output coverage before freezing and changing the complete stage.",
+  "distinction": "Prior rejected LDL chunk traversal vectorized terms inside one output. New lanes would represent different i>j output rows of a fixed pivot column, sharing temp[k] while retaining every original per-output chain/fold/tail and reciprocal multiply.",
+  "source_proof": [
+    "For fixed j, row i>j reads completed columns <j and temp, and writes only its own column-j element.",
+    "Compute original diagonal update/pivot/reciprocal first. Complete all original off-diagonal updates/scaling before constructing next temp.",
+    "Keep scalar short reductions, eight long chains/fold, scalar tails, pivot regularization/raw diagonal and reciprocal bits; no FMA/padded arithmetic.",
+    "Single-precision and unsupported FP-environment paths remain original initially; finite inputs do not exclude nonfinite intermediates or NaN payload differences.",
+    "Freeze complete dense_ldl before edits; full-stage random/extreme/FP-status/live-front tests required, not only dot-helper tests."
+  ],
+  "cached_profile_provenance": {
+    "source": "perf/evidence/gemm-routing-scope.json",
+    "cli_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "profiles": {
+      "degen2-lowrate": {
+        "event": "instructions:u",
+        "period": 16000000,
+        "repetitions": 128,
+        "event_audit": {
+          "PERF_RECORD_SAMPLE": 1916,
+          "PERF_RECORD_LOST": 0,
+          "PERF_RECORD_THROTTLE": 0,
+          "PERF_RECORD_UNTHROTTLE": 0
+        },
+        "represented_events": 30656000000,
+        "direct_batch_events": 32093180881,
+        "represented_fraction": 0.9552184968411515
+      },
+      "degen2-cycle": {
+        "event": "cycles:u",
+        "period": 2000000,
+        "repetitions": 32,
+        "event_audit": {
+          "PERF_RECORD_SAMPLE": 1709,
+          "PERF_RECORD_LOST": 0,
+          "PERF_RECORD_THROTTLE": 0,
+          "PERF_RECORD_UNTHROTTLE": 0
+        },
+        "represented_events": 3418000000,
+        "direct_batch_events": 3578768100,
+        "represented_fraction": 0.9550772513033186
+      }
+    },
+    "qualification": "Same accepted release CLI. Healthy recordings, zero loss/throttle; about95.5% direct-event coverage, not near-complete attribution. Whole-batch self fractions include launch/parser/startup; no time/removable bound."
+  },
+  "attribution": {
+    "instruction": {
+      "batch_samples": 1916,
+      "numeric_factor_samples": 675,
+      "ranges": {
+        "long_double_dot_with_checks_fold_tail": {
+          "elf_start": "0x248a8e",
+          "elf_end_exclusive": "0x248ca4",
+          "samples": 520,
+          "batch_percent": 27.139874739039666
+        },
+        "next_temp_formation": {
+          "elf_start": "0x248cb0",
+          "elf_end_exclusive": "0x248d92",
+          "samples": 41,
+          "batch_percent": 2.139874739039666
+        }
+      }
+    },
+    "cycle": {
+      "batch_samples": 1709,
+      "numeric_factor_samples": 217,
+      "ranges": {
+        "long_double_dot_with_checks_fold_tail": {
+          "elf_start": "0x248a8e",
+          "elf_end_exclusive": "0x248ca4",
+          "samples": 152,
+          "batch_percent": 8.894090111176126
+        },
+        "next_temp_formation": {
+          "elf_start": "0x248cb0",
+          "elf_end_exclusive": "0x248d92",
+          "samples": 2,
+          "batch_percent": 0.11702750146284377
+        }
+      }
+    }
+  },
+  "assembly_proof": "Accepted numeric_factor_with starts0x244dc0. Eight scalar accumulator updates at0x248a8e..0x248c3b, original fold0x248c3b..0x248c63, tail to0x248ca4; includes bounds checks/control. Next-temp generation0x248cb0..0x248d92. First region includes diagonal and off-diagonal long dots; it is not all eligible SIMD work.",
+  "small_counter": {
+    "model": "degen2 barrier-release",
+    "cap": 100,
+    "status": "optimal",
+    "iterations": 12,
+    "solve_seconds": 0.025669261,
+    "instructions": 239342852,
+    "cycles": 99702639,
+    "qualification": "One bounded feasibility/timing estimate only, not performance comparison.",
+    "complete_result": "Matches accepted target/perf-factor-engine/unrestricted-scatter/degen2-0-after.json after removing diagnostics.seconds only; exit0."
+  },
+  "excluded_new_lead": "Whole solve305 codegen adds routing/unrolling to settled triangular coefficient-sharing/in-place trials; no new substantial numerical boundary identified. Do not advance a descriptor/codegen composition from total solve scope.",
+  "artifacts": "target/perf-ldl-scope/: numeric-factor.asm, annotate.stderr, degen2-{instruction,cycle}-ips.txt, script stderr, attribute.py, cached-attribution.json, degen2-small*. Cached source recordings remain target/perf-gemm-routing/degen2-{lowrate,cycles}.data.",
+  "verification": {
+    "accepted_root": "Unchanged numerical source and accepted CLI; full987 and292release tests passed this turn, target/perf-btran-pair/accepted-{full-parity,release-tests}.log.",
+    "candidate": "None; no candidate gates/timing screen."
+  }
+}

@@ -412,8 +412,14 @@ measured.
   direct BTRAN rank/layout ownership or rho/Devex matrix-product fusion.
   A fresh substantial execution phase must be identified before another
   ordinary primal/dual implementation; aggregate hot-function shares alone
-  do not qualify one. Review remaining barrier numerical stages against the
-  accepted factor executor and settled triangular-program/LDL-chunk trials.
+  do not qualify one. Next measure actual dense LDL independent-output coverage
+  on small fronts: cached identical-CLI DEGEN2 assembly attributes 27.14% batch
+  instruction / 8.89% cycle samples to long double dots, including diagonal
+  outputs, checks and tails. Whole-column i>j batching is distinct from the
+  rejected within-output chunk trial. Preserve pivot/reciprocal and next-temp
+  boundaries; freeze/test the complete stage before editing. No solve305
+  routing/codegen composition follows from the settled triangular-plan scope.
+  See evidence/ldl-output-batch-scope.json.
   The scalar prefilter and prior rank/layout trials remain
   rejected; do not infer further gains from isolated predicate costs.
   Comparator alignment stays centralized; normal lunum's build/cache transport
