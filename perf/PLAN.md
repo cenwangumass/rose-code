@@ -315,48 +315,41 @@ measured.
   backward shares geometry. Preserve dsub8/dsub2 reduction trees, four-product
   grouping and dynamic zero-diagonal rules. Current scope is measured below;
   triangular code generation remains unimplemented and lower priority.
-  Current scoped DEGEN3 measurements put complete forward/backward near7%,
-  versus numeric factor71% and child updates35% (including DGEMM19%). These
+  Pre-executor scoped DEGEN3 measurements put complete forward/backward near 7%,
+  versus numeric factor 71% and child updates 35% (including DGEMM 19%). These
   nested release-test scopes are not accepted-release removable bounds.
-  A complete solver-owned child row schedule/scratch program now passes its
-  independent child/full-factor oracles and fast940, lowering DEGEN3 instructions
-  5.246%. Fixed screen43117 measures -6.561% but fails conservative AA separation;
-  stop without43189/extension/full gates and restore. Do not repeat this screen.
-  A larger whole-factor plan would need additional work such as retained block
-  solves/LDL orchestration; factor blocks occupy23% of scoped DEGEN3, including
-  DTRSM14% and LDL6%. Prior individual map/panel/scratch trials remain rejected.
-  The distinct next hypothesis is a complete rectangular multi-RHS block solve,
-  sharing live L coefficients while retaining each RHS's original kernel class,
-  total n/column index and tile schedule. Preserve original RHS inputs for native
-  nonfinite fallback, LL0 external-update/substitution boundaries and final
-  reciprocal scaling. Current census gives99.42% four-double term coverage on
-  DEGEN3, with13.28% diagnostic rectangle scope and no single-mode fronts.
-  Freeze full factor_block and compare complete outputs/flags on real fronts;
-  Complete four-double packets are now numerically verified (5,624rectangle /
-  1,488full-block oracle cases, full987,285release tests), but timing remains
-  unqualified: first44217 median-10.103%, conservative CI upper-4.208 versus
-  AA error4.300. Stop without44289/extension/retry. Exact source is preserved
-  on experiments/barrier-rhs-packets; accepted solver is restored unchanged.
-  Ordinary auxiliary four-RHS and local LDL/dispatch trials are separate and
-  remain rejected; do not restart them as a small buffer experiment.
-  A genuinely larger next boundary is a complete factor owner with logical
-  GEMM destination views: assemble/update/solve R in its eventual packed suffix,
-  reuse mm/child/RHS scratch, and eliminate child cm/cn materialization. First
-  census bytes/calls from actual Plan geometry. Recycle old Factor only after
-  the early return check; keep current/previous generations disjoint and par
-  from logical lengths. Private destination-aware GEMM must preserve exact
-  logical C extents/finite scans, k partitions, zero-product-then-parent-add
-  semantics, single conversion and computations of unused outputs/FP flags.
-  Passing strided parent slices directly to current public DGEMM is invalid.
-  Prior arena/owner experiments do not establish this broader numerical scope;
-  do not credit copies or add past gains without measurement.
-  The exact Plan census is complete: DEGEN3 has1008wide GEMM calls/factor,
-  799zero-product; fifteen factors materialize83.2MB of cn buffers,37.4%unused
-  cells (compute/flags still required), versus13.0MB R packing and5.46MB
-  contiguous C copies. These counts favor the zero-product destination boundary,
-  not a contiguous-only or allocation-only rewrite; they are not time bounds.
-  PEROLD FTRAN/L/update and factor-production/installation ownership remain larger
-  measured leads. The scalar prefilter and prior rank/layout trials remain
+  The complete solver-owned child/direct-GEMM-destination/rectangular-RHS
+  executor is qualified: fixed screens 45631/45697 both pass, full 987 parity and
+  release tests pass, all 23 benchmark outputs/exits agree. Independent output
+  cells retain their original arithmetic; discarded products must still execute.
+  Admitted A/B ranges guarantee finite normal-or-zero product intermediates.
+  Gathered C retains its full logical finite-range check. Zero-C scatter accepts
+  arbitrary parents because each final addition has at most one nonfinite
+  operand. Keep the single-pass k gate, masked-exception check, distinct physical
+  destinations, all logical A/B extents, signed-zero addition and original
+  single/extreme/unmasked fallbacks. Passing strided parent slices to public
+  GEMM remains invalid. Full original factor orchestration is frozen as oracle.
+  Exact qualification and predecessor controls are in
+  evidence/barrier-factor-executor.json; prior isolated 43117/44217 screens
+  remain inconclusive and must not be repeated.
+  Refresh accepted-release factor/solve attribution before choosing another
+  barrier scope; predecessor nested scope percentages are not current bounds.
+  Packed-R assembly/updates/solve ownership and disjoint factor recycling remain
+  unimplemented. Recycle only after the early return check and preserve par from
+  logical lengths. The exact Plan census counts 13.0 MB R packing on DEGEN3,
+  versus 83.2 MB original zero-product buffers now covered by admitted direct
+  destinations. These are logical byte counts, not removable time. Prior arena
+  and owner trials remain rejected; do not restart them without larger measured
+  scope or assume that the independent historical gains add.
+  The next whole-column boundary census covers L/eta tuple production, full/
+  needed U reconstruction, replacement reconstruction and installed U storage.
+  Start with cached SC50A and DEGEN2 cap 300; reach PEROLD only if representation
+  work across the complete chain has a plausible whole-solve payoff. Reused U
+  workspace is already accepted. Preserve pre-U numerical values, support order,
+  omitted zeros, sub-tolerance residues, WORK and keep/basic restoration. Do not
+  repeat rejected dense-buffer-transfer or partial normalization/storage trials.
+  Factor-production/installation ownership remains another measured lead.
+  The scalar prefilter and prior rank/layout trials remain
   rejected; do not infer further gains from isolated predicate costs.
   Comparator alignment stays centralized; normal lunum's build/cache transport
   still needs an explicit no-build/schema-current source option for direct reuse.

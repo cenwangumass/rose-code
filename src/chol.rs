@@ -8,6 +8,23 @@
 //!
 //! Gaps (never approximated): regularisation and 2x2 pivots of `0x2f1940` (never triggered in the corpus; this port has the normal pivot test
 //! only), dense columns, free variables, the iterative refinement of `0x30fc90`.
+#[path = "chol_child_program.rs"]
+mod child_program;
+#[cfg(test)]
+#[path = "chol_child_oracle.rs"]
+mod child_oracle;
+
+#[path = "chol_rect_packet.rs"]
+mod rect_packet;
+#[cfg(test)]
+#[path = "chol_rect_oracle.rs"]
+mod rect_oracle;
+#[path = "chol_gemm_destination.rs"]
+mod gemm_destination;
+#[cfg(test)]
+#[path = "chol_factor_oracle.rs"]
+mod factor_oracle;
+
 use crate::barrier::{
     BarrierError, DirKind, Direction, NormalSolver, Rhs, StartKind, State, StdForm,
 };
@@ -1579,18 +1596,22 @@ fn factor_block(
             } else {
                 Vec::new()
             };
-            for rr in 0..rows {
-                let x = if big32 {
-                    let mut x: Vec<f32> =
-                        r[rr * w..(rr + 1) * w].iter().map(|&v| v as f32).collect();
-                    crate::sgemm32::strsm_llu_col(&l32, w, &mut x, rr, rows);
-                    x.iter().map(|&v| v as f64).collect()
-                } else if SINGLE.with(|c| c.get()) {
-                    strsm_seq(mm, w, &r[rr * w..(rr + 1) * w])
-                } else {
-                    dtrsm_llu_col(mm, w, &r[rr * w..(rr + 1) * w], rr, rows)
-                };
-                r[rr * w..(rr + 1) * w].copy_from_slice(&x);
+            if !SINGLE.with(|s| s.get()) && rect_packet::try_solve(mm, w, r) {
+                // Four independent RHS lanes retain each original G4 schedule.
+            } else {
+                for rr in 0..rows {
+                    let x = if big32 {
+                        let mut x: Vec<f32> =
+                            r[rr * w..(rr + 1) * w].iter().map(|&v| v as f32).collect();
+                        crate::sgemm32::strsm_llu_col(&l32, w, &mut x, rr, rows);
+                        x.iter().map(|&v| v as f64).collect()
+                    } else if SINGLE.with(|c| c.get()) {
+                        strsm_seq(mm, w, &r[rr * w..(rr + 1) * w])
+                    } else {
+                        dtrsm_llu_col(mm, w, &r[rr * w..(rr + 1) * w], rr, rows)
+                    };
+                    r[rr * w..(rr + 1) * w].copy_from_slice(&x);
+                }
             }
         }
         for rr in 0..rows {
@@ -1827,7 +1848,19 @@ pub fn numeric_factor(
     plan: &Plan,
     d: &[f64],
     zx: Option<&[f64]>,
+    on_sn: Option<&mut dyn FnMut(usize, &Supernode, &[f64], &[f64])>,
+) -> Factor {
+    numeric_factor_with(f, rows, plan, d, zx, on_sn, None)
+}
+
+fn numeric_factor_with(
+    f: &StdForm,
+    rows: &[Vec<(usize, usize)>],
+    plan: &Plan,
+    d: &[f64],
+    zx: Option<&[f64]>,
     mut on_sn: Option<&mut dyn FnMut(usize, &Supernode, &[f64], &[f64])>,
+    mut execution: Option<(&child_program::NumericProgram, &mut child_program::Scratch)>,
 ) -> Factor {
     let m = f.m;
     let _guard = SingleGuard::new(plan.single);
@@ -1910,7 +1943,7 @@ pub fn numeric_factor(
         if front_col == Some(col) {
             front_rec("ASM", -1, &mm);
         }
-        for &ci in &s.upd {
+        for (child_index, &ci) in s.upd.iter().enumerate() {
             let cs = &plan.sns[ci];
             let ch = Child {
                 w: cs.w,
@@ -1919,7 +1952,14 @@ pub fn numeric_factor(
                 packed: &vals[ci],
                 d: &dvec[ci],
             };
-            child_update(&ch, w, col, plan.sym80, &mp, &mut mm, &mut r);
+            if let Some((program, scratch)) = execution.as_mut() {
+                match program.child(k, child_index) {
+                    Some(child) => child.apply(&ch, &mut mm, &mut r, scratch),
+                    None => child_update(&ch, w, col, plan.sym80, &mp, &mut mm, &mut r),
+                }
+            } else {
+                child_update(&ch, w, col, plan.sym80, &mp, &mut mm, &mut r);
+            }
             if front_col == Some(col) {
                 front_rec("UPD", ci as i64, &mm);
             }
@@ -2378,6 +2418,8 @@ pub fn sym_rho_s(f: &StdForm, sym: &Symbolic) -> (f64, f64) {
 /// The bit-exact solver: supernodal factor of `A D A'` and the solves of the reference.
 pub struct CholSolver {
     plan: Plan,
+    execution: child_program::NumericProgram,
+    child_scratch: child_program::Scratch,
     rows: Vec<Vec<(usize, usize)>>,
     a: Amat,
     d: Vec<f64>,
@@ -2422,12 +2464,13 @@ impl CholSolver {
     }
 
     pub fn new(f: &StdForm, sym: &Symbolic) -> CholSolver {
+        let mut plan = Plan::new(sym);
+        plan.single = replaced_pivots(f, sym, -1);
+        let execution = child_program::NumericProgram::new(&plan);
         CholSolver {
-            plan: {
-                let mut p = Plan::new(sym);
-                p.single = replaced_pivots(f, sym, -1);
-                p
-            },
+            plan,
+            execution,
+            child_scratch: child_program::Scratch::default(),
             rows: model_rows(f),
             a: Amat::new(f),
             d: Vec::new(),
@@ -2658,16 +2701,25 @@ impl NormalSolver for CholSolver {
             );
         };
         let fac = if on {
-            numeric_factor(
+            numeric_factor_with(
                 f,
                 &self.rows,
                 &self.plan,
                 d,
                 self.fzx.as_deref(),
                 Some(&mut cb),
+                Some((&self.execution, &mut self.child_scratch)),
             )
         } else {
-            numeric_factor(f, &self.rows, &self.plan, d, self.fzx.as_deref(), None)
+            numeric_factor_with(
+                f,
+                &self.rows,
+                &self.plan,
+                d,
+                self.fzx.as_deref(),
+                None,
+                Some((&self.execution, &mut self.child_scratch)),
+            )
         };
         // `0x2f1720`: a single-precision factor with `SYM+0x100 < 1e-8` is dropped and the factor computed in double.
         if self.plan.single && fac.minratio < 1e-8 {

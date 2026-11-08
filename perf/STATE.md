@@ -4,11 +4,11 @@ Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (histo
 
 ## Current host: AMD EPYC virtual CPU, family 23
 
-Source `3ee41127`, pinned Rust 1.98.1, ordinary ThinLTO release and glibc,
+Source `zxtxvvvn`, pinned Rust 1.98.1, ordinary ThinLTO release and glibc,
 CPU 2. This checkout has no preceding PGO artifacts or TCMalloc library;
 the historical EPYC 9V74 timing table is not a current-host comparison.
-The unchanged release passes fast 940/940 and full 987/987 parity. The
-frame-pointer profiling build passes fast 940/940.
+The current release passes fast 940/940 and full 987/987 parity. The
+preceding frame-pointer profiling build passes fast 940/940.
 
 `perf/bench.sh` now appends solve samples inside Python: Hyperfine 1.19 applies
 `-N` to hooks, so its former shell redirection left an empty sample file.
@@ -29,6 +29,42 @@ full and needed FTRAN are 14.53% and 14.13%, with their shared L stage 9.82%.
 These are whole-batch profiling-build instruction shares, not release solve-only
 costs. They keep whole forward solves and factor production/installation as the
 structural targets; they do not justify another small arithmetic or queue trial.
+
+### Barrier factor executor
+
+The solver compiles child-update geometry once and retains its scratch across
+Newton factors. Logical GEMM destinations update the parent directly without
+materializing gathered or zero-product buffers when admitted by the exact
+range/context checks. Discarded upper outputs still execute. Four independent
+double RHS lanes share each live rectangular-triangular coefficient. All original
+per-output reductions, precision paths, fallback inputs and WORK calls remain.
+
+Two fixed CPU 2 DEGEN3 screens (32 AB + 32 AA each, seeds 45631/45697, cap 100)
+pass: median solve reductions 13.286% and 14.379%, confidence intervals
+[-15.253%,-9.897%] and [-16.585%,-12.314%], 31/32 and 32/32 improving. Both
+orders improve and healthy AA uncertainty is clear of both intervals.
+DEGEN3 instructions fall 14.485%; DEGEN2 barrier instructions fall 9.246%.
+These counter reductions describe the complete executor, not additive gains
+from its components. The materialized compiled-plan/packet control reduces
+DEGEN3 instructions 14.638%, so no independent direct-C timing gain is claimed.
+
+The complete 23-row sweep preserves all 184 complete result/exit objects. DEGEN3
+barrier solve median changes 0.328336 to 0.271563 s (-17.291%); 80BAU3B and
+GREENBEA barrier changes remain within their measured spreads. A separated
+primal_5959.primal-r short-sweep slowdown receives a fixed reversed-role screen:
+median accepted/candidate -2.127%, interval [-7.474%,+1.816%], sign p 0.0551;
+AA is healthy (p 0.2153), with interval [-5.966%,+0.506%]. No regression is
+established; this does not establish timing equivalence. Other median increases
+remain within the sweep spreads. Full parity 987/987 and all 292 runnable
+release tests pass (22 ignored).
+
+Configuration is ordinary ThinLTO/glibc, with no global target-CPU flags or PGO.
+The patched reference library remains unavailable on this host; no new Gurobi
+win count or speed ratio is claimed. Source hashes, all 23 before/after rows,
+controls, source variants and exact qualification are in
+[barrier-factor-executor.json](evidence/barrier-factor-executor.json); raw data
+and proof are in `target/perf-factor-engine/`. Prior isolated schedule/packet
+screens remain inconclusive and were not repeated.
 
 ## Historical AMD EPYC 9V74 measurements
 
@@ -1412,53 +1448,30 @@ no new solver speedup or reference timing ratio.
 
 ## Candidates
 
-Barrier geometry/materialization census matches all7original full-run block
-counts exactly (Plan nodes times numeric factors). DEGEN3 has1,008wide GEMM
-calls/factor,799zero-product calls. Across15factors, logical cn buffers cover
-83.2MB;37.4%of cells are unconsumed but their arithmetic/flags must remain.
-R-packing copies cover13.0MB, contiguous-C gather/store5.46MB. These are logical
-volume counts, not allocator/cache traffic or removable time. Target complete
-zero-product destination materialization as part of a factor executor rather
-than only contiguous copies or arena allocation.
-[factor-materialization.json](evidence/factor-materialization.json), exact
-SYM captures and reconstruction in `target/perf-factor-boundaries/`.
+Next structural measurement: the complete forward-column representation
+boundary from L/eta tuple production through U expansion, replacement expansion
+and installed U storage. Use cached SC50A for correctness, DEGEN2 capped at 300
+for the first boundary census, then PEROLD only if the complete chain has a
+plausible whole-solve payoff. The accepted dirty-block U workspace is already
+reused; earlier dense-buffer transfers and partial normalization/storage trials
+remain rejected. Preserve ordered support, pre-U values, omitted zeros,
+sub-tolerance residues, WORK and keep/basic restoration. Surrounding FTRAN/L
+inclusive profile shares overlap and are not a removable-cost bound.
 
-The complete four-double-RHS rectangle prototype is numerically verified and
-preserved on `experiments/barrier-rhs-packets`, but remains unqualified for
-acceptance. Independent checks cover5,624rectangles and1,488complete blocks;
-full frozen parity passes987/987 and285release tests pass (22ignored). Original
-G4 schedules, live coefficients, separate nonfused operations, scalar tails,
-nonfinite replay and unmasked-environment fallback are retained. DEGEN3
-instructions/cycles fall9.224/14.029%. First fixed screen44217 (CPU2,cap100,
-32AB+32AA) measures-10.103%, interval[-13.000,-4.208],27/32improving,p5.65e-5,
-bothordersimprove; healthy AA[-4.300,+2.931] defeats conservative separation.
-No44289,extension or same-source retry. The accepted solver remains unchanged.
-[rectangular-rhs-packet.json](evidence/rectangular-rhs-packet.json), exact
-implementation/proofs/full checks and every timing result in
-`target/perf-rhs-packet/`. Further factor-engine work needs an additional
-ownership/destination boundary; do not add the separate historical gains.
+The complete child/direct-destination/rectangular-RHS factor executor is
+qualified above. Refresh its accepted-release factor/solve attribution before
+choosing another barrier structural change. Pre-executor nested test scopes
+(numeric factor 71%, child 35% including GEMM 19%, factor blocks 23%, complete
+forward/backward 7%) describe the predecessor and are not current removable
+bounds. [barrier-current-scope.json](evidence/barrier-current-scope.json).
 
-Current rectangular-RHS census covers99.42% of DEGEN3 triangular terms with
-natural four-double packets; the complete rectangle scope is13.28% of its
-instrumented test solve. All measured fronts are double precision. DEGEN2's
-coverage is96.55%, rectangle scope5.23%; smaller witnesses include LL0 and left
-kernels. These single-run test scopes are diagnostic, not accepted-release or
-removable-cost bounds. All7 complete uninstrumented/measured solve results
-agree. [rectangular-rhs-census.json](evidence/rectangular-rhs-census.json), raw
-original front inputs/logs/probe in `target/perf-rhs-census/`.
-
-Current barrier release-test scope measurements (three bounded full pairs per
-row; DEGEN3 CPU2, cap100) put the complete forward/backward pair near7%, normal
-solve11%, numeric factor71%, child updates35% including DGEMM19%, assembly9%
-and factor blocks23%. Diagnostic setup is only0.75%. These are nested inclusive
-instrumented-test scopes, affected by inlining/timer overhead; they are not
-accepted-release cost bounds and must not be added. All27 complete instrumented
-versus uninstrumented SolveResult pairs agree. The complete child plan is tested
-and unqualified as recorded below. Whole rectangular block-solve execution
-beyond that child boundary remains unimplemented; triangular JIT and local
-configuration changes have smaller measured scope.
-[barrier-current-scope.json](evidence/barrier-current-scope.json), raw probes
-and logs in `target/perf-barrier-scope/`.
+The exact Plan census counts 1,008 wide GEMM calls/factor on DEGEN3, 799 zero-C;
+fifteen factors describe 83.2 MB of logical cn buffers, 37.4% unused cells whose
+arithmetic is retained. Original R-packing copies cover 13.0 MB; contiguous-C
+copies 5.46 MB. These are logical volumes, not time bounds. Direct destinations
+now cover the admitted double-precision boundary; packed-R ownership and
+factor-generation recycling remain unimplemented, and prior arena-only trials
+provide no qualifying gain. [factor-materialization.json](evidence/factor-materialization.json).
 
 Current non-level sparse-L replay census rules out that duplication on the
 measured targets. DEGEN2, PILOT4 and PEROLD have no Kahn calls and no dense
@@ -1985,7 +1998,22 @@ restoration: `target/perf-eta-long/`.
 
 - Generated complete immutable dense forward-L and L-transpose SSE2 programs with fixed workspace displacements and exact coefficient/WORK literals. All 8,192 captured SC50A/mode/input cases and 4,888 actual dense-pass inputs across eight bounded models preserve numeric/WORK bits and MXCSR; all complete solver results match uninstrumented runs. Execution-only tiny-factor probes improve, but construction-inclusive lifetime replay loses. Histories optimistically share all identical geometry/coefficients within one solve and exclude capture/cache costs. A one-pass mapped-image emitter removes staging/relocation and produces byte-identical code on all 182 observed geometry-direction groups, but final CPU2 replay still loses about 63% on PILOT4 and 29% on PEROLD; each aggregate direction also loses. Do not integrate this per-LU-factor program or infer solver gains from repeated-kernel timing. Source restored exactly; no production patch/full candidate gates. Evidence: [l-generated-program.json](evidence/l-generated-program.json), complete probes/source/checks/replays in `target/perf-l-program/`. Programs with topology retained across all barrier Newton factors would have a different, untested lifetime.
 
-- Retain complete barrier child execution row schedules and temp/product scratch across Newton factors. Geometry includes both width-one orders and wide GEMM calls, exact logical slice extents, contiguous gather/store versus zero/add, 24-column groups and rectangle extension. Live coefficients, D and precision stay original; public numeric_factor retains its fallback. All 7,200 independent child comparisons and 30 complete small-model factor/callback cases pass, including flags and single-to-double poisoned-scratch reuse. Fast parity940 passes and all42final bounded result/exit pairs agree. DEGEN2/DEGEN3 instructions fall4.803/5.246%, cycles10.404/3.831%. The fixed ordinary-release DEGEN3 screen43117 (CPU2,cap100,32AB+32AA) is inconclusive: median-6.561%, interval[-9.205,-2.991],26/32improving,p0.0002675,bothordersimprove; healthy AA interval[-1.949,+4.326] defeats conservative separation. Stop without43189,extension or full candidate gates. Source/acceptedCLI restored; no optimization accepted. Evidence: [barrier-child-program.json](evidence/barrier-child-program.json), complete implementation/oracle/tests/builds/counters/screen in `target/perf-child-program/`. Broader factor execution planning needs a genuinely additional scope beyond this child schedule.
+- The isolated four-double-RHS rectangle prototype is numerically verified and
+preserved on `experiments/barrier-rhs-packets`, but remains unqualified for
+acceptance. Independent checks cover5,624rectangles and1,488complete blocks;
+full frozen parity passes987/987 and285release tests pass (22ignored). Original
+G4 schedules, live coefficients, separate nonfused operations, scalar tails,
+nonfinite replay and unmasked-environment fallback are retained. DEGEN3
+instructions/cycles fall9.224/14.029%. First fixed screen44217 (CPU2,cap100,
+32AB+32AA) measures-10.103%, interval[-13.000,-4.208],27/32improving,p5.65e-5,
+bothordersimprove; healthy AA[-4.300,+2.931] defeats conservative separation.
+No44289,extension or same-source retry. This isolated packet experiment was not accepted.
+[rectangular-rhs-packet.json](evidence/rectangular-rhs-packet.json), exact
+implementation/proofs/full checks and every timing result in
+`target/perf-rhs-packet/`. The combined factor executor is qualified above;
+these isolated measurements remain inconclusive and are not added together.
+
+- Retain complete barrier child execution row schedules and temp/product scratch across Newton factors. Geometry includes both width-one orders and wide GEMM calls, exact logical slice extents, contiguous gather/store versus zero/add, 24-column groups and rectangle extension. Live coefficients, D and precision stay original; public numeric_factor retains its fallback. All 7,200 independent child comparisons and 30 complete small-model factor/callback cases pass, including flags and single-to-double poisoned-scratch reuse. Fast parity940 passes and all42final bounded result/exit pairs agree. DEGEN2/DEGEN3 instructions fall4.803/5.246%, cycles10.404/3.831%. The fixed ordinary-release DEGEN3 screen43117 (CPU2,cap100,32AB+32AA) is inconclusive: median-6.561%, interval[-9.205,-2.991],26/32improving,p0.0002675,bothordersimprove; healthy AA interval[-1.949,+4.326] defeats conservative separation. Stop without43189,extension or full candidate gates. Source/acceptedCLI restored; no optimization accepted. Evidence: [barrier-child-program.json](evidence/barrier-child-program.json), complete implementation/oracle/tests/builds/counters/screen in `target/perf-child-program/`. The combined factor executor is qualified above; this isolated schedule screen remains inconclusive.
 
 ## Tried, breaks parity
 
