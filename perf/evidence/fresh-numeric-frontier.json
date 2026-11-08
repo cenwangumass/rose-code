@@ -1,0 +1,182 @@
+{
+  "source": "0fa7e8a0",
+  "experiment": "Fuse full structural L closure, closure cloning/sorting and numeric replay in RefStruct::fresh into an ascending write-discovered bitset frontier. Certify all L edges strictly lower; nonlower factors retain original structural traversal.",
+  "configuration": "Pinned Rust 1.98.1 ordinary ThinLTO release/glibc, CPU 2, current EPYC virtual host; no PGO.",
+  "hashes": {
+    "before": "fa615c020cf4eaf9b632ceeab247e68e4382b1782eaa89420911222b9a6ba70a",
+    "after": "49b136024836252069f160646095cfff9252144710764536d6c0a81b69ddebb0",
+    "original.rs": "57c86340f6959717954e2cb1c58f06c285ab7ce564a25d7d0e9e9c429d802ef1",
+    "candidate.rs": "a202adaa2d935b119960e651468a40587b7478602341c809c0506b85ff87e279",
+    "oracle.rs": "9bfa13e084366ee76068fabb57aa7720fe8cc2b31244c36bf896acc3d80b5373"
+  },
+  "oracle": "Complete original constructor copied before rewriting; exact source reconstruction verified. All three release differential tests pass: generated f64/F80 factors and altered live inputs, self/backward fallback, small real model factors, directed duplicate inputs/destinations, zero/drop chains, cancellation, consecutive-column cleanup at t, tiny duplicate Markowitz overlays, raw singleton and multiplier paths, extremes/nonfinites/two NaN payloads and all 16 MXCSR modes. Complete constructor Debug state, every U index/value bit, fresh WORK vector and MXCSR flags agree.",
+  "parity": "Fast 940/940 passes. Full candidate gates not run after the negative first screen.",
+  "whole_results": "All 48 alternating counter runs agree on full original JSON result/exit objects after removing only diagnostics.seconds. The paired runner verifies every complete result/exit in its fixed 128 timed solves.",
+  "counter_rows": [
+    {
+      "model": "afiro",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 2267282,
+        "after": 2271474,
+        "change_percent": 0.1848909840064028
+      },
+      "cycles:u": {
+        "before": 3449831,
+        "after": 3459854,
+        "change_percent": 0.29053597118235963
+      }
+    },
+    {
+      "model": "sc50a",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 6476820,
+        "after": 6472808,
+        "change_percent": -0.061943978680900624
+      },
+      "cycles:u": {
+        "before": 6497166,
+        "after": 5823470,
+        "change_percent": -10.369074762750408
+      }
+    },
+    {
+      "model": "blend",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 13690814,
+        "after": 13666940,
+        "change_percent": -0.1743796972188849
+      },
+      "cycles:u": {
+        "before": 12950243,
+        "after": 11914314,
+        "change_percent": -7.999301634726086
+      }
+    },
+    {
+      "model": "adlittle",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 13449118,
+        "after": 13412078,
+        "change_percent": -0.27540839481072776
+      },
+      "cycles:u": {
+        "before": 11246829,
+        "after": 11443254,
+        "change_percent": 1.746492277956757
+      }
+    },
+    {
+      "model": "bore3d",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 46301985,
+        "after": 46230223,
+        "change_percent": -0.15498687583264115
+      },
+      "cycles:u": {
+        "before": 35010746,
+        "after": 33981251,
+        "change_percent": -2.940511464680018
+      }
+    },
+    {
+      "model": "degen2",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 244491589,
+        "after": 244230706,
+        "change_percent": -0.1067042842115895
+      },
+      "cycles:u": {
+        "before": 178828324,
+        "after": 168721584,
+        "change_percent": -5.651643863753931
+      }
+    },
+    {
+      "model": "pilot4",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 551946544,
+        "after": 549810720,
+        "change_percent": -0.38696211131634684
+      },
+      "cycles:u": {
+        "before": 293431061,
+        "after": 304688502,
+        "change_percent": 3.8364858040710326
+      }
+    },
+    {
+      "model": "perold",
+      "pairs": 3,
+      "instructions:u": {
+        "before": 1226195269,
+        "after": 1223074746,
+        "change_percent": -0.25448825965092015
+      },
+      "cycles:u": {
+        "before": 797810907,
+        "after": 737570994,
+        "change_percent": -7.550650470111964
+      }
+    }
+  ],
+  "timing_screen": {
+    "arguments": {
+      "before": "target/perf-fresh-frontier/before",
+      "after": "target/perf-fresh-frontier/after",
+      "run": "perold.dual-r",
+      "output": "target/perf-fresh-frontier/screen42117.json",
+      "pairs": 32,
+      "seed": 42117,
+      "cpu": 2,
+      "max_iterations": 1300,
+      "timeout": 10
+    },
+    "binary_sha256": {
+      "A": "fa615c020cf4eaf9b632ceeab247e68e4382b1782eaa89420911222b9a6ba70a",
+      "B": "49b136024836252069f160646095cfff9252144710764536d6c0a81b69ddebb0"
+    },
+    "rule": "one-sided sign p<=.01; AA two-sided sign p>.05; median gain>=0.5%; AB 95% median upper bound < negative max absolute AA 95% bound; both orders improve",
+    "status": "complete",
+    "binary_end_sha256": {
+      "A": "fa615c020cf4eaf9b632ceeab247e68e4382b1782eaa89420911222b9a6ba70a",
+      "B": "49b136024836252069f160646095cfff9252144710764536d6c0a81b69ddebb0"
+    },
+    "summary": {
+      "ab_median_percent": 3.9245853793477297,
+      "ab_ci_percent": [
+        -1.9541123032376095,
+        5.3710726349395
+      ],
+      "aa_median_percent": 1.2399157499924465,
+      "aa_ci_percent": [
+        -1.712633818319187,
+        3.6610740106115314
+      ],
+      "improving_pairs": 12,
+      "pairs_per_kind": 32,
+      "ab_sign_p": 0.9449079174082726,
+      "aa_sign_p": 0.21532714972272515,
+      "order_median_percent": {
+        "AB": 0.6351232270060981,
+        "BA": 4.718231032630508
+      },
+      "criteria": {
+        "sign_p_at_most_001": false,
+        "aa_not_biased_at_005": true,
+        "median_gain_at_least_half_percent": false,
+        "ab_upper_ci_below_aa_error": false,
+        "both_orders_improve": false
+      },
+      "positive_screen": false
+    }
+  },
+  "decision": "First fixed screen42117 is inconclusive/nonpositive: AB median +3.9246%, interval [-1.9541%,+5.3711%], AA healthy but broad, 12/32 improving, both order medians slower. Do not run42189, extend or repeat this screen. No optimization accepted; restore source and accepted CLI.",
+  "artifacts": "target/perf-fresh-frontier/ (original/candidate/oracle/proof, build/test/parity logs, complete counter results and paired schedule/results)"
+}

@@ -8,6 +8,12 @@ witness differs by one ULP. Guarded elimination of overwritten replay work is
 a separate data-flow question; its arithmetic-only trial has no established
 runtime benefit. Contiguous-suffix graph pruning is numerically verified but
 timing-inconclusive and unapplied; accepted source/build are restored.
+A separate whole-pass fusion replaces structural closure and sorting with an
+ascending numeric frontier under a strict lower-graph certificate. Its complete
+constructor oracle and fast parity pass, but current-host PEROLD screen42117
+is nonpositive (+3.925% median, interval [-1.954%, +5.371%]); no confirmation or
+extension follows. That candidate is also restored. See
+[fresh-numeric-frontier.json](evidence/fresh-numeric-frontier.json).
 
 | Producer | Consumers and lifetime | Consequence |
 |---|---|---|

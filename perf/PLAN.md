@@ -249,6 +249,11 @@ measured.
   PILOT4 instructions 1.068%, but screen32217 is inconclusive; stop without
   seed32289 or full candidate gates. It remains unapplied. Do not repeat either
   this screen or the earlier arithmetic-only guarded-replay screen.
+  A distinct fresh-constructor whole-pass fusion removes symbolic closure and
+  sorting via a certified ascending numeric frontier. Complete constructor oracle
+  and fast parity pass, but the fixed current-host PEROLD screen42117 is
+  nonpositive (+3.925% median); no42189 or extension. It remains unapplied.
+  Do not infer another replay optimization from graph-pass savings alone.
   The extended BTRAN conversion/operation-boundary audit is complete. Prepacking
   alone does not make the small component faster than software; rebuilding its
   cache per call is worse. Combined multiply/store/subtract blocks retain both
