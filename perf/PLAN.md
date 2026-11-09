@@ -175,6 +175,14 @@ translation/lifetime trials. Main/fresh and auxiliary factors remain distinct
 numerical owners. Read factor-audit.md's remaining proof obligations before
 claiming this is either a tested failure or a qualified new implementation.
 
+Incremental Markowitz clean/maximum summaries are closed at complete cost scope.
+Mode-switch search is3.76–4.13% of the instrumented solve; all cleanup plus ordered
+maxima is3.004–3.591%, including necessary work. PEROLD search is2.669–2.749%.
+All18 complete paired results/float bits agree. No eligibility/invalidation census
+or prototype follows. Existing linked/borrowed-chain failures are separate;
+unchanged maxima do not imply unchanged candidate costs. Read
+evidence/markowitz-summary-scope.json before another search-summary proposal.
+
 The ordinary phase-one extended accumulator question is settled. Accepted
 machine code executes the dead software pipeline, but whole-kernel live replay
 is only1.361ms per80BAUsolve and timing roles cross. All12468live kernel calls,

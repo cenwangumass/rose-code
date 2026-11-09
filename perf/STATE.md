@@ -250,6 +250,30 @@ CLI are unchanged. [mode-switch-scope.json](evidence/mode-switch-scope.json), al
 recordings, excluded samples, source/offset maps, and raw outcomes are in
 `target/perf-mode-scope/`; PEROLD reproduction is in `target/perf-refactor-stages/`.
 
+### Markowitz summary scope
+
+The distinct incremental clean/maximum certificate proposal is closed at complete
+cost scope, before an eligibility census or implementation. Existing linked-chain
+and borrowed-search trials do not test unchanged numerical maximum reuse. A
+timer-only release-library probe retains every numerical/search/WORK statement;
+full source reconstructs literally after removing test scopes. Six small models
+cap300 precede PEROLD cap1300 and mode-switch cap12000. All18 complete paired
+results agree, including explicit bits for every public floating-point value.
+
+On mode-switch, complete search including helper descendants occupies3.76–4.13%
+of instrumented solve time. All cleanup plus ordered maximum folds occupies
+3.004–3.591%; maximum alone is0.439–0.458%. These include required first/changed
+work, not merely potential unchanged repeats. PEROLD search is2.669–2.749% and
+cleanup plus maximum is1.320–1.394%. Candidate costs depend on opposite-axis
+counts even when the own chain/maximum is unchanged, so caching a winner cannot
+follow from these certificates. A maximum reuse path also needs an independent
+FP-status/control proof. Nested timers/inlining affect these ordinary ThinLTO/
+glibc diagnostic scopes; they are not exact accepted-PGO removable bounds.
+No sufficient substantial residual is established. No shadow certificate/key
+census, cache/borrowed-search rescue, prototype or formal screen follows.
+[Summary scope](evidence/markowitz-summary-scope.json), complete source/probe,
+release-test ELF, counts and outputs: `target/perf-markowitz-scope/`.
+
 ### Current compact extended execution
 
 The remaining numerical extended BTRAN is cold after compact state replay.

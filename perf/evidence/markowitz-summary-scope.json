@@ -1,0 +1,418 @@
+{
+  "source": "18061fe9",
+  "proposal": "Two per-row/column certificates: no dead nodes in the stored chain; original ordered absolute maximum still valid until incident numerical/structural mutations. Preserve candidate traversal/costs/ratios/stopping/bucket rotations/WORK. Not a cached winner.",
+  "prior_overlap": "Linked chains cover stale cleanup/front shifts and borrowed search covers snapshots. Neither covers unchanged numeric maximum summary reuse across search visits; no dirty/generation maximum-summary trial found in current STATE/factor-audit.",
+  "architecture_review": {
+    "reviewer": "independent_architecture_review, existing Astra high read-only agent",
+    "invalidation": [
+      "Initial chains clean, maxima uncomputed.",
+      "Every numerical write invalidates maxima at both incident row and column.",
+      "Actual live-to-dead transitions invalidate both clean/max certificates, including deletions of pivot row/column that leave surviving opposite-axis chains.",
+      "Fill invalidates both maxima; insertion preserves previously clean chains.",
+      "Cleanup establishes cleanliness in unchanged survivor order.",
+      "Opposite-axis counts invalidate candidate costs even with unchanged own chain/max; do not cache winning pivot or skip candidate scans.",
+      "Retire at dense handoff/factor end; no cross-factor reuse."
+    ],
+    "numeric_obligation": "Refresh with original ordered fold; an incrementally adjusted maximum is not automatically NaN-equivalent. Summary reuse needs FP environment/status/trap proof beyond value equality. No reordered/skipped numerical executor tested."
+  },
+  "scope_configuration": "Isolated ordinary ThinLTO/glibc release library tests, pinned compiler, CPU2. Six small models first cap300 two rounds, PEROLD cap1300 three rounds, mode-switch cap12000 three rounds. Scope timers only; no hash keys, shadow maxima or invalidation metadata.",
+  "scope_indices": [
+    "complete nucleus including helper descendants and original lifetime",
+    "complete search including cloned-chain/cleanup/max and candidate control",
+    "cleanup during search",
+    "cleanup during selected-pivot preparation",
+    "original ordered maximum fold"
+  ],
+  "nested_scope_rule": "Search contains its cleanup and maximum scopes; nucleus contains all. Do not add parent scopes to descendants. Cleanup categories and maximum are disjoint from each other.",
+  "qualification": {
+    "literal_source_reconstruction": "Entire lu_order.rs reconstructs after removing only four entry guards, two maximum boundary guards and test module include. Every numerical/search/WORK statement unchanged. Production source hashes rechecked.",
+    "complete_paired_library_results": 18,
+    "result_comparison": "Complete SolveResult Debug comparison plus explicit to_bits equality for objective, every x/dual/reduced_cost/Farkas/ray element and trace step. Nonfloating result metadata included in Debug comparison.",
+    "runs": {
+      "small": {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-markowitz-scope/scope-tests",
+          "markowitz_scope_small",
+          "--ignored",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "cwd": "/home/derekwang/rose-reverse-engineer/rose/target/perf-markowitz-scope/source",
+        "exit_code": 0,
+        "elapsed": 0.16643887900136178,
+        "timeout": 60
+      },
+      "perold": {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-markowitz-scope/scope-tests",
+          "markowitz_scope_perold",
+          "--ignored",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "cwd": "/home/derekwang/rose-reverse-engineer/rose/target/perf-markowitz-scope/source",
+        "exit_code": 0,
+        "elapsed": 1.5215167869973811,
+        "timeout": 60
+      },
+      "mode": {
+        "argv": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-markowitz-scope/scope-tests",
+          "markowitz_scope_mode",
+          "--ignored",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "cwd": "/home/derekwang/rose-reverse-engineer/rose/target/perf-markowitz-scope/source",
+        "exit_code": 0,
+        "elapsed": 8.20199026499904,
+        "timeout": 60
+      }
+    },
+    "build": {
+      "exit_code": 0,
+      "elapsed": 48.40919717900397
+    }
+  },
+  "summary": {
+    "afiro": {
+      "calls": [
+        4,
+        0,
+        0,
+        0,
+        0
+      ],
+      "cap": 300,
+      "iterations": 10,
+      "refactorizations": 4,
+      "whole_nucleus_fractions": [
+        0.009682549391400086,
+        0.009676791799715567
+      ],
+      "whole_search_fractions": [
+        0.0,
+        0.0
+      ],
+      "search_cleanup_fractions": [
+        0.0,
+        0.0
+      ],
+      "pivot_cleanup_fractions": [
+        0.0,
+        0.0
+      ],
+      "ordered_max_fractions": [
+        0.0,
+        0.0
+      ],
+      "all_cleanup_plus_max_fractions": [
+        0.0,
+        0.0
+      ]
+    },
+    "sc50a": {
+      "calls": [
+        6,
+        86,
+        175,
+        182,
+        175
+      ],
+      "cap": 300,
+      "iterations": 33,
+      "refactorizations": 6,
+      "whole_nucleus_fractions": [
+        0.14394311742115407,
+        0.14650896114419115
+      ],
+      "whole_search_fractions": [
+        0.03194689730078565,
+        0.0346201802630109
+      ],
+      "search_cleanup_fractions": [
+        0.006016692547702254,
+        0.0065765565630092285
+      ],
+      "pivot_cleanup_fractions": [
+        0.0063433986073217884,
+        0.006874469503088921
+      ],
+      "ordered_max_fractions": [
+        0.004308256098369063,
+        0.0047749537400273
+      ],
+      "all_cleanup_plus_max_fractions": [
+        0.016668347253393105,
+        0.01822597980612545
+      ]
+    },
+    "blend": {
+      "calls": [
+        7,
+        74,
+        210,
+        172,
+        210
+      ],
+      "cap": 300,
+      "iterations": 75,
+      "refactorizations": 7,
+      "whole_nucleus_fractions": [
+        0.08786194493805657,
+        0.06668622226408036
+      ],
+      "whole_search_fractions": [
+        0.020645397157800945,
+        0.018107567558375746
+      ],
+      "search_cleanup_fractions": [
+        0.0038355969574475584,
+        0.003480438516286085
+      ],
+      "pivot_cleanup_fractions": [
+        0.00372956823341673,
+        0.0031508057036941112
+      ],
+      "ordered_max_fractions": [
+        0.0028442126564946213,
+        0.0025454978305713503
+      ],
+      "all_cleanup_plus_max_fractions": [
+        0.01040937784735891,
+        0.009176742050551545
+      ]
+    },
+    "adlittle": {
+      "calls": [
+        9,
+        112,
+        295,
+        288,
+        295
+      ],
+      "cap": 300,
+      "iterations": 73,
+      "refactorizations": 9,
+      "whole_nucleus_fractions": [
+        0.12759269096121592,
+        0.11355697438075611
+      ],
+      "whole_search_fractions": [
+        0.03376286673211444,
+        0.027828898674669145
+      ],
+      "search_cleanup_fractions": [
+        0.012191988642440633,
+        0.005200727763077204
+      ],
+      "pivot_cleanup_fractions": [
+        0.005676688382342485,
+        0.00608440487011117
+      ],
+      "ordered_max_fractions": [
+        0.0036334868746934,
+        0.0038596576605934526
+      ],
+      "all_cleanup_plus_max_fractions": [
+        0.02150216389947652,
+        0.015144790293781827
+      ]
+    },
+    "bore3d": {
+      "calls": [
+        9,
+        109,
+        287,
+        278,
+        287
+      ],
+      "cap": 300,
+      "iterations": 172,
+      "refactorizations": 9,
+      "whole_nucleus_fractions": [
+        0.04065371045747027,
+        0.04009337668229245
+      ],
+      "whole_search_fractions": [
+        0.008899984984109552,
+        0.00845181838802359
+      ],
+      "search_cleanup_fractions": [
+        0.001722718094689451,
+        0.0015377854226523513
+      ],
+      "pivot_cleanup_fractions": [
+        0.001810705604717368,
+        0.0016881521246030545
+      ],
+      "ordered_max_fractions": [
+        0.0012125839156704498,
+        0.0011595531528806895
+      ],
+      "all_cleanup_plus_max_fractions": [
+        0.004746007615077269,
+        0.0043854907001360955
+      ]
+    },
+    "degen2": {
+      "calls": [
+        8,
+        60,
+        124,
+        176,
+        124
+      ],
+      "cap": 300,
+      "iterations": 300,
+      "refactorizations": 8,
+      "whole_nucleus_fractions": [
+        0.01746638860519625,
+        0.016102032392746286
+      ],
+      "whole_search_fractions": [
+        0.002566811498006416,
+        0.002498389175635288
+      ],
+      "search_cleanup_fractions": [
+        0.0004261596824905086,
+        0.00042119336244263086
+      ],
+      "pivot_cleanup_fractions": [
+        0.0006307350984727402,
+        0.000641751489353324
+      ],
+      "ordered_max_fractions": [
+        0.0003048689828771902,
+        0.00030446865765886336
+      ],
+      "all_cleanup_plus_max_fractions": [
+        0.0013617637638404388,
+        0.0013674135094548182
+      ]
+    },
+    "perold": {
+      "calls": [
+        27,
+        7029,
+        23595,
+        14758,
+        23595
+      ],
+      "cap": 1300,
+      "iterations": 1273,
+      "refactorizations": 27,
+      "whole_nucleus_fractions": [
+        0.11407560477286496,
+        0.11340980950242846,
+        0.11633452713485326
+      ],
+      "whole_search_fractions": [
+        0.026689663897614818,
+        0.02680830440415648,
+        0.02748766191524896
+      ],
+      "search_cleanup_fractions": [
+        0.0053434944675273864,
+        0.00569738593324427,
+        0.005620302863106153
+      ],
+      "pivot_cleanup_fractions": [
+        0.004065498691458625,
+        0.004231257242348284,
+        0.004290205685099576
+      ],
+      "ordered_max_fractions": [
+        0.003792896481578646,
+        0.003929133650902492,
+        0.0040344837035101696
+      ],
+      "all_cleanup_plus_max_fractions": [
+        0.013201889640564657,
+        0.013857776826495046,
+        0.0139449922517159
+      ]
+    },
+    "witness_dual_r2_mode_switch": {
+      "calls": [
+        17,
+        79178,
+        153821,
+        171252,
+        153821
+      ],
+      "cap": 12000,
+      "iterations": 11393,
+      "refactorizations": 17,
+      "whole_nucleus_fractions": [
+        0.14160808361473406,
+        0.15066942279869477,
+        0.13349151512423055
+      ],
+      "whole_search_fractions": [
+        0.03939808183163355,
+        0.041274240487525884,
+        0.037565898731230306
+      ],
+      "search_cleanup_fractions": [
+        0.013872006873341036,
+        0.015058203361584305,
+        0.012074536835820132
+      ],
+      "pivot_cleanup_fractions": [
+        0.014821638790200289,
+        0.016403593054615584,
+        0.013379143821931911
+      ],
+      "ordered_max_fractions": [
+        0.004385904633491436,
+        0.0044436320082106694,
+        0.0045843583514774515
+      ],
+      "all_cleanup_plus_max_fractions": [
+        0.03307955029703276,
+        0.03590542842441056,
+        0.030038039009229495
+      ]
+    }
+  },
+  "decision": "Close incremental summary proposal at complete cost scope, before a repeat/invalidation census or prototype. Mode whole search3.76\u20134.13% includes required candidate work; ordered max0.439\u20130.458%; all cleanup plus max3.004\u20133.591% includes first/necessary clean and fold work, not just unchanged repeats. PEROLD whole search2.669\u20132.749%, all cleanup plus max1.320\u20131.394%. No sufficient substantial removable scope established; no ownership/borrowed-search rescue, matching PGO, formal screens or candidate full gates.",
+  "limitations": [
+    "Test-only clock entry/drop/aggregation and inlining affect timings; these are diagnostic wall scopes, not accepted PGO removable bounds.",
+    "Inner timing aggregation lies outside its own scope and inside parent/whole solve.",
+    "No repeated-input eligibility or maintenance cost measured, so do not infer hit rates or a numerical summary implementation from raw call counts.",
+    "Not a rejection of every possible Markowitz search algorithm or unmeasured model; original candidate-control work remains required for this proposal."
+  ],
+  "artifacts": {
+    "target/perf-markowitz-scope/prepare.py": "78280f0ad171164d18b674e02c8637f3801afcc63b08bf80f5e2f4f99be0fb31",
+    "target/perf-markowitz-scope/probe.rs": "9f500775e44ce0d74e8db5dccb61641d695476b6dc11253c1ea493b682b5b29b",
+    "target/perf-markowitz-scope/source/src/lu_order.rs": "ea01d866883c0864fcc39b17b5a315c822db6f50eb2af22d1f3c6c46a97232e9",
+    "target/perf-markowitz-scope/source/src/markowitz_scope_probe.rs": "9f500775e44ce0d74e8db5dccb61641d695476b6dc11253c1ea493b682b5b29b",
+    "target/perf-markowitz-scope/original-lu-order.rs": "530ff158c6d8c1263ed4317ad6d67d3bd6a8509bbc4e55b4c5a3e00bdfa89123",
+    "target/perf-markowitz-scope/source-hashes.json": "fc6b64b7e22520f6bd82622b82b05ae395cfc25d0c419867caec411465fc7c1c",
+    "target/perf-markowitz-scope/build.py": "2c88d2d36b81ef1743441aac1410c6dc6cca24b6e4145665638dd366e11a05a5",
+    "target/perf-markowitz-scope/build-command.json": "c21a8e2456ceedf4ee6978db91f3c988baf7193c0e49634cba1f1accffb041bb",
+    "target/perf-markowitz-scope/build-result.json": "ebc840801f49b1bcfd6baccbccdfd809243d589e856d9261e9e8612079330f4e",
+    "target/perf-markowitz-scope/binary.json": "99aec203fbb0285b6b8dbde404bc92ff3fee16806f347dde1edbca6cea58e50e",
+    "target/perf-markowitz-scope/scope-tests": "9c9ad56cfc287334fa72e7da63cd7e7055ad29f4e34992e5f9fe9b18dd8e4515",
+    "target/perf-markowitz-scope/run.py": "ea070e94d754383661d9ff2d4264d4564c89d3d9325d7b79b5793ad32f37e3a7",
+    "target/perf-markowitz-scope/small.log": "1b7e6a1686b8bf9f6d2c53bc8fef0e9ec29791b81e0432ad7702ae04fa4045a7",
+    "target/perf-markowitz-scope/small-run.json": "852a7dad83c715fd3234317f43d3feb9b81fe372dd0c77526c828d83d30bdc54",
+    "target/perf-markowitz-scope/small-records.json": "4caf295a6a6fda9790f344070c05aed5d04bfdee71f36aa41ae986c68515c746",
+    "target/perf-markowitz-scope/perold.log": "391371b40019324043f2c6cdb1c88f21610108239cca3494f9762d98e5c2b201",
+    "target/perf-markowitz-scope/perold-run.json": "76bbdef71b3ddde04d8fc7c8b5a7ed32af76639a3a5d318b3a55fba049822bb7",
+    "target/perf-markowitz-scope/perold-records.json": "69ce1a1c4c0e98d249f396d79dd04429432f40909778c0dd15098ec91f196441",
+    "target/perf-markowitz-scope/mode.log": "d5093152fa92972018303982d5d69e421c95291ffcbfdd509c5489ebdce68948",
+    "target/perf-markowitz-scope/mode-run.json": "0d2065b9ce39f3f23fb888692d4e7428f7aa1cb346367e47fb20e199948aa05d",
+    "target/perf-markowitz-scope/mode-records.json": "bbf6f395ca34d53cbf8f1939b40b06047bb3c3787686836295a038595095fe50"
+  }
+}

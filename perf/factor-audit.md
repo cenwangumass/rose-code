@@ -1238,6 +1238,16 @@ projected effects, component source/binary/timings, dependency audit and restora
 
 ## Remaining proof obligations
 
+Incremental Markowitz clean/maximum certificates are distinct from the settled
+linked-chain and borrowed-search trials, but fail the substantial-scope admission.
+Complete timer-only search occupies3.76–4.13% of mode-switch and2.669–2.749%
+of PEROLD; all cleanup plus maximum folds includes necessary work and occupies
+3.004–3.591%/1.320–1.394%. These ordinary-release diagnostic shares include
+instrumentation effects. No repeated-input/invalidation census or prototype
+follows. Preserve opposite-axis candidate-count dependencies, original ordered
+folds, rotations and WORK; numerical summary reuse also needs an FP-status proof.
+See [markowitz-summary-scope.json](evidence/markowitz-summary-scope.json).
+
 An end-to-end flat factor representation has not been tested as one mechanism.
 The rejected linked chains cover producer traversal; arenas/banks cover lifetime;
 component coordinates cover workspaces/handoffs; flat auxiliary LU and shared L
