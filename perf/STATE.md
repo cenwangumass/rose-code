@@ -140,6 +140,26 @@ objcopy metadata rewrite was restored byte-for-byte before this follow-up.
 
 ### Current DEGEN2 triangular-kernel diagnosis
 
+The current architecture and field/lifetime contract are in
+[dual-factor-backend.md](../../reverse-engineer/specs/dual-factor-backend.md),
+with provenance in [dual-factor-architecture.json](evidence/dual-factor-architecture.json).
+A delegated bounded native SC50A capture now spans initial construction, all
+six updates/seven pivot solves and next refactor's actual return (context7,
+request10). It completes in2.1s/334events with no errors; elapsed is not performance
+evidence. Central comparison verifies48 installed snapshots, L/LT immutability,
+raw column/row coefficient transport, cache publication/consumption/retirement,
+and seven source pivot projections. Initial50weight BTRANs,7rho and1true-d,
+7FTRANpairs,3standaloneFTRANs and both constructors have paired returns.
+Native keeps the same factor/pool/cache allocations; fresh views pack numeric
+rows/L/U/LT into shared index/value pools. Fill58→142 resets/rebuilds to84,
+capacity2778 unchanged. Cache pivots25/33/40 publish2/2/3 entries after U returns,
+retain them until update and clear count/key atf377d/f3783. Slot/at alias existing
+allocations at installation. Mark is F+e8=H+c8, not H+e8=F108 density; the spec
+corrects the earlier base error. No monitored private allocation/free calls occur
+inside this interval; outer allocation, exhaustion and ultimate teardown remain
+unmeasured. This establishes a bounded native lifetime without implying complete
+arithmetic identity or a speedup. No solver code/build/restart changed.
+
 The separate pricing-reset internal comparison stops earlier at reset3/context82:
 all516 term-role projections and444 weights per phase agree, but SUM differs
 8ULP (native409ca37aef572848/Rose409ca37aef572850). Literal ADD/MUL order differs

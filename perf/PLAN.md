@@ -141,12 +141,21 @@ baseline. No exceptions, no "within a ULP", no re-recording.
 
 ## The loop
 
-The next bounded F/B diagnostic is the earliest pre-reset82 true-d recomputation
-BTRAN, whose dense-U/dense-LT purpose has no complete paired arithmetic/lifecycle
-proof. Reuse caches; delegate reference work and centralize pairing in compare.py.
-Stop at the first difference. All16 calls are only0.136ms in the separate timer
-build; no accepted speedup forecast or optimization follows from that scope.
-This does not reopen settled rho reuse, empty-gap, L handoff or owner trials.
+The active task is architecture recovery, not another optimization screen.
+The executed SC50A interval and remaining coverage are in
+[dual-factor-backend.md](../../reverse-engineer/specs/dual-factor-backend.md).
+Initial construction through next actual refactor return is now captured and
+centrally checked, including retained shared pools, installed headers, numeric
+row capacities, copied BTRAN cache payload and common-return invalidation.
+Do not repeat this interval or resume the earlier isolated pre-reset82 true-d
+proposal from its historical schedule. Remaining recovery targets are precise:
+pool exhaustion/compaction and view repair, internal L/eta operand visits,
+extended/dense ownership and ultimate caller teardown. Identify the smallest
+witness for a missing mechanism before capturing more; use refcap.py, delegated
+comparison and compare.py alignment, stopping each raw numeric projection at
+its first difference. No backend implementation, solver restart or tuning screen
+belongs to this recovery task. Matched inclusive whole-lifetime costs are still
+missing, so representation savings are not qualified.
 
 The bounded DEGEN2 triangular diagnosis stops at the first strict internal
 bit difference: needed pivot163/pricingk164/basis22 is native−0 versus Rose+0.

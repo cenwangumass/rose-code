@@ -1,0 +1,911 @@
+{
+  "scope": "Architecture recovery with bounded native capture and centralized saved-state comparison; no solver source change, optimization, build or algorithm restart",
+  "spec": "../reverse-engineer/specs/dual-factor-backend.md",
+  "comparison_owner": "Delegated ref_compare captures via refcap.py; all alignment and state checks in tools/compare.py",
+  "checks": [
+    {
+      "name": "afiro3",
+      "command_from_rose_directory": "python3 ../reverse-engineer/tools/compare.py dual-btran-eliminate tests/fixtures/afiro.mps --profile dual-release --rose-trace target/perf-degen2-btran-lifecycle/afiro-3/trace.json --rose-binary target/perf-optimized-build/rose-pgo-tcmalloc --output target/factor-architecture-review/afiro3.json",
+      "output": "target/factor-architecture-review/afiro3.json",
+      "sha256": "9187f0ee2463056a370e54d4c57a724bf63391fa6f35a6e255acf022376220bd",
+      "status": "SOURCE_WITHIN_PIVOT_ORDERED_U_ETA_PROJECTION_PASS",
+      "scope": "source-only within-pivot projection"
+    },
+    {
+      "name": "sc50a20",
+      "command_from_rose_directory": "python3 ../reverse-engineer/tools/compare.py dual-btran-eliminate tests/fixtures/sc50a.mps --profile dual-release --rose-trace target/perf-degen2-btran-lifecycle/sc50a-20/trace.json --rose-binary target/perf-optimized-build/rose-pgo-tcmalloc --output target/factor-architecture-review/sc50a20.json",
+      "output": "target/factor-architecture-review/sc50a20.json",
+      "sha256": "8974ef9bfce4f52f7747729380b4769ae4428f78bb330b29e47d6d35d9d66dc9",
+      "status": "SOURCE_WITHIN_PIVOT_ORDERED_U_ETA_PROJECTION_PASS",
+      "scope": "source-only within-pivot projection"
+    },
+    {
+      "name": "factor16",
+      "command_from_rose_directory": "python3 ../reverse-engineer/tools/compare.py dual-factor-census tests/fixtures/degen2.mps --profile dual-release --target 1 --ref-census target/perf-degen2-factor-census/captures/degen2-dual-release/dual_factor_census.0f3ee0af70.jsonl --rose-dump target/perf-degen2-factor-split/accepted-20-dump.stderr --rose-input-dump target/perf-degen2-factor-census/rose/degen2-20.stderr --rose-binary target/perf-optimized-build/rose-pgo-tcmalloc --reference-library target/perf-reference/reconstructed/libgurobi130.so --output target/factor-architecture-review/factor16.json",
+      "output": "target/factor-architecture-review/factor16.json",
+      "sha256": "773e0ef8c5c1b8645c79ccee3fc05e3cfa54d5860d821ff92ca06437edf5e40f",
+      "status": "completed central comparator checks; see retained output and projection limits",
+      "scope": "cached native/source projection; see spec for limits"
+    },
+    {
+      "name": "installed4",
+      "command_from_rose_directory": "python3 ../reverse-engineer/tools/compare.py dual-factor-census tests/fixtures/degen2.mps --profile dual-release --target 4 --ref-census target/perf-degen2-factor-boundary/captures/degen2-dual-release/dual_factor_boundary.LIM=5,PARAMS=IterationLimit=132,TimeLimit=12,OutputFlag=0.jsonl --rose-dump target/perf-degen2-factor-split/accepted-640-dump.stderr --rose-input-capture target/perf-degen2-construction-accounting/rose-degen2-133-inputs/capture.json --rose-binary target/perf-optimized-build/rose-pgo-tcmalloc --reference-library target/perf-reference/reconstructed/libgurobi130.so --output target/factor-architecture-review/installed4.json --ref-driver-cost target/perf-degen2-factor-boundary/cost-captures/degen2-dual-release/dual_factor_driver_cost.8c84baa2a6.jsonl --ref-driver-cost target/perf-degen2-factor-boundary/cost-captures/degen2-dual-release/dual_factor_driver_cost.12f42dab36.jsonl --ref-driver-cost target/perf-degen2-factor-boundary/cost-captures/degen2-dual-release/dual_factor_driver_cost.d7325c2599.jsonl --ref-driver-cost target/perf-degen2-factor-boundary/cost-captures/degen2-dual-release/dual_factor_driver_cost.01440fcf3e.jsonl",
+      "output": "target/factor-architecture-review/installed4.json",
+      "sha256": "ff770bfeedca43489e3b9d197270072fc082a5b0787433d970514f897818a251",
+      "status": "completed central comparator checks; see retained output and projection limits",
+      "scope": "cached native/source projection; see spec for limits"
+    },
+    {
+      "name": "transaction135",
+      "command_from_rose_directory": "python3 ../reverse-engineer/tools/compare.py dual-kernels tests/fixtures/degen2.mps --profile dual-release --lim 135 --rose-dump target/perf-degen2-alignment/rose-dsx640.stderr --rose-kernel-dump target/perf-degen2-kernels/trace136.stderr --ref-f2 target/perf-degen2-alignment/captures/degen2-dual-release/dual_ftran2.DETAIL=134,135,LIM=135,PROVENANCE=2,ROUTES=5.jsonl --ref-transaction target/perf-degen2-alignment/captures/degen2-dual-release/dual_pair_transaction.fb7976f84c.jsonl --rose-prefix-trace target/perf-degen2-transaction/rose-degen2-136-prefix.json --rose-full-prefix-trace target/perf-degen2-transaction/rose-degen2-136-full-prefix.json --reference-library target/perf-reference/reconstructed/libgurobi130.so --output target/factor-architecture-review/transaction135.json",
+      "output": "target/factor-architecture-review/transaction135.json",
+      "sha256": "f16fe415aee2ce921e71fe52693db9a23541d6e8ccf0df7d973f03e8d753ec87",
+      "status": "completed central comparator checks; see retained output and projection limits",
+      "scope": "cached native/source projection; see spec for limits"
+    },
+    {
+      "name": "strict163",
+      "command_from_rose_directory": "python3 ../reverse-engineer/tools/compare.py dual-kernels tests/fixtures/degen2.mps --profile dual-release --lim 163 --rose-dump target/perf-degen2-alignment/rose-dsx640.stderr --ref-f2 target/perf-degen2-alignment/captures/degen2-dual-release/dual_ftran2.LIM=640,PROVENANCE=2,ROUTES=1.jsonl --reference-library target/perf-reference/reconstructed/libgurobi130.so --output target/factor-architecture-review/strict163.json",
+      "output": "target/factor-architecture-review/strict163.json",
+      "sha256": "a9e5e009a99bcdbf6dd2be4d73028bbf74915e5bfd5a76bd121eec455010c5b8",
+      "status": "first_bit_difference",
+      "scope": "cached native/source projection; see spec for limits"
+    }
+  ],
+  "stopping_frontiers": {
+    "reset": "reset3/context82 SUM 8 ULP; no later reset arithmetic pairing",
+    "published_needed": "pivot163/basis22 native -0 Rose +0, strict prefix162"
+  },
+  "missing": "Every internal L/eta operand visit, exhaustion/compaction view repair, complete extended/dense ownership, ultimate solver teardown and matched lifetime hardware costs",
+  "smallest_witness": {
+    "model": "SC50A",
+    "profile": "dual-release",
+    "cap": 20,
+    "source_pairs": 18,
+    "first_generation_pricing": [
+      1,
+      7
+    ],
+    "unused_before_refactor": [
+      7,
+      13
+    ],
+    "native_constructor_context": [
+      0,
+      7
+    ],
+    "native_constructor_L": [
+      29,
+      29
+    ],
+    "native_constructor_U": [
+      0,
+      13
+    ]
+  },
+  "static_evidence": [
+    {
+      "path": "target/perf-degen2-kernels/reference-needed.asm",
+      "sha256": "67dc3a5bacfe4151fe485ef6ac2f8ef186441fc2793692f75c07df7a9420f180"
+    },
+    {
+      "path": "target/perf-degen2-kernels/native-pivot-ftran-wrapper.asm",
+      "sha256": "858adb3e76d3750762a3e631959a00cf72ec40969b22e10327b62720f278cbb7"
+    },
+    {
+      "path": "target/perf-degen2-btran-row-reuse/alignment-audit.txt",
+      "sha256": "135c115a706b91afa5970bec00b097aa7346922bec64ae38788fc676450c6425"
+    },
+    {
+      "path": "../reverse-engineer/replay/gdb_dual_factor_census.py",
+      "sha256": "3bf87d5c20dd393256c342b9ff0822276c8de362eec6863689d0ae512104f8c9"
+    },
+    {
+      "path": "../reverse-engineer/replay/gdb_dual_ufac.py",
+      "sha256": "0ffa6ce21d53417eb821effe11d16d81bba9fce6478a628290efb4b4bc36b43f"
+    },
+    {
+      "path": "../reverse-engineer/replay/gdb_dual_factor_driver_cost.py",
+      "sha256": "8f87ccd2773cba23a21767f7cc7071ffed8e2ea42282b464d4661bc774866ffd"
+    },
+    {
+      "path": "src/ftran_order.rs",
+      "sha256": "57c86340f6959717954e2cb1c58f06c285ab7ce564a25d7d0e9e9c429d802ef1"
+    },
+    {
+      "path": "../reverse-engineer/tools/compare.py",
+      "sha256": "0c2f59dba10b98361edfd04ac5089643fdfab5e84f966c0d5acd933f41a5b84e"
+    },
+    {
+      "path": "../reverse-engineer/replay/gdb_dual_factor_interval.py",
+      "sha256": "8220ee47a5c960fbc099e22743373d71b87bea8768b47f15d776863a47be4fad"
+    },
+    {
+      "path": "../reverse-engineer/tools/tests/test_factor_interval_compare.py",
+      "sha256": "f51f55dc7c66c108f35809cac0342d4a46d5b1ee1316700500ae52d62d3acaaf"
+    },
+    {
+      "path": "target/factor-architecture-review/static/factor-driver.asm",
+      "sha256": "6cf509319aaad2cd7b94babb2e3f996e4e1f58b78e40c1e2b7cd54c305abeb30"
+    },
+    {
+      "path": "target/factor-architecture-review/static/factor-constructor.asm",
+      "sha256": "d11b004acf6a49f9f14e8453cac325474286600c32afe9bfb8d7e9b54107f552"
+    },
+    {
+      "path": "target/factor-architecture-review/static/btran-core.asm",
+      "sha256": "a25904c7bd08965b3eb41fb31326408ae0e943995afd8de98d456c65aeafc5c4"
+    }
+  ],
+  "executed_native_interval": {
+    "capture": "target/factor-architecture-review/captures/sc50a-dual-release/dual_factor_interval.f7627eb1ea.jsonl",
+    "capture_sha256": "e27832875e33f5f82ba2b244f109d7abdbedae3138160112829b54ff2283f529",
+    "command_from_rose_directory": "python3 ../reverse-engineer/tools/compare.py dual-factor-interval tests/fixtures/sc50a.mps --profile dual-release --ref-interval target/factor-architecture-review/captures/sc50a-dual-release/dual_factor_interval.f7627eb1ea.jsonl --reference-library target/perf-reference/reconstructed/libgurobi130.so --rose-trace target/perf-degen2-btran-lifecycle/sc50a-20/trace.json --rose-binary target/perf-optimized-build/rose-pgo-tcmalloc --output target/factor-architecture-review/interval-central.json",
+    "capture_command_from_rose_directory": "python3 target/factor-architecture-review/capture_interval.py sc50a 2 9",
+    "capture_harness": "from pathlib import Path\nimport sys,time,json\nr=Path.cwd();sys.path.insert(0,str(r.parent/'reverse-engineer/tools'));import refcap\nrefcap.CAPTURES=r/'target/factor-architecture-review/captures';refcap.LIB=r/'target/perf-reference/reconstructed/libgurobi130.so';refcap.RUNNER=r.parent/'reverse-engineer/build/native_run';refcap.runner=lambda:refcap.RUNNER\nmodel,lim,cap=sys.argv[1:];s=time.monotonic();p=refcap.capture('dual_factor_interval',r/f'tests/fixtures/{model}.mps','dual-release',env=dict(SCHEMA='3',LIM=lim,MAX_RECORDS='1800',PARAMS=f'IterationLimit={cap},TimeLimit=12,OutputFlag=0'),timeout=25)\nprint(json.dumps(dict(path=str(p),elapsed=time.monotonic()-s,records=len(refcap.load(p,'INTERVAL')),stop=refcap.load(p,'INTERVAL_STOP'),errors=refcap.load(p,'INTERVAL_ERROR'))))\n",
+    "capture_script": "../reverse-engineer/replay/gdb_dual_factor_interval.py",
+    "capture_elapsed_seconds": 2.1,
+    "elapsed_not_performance_evidence": true,
+    "bounds": {
+      "requested_driver_returns": 2,
+      "IterationLimit": 9,
+      "TimeLimit": 12,
+      "external_timeout": 25,
+      "max_events": 1800
+    },
+    "central_report": "target/factor-architecture-review/interval-central.json",
+    "central_report_sha256": "a68f15d94a33bb15c79c2cde61900162581a283069e05a2e26e7a3aa86086c7e",
+    "result": {
+      "status": "BOUNDED_INTERVAL_PROJECTIONS_PASS",
+      "checks": 19493,
+      "stop": {
+        "reason": "requested_driver_return",
+        "completed": 2,
+        "events": 334
+      },
+      "covered_interval": {
+        "start": 7,
+        "next_refactor_entry": 327,
+        "retired_at": 334
+      },
+      "installed_snapshots_checked": 48,
+      "event_counts": {
+        "driver_entry": 8,
+        "constructor_entry": 2,
+        "write": 36,
+        "constructor_return": 2,
+        "driver_return": 8,
+        "btran_core_entry": 58,
+        "btran_core_return": 58,
+        "full_ftran_entry": 3,
+        "full_ftran_return": 3,
+        "btran_U_entry": 57,
+        "btran_U_return": 57,
+        "btran_wrapper_entry": 7,
+        "btran_wrapper_return": 7,
+        "pair_entry": 7,
+        "needed_U_entry": 7,
+        "needed_U_return": 7,
+        "pair_return": 7
+      },
+      "factor_pointers": [
+        "0x5555555724b0"
+      ],
+      "installation": [
+        {
+          "context": 0.0,
+          "constructor_return_seq": 6,
+          "driver_return_seq": 7,
+          "changed_since_constructor": [
+            "Uend",
+            "Rend",
+            "Rcapacity",
+            "kind",
+            "slot",
+            "at"
+          ]
+        },
+        {
+          "context": 7.0,
+          "constructor_return_seq": 333,
+          "driver_return_seq": 334,
+          "changed_since_constructor": [
+            "Uend",
+            "Rend",
+            "Rcapacity",
+            "kind",
+            "slot",
+            "at"
+          ]
+        }
+      ],
+      "fresh_pool_views": [
+        {
+          "context": 0.0,
+          "views": {
+            "numeric_rows": {
+              "index_offset": 0,
+              "value_offset": 0,
+              "length": 0
+            },
+            "L": {
+              "index_offset": 0,
+              "value_offset": 0,
+              "length": 29
+            },
+            "U_columns": {
+              "index_offset": 29,
+              "value_offset": 29,
+              "length": 0
+            },
+            "LT": {
+              "index_offset": 29,
+              "value_offset": 29,
+              "length": 29
+            }
+          },
+          "fill": 58,
+          "capacity": 2778
+        },
+        {
+          "context": 7.0,
+          "views": {
+            "numeric_rows": {
+              "index_offset": 0,
+              "value_offset": 0,
+              "length": 13
+            },
+            "L": {
+              "index_offset": 13,
+              "value_offset": 13,
+              "length": 29
+            },
+            "U_columns": {
+              "index_offset": 42,
+              "value_offset": 42,
+              "length": 13
+            },
+            "LT": {
+              "index_offset": 55,
+              "value_offset": 55,
+              "length": 29
+            }
+          },
+          "fill": 84,
+          "capacity": 2778
+        }
+      ],
+      "update_pool_ledger": [
+        {
+          "context": 1.0,
+          "fill_before": 58,
+          "fill_after": 78,
+          "moved_rows": [
+            15,
+            16,
+            25,
+            33
+          ],
+          "new_row_capacity_terms": 16,
+          "moved_columns": [
+            26
+          ],
+          "new_column_terms": 4,
+          "eta_terms": 0,
+          "eta_views": []
+        },
+        {
+          "context": 2.0,
+          "fill_before": 78,
+          "fill_after": 83,
+          "moved_rows": [
+            29
+          ],
+          "new_row_capacity_terms": 4,
+          "moved_columns": [
+            32
+          ],
+          "new_column_terms": 1,
+          "eta_terms": 0,
+          "eta_views": []
+        },
+        {
+          "context": 3.0,
+          "fill_before": 83,
+          "fill_after": 98,
+          "moved_rows": [
+            4,
+            40,
+            46
+          ],
+          "new_row_capacity_terms": 12,
+          "moved_columns": [
+            34
+          ],
+          "new_column_terms": 3,
+          "eta_terms": 0,
+          "eta_views": []
+        },
+        {
+          "context": 4.0,
+          "fill_before": 98,
+          "fill_after": 103,
+          "moved_rows": [
+            22
+          ],
+          "new_row_capacity_terms": 4,
+          "moved_columns": [
+            25
+          ],
+          "new_column_terms": 1,
+          "eta_terms": 0,
+          "eta_views": []
+        },
+        {
+          "context": 5.0,
+          "fill_before": 103,
+          "fill_after": 127,
+          "moved_rows": [
+            0,
+            5,
+            34,
+            49
+          ],
+          "new_row_capacity_terms": 16,
+          "moved_columns": [
+            33
+          ],
+          "new_column_terms": 6,
+          "eta_terms": 2,
+          "eta_views": [
+            {
+              "target": 33,
+              "count": 2,
+              "pool_offset": 103
+            }
+          ]
+        },
+        {
+          "context": 6.0,
+          "fill_before": 127,
+          "fill_after": 142,
+          "moved_rows": [
+            26,
+            32
+          ],
+          "new_row_capacity_terms": 8,
+          "moved_columns": [
+            40
+          ],
+          "new_column_terms": 4,
+          "eta_terms": 3,
+          "eta_views": [
+            {
+              "target": 40,
+              "count": 3,
+              "pool_offset": 127
+            }
+          ]
+        }
+      ],
+      "cached_rows": [
+        {
+          "context": 3.0,
+          "pivot": 25,
+          "indices": [
+            25,
+            26
+          ],
+          "value_bits": [
+            "3ff0000000000000",
+            "bfde79e79e79e79e"
+          ],
+          "producer_seq": 265,
+          "consumer_seq": 272,
+          "retirement_seq": 276
+        },
+        {
+          "context": 4.0,
+          "pivot": 33,
+          "indices": [
+            33,
+            26
+          ],
+          "value_bits": [
+            "3ff0000000000000",
+            "bfe2702702702703"
+          ],
+          "producer_seq": 281,
+          "consumer_seq": 288,
+          "retirement_seq": 296
+        },
+        {
+          "context": 5.0,
+          "pivot": 40,
+          "indices": [
+            40,
+            34,
+            33
+          ],
+          "value_bits": [
+            "3ff0000000000000",
+            "3ff0000000000000",
+            "3ff0000000000000"
+          ],
+          "producer_seq": 301,
+          "consumer_seq": 310,
+          "retirement_seq": 316
+        }
+      ],
+      "source_pairs": [
+        {
+          "pricing": 1,
+          "generation": 1,
+          "updates": 0,
+          "pivot": 26,
+          "native_seq": 213,
+          "U_positions": 1
+        },
+        {
+          "pricing": 2,
+          "generation": 1,
+          "updates": 1,
+          "pivot": 32,
+          "native_seq": 232,
+          "U_positions": 1
+        },
+        {
+          "pricing": 3,
+          "generation": 1,
+          "updates": 2,
+          "pivot": 34,
+          "native_seq": 246,
+          "U_positions": 1
+        },
+        {
+          "pricing": 4,
+          "generation": 1,
+          "updates": 3,
+          "pivot": 25,
+          "native_seq": 262,
+          "U_positions": 2
+        },
+        {
+          "pricing": 5,
+          "generation": 1,
+          "updates": 4,
+          "pivot": 33,
+          "native_seq": 278,
+          "U_positions": 2
+        },
+        {
+          "pricing": 6,
+          "generation": 1,
+          "updates": 5,
+          "pivot": 40,
+          "native_seq": 298,
+          "U_positions": 3
+        },
+        {
+          "pricing": 7,
+          "generation": 1,
+          "updates": 6,
+          "pivot": 37,
+          "native_seq": 318,
+          "U_positions": 1
+        }
+      ],
+      "write_events": [
+        {
+          "seq": 3,
+          "pc": "0xd457f",
+          "field": "0x160",
+          "old": "0000000000000000",
+          "new": "000000000000022b",
+          "context_it": 0.0
+        },
+        {
+          "seq": 4,
+          "pc": "0xd5004",
+          "field": "0x160",
+          "old": "000000000000022b",
+          "new": "000000000000022f",
+          "context_it": 0.0
+        },
+        {
+          "seq": 5,
+          "pc": "0xdc5d8",
+          "field": "0x160",
+          "old": "000000000000022f",
+          "new": "000000000000003a",
+          "context_it": 0.0
+        },
+        {
+          "seq": 225,
+          "pc": "0xf2bb0",
+          "field": "0x160",
+          "old": "000000000000003a",
+          "new": "000000000000003e",
+          "context_it": 1.0
+        },
+        {
+          "seq": 226,
+          "pc": "0xf2d49",
+          "field": "0x160",
+          "old": "000000000000003e",
+          "new": "0000000000000042",
+          "context_it": 1.0
+        },
+        {
+          "seq": 227,
+          "pc": "0xf2d49",
+          "field": "0x160",
+          "old": "0000000000000042",
+          "new": "0000000000000046",
+          "context_it": 1.0
+        },
+        {
+          "seq": 228,
+          "pc": "0xf2d49",
+          "field": "0x160",
+          "old": "0000000000000046",
+          "new": "000000000000004a",
+          "context_it": 1.0
+        },
+        {
+          "seq": 229,
+          "pc": "0xf2d49",
+          "field": "0x160",
+          "old": "000000000000004a",
+          "new": "000000000000004e",
+          "context_it": 1.0
+        },
+        {
+          "seq": 242,
+          "pc": "0xf2bb0",
+          "field": "0x160",
+          "old": "000000000000004e",
+          "new": "000000000000004f",
+          "context_it": 2.0
+        },
+        {
+          "seq": 243,
+          "pc": "0xf2d49",
+          "field": "0x160",
+          "old": "000000000000004f",
+          "new": "0000000000000053",
+          "context_it": 2.0
+        },
+        {
+          "seq": 256,
+          "pc": "0xf2bb0",
+          "field": "0x160",
+          "old": "0000000000000053",
+          "new": "0000000000000056",
+          "context_it": 3.0
+        },
+        {
+          "seq": 257,
+          "pc": "0xf2d49",
+          "field": "0x160",
+          "old": "0000000000000056",
+          "new": "000000000000005a",
+          "context_it": 3.0
+        },
+        {
+          "seq": 258,
+          "pc": "0xf2d49",
+          "field": "0x160",
+          "old": "000000000000005a",
+          "new": "000000000000005e",
+          "context_it": 3.0
+        },
+        {
+          "seq": 259,
+          "pc": "0xf2d49",
+          "field": "0x160",
+          "old": "000000000000005e",
+          "new": "0000000000000062",
+          "context_it": 3.0
+        },
+        {
+          "seq": 263,
+          "pc": "0x12e567",
+          "field": "0x1d8",
+          "old": "00000000ffffffff",
+          "new": "0000000000000019",
+          "context_it": 3.0
+        },
+        {
+          "seq": 273,
+          "pc": "0xf2bb0",
+          "field": "0x160",
+          "old": "0000000000000062",
+          "new": "0000000000000063",
+          "context_it": 4.0
+        },
+        {
+          "seq": 274,
+          "pc": "0xf2d49",
+          "field": "0x160",
+          "old": "0000000000000063",
+          "new": "0000000000000067",
+          "context_it": 4.0
+        },
+        {
+          "seq": 275,
+          "pc": "0xf378d",
+          "field": "0x1d8",
+          "old": "0000000000000019",
+          "new": "00000000ffffffff",
+          "context_it": 4.0
+        },
+        {
+          "seq": 279,
+          "pc": "0x12e567",
+          "field": "0x1d8",
+          "old": "00000000ffffffff",
+          "new": "0000000000000021",
+          "context_it": 4.0
+        },
+        {
+          "seq": 289,
+          "pc": "0xf274a",
+          "field": "0x160",
+          "old": "0000000000000067",
+          "new": "0000000000000069",
+          "context_it": 5.0
+        },
+        {
+          "seq": 290,
+          "pc": "0xf2bb0",
+          "field": "0x160",
+          "old": "0000000000000069",
+          "new": "000000000000006f",
+          "context_it": 5.0
+        },
+        {
+          "seq": 291,
+          "pc": "0xf2d49",
+          "field": "0x160",
+          "old": "000000000000006f",
+          "new": "0000000000000073",
+          "context_it": 5.0
+        },
+        {
+          "seq": 292,
+          "pc": "0xf2d49",
+          "field": "0x160",
+          "old": "0000000000000073",
+          "new": "0000000000000077",
+          "context_it": 5.0
+        },
+        {
+          "seq": 293,
+          "pc": "0xf2d49",
+          "field": "0x160",
+          "old": "0000000000000077",
+          "new": "000000000000007b",
+          "context_it": 5.0
+        },
+        {
+          "seq": 294,
+          "pc": "0xf2d49",
+          "field": "0x160",
+          "old": "000000000000007b",
+          "new": "000000000000007f",
+          "context_it": 5.0
+        },
+        {
+          "seq": 295,
+          "pc": "0xf378d",
+          "field": "0x1d8",
+          "old": "0000000000000021",
+          "new": "00000000ffffffff",
+          "context_it": 5.0
+        },
+        {
+          "seq": 299,
+          "pc": "0x12e567",
+          "field": "0x1d8",
+          "old": "00000000ffffffff",
+          "new": "0000000000000028",
+          "context_it": 5.0
+        },
+        {
+          "seq": 311,
+          "pc": "0xf274a",
+          "field": "0x160",
+          "old": "000000000000007f",
+          "new": "0000000000000082",
+          "context_it": 6.0
+        },
+        {
+          "seq": 312,
+          "pc": "0xf2bb0",
+          "field": "0x160",
+          "old": "0000000000000082",
+          "new": "0000000000000086",
+          "context_it": 6.0
+        },
+        {
+          "seq": 313,
+          "pc": "0xf2d49",
+          "field": "0x160",
+          "old": "0000000000000086",
+          "new": "000000000000008a",
+          "context_it": 6.0
+        },
+        {
+          "seq": 314,
+          "pc": "0xf2d49",
+          "field": "0x160",
+          "old": "000000000000008a",
+          "new": "000000000000008e",
+          "context_it": 6.0
+        },
+        {
+          "seq": 315,
+          "pc": "0xf378d",
+          "field": "0x1d8",
+          "old": "0000000000000028",
+          "new": "00000000ffffffff",
+          "context_it": 6.0
+        },
+        {
+          "seq": 328,
+          "pc": "0xf33a7",
+          "field": "0x160",
+          "old": "000000000000008e",
+          "new": "0000000000000000",
+          "context_it": 7.0
+        },
+        {
+          "seq": 330,
+          "pc": "0xd457f",
+          "field": "0x160",
+          "old": "0000000000000000",
+          "new": "000000000000022b",
+          "context_it": 7.0
+        },
+        {
+          "seq": 331,
+          "pc": "0xd5004",
+          "field": "0x160",
+          "old": "000000000000022b",
+          "new": "0000000000000257",
+          "context_it": 7.0
+        },
+        {
+          "seq": 332,
+          "pc": "0xdc5d8",
+          "field": "0x160",
+          "old": "0000000000000257",
+          "new": "0000000000000054",
+          "context_it": 7.0
+        }
+      ]
+    },
+    "pointer_values": {
+      "0x20": [
+        "00005555555728d0"
+      ],
+      "0x28": [
+        "00005555555729b0"
+      ],
+      "0x38": [
+        "0000555555572b70"
+      ],
+      "0x40": [
+        "0000000000000000",
+        "00005555555729b0"
+      ],
+      "0x48": [
+        "0000000000000000",
+        "0000555555572b70"
+      ],
+      "0x58": [
+        "0000555555572e00"
+      ],
+      "0x60": [
+        "0000000000000000",
+        "000055555557b0c0",
+        "000055555557b128"
+      ],
+      "0x68": [
+        "0000000000000000",
+        "0000555555578540",
+        "0000555555578574"
+      ],
+      "0x70": [
+        "0000555555572fb0"
+      ],
+      "0x78": [
+        "0000000000000000",
+        "000055555557b1a8",
+        "000055555557b278"
+      ],
+      "0x80": [
+        "0000000000000000",
+        "00005555555785b4",
+        "000055555557861c"
+      ],
+      "0x88": [
+        "0000555555573160"
+      ],
+      "0x90": [
+        "0000555555571c60"
+      ],
+      "0x98": [
+        "0000555555573310"
+      ],
+      "0xa0": [
+        "0000000000000000",
+        "000055555557b1a8",
+        "000055555557b210"
+      ],
+      "0xa8": [
+        "0000000000000000",
+        "00005555555785b4",
+        "00005555555785e8"
+      ],
+      "0xb0": [
+        "00005555555734b0"
+      ],
+      "0xb8": [
+        "0000555555573660"
+      ],
+      "0xc0": [
+        "0000555555573800"
+      ],
+      "0xc8": [
+        "0000000000000000",
+        "000055555557b0c0"
+      ],
+      "0xd0": [
+        "0000000000000000",
+        "0000555555578540"
+      ],
+      "0x148": [
+        "0000555555578540"
+      ],
+      "0x150": [
+        "000055555557b0c0"
+      ],
+      "0x198": [
+        "00005555555746e0"
+      ],
+      "0x1c8": [
+        "0000555555564a20"
+      ],
+      "0x1d0": [
+        "00005555555743e0"
+      ]
+    },
+    "vector_view_transition_count": 70,
+    "native_core_purpose_counts": {
+      "initial_weights": 50,
+      "rho": 7,
+      "true_d": 1
+    },
+    "tests": {
+      "command": "python3 ../reverse-engineer/tools/tests/test_factor_interval_compare.py",
+      "passed": 4,
+      "cases": [
+        "valid interval",
+        "constructor-return headers excluded until actual installation",
+        "signed-zero coefficient mismatch rejected",
+        "missing return rejected"
+      ]
+    },
+    "excluded_interim_reports": [
+      "interval-central-schema2.json: diagnostic failed on uninstalled initial-entry summary; final analyzer excludes uninstalled headers from numeric invariants"
+    ]
+  },
+  "architecture_spec_and_tools_parent_commit": "06d2c8d3",
+  "commit_validation": {
+    "cargo_test_release": "passed",
+    "comparator_tests": 4,
+    "solver_source_changed": false
+  }
+}

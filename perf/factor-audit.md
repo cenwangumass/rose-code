@@ -1238,6 +1238,19 @@ projected effects, component source/binary/timings, dependency audit and restora
 
 ## Remaining proof obligations
 
+The cross-stage contract is consolidated in
+[dual-factor-backend.md](../../reverse-engineer/specs/dual-factor-backend.md).
+The completed native SC50A interval now distinguishes constructor output from
+installed headers, shared numerical-pool views from allocations, pre-eta BTRAN
+cache copies from final rho, and logical retirement from freeing storage.
+Central comparison checks48 installed boundaries and7source pivot projections.
+The cache key is set before U completes, payload count published after U returns,
+and count/key cleared at common driver return. Refactor retains allocations and
+repacks rows/L/U/LT. Exhaustion/compaction, every internal operand visit, ultimate
+teardown and matched lifetime costs remain missing; no flat-store/shared-owner
+optimization is justified. Reproduction and retained strict stopping boundaries:
+evidence/dual-factor-architecture.json.
+
 Incremental Markowitz clean/maximum certificates are distinct from the settled
 linked-chain and borrowed-search trials, but fail the substantial-scope admission.
 Complete timer-only search occupies3.76–4.13% of mode-switch and2.669–2.749%
