@@ -8,6 +8,7 @@ pub mod dump;
 pub mod early;
 pub mod f80;
 pub mod ftran_order;
+pub mod dual_factor;
 pub mod lu;
 pub mod lu_order;
 pub mod lu_pairs;

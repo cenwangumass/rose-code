@@ -6,7 +6,10 @@
 //! ratio-test candidate has `alpha' < 0`. Basic variables are indexed by position (the row of the pivot-row BTRAN).
 
 use crate::basis::Basis;
-use crate::ftran_order::RefStruct;
+#[cfg(not(feature = "factor-shadow"))]
+pub(crate) type Mirror<R> = crate::dual_factor::DualFactor<R>;
+#[cfg(feature = "factor-shadow")]
+pub(crate) type Mirror<R> = crate::dual_factor::shadow::Shadow<R>;
 use crate::lu::{Column, Factor};
 use crate::model::{LpModel, Sense, INF};
 use crate::real::Real;
@@ -432,7 +435,7 @@ struct Dual<'a, R: Real = f64> {
     d: Vec<R>,
     /// Dual steepest-edge weights by position.
     w: Vec<R>,
-    mirror: RefStruct<R>,
+    mirror: Mirror<R>,
     factor: Factor,
     /// Row-wise copy of the nonbasic, non-fixed structurals in the reference's storage order, with their immutable first-match coefficients.
     rrows: Vec<Vec<(usize, f64)>>,
@@ -1040,11 +1043,11 @@ impl<'a, R: Real> Dual<'a, R> {
         Vec<usize>,
         crate::lu_order::Structure<R>,
         Vec<(bool, Vec<usize>, Vec<f64>)>,
-        Option<RefStruct<R>>,
+        Option<Mirror<R>>,
     ) {
         crate::lu_order::set_threshold(self.lu_thr);
         let (order, st, rows) = reference_order::<R>(self.p, &self.head, self.refactorizations + 1);
-        let mi = (order.len() == self.m).then(|| RefStruct::fresh(self.m, self.n, &st, &rows));
+        let mi = (order.len() == self.m).then(|| Mirror::fresh(self.m, self.n, &st, &rows));
         if crate::dump::on("luin") {
             crate::dump::emit(
                 "luin",
@@ -1198,7 +1201,7 @@ impl<'a, R: Real> Dual<'a, R> {
         self.head = order;
         self.reset_pricing(&st, &rows);
         self.mirror = mi;
-        self.mirror.upd_limit = self.upd_limit;
+        self.mirror.set_upd_limit(self.upd_limit);
         self.factor_work(&st, &rows, discard);
         let cols: Vec<&Column> = self.head.iter().map(|&j| &self.p.cols[j]).collect();
         self.factor =
@@ -1312,7 +1315,7 @@ impl<'a, R: Real> Dual<'a, R> {
             self.factor
                 .update(r, alpha.iter().map(|v| v.to_f64()).collect());
             self.mirror.update(r);
-            self.mirror.upd_work.clear();
+            self.mirror.clear_update_work();
             self.updates += 1;
         }
         Ok(())
@@ -1584,7 +1587,7 @@ impl<'a, R: Real> Dual<'a, R> {
         let dt = self.true_d();
         self.dual_residual_check();
         self.work
-            .add_from(0x12de50, 0xe53a7, self.mirror.work, crate::work::FAC);
+            .add_from(0x12de50, 0xe53a7, self.mirror.work(), crate::work::FAC);
         for j in 0..self.n + self.m {
             if self.st[j] == FIXED {
                 if j < self.n {
@@ -2066,10 +2069,10 @@ impl<'a, R: Real> Dual<'a, R> {
             let lim = ((self.m as f64).powf(0.65) as usize).max(20);
             let cur = self
                 .mirror
-                .upd_limit
+                .upd_limit()
                 .unwrap_or(((self.m as f64).powf(0.7) as usize).max(20));
             self.upd_limit = Some(lim.min(cur));
-            self.mirror.upd_limit = self.upd_limit;
+            self.mirror.set_upd_limit(self.upd_limit);
         }
         self.value_mode = true;
         self.cursor = 0;
@@ -3506,7 +3509,7 @@ impl<'a, R: Real> Dual<'a, R> {
             .collect();
         self.p60 = rho.len() as f64;
         self.work
-            .add_from(0x13174d, 0xc51dd, self.mirror.work, crate::work::FAC);
+            .add_from(0x13174d, 0xc51dd, self.mirror.work(), crate::work::FAC);
         let (row, esi, occurrences, distinct) = self.pivot_row(&rho, leave, above);
         self.row_product_work(&rho, row.len() - esi, occurrences, distinct);
         self.p58 += occurrences as f64;
@@ -3766,7 +3769,7 @@ impl<'a, R: Real> Dual<'a, R> {
             } else {
                 col_out.len()
             };
-            self.p58d += (first + self.mirror.tau_fin.get()) as f64;
+            self.p58d += (first + self.mirror.tau_fin()) as f64;
             t
         };
         if R::QUAD && crate::dump::on("qtau") {
@@ -3784,15 +3787,15 @@ impl<'a, R: Real> Dual<'a, R> {
         {
             // The two-vector FTRAN books the L stages of both vectors and then the U stage of the column at the factor's scale
             // (`0x129671`, call `0x120200`); the wrapper `0x11f620` books `4 nnz(column) + nnz(rho)` (`0x120114`).
-            let (e1, u1) = self.mirror.work_parts;
+            let (e1, u1) = self.mirror.work_parts();
             if self.pmode == 2 {
                 // The plain FTRAN of the column alone (`0x1205d0` -> `0x120673`).
                 self.work
                     .add_from(0x1219d6, 0x120673, e1 + u1, crate::work::FAC);
             } else {
                 let est = match self.mirror.joint_u(&needed) {
-                    Some(j) => (e1 + self.mirror.tau_l.get()) + j,
-                    None => ((e1 + self.mirror.tau_l.get()) + u1) + self.mirror.tau_u.get(),
+                    Some(j) => (e1 + self.mirror.tau_l()) + j,
+                    None => ((e1 + self.mirror.tau_l()) + u1) + self.mirror.tau_u(),
                 };
                 self.work
                     .add_from(0x129671, 0x120200, est, crate::work::FAC);
@@ -3974,10 +3977,10 @@ impl<'a, R: Real> Dual<'a, R> {
             self.work.add_from(
                 0x1219d6,
                 0x120673,
-                dense_est.unwrap_or(self.mirror.keep_work),
+                dense_est.unwrap_or(self.mirror.keep_work()),
                 crate::work::FAC,
             );
-            if dense_in || self.mirror.keep_dense {
+            if dense_in || self.mirror.keep_dense() {
                 self.work
                     .add(0xce316, (m + sol.len()) as f64, crate::work::CTX);
             }
@@ -4709,7 +4712,7 @@ impl<'a, R: Real> Dual<'a, R> {
             } else {
                 self.factor.update_column(pv.r, alpha);
                 self.mirror.update(pv.r);
-                for (site, est, scale) in std::mem::take(&mut self.mirror.upd_work) {
+                for (site, est, scale) in self.mirror.take_update_work() {
                     self.work.add(site, est, scale);
                 }
                 self.touch_pricing(pv.r, &pv.col);
@@ -5727,7 +5730,7 @@ fn solve_pass_callback<R: Real>(
     crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
     let (mut order, mut stc, mut rows) = reference_order::<R>(&p, &basis.basic, carry.fac + 1);
     dump_start(&basis.basic, &order, &stc, carry.thr);
-    let mut mirror = RefStruct::fresh(m, n, &stc, &rows);
+    let mut mirror = Mirror::fresh(m, n, &stc, &rows);
     let mut carry_thr = carry.thr;
     // Growth check of the setup factorization (quad setup `0x246d39..0x246df1`, double driver `0xf351d..0xf3629`): max|diag| / min|diag| above 1e15 (1e12 scaled)
     // raises the threshold to 0.5, then 0.9, and the same columns are factorized again.
@@ -5750,7 +5753,7 @@ fn solve_pass_callback<R: Real>(
             if order.len() != m {
                 break;
             }
-            mirror = RefStruct::fresh(m, n, &stc, &rows);
+            mirror = Mirror::fresh(m, n, &stc, &rows);
         }
     }
     let cols: Vec<&Column> = order.iter().map(|&j| &p.cols[j]).collect();
@@ -5983,7 +5986,7 @@ fn solve_pass_callback<R: Real>(
     s.request = 1;
     s.dual_residual_check();
     s.work
-        .add_from(0x12de50, 0xe53a7, s.mirror.work, crate::work::FAC);
+        .add_from(0x12de50, 0xe53a7, s.mirror.work(), crate::work::FAC);
     let level_work = s.set_level_work(false);
     s.work.add(0xe7000, level_work, crate::work::CTX);
     s.request = 0;
@@ -6076,8 +6079,8 @@ fn solve_pass_callback<R: Real>(
     for r in 0..if s.warm { 0 } else { m } {
         let out = s.mirror.btran(&[(r, R::ONE)], false, false);
         s.work
-            .add_from(0x12de50, 0xc36f1, s.mirror.work, crate::work::FAC);
-        s.w[r] = if s.mirror.bt_dense {
+            .add_from(0x12de50, 0xc36f1, s.mirror.work(), crate::work::FAC);
+        s.w[r] = if s.mirror.bt_dense() {
             rho_norm_dense(&out, m)
         } else {
             rho_norm(&out)
@@ -7305,7 +7308,7 @@ mod captured_bh305_ratio {
         }
         let basic: Vec<_> = (n..n + m).collect();
         let (order, structure, cols) = reference_order::<f64>(&p, &basic, 1);
-        let mirror = RefStruct::fresh(m, n, &structure, &cols);
+        let mirror = Mirror::fresh(m, n, &structure, &cols);
         let basis_cols: Vec<_> = order.iter().map(|&j| &p.cols[j]).collect();
         let factor = Factor::new(m, &basis_cols).unwrap();
         let cap = 20;

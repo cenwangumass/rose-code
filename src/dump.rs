@@ -5,6 +5,37 @@
 //! compares the two. Add a kind here rather than an ad hoc `eprintln!` behind its own variable.
 use std::sync::OnceLock;
 
+// One sequence across primal and dual factors. Muted oracle calls never reach
+// these counters because their dump-enabled checks return false.
+pub(crate) static FACTOR_STRUCT_CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+pub(crate) static FACTOR_FILL_CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+#[cfg(feature = "factor-shadow")]
+thread_local! {
+    static MUTED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Suppress oracle diagnostics, restoring the previous state even on unwind.
+#[cfg(feature = "factor-shadow")]
+pub(crate) fn muted<T>(f: impl FnOnce() -> T) -> T {
+    struct Restore(bool);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            MUTED.with(|v| v.set(self.0));
+        }
+    }
+    let _restore = Restore(MUTED.with(|v| v.replace(true)));
+    f()
+}
+
+#[inline]
+fn is_muted() -> bool {
+    #[cfg(feature = "factor-shadow")]
+    { return MUTED.with(|v| v.get()); }
+    #[cfg(not(feature = "factor-shadow"))]
+    { false }
+}
+
 /// Dump kinds, their line tags and what they record.
 pub const KINDS: &[(&str, &str, &str)] = &[
     ("callback", "CALLBACK", "simplex controller callback entry and return tolerance state"),
@@ -77,6 +108,7 @@ fn kinds() -> &'static [String] {
 
 /// Whether the dump `kind` is selected.
 pub fn on(kind: &str) -> bool {
+    if is_muted() { return false; }
     debug_assert!(
         KINDS.iter().any(|k| k.0 == kind),
         "unknown dump kind {kind}"
@@ -86,11 +118,12 @@ pub fn on(kind: &str) -> bool {
 
 /// Whether any dump is selected.
 pub fn any() -> bool {
-    !kinds().is_empty()
+    !is_muted() && !kinds().is_empty()
 }
 
 /// Writes one record of `kind` under its tag.
 pub fn emit(kind: &str, rec: serde_json::Value) {
+    if is_muted() { return; }
     let tag = KINDS.iter().find(|k| k.0 == kind).map_or("DUMP", |k| k.1);
     // One write per record: stderr is unbuffered and `Value`'s Display writes piece by piece.
     let line = format!("{tag} {}\n", serde_json::to_string(&rec).unwrap());
@@ -124,6 +157,7 @@ pub fn on_from(kind: &str, k: usize) -> bool {
 
 /// Writes one record of `kind` under an explicit tag (kinds that emit several record types).
 pub fn emit_tag(kind: &str, tag: &str, rec: serde_json::Value) {
+    if is_muted() { return; }
     debug_assert!(
         KINDS.iter().any(|k| k.0 == kind),
         "unknown dump kind {kind}"

@@ -64,6 +64,12 @@ impl F80 {
         self.neg == other.neg && self.e == other.e && self.m == other.m
     }
 
+    /// Raw software representation, including signed zero and NaN payloads.
+    #[cfg(feature = "factor-shadow")]
+    pub(crate) fn factor_bits(self) -> (bool, i32, u64) {
+        (self.neg, self.e, self.m)
+    }
+
     /// The significand and the sign/exponent word as stored by `fstp tbyte` (biased exponent, sign in bit 15).
     pub fn repr(self) -> (u64, u16) {
         if self.is_nan() {

@@ -11,6 +11,9 @@ use crate::lu_order::Structure;
 use crate::real::Real;
 use std::collections::BinaryHeap;
 
+#[cfg(feature = "factor-shadow")]
+crate::dual_factor::projection::impl_factor_projection!(RefStruct);
+
 /// Sparse U solves visit only reached rows, in ascending basis position. Dense
 /// solves retain their contiguous marker scan. Duplicate touches are idempotent.
 enum FtranTouched {
@@ -4009,8 +4012,7 @@ impl<R: Real> RefStruct<R> {
     pub fn update(&mut self, r: usize) {
         let m = self.m;
         if crate::dump::on("fstruct") {
-            static CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-            let n = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let n = crate::dump::FACTOR_STRUCT_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             crate::dump::emit(
                 "fstruct",
                 serde_json::json!({"r": r, "rowl": (0..m).filter(|&y| !self.rowl[y].is_empty()).map(|y| (y.to_string(), self.rowl[y].clone())).collect::<std::collections::BTreeMap<_, _>>(), "mark": self.mark, "n": n, "m": m, "i3": self.nuc.len(), "i21": self.i21, "kind": self.kind, "nuc": self.nuc, "seqA": self.slot, "fill": self.fill, "diag": jv(&self.diag), "uvals": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), (self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.0).collect::<Vec<_>>(), self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.1.to_f64()).collect::<Vec<_>>()))).collect::<std::collections::BTreeMap<_, _>>(), "cols": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), [&self.a[k], &self.b[k]])).collect::<std::collections::BTreeMap<_, _>>()}),
@@ -4435,8 +4437,7 @@ impl<R: Real> RefStruct<R> {
             }
         }
         if crate::dump::on("fillparts") {
-            static FP: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-            let n = FP.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let n = crate::dump::FACTOR_FILL_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             crate::dump::emit(
                 "fillparts",
                 serde_json::json!({"n": n, "k": k, "old": old_rows.len(), "col": if k > old_rows.len() { k } else { 0 }, "fill_after_eta": fill_in, "rows": fp_rows}),

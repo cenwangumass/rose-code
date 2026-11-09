@@ -5,6 +5,7 @@ edition = "2021"
 description = "Standalone primal and dual simplex LP solver built from recovered numerical decisions"
 
 [features]
+factor-shadow = []
 # Linux CLI only; requires the system gperftools development library.
 system-tcmalloc = []
 
