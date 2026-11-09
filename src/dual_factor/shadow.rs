@@ -49,6 +49,7 @@ impl<R: Real> Shadow<R> {
     fn finish<T: Exact>(&self, method: &str, new: &T, old: &T, canonical: bool) {
         let call = self.calls.get() + 1;
         self.calls.set(call);
+        self.new.check_btran_workspace();
         check(method, call, "return", new, old);
         check(method, call, "observable", &self.new.observables(), &muted(|| self.old.observables()));
         // Every solver transition, not just updates, can leave state consumed
