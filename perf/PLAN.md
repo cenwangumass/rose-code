@@ -169,6 +169,12 @@ owner is demonstrated, so no generic executor or timing screen follows.
 Read evidence/generic-assembly-scope.json before another assembly proposal;
 oversized generic fronts remain outside this measured set.
 
+The end-to-end flat factor representation is not tested as a whole, but its
+source audit identifies no measured substantial residual outside settled
+translation/lifetime trials. Main/fresh and auxiliary factors remain distinct
+numerical owners. Read factor-audit.md's remaining proof obligations before
+claiming this is either a tested failure or a qualified new implementation.
+
 The ordinary phase-one extended accumulator question is settled. Accepted
 machine code executes the dead software pipeline, but whole-kernel live replay
 is only1.361ms per80BAUsolve and timing roles cross. All12468live kernel calls,

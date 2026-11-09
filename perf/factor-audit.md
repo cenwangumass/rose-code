@@ -1238,6 +1238,26 @@ projected effects, component source/binary/timings, dependency audit and restora
 
 ## Remaining proof obligations
 
+An end-to-end flat factor representation has not been tested as one mechanism.
+The rejected linked chains cover producer traversal; arenas/banks cover lifetime;
+component coordinates cover workspaces/handoffs; flat auxiliary LU and shared L
+cover individual factors. This does not prove a complete representation rewrite
+cannot help. It also supplies no measured substantial residual to justify one.
+The auxiliary LU has its own pivot order, and main producer U can differ from
+fresh replay by one ULP, so storage sharing cannot eliminate those computations.
+The local-elimination audit in STATE.md records zero identical complete local
+pivot orders across4,500 main/auxiliary installations.
+
+Concrete remaining translations include producer rows to pivot-position L and
+its transpose, numeric uc to ordered ut in replace_u_column, and numeric ut to
+virtual row order in TauRow::prepare. Their complete current removable cost is
+unmeasured. Prior transpose batching, A/B lookup, Tau gathering and lifetime
+trials cover portions of the proposed savings. Do not credit whole update or
+refactor samples to these translations or add overlapping historical fractions.
+A persistent coefficient store with ordered cross-links needs a distinct
+eligible-scope/cost argument before an implementation; the current source audit
+does not qualify that rewrite or a broad new census.
+
 Fresh auxiliary Factor numeric fields are immutable after construction; only
 eta updates and their nnz counter change. Deep-copy constructor reuse is verified
 but its fixed solver screen is inconclusive; do not extend it. Immutable-base
