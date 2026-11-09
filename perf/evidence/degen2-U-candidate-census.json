@@ -1,0 +1,383 @@
+{
+  "previous_goal_turn_classification": "Progress: actualmatchedUcomparison established72DIV/52scatter/21rowdot arithmetic projections and205rejectedcandidatechecks; currentturn boundswholeexposure andaccounts indexlifecycles before anyprototype.",
+  "scope": "One bounded diagnostic whole-source neededU candidate/rejection census plus separate standaloneinteger lifecycle replay. No solveroptimization, numericrewrite, WORK/dump/parity changes, acceptedbuild overwrite or newreferencecapture.",
+  "configuration": {
+    "rose_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "ordinary_cli_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "profile": "Qualified fixed39PGO/systemTCMalloc dual-release, CPU2,cap640actual634pivots",
+    "strict_reference_frontier": "Previouslycentralmatchingprefix162; firstneededoutputsignedzero163unchanged. Thisturnno newnativecomparisons; latercountsstructuralonly."
+  },
+  "whole_observed_counts": {
+    "calls": 634,
+    "active_column_visits": 44322,
+    "candidate_entries": 339979,
+    "tail_scatter_entries": 161569,
+    "rejected_entries": 178410
+  },
+  "selected149_qualification": {
+    "pricing": 149,
+    "generation": 5,
+    "upd": 16,
+    "active_columns": [
+      145,
+      315,
+      22,
+      439,
+      70,
+      102,
+      419,
+      428,
+      443,
+      442,
+      441,
+      440,
+      386,
+      408,
+      406,
+      136,
+      146,
+      65,
+      292
+    ],
+    "candidates": 237,
+    "tail_entries": 32,
+    "rejected_entries": 205
+  },
+  "source_instruction_exposure": {
+    "rejected_per_entry_I": 10,
+    "basis": "Previouslyvalidatedaccepted14368d..1436a6 sevenrejectcoreI plus143680..143687 threeadvance/endI;selected205entries2050static/2051PMU,root/detail1Iresidual. Countsnowaggregatedfromactualacceptednonzero-columnentry14360d andliveUCindices/kinds ratherthantrappingeveryentry.",
+    "whole_rejected_I": 1784100,
+    "accepted_solve_I": 181193000,
+    "whole_rejected_instruction_percent": 0.9846406870022573,
+    "limitation": "An exposure for deleting allrejected-entry visits before replacement/capture/indexlookup and WORK-preservingmaintenance. Not time/removable/nativeexcess share. LiveUCindicesandkind predicate supportexactcounts; no numericcoefficients modeled."
+  },
+  "prefix_split": {
+    "covered_prefix": {
+      "calls": 162,
+      "candidates": 3745,
+      "rejected_entries": 3159,
+      "rejected_static_I": 31590
+    },
+    "later_source_only": {
+      "calls": 472,
+      "candidates": 336234,
+      "rejected_entries": 175251,
+      "rejected_static_I": 1752510
+    }
+  },
+  "lifetime_geometry": {
+    "states": 637,
+    "constructors": 16,
+    "successful_updates": 621,
+    "retirements_in_replay": 16,
+    "statistics": {
+      "constructors": 16,
+      "events": 637,
+      "eager_columns": 59043,
+      "dirty_columns": 3425,
+      "eager_scan_entries": 463057,
+      "eager_output_indices": 202766,
+      "dirty_scan_entries": 41297,
+      "dirty_output_indices": 22830
+    },
+    "final_unused_factor": {
+      "generation": 16,
+      "upd": 0,
+      "m": 444,
+      "tail_columns": 217,
+      "numericUCentries": 929,
+      "needed_calls": 0,
+      "provenance": "Targetedfreshreturnb1874 actualsret/RAXequalitycaptureafterAFIROqualification. Initial636statecapturemissedunusedfinalconstructor; addedthisactualstate ratherthanassumingzero/omittinglifecycle."
+    },
+    "index_eligibility_key": "OrderedUCdestinationindexsequence plus currentkind[destination]==\u22122bits; coefficientvaluechangesalone do not alter eligible offsets. Countedchangedkeys acrosssuccessorversions plusremovedcolumns. Actualcheapinvalidation implementation notproved."
+  },
+  "lifecycle_proxy": {
+    "configuration": "StandalonepinnedRust1.98.1 optlevel3/loopalignment64/systemTCMalloc, NO PGO, separate ELF/source/fixture. Not qualifiedRose CLI or matching-profile optimizationcandidate.",
+    "measurement": "Sameproxybinary control/dirty/eager,3balancedrounds,64complete16-factor/621-update lifetimesperprocess;9freshCPU2perfstatprocesses. Controlincludesfixturedecoding/allocations/eventdispatch. Differencesper64livesreported; no solver walltimeclaim.",
+    "validation": "Bothpoliciesverifyall637stateindexvectorsagainstindependentcapturedUC/kind-derived expectedoffsets, includingempty/deletedcolumns andfinalunusedfactor. Dirty22830/eager202766writes perlife; exactchecksumall9runs.",
+    "results": {
+      "dirty": {
+        "instructions_per_lifetime_median": 937037.234375,
+        "instructions_per_lifetime_range": [
+          937035.453125,
+          937038.890625
+        ],
+        "cycles_per_lifetime_median": 1299930.125,
+        "cycles_per_lifetime_range": [
+          1259076.234375,
+          1378468.71875
+        ]
+      },
+      "eager": {
+        "instructions_per_lifetime_median": 7936083.125,
+        "instructions_per_lifetime_range": [
+          7936065.0,
+          7936087.265625
+        ],
+        "cycles_per_lifetime_median": 12079159.5625,
+        "cycles_per_lifetime_range": [
+          10967317.234375,
+          12388734.015625
+        ]
+      }
+    },
+    "optimistic_assumptions": "Dirtycolumn lists and exactrequiredoutputcapacity suppliedfree fromcapture; buffers retaincapacity. Excludes detectingdirtycols, updatehookmutation bookkeeping, metadata storage/writes/invalidation discovery and extraindexindirection on161569retainedscatterentries. Fixtureparserretainsmanyallocationsandpreconditionsheapdifferentlyfromsolver. Eageralsoavoidsdiscoveringcurrenttailcolnames. Includescacheheaderconstruction,refresh/scans/reserve/allocation/retirement andfinaldrop.",
+    "cost_scope": "Actualconstructionandcleanup ofthemodeled Vec<Vec<usize>>indexcache acrossall16lifetimes. Dirtydoes3425columnrefreshes including66removedtailcolumns,scans41297UCentries,writes22830indices. Eager59043refreshes,463057scans,202766writes. Doesnotmeasureallpossibleindexrepresentations or aprovenminimum.",
+    "instruction_budget_illustration": {
+      "accepted_rejection_exposure_I": 1784100,
+      "proxy_dirty_median_I": 937037.234375,
+      "arithmetic_difference_I": 847062.765625,
+      "arithmetic_difference_percent_of_solve": 0.46749199230930555,
+      "warning": "Crossbuildbudgetillustration only, NOT measured/guaranteed netinstructionreduction orspeedup. PGO/codegen/heapstate and omittedinvalidation/indirection mustbe resolved inanyactualcandidate."
+    }
+  },
+  "decision": {
+    "eager": "Do not integrate tested eager-rebuild index design: modeledlifecycle alone~7.936M I exceeds1.784M scanexposure by~4.45x before additionalcosts.",
+    "dirty": "No solverprototype justified by thisdiagnostic: optimisticmodeledmaintenance~.937M I, missingcheapinvalidation andscatterindirection. Illustrativeheadroom~.847M I(.4675%solveI) is not aspeedupprediction. No claimthatall alternative metadatarepresentations aredisproved.",
+    "rejected_trial_check": "No rowmapcache/shorttau, two-vectorfusion/WORKdeferral, outputreuse/workspace/preUownership/arenas, completedLhandoff/emptyLgap, slotheap or BTRANmemoization rescue. Lifecycleprogram is diagnosticinteger-only, not solvercandidate or a newacceptancescreen."
+  },
+  "validation": {
+    "capture_controls": [
+      {
+        "index": 0,
+        "model": "afiro",
+        "cap": 3,
+        "mode": "count",
+        "wall_seconds": 0.5822967200074345,
+        "controls_exact": true,
+        "calls": 3,
+        "fresh": 1,
+        "updates": 3,
+        "versions": 0,
+        "active_columns": 0,
+        "candidates": 0,
+        "tail_entries": 0,
+        "rejected": 0
+      },
+      {
+        "index": 1,
+        "model": "afiro",
+        "cap": 3,
+        "mode": "geometry",
+        "wall_seconds": 0.5878343119984493,
+        "controls_exact": true,
+        "calls": 3,
+        "fresh": 1,
+        "updates": 3,
+        "versions": 4,
+        "active_columns": 0,
+        "candidates": 0,
+        "tail_entries": 0,
+        "rejected": 0
+      },
+      {
+        "index": 2,
+        "model": "sc50a",
+        "cap": 3,
+        "mode": "count",
+        "wall_seconds": 0.5720880519947968,
+        "controls_exact": true,
+        "calls": 3,
+        "fresh": 1,
+        "updates": 3,
+        "versions": 0,
+        "active_columns": 0,
+        "candidates": 0,
+        "tail_entries": 0,
+        "rejected": 0
+      },
+      {
+        "index": 3,
+        "model": "sc50a",
+        "cap": 3,
+        "mode": "geometry",
+        "wall_seconds": 0.5666142300033243,
+        "controls_exact": true,
+        "calls": 3,
+        "fresh": 1,
+        "updates": 3,
+        "versions": 4,
+        "active_columns": 0,
+        "candidates": 0,
+        "tail_entries": 0,
+        "rejected": 0
+      },
+      {
+        "index": 4,
+        "model": "degen2",
+        "cap": 20,
+        "mode": "count",
+        "wall_seconds": 0.6195349980116589,
+        "controls_exact": true,
+        "calls": 20,
+        "fresh": 2,
+        "updates": 19,
+        "versions": 0,
+        "active_columns": 8,
+        "candidates": 101,
+        "tail_entries": 3,
+        "rejected": 98
+      },
+      {
+        "index": 5,
+        "model": "degen2",
+        "cap": 20,
+        "mode": "geometry",
+        "wall_seconds": 0.5980621950002387,
+        "controls_exact": true,
+        "calls": 20,
+        "fresh": 2,
+        "updates": 19,
+        "versions": 21,
+        "active_columns": 8,
+        "candidates": 101,
+        "tail_entries": 3,
+        "rejected": 98
+      },
+      {
+        "index": 6,
+        "model": "degen2",
+        "cap": 150,
+        "mode": "count",
+        "wall_seconds": 0.8817573980049929,
+        "controls_exact": true,
+        "calls": 150,
+        "fresh": 5,
+        "updates": 147,
+        "versions": 0,
+        "active_columns": 199,
+        "candidates": 2076,
+        "tail_entries": 237,
+        "rejected": 1839
+      },
+      {
+        "index": 7,
+        "model": "degen2",
+        "cap": 640,
+        "mode": "count",
+        "wall_seconds": 13.138900197009207,
+        "controls_exact": true,
+        "calls": 634,
+        "fresh": 16,
+        "updates": 621,
+        "versions": 0,
+        "active_columns": 44322,
+        "candidates": 339979,
+        "tail_entries": 161569,
+        "rejected": 178410
+      },
+      {
+        "index": 8,
+        "model": "degen2",
+        "cap": 640,
+        "mode": "geometry",
+        "wall_seconds": 13.915808959005517,
+        "controls_exact": true,
+        "calls": 634,
+        "fresh": 16,
+        "updates": 621,
+        "versions": 636,
+        "active_columns": 44322,
+        "candidates": 339979,
+        "tail_entries": 161569,
+        "rejected": 178410
+      },
+      {
+        "index": 0,
+        "model": "afiro",
+        "cap": 3,
+        "mode": "final",
+        "wall_seconds": 0.608316918995115,
+        "controls_exact": true,
+        "calls": 0,
+        "fresh": 1,
+        "updates": 0,
+        "versions": 1,
+        "active_columns": 0,
+        "candidates": 0,
+        "tail_entries": 0,
+        "rejected": 0
+      },
+      {
+        "index": 1,
+        "model": "degen2",
+        "cap": 640,
+        "mode": "final",
+        "wall_seconds": 0.6699824649986112,
+        "controls_exact": true,
+        "calls": 0,
+        "fresh": 16,
+        "updates": 0,
+        "versions": 1,
+        "active_columns": 0,
+        "candidates": 0,
+        "tail_entries": 0,
+        "rejected": 0
+      }
+    ],
+    "all_eleven_complete_results_exits_signedzeros_match": true,
+    "two_independent_whole_count_modes_exact_per_call": true,
+    "all637states_and634calls_reconcile": true,
+    "all_observer_logs_no_Python_errors": true,
+    "preserve": "Acceptedhashes unchanged; solver source unchanged. Existingqualified987baseline retained; no newsolverbuild means no new fullparitytest required."
+  },
+  "distortion": {
+    "observer": "Read-onlyGDB only. Smallruns.57\u2013.62s,cap150.882s;wholecount13.139s/geometry13.916s,finalfactorcapture.670s. Debugclocks/cycles entirelyexcluded. No per-elementnumerictrace or instructioncodegen changes.",
+    "proxy": "SeparateunprofiledreleaseallocatorlinkedELF, parserheapstate/codegen/proxy-assumption caveatsabove. Proxycycles arevalidforthisprogramonly, not per-stageRose/Gurobitimings.",
+    "counter_calibration": "Newwholecensususesobservedintegercountsandpreviousqualified10Ibasicblock cost, no newPMUbreakpointcorrection or extrapolatedselectedcallaverage."
+  },
+  "reconciliation": {
+    "overall_accepted_instruction_gap": 127995000,
+    "overall_accepted_cycle_gap": 89315000,
+    "whole_rejected_instructions_already_inside_prior_FTRAN_self_and_needed_scopes": true,
+    "not_additive": "Do notadd1.7841M exposuretocurrentF/Bselfgap orstagecosts; do notsubtractstandaloneproxyfromacceptedruntime. No new whole-solve gain,2.74xgapunchanged."
+  },
+  "one_next_experiment": {
+    "question": "Can existing same-pivot BTRAN U-stage values replace the repeated mirror-update eliminate solve without changing anyorderedeta/WORK/FPstate?",
+    "design": "Use alreadyplannedmirror-update lead: observeoriginaldirectBTRANUbeforeetas/Ltranspose atcachedsource136/native135 aftersmallqualification. Compareorderedeta candidates against completefrozeneliminate/BTRAN bodies throughcentralcompare.py/delegatedreferencework. Stopfirstactualdifference, no normalization. Accountforcapture/storage/install/invalidation/retirement before anysolverchange.",
+    "benefit": "Existingacceptedeliminateexposure2.469725M I(1.363%solveI), not a time/removablebound. Plausiblenetbenefit remainsunquantifieduntilbitexactreuse andcapturelifetimecostsproved.",
+    "distinct": "Within-pivot existingnumericalstage reuse, not rejected fullBTRANmemo acrossclones, completedLhandoff, rowmap or sharedL/eta fusion. No failedscreenretry or tail-index layout/allocator/PGO rescue."
+  },
+  "artifacts": {
+    "root": "target/perf-degen2-U-candidate-census",
+    "count_capture": "7/capture.json",
+    "geometry_capture": "8/capture.json",
+    "final_factor_capture": "final-1/capture.json",
+    "standalone_replay": "lifecycle.rs",
+    "fixture": "lifecycle.bin",
+    "plan": "lifecycle-plan.json",
+    "raw_runs": "lifecycle-runs.json",
+    "deltas": "lifecycle-deltas.json",
+    "verification": "lifecycle-verify.out"
+  },
+  "artifact_hashes": {
+    "target/perf-degen2-U-candidate-census/observe_gdb.py": "521b22d8b866a8e7ae7e75593bec5daaa9f2789ebb7824d07732541d70ad4085",
+    "target/perf-degen2-U-candidate-census/final_factor_gdb.py": "4c2c6fa05cc44d5ded7f87def6c08b0403c8a0556263469eff8888a564e202d3",
+    "target/perf-degen2-U-candidate-census/run.py": "9b92eff1277b63bffed1dfaca581d05e107ef41733add6d9a1f0839770ea3391",
+    "target/perf-degen2-U-candidate-census/run_final.py": "3f93058e6e38726e6b3115a87ee868df0cf3bbb93d27e1f87c6fc5d41b2e125b",
+    "target/perf-degen2-U-candidate-census/summary.json": "e28a9477f555727731b65e8c957e8810e7461a49fb0bce67ead8b73b39f2acfc",
+    "target/perf-degen2-U-candidate-census/final-summary.json": "bc9c78099ab198d11155a84a062ec668cd76eec7ae9bb48d49c87297df0d529d",
+    "target/perf-degen2-U-candidate-census/7/capture.json": "b6c31b230e07d29ffb99efef5de5b77b76606c64bc9a26c9e079678da8b5229c",
+    "target/perf-degen2-U-candidate-census/8/capture.json": "26c314d48b7baa81f8c5fa4f627f276164271d2d62a563a2ecd13aa835575c90",
+    "target/perf-degen2-U-candidate-census/final-1/capture.json": "5755310b8b06b22fb8572bff7f2e60e3a81c9225c437838f2bb98b5f258672ee",
+    "target/perf-degen2-U-candidate-census/prepare_lifecycle.py": "f8bcf126deb89b35f8806b1b5fec84bb5a8f5047ad75e0030c1fda03a26166a1",
+    "target/perf-degen2-U-candidate-census/lifecycle-statistics.json": "2a843e55aed5c16f91f0d2370074c4a2bb6c47185cc60701b8352f874e7aa593",
+    "target/perf-degen2-U-candidate-census/lifecycle.rs": "f75c13b5c267517e8305371179598bc8e5ed7416abf2df2c3b8221bc70a679e0",
+    "target/perf-degen2-U-candidate-census/lifecycle": "572829c97f8fcc4359f6ae451382f723b38c610f17ece8c114d9ed13fad28ab6",
+    "target/perf-degen2-U-candidate-census/lifecycle.bin": "3696335dd564929c3aa54a4c3d4d8a4d78c63bdb353e2dac9294ae7fb6997c3d",
+    "target/perf-degen2-U-candidate-census/lifecycle-plan.json": "87db0f093b0bac24db92e07238b3b340498c0cdbc9629c6c3d44f4ceff6f3bbf",
+    "target/perf-degen2-U-candidate-census/lifecycle-runs.json": "e539c2f0b8652eecbf1cf18c42a34bdbb355abe022ca437915388a474a66799b",
+    "target/perf-degen2-U-candidate-census/lifecycle-deltas.json": "4c3ce6be7a7c55158b3ecdcce436da5f07baa235789cfe49da9603dd2cb25cb4",
+    "target/perf-degen2-U-candidate-census/lifecycle-verify.out": "71699710606f4011661c1e7fc33e8b6e92e3406838379578d8cd6d70ca1cf69a",
+    "target/perf-degen2-U-candidate-census/run_lifecycle.py": "59e4644818210add04c6cc71886f15de0e884cd0715c896445b27240ed63e189",
+    "target/perf-degen2-U-candidate-census/summarize.py": "f20e7afc8c3f24db1431d005982f5d205968198852fb4be201f3c615acf3b41c"
+  },
+  "completed_direct_BTRAN_U_projection": {
+    "evidence": "perf/evidence/degen2-btran-eliminate-reuse.json",
+    "status": "CapturedprefixstageprojectionPASS;unconditionalgenericreuseFALSEunder directedrounding.",
+    "prefix": "159updates/112etaentries/sourcepricing\u2264163nativepivot\u2264162;only68746I of2.469725M eliminatecost.",
+    "restriction": "Unchanged original3nodekernels differonebit withdirectedrounding;defaultcapturedLPpairsagree. No cacheoptimizationimplemented.",
+    "next": "Frozencompletekernel eligibility/fallback/FPstate study pluslifecyclecosts before anysolverchange; no rejectedtrialretry."
+  }
+}

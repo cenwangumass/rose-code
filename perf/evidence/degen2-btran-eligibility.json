@@ -1,0 +1,458 @@
+{
+  "scope": "Bounded diagnostic eligibility study only; no solver optimization or performance measurement. Reuses completed accepted-binary costs and delegated cached central comparison.",
+  "configuration": {
+    "accepted_optimized_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "ordinary_cli_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "numerical_source_sha256": "57c86340f6959717954e2cb1c58f06c285ab7ce564a25d7d0e9e9c429d802ef1",
+    "test_build": "Independent ordinary release/glibc; functional evidence only, separate from accepted fixed39 PGO/systemTCMalloc."
+  },
+  "frozen_kernel_results": {
+    "F80": {
+      "counts": {
+        "cases": 11782,
+        "equal_output": 10560,
+        "fallback": 11782,
+        "fallback_output_difference": 1222,
+        "tracked_kernel_exact": 11782
+      },
+      "first_fallback_difference": {
+        "first_difference": {
+          "BTRAN_count": 0,
+          "eliminate_count": 1,
+          "index": 0
+        },
+        "label": "generated/1/2",
+        "mode": 8064,
+        "occupied": false
+      },
+      "targeted": [
+        {
+          "all_quotients_finite": true,
+          "eligible": false,
+          "first_difference": {
+            "BTRAN_count": 0,
+            "eliminate_count": 1,
+            "index": 0
+          },
+          "initial_unique": true,
+          "label": "targeted/0",
+          "occupied": false,
+          "pivot_retained": false,
+          "unit_input": true
+        },
+        {
+          "all_quotients_finite": true,
+          "eligible": false,
+          "first_difference": {
+            "BTRAN_count": 0,
+            "eliminate_count": 1,
+            "index": 0
+          },
+          "initial_unique": true,
+          "label": "targeted/0",
+          "occupied": true,
+          "pivot_retained": false,
+          "unit_input": true
+        },
+        {
+          "all_quotients_finite": true,
+          "eligible": false,
+          "first_difference": {
+            "BTRAN": [
+              1,
+              [
+                13835058055282163712,
+                49152
+              ]
+            ],
+            "eliminate": [
+              1,
+              [
+                9223372036854775808,
+                49152
+              ]
+            ],
+            "index": 0
+          },
+          "initial_unique": false,
+          "label": "targeted/1",
+          "occupied": false,
+          "pivot_retained": true,
+          "unit_input": true
+        },
+        {
+          "all_quotients_finite": true,
+          "eligible": false,
+          "first_difference": {
+            "BTRAN": [
+              1,
+              [
+                13835058055282163712,
+                49152
+              ]
+            ],
+            "eliminate": [
+              1,
+              [
+                9223372036854775808,
+                49152
+              ]
+            ],
+            "index": 0
+          },
+          "initial_unique": false,
+          "label": "targeted/1",
+          "occupied": true,
+          "pivot_retained": true,
+          "unit_input": true
+        },
+        {
+          "all_quotients_finite": true,
+          "eligible": false,
+          "first_difference": {
+            "BTRAN": [
+              1,
+              [
+                9223372036854775808,
+                49152
+              ]
+            ],
+            "eliminate": [
+              1,
+              [
+                9223372036854775808,
+                49151
+              ]
+            ],
+            "index": 0
+          },
+          "initial_unique": true,
+          "label": "targeted/2",
+          "occupied": false,
+          "pivot_retained": true,
+          "unit_input": false
+        },
+        {
+          "all_quotients_finite": true,
+          "eligible": false,
+          "first_difference": {
+            "BTRAN": [
+              1,
+              [
+                9223372036854775808,
+                49152
+              ]
+            ],
+            "eliminate": [
+              1,
+              [
+                9223372036854775808,
+                49151
+              ]
+            ],
+            "index": 0
+          },
+          "initial_unique": true,
+          "label": "targeted/2",
+          "occupied": true,
+          "pivot_retained": true,
+          "unit_input": false
+        }
+      ]
+    },
+    "captured": {
+      "counts": {
+        "cases": 324,
+        "eligible": 324,
+        "eligible_flag_coverage": 324,
+        "equal_output": 324,
+        "full_finite_policy_eligible": 324,
+        "tracked_kernel_exact": 324
+      }
+    },
+    "f64": {
+      "counts": {
+        "cases": 11782,
+        "eligible": 581,
+        "eligible_flag_coverage": 581,
+        "eligible_with_unreached_nonfinite_or_zero": 29,
+        "equal_output": 10536,
+        "fallback": 11201,
+        "fallback_output_difference": 1246,
+        "full_finite_policy_eligible": 552,
+        "tracked_kernel_exact": 11782
+      },
+      "first_fallback_difference": {
+        "first_difference": {
+          "BTRAN": [
+            10,
+            [
+              4633008549861452499,
+              0
+            ]
+          ],
+          "eliminate": [
+            10,
+            [
+              4633008549861452495,
+              0
+            ]
+          ],
+          "index": 4
+        },
+        "label": "generated/0/77",
+        "mode": 16256,
+        "occupied": false
+      },
+      "targeted": [
+        {
+          "all_quotients_finite": true,
+          "eligible": false,
+          "first_difference": {
+            "BTRAN_count": 0,
+            "eliminate_count": 1,
+            "index": 0
+          },
+          "initial_unique": true,
+          "label": "targeted/0",
+          "occupied": false,
+          "pivot_retained": false,
+          "unit_input": true
+        },
+        {
+          "all_quotients_finite": true,
+          "eligible": false,
+          "first_difference": {
+            "BTRAN_count": 0,
+            "eliminate_count": 1,
+            "index": 0
+          },
+          "initial_unique": true,
+          "label": "targeted/0",
+          "occupied": true,
+          "pivot_retained": false,
+          "unit_input": true
+        },
+        {
+          "all_quotients_finite": true,
+          "eligible": false,
+          "first_difference": {
+            "BTRAN": [
+              1,
+              [
+                13837309855095848960,
+                0
+              ]
+            ],
+            "eliminate": [
+              1,
+              [
+                13835058055282163712,
+                0
+              ]
+            ],
+            "index": 0
+          },
+          "initial_unique": false,
+          "label": "targeted/1",
+          "occupied": false,
+          "pivot_retained": true,
+          "unit_input": true
+        },
+        {
+          "all_quotients_finite": true,
+          "eligible": false,
+          "first_difference": {
+            "BTRAN": [
+              1,
+              [
+                13837309855095848960,
+                0
+              ]
+            ],
+            "eliminate": [
+              1,
+              [
+                13835058055282163712,
+                0
+              ]
+            ],
+            "index": 0
+          },
+          "initial_unique": false,
+          "label": "targeted/1",
+          "occupied": true,
+          "pivot_retained": true,
+          "unit_input": true
+        },
+        {
+          "all_quotients_finite": true,
+          "eligible": false,
+          "first_difference": {
+            "BTRAN": [
+              1,
+              [
+                13835058055282163712,
+                0
+              ]
+            ],
+            "eliminate": [
+              1,
+              [
+                13830554455654793216,
+                0
+              ]
+            ],
+            "index": 0
+          },
+          "initial_unique": true,
+          "label": "targeted/2",
+          "occupied": false,
+          "pivot_retained": true,
+          "unit_input": false
+        },
+        {
+          "all_quotients_finite": true,
+          "eligible": false,
+          "first_difference": {
+            "BTRAN": [
+              1,
+              [
+                13835058055282163712,
+                0
+              ]
+            ],
+            "eliminate": [
+              1,
+              [
+                13830554455654793216,
+                0
+              ]
+            ],
+            "index": 0
+          },
+          "initial_unique": true,
+          "label": "targeted/2",
+          "occupied": true,
+          "pivot_retained": true,
+          "unit_input": false
+        }
+      ]
+    },
+    "guard": "DIAGNOSTIC_ONLY: valid managed triangular U,uniqueinitialrow,unitinput,retainedpivot,tail-only nonpivotout,nearest/noDAZFTZ,f64only,all computed U quotients finite,noinvalid/divzero/overflowfromU; requirecurrentflagscovercapturedflagsbeforefutureuse. No cheap runtime guard implemented.",
+    "quick": false
+  },
+  "total_comparisons": 23888,
+  "admitted_comparisons": 905,
+  "source_proof": {
+    "original_sha256": "57c86340f6959717954e2cb1c58f06c285ab7ce564a25d7d0e9e9c429d802ef1",
+    "study_sha256": "79bddd63f7b22969f0b7cf7c0fd7dadf89cd23222fedce814c7705f190db81ba",
+    "literal_original_unchanged": true,
+    "tracked_original_body_reconstruction_exact": true,
+    "tracked_original_body_sha256": "85033cde98df85f783b488b221758b2ad1dfb16a8b2d5bb229bdc2a61341f22d",
+    "tracked_changes": "Only two finite-classifications after original quotients, bool initialization/return; original numeric kernel retained separately. No solver optimization or performance claims."
+  },
+  "source_only_coverage": [
+    {
+      "model": "afiro",
+      "cap": 3,
+      "wall_seconds": 0.6787717300030636,
+      "controls_exact": true,
+      "captures": 3,
+      "qualified_U": 3,
+      "updates": 3,
+      "qualified_updates": 3,
+      "discarded": 0,
+      "nonpivot_capture_entries": 0
+    },
+    {
+      "model": "sc50a",
+      "cap": 20,
+      "wall_seconds": 0.658138039012556,
+      "controls_exact": true,
+      "captures": 20,
+      "qualified_U": 20,
+      "updates": 18,
+      "qualified_updates": 18,
+      "discarded": 2,
+      "nonpivot_capture_entries": 20
+    },
+    {
+      "model": "degen2",
+      "cap": 20,
+      "wall_seconds": 0.809529655991355,
+      "controls_exact": true,
+      "captures": 20,
+      "qualified_U": 20,
+      "updates": 19,
+      "qualified_updates": 19,
+      "discarded": 1,
+      "nonpivot_capture_entries": 3
+    },
+    {
+      "model": "degen2",
+      "cap": 640,
+      "wall_seconds": 3.099173017006251,
+      "controls_exact": true,
+      "captures": 634,
+      "qualified_U": 634,
+      "updates": 621,
+      "qualified_updates": 621,
+      "discarded": 13,
+      "nonpivot_capture_entries": 4209
+    }
+  ],
+  "full_census_lifecycle": {
+    "captures": 634,
+    "matching_updates": 621,
+    "discarded_at_factor_replacement": 13,
+    "all_nonpivot_entries": 4209,
+    "used_nonpivot_entries": 4088,
+    "discarded_nonpivot_entries": 121,
+    "logical_capture_bytes_at_16_per_entry": 67344,
+    "meaning": "Logical entries/bytes only; copying, allocation, memory traffic, guard and lifecycle costs are unmeasured. Strong full-factor finite predicate is an offline coverage lower bound, not an implemented cheap runtime guard."
+  },
+  "distortion": {
+    "gdb_wall_seconds_including_plain_control": [
+      0.6787717300030636,
+      0.658138039012556,
+      0.809529655991355,
+      3.099173017006251
+    ],
+    "timing_and_cycles_excluded": true,
+    "cost_overhead_unmeasured": true,
+    "no_new_performance_claim": true,
+    "excluded_attempt": "coverage-0/run.log: Python syntax error before solving; corrected else None in script, retained excluded artifacts."
+  },
+  "central_alignment": {
+    "delegate": "/root/ref_compare",
+    "tool": "../reverse-engineer/tools/compare.py",
+    "matched_native_pivots": 162,
+    "last_source_pricing": 163,
+    "first_failure": "native163/source164 basis22 native -0 vs Rose +0; no pairing after this frontier.",
+    "source_within_pivot_pairs": 159,
+    "whole_run_source_predicate_census_is_not_reference_equivalence": true
+  },
+  "missing_evidence": [
+    "Practical guard correctness over complete solver histories, including cache invalidation and FP-state consumption. Differential tests are not a general proof.",
+    "Complete cost of predicate/capture/copy/faithful visited and dense estimate reconstruction/install/invalidation/retirement.",
+    "Exhaustive initial/recompute BTRAN and flip/basic FTRAN numerical pairing, complete cross-solver BTRAN boundaries, and later native state equivalence."
+  ],
+  "one_proposed_experiment": {
+    "design": "Isolated construction-inclusive lifecycle cost experiment using all 634 capture events and 621 consumes, retaining all 13 discarded captures. Preserve original elimination as the numerical oracle; charge practical guards, materialization/copy, original-order WORK/dense bookkeeping, install, invalidation and retirement. Start AFIRO/SC50A then bounded DEGEN2. No production optimization.",
+    "whole_solve_benefit": "No measured speedup. Entire current eliminate scope is 2.469725M instructions, 1.363% of accepted solve instructions, a loose instruction opportunity ceiling before required work/new costs. Plausible benefit is sub-percent unless a lifecycle measurement establishes otherwise; no cycle/time projection supported.",
+    "rejected_trial_check": "Same live pivot pre-eta/LT U result transferred to eliminate; differs from rejected full BTRAN query memo across clones and from L handoff, shared L/eta fusion, rowmap/workspace/arena and maintained U-index trials. No failed timing screen is retried."
+  },
+  "artifacts": {
+    "target/perf-degen2-btran-eligibility/study.rs": "79bddd63f7b22969f0b7cf7c0fd7dadf89cd23222fedce814c7705f190db81ba",
+    "target/perf-degen2-btran-eligibility/source-proof.json": "02f4f9f4607b37de123837f8a2e0ae8fff2fd13410a0d67c936f36ff5fd5585d",
+    "target/perf-degen2-btran-eligibility/full-v2.json": "6815c794a2609dc2709ad6e0a5cdc50a5629d6155fac4f508e0879d0b43d51f7",
+    "target/perf-degen2-btran-eligibility/full-v2.log": "23ed5ed9fc441a41d3a0219bd231c5f419e3110fc7d39c4985be050b597b0624",
+    "target/perf-degen2-btran-eligibility/coverage_gdb.py": "72c9b9747daae47c2751bb55e24d92a2300ac9d8cc9af0c37a825d7cc33958ea",
+    "target/perf-degen2-btran-eligibility/run_coverage.py": "7300315ea8984a01843ba60f499abc794582f51aff88caa19f37ed137ac50463",
+    "target/perf-degen2-btran-eligibility/coverage-summary.json": "b94b6eec8b7e849bf974ca1516870a012152289288266f7291765b7556c12bce",
+    "target/perf-degen2-btran-eligibility/cargo-target/release/deps/rose-1647c29dde43abc1": "6a3fbf9a715a0e446dc742c8b1e6f70fab78e151814c39f422b041fc79a2e8f5"
+  },
+  "completed_lifecycle_followup": "degen2-btran-lifecycle.json"
+}

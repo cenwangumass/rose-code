@@ -1,0 +1,4569 @@
+{
+  "decision": "Timing-inconclusive; stop without seed65189,extensions or defaultpromotion.",
+  "configuration": "SingleCGU in both fixed39PGO stages; ThinLTO retained,sourceunchanged,TCMalloc unchanged,64byteloop alignment unchanged. This is not repeated full/fatLTO trial.",
+  "build": {
+    "argv": [
+      "python3",
+      "perf/build_pgo.py",
+      "--system-tcmalloc"
+    ],
+    "cwd": "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source",
+    "env": {
+      "LIBRARY_PATH": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/sysroot/usr/lib/x86_64-linux-gnu",
+      "LD_LIBRARY_PATH": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/sysroot/usr/lib/x86_64-linux-gnu",
+      "LLVM_PROFDATA": "/home/derekwang/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/bin/llvm-profdata",
+      "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1"
+    },
+    "source": "byte-identical to qualified55afsource; ThinLTO unchanged,CGU1 bothinstrumented/profileuse builds",
+    "estimated_seconds": 100,
+    "exit": 0,
+    "elapsed": 248.55981326899928,
+    "sha256": "05dc07287bc19c1f6c7f4129d894edf7c00b79239263725dd12b9ab7945c6d76"
+  },
+  "profile": {
+    "compiler": "rustc 1.98.1 (48a229cea 2026-09-01)\nbinary: rustc\ncommit-hash: 48a229ceaefd4985c50990b14116b6d856af0985\ncommit-date: 2026-09-01\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.1\nLLVM version: 22.1.8\n",
+    "profile": "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/perf-pgo/8cc16a83196be6b23f732c369cf95d494fbdd7841aba8cab2abd3513ce16bd59.profdata",
+    "sha256": "8cc16a83196be6b23f732c369cf95d494fbdd7841aba8cab2abd3513ce16bd59",
+    "rustflags": [
+      "-Cllvm-args=--align-loops=64",
+      "-Cprofile-use=/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/perf-pgo/8cc16a83196be6b23f732c369cf95d494fbdd7841aba8cab2abd3513ce16bd59.profdata"
+    ],
+    "features": [
+      "system-tcmalloc"
+    ],
+    "training": [
+      [
+        "solve",
+        "tests/fixtures/afiro.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/afiro.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/afiro.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/afiro.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/afiro.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/afiro.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/afiro.mps",
+        "--method",
+        "pdhg",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--pdhg-iter-limit",
+        "2000"
+      ],
+      [
+        "solve",
+        "tests/fixtures/sc50a.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/sc50a.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/sc50a.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/sc50a.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/sc50a.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/sc50a.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/sc50a.mps",
+        "--method",
+        "pdhg",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--pdhg-iter-limit",
+        "2000"
+      ],
+      [
+        "solve",
+        "tests/fixtures/blend.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/blend.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/blend.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/blend.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/blend.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/blend.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/blend.mps",
+        "--method",
+        "pdhg",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--pdhg-iter-limit",
+        "2000"
+      ],
+      [
+        "solve",
+        "tests/fixtures/adlittle.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/adlittle.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/adlittle.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/adlittle.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/adlittle.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/adlittle.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/adlittle.mps",
+        "--method",
+        "pdhg",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--pdhg-iter-limit",
+        "2000"
+      ],
+      [
+        "solve",
+        "tests/fixtures/bore3d.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/bore3d.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/bore3d.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/bore3d.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/bore3d.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/bore3d.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/bore3d.mps",
+        "--method",
+        "pdhg",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--pdhg-iter-limit",
+        "2000"
+      ],
+      [
+        "solve",
+        "tests/fixtures/inf_itest6.mps",
+        "--method",
+        "primal",
+        "--profile",
+        "release",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null"
+      ],
+      [
+        "solve",
+        "tests/fixtures/inf_itest6.mps",
+        "--method",
+        "dual",
+        "--profile",
+        "release",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null"
+      ],
+      [
+        "solve",
+        "tests/fixtures/fx_midsing_1106.mps",
+        "--method",
+        "primal",
+        "--profile",
+        "release",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null"
+      ],
+      [
+        "solve",
+        "tests/fixtures/fx_midsing_1106.mps",
+        "--method",
+        "dual",
+        "--profile",
+        "release",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null"
+      ]
+    ]
+  },
+  "counter_scope": "Wholeprocess preliminary pairedfreshprocessCPU2; complete results/exits equal afterremoving onlytime",
+  "counters": {
+    "afiro": {
+      "instructions:u": {
+        "before": 6902817.0,
+        "after": 6874432.0,
+        "percent": -0.4112089310784328
+      },
+      "cycles:u": {
+        "before": 10208042.0,
+        "after": 10583696.0,
+        "percent": 3.679980940517291
+      }
+    },
+    "sc50a": {
+      "instructions:u": {
+        "before": 9809793.0,
+        "after": 9721958.0,
+        "percent": -0.8953807689927817
+      },
+      "cycles:u": {
+        "before": 12846802.0,
+        "after": 12814586.0,
+        "percent": -0.25077058088075477
+      }
+    },
+    "adlittle": {
+      "instructions:u": {
+        "before": 15045743.0,
+        "after": 14884250.0,
+        "percent": -1.0733467931759888
+      },
+      "cycles:u": {
+        "before": 17352717.0,
+        "after": 17072802.0,
+        "percent": -1.61309033046525
+      }
+    },
+    "degen2": {
+      "instructions:u": {
+        "before": 196500395.5,
+        "after": 193521064.5,
+        "percent": -1.5161959305064143
+      },
+      "cycles:u": {
+        "before": 156613070.5,
+        "after": 151656318.5,
+        "percent": -3.164967000631025
+      }
+    }
+  },
+  "screen": {
+    "arguments": {
+      "before": "target/perf-optimized-build/rose-pgo-tcmalloc",
+      "after": "target/perf-cgu1-degen2/source/target/release/rose",
+      "run": "degen2.dual-r",
+      "output": "target/perf-cgu1-degen2/screen-65117.json",
+      "pairs": 32,
+      "seed": 65117,
+      "cpu": 2,
+      "max_iterations": 640,
+      "timeout": 10
+    },
+    "binary_sha256": {
+      "A": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+      "B": "05dc07287bc19c1f6c7f4129d894edf7c00b79239263725dd12b9ab7945c6d76"
+    },
+    "schedule": [
+      {
+        "kind": "AA",
+        "order": "BA"
+      },
+      {
+        "kind": "AA",
+        "order": "BA"
+      },
+      {
+        "kind": "AA",
+        "order": "AB"
+      },
+      {
+        "kind": "AA",
+        "order": "AB"
+      },
+      {
+        "kind": "AA",
+        "order": "BA"
+      },
+      {
+        "kind": "AA",
+        "order": "BA"
+      },
+      {
+        "kind": "AB",
+        "order": "AB"
+      },
+      {
+        "kind": "AA",
+        "order": "AB"
+      },
+      {
+        "kind": "AB",
+        "order": "AB"
+      },
+      {
+        "kind": "AB",
+        "order": "BA"
+      },
+      {
+        "kind": "AA",
+        "order": "AB"
+      },
+      {
+        "kind": "AB",
+        "order": "AB"
+      },
+      {
+        "kind": "AB",
+        "order": "BA"
+      },
+      {
+        "kind": "AB",
+        "order": "AB"
+      },
+      {
+        "kind": "AA",
+        "order": "BA"
+      },
+      {
+        "kind": "AB",
+        "order": "BA"
+      },
+      {
+        "kind": "AA",
+        "order": "AB"
+      },
+      {
+        "kind": "AB",
+        "order": "AB"
+      },
+      {
+        "kind": "AB",
+        "order": "AB"
+      },
+      {
+        "kind": "AB",
+        "order": "AB"
+      },
+      {
+        "kind": "AB",
+        "order": "BA"
+      },
+      {
+        "kind": "AB",
+        "order": "BA"
+      },
+      {
+        "kind": "AA",
+        "order": "AB"
+      },
+      {
+        "kind": "AB",
+        "order": "BA"
+      },
+      {
+        "kind": "AB",
+        "order": "BA"
+      },
+      {
+        "kind": "AB",
+        "order": "BA"
+      },
+      {
+        "kind": "AB",
+        "order": "BA"
+      },
+      {
+        "kind": "AB",
+        "order": "BA"
+      },
+      {
+        "kind": "AA",
+        "order": "AB"
+      },
+      {
+        "kind": "AB",
+        "order": "AB"
+      },
+      {
+        "kind": "AA",
+        "order": "AB"
+      },
+      {
+        "kind": "AB",
+        "order": "BA"
+      },
+      {
+        "kind": "AB",
+        "order": "AB"
+      },
+      {
+        "kind": "AA",
+        "order": "BA"
+      },
+      {
+        "kind": "AB",
+        "order": "AB"
+      },
+      {
+        "kind": "AA",
+        "order": "AB"
+      },
+      {
+        "kind": "AA",
+        "order": "AB"
+      },
+      {
+        "kind": "AB",
+        "order": "BA"
+      },
+      {
+        "kind": "AB",
+        "order": "AB"
+      },
+      {
+        "kind": "AA",
+        "order": "BA"
+      },
+      {
+        "kind": "AA",
+        "order": "BA"
+      },
+      {
+        "kind": "AA",
+        "order": "BA"
+      },
+      {
+        "kind": "AA",
+        "order": "BA"
+      },
+      {
+        "kind": "AA",
+        "order": "BA"
+      },
+      {
+        "kind": "AA",
+        "order": "BA"
+      },
+      {
+        "kind": "AA",
+        "order": "AB"
+      },
+      {
+        "kind": "AA",
+        "order": "AB"
+      },
+      {
+        "kind": "AA",
+        "order": "BA"
+      },
+      {
+        "kind": "AA",
+        "order": "AB"
+      },
+      {
+        "kind": "AA",
+        "order": "AB"
+      },
+      {
+        "kind": "AB",
+        "order": "AB"
+      },
+      {
+        "kind": "AB",
+        "order": "AB"
+      },
+      {
+        "kind": "AA",
+        "order": "AB"
+      },
+      {
+        "kind": "AB",
+        "order": "AB"
+      },
+      {
+        "kind": "AB",
+        "order": "AB"
+      },
+      {
+        "kind": "AA",
+        "order": "BA"
+      },
+      {
+        "kind": "AB",
+        "order": "BA"
+      },
+      {
+        "kind": "AB",
+        "order": "BA"
+      },
+      {
+        "kind": "AA",
+        "order": "AB"
+      },
+      {
+        "kind": "AA",
+        "order": "BA"
+      },
+      {
+        "kind": "AB",
+        "order": "BA"
+      },
+      {
+        "kind": "AB",
+        "order": "BA"
+      },
+      {
+        "kind": "AA",
+        "order": "BA"
+      },
+      {
+        "kind": "AB",
+        "order": "AB"
+      }
+    ],
+    "pairs": [
+      {
+        "kind": "AA",
+        "order": "BA",
+        "seconds": {
+          "B": 0.046924736,
+          "A": 0.050550594
+        },
+        "log_ratio": -0.0744297396814686
+      },
+      {
+        "kind": "AA",
+        "order": "BA",
+        "seconds": {
+          "B": 0.053294247,
+          "A": 0.048231061
+        },
+        "log_ratio": 0.09982515654126323
+      },
+      {
+        "kind": "AA",
+        "order": "AB",
+        "seconds": {
+          "A": 0.047491152,
+          "B": 0.050963323
+        },
+        "log_ratio": 0.07056279713895011
+      },
+      {
+        "kind": "AA",
+        "order": "AB",
+        "seconds": {
+          "A": 0.057001086,
+          "B": 0.051350425
+        },
+        "log_ratio": -0.10439710741072016
+      },
+      {
+        "kind": "AA",
+        "order": "BA",
+        "seconds": {
+          "B": 0.051035196,
+          "A": 0.048817314
+        },
+        "log_ratio": 0.04443046733352671
+      },
+      {
+        "kind": "AA",
+        "order": "BA",
+        "seconds": {
+          "B": 0.05065598,
+          "A": 0.051016322
+        },
+        "log_ratio": -0.007088331859824662
+      },
+      {
+        "kind": "AB",
+        "order": "AB",
+        "seconds": {
+          "A": 0.050787515,
+          "B": 0.054914498
+        },
+        "log_ratio": 0.07812683713611414
+      },
+      {
+        "kind": "AA",
+        "order": "AB",
+        "seconds": {
+          "A": 0.058845904,
+          "B": 0.06187517
+        },
+        "log_ratio": 0.05019673775547572
+      },
+      {
+        "kind": "AB",
+        "order": "AB",
+        "seconds": {
+          "A": 0.056519138,
+          "B": 0.053740218
+        },
+        "log_ratio": -0.05041764671374445
+      },
+      {
+        "kind": "AB",
+        "order": "BA",
+        "seconds": {
+          "B": 0.050821899,
+          "A": 0.049338535
+        },
+        "log_ratio": 0.02962192564528463
+      },
+      {
+        "kind": "AA",
+        "order": "AB",
+        "seconds": {
+          "A": 0.04870832,
+          "B": 0.045841577
+        },
+        "log_ratio": -0.06065838330234693
+      },
+      {
+        "kind": "AB",
+        "order": "AB",
+        "seconds": {
+          "A": 0.049713604,
+          "B": 0.046531743
+        },
+        "log_ratio": -0.06614389312308665
+      },
+      {
+        "kind": "AB",
+        "order": "BA",
+        "seconds": {
+          "B": 0.04648702,
+          "A": 0.050572584
+        },
+        "log_ratio": -0.08423647743348608
+      },
+      {
+        "kind": "AB",
+        "order": "AB",
+        "seconds": {
+          "A": 0.049366687,
+          "B": 0.054650055
+        },
+        "log_ratio": 0.10167437653701186
+      },
+      {
+        "kind": "AA",
+        "order": "BA",
+        "seconds": {
+          "B": 0.048363597,
+          "A": 0.052477093
+        },
+        "log_ratio": -0.08162934793795482
+      },
+      {
+        "kind": "AB",
+        "order": "BA",
+        "seconds": {
+          "B": 0.045506924,
+          "A": 0.044657471
+        },
+        "log_ratio": 0.01884287324982377
+      },
+      {
+        "kind": "AA",
+        "order": "AB",
+        "seconds": {
+          "A": 0.049168037,
+          "B": 0.046747386
+        },
+        "log_ratio": -0.050485418176888223
+      },
+      {
+        "kind": "AB",
+        "order": "AB",
+        "seconds": {
+          "A": 0.04869211,
+          "B": 0.048239406
+        },
+        "log_ratio": -0.009340765732518616
+      },
+      {
+        "kind": "AB",
+        "order": "AB",
+        "seconds": {
+          "A": 0.047380406,
+          "B": 0.051125034
+        },
+        "log_ratio": 0.07606551168903117
+      },
+      {
+        "kind": "AB",
+        "order": "AB",
+        "seconds": {
+          "A": 0.047411514,
+          "B": 0.048401378
+        },
+        "log_ratio": 0.020663173796432375
+      },
+      {
+        "kind": "AB",
+        "order": "BA",
+        "seconds": {
+          "B": 0.046051398,
+          "A": 0.049844147
+        },
+        "log_ratio": -0.07914295673108021
+      },
+      {
+        "kind": "AB",
+        "order": "BA",
+        "seconds": {
+          "B": 0.049355216,
+          "A": 0.050721513
+        },
+        "log_ratio": -0.02730668580913136
+      },
+      {
+        "kind": "AA",
+        "order": "AB",
+        "seconds": {
+          "A": 0.050093583,
+          "B": 0.045887713
+        },
+        "log_ratio": -0.08769552545589063
+      },
+      {
+        "kind": "AB",
+        "order": "BA",
+        "seconds": {
+          "B": 0.057013068,
+          "A": 0.051497879
+        },
+        "log_ratio": 0.1017398823600955
+      },
+      {
+        "kind": "AB",
+        "order": "BA",
+        "seconds": {
+          "B": 0.049527356,
+          "A": 0.048378396
+        },
+        "log_ratio": 0.023471812950153277
+      },
+      {
+        "kind": "AB",
+        "order": "BA",
+        "seconds": {
+          "B": 0.047546845,
+          "A": 0.048386901
+        },
+        "log_ratio": -0.01751370101616317
+      },
+      {
+        "kind": "AB",
+        "order": "BA",
+        "seconds": {
+          "B": 0.048409243,
+          "A": 0.044601626
+        },
+        "log_ratio": 0.081920450803745
+      },
+      {
+        "kind": "AB",
+        "order": "BA",
+        "seconds": {
+          "B": 0.044347091,
+          "A": 0.046487171
+        },
+        "log_ratio": -0.0471292673332665
+      },
+      {
+        "kind": "AA",
+        "order": "AB",
+        "seconds": {
+          "A": 0.048226232,
+          "B": 0.041446946
+        },
+        "log_ratio": -0.15148890564559644
+      },
+      {
+        "kind": "AB",
+        "order": "AB",
+        "seconds": {
+          "A": 0.044639637,
+          "B": 0.04415832
+        },
+        "log_ratio": -0.010840828552655253
+      },
+      {
+        "kind": "AA",
+        "order": "AB",
+        "seconds": {
+          "A": 0.049282019,
+          "B": 0.048984575
+        },
+        "log_ratio": -0.0060538357199272684
+      },
+      {
+        "kind": "AB",
+        "order": "BA",
+        "seconds": {
+          "B": 0.046650235,
+          "A": 0.04594491
+        },
+        "log_ratio": 0.015234894706991582
+      },
+      {
+        "kind": "AB",
+        "order": "AB",
+        "seconds": {
+          "A": 0.049823549,
+          "B": 0.045564782
+        },
+        "log_ratio": -0.08935265018538967
+      },
+      {
+        "kind": "AA",
+        "order": "BA",
+        "seconds": {
+          "B": 0.04811792,
+          "A": 0.046033896
+        },
+        "log_ratio": 0.04427667020285312
+      },
+      {
+        "kind": "AB",
+        "order": "AB",
+        "seconds": {
+          "A": 0.046955424,
+          "B": 0.051580763
+        },
+        "log_ratio": 0.09395006676097048
+      },
+      {
+        "kind": "AA",
+        "order": "AB",
+        "seconds": {
+          "A": 0.05509849,
+          "B": 0.052559948
+        },
+        "log_ratio": -0.0471679262343035
+      },
+      {
+        "kind": "AA",
+        "order": "AB",
+        "seconds": {
+          "A": 0.045375009,
+          "B": 0.050607069
+        },
+        "log_ratio": 0.10912977916099623
+      },
+      {
+        "kind": "AB",
+        "order": "BA",
+        "seconds": {
+          "B": 0.049150054,
+          "A": 0.045763191
+        },
+        "log_ratio": 0.07139786723819884
+      },
+      {
+        "kind": "AB",
+        "order": "AB",
+        "seconds": {
+          "A": 0.045775715,
+          "B": 0.048145411
+        },
+        "log_ratio": 0.050472117049393125
+      },
+      {
+        "kind": "AA",
+        "order": "BA",
+        "seconds": {
+          "B": 0.04797311,
+          "A": 0.048990736
+        },
+        "log_ratio": -0.02099057341256997
+      },
+      {
+        "kind": "AA",
+        "order": "BA",
+        "seconds": {
+          "B": 0.047003433,
+          "A": 0.049488596
+        },
+        "log_ratio": -0.05152161759805506
+      },
+      {
+        "kind": "AA",
+        "order": "BA",
+        "seconds": {
+          "B": 0.044023028,
+          "A": 0.048330316
+        },
+        "log_ratio": -0.09334616356993207
+      },
+      {
+        "kind": "AA",
+        "order": "BA",
+        "seconds": {
+          "B": 0.045609886,
+          "A": 0.045457472
+        },
+        "log_ratio": 0.003347283717350455
+      },
+      {
+        "kind": "AA",
+        "order": "BA",
+        "seconds": {
+          "B": 0.045146492,
+          "A": 0.04818237
+        },
+        "log_ratio": -0.0650806062349415
+      },
+      {
+        "kind": "AA",
+        "order": "BA",
+        "seconds": {
+          "B": 0.045398132,
+          "A": 0.045651984
+        },
+        "log_ratio": -0.005576108387407729
+      },
+      {
+        "kind": "AA",
+        "order": "AB",
+        "seconds": {
+          "A": 0.044449493,
+          "B": 0.047304352
+        },
+        "log_ratio": 0.06224874390140536
+      },
+      {
+        "kind": "AA",
+        "order": "AB",
+        "seconds": {
+          "A": 0.044181513,
+          "B": 0.050041013
+        },
+        "log_ratio": 0.12453648552790388
+      },
+      {
+        "kind": "AA",
+        "order": "BA",
+        "seconds": {
+          "B": 0.048926377,
+          "A": 0.046270457
+        },
+        "log_ratio": 0.05581297832599424
+      },
+      {
+        "kind": "AA",
+        "order": "AB",
+        "seconds": {
+          "A": 0.049730145,
+          "B": 0.045356223
+        },
+        "log_ratio": -0.09206389971059555
+      },
+      {
+        "kind": "AA",
+        "order": "AB",
+        "seconds": {
+          "A": 0.054388536,
+          "B": 0.048997639
+        },
+        "log_ratio": -0.10438128308369041
+      },
+      {
+        "kind": "AB",
+        "order": "AB",
+        "seconds": {
+          "A": 0.048271687,
+          "B": 0.043606662
+        },
+        "log_ratio": -0.10163526145785216
+      },
+      {
+        "kind": "AB",
+        "order": "AB",
+        "seconds": {
+          "A": 0.045521701,
+          "B": 0.045833943
+        },
+        "log_ratio": 0.006835772858521046
+      },
+      {
+        "kind": "AA",
+        "order": "AB",
+        "seconds": {
+          "A": 0.045332368,
+          "B": 0.048895429
+        },
+        "log_ratio": 0.07566261290543769
+      },
+      {
+        "kind": "AB",
+        "order": "AB",
+        "seconds": {
+          "A": 0.051119093,
+          "B": 0.048306652
+        },
+        "log_ratio": -0.05658879360243524
+      },
+      {
+        "kind": "AB",
+        "order": "AB",
+        "seconds": {
+          "A": 0.050780773,
+          "B": 0.047617397
+        },
+        "log_ratio": -0.06431962103128709
+      },
+      {
+        "kind": "AA",
+        "order": "BA",
+        "seconds": {
+          "B": 0.046662306,
+          "A": 0.046984768
+        },
+        "log_ratio": -0.006886777358752531
+      },
+      {
+        "kind": "AB",
+        "order": "BA",
+        "seconds": {
+          "B": 0.04757596,
+          "A": 0.046198433
+        },
+        "log_ratio": 0.02938171188033656
+      },
+      {
+        "kind": "AB",
+        "order": "BA",
+        "seconds": {
+          "B": 0.045453133,
+          "A": 0.046435735
+        },
+        "log_ratio": -0.021387562539268174
+      },
+      {
+        "kind": "AA",
+        "order": "AB",
+        "seconds": {
+          "A": 0.049465832,
+          "B": 0.044088732
+        },
+        "log_ratio": -0.11507792900702547
+      },
+      {
+        "kind": "AA",
+        "order": "BA",
+        "seconds": {
+          "B": 0.048978915,
+          "A": 0.047713235
+        },
+        "log_ratio": 0.026181076659092098
+      },
+      {
+        "kind": "AB",
+        "order": "BA",
+        "seconds": {
+          "B": 0.043986811,
+          "A": 0.045035565
+        },
+        "log_ratio": -0.023562671970470787
+      },
+      {
+        "kind": "AB",
+        "order": "BA",
+        "seconds": {
+          "B": 0.047509956,
+          "A": 0.046865155
+        },
+        "log_ratio": 0.013664853512365202
+      },
+      {
+        "kind": "AA",
+        "order": "BA",
+        "seconds": {
+          "B": 0.045678273,
+          "A": 0.044004143
+        },
+        "log_ratio": 0.03733896957673054
+      },
+      {
+        "kind": "AB",
+        "order": "AB",
+        "seconds": {
+          "A": 0.045758663,
+          "B": 0.046424965
+        },
+        "log_ratio": 0.014456224346983139
+      }
+    ],
+    "samples": [
+      {
+        "label": "A",
+        "phase": "warmup",
+        "seconds": 0.050574608,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0000.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0000.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "warmup",
+        "seconds": 0.04979734,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0001.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0001.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.046924736,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0002.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0002.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.050550594,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0003.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0003.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.053294247,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0004.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0004.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.048231061,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0005.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0005.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.047491152,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0006.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0006.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.050963323,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0007.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0007.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.057001086,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0008.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0008.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.051350425,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0009.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0009.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.051035196,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0010.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0010.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.048817314,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0011.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0011.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.05065598,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0012.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0012.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.051016322,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0013.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0013.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.050787515,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0014.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0014.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.054914498,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0015.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0015.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.058845904,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0016.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0016.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.06187517,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0017.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0017.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.056519138,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0018.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0018.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.053740218,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0019.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0019.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.050821899,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0020.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0020.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.049338535,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0021.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0021.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.04870832,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0022.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0022.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.045841577,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0023.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0023.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.049713604,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0024.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0024.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.046531743,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0025.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0025.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.04648702,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0026.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0026.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.050572584,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0027.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0027.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.049366687,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0028.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0028.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.054650055,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0029.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0029.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.048363597,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0030.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0030.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.052477093,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0031.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0031.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.045506924,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0032.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0032.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.044657471,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0033.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0033.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.049168037,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0034.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0034.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.046747386,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0035.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0035.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.04869211,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0036.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0036.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.048239406,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0037.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0037.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.047380406,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0038.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0038.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.051125034,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0039.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0039.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.047411514,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0040.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0040.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.048401378,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0041.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0041.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.046051398,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0042.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0042.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.049844147,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0043.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0043.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.049355216,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0044.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0044.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.050721513,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0045.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0045.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.050093583,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0046.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0046.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.045887713,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0047.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0047.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.057013068,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0048.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0048.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.051497879,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0049.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0049.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.049527356,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0050.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0050.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.048378396,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0051.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0051.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.047546845,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0052.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0052.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.048386901,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0053.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0053.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.048409243,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0054.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0054.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.044601626,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0055.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0055.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.044347091,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0056.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0056.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.046487171,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0057.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0057.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.048226232,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0058.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0058.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.041446946,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0059.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0059.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.044639637,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0060.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0060.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.04415832,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0061.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0061.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.049282019,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0062.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0062.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.048984575,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0063.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0063.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.046650235,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0064.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0064.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.04594491,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0065.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0065.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.049823549,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0066.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0066.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.045564782,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0067.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0067.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.04811792,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0068.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0068.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.046033896,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0069.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0069.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.046955424,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0070.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0070.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.051580763,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0071.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0071.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.05509849,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0072.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0072.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.052559948,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0073.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0073.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.045375009,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0074.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0074.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.050607069,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0075.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0075.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.049150054,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0076.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0076.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.045763191,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0077.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0077.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.045775715,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0078.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0078.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.048145411,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0079.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0079.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.04797311,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0080.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0080.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.048990736,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0081.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0081.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.047003433,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0082.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0082.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.049488596,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0083.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0083.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.044023028,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0084.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0084.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.048330316,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0085.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0085.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.045609886,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0086.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0086.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.045457472,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0087.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0087.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.045146492,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0088.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0088.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.04818237,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0089.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0089.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.045398132,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0090.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0090.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.045651984,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0091.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0091.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.044449493,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0092.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0092.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.047304352,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0093.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0093.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.044181513,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0094.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0094.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.050041013,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0095.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0095.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.048926377,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0096.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0096.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.046270457,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0097.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0097.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.049730145,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0098.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0098.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.045356223,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0099.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0099.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.054388536,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0100.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0100.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.048997639,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0101.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0101.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.048271687,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0102.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0102.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.043606662,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0103.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0103.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.045521701,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0104.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0104.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.045833943,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0105.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0105.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.045332368,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0106.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0106.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.048895429,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0107.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0107.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.051119093,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0108.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0108.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.048306652,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0109.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0109.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.050780773,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0110.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0110.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.047617397,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0111.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0111.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.046662306,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0112.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0112.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.046984768,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0113.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0113.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.04757596,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0114.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0114.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.046198433,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0115.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0115.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.045453133,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0116.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0116.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.046435735,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0117.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0117.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.049465832,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0118.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0118.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.044088732,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0119.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0119.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.048978915,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0120.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0120.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.047713235,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0121.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0121.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.043986811,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0122.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0122.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.045035565,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0123.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0123.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.047509956,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0124.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0124.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.046865155,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0125.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0125.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.045678273,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0126.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0126.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AA",
+        "seconds": 0.044004143,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0127.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0127.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "A",
+        "phase": "AB",
+        "seconds": 0.045758663,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0128.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0128.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      },
+      {
+        "label": "B",
+        "phase": "AB",
+        "seconds": 0.046424965,
+        "exit_code": 0,
+        "command": [
+          "taskset",
+          "-c",
+          "2",
+          "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2/source/target/release/rose",
+          "solve",
+          "tests/fixtures/degen2.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "640",
+          "--output",
+          "target/perf-cgu1-degen2/screen-65117.raw/0129.json"
+        ],
+        "result": "target/perf-cgu1-degen2/screen-65117.raw/0129.json",
+        "result_sha256": "2de8b84192845edffc162a0a698b75bbc9305331636d6f5794881507db603674"
+      }
+    ],
+    "rule": "one-sided sign p<=.01; AA two-sided sign p>.05; median gain>=0.5%; AB 95% median upper bound < negative max absolute AA 95% bound; both orders improve",
+    "status": "complete",
+    "binary_end_sha256": {
+      "A": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+      "B": "05dc07287bc19c1f6c7f4129d894edf7c00b79239263725dd12b9ab7945c6d76"
+    },
+    "summary": {
+      "ab_median_percent": 1.0303027604789166,
+      "ab_ci_percent": [
+        -2.6937228784953637,
+        2.981761307791553
+      ],
+      "aa_median_percent": -0.6963198412682637,
+      "aa_ci_percent": [
+        -6.300806705855266,
+        4.527151036705667
+      ],
+      "improving_pairs": 15,
+      "pairs_per_kind": 32,
+      "ab_sign_p": 0.7016925520729274,
+      "aa_sign_p": 0.37708558747544885,
+      "order_median_percent": {
+        "AB": -0.12517123907089955,
+        "BA": 1.455477821525163
+      },
+      "criteria": {
+        "sign_p_at_most_001": false,
+        "aa_not_biased_at_005": true,
+        "median_gain_at_least_half_percent": false,
+        "ab_upper_ci_below_aa_error": false,
+        "both_orders_improve": false
+      },
+      "positive_screen": false
+    }
+  },
+  "fast_parity": "940/940",
+  "source_unchanged": true,
+  "full_parity_tests_regression_sweep": "Notrun; firstscreeninconclusive",
+  "artifacts": "/home/derekwang/rose-reverse-engineer/rose/target/perf-cgu1-degen2"
+}

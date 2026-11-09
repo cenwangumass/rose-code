@@ -1,0 +1,702 @@
+{
+  "scope": "Isolated fixed39 PGO/system-TCMalloc instrumentation; not accepted-build stage shares or optimization results",
+  "builds": {
+    "plain": {
+      "argv": [
+        "cargo",
+        "build",
+        "--release",
+        "--features",
+        "system-tcmalloc",
+        "--bin",
+        "rose"
+      ],
+      "cwd": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/source",
+      "env": {
+        "CARGO_ENCODED_RUSTFLAGS": "-Cllvm-args=--align-loops=64\u001f-Cprofile-use=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/source/target/perf-pgo/a018c80fcf31c7a35a87d9f7be872b8f6174a92969af2c801ed4dc8a2581e46b.profdata",
+        "CARGO_TARGET_DIR": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-followup/plain-build",
+        "LIBRARY_PATH": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/sysroot/usr/lib/x86_64-linux-gnu",
+        "LD_LIBRARY_PATH": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/sysroot/usr/lib/x86_64-linux-gnu"
+      },
+      "binary_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb"
+    },
+    "probe": {
+      "argv": [
+        "cargo",
+        "build",
+        "--release",
+        "--features",
+        "system-tcmalloc",
+        "--bin",
+        "rose"
+      ],
+      "cwd": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-followup/source",
+      "env": {
+        "CARGO_ENCODED_RUSTFLAGS": "-Cllvm-args=--align-loops=64\u001f-Cprofile-use=/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/source/target/perf-pgo/a018c80fcf31c7a35a87d9f7be872b8f6174a92969af2c801ed4dc8a2581e46b.profdata",
+        "CARGO_TARGET_DIR": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-followup/probe-build",
+        "LIBRARY_PATH": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/sysroot/usr/lib/x86_64-linux-gnu",
+        "LD_LIBRARY_PATH": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/sysroot/usr/lib/x86_64-linux-gnu"
+      },
+      "binary_sha256": "554d5adb0b71fd1f6c438c8b9c8f2afd4f13545899ee89fcb7081e746d6844cb"
+    }
+  },
+  "source_reconstruction": {
+    "files": [
+      "dual.rs",
+      "ftran_order.rs",
+      "lu.rs",
+      "lib.rs",
+      "bin/rose.rs"
+    ],
+    "literal_reconstruction": true,
+    "probe_sources": {
+      "src/quad_row_audit.rs": "b3860aa59ae7664a0632af9d7087ee851e58f3efd511626c8c67dc6014b5a16e",
+      "src/quad_change.rs": "a0d6b5d3eae9db4fbfc93a4432c21c142eb67c6aacde8c570f3a97395a599ad0",
+      "src/chol_child_oracle.rs": "461b859ceb95785d6c3f0e79f04933958e3dc423f9e855e37a2efbbf7032f082",
+      "src/verify.rs": "628c76c64368c93d32902ccf83464cfe7a9f89448f148a940453d22723cee8a2",
+      "src/barrier.rs": "05291d4b59fa02c7bab4802e20db42be517f529f34ac8c5ef112344f6d8dd0cf",
+      "src/chol_rect_oracle.rs": "f2acbde88b2fe00906e52941a36867a40b6a910aaad307481bbb5885352b4f09",
+      "src/work.rs": "6d1f1ff38e6b7af5d833713190c275b46b110efd6242315676eb378d01e5ed24",
+      "src/lib.rs": "19ba4c41a1b25eb50617fd2ac040c4bbde0d579719f967b1cdf1886b79731a81",
+      "src/early.rs": "80e17a00737161a5eb8eed6210ab8577b2d408945b3e8db7c5e6f9a49692b3ed",
+      "src/sgemm32.rs": "9b729ec25481c1ec2d22ded132863f5921d7d0a0451594f776d42e006c3d6dfc",
+      "src/ftran_order.rs": "14926538f075a5ebc3a625f1ef44d4b38a7f6e321eec9f1d1c3044da99a91f54",
+      "src/simplex.rs": "4ff9697cd5627beccce151d2eb03a84852a149dcb39a7249606a6e363c155ac6",
+      "src/chol.rs": "158e393ca8dc6aef7f98482ca9f4609b49d2df00b03978310873e333ebf51bea",
+      "src/quad_cost.rs": "00116dcb8a6b6e4112717f111f3b865beb9857e4ab4d71436dd37fc7dd0a7521",
+      "src/primal_rhs_perturb.rs": "ff692cc51479e3d825c70b1d15861c275cdda7c73221df7949a52dfe2e6275ff",
+      "src/f80.rs": "2a20a41d94ff36934fb84375886b1ac0fbf1b35dd7bb29f3d009e0b95e35aa70",
+      "src/scale.rs": "1e0deac05e78ac048d1fdd8cb3421ae45d88b57768901bba759a99fd52dc63f1",
+      "src/stage_diag.rs": "8fca1bcd11030d22a6416116928fb66844f8caa70e382ab6e317a09e2bee9040",
+      "src/lu_pairs.rs": "8549f681e432888ffbde8ccaf9113e24fa1760c2962db852d069b7729e2ae2b9",
+      "src/pdhg.rs": "bd2944b7011736e3f3e9a1bf6fc47468a997ae3c505f051a6687a76e8e2682e0",
+      "src/quad_fresh.rs": "8adca530373406e9e48de19d179f7cc0b232d0ed1b964c4ef131b90a1a3b9079",
+      "src/lu.rs": "b9fa1fd4854aef5acc4dc30c3b6d1ff0b9dd4ffd4d8538b195d4dcedd32a2e90",
+      "src/mps.rs": "970ab51460301ca4d1e06aee0d268c96882bd2d58de37aaacea6484735c3b0ba",
+      "src/chol_rect_packet.rs": "d00c064a281b321d5018a58337496226d3beb29c3050cbb27eec9b5e6f5403a7",
+      "src/order.rs": "a4746d44a9022b37884852f37d52b8dd9a710dd8c2b96e32734044a99025b857",
+      "src/lu_order.rs": "530ff158c6d8c1263ed4317ad6d67d3bd6a8509bbc4e55b4c5a3e00bdfa89123",
+      "src/chol_factor_oracle.rs": "ebdbb1d57b60c7084b81ea923056b09e0344b182a37bf5690ef886d24c495f81",
+      "src/quad_row.rs": "ff49da21c8788d4cb03936fd61e60011cff4af048c94373295feb9a568029910",
+      "src/real.rs": "9399212fbe9de003ae4e70b44c850fa7a0459b8c2f8d19ec538c15286cb23918",
+      "src/quad_main.rs": "812880569bab4a597f916d2b75fd75e9512262646b91cc2dbae4475746cbd545",
+      "src/model.rs": "2116c56536cc2a46923734a42afa79de087083dd265b0b8915fcc52d1c028654",
+      "src/chol_child_program.rs": "ceea4df4a8f9dfb25b11a1cfaddd9744eb372c1b6d9b4df0814bba37ef1fa2cb",
+      "src/dual.rs": "bc974afeba0b23de44f49b712f495678f7622cba6a42510276dab222bd359132",
+      "src/chol_gemm_destination.rs": "412987255d14117b4605d601975a99ba5bbdd8d5b50953585cf2cce1601ef86f",
+      "src/btran_oracle.rs": "bd92e94286dd5da076f5e94fe3f857a6637fa19d10b1f109efbfdea6af7f79d1",
+      "src/method.rs": "e70e94e648cd3913e269340388a7a891160ab42165883c48dcc6c98a66b14fa6",
+      "src/dump.rs": "1cb1ab3b535c4a0648ed126f061f719e3b33a3c845af28819203a3f1051415ce",
+      "src/basis.rs": "babc01e8dde812261d2096c271f8db5d8d5fd436a569facdc2592272d8897a4e",
+      "src/bin/rose-parity.rs": "41d3fe0a35bbddfc64fa99b0499af85075654715f8d02c8abce8c728b73d2993",
+      "src/bin/rose.rs": "bb0cec7e378d3fd316f1cda8f222e6180718b82fce2193ea174398bbbd3b3893",
+      "src/barrier/extended.rs": "34c076e795029c46d920b43b960c37cab8f1e9939af03df750ae65d1769b3393",
+      "src/pdhg/ordered.rs": "42a080cb036d7fdfd603110b1a1f24d89b596242687adc8c82f40db036a9f853",
+      "src/pdhg/forward.rs": "d6aa78f846da0f8864fc4b7a0d2bb750ea30a2657d82b799f7b656ad7638bbd1"
+    }
+  },
+  "stages": {
+    "factor_update_refactor": {
+      "entries": 1257,
+      "requested_entries": 1273,
+      "alloc_calls": 93134,
+      "realloc_calls": 34643,
+      "free_calls": 92864,
+      "requested_bytes": 17219182,
+      "mean_ms": 17.5345945,
+      "timer_ms_range": [
+        16.185972,
+        18.592102
+      ],
+      "mean_instructions": 62764054,
+      "mean_user_cycles": 55890850.875,
+      "fraction_of_diagnostic_timer_scope": 0.3548404656099237,
+      "self_instructions_per_stage_entry": 49931.62609387431,
+      "self_user_cycles_per_stage_entry": 44463.68406921241
+    },
+    "ftran_btran": {
+      "entries": 2034,
+      "requested_entries": 2482,
+      "alloc_calls": 20147,
+      "realloc_calls": 9958,
+      "free_calls": 16457,
+      "requested_bytes": 24056064,
+      "mean_ms": 17.25709175,
+      "timer_ms_range": [
+        16.433055,
+        17.998997
+      ],
+      "mean_instructions": 76666609.5,
+      "mean_user_cycles": 58150056.5,
+      "fraction_of_diagnostic_timer_scope": 0.34922475519141166,
+      "self_instructions_per_stage_entry": 37692.53171091445,
+      "self_user_cycles_per_stage_entry": 28589.01499508358
+    },
+    "pivot_state": {
+      "entries": 1273,
+      "requested_entries": 3890,
+      "alloc_calls": 19207,
+      "realloc_calls": 8731,
+      "free_calls": 18714,
+      "requested_bytes": 20656428,
+      "mean_ms": 11.21614475,
+      "timer_ms_range": [
+        10.451226,
+        11.708292
+      ],
+      "mean_instructions": 45112898.25,
+      "mean_user_cycles": 40055778.125,
+      "fraction_of_diagnostic_timer_scope": 0.22697656483805778,
+      "self_instructions_per_stage_entry": 35438.254713275724,
+      "self_user_cycles_per_stage_entry": 31465.65445797329
+    },
+    "pricing_ratio": {
+      "entries": 1892,
+      "requested_entries": 1892,
+      "alloc_calls": 3600,
+      "realloc_calls": 1710,
+      "free_calls": 3505,
+      "requested_bytes": 402952,
+      "mean_ms": 1.469624,
+      "timer_ms_range": [
+        1.40987,
+        1.527869
+      ],
+      "mean_instructions": 5552623.125,
+      "mean_user_cycles": 5907191.875,
+      "fraction_of_diagnostic_timer_scope": 0.029740183865188247,
+      "self_instructions_per_stage_entry": 2934.7902352008455,
+      "self_user_cycles_per_stage_entry": 3122.1944371035943
+    },
+    "setup_initial": {
+      "entries": 1,
+      "requested_entries": 0,
+      "alloc_calls": 9683,
+      "realloc_calls": 1349,
+      "free_calls": 3854,
+      "requested_bytes": 1893304,
+      "mean_ms": 1.43439225,
+      "timer_ms_range": [
+        1.249739,
+        1.607206
+      ],
+      "mean_instructions": 4593458.5,
+      "mean_user_cycles": 2916722.875,
+      "fraction_of_diagnostic_timer_scope": 0.029027213253050483,
+      "self_instructions_per_stage_entry": 4593458.5,
+      "self_user_cycles_per_stage_entry": 2916722.875
+    },
+    "termination": {
+      "entries": 1,
+      "requested_entries": 0,
+      "alloc_calls": 550,
+      "realloc_calls": 7,
+      "free_calls": 8289,
+      "requested_bytes": 111986,
+      "mean_ms": 0.2242895,
+      "timer_ms_range": [
+        0.179344,
+        0.260856
+      ],
+      "mean_instructions": 844848.25,
+      "mean_user_cycles": 741451.125,
+      "fraction_of_diagnostic_timer_scope": 0.004538855495712603,
+      "self_instructions_per_stage_entry": 844848.25,
+      "self_user_cycles_per_stage_entry": 741451.125
+    },
+    "unattributed": {
+      "entries": 1,
+      "requested_entries": 0,
+      "alloc_calls": 8,
+      "realloc_calls": 0,
+      "free_calls": 2638,
+      "requested_bytes": 18120,
+      "mean_ms": 0.279294125,
+      "timer_ms_range": [
+        0.229873,
+        0.365096
+      ],
+      "mean_instructions": 864977.625,
+      "mean_user_cycles": 1665345.75,
+      "fraction_of_diagnostic_timer_scope": 0.005651961746655518,
+      "self_instructions_per_stage_entry": 864977.625,
+      "self_user_cycles_per_stage_entry": 1665345.75
+    }
+  },
+  "modes": {
+    "plain": {
+      "median_ms": 48.42172,
+      "mean_ms": 48.62404575,
+      "range_ms": [
+        45.436209999999996,
+        53.224095
+      ],
+      "runs": 8,
+      "whole_process_mean_instructions": 196693418.125,
+      "whole_process_median_instructions": 196683541.5,
+      "whole_process_mean_cycles": 155971498.75
+    },
+    "off": {
+      "median_ms": 49.719684,
+      "mean_ms": 48.41738925,
+      "range_ms": [
+        43.296983999999995,
+        50.895164
+      ],
+      "runs": 8,
+      "whole_process_mean_instructions": 204852677.0,
+      "whole_process_median_instructions": 204863968.0,
+      "whole_process_mean_cycles": 154279765.375
+    },
+    "timers-noalloc": {
+      "median_ms": 47.901064500000004,
+      "mean_ms": 49.316443625,
+      "range_ms": [
+        45.378423,
+        56.762971
+      ],
+      "runs": 8,
+      "whole_process_mean_instructions": 208893521.625,
+      "whole_process_median_instructions": 208906302.0,
+      "whole_process_mean_cycles": 161224714.625
+    },
+    "timers": {
+      "median_ms": 50.162194,
+      "mean_ms": 49.41473575,
+      "range_ms": [
+        46.379348,
+        51.940854
+      ],
+      "runs": 8,
+      "whole_process_mean_instructions": 211415618.125,
+      "whole_process_median_instructions": 211416528.5,
+      "whole_process_mean_cycles": 160327420.625
+    },
+    "pmu": {
+      "median_ms": 116.35030549999999,
+      "mean_ms": 115.124855,
+      "range_ms": [
+        107.67950499999999,
+        119.71347300000001
+      ],
+      "runs": 8
+    }
+  },
+  "totals": {
+    "mean_timer_ms": 49.415430875,
+    "mean_instructions": 196399469.25,
+    "mean_user_cycles": 165327397.125,
+    "stage_transitions": 12915,
+    "requested_allocation_bytes": 64358036,
+    "alloc_calls": 146329,
+    "realloc_calls": 56398,
+    "free_calls": 146321
+  },
+  "calibration_per_transition": {
+    "timers-noalloc": {
+      "ns": 52.65288471152885,
+      "instructions": 0.0,
+      "cycles": 0.0,
+      "approx_external_instructions_per_transition": 250.7894210578942
+    },
+    "timers": {
+      "ns": 52.792920707929206,
+      "instructions": 0.0,
+      "cycles": 0.0,
+      "approx_external_instructions_per_transition": 250.89663533646635
+    },
+    "pmu": {
+      "ns": 4421.752849715029,
+      "instructions": 301.0037746225377,
+      "cycles": 420.2931206879312
+    }
+  },
+  "pmu_multiplexing": "all8 solve scopes enabled==running",
+  "alignment": {
+    "CPU": 3,
+    "diagnostic_only": true,
+    "probe_sha256": "554d5adb0b71fd1f6c438c8b9c8f2afd4f13545899ee89fcb7081e746d6844cb",
+    "trace_cap20": "isolated probe CLI, no comparator schedule override; requested comparator schedule [16, 37, 82, 167, 228, 278, 316, 356, 396, 436, 486, 536, 586] exit 3\nbounded prefix 1..20 agrees (state and decisions); rose stopped at iteration limit 20, reference has 637 calls\n",
+    "trace_cap640": "isolated probe CLI, no comparator schedule override; requested comparator schedule [16, 37, 82, 167, 228, 278, 316, 356, 396, 436, 486, 536, 586] exit 0\ncalls 1..637 agree (state and decisions); reference 637 calls, rose 637; refactorization schedule [16, 37, 82, 167, 228, 278, 316, 356, 396, 436, 486, 536, 586]\n",
+    "factor_cap640": "isolated probe CLI, no comparator schedule override; requested comparator schedule None exit 0\npost-setup factors 1..15 agree (iteration and cause); reference/rose factors 15/15; scheduled requests 2/10 are not distinguished in rose\n",
+    "method_counts": [
+      {
+        "file": "dual.rs",
+        "method": "price",
+        "stage": "PRICE",
+        "count": 637
+      },
+      {
+        "file": "dual.rs",
+        "method": "ratio_test",
+        "stage": "PRICE",
+        "count": 634
+      },
+      {
+        "file": "dual.rs",
+        "method": "forced_ratio",
+        "stage": "PRICE",
+        "count": 0
+      },
+      {
+        "file": "dual.rs",
+        "method": "forced_ratio_chosen",
+        "stage": "PRICE",
+        "count": 0
+      },
+      {
+        "file": "dual.rs",
+        "method": "touch_pricing",
+        "stage": "PRICE",
+        "count": 621
+      },
+      {
+        "file": "dual.rs",
+        "method": "iteration",
+        "stage": "ROW",
+        "count": 637
+      },
+      {
+        "file": "dual.rs",
+        "method": "post_inner",
+        "stage": "ROW",
+        "count": 636
+      },
+      {
+        "file": "dual.rs",
+        "method": "pivot_row",
+        "stage": "ROW",
+        "count": 634
+      },
+      {
+        "file": "dual.rs",
+        "method": "row_product_work",
+        "stage": "ROW",
+        "count": 634
+      },
+      {
+        "file": "dual.rs",
+        "method": "update_weights",
+        "stage": "ROW",
+        "count": 634
+      },
+      {
+        "file": "dual.rs",
+        "method": "update_primal_and_weights",
+        "stage": "ROW",
+        "count": 621
+      },
+      {
+        "file": "dual.rs",
+        "method": "true_d",
+        "stage": "ROW",
+        "count": 17
+      },
+      {
+        "file": "dual.rs",
+        "method": "recompute_d",
+        "stage": "ROW",
+        "count": 15
+      },
+      {
+        "file": "dual.rs",
+        "method": "recompute_xb",
+        "stage": "ROW",
+        "count": 16
+      },
+      {
+        "file": "dual.rs",
+        "method": "recompute_flags",
+        "stage": "ROW",
+        "count": 16
+      },
+      {
+        "file": "dual.rs",
+        "method": "shift_wrong_d",
+        "stage": "ROW",
+        "count": 15
+      },
+      {
+        "file": "dual.rs",
+        "method": "set_level",
+        "stage": "ROW",
+        "count": 15
+      },
+      {
+        "file": "dual.rs",
+        "method": "refactor",
+        "stage": "FACTOR",
+        "count": 15
+      },
+      {
+        "file": "ftran_order.rs",
+        "method": "ftran_with",
+        "stage": "FB",
+        "count": 747
+      },
+      {
+        "file": "ftran_order.rs",
+        "method": "ftran_needed",
+        "stage": "FB",
+        "count": 634
+      },
+      {
+        "file": "ftran_order.rs",
+        "method": "btran",
+        "stage": "FB",
+        "count": 1095
+      },
+      {
+        "file": "ftran_order.rs",
+        "method": "update",
+        "stage": "FACTOR",
+        "count": 621
+      },
+      {
+        "file": "lu.rs",
+        "method": "ftran",
+        "stage": "FB",
+        "count": 5
+      },
+      {
+        "file": "lu.rs",
+        "method": "btran",
+        "stage": "FB",
+        "count": 1
+      },
+      {
+        "file": "lu.rs",
+        "method": "update_column",
+        "stage": "FACTOR",
+        "count": 621
+      },
+      {
+        "file": "dual.rs",
+        "method": "reset_pricing",
+        "stage": "FACTOR",
+        "count": 16
+      }
+    ],
+    "final_vs_accepted": "complete result and exit agree; all floating-point fields checked bitwise after deleting only timer",
+    "final_vs_reference": {
+      "x": {
+        "length": 534,
+        "bit_differences": 0
+      },
+      "dual": {
+        "length": 444,
+        "bit_differences": 0
+      },
+      "reduced_cost": {
+        "length": 534,
+        "bit_differences": 0
+      }
+    },
+    "note": "Setup and termination phase override nested guards, so method invocation totals are not per-stage invocation counts. Sidecars include trace/dump work and must not support performance claims."
+  },
+  "all_records": {
+    "3": {
+      "result_exit_equal": true,
+      "all_records_equal": false,
+      "dump_records": null
+    },
+    "20": {
+      "result_exit_equal": true,
+      "all_records_equal": true,
+      "dump_records": 1002
+    },
+    "640": {
+      "result_exit_equal": true,
+      "all_records_equal": true,
+      "dump_records": 17201
+    }
+  },
+  "parity": "987/987 full frozen parity, ROSE_STAGE_MODE=pmu,77.0s",
+  "methods": [
+    {
+      "file": "dual.rs",
+      "method": "price",
+      "stage": "PRICE",
+      "calls": 637
+    },
+    {
+      "file": "dual.rs",
+      "method": "ratio_test",
+      "stage": "PRICE",
+      "calls": 634
+    },
+    {
+      "file": "dual.rs",
+      "method": "forced_ratio",
+      "stage": "PRICE",
+      "calls": 0
+    },
+    {
+      "file": "dual.rs",
+      "method": "forced_ratio_chosen",
+      "stage": "PRICE",
+      "calls": 0
+    },
+    {
+      "file": "dual.rs",
+      "method": "touch_pricing",
+      "stage": "PRICE",
+      "calls": 621
+    },
+    {
+      "file": "dual.rs",
+      "method": "iteration",
+      "stage": "ROW",
+      "calls": 637
+    },
+    {
+      "file": "dual.rs",
+      "method": "post_inner",
+      "stage": "ROW",
+      "calls": 636
+    },
+    {
+      "file": "dual.rs",
+      "method": "pivot_row",
+      "stage": "ROW",
+      "calls": 634
+    },
+    {
+      "file": "dual.rs",
+      "method": "row_product_work",
+      "stage": "ROW",
+      "calls": 634
+    },
+    {
+      "file": "dual.rs",
+      "method": "update_weights",
+      "stage": "ROW",
+      "calls": 634
+    },
+    {
+      "file": "dual.rs",
+      "method": "update_primal_and_weights",
+      "stage": "ROW",
+      "calls": 621
+    },
+    {
+      "file": "dual.rs",
+      "method": "true_d",
+      "stage": "ROW",
+      "calls": 17
+    },
+    {
+      "file": "dual.rs",
+      "method": "recompute_d",
+      "stage": "ROW",
+      "calls": 15
+    },
+    {
+      "file": "dual.rs",
+      "method": "recompute_xb",
+      "stage": "ROW",
+      "calls": 16
+    },
+    {
+      "file": "dual.rs",
+      "method": "recompute_flags",
+      "stage": "ROW",
+      "calls": 16
+    },
+    {
+      "file": "dual.rs",
+      "method": "shift_wrong_d",
+      "stage": "ROW",
+      "calls": 15
+    },
+    {
+      "file": "dual.rs",
+      "method": "set_level",
+      "stage": "ROW",
+      "calls": 15
+    },
+    {
+      "file": "dual.rs",
+      "method": "refactor",
+      "stage": "FACTOR",
+      "calls": 15
+    },
+    {
+      "file": "ftran_order.rs",
+      "method": "ftran_with",
+      "stage": "FB",
+      "calls": 747
+    },
+    {
+      "file": "ftran_order.rs",
+      "method": "ftran_needed",
+      "stage": "FB",
+      "calls": 634
+    },
+    {
+      "file": "ftran_order.rs",
+      "method": "btran",
+      "stage": "FB",
+      "calls": 1095
+    },
+    {
+      "file": "ftran_order.rs",
+      "method": "update",
+      "stage": "FACTOR",
+      "calls": 621
+    },
+    {
+      "file": "lu.rs",
+      "method": "ftran",
+      "stage": "FB",
+      "calls": 5
+    },
+    {
+      "file": "lu.rs",
+      "method": "btran",
+      "stage": "FB",
+      "calls": 1
+    },
+    {
+      "file": "lu.rs",
+      "method": "update_column",
+      "stage": "FACTOR",
+      "calls": 621
+    },
+    {
+      "file": "dual.rs",
+      "method": "reset_pricing",
+      "stage": "FACTOR",
+      "calls": 16
+    }
+  ],
+  "artifacts": {
+    "base": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-followup",
+    "measurements": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-followup/measurement",
+    "parity": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-followup/full-parity.log",
+    "numeric_source": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-followup/source/src"
+  },
+  "findings": {
+    "ownership_policy": "Setup is full solve entry through before first driver loop; termination is after loop through construction and destruction. These lifecycle phases override nested operation scopes. In-loop FTRAN/BTRAN and factor scopes override pivot/controller scopes. reset_pricing belongs setup or factor; selection/ratio/touch_pricing belong pricing. Inlined arithmetic/allocation/copy/bookkeeping and allocator descendants stay inside their owning exclusive scopes. Unattributed includes outside-guard loop control and pivot-object retirement.",
+    "memory": "Allocator wrapper forwards unchanged to System, which binds to qualified TCMalloc. Counts are Rust GlobalAlloc invocations, not proof of all private native allocation. Requested bytes sum allocation sizes and realloc target sizes: not live memory, actual moved bytes or RSS. Copy/memset work is included by scope but not separately byte-counted or timed. Factor stage owns127777/202727 allocation+growth calls (63.03%);17.219MB requested, not proof these calls dominate factor time.",
+    "calibration": "Timer-only boundary ~52.8ns, PMU boundary~4.422us. Calibrated12915 transitions imply ~.68ms timer scope cost and ~57ms PMU wall cost. PMU-enabled wall attribution excluded. Calibration includes empty control and cannot exactly subtract site-specific overhead. Timer sample stages remain raw inclusive of counters/allocator tracking. Whole-process instruction skew separates compiled-off, timer/noallocation, allocation-counter and PMU modes; no per-stage cost shares transferred to accepted ELF.",
+    "reconciliation": "All seven exclusive stages sum each measured diagnostic solve; timer arithmetic means sum49.415ms, not a sum of medians. PMU means separately sum all user instructions/cycles and exclude kernel; enabled/running identical. Extra timer/Pmu/system costs are not solver excess. Prior accepted stage table remains coarse and cannot be replaced by instrumented numbers; reference scopes are sampled self rather than matching inclusive stages. Timer-sidecar mean49.415431ms vs CLI mean49.414736ms differs0.000695ms from bracket/report boundaries. Stage user counters sum196.399469M instructions/165.327397M cycles. No PMU wall times are used in the time-share table.",
+    "calls_correction": "Prior1094 BTRAN and747 full FTRAN counts were booked/corresponding mirror operations. Physical Rose:747mirror full FTRAN+634needed+5auxiliary FTRAN;1095mirror BTRAN+1auxiliary BTRAN. Five auxiliary FTRANs from fresh_objective; two final BTRAN implementations owned termination. This overturns the unqualified claim that all physical invocation counts matched; most corresponding mirror pivots/operations and all states still match.",
+    "cost_per_entry": "entries are exclusive-stage transitions, not operation-equivalent logical invocations. Per-entry instruction/cycle numbers are descriptive. Mixed634ratio/637selection/621touch and621paired updates+15refactors must not be equated with a single homogeneous kernel.",
+    "diagnosis": "Within this diagnostic ELF, factor update/refactor and FTRAN/BTRAN dominate solve time at about35% each; pivot/state about23%; pricing/ratio about3%. Setup+termination about3.4%, and residual about.57%. Factor/Pivot own most allocations. This closes lifecycle attribution for this build, not the accepted cross-solver cycle gap. Memory traffic and ownership are included, not shown removable. Five extra auxiliary FTRANs and two final BTRANs are measurable multiplicity differences but their individual exclusive costs were not isolated.",
+    "next_experiment": "If continuing diagnosis, split the factor stage into successful paired updates, subsequent factorization construction, pricing-weight reconstruction and factor publication/retirement; retain same original lifetimes and full-stage totals as oracle. This is measurement only. Do not reopen existing arena/workspace/publication, eta, dense-L or fixed-row-scatter prototypes from these counts.",
+    "limitations": "Existing profile reused unchanged for added instrumentation; PGO flow-mismatch warnings retained. Plain control is byte-identical; diagnostic compiled-off code and GlobalAlloc forwarding differ in codegen/cost, quantified separately. No matching reference inclusive timing measurement performed, so no precise per-stage Rose/reference gap or removable-time bound is claimed.",
+    "instruction_skew_percent": {
+      "compiled_off": 4.14821144132782,
+      "timer_without_allocation_census": 6.202598753074051,
+      "timer_with_allocation_census": 7.484846285321023
+    },
+    "allocation_count_interpretation": "No allocation timing subtraction: all allocator/copy descendants stay inside owning stage. The separate census cost is about2.522M whole-process instructions (timers minus timers-noalloc). 146329 allocation calls+56398 reallocations,146321 frees,64.358MB summed requests. This is not a distinct measured removable allocator-time stage."
+  },
+  "hash_preservation": {
+    "target/release/rose": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "target/perf-optimized-build/rose-pgo-tcmalloc": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "target/perf-reference/reconstructed/libgurobi130.so": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30"
+  },
+  "later_strict_kernel_qualification": "degen2-triangular-kernel-diagnosis.json: kernel outputbits agree through162 pivots, first\u22120/+0 atneededpivot163. Earlier637state comparison treated signedzeros equal; finalvectors stillbitwise equal. Do not infer allinternalreferencebitidentity."
+}

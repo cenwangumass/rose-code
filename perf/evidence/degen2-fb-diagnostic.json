@@ -1,0 +1,813 @@
+{
+  "scope": "Bounded diagnostic synthesis of completed stage accounting, cached strict comparisons, accepted-binary profiles, and complete FTRAN transaction instruction accounting. No solver optimization or new instrumentation.",
+  "configuration": "Qualified optimized accepted ELF55af6617/systemTCMalloc vs reference26a50517. New rootkernel scopes are a separate diagnostic ELF39f6d08d using same originalsource/fixed39 profile. Trace-only ELF0100f699 is separate and excluded from all costs. CPU2costs,CPU3traces,cap640(634iterations).",
+  "new_validation": {
+    "argv": [
+      "timeout",
+      "10s",
+      "taskset",
+      "-c",
+      "2",
+      "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+      "solve",
+      "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen2.mps",
+      "--method",
+      "dual",
+      "--profile",
+      "release",
+      "--max-iterations",
+      "20",
+      "--output",
+      "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-fb-audit/bounded20.json"
+    ],
+    "exit": 3,
+    "result_including_zero_sign_matches_cached": true,
+    "hashes": {
+      "target/release/rose": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+      "target/perf-optimized-build/rose-pgo-tcmalloc": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+      "target/perf-reference/reconstructed/libgurobi130.so": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30"
+    },
+    "new_performance_claim": false
+  },
+  "alignment": {
+    "central_tool": "../reverse-engineer/tools/compare.py",
+    "delegate": "/root/ref_compare",
+    "strict_matched_pivots": 162,
+    "first_divergence": {
+      "pivot_ordinal": 163,
+      "pricing_call": 164,
+      "context_it": 162.0,
+      "entering": 120,
+      "leaving_basis_position": 36,
+      "field": "needed-output",
+      "basis_position": 22,
+      "native_compact_index": 0,
+      "native_full_output_count": 35,
+      "native_compact_output": -0.0,
+      "native_compact_f64_be": "8000000000000000",
+      "native_immediate_needed_U_output": -0.0,
+      "native_immediate_needed_U_f64_be": "8000000000000000",
+      "rose_output": 0.0,
+      "rose_f64_be": "0000000000000000",
+      "native_routes": [
+        "0x12bd30",
+        "0x12a990",
+        "0x129aa0",
+        "0x121ef0",
+        "0x123690"
+      ],
+      "full_output_value_support_match": true,
+      "note": "Only proven native dense-first wrapper publication permutation applied; zero signs compared strictly. No comparison after this pivot."
+    },
+    "whole_run_counts": "Structural purpose/path counts only; not strict numerical pairing after pivot162. Full flip97/basic16 and initial444/recompute16 BTRAN raw pairing are incomplete."
+  },
+  "accepted_sampled_self_pools": {
+    "full_needed_shared_L_eta_WORK_publication": {
+      "rose_instructions": 66597341.35416666,
+      "native_instructions": 17120885.9140625,
+      "instruction_difference": 49476455.44010416,
+      "rose_cycles": 39051567.29166669,
+      "native_cycles": 18355782.37499997,
+      "cycle_difference": 20695784.916666716,
+      "rose_cycles_per_instruction": 0.586383277434294,
+      "native_cycles_per_instruction": 1.0721280701907585
+    },
+    "BTRAN": {
+      "rose_instructions": 8187411.708333337,
+      "native_instructions": 5800862.296875,
+      "instruction_difference": 2386549.4114583367,
+      "rose_cycles": 6809846.937499996,
+      "native_cycles": 5066513.28125,
+      "cycle_difference": 1743333.6562499963
+    },
+    "caveat": "Approximate whole-run self pools; exclude unowned allocator/helper/caller leaves. Native two-vector boundary is shared, so no per-full/per-needed cross-solver cost difference is supported. Pooled CPI does not establish arithmetic, branch or cache causality."
+  },
+  "diagnostic_inclusive_purpose_table": [
+    {
+      "family": 1,
+      "purpose": 1,
+      "calls": 634,
+      "mean_ms": 7.108037833333333,
+      "mean_instructions": 26650341.166666668,
+      "mean_cycles": 22932328.5,
+      "alloc": 10618,
+      "realloc": 7055,
+      "free": 9705,
+      "bytes": 8649160,
+      "label": "full pivot",
+      "instructions_per_call": 42035.23843322818,
+      "cycles_per_call": 36170.86514195584
+    },
+    {
+      "family": 1,
+      "purpose": 2,
+      "calls": 97,
+      "mean_ms": 0.449587,
+      "mean_instructions": 1504486.5,
+      "mean_cycles": 1281259.3333333333,
+      "alloc": 1444,
+      "realloc": 809,
+      "free": 1532,
+      "bytes": 508444,
+      "label": "full flip",
+      "instructions_per_call": 15510.170103092783,
+      "cycles_per_call": 13208.85910652921
+    },
+    {
+      "family": 1,
+      "purpose": 3,
+      "calls": 16,
+      "mean_ms": 0.3246863333333333,
+      "mean_instructions": 1330657.5,
+      "mean_cycles": 906629.8333333334,
+      "alloc": 109,
+      "realloc": 110,
+      "free": 61,
+      "bytes": 530592,
+      "label": "full basic recompute",
+      "instructions_per_call": 83166.09375,
+      "cycles_per_call": 56664.364583333336
+    },
+    {
+      "family": 2,
+      "purpose": 1,
+      "calls": 634,
+      "mean_ms": 6.8961835,
+      "mean_instructions": 34784060.166666664,
+      "mean_cycles": 22259924.333333332,
+      "alloc": 6051,
+      "realloc": 1390,
+      "free": 4054,
+      "bytes": 11316440,
+      "label": "needed pivot",
+      "instructions_per_call": 54864.44821240799,
+      "cycles_per_call": 35110.29074658254
+    },
+    {
+      "family": 3,
+      "purpose": 1,
+      "calls": 634,
+      "mean_ms": 2.8191316666666664,
+      "mean_instructions": 11678313.666666666,
+      "mean_cycles": 9325858.666666666,
+      "alloc": 1963,
+      "realloc": 601,
+      "free": 1215,
+      "bytes": 2864960,
+      "label": "BTRAN rho",
+      "instructions_per_call": 18420.053101997895,
+      "cycles_per_call": 14709.556256572028
+    },
+    {
+      "family": 3,
+      "purpose": 4,
+      "calls": 444,
+      "mean_ms": 0.09083533333333332,
+      "mean_instructions": 606282,
+      "mean_cycles": 562180.8333333334,
+      "alloc": 1354,
+      "realloc": 0,
+      "free": 904,
+      "bytes": 73448,
+      "label": "BTRAN initial weight",
+      "instructions_per_call": 1365.5,
+      "cycles_per_call": 1266.173048048048
+    },
+    {
+      "family": 3,
+      "purpose": 5,
+      "calls": 16,
+      "mean_ms": 0.13587633333333335,
+      "mean_instructions": 676795,
+      "mean_cycles": 454845.8333333333,
+      "alloc": 64,
+      "realloc": 0,
+      "free": 0,
+      "bytes": 230912,
+      "label": "BTRAN true-d",
+      "instructions_per_call": 42299.6875,
+      "cycles_per_call": 28427.864583333332
+    },
+    {
+      "family": 3,
+      "purpose": 8,
+      "calls": 1,
+      "mean_ms": 0.011433166666666666,
+      "mean_instructions": 58563,
+      "mean_cycles": 36739.166666666664,
+      "alloc": 1,
+      "realloc": 0,
+      "free": 0,
+      "bytes": 7104,
+      "label": "extra mirror readout BTRAN",
+      "instructions_per_call": 58563.0,
+      "cycles_per_call": 36739.166666666664
+    },
+    {
+      "family": 4,
+      "purpose": 7,
+      "calls": 5,
+      "mean_ms": 0.063606,
+      "mean_instructions": 195863.16666666666,
+      "mean_cycles": 187744.16666666666,
+      "alloc": 5,
+      "realloc": 0,
+      "free": 5,
+      "bytes": 17760,
+      "label": "extra auxiliary objective FTRAN",
+      "instructions_per_call": 39172.63333333333,
+      "cycles_per_call": 37548.83333333333
+    },
+    {
+      "family": 5,
+      "purpose": 8,
+      "calls": 1,
+      "mean_ms": 0.012713666666666667,
+      "mean_instructions": 54663,
+      "mean_cycles": 38634.666666666664,
+      "alloc": 2,
+      "realloc": 0,
+      "free": 2,
+      "bytes": 7104,
+      "label": "extra auxiliary readout BTRAN",
+      "instructions_per_call": 54663.0,
+      "cycles_per_call": 38634.666666666664
+    },
+    {
+      "family": 6,
+      "purpose": 1,
+      "calls": 634,
+      "mean_ms": 0.7476175,
+      "mean_instructions": 3047065.5,
+      "mean_cycles": 2638996,
+      "alloc": 89,
+      "realloc": 87,
+      "free": 89,
+      "bytes": 21252,
+      "label": "joint U WORK",
+      "instructions_per_call": 4806.097003154574,
+      "cycles_per_call": 4162.454258675079
+    }
+  ],
+  "diagnostic_table_scope": "Separate ELF39f6d08d, not accepted55af. Timers and PMU counters are independent runs. Per-call averages only within stated purpose, not paired native costs. PMU I/C include probe/read and changed-codegen overhead; all PMU wall times excluded. Returned vectors and retained factor lifecycle are outside root. Root-local helper/copy/allocation/destruction are included.",
+  "path_census": {
+    "native": {
+      "normal_pair": 192,
+      "normal_full_sparse_U": 162,
+      "joint_sparse_column_dense_tau": 105,
+      "normal_full_dense_U": 30,
+      "inline_joint_dense": 337
+    },
+    "native_BTRAN": {
+      "recompute_d": {
+        "calls": 16,
+        "dense_u": 16,
+        "dense_l": 16
+      },
+      "initial_weight": {
+        "calls": 444,
+        "sparse_u": 444,
+        "sparse_l": 444
+      },
+      "rho": {
+        "calls": 634,
+        "sparse_u": 634,
+        "sparse_l": 291,
+        "dense_l": 343
+      }
+    },
+    "rose_diagnostic_paths": [
+      {
+        "family": 1,
+        "path": 1,
+        "calls": 3,
+        "mean_ms": 0.036304333333333334,
+        "mean_instructions": 136766,
+        "mean_cycles": 90114.33333333333,
+        "alloc": 33,
+        "realloc": 35,
+        "free": 36,
+        "bytes": 72628
+      },
+      {
+        "family": 1,
+        "path": 2,
+        "calls": 182,
+        "mean_ms": 2.2674061666666665,
+        "mean_instructions": 8405468.333333334,
+        "mean_cycles": 7294767.333333333,
+        "alloc": 4809,
+        "realloc": 2263,
+        "free": 4237,
+        "bytes": 3463940
+      },
+      {
+        "family": 1,
+        "path": 3,
+        "calls": 201,
+        "mean_ms": 2.3981035,
+        "mean_instructions": 9967185.666666666,
+        "mean_cycles": 7549133,
+        "alloc": 1401,
+        "realloc": 1314,
+        "free": 1561,
+        "bytes": 3644420
+      },
+      {
+        "family": 1,
+        "path": 8,
+        "calls": 361,
+        "mean_ms": 3.1804971666666666,
+        "mean_instructions": 10976065.166666666,
+        "mean_cycles": 10186203,
+        "alloc": 5928,
+        "realloc": 4362,
+        "free": 5464,
+        "bytes": 2507208
+      },
+      {
+        "family": 2,
+        "path": 6,
+        "calls": 54,
+        "mean_ms": 0.5337466666666666,
+        "mean_instructions": 2266538.5,
+        "mean_cycles": 1720552.3333333333,
+        "alloc": 1337,
+        "realloc": 582,
+        "free": 1131,
+        "bytes": 1251240
+      },
+      {
+        "family": 2,
+        "path": 7,
+        "calls": 388,
+        "mean_ms": 6.011933666666667,
+        "mean_instructions": 31057589.666666668,
+        "mean_cycles": 19223583.166666668,
+        "alloc": 3512,
+        "realloc": 679,
+        "free": 2318,
+        "bytes": 8387280
+      },
+      {
+        "family": 2,
+        "path": 8,
+        "calls": 192,
+        "mean_ms": 0.3505031666666667,
+        "mean_instructions": 1459932,
+        "mean_cycles": 1315788.8333333333,
+        "alloc": 1202,
+        "realloc": 129,
+        "free": 605,
+        "bytes": 1677920
+      },
+      {
+        "family": 3,
+        "path": 0,
+        "calls": 17,
+        "mean_ms": 0.1473095,
+        "mean_instructions": 735358,
+        "mean_cycles": 491585,
+        "alloc": 65,
+        "realloc": 0,
+        "free": 0,
+        "bytes": 238016
+      },
+      {
+        "family": 3,
+        "path": 1,
+        "calls": 343,
+        "mean_ms": 2.3784683333333336,
+        "mean_instructions": 10306346.666666666,
+        "mean_cycles": 7726926.333333333,
+        "alloc": 388,
+        "realloc": 101,
+        "free": 0,
+        "bytes": 2520744
+      },
+      {
+        "family": 3,
+        "path": 3,
+        "calls": 735,
+        "mean_ms": 0.5314986666666667,
+        "mean_instructions": 1978249,
+        "mean_cycles": 2161113.1666666665,
+        "alloc": 2929,
+        "realloc": 500,
+        "free": 2119,
+        "bytes": 417664
+      },
+      {
+        "family": 4,
+        "path": 0,
+        "calls": 5,
+        "mean_ms": 0.063606,
+        "mean_instructions": 195863.16666666666,
+        "mean_cycles": 187744.16666666666,
+        "alloc": 5,
+        "realloc": 0,
+        "free": 5,
+        "bytes": 17760
+      },
+      {
+        "family": 5,
+        "path": 0,
+        "calls": 1,
+        "mean_ms": 0.012713666666666667,
+        "mean_instructions": 54663,
+        "mean_cycles": 38634.666666666664,
+        "alloc": 2,
+        "realloc": 0,
+        "free": 2,
+        "bytes": 7104
+      },
+      {
+        "family": 6,
+        "path": 0,
+        "calls": 634,
+        "mean_ms": 0.7476175,
+        "mean_instructions": 3047065.5,
+        "mean_cycles": 2638996,
+        "alloc": 89,
+        "realloc": 87,
+        "free": 89,
+        "bytes": 21252
+      }
+    ],
+    "qualifications": {
+      "full": "1=L initiallydense;2=Udense;8=cachedlevelL successfullyreturned. Noncached non-dense branch not further split by new costprobe.",
+      "needed": "1=L initiallydense;2=joint_dense;4=tau_dense;8=cachedlevelL successfullyreturned.",
+      "btran": "1=sparseU branch;2=sparseLT branch;4=emptyearlyreturn beforeLT. Count0=denseU/denseLT."
+    }
+  },
+  "mechanisms": {
+    "duplicate_L": {
+      "matched_pair": {
+        "native_pivot": 135,
+        "rose_pricing_call": 136,
+        "strict_stop_pivot": 163,
+        "full": {
+          "cached_terms": 46,
+          "fallback_terms": 46,
+          "ordered_destination_and_operand_bits_match": true,
+          "all_444_raw_slots_bit_equal": true,
+          "density_product": 690,
+          "m": 444
+        },
+        "needed": {
+          "cached_terms": 132,
+          "fallback_terms": 132,
+          "ordered_destination_and_operand_bits_match": true,
+          "all_444_raw_slots_bit_equal": true,
+          "density_product": 2160,
+          "m": 444
+        }
+      },
+      "complete_fallback_cleanup_instructions": {
+        "attempts": 789,
+        "completed_rejections": 236,
+        "fallback_plus_delayed_cleanup_raw_instructions": 1522017,
+        "calibrated_extra_instructions": 1888,
+        "calibrated_original_estimate_instructions": 1520129,
+        "accepted_total_instructions": 181193000,
+        "raw_instruction_ceiling_percent": 0.839997682029659,
+        "corrected_instruction_ceiling_percent": 0.8389556991716015,
+        "meaning": "A ceiling for deleting the entire fallback and its buffer cleanup, not a speedup prediction. WORK bookkeeping must remain, required handoff copying/control costs are additional, and some cleanup remains required. Cached attempt is needed to obtain result; do not claim both passes removable."
+      },
+      "trial_status": "Closed: handoff trial instructions -0.5606%, cycles +4.0016%; rejected at counter gate. Do not retry or rebrand."
+    },
+    "needed_tail": {
+      "source_tail_scans": 8,
+      "source_nonzero_columns": 6,
+      "source_candidate_numeric_uc": 40,
+      "source_actual_scatter": 8,
+      "source_discarded_nucleus_checks": 32,
+      "native_active_A_spans": 6,
+      "native_A_coeff_entries": 8,
+      "native_destinations_all_kind_tail": true,
+      "native_A_destination_order_differs": true,
+      "native_capture": "dual_ftran2.DETAIL=134,135,LIM=135,PROVENANCE=2,ROUTES=5.jsonl"
+    },
+    "needed_row_gather": {
+      "needed_nucleus_rows": 21,
+      "numeric_entries_scanned_for_stamps": 25,
+      "virtual_indices_scanned_for_gather": 25,
+      "dot_product_terms": 25,
+      "additional_allocation_for_TauRow_or_terms_in_this_call": 0,
+      "tail_numeric_entries_checked": 40,
+      "tail_scatter_terms": 8,
+      "native_tail_coefficients_visited": 8,
+      "requested_outputs": 39,
+      "native_dense_publication_slots_scanned": 444
+    },
+    "memory": {
+      "selected_full_allocation_growth": 36,
+      "selected_needed_allocation_growth": 39,
+      "native_exported_allocation_calls_in_selected_wrapper": 0,
+      "native_private_allocation_unproved": true,
+      "lifetimes": "Needed result624B retires in caller; x_tau3552B/tau_raw444B remain inF2 and two grownLcachebuffers remain. Full result1024B survives iteration andpost: Dual.pending_alpha transfers ownership to auxiliaryFactor.update_column Eta::Sparse.entries; its eventual retirement belongs factor lifecycle. Full Lspike7104B remains mirror spike; cache eta-index/bucket buffers remain. Do not charge retained buffers construction/retirement repeatedly per solve body or assume no native-private/inlined allocation outside observed wrapper.",
+      "copy": "Needed clones444 doubles634times =2251968 logical bytes; not measured traffic or time."
+    },
+    "machine_code": "Acceptedneeded14368d..1436cd loop checks kind and bounds for every numericUentry before tail-onlyscatter; raw samples6.933Minstructions/3.511Mcycles include required arithmetic and skid. Acceptedneededclosure94940..94ed0 includes stampedTauRowprepare,rowdot,division/output and8.169Minstruction self; append_terms adds3.440M. Native normal/joint reads numericrow directly. Both scalar multiply/subtract for shortrows, packedmul/sub longrows; no broad different-arithmetic-speed claim. Native denseL is four-wayunrolled with32-bitindexarrays; Roseuses64-bitindices/Vecmetadata/bounds. No causal branch/cache-stall proof."
+  },
+  "distortion": {
+    "existing_kernel_probe": "Six shuffled repeats/mode. Plainbyteidentical accepted, off+3.229%,timers-noalloc+4.776%,timers+5.113% whole-process instructions. PMUwall median83.046ms vsplain49.946/timer49.607; PMUwall times excluded. Emptyrootinside~65.2ns,whole~125.3ns; PMUinside4557ns/308instructions/428cycles,whole~9100ns. Newrootcounters include read/probe cost and codegenskew; do not transfer their totals/shares to accepted. Traceper-element build has no performanceclaims.",
+    "existing_GDB_instruction_probe": {
+      "known_sequence_original_instructions": 5,
+      "observed": [
+        {
+          "instructions": 7,
+          "cycles": 3857,
+          "enabled": 88235,
+          "running": 88235
+        },
+        {
+          "instructions": 7,
+          "cycles": 4424,
+          "enabled": 74690,
+          "running": 74690
+        }
+      ],
+      "extra_instructions_per_interval": 2,
+      "root_detail_added_expected": {
+        "full": 16,
+        "needed": 20
+      },
+      "root_detail_added_observed": {
+        "full": 16.125,
+        "needed": 19.875
+      },
+      "same_stopped_inferior_double_read_equal": true,
+      "pmu_no_multiplexing": true,
+      "codegen_distortion": 0
+    },
+    "GDB_cycles_excluded": {
+      "root_cycles": {
+        "full": {
+          "root-only": 95012,
+          "detail": 140568.125
+        },
+        "needed": {
+          "root-only": 93726.875,
+          "detail": 188817.875
+        }
+      },
+      "reason": "Known fiveinstruction sequence takes thousands of cycles under debug; addingstops inflates rootcyclecounts roughly48%/101%. All new debug cycles and timers excluded; no instructions-as-time claim."
+    },
+    "new_distortion": "No new instrumentation/profiling. Accepted cap20 smoke agrees with cached complete result including zero sign. Existing fixed-PC instructions calibrated at roughly2I per stopped interval; selected controls1-4I residual. Existing diagnostic mode codegen/PMU skew retained separately."
+  },
+  "reconciliation": {
+    "accepted_solve_ms": [
+      45.784,
+      16.696
+    ],
+    "overall_instruction_gap": 127995000,
+    "overall_cycle_gap": 89315000,
+    "known_FB_self_instruction_gap": 51863004.8515625,
+    "known_FB_self_cycle_gap": 22439118.572916716,
+    "outside_pools_instruction_gap": 76131995.1484375,
+    "outside_pools_cycle_gap": 66875881.42708328,
+    "meaning": "Outside pools includes other measured stages, unowned memory/helpers and sampling residual. Do not add duplicate-L or tail-region costs to self-pool delta; they are already included. No exact complete inclusive per-family cross-solver reconciliation exists."
+  },
+  "missing_evidence": "Complete L/eta decomposition into corresponding arithmetic, support/index construction and cleanup; exhaustive visited-entry histories; complete matched BTRAN root/helper/cleanup costs; raw97flip/16basic and444initial/16recompute BTRAN enumeration; native-private retained-factor ownership/cost; valid matched inclusive cycles. Strict raw numerical pairing stops162 at needed-output signed-zero divergence163. Most observed F/B excess has no quantified removable mechanism.",
+  "one_proposed_experiment": {
+    "type": "Diagnostic only, different remaining boundary.",
+    "question": "At matched source149/native148, do full/needed U solve roots repeat numerical work or spend excess on structural scans/bookkeeping versus nativejoint12c300?",
+    "basis": "Complete sourcefull+needed roots67988I minusL+eta31099I leaves36889I; nativejointU/publication4050I. Scopeendpoint/lifetimes mustbe reconciled before subtracting. RawL/neededaftereta states and403actualLterm projections alreadyaligned.",
+    "design": "Reusecached149states, strictlycentral compare.py pairing anddelegatedreferencecapture. Observe actualUorderedterms, scans/WORK/input-output helper costs withincomplete disjoint boundaries, usingimmutableELFs andcalibratedfixedPCinstructions. No comparisonpast163, no debuggercycles.",
+    "benefit": "Diagnostic0. Local36889/4050scope exposure isnot an equivalent/removablegap and cannotbe multipliedby634. No whole-solve benefitprediction before actualoperationandlifecycle proof.",
+    "rejected_check": "No retry of empty-gap83117/83189, rowmapcache, shorttau, two-vectorfusion, WORKdeferral, F2workspace, outputorder, preUownership, packedL, completedLhandoff orarenas."
+  },
+  "sources": [
+    "degen2-stage-accounting.json",
+    "degen2-exclusive-stage-followup.json",
+    "degen2-triangular-kernel-diagnosis.json",
+    "degen2-joint-transaction.json",
+    "degen2-l-rejection-cost.json",
+    "degen2-l-handoff.json",
+    "degen2-fb-transaction-cost.json"
+  ],
+  "complete_boundary_audit": "Completed: central alignment and accepted-ELF complete full+needed transactions at 1/20/115/Rose136-native135, including transient cleanup. Retained-factor lifecycle remains separate. No complete matched BTRAN family cost or equivalent arithmetic-only L/U cycle delta established.",
+  "delegated_validation": {
+    "strict162": "PASS",
+    "strict163": "ExpectedFAIL native-minuszero/Rose-pluszero basis22",
+    "raw115_and_selected_rho_BTRAN": "PASS",
+    "raw_Rose136_native135": "PASS,21rows25orderedterms",
+    "accepted_runtime_L_terms": "PASS full46/needed132 nativeonce/Rosetwice",
+    "new_reference_captures": false
+  },
+  "current_smoke_validation": {
+    "argv": [
+      "timeout",
+      "10s",
+      "taskset",
+      "-c",
+      "2",
+      "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+      "solve",
+      "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen2.mps",
+      "--method",
+      "dual",
+      "--profile",
+      "release",
+      "--max-iterations",
+      "20",
+      "--output",
+      "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-fb-explanation/bounded20.json"
+    ],
+    "exit": 3,
+    "hashes": {
+      "target/release/rose": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+      "target/perf-optimized-build/rose-pgo-tcmalloc": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+      "target/perf-reference/reconstructed/libgurobi130.so": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30"
+    },
+    "cached_cap20_result_including_zero_sign_matches": true,
+    "new_performance_measurement": false
+  },
+  "completed_transaction_accounting": {
+    "source": "degen2-fb-transaction-cost.json",
+    "selected_transactions": [
+      {
+        "Rose_pricing": 1,
+        "native_pivot": 1,
+        "Rose_instructions": 13020,
+        "native_instructions": 1785,
+        "excess_instructions": 11235
+      },
+      {
+        "Rose_pricing": 20,
+        "native_pivot": 20,
+        "Rose_instructions": 8592,
+        "native_instructions": 1696,
+        "excess_instructions": 6896
+      },
+      {
+        "Rose_pricing": 115,
+        "native_pivot": 115,
+        "Rose_instructions": 43495,
+        "native_instructions": 18138,
+        "excess_instructions": 25357
+      },
+      {
+        "Rose_pricing": 136,
+        "native_pivot": 135,
+        "Rose_instructions": 81377,
+        "native_instructions": 23001,
+        "excess_instructions": 58376
+      }
+    ],
+    "selected135_excess": {
+      "roots": 54197,
+      "outside_roots": 4179,
+      "total": 58376
+    },
+    "selected135_L_eta_localization": {
+      "Rose_L_eta": 56868,
+      "native_deliberately_wider_prefix": 12211,
+      "meaning": "Largest supported selected localization; native prefix includes input/support/dispatch plus L/inline eta. Not an exact equivalent L-only delta or proof of removable work."
+    },
+    "complete_boundary": "Disjoint Rose input preparation, full/needed roots, WORK, publication and deferred transient frees versus complete native paired wrapper. Exclude Rose caller pivot check and intervening updates. Persistent buffers and lazy retained construction/retirement remain assigned to factor lifecycle; not assumed zero.",
+    "whole_Rose_L_eta_instructions": 25387017,
+    "whole_Rose_needed_prepare_gather_instructions": 3959353,
+    "cycles": "No complete matched transaction cycle measurements: debugger stops distort cycles. Sampled self cycles remain separate.",
+    "no_extrapolation": "Do not multiply selected transaction excess by634 or infer matching arithmetic after strict pivot162."
+  },
+  "current_delegated_cached_audit": {
+    "delegate": "/root/ref_compare",
+    "artifacts": "target/perf-degen2-fb-cached-audit/",
+    "commands": "target/perf-degen2-fb-cached-audit/commands.json",
+    "prefix162": "PASS",
+    "first163": "Expected strict signed-zero FAIL",
+    "selected115_and136": "PASS",
+    "joint_L135": "PASS",
+    "complete_native_transactions": "30 central comparison gates PASS",
+    "new_reference_captures": false
+  },
+  "completed_L_partition_followup": "degen2-l-stage-partition.json",
+  "completed_dense_path_followup": "degen2-dense-L-diagnosis.json",
+  "completed_empty_gap_followup": "degen2-empty-L-gap.json",
+  "current_request_synthesis": {
+    "scope": "Bounded cached-evidence audit; no optimization, source change, new profiling or new diagnostic instrumentation.",
+    "smoke_validation": "target/perf-degen2-fb-request-audit/manifest.json; accepted cap20 result/exit/signed zeros match cache; ordinary/optimized/reference hashes preserved.",
+    "largest_supported_mechanisms": [
+      {
+        "family": "dense L",
+        "matched_source_pricing": 149,
+        "matched_native_pivot": 148,
+        "same_arithmetic_terms": 403,
+        "Rose_positions": 444,
+        "native_positions": 112,
+        "extra_empty_positions": 332,
+        "extra_empty_instructions": 7018,
+        "dense_walk_instruction_difference": 8956,
+        "unresolved_walk_instructions": 1938,
+        "whole_Rose_only_exposure_instructions": 2356201,
+        "trial_status": "Empty-gap specialization timing inconclusive and closed; no retry."
+      },
+      {
+        "family": "full sparse output order",
+        "calls": 364,
+        "whole_Rose_only_instructions": 4315376,
+        "scope": "Construction including allocation/copy/local cleanup; required ordering remains. Returned order-buffer retirement in filter measured separately; retained auxiliary-eta/factor retirement remains lifecycle. No matched native whole delta. Prior natural-order/slotheap trials closed."
+      },
+      {
+        "family": "needed U candidate filtering",
+        "matched_source_pricing": 149,
+        "matched_native_pivot": 148,
+        "Rose_candidates": 237,
+        "both_scatter_products": 32,
+        "Rose_rejected_candidates": 205,
+        "selected_instructions": 2051,
+        "whole_Rose_only_exposure_instructions": 1784100,
+        "scope": "Already included in F/B pools. Maintained-index construction/update cost prevents treating scan as free opportunity."
+      },
+      {
+        "family": "cached L rejection",
+        "whole_Rose_only_fallback_and_cleanup_instructions": 1520129,
+        "scope": "Both passes have corresponding terms at selected135; removing fallback entirely is a loose .84% solve instruction ceiling. Required WORK/handoff/cleanup remain. Rejected handoff trial stays closed."
+      }
+    ],
+    "code_generation": "Matched149 U:72 corresponding divisions/52 scatters/21 row-dot terms agree in numerical projections; native additionally executes120 full zero DIVs. Both solvers use scalar MUL/SUB on selected dense L; native has four-way unrolling/32-bit indices, Rose64-bit indices/Vec bounds. No arithmetic-only cycle or causal cache/stall claim.",
+    "one_proposed_experiment": {
+      "type": "One bounded diagnostic only; no optimization.",
+      "question": "Pair the first pre-reset82 true-d recomputation BTRAN (expected native context16; establish actual call/purpose centrally) with its Rose dense-U/dense-LT operation.",
+      "design": "Reuse cached states first; delegate reference capture/comparison and keep all alignment in compare.py. Verify input, ordered numerical visits and output before measuring complete helper/WORK/publication and transient cleanup boundaries. Stop at the first difference; retain private-factor construction/retirement separately. No additional captures performed for this synthesis.",
+      "plausible_whole_solve_benefit": "Diagnostic itself 0. No supported optimization forecast. All16 true-d calls take0.135876ms in the separate diagnostic timer build (about0.30% of45.784ms accepted solve, cross-build scale only). This includes required arithmetic and is not a removable accepted-time bound; cannot explain the broad gap.",
+      "rejected_check": "A previously unpaired purpose/path, not another rho memo, direct-U reuse, L handoff, empty-gap, packed-L, rowmap, shorttau, workspace, ordering, arena or storage-owner trial. No retry of any failed screen."
+    },
+    "precise_remaining_unknowns": "Raw97flip/16basic full and444initial/16true-d BTRAN input/output and visited-entry histories; complete per-purpose native helper/memory/retained-factor costs; valid matched inclusive cycles. Most F/B excess lacks quantified removable mechanisms. Published triangular pairing stops at163 signedzero; deeper ordered-history gates stop earlier where reported. Pricing-reset82 internal SUM8ULP is a separate gate, not a continuation or normalization of triangular endpoint comparisons.",
+    "delegated_cached_audit": {
+      "delegate": "/root/ref_compare",
+      "new_reference_capture": false,
+      "sparse_LT_witness": "sourcepricing1; native numerical context it0, BTRAN core call446, unit basis6 (+1); selected1/20/115 are all sparseU+sparseLT.",
+      "dense_LT_witness": "Now established: firstnative148/sourcepricing149,contextit147/core597/r138/upd16. See completed_BTRAN_boundary_followup.",
+      "central_alignment": "Existing compare.py selected BTRAN gates and strict162/first163 unchanged."
+    },
+    "completed_BTRAN_boundary_followup": "degen2-btran-boundary.json",
+    "completed_BTRAN_U_eta_followup": "degen2-btran-u-eta.json"
+  },
+  "completed_BTRAN_boundary_followup": "degen2-btran-boundary.json",
+  "completed_BTRAN_U_eta_followup": "degen2-btran-u-eta.json",
+  "latest_bounded_request_audit": {
+    "scope": "Cached evidence synthesis; no optimization, solver edits, new profiles or new instrumentation.",
+    "delegate": "/root/ref_compare",
+    "small_control": "target/perf-degen2-fb-current-audit/check.json; cap20 exit3 and complete result excluding seconds/including signed zeros match cache.",
+    "preserved_hashes": {
+      "target/release/rose": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+      "target/perf-optimized-build/rose-pgo-tcmalloc": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+      "target/perf-reference/reconstructed/libgurobi130.so": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30"
+    },
+    "matched_complete_instruction_cases": [
+      {
+        "case": "joint135/source136",
+        "Rose": 81377,
+        "Gurobi": 23001,
+        "difference": 58376
+      },
+      {
+        "case": "rho sparse1",
+        "Rose": 1226,
+        "Gurobi": 504,
+        "difference": 722
+      },
+      {
+        "case": "rho dense149/native148",
+        "Rose": 18179,
+        "Gurobi": 14215,
+        "difference": 3964
+      }
+    ],
+    "boundary": "Includes stated preparation/helper/publication and deferred transient cleanup; retained factor/workspace construction/retirement remain their lifecycle, not zero. Costs nested in existing self pools, not additive.",
+    "largest_concrete_dense_walk_mechanism": {
+      "matching_coefficient_terms": 403,
+      "Rose_nodes": 444,
+      "Gurobi_nodes": 112,
+      "extra_empty_nodes": 332,
+      "extra_instructions": 7018,
+      "walk_difference": 8956,
+      "unexplained_walk_difference": 1938,
+      "closed_trial": "Empty-gap timing inconclusive; no retry."
+    },
+    "no_new_cycle_claim": "Debugger cycles excluded. Sampled self only supports51.863M I/22.439M C F/B pool difference;76.132M I/66.876M C remains outside pools.",
+    "next": {
+      "type": "One bounded diagnostic only; no optimization.",
+      "question": "Pair the first pre-reset82 true-d recomputation BTRAN (expected native context16; establish actual call/purpose centrally) with its Rose dense-U/dense-LT operation.",
+      "design": "Reuse cached states first; delegate reference capture/comparison and keep all alignment in compare.py. Verify input, ordered numerical visits and output before measuring complete helper/WORK/publication and transient cleanup boundaries. Stop at the first difference; retain private-factor construction/retirement separately. No additional captures performed for this synthesis.",
+      "plausible_whole_solve_benefit": "Diagnostic itself 0. No supported optimization forecast. All16 true-d calls take0.135876ms in the separate diagnostic timer build (about0.30% of45.784ms accepted solve, cross-build scale only). This includes required arithmetic and is not a removable accepted-time bound; cannot explain the broad gap.",
+      "rejected_check": "A previously unpaired purpose/path, not another rho memo, direct-U reuse, L handoff, empty-gap, packed-L, rowmap, shorttau, workspace, ordering, arena or storage-owner trial. No retry of any failed screen."
+    },
+    "central_cached_replays": {
+      "artifact": "target/perf-degen2-fb-final-audit/cached-replay.json",
+      "dual-wrapper-cost": "exit0;30 captures pass declared bit-boundary gates",
+      "dual-btran-boundary": "expected exit1; stage gates PASS, first ordered LT operation difference1",
+      "new_capture": false,
+      "alignment_edits": false
+    },
+    "commit_validation": {
+      "cargo test --release": "PASS exit0",
+      "target/release/rose-parity check --tier full": "PASS all987 baseline runs (70.2s)",
+      "accepted_hashes": "ordinary84830499 and optimized55af6617 unchanged after tests",
+      "optimization_implemented": false
+    }
+  }
+}

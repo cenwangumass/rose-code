@@ -1,0 +1,271 @@
+{
+  "scope": "accepted optimized solve-only; sampled self mass, not inclusive or removable costs",
+  "build": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+  "reference": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+  "groups": {
+    "rose instructions:u": {
+      "direct_total": 181193409.1875,
+      "sampled_mass": 169228744.58333334,
+      "coverage": 0.9339674403289937,
+      "samples": 808,
+      "audit": {
+        "PERF_RECORD_SAMPLE": 808,
+        "PERF_RECORD_LOST": 0,
+        "PERF_RECORD_THROTTLE": 0,
+        "PERF_RECORD_UNTHROTTLE": 0
+      },
+      "families": {
+        "FTRAN/L/U": 54621852.54166667,
+        "factor other": 3837248.9791666665,
+        "TCMalloc": 16843984.729166664,
+        "factor ordered construction": 8699213.510416668,
+        "BTRAN": 8187411.708333333,
+        "dual control/update other": 32010364.729166668,
+        "FTRAN output preparation": 3368642.3229166665,
+        "factor publication/retirement": 11635957.0625,
+        "factor update/install": 13315284.447916668,
+        "libc memory": 3754789.1666666665,
+        "libm": 518066.2604166666,
+        "libc other": 358320.21875,
+        "Rust allocation/containers": 1682807.9791666667,
+        "FTRAN WORK": 4769597.510416667,
+        "auxiliary LU (all operations)": 5145575.614583333,
+        "Rose ambiguous/unresolved": 479627.8020833333
+      },
+      "tags": [
+        "degen2-varied-rose-instructions-0",
+        "degen2-varied-rose-instructions-1",
+        "degen2-varied-rose-instructions-2",
+        "degen2-varied-rose-instructions-3",
+        "degen2-varied-rose-instructions-4",
+        "degen2-varied-rose-instructions-5",
+        "degen2-varied-rose-instructions-6",
+        "degen2-varied-rose-instructions-7",
+        "degen2-varied-rose-instructions-8",
+        "degen2-varied-rose-instructions-9",
+        "degen2-varied-rose-instructions-10",
+        "degen2-varied-rose-instructions-11"
+      ]
+    },
+    "rose cycles:u": {
+      "direct_total": 137330143.1875,
+      "sampled_mass": 130681800.33333334,
+      "coverage": 0.9515886119401367,
+      "samples": 2182,
+      "audit": {
+        "PERF_RECORD_SAMPLE": 2182,
+        "PERF_RECORD_LOST": 0,
+        "PERF_RECORD_THROTTLE": 0,
+        "PERF_RECORD_UNTHROTTLE": 0
+      },
+      "families": {
+        "FTRAN/L/U": 33106032.968750004,
+        "dual control/update other": 30116675.135416664,
+        "TCMalloc": 14085571.229166668,
+        "factor ordered construction": 6897972.166666667,
+        "factor update/install": 10540701.083333334,
+        "auxiliary LU (all operations)": 7635437.197916667,
+        "BTRAN": 6742885.645833333,
+        "factor other": 2876399.0312500005,
+        "factor publication/retirement": 4142546.53125,
+        "FTRAN WORK": 2017238.3541666665,
+        "libc memory": 5580434.072916666,
+        "Rose other": 1071106.09375,
+        "Rust allocation/containers": 2379181.1458333335,
+        "FTRAN output preparation": 1171718.0833333333,
+        "Rust core generic": 280479.8020833333,
+        "Rose ambiguous/unresolved": 459610.4583333333,
+        "simplex shared other": 295718.2604166666,
+        "external/unknown": 707265.0729166666,
+        "libc other": 187165.2395833333,
+        "libm": 174871.7916666667,
+        "factor driver self": 90919.8125,
+        "Rose runtime/generic other": 121871.15625
+      },
+      "tags": [
+        "degen2-varied-rose-cycles-0",
+        "degen2-varied-rose-cycles-1",
+        "degen2-varied-rose-cycles-2",
+        "degen2-varied-rose-cycles-3",
+        "degen2-varied-rose-cycles-4",
+        "degen2-varied-rose-cycles-5",
+        "degen2-varied-rose-cycles-6",
+        "degen2-varied-rose-cycles-7",
+        "degen2-varied-rose-cycles-8",
+        "degen2-varied-rose-cycles-9",
+        "degen2-varied-rose-cycles-10",
+        "degen2-varied-rose-cycles-11"
+      ]
+    },
+    "reference instructions:u": {
+      "direct_total": 53198052.3125,
+      "sampled_mass": 50139627.375,
+      "coverage": 0.9425087046508024,
+      "samples": 1088,
+      "audit": {
+        "PERF_RECORD_SAMPLE": 1088,
+        "PERF_RECORD_LOST": 0,
+        "PERF_RECORD_THROTTLE": 0,
+        "PERF_RECORD_UNTHROTTLE": 0
+      },
+      "families": {
+        "FTRAN needed": 13525596.75,
+        "L stage": 2392820.3359375,
+        "pricing reset": 383100.8125,
+        "pivot-row product": 6140466.9921875,
+        "BTRAN": 5800862.296875,
+        "ratio": 1474622.078125,
+        "dual iteration/control": 1920798.0390625,
+        "reference other": 3160690.5703125,
+        "singleton/pair factor": 1431323.7890625,
+        "basic-value/DSE update": 4548874.6171875,
+        "factor update/install": 2821039.703125,
+        "libc memory": 484145.421875,
+        "reduced-cost update": 254462.125,
+        "factor driver/nucleus": 3723537.1875,
+        "recompute row product": 355605.5,
+        "U stage": 1202468.828125,
+        "leaving pricing": 519212.328125
+      },
+      "tags": [
+        "degen2-fine-reference-ins-0",
+        "degen2-fine-reference-ins-1",
+        "degen2-fine-reference-ins-2",
+        "degen2-fine-reference-ins-3",
+        "degen2-fine-reference-ins-4",
+        "degen2-fine-reference-ins-5",
+        "degen2-fine-reference-ins-6",
+        "degen2-fine-reference-ins-7",
+        "degen2-fine-reference-ins-8",
+        "degen2-fine-reference-ins-9",
+        "degen2-fine-reference-ins-10",
+        "degen2-fine-reference-ins-11",
+        "degen2-fine-reference-ins-12",
+        "degen2-fine-reference-ins-13",
+        "degen2-fine-reference-ins-14",
+        "degen2-fine-reference-ins-15"
+      ]
+    },
+    "reference cycles:u": {
+      "direct_total": 48015204.3125,
+      "sampled_mass": 48390068.614583336,
+      "coverage": 1.0078071999786482,
+      "samples": 824,
+      "audit": {
+        "PERF_RECORD_SAMPLE": 824,
+        "PERF_RECORD_LOST": 0,
+        "PERF_RECORD_THROTTLE": 0,
+        "PERF_RECORD_UNTHROTTLE": 0
+      },
+      "families": {
+        "FTRAN needed": 13166717.208333332,
+        "pivot-row product": 5343308.125000001,
+        "BTRAN": 5066513.281250001,
+        "basic-value/DSE update": 3131070.46875,
+        "factor update/install": 2684102.552083333,
+        "singleton/pair factor": 2021113.0729166667,
+        "factor driver/nucleus": 3062376.03125,
+        "reference other": 2356032.364583333,
+        "U stage": 2155429.9375,
+        "ratio": 2479554.395833333,
+        "pricing reset": 364863.93750000006,
+        "leaving pricing": 672137.4166666666,
+        "dual iteration/control": 1678706.3229166667,
+        "L stage": 2985024.322916667,
+        "reduced-cost update": 729524.8125,
+        "FTRAN first": 48610.90625,
+        "external/unknown": 98067.19791666666,
+        "libc memory": 346916.2604166667
+      },
+      "tags": [
+        "degen2-varied-reference-cycles-0",
+        "degen2-varied-reference-cycles-1",
+        "degen2-varied-reference-cycles-2",
+        "degen2-varied-reference-cycles-3",
+        "degen2-varied-reference-cycles-4",
+        "degen2-varied-reference-cycles-5",
+        "degen2-varied-reference-cycles-6",
+        "degen2-varied-reference-cycles-7",
+        "degen2-varied-reference-cycles-8",
+        "degen2-varied-reference-cycles-9",
+        "degen2-varied-reference-cycles-10",
+        "degen2-varied-reference-cycles-11"
+      ]
+    }
+  },
+  "nonoverlap": {
+    "rose instructions:u": {
+      "ftran_btran_self": 70947504.08333334,
+      "factor_update_self": 13315284.447916668,
+      "pricing_ratio_self": 0,
+      "pivot_state_self": 0,
+      "unattributed": 96930620.65624999,
+      "total": 181193409.1875,
+      "unresolved_pool": 96930620.65624999
+    },
+    "rose cycles:u": {
+      "ftran_btran_self": 43037875.052083336,
+      "factor_update_self": 10540701.083333334,
+      "pricing_ratio_self": 0,
+      "pivot_state_self": 0,
+      "unattributed": 83751567.05208333,
+      "total": 137330143.1875,
+      "unresolved_pool": 83751567.05208333
+    },
+    "reference instructions:u": {
+      "ftran_btran_self": 22921748.2109375,
+      "factor_update_self": 2821039.703125,
+      "pricing_ratio_self": 2376935.21875,
+      "pivot_state_self": 11299409.234375,
+      "unattributed": 13778919.9453125,
+      "total": 53198052.3125,
+      "unresolved_pool": 27455264.3984375
+    },
+    "reference cycles:u": {
+      "ftran_btran_self": 23422295.65625,
+      "factor_update_self": 2684102.552083333,
+      "pricing_ratio_self": 3516555.7499999995,
+      "pivot_state_self": 9203903.40625,
+      "unattributed": 9188346.947916668,
+      "total": 48015204.3125,
+      "unresolved_pool": 21908806.104166668
+    }
+  },
+  "empty_boundary_per_solve": {
+    "instructions": 517.0,
+    "cycles": 3985.78125
+  },
+  "alignment": "target/perf-degen2-alignment/summary.json",
+  "excluded": [
+    "degen2-account-ins: throttled",
+    "degen2-account-freq-rose and reference: frequency startup/throttling; not quantitative",
+    "cached fixed/prime periods: phase alias sensitivity",
+    "line-table build: text/code layout differs; no accepted attribution transferred"
+  ],
+  "interpretation": {
+    "calls": "Corresponding/booked census:637 pricing;634 ratio/pivot-row;747 mirror full FTRAN;634 needed FTRAN;1094 booked BTRAN;621 successful updates;16 factors (1 initial+15 later), equal in both. Followup corrects complete physical Rose census: mirror BTRAN1095 plus auxiliary BTRAN1 and auxiliary FTRAN5. Inner arithmetic/visited entries remain uncounted.",
+    "attribution": "Stage cells are disjoint sampled self event mass per solve. Inlined price/ratio/pivot/state remain unresolved for Rose. All shared factor construction/publication/auxiliary LU goes to unattributed because setup vs subsequent factorization cannot be separated. Do not place those same samples in either stage too. Unresolved pooled remainder combines both solvers pricing/row/other so its difference is meaningful.",
+    "ownership": "Inline/local allocation copying WORK bookkeeping included wherever executed in attributed symbols. Shared allocator, generic allocation and libc memory leaves have unproven dynamic ownership and remain explicitly unattributed: Rose16.844+1.683+3.755M sampled instructions /14.086+2.379+5.580M sampled cycles. Do not call these a separate removable allocation stage or transfer FP ownership shares.",
+    "gap": "181.193409M vs53.198052M instructions,137.330143M vs48.015204M cycles:127.995357M/89.314939M gap. FTRAN/BTRAN self differences48.025756M/19.615565M; update self10.494245M/7.856599M; pooled other69.475356M/61.842776M. These are approximate sampled boundaries, not exact operation-equivalent inclusive excesses.",
+    "cost_per_call": "Combined2475 logical triangular solves: Rose28666 vs9261 sampled instructions/call,17389 vs9464 sampled cycles/call. Successful-update621 denominator:21442 vs4543 instructions,16974 vs4322 cycles; physical update scope differs so use descriptively. Pricing/reset/row/factor setup/termination per-call inclusive costs unsupported. CORRECTION:2475 is a booked/corresponding denominator, not all physical implementations. See degen2-exclusive-stage-followup.json; do not infer exact physical cost or identical operation multiplicity from that average.",
+    "execution": "Overall CPI .758 Rose vs .903 reference. Instructions ratio3.406,cycles2.860,timer2.742. No supported claim that similar instruction counts execute slower in Rose. Inner per-kernel CPI and instruction shares cannot be equated to wall-time shares.",
+    "calibration": "Empty enable/disable brackets32 processes:517 instructions,3985.8 cycles per bracket; <.001% instructions/<.009% cycles of either solve. This is a control-only calibration, excludes clock-dispatch overhead and sampling interrupts. Perf wall clock enabled includes scheduling/kernel effects, user counters do not. Traces excluded. Throttled frequency probes excluded. Varied periods reduce phase locking but short-process tail and residual sampling bias remain; coverage independent batches93.40/94.25% instructions and95.16/100.78% cycles. No confidence interval or exact per-stage time asserted.",
+    "followup": "One bounded isolated diagnostic experiment: exclusive per-stage scope counters with caller ownership for allocator/copy paths, separate initial factorization and final result construction, divide Dual::iteration/post_inner into pricing/ratio vs pivot/state. Same-source plain control, empty-scope overhead calibration, complete dump/result agreement and own instruction-skew measurement required. Start DEGEN2 cap20 then cap640 if aligned; keep instrumentation out of accepted performance timings. This is measurement, not algorithm/buffer/cache/kernel rewrite.",
+    "rejected_experiments": "Follow-up is not another dense-L sharing/output ordering, workspace/arena, factor publication/retirement, fixed-row scatter, BTRAN bounds/buffer, eta SIMD or ranked-row executor trial. Existing rejected implementations not reopened. No optimization justified by current residual.",
+    "qualification": "Fresh timing warmup+3 rotating fresh processes CPU2:45.784ms vs16.696ms. All512 varied profile outputs/exits +32 final counter outputs/exits validated against qualified full panel. Source and accepted ordinary/optimized hashes preserved/restored. Isolated line-table code layout differed, no numerical/performance attribution used from it. Metadata rewrite/restoration retained separately."
+  },
+  "artifacts": {
+    "accounting": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-accounting/accounting.json",
+    "alignment": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-alignment/summary.json",
+    "timing": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-accounting/timing/summary.json",
+    "profiles": "target/perf-optimized-scope/degen2-varied-* and degen2-fine-reference-ins-*",
+    "source_tools": [
+      "target/perf-optimized-scope/collect.py",
+      "target/perf-optimized-scope/analyze.py",
+      "target/perf-optimized-scope/validate.py"
+    ],
+    "scratch": "target/perf-degen2-accounting/"
+  },
+  "followup_result": "perf/evidence/degen2-exclusive-stage-followup.json",
+  "later_strict_kernel_qualification": "degen2-triangular-kernel-diagnosis.json: kernel outputbits agree through162 pivots, first\u22120/+0 atneededpivot163. Earlier637state comparison treated signedzeros equal; finalvectors stillbitwise equal. Do not infer allinternalreferencebitidentity."
+}

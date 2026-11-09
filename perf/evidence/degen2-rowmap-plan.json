@@ -1,0 +1,673 @@
+{
+  "hypothesis": "Producer-invalidated virtual-to-numeric U row index plans survive repeated needed-FTRAN queries; store only index mappings, read current values, preserve dot arithmetic/order. Distinct from per-call short-row direct lookup.",
+  "decision": "REJECTED at matching fixed39 PGO counters; do not run timing seeds65017/65089, retry profile or tune this candidate.",
+  "census": [
+    {
+      "file": "target/perf-rowmap-lifetime/degen2-20-census.stderr",
+      "counts": {
+        "epochs": 2,
+        "notifications": 342,
+        "updates": 19,
+        "queries": 68,
+        "misses": 50,
+        "build_terms": 59,
+        "live_invalidations": 24,
+        "hits": 18
+      },
+      "hit_rate": 0.2647058823529412
+    },
+    {
+      "file": "target/perf-rowmap-lifetime/afiro-30-census.stderr",
+      "counts": {
+        "epochs": 4,
+        "notifications": 131,
+        "updates": 9,
+        "queries": 35,
+        "misses": 35,
+        "build_terms": 51,
+        "live_invalidations": 24
+      },
+      "hit_rate": 0.0
+    },
+    {
+      "file": "target/perf-rowmap-lifetime/degen2-640-census.stderr",
+      "counts": {
+        "epochs": 16,
+        "notifications": 29284,
+        "updates": 621,
+        "queries": 19765,
+        "misses": 4089,
+        "build_terms": 17201,
+        "live_invalidations": 2756,
+        "hits": 15676
+      },
+      "hit_rate": 0.7931191500126487
+    },
+    {
+      "file": "target/perf-rowmap-lifetime/sc50a-60-census.stderr",
+      "counts": {
+        "epochs": 6,
+        "notifications": 467,
+        "updates": 30,
+        "queries": 190,
+        "misses": 145,
+        "build_terms": 205,
+        "live_invalidations": 63,
+        "hits": 45
+      },
+      "hit_rate": 0.23684210526315788
+    }
+  ],
+  "source_numeric_proof": {
+    "needed_numeric_body_reconstructs_literally": true,
+    "reference_body_is_original_renamed": true,
+    "original_needed_sha256": "addd9692d575c05ed66ccd44adebab09bd464ccf8d117b278cf47d3051cb0e99",
+    "source_sha256": "067365a3e02ee04345b96495bb6a9c7b53f6206754d5d3ea84c20c8c7835b8a3"
+  },
+  "matching_pgo": {
+    "compiler": "rustc 1.98.1 (48a229cea 2026-09-01)\nbinary: rustc\ncommit-hash: 48a229ceaefd4985c50990b14116b6d856af0985\ncommit-date: 2026-09-01\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.1\nLLVM version: 22.1.8\n",
+    "profile": "/home/derekwang/rose-reverse-engineer/rose/target/perf-rowmap-plan/source/target/perf-pgo/2c6ae65d4a5842fd0c9a9663fdd1b3c5062e010a5e1ceb6b60ce7fc73d1ca138.profdata",
+    "sha256": "2c6ae65d4a5842fd0c9a9663fdd1b3c5062e010a5e1ceb6b60ce7fc73d1ca138",
+    "rustflags": [
+      "-Cllvm-args=--align-loops=64",
+      "-Cprofile-use=/home/derekwang/rose-reverse-engineer/rose/target/perf-rowmap-plan/source/target/perf-pgo/2c6ae65d4a5842fd0c9a9663fdd1b3c5062e010a5e1ceb6b60ce7fc73d1ca138.profdata"
+    ],
+    "features": [
+      "system-tcmalloc"
+    ],
+    "training": [
+      [
+        "solve",
+        "tests/fixtures/afiro.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/afiro.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/afiro.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/afiro.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/afiro.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/afiro.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/afiro.mps",
+        "--method",
+        "pdhg",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--pdhg-iter-limit",
+        "2000"
+      ],
+      [
+        "solve",
+        "tests/fixtures/sc50a.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/sc50a.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/sc50a.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/sc50a.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/sc50a.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/sc50a.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/sc50a.mps",
+        "--method",
+        "pdhg",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--pdhg-iter-limit",
+        "2000"
+      ],
+      [
+        "solve",
+        "tests/fixtures/blend.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/blend.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/blend.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/blend.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/blend.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/blend.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/blend.mps",
+        "--method",
+        "pdhg",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--pdhg-iter-limit",
+        "2000"
+      ],
+      [
+        "solve",
+        "tests/fixtures/adlittle.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/adlittle.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/adlittle.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/adlittle.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/adlittle.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/adlittle.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/adlittle.mps",
+        "--method",
+        "pdhg",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--pdhg-iter-limit",
+        "2000"
+      ],
+      [
+        "solve",
+        "tests/fixtures/bore3d.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/bore3d.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/bore3d.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/bore3d.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/bore3d.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/bore3d.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/bore3d.mps",
+        "--method",
+        "pdhg",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--pdhg-iter-limit",
+        "2000"
+      ],
+      [
+        "solve",
+        "tests/fixtures/inf_itest6.mps",
+        "--method",
+        "primal",
+        "--profile",
+        "release",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null"
+      ],
+      [
+        "solve",
+        "tests/fixtures/inf_itest6.mps",
+        "--method",
+        "dual",
+        "--profile",
+        "release",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null"
+      ],
+      [
+        "solve",
+        "tests/fixtures/fx_midsing_1106.mps",
+        "--method",
+        "primal",
+        "--profile",
+        "release",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null"
+      ],
+      [
+        "solve",
+        "tests/fixtures/fx_midsing_1106.mps",
+        "--method",
+        "dual",
+        "--profile",
+        "release",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null"
+      ]
+    ]
+  },
+  "build": {
+    "argv": [
+      "python3",
+      "perf/build_pgo.py",
+      "--system-tcmalloc"
+    ],
+    "cwd": "/home/derekwang/rose-reverse-engineer/rose/target/perf-rowmap-plan/source",
+    "env": {
+      "LIBRARY_PATH": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/sysroot/usr/lib/x86_64-linux-gnu",
+      "LD_LIBRARY_PATH": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/sysroot/usr/lib/x86_64-linux-gnu",
+      "LLVM_PROFDATA": "/home/derekwang/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/bin/llvm-profdata"
+    },
+    "estimated_minutes": "2-4",
+    "exit": 0,
+    "elapsed": 73.31601550600317
+  },
+  "tests": {
+    "focused_release": "18/18 including f64/F80 bit patterns, duplicates/holes, changed values with identical keys, warm complete needed kernel vs frozen original and captured SC50A factors",
+    "parent_profile_fast_parity": "940/940",
+    "matching_profile_full_parity": "not run; candidate stopped at counter gate",
+    "whole_comparison": "All34 complete bounded result/exit objects per profile agree; only seconds removed, signedzeros preserved"
+  },
+  "artifacts": "/home/derekwang/rose-reverse-engineer/rose/target/perf-rowmap-plan",
+  "numeric_source_main_unchanged": true,
+  "parent_counter_summary": {
+    "adlittle": {
+      "instructions:u": {
+        "before": 15044565.0,
+        "after": 15294649.0,
+        "percent": 1.6622880089919523
+      },
+      "cycles:u": {
+        "before": 16988813.0,
+        "after": 17548211.0,
+        "percent": 3.29274328936342
+      }
+    },
+    "afiro": {
+      "instructions:u": {
+        "before": 6901693.0,
+        "after": 6930887.0,
+        "percent": 0.4229976615882425
+      },
+      "cycles:u": {
+        "before": 10109852.0,
+        "after": 10211267.0,
+        "percent": 1.0031304118002904
+      }
+    },
+    "degen2": {
+      "instructions:u": {
+        "before": 196499904.5,
+        "after": 199793873.5,
+        "percent": 1.6763209164816661
+      },
+      "cycles:u": {
+        "before": 141375904.0,
+        "after": 145609803.0,
+        "percent": 2.994781204016217
+      }
+    },
+    "sc50a": {
+      "instructions:u": {
+        "before": 9809711.0,
+        "after": 9941158.0,
+        "percent": 1.3399681193462243
+      },
+      "cycles:u": {
+        "before": 13340849.0,
+        "after": 12528477.0,
+        "percent": -6.089357581365329
+      }
+    }
+  },
+  "own_counter_summary": {
+    "adlittle": {
+      "instructions:u": {
+        "before": 15045837.0,
+        "after": 15068172.0,
+        "percent": 0.14844637755946355
+      },
+      "cycles:u": {
+        "before": 17725021.0,
+        "after": 18328819.0,
+        "percent": 3.4064726919082355
+      }
+    },
+    "afiro": {
+      "instructions:u": {
+        "before": 6903470.0,
+        "after": 6909473.0,
+        "percent": 0.08695626981793936
+      },
+      "cycles:u": {
+        "before": 10426150.0,
+        "after": 11452889.0,
+        "percent": 9.84772902749338
+      }
+    },
+    "degen2": {
+      "instructions:u": {
+        "before": 196501567.0,
+        "after": 196882118.0,
+        "percent": 0.19366308666637355
+      },
+      "cycles:u": {
+        "before": 145472107.0,
+        "after": 155293672.0,
+        "percent": 6.751510789625126
+      }
+    },
+    "sc50a": {
+      "instructions:u": {
+        "before": 9808520.0,
+        "after": 9824181.0,
+        "percent": 0.15966730964509512
+      },
+      "cycles:u": {
+        "before": 12715722.0,
+        "after": 13276427.0,
+        "percent": 4.40954119632373
+      }
+    }
+  }
+}

@@ -1,0 +1,443 @@
+{
+  "previous_goal_turn_classification": "Progress: whole accepted-ELF output census bounded prior ordering lead at2.38%solveI and changed nextaction to original Uoperation comparison. Currentturn establishes actual numerical operation projections and a separate concrete rejected-candidate scan cost; no optimization.",
+  "scope": "One bounded diagnostic at sourcepricing149/native148, contextit147,r138,q448. Release/fixed39 PGO/systemTCMalloc55af observed read-only. All arithmetic captured as actualmachine state; no floating model, normalization, solver source edit or newcandidate.",
+  "configuration": {
+    "rose_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "ordinary_cli_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "cpu": 2,
+    "cap": 150,
+    "strict_numeric_prefix_pivots": 162,
+    "first_divergence": "Neededoutput signed-zero atpivot163 unchanged; no comparisons beyond it."
+  },
+  "division_table": [
+    {
+      "purpose": "full",
+      "stage": "singleton",
+      "Rose_DIV": 11,
+      "Gurobi_DIV": 11,
+      "Rose_zero_quotients": 0,
+      "Gurobi_zero_quotients": 0
+    },
+    {
+      "purpose": "full",
+      "stage": "tail",
+      "Rose_DIV": 11,
+      "Gurobi_DIV": 20,
+      "Rose_zero_quotients": 8,
+      "Gurobi_zero_quotients": 17
+    },
+    {
+      "purpose": "full",
+      "stage": "nucleus",
+      "Rose_DIV": 11,
+      "Gurobi_DIV": 122,
+      "Rose_zero_quotients": 2,
+      "Gurobi_zero_quotients": 113
+    },
+    {
+      "purpose": "needed",
+      "stage": "singleton",
+      "Rose_DIV": 11,
+      "Gurobi_DIV": 11,
+      "Rose_zero_quotients": 3,
+      "Gurobi_zero_quotients": 3
+    },
+    {
+      "purpose": "needed",
+      "stage": "tail",
+      "Rose_DIV": 19,
+      "Gurobi_DIV": 19,
+      "Rose_zero_quotients": 0,
+      "Gurobi_zero_quotients": 0
+    },
+    {
+      "purpose": "needed",
+      "stage": "nucleus",
+      "Rose_DIV": 9,
+      "Gurobi_DIV": 9,
+      "Rose_zero_quotients": 0,
+      "Gurobi_zero_quotients": 0
+    }
+  ],
+  "central_comparison": {
+    "status": "CAPTURED_OPERATION_PROJECTIONS_PASS",
+    "native_only_division_counts": {
+      "full/tail": 9,
+      "full/nucleus": 111
+    },
+    "native_only_all_zero_quotient": true,
+    "division_raw_order_first_difference": {
+      "ordinal": 1,
+      "native": [
+        "full",
+        "singleton",
+        214
+      ],
+      "Rose": [
+        "full",
+        "tail",
+        22
+      ]
+    },
+    "corresponding_divisions_pass": 72,
+    "scatter_raw_order_first_difference": {
+      "ordinal": 1,
+      "native": [
+        "needed",
+        145,
+        315
+      ],
+      "Rose": [
+        "full",
+        22,
+        223
+      ]
+    },
+    "corresponding_scatter_pass": 52,
+    "corresponding_rowdot_pass": 21,
+    "rowdot_column_alignment": "NOT_PROVEN: source actual prepared buffer retains coefficient/value pairs without observed column IDs; row-ordered operand/product/result projection only.",
+    "rowdot_operand_roles": "Source append_terms tuple=(coefficient,value), src/ftran_order.rs:630: MUL XMM coefficient times memory value; native12dcb8/12dcc2 has same literal operand roles. No operand swapping or normalization."
+  },
+  "numerical_gates": {
+    "fresh_full_input": "Actualsourcefirsttail rawworkspace positions19 equal native sparseUentry19; no native unpublished444memory claim.",
+    "fresh_needed_input": "All444actualsourcefirsttail rawworkspace bits and kind arrays match native neededUinput.",
+    "divisions": "All72source divisions paired bypurpose/stage/position have sameactual numerator/diagonal/quotient bits. Native120unmatched full divisions are9tail+111nucleus, allzeroquotients. Sourcehasno unmatcheddivision.",
+    "scatters": "All20full+32needed from-column/destination coefficient/source/before/product/after tuples pass. Actual globalinterleaving differs; native ADD/signflip rawmachineoperands retained separately from destination-state/product projection. No literal instructionstream identity claim.",
+    "rowdot": "All21ordered rowdot coefficient/value/accumulator/product/result projections pass for9needednucleus rows. Sourcegatheredpairs lose observedcolumnidentity; exact column-ID visitation unproved. append_terms original tuple layout proves coefficient/value roles; initial extractor mislabeled fields, corrected against actual source/disassembly; not a numerical divergence."
+  },
+  "concrete_mechanism": {
+    "Rose_needed_numeric_candidates": 237,
+    "Rose_actual_needed_tail_scatters": 32,
+    "native_actual_needed_tail_coefficients": 32,
+    "Rose_rejected_nucleus_candidates": 205,
+    "meaning": "Rose walks all numericUC entries and reads kind/bounds before accepting tail entries.205nucleus candidates execute lookup/index/control but no coefficientload/MUL/scatter. Native tailadjacency visits the32relevant coefficients. Corresponding52tailproducts/statesmatch andRoseexecutesfewerfullDIVs, so extra Uarithmetic isnot the selected gap mechanism.",
+    "machine_code": "14368dMOVdest,143690MOVkindlen,143694CMP,143697JAE,14369dMOVkindptr,1436a1CMPkind,1436a6JNE\u2192143680ADD,143684CMPend,143687JE. Seven rejectioncore instructions plus3commonpointer/end instructions perrejectedentry.",
+    "static_extra_instruction_exposure": 2050,
+    "actual_reject_core_I": 1435,
+    "actual_reject_advance_I": 616,
+    "actual_total_I": 2051,
+    "tail_root_I": 3469,
+    "tail_detail_I": 3470,
+    "tail_static_fraction_percent": 59.0948400115307,
+    "tail_remaining_I": 1419,
+    "limits": "Selected local source instruction exposure, not removable/free stage or elapsed-time share. Required pointer/index/filter work and construction/update costs for any alternative adjacency remain. No extrapolation by634 or laternumericpairing.",
+    "actual_per_column_tail_offsets": [
+      {
+        "from_column": 145,
+        "candidates": 11,
+        "tail_entry_offsets": [
+          4,
+          8,
+          9,
+          10
+        ]
+      },
+      {
+        "from_column": 315,
+        "candidates": 34,
+        "tail_entry_offsets": [
+          20,
+          22,
+          33
+        ]
+      },
+      {
+        "from_column": 22,
+        "candidates": 10,
+        "tail_entry_offsets": [
+          4,
+          6,
+          7,
+          8,
+          9
+        ]
+      },
+      {
+        "from_column": 439,
+        "candidates": 14,
+        "tail_entry_offsets": [
+          5,
+          11,
+          12,
+          13
+        ]
+      },
+      {
+        "from_column": 70,
+        "candidates": 12,
+        "tail_entry_offsets": [
+          5
+        ]
+      },
+      {
+        "from_column": 102,
+        "candidates": 16,
+        "tail_entry_offsets": [
+          4,
+          14
+        ]
+      },
+      {
+        "from_column": 419,
+        "candidates": 22,
+        "tail_entry_offsets": [
+          20,
+          21
+        ]
+      },
+      {
+        "from_column": 428,
+        "candidates": 9,
+        "tail_entry_offsets": [
+          4,
+          7,
+          8
+        ]
+      },
+      {
+        "from_column": 443,
+        "candidates": 5,
+        "tail_entry_offsets": [
+          3,
+          4
+        ]
+      },
+      {
+        "from_column": 442,
+        "candidates": 5,
+        "tail_entry_offsets": [
+          4
+        ]
+      },
+      {
+        "from_column": 441,
+        "candidates": 5,
+        "tail_entry_offsets": [
+          4
+        ]
+      },
+      {
+        "from_column": 440,
+        "candidates": 10,
+        "tail_entry_offsets": []
+      },
+      {
+        "from_column": 386,
+        "candidates": 9,
+        "tail_entry_offsets": [
+          8
+        ]
+      },
+      {
+        "from_column": 408,
+        "candidates": 10,
+        "tail_entry_offsets": [
+          5,
+          9
+        ]
+      },
+      {
+        "from_column": 406,
+        "candidates": 11,
+        "tail_entry_offsets": [
+          10
+        ]
+      },
+      {
+        "from_column": 136,
+        "candidates": 17,
+        "tail_entry_offsets": []
+      },
+      {
+        "from_column": 146,
+        "candidates": 13,
+        "tail_entry_offsets": []
+      },
+      {
+        "from_column": 65,
+        "candidates": 20,
+        "tail_entry_offsets": []
+      },
+      {
+        "from_column": 292,
+        "candidates": 4,
+        "tail_entry_offsets": []
+      }
+    ],
+    "contiguity": "Selected315 tailentries at offsets20,22,33of34;145at4,8,9,10of11. Tailentries are not a common contiguousUCprefix/suffix; a future indexed traversal requires proved maintainedmetadata or equivalent lookup/construction. Do not assume free sub-slice bypass.",
+    "native_partition_disassembly": {
+      "qualification": "Delegated saved-disassembly review, no new reference capture.",
+      "metadata_loads": "12c314/12c33a/12c33e load originalnumericobjectRDX+68/+78/+70 start/split/end arrays, retained atstacke0/d0/c8.",
+      "per_column": "12d510loadssplit and12d518start;12d51ccomputessplit\u2212start. Neededonly12d72f..12d859 traverses[start,split), each index/coefficient feeds actualscatter, no kindlookup/branch.",
+      "joint": "Jointprefix12d591..12d5f4 uses same[start,split) forbothvectors; fullonlysuffix12d5fe..12d728 traverses[split,end).",
+      "limits": "Only this scatterloop avoids nucleus-kind filtering; native support/preparation and partition construction/maintenance remain separately owned/unaccounted. No claimofzerootherintegerwork."
+    }
+  },
+  "cost_ownership": "New candidate-loop counters are inside existing neededtail3469I, itself inside neededroot34432I, inside matched72460Itransaction. No newallocations attributed to rejection loop. Existing prep3914I/F2clone440I/rows2612I/publication9I/cleanup169\u2013170I remain disjoint and unchanged. Native4050I is jointU/WORK/publication, not equivalent32scatter-only cost. Retained construction/update/retirement mustbe counted byfactorlifetime for anyfuture alternative.",
+  "distortion": {
+    "numerical_capture": "SeparateGDB only, noPMU/timing conclusions.347validatednumeric PCs acrossacceptedfunctionranges; actual588events. Allbefore/afterbits fromrealregister/memory. AFIRO3/SC50A3 controls have no selectedUCloop hits; theyqualifyinstrumentation/output only.",
+    "solve_clock": {
+      "traced_seconds": 6.294086023,
+      "plain_seconds": 0.005735409,
+      "ratio": 1097.4084015629921,
+      "interpretation": "Observeddebuggerperturbation about1097x atcap150; neitherdebugclock nortracecostusedforperformance."
+    },
+    "PMU": "Known5I\u21927I calibration subtract2I perstoppedinterval, target-piduser counters,enabled==running,same-stopped double-read equal. Root3469/detail3470 residual1I; all205rejectcores exactly7I;204advances3I andone4I,615Istatic/616Imeasured.496marks gives990I correction. No universalexacterrorbound.",
+    "cycles": "All debugger cycles excluded; existing acceptedselfprofiles alone retain cyclecomparisons.",
+    "codegen_changed": false
+  },
+  "validation": {
+    "numeric_controls": [
+      {
+        "model": "afiro",
+        "cap": 3,
+        "pricing": 1,
+        "seconds": 0.9801819589993102,
+        "controls_exact": true,
+        "ops": 38,
+        "divisions": {
+          "full:singleton": 6,
+          "needed:singleton": 6
+        },
+        "scatters": {},
+        "tail_visits": 0,
+        "needed_candidates": 0
+      },
+      {
+        "model": "sc50a",
+        "cap": 3,
+        "pricing": 1,
+        "seconds": 1.0134424540010514,
+        "controls_exact": true,
+        "ops": 43,
+        "divisions": {
+          "full:singleton": 8,
+          "needed:singleton": 5
+        },
+        "scatters": {},
+        "tail_visits": 0,
+        "needed_candidates": 0
+      },
+      {
+        "model": "degen2",
+        "cap": 150,
+        "pricing": 149,
+        "seconds": 7.04126911899948,
+        "controls_exact": true,
+        "ops": 588,
+        "divisions": {
+          "full:tail": 11,
+          "full:singleton": 11,
+          "full:nucleus": 11,
+          "needed:tail": 19,
+          "needed:singleton": 11,
+          "needed:nucleus": 9
+        },
+        "scatters": {
+          "full": 20,
+          "needed": 32
+        },
+        "tail_visits": 31,
+        "needed_candidates": 237
+      }
+    ],
+    "cost_controls": [
+      {
+        "model": "afiro",
+        "cap": 3,
+        "pricing": 1,
+        "mode": "detail",
+        "seconds": 0.7137258869988727,
+        "controls_exact": true,
+        "total_I": 0,
+        "marks": 0
+      },
+      {
+        "model": "sc50a",
+        "cap": 3,
+        "pricing": 1,
+        "mode": "detail",
+        "seconds": 0.6456585740015726,
+        "controls_exact": true,
+        "total_I": 0,
+        "marks": 0
+      },
+      {
+        "model": "degen2",
+        "cap": 150,
+        "pricing": 149,
+        "mode": "root",
+        "seconds": 0.7531724419968668,
+        "controls_exact": true,
+        "total_I": 3469,
+        "marks": 2
+      },
+      {
+        "model": "degen2",
+        "cap": 150,
+        "pricing": 149,
+        "mode": "detail",
+        "seconds": 2.324586390001059,
+        "controls_exact": true,
+        "total_I": 3470,
+        "marks": 496
+      }
+    ],
+    "all_seven_complete_result_exit_zero_sign_controls": true,
+    "no_solver_source_changes": true,
+    "no_accepted_binary_changes": true,
+    "no_new_reference_capture": true,
+    "full_parity": "Existing qualifiedaccepted987baseline retained; notrerun becauseimmutablebinary/no solverchanges."
+  },
+  "reconciliation": {
+    "accepted_whole_instruction_gap": 127995000,
+    "accepted_whole_cycle_gap": 89315000,
+    "matched_complete_transaction_I": [
+      72460,
+      14018
+    ],
+    "matched_complete_gap_I": 58442,
+    "new_reject_cost_already_in_gap": true,
+    "accepted_whole_full_postL_preoutput_I": 10208631,
+    "meaning": "New2050Iselected mechanism isalready inside previous costs. Source DIVcount islower, and matched products/rowdots defeat more-arithmetic hypothesis here. Whole-loop rejection exposure, corresponding lifecycle costs and valid inclusive cycles remain missing; cannotassign remainingwholeF/Bexcess tothis loop."
+  },
+  "one_next_experiment": {
+    "type": "One diagnostic whole-source needed-U candidate/rejection census with complete scope/lifetime accounting.",
+    "design": "Countall634neededcalls atactual kindbranch, distinguishing numericcandidates/tailscatters/rejections and coveredprefix/later structural counts. QualifyAFIRO/SC50A/cap20, estimatecost beforeboundedcap640. Use cheap counters/instruction evidence, no per-elementvalue trace afterfrontier. Before anyprototype measure/estimatealternative index construction+621update+16factor cleanup costs.",
+    "benefit": "Diagnostic0. Future speedup unquantified untilwholeexposure andlifecyclecostsknown; selected2050Icannotbemultipliedby634. A1%wholeIproposal requires1.812M netinstructions afterconstruction/update/retirement, plus valid cycle/timing evidence.",
+    "rejected_check": "This measures actualneededtailkind-filter rejection, distinct from rejected fullrowmap cache, shorttau rowgather, combinedWORKdeferral, sharedtwo-vectorfusion, outputorder reuse/workspace/preUowner/arenas, emptyLgap/handoff. None reopened; no alternative numericadjacency implementation authorizedbythisdiagnostic."
+  },
+  "artifacts": {
+    "root": "target/perf-degen2-U-ops",
+    "central_report": "target/perf-degen2-U-operation-compare/central.json",
+    "central_reproducer": "target/perf-degen2-U-operation-compare/command.txt",
+    "central_provenance": "target/perf-degen2-U-operation-compare/provenance.json"
+  },
+  "artifact_hashes": {
+    "target/perf-degen2-U-ops/make_ops.py": "af92233645a90db99196d70d6a5c441e414a4c7cd555fccaa54443364db8d4ed",
+    "target/perf-degen2-U-ops/ops.json": "5f7992417a7f644b2b9fe74eb498704003028ff74b07fc519953fb90ddb01cb3",
+    "target/perf-degen2-U-ops/trace_gdb.py": "8c30e1f21486bebef150ec7b6f3b36c2a4d86e372f2057f551ea04c6a073fbd3",
+    "target/perf-degen2-U-ops/cost_reject_gdb.py": "1cf150be2fd1c69e99e4cc17143fba284c2b7ab4d10e8d4d84859698d487ef0d",
+    "target/perf-degen2-U-ops/run.py": "235d7eeaf48d7a62a60e366c213325fbcdbe3fd912f2b4cd9100692425ffa0e5",
+    "target/perf-degen2-U-ops/run_cost.py": "a274b660985cb58f55ebb97b5cc55484ebad3bbea5290ec40308771c117ebe7e",
+    "target/perf-degen2-U-ops/summary.json": "42c7511949631812bff10b54bbc9cbcd264385c9c172c078f577a83ecddffd60",
+    "target/perf-degen2-U-ops/cost-summary.json": "4c929d4c4a0cc2a1465fea312cfc7ebc591a32169fe42d81c3a29fea7922401c",
+    "target/perf-degen2-U-ops/degen2/trace.json": "44e3e76535f729805accfb6398d9aafc926a037ff164e7c8fa5b3c83a9918378",
+    "target/perf-degen2-U-ops/degen2/trace.meta.json": "4cfe0e383da37ffbb8003237bfe0bc4f7fe1964dafa9f3236265ff933e0b7af2",
+    "target/perf-degen2-U-ops/degen2-cost-detail/trace.json": "582076ef77a178b0ba3d41dcdcb7f1f6e8a295dfda033725c294074f2ff3c368",
+    "target/perf-degen2-U-ops/degen2-cost-root/trace.json": "34ce00769e2df54d84fed622bd490cb6fc0f1dac65ebed76388b63f6a5205d8f",
+    "target/perf-degen2-U-operation-compare/central.json": "3f8494ee2cab7c0993c8cb9fe5e798f13a3f43f39e6a628f69061f38c3ed2cd5",
+    "target/perf-degen2-U-operation-compare/command.txt": "5279ca95d7fd534363798868f32b1a1c709ca0c97045002b8dbafa199340e83e",
+    "target/perf-degen2-U-operation-compare/provenance.json": "f157fe54b4b3696bf1052dae0f4684575db8eb6557a87a347a70a443ba5128c7",
+    "target/perf-degen2-U-ops/summarize.py": "e502567b7c23a7c71c34c415d7b20631ae719db02a4fdcf69a875038385dc7f8",
+    "target/perf-degen2-U-native/native-U-wide.asm": "2c1a783c45afd73393684afc0144cf97bf020e0617b28068ae25923a77d67ee6"
+  },
+  "completed_whole_candidate_lifecycle_followup": {
+    "evidence": "perf/evidence/degen2-U-candidate-census.json",
+    "status": "Complete diagnostic, no solver optimization.",
+    "whole": "178410rejections/1.7841M I(.984641%solveI) exposure; full637state lifecycle.",
+    "proxy": "SeparateunprofiledreleaseTCmalloc eager7.936M I, optimisticdirty.937M I withfreeinvalidation. No acceptedruntime/netgainclaim.",
+    "next": "Alreadyplanned samepivotdirectBTRANU/eliminate proof/cost; no rejectedtrialretry."
+  }
+}

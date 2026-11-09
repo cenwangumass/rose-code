@@ -1,0 +1,1583 @@
+{
+  "previous_goal_turn_classification": "Progress: full captured source-stage equivalence and offline lifecycle cost established a component margin and justified the actual-solver shadow diagnostic. This turn completes its ownfixed39 build, 987 parity,17201dump qualification, actual lifecycle tests and cost measurement.",
+  "scope": "Bounded diagnostic only. Original eliminate always executes; no solver optimization/source promotion. All production numeric source, ordinary accepted8483, optimized55af and reference26a50517 remain unchanged.",
+  "configuration": {
+    "optimized_accepted_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "ordinary_accepted_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "diagnostic_build": {
+      "compiler": "rustc 1.98.1 (48a229cea 2026-09-01)\nbinary: rustc\ncommit-hash: 48a229ceaefd4985c50990b14116b6d856af0985\ncommit-date: 2026-09-01\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.1\nLLVM version: 22.1.8\n",
+      "features": [
+        "system-tcmalloc"
+      ],
+      "flags": [
+        "-Cllvm-args=--align-loops=64"
+      ],
+      "training": [
+        [
+          "solve",
+          "tests/fixtures/afiro.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/afiro.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/afiro.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/afiro.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/afiro.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/afiro.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/afiro.mps",
+          "--method",
+          "pdhg",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--pdhg-iter-limit",
+          "2000"
+        ],
+        [
+          "solve",
+          "tests/fixtures/sc50a.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/sc50a.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/sc50a.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/sc50a.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/sc50a.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/sc50a.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/sc50a.mps",
+          "--method",
+          "pdhg",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--pdhg-iter-limit",
+          "2000"
+        ],
+        [
+          "solve",
+          "tests/fixtures/blend.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/blend.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/blend.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/blend.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/blend.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/blend.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/blend.mps",
+          "--method",
+          "pdhg",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--pdhg-iter-limit",
+          "2000"
+        ],
+        [
+          "solve",
+          "tests/fixtures/adlittle.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/adlittle.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/adlittle.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/adlittle.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/adlittle.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/adlittle.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/adlittle.mps",
+          "--method",
+          "pdhg",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--pdhg-iter-limit",
+          "2000"
+        ],
+        [
+          "solve",
+          "tests/fixtures/bore3d.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/bore3d.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/bore3d.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/bore3d.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/bore3d.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/bore3d.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/bore3d.mps",
+          "--method",
+          "pdhg",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--pdhg-iter-limit",
+          "2000"
+        ],
+        [
+          "solve",
+          "tests/fixtures/inf_itest6.mps",
+          "--method",
+          "primal",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null"
+        ],
+        [
+          "solve",
+          "tests/fixtures/inf_itest6.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null"
+        ],
+        [
+          "solve",
+          "tests/fixtures/fx_midsing_1106.mps",
+          "--method",
+          "primal",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null"
+        ],
+        [
+          "solve",
+          "tests/fixtures/fx_midsing_1106.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null"
+        ]
+      ],
+      "training_mode": "record",
+      "estimated_seconds": "80-140",
+      "scope": "Own fixed39 profile diagnostic shadow. Original solver algorithms and eliminate stay active.",
+      "stop": "First mismatch or unexpected exit; no optimization or timing screen.",
+      "rustflags": [
+        "-Cllvm-args=--align-loops=64",
+        "-Cprofile-use=/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-btran-shadow/be2171a22e6ff33a2f1d550155784aba68cb4f83543294e2d40cd56d592bf685.profdata"
+      ],
+      "profile": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-btran-shadow/be2171a22e6ff33a2f1d550155784aba68cb4f83543294e2d40cd56d592bf685.profdata",
+      "profile_sha256": "be2171a22e6ff33a2f1d550155784aba68cb4f83543294e2d40cd56d592bf685",
+      "elapsed_seconds": 76.00265395099996,
+      "binary_sha256": "df44416ecaa47ca0f92346e6551ba6420accdb990c8efd3e2a8d1905846926b4"
+    },
+    "same_system_TCMalloc": true,
+    "CPU": 2,
+    "fixed39_small_preflight_checks": [
+      {
+        "model": "afiro",
+        "cap": 3,
+        "exit": 3,
+        "exact": true
+      },
+      {
+        "model": "sc50a",
+        "cap": 20,
+        "exit": 3,
+        "exact": true
+      },
+      {
+        "model": "degen2",
+        "cap": 20,
+        "exit": 3,
+        "exact": true
+      }
+    ]
+  },
+  "source_reversal_proof": {
+    "original_ftran_sha256": "57c86340f6959717954e2cb1c58f06c285ab7ce564a25d7d0e9e9c429d802ef1",
+    "shadow_ftran_sha256": "e1d978cc16af849b11f51d31e076fe78e15aa7e4dc33392f0351d07904b8c861",
+    "numeric_lines_literal_reversal_exact": true,
+    "original_eliminate_unchanged": true,
+    "original_cli_sha256": "63d282ccf37597706b28ecbf0cc6d18a0a37b41e9c9b06defd7cf643b6902962",
+    "shadow_cli_sha256": "15ac1c53871a4c24a71cfd1a8d87bf8d05df79cda1a3168f78320f6d6c233e9f",
+    "shadow_module_sha256": "dc29d0f0bacc89ab11022cea8df7fe62035bb11f417f6e82724e59ba9a81b1ab",
+    "accepted_optimized_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "ordinary_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410"
+  },
+  "validation": {
+    "all_16_plain_complete_results_exits_zero_sign_match": true,
+    "checks": [
+      {
+        "model": "afiro",
+        "cap": 3,
+        "mode": "accepted",
+        "exit": 3,
+        "wall_seconds": 0.15361221200146247,
+        "stats": null
+      },
+      {
+        "model": "afiro",
+        "cap": 3,
+        "mode": "off",
+        "exit": 3,
+        "wall_seconds": 0.021312645010766573,
+        "stats": {
+          "constructors": 0,
+          "clones": 0,
+          "restores": 0,
+          "btran_entries": 0,
+          "captures": 0,
+          "rejected": 0,
+          "consumes": 0,
+          "misses": 0,
+          "discarded": 0,
+          "entries": 0,
+          "consumed_entries": 0,
+          "verified": 0,
+          "owner_fail": 0,
+          "epoch_fail": 0,
+          "row_fail": 0,
+          "fp_fail": 0
+        }
+      },
+      {
+        "model": "afiro",
+        "cap": 3,
+        "mode": "record",
+        "exit": 3,
+        "wall_seconds": 0.01804844099387992,
+        "stats": {
+          "constructors": 1,
+          "clones": 0,
+          "restores": 0,
+          "btran_entries": 32,
+          "captures": 3,
+          "rejected": 0,
+          "consumes": 3,
+          "misses": 0,
+          "discarded": 0,
+          "entries": 0,
+          "consumed_entries": 0,
+          "verified": 0,
+          "owner_fail": 0,
+          "epoch_fail": 0,
+          "row_fail": 0,
+          "fp_fail": 0
+        }
+      },
+      {
+        "model": "afiro",
+        "cap": 3,
+        "mode": "verify",
+        "exit": 3,
+        "wall_seconds": 0.018219367993879132,
+        "stats": {
+          "constructors": 1,
+          "clones": 0,
+          "restores": 0,
+          "btran_entries": 32,
+          "captures": 3,
+          "rejected": 0,
+          "consumes": 3,
+          "misses": 0,
+          "discarded": 0,
+          "entries": 0,
+          "consumed_entries": 0,
+          "verified": 3,
+          "owner_fail": 0,
+          "epoch_fail": 0,
+          "row_fail": 0,
+          "fp_fail": 0
+        }
+      },
+      {
+        "model": "sc50a",
+        "cap": 20,
+        "mode": "accepted",
+        "exit": 3,
+        "wall_seconds": 0.01972371299052611,
+        "stats": null
+      },
+      {
+        "model": "sc50a",
+        "cap": 20,
+        "mode": "off",
+        "exit": 3,
+        "wall_seconds": 0.02215488499496132,
+        "stats": {
+          "constructors": 0,
+          "clones": 0,
+          "restores": 0,
+          "btran_entries": 0,
+          "captures": 0,
+          "rejected": 0,
+          "consumes": 0,
+          "misses": 0,
+          "discarded": 0,
+          "entries": 0,
+          "consumed_entries": 0,
+          "verified": 0,
+          "owner_fail": 0,
+          "epoch_fail": 0,
+          "row_fail": 0,
+          "fp_fail": 0
+        }
+      },
+      {
+        "model": "sc50a",
+        "cap": 20,
+        "mode": "record",
+        "exit": 3,
+        "wall_seconds": 0.019153720000758767,
+        "stats": {
+          "constructors": 3,
+          "clones": 0,
+          "restores": 0,
+          "btran_entries": 74,
+          "captures": 20,
+          "rejected": 0,
+          "consumes": 18,
+          "misses": 0,
+          "discarded": 2,
+          "entries": 20,
+          "consumed_entries": 19,
+          "verified": 0,
+          "owner_fail": 0,
+          "epoch_fail": 0,
+          "row_fail": 0,
+          "fp_fail": 0
+        }
+      },
+      {
+        "model": "sc50a",
+        "cap": 20,
+        "mode": "verify",
+        "exit": 3,
+        "wall_seconds": 0.016327343008015305,
+        "stats": {
+          "constructors": 3,
+          "clones": 0,
+          "restores": 0,
+          "btran_entries": 74,
+          "captures": 20,
+          "rejected": 0,
+          "consumes": 18,
+          "misses": 0,
+          "discarded": 2,
+          "entries": 20,
+          "consumed_entries": 19,
+          "verified": 18,
+          "owner_fail": 0,
+          "epoch_fail": 0,
+          "row_fail": 0,
+          "fp_fail": 0
+        }
+      },
+      {
+        "model": "degen2",
+        "cap": 20,
+        "mode": "accepted",
+        "exit": 3,
+        "wall_seconds": 0.03474945000198204,
+        "stats": null
+      },
+      {
+        "model": "degen2",
+        "cap": 20,
+        "mode": "off",
+        "exit": 3,
+        "wall_seconds": 0.022741067004972138,
+        "stats": {
+          "constructors": 0,
+          "clones": 0,
+          "restores": 0,
+          "btran_entries": 0,
+          "captures": 0,
+          "rejected": 0,
+          "consumes": 0,
+          "misses": 0,
+          "discarded": 0,
+          "entries": 0,
+          "consumed_entries": 0,
+          "verified": 0,
+          "owner_fail": 0,
+          "epoch_fail": 0,
+          "row_fail": 0,
+          "fp_fail": 0
+        }
+      },
+      {
+        "model": "degen2",
+        "cap": 20,
+        "mode": "record",
+        "exit": 3,
+        "wall_seconds": 0.019455614004982635,
+        "stats": {
+          "constructors": 2,
+          "clones": 0,
+          "restores": 0,
+          "btran_entries": 467,
+          "captures": 20,
+          "rejected": 0,
+          "consumes": 19,
+          "misses": 0,
+          "discarded": 1,
+          "entries": 3,
+          "consumed_entries": 3,
+          "verified": 0,
+          "owner_fail": 0,
+          "epoch_fail": 0,
+          "row_fail": 0,
+          "fp_fail": 0
+        }
+      },
+      {
+        "model": "degen2",
+        "cap": 20,
+        "mode": "verify",
+        "exit": 3,
+        "wall_seconds": 0.020863496989477426,
+        "stats": {
+          "constructors": 2,
+          "clones": 0,
+          "restores": 0,
+          "btran_entries": 467,
+          "captures": 20,
+          "rejected": 0,
+          "consumes": 19,
+          "misses": 0,
+          "discarded": 1,
+          "entries": 3,
+          "consumed_entries": 3,
+          "verified": 19,
+          "owner_fail": 0,
+          "epoch_fail": 0,
+          "row_fail": 0,
+          "fp_fail": 0
+        }
+      },
+      {
+        "model": "degen2",
+        "cap": 640,
+        "mode": "accepted",
+        "exit": 0,
+        "wall_seconds": 0.07360201800474897,
+        "stats": null
+      },
+      {
+        "model": "degen2",
+        "cap": 640,
+        "mode": "off",
+        "exit": 0,
+        "wall_seconds": 0.06464293900353368,
+        "stats": {
+          "constructors": 0,
+          "clones": 0,
+          "restores": 0,
+          "btran_entries": 0,
+          "captures": 0,
+          "rejected": 0,
+          "consumes": 0,
+          "misses": 0,
+          "discarded": 0,
+          "entries": 0,
+          "consumed_entries": 0,
+          "verified": 0,
+          "owner_fail": 0,
+          "epoch_fail": 0,
+          "row_fail": 0,
+          "fp_fail": 0
+        }
+      },
+      {
+        "model": "degen2",
+        "cap": 640,
+        "mode": "record",
+        "exit": 0,
+        "wall_seconds": 0.06297566198918503,
+        "stats": {
+          "constructors": 16,
+          "clones": 0,
+          "restores": 0,
+          "btran_entries": 1095,
+          "captures": 634,
+          "rejected": 0,
+          "consumes": 621,
+          "misses": 0,
+          "discarded": 13,
+          "entries": 4209,
+          "consumed_entries": 4088,
+          "verified": 0,
+          "owner_fail": 0,
+          "epoch_fail": 0,
+          "row_fail": 0,
+          "fp_fail": 0
+        }
+      },
+      {
+        "model": "degen2",
+        "cap": 640,
+        "mode": "verify",
+        "exit": 0,
+        "wall_seconds": 0.06774463100009598,
+        "stats": {
+          "constructors": 16,
+          "clones": 0,
+          "restores": 0,
+          "btran_entries": 1095,
+          "captures": 634,
+          "rejected": 0,
+          "consumes": 621,
+          "misses": 0,
+          "discarded": 13,
+          "entries": 4209,
+          "consumed_entries": 4088,
+          "verified": 621,
+          "owner_fail": 0,
+          "epoch_fail": 0,
+          "row_fail": 0,
+          "fp_fail": 0
+        }
+      }
+    ],
+    "frozen_parity": "All987dump/result/status/exit digests agree, ROSE_U_SHADOW=verify,68.4s. Never rerecorded or ignored baseline.",
+    "dumps": [
+      {
+        "cap": 20,
+        "records": 1002,
+        "all_original_records_exact": true,
+        "complete_result_signedzero_exact": true,
+        "seconds": 0.048439888007123955,
+        "accepted_dump_path": "/home/derekwang/rose-reverse-engineer/rose/target/perf-empty-L-gap/accepted-degen2-20.stderr",
+        "accepted_dump_sha256": "59f3a82954951b76065fd5fa65e780c89e5ec7f11caf15563e3c1d5b0f0e8fa7"
+      },
+      {
+        "cap": 640,
+        "records": 17201,
+        "all_original_records_exact": true,
+        "complete_result_signedzero_exact": true,
+        "seconds": 0.6240531969961012,
+        "accepted_dump_path": "/home/derekwang/rose-reverse-engineer/rose/target/perf-empty-L-gap/accepted-degen2-640.stderr",
+        "accepted_dump_sha256": "ae0386b81de4624bd9aa4d631cd85b84139f7e9406dfb017c8a696dba9b419e1"
+      }
+    ],
+    "lifetime_unit_test": "Release exact probe-helper copy plus appendedcfgtest. Clone andrestoreclear livecache; original retainsit; consumeonce; nonunit/nondirectoverwrite; movedowner,staleepoch,wrongrow,clearedstickyflags,changedrounding rejected;Drop retires unusedcache. One test passed.",
+    "lifetime_initial_setup_failure": "2x2 identity routesdense because hsum3>m2, so testfailedbefore reaching intendedcache. Test-only fixture corrected to4x4; initialsource/binary/log retained. Measured source/profile/costs unchanged.",
+    "all_gdb_cost_results_match_accepted_complete_result": true,
+    "all_72_counter_results_exits_match_complete_accepted_objects": true
+  },
+  "actual_full_lifetimes": {
+    "constructors": 16,
+    "clones": 0,
+    "restores": 0,
+    "BTRAN_entries": 1095,
+    "captures": 634,
+    "consumes": 621,
+    "unused_captures_retired": 13,
+    "nonpivot_entries_captured": 4209,
+    "entries_consumed": 4088,
+    "ordered_source_oracle_checks": 621,
+    "owner_epoch_row_FP_failures": 0,
+    "note": "OwnedShadowfield clears onClone/restore/fresh;Drop andnextBTRANretire;pointerguard rejectsmoves; consume checksoldcached_upd+1=currentupd beforeoriginaleliminate, row_cached stillpresent. Originalrow_cached.take andWORK publication remainunchanged."
+  },
+  "accepted_reference_alignment": {
+    "delegated_to": "/root/ref_compare",
+    "reuse": "Existing compare.py fullsource621 orderedU/eliminate projection and cachednative consumption disassembly; no new nativecapture.",
+    "strict_native_frontier": "native162/sourcepricing163 pass; firstnative163/source164signedzero mismatch retained. Shadowparity/dumps do not extend native pairing."
+  },
+  "same_diagnostic_original_eliminate": {
+    "calls": 621,
+    "off_raw_I": 2492544,
+    "record_raw_I": 2492545,
+    "calibration": "Known2instructions in original_begin observed4I, +2I/stoppedinterval. Beginbody3I andcallerCALLtoend1I are4markerI percall.",
+    "corrected_off_I": 2488818,
+    "corrected_record_I": 2488819,
+    "marker_correction_I": 2484,
+    "debugger_correction_I": 1242,
+    "limits": "Scope includes complete compiled elimination/localhelpers/cleanup throughendmarker; resulteta retirement belongslaterupdate. Caller layout/spill effects remain diagnostic. Existing accepted scope2.469725M I separate."
+  },
+  "actual_shadow_instruction_ledger": {
+    "helper_ledger": [
+      {
+        "stage": "begin",
+        "calls": 1095,
+        "off_I": 18616,
+        "record_I": 48875,
+        "difference_I": 30259
+      },
+      {
+        "stage": "capture",
+        "calls": 1078,
+        "off_I": 20486,
+        "record_I": 183968,
+        "difference_I": 163482
+      },
+      {
+        "stage": "consume",
+        "calls": 621,
+        "off_I": 13041,
+        "record_I": 562476,
+        "difference_I": 549435
+      },
+      {
+        "stage": "retirement",
+        "calls": 621,
+        "off_I": 9940,
+        "record_I": 40559,
+        "difference_I": 30619
+      }
+    ],
+    "helper_difference_sum_I": 773795,
+    "wholeCLI_record_minus_off_I_median": 774234.5,
+    "wholeCLI_incremental_I_range": [
+      756400,
+      787011
+    ],
+    "residual_at_median_I": 439.5,
+    "residual_limits": "Median residual439.5I is smallerthan processIvariation (~31k) andcannotbe assignedprecisely. Includes Utrackingdifferences,ctor/Drop/unusedcapturecleanup,telemetry and changedallocator/controlpaths; do not assume any isfree.",
+    "baseline_skew": "Off has194.582799M I vsaccepted194.409926M I median (+0.172873M). Off alreadyexecutesdiagnosticbranchesand someconditionalfiniteclassification loweredunconditionally. Includes source/profile/layout differences; not pure instrumentation overhead.",
+    "machine_code": "F64BTRAN140700: inputclassification140a03..140a25 conditionally skipped; occupancy-tail14190a..141949 and scan-tail141ddb..141e1c computeintegerfiniteclassification andcmov evenwhen shadow_trackfalse. NumericDIV/MUL/ADD originalsource unchanged. Saved btran.asm. No broad arithmetic-speed claim.",
+    "interpretation": "Recordingaddsroughly0.77M I overoff, plus0.17M diagnostic-offversusacceptedskew; not zero-cost tracking andnot an accepted optimization. Originalscopeabout2.49M I leavesonlyorder1.5\u20131.7M I illustrativebudget (<1%accepted181.193M solveI) before actualcandidate codegen/remainingcontractcosts. No removable-timebound or supported timegain."
+  },
+  "counters": [
+    {
+      "model": "afiro",
+      "cap": 3,
+      "medians": {
+        "accepted": {
+          "instructions:u": 4154893.0,
+          "cycles:u": 6083304.0
+        },
+        "off": {
+          "instructions:u": 4159632.5,
+          "cycles:u": 5784228.5
+        },
+        "record": {
+          "instructions:u": 4160915.0,
+          "cycles:u": 6144330.0
+        }
+      },
+      "paired_differences": [
+        {
+          "round": 0,
+          "record_minus_off": {
+            "instructions:u": 1288,
+            "cycles:u": -183161
+          },
+          "off_minus_accepted": {
+            "instructions:u": 5499,
+            "cycles:u": 367021
+          },
+          "record_minus_accepted": {
+            "instructions:u": 6787,
+            "cycles:u": 183860
+          }
+        },
+        {
+          "round": 1,
+          "record_minus_off": {
+            "instructions:u": 723,
+            "cycles:u": 636763
+          },
+          "off_minus_accepted": {
+            "instructions:u": 5194,
+            "cycles:u": -691248
+          },
+          "record_minus_accepted": {
+            "instructions:u": 5917,
+            "cycles:u": -54485
+          }
+        },
+        {
+          "round": 2,
+          "record_minus_off": {
+            "instructions:u": 2308,
+            "cycles:u": 269200
+          },
+          "off_minus_accepted": {
+            "instructions:u": 3463,
+            "cycles:u": -514312
+          },
+          "record_minus_accepted": {
+            "instructions:u": 5771,
+            "cycles:u": -245112
+          }
+        },
+        {
+          "round": 3,
+          "record_minus_off": {
+            "instructions:u": 200,
+            "cycles:u": -483921
+          },
+          "off_minus_accepted": {
+            "instructions:u": 5654,
+            "cycles:u": 218532
+          },
+          "record_minus_accepted": {
+            "instructions:u": 5854,
+            "cycles:u": -265389
+          }
+        },
+        {
+          "round": 4,
+          "record_minus_off": {
+            "instructions:u": 2306,
+            "cycles:u": 496803
+          },
+          "off_minus_accepted": {
+            "instructions:u": 3519,
+            "cycles:u": 587081
+          },
+          "record_minus_accepted": {
+            "instructions:u": 5825,
+            "cycles:u": 1083884
+          }
+        },
+        {
+          "round": 5,
+          "record_minus_off": {
+            "instructions:u": 670,
+            "cycles:u": 847697
+          },
+          "off_minus_accepted": {
+            "instructions:u": 4496,
+            "cycles:u": -363633
+          },
+          "record_minus_accepted": {
+            "instructions:u": 5166,
+            "cycles:u": 484064
+          }
+        }
+      ],
+      "incremental_I_median": 1005.5,
+      "incremental_I_min": 200,
+      "incremental_I_max": 2308
+    },
+    {
+      "model": "sc50a",
+      "cap": 20,
+      "medians": {
+        "accepted": {
+          "instructions:u": 5659221.0,
+          "cycles:u": 7476170.0
+        },
+        "off": {
+          "instructions:u": 5668637.0,
+          "cycles:u": 7608552.0
+        },
+        "record": {
+          "instructions:u": 5677967.0,
+          "cycles:u": 7136971.5
+        }
+      },
+      "paired_differences": [
+        {
+          "round": 0,
+          "record_minus_off": {
+            "instructions:u": 9270,
+            "cycles:u": -681000
+          },
+          "off_minus_accepted": {
+            "instructions:u": 8765,
+            "cycles:u": 555202
+          },
+          "record_minus_accepted": {
+            "instructions:u": 18035,
+            "cycles:u": -125798
+          }
+        },
+        {
+          "round": 1,
+          "record_minus_off": {
+            "instructions:u": 10545,
+            "cycles:u": 1257608
+          },
+          "off_minus_accepted": {
+            "instructions:u": 8620,
+            "cycles:u": -2228139
+          },
+          "record_minus_accepted": {
+            "instructions:u": 19165,
+            "cycles:u": -970531
+          }
+        },
+        {
+          "round": 2,
+          "record_minus_off": {
+            "instructions:u": 10392,
+            "cycles:u": 532256
+          },
+          "off_minus_accepted": {
+            "instructions:u": 8433,
+            "cycles:u": 790794
+          },
+          "record_minus_accepted": {
+            "instructions:u": 18825,
+            "cycles:u": 1323050
+          }
+        },
+        {
+          "round": 3,
+          "record_minus_off": {
+            "instructions:u": 8835,
+            "cycles:u": -415173
+          },
+          "off_minus_accepted": {
+            "instructions:u": 10222,
+            "cycles:u": 306658
+          },
+          "record_minus_accepted": {
+            "instructions:u": 19057,
+            "cycles:u": -108515
+          }
+        },
+        {
+          "round": 4,
+          "record_minus_off": {
+            "instructions:u": 8051,
+            "cycles:u": -1180617
+          },
+          "off_minus_accepted": {
+            "instructions:u": 10329,
+            "cycles:u": -641512
+          },
+          "record_minus_accepted": {
+            "instructions:u": 18380,
+            "cycles:u": -1822129
+          }
+        },
+        {
+          "round": 5,
+          "record_minus_off": {
+            "instructions:u": 9492,
+            "cycles:u": -1014515
+          },
+          "off_minus_accepted": {
+            "instructions:u": 8486,
+            "cycles:u": 446806
+          },
+          "record_minus_accepted": {
+            "instructions:u": 17978,
+            "cycles:u": -567709
+          }
+        }
+      ],
+      "incremental_I_median": 9381.0,
+      "incremental_I_min": 8051,
+      "incremental_I_max": 10545
+    },
+    {
+      "model": "degen2",
+      "cap": 20,
+      "medians": {
+        "accepted": {
+          "instructions:u": 21689863.5,
+          "cycles:u": 15116006.5
+        },
+        "off": {
+          "instructions:u": 21713009.5,
+          "cycles:u": 14678385.0
+        },
+        "record": {
+          "instructions:u": 21725094.5,
+          "cycles:u": 14137745.0
+        }
+      },
+      "paired_differences": [
+        {
+          "round": 0,
+          "record_minus_off": {
+            "instructions:u": 2115,
+            "cycles:u": -1755469
+          },
+          "off_minus_accepted": {
+            "instructions:u": 31991,
+            "cycles:u": -67796
+          },
+          "record_minus_accepted": {
+            "instructions:u": 34106,
+            "cycles:u": -1823265
+          }
+        },
+        {
+          "round": 1,
+          "record_minus_off": {
+            "instructions:u": 19863,
+            "cycles:u": -2667208
+          },
+          "off_minus_accepted": {
+            "instructions:u": 25199,
+            "cycles:u": 1105210
+          },
+          "record_minus_accepted": {
+            "instructions:u": 45062,
+            "cycles:u": -1561998
+          }
+        },
+        {
+          "round": 2,
+          "record_minus_off": {
+            "instructions:u": 16528,
+            "cycles:u": -411847
+          },
+          "off_minus_accepted": {
+            "instructions:u": 19241,
+            "cycles:u": -635700
+          },
+          "record_minus_accepted": {
+            "instructions:u": 35769,
+            "cycles:u": -1047547
+          }
+        },
+        {
+          "round": 3,
+          "record_minus_off": {
+            "instructions:u": -1884,
+            "cycles:u": 968500
+          },
+          "off_minus_accepted": {
+            "instructions:u": 36035,
+            "cycles:u": 437295
+          },
+          "record_minus_accepted": {
+            "instructions:u": 34151,
+            "cycles:u": 1405795
+          }
+        },
+        {
+          "round": 4,
+          "record_minus_off": {
+            "instructions:u": 22062,
+            "cycles:u": 2927169
+          },
+          "off_minus_accepted": {
+            "instructions:u": 10124,
+            "cycles:u": -1990792
+          },
+          "record_minus_accepted": {
+            "instructions:u": 32186,
+            "cycles:u": 936377
+          }
+        },
+        {
+          "round": 5,
+          "record_minus_off": {
+            "instructions:u": 13557,
+            "cycles:u": -564745
+          },
+          "off_minus_accepted": {
+            "instructions:u": 19095,
+            "cycles:u": -487450
+          },
+          "record_minus_accepted": {
+            "instructions:u": 32652,
+            "cycles:u": -1052195
+          }
+        }
+      ],
+      "incremental_I_median": 15042.5,
+      "incremental_I_min": -1884,
+      "incremental_I_max": 22062
+    },
+    {
+      "model": "degen2",
+      "cap": 640,
+      "medians": {
+        "accepted": {
+          "instructions:u": 194409926.0,
+          "cycles:u": 143119139.5
+        },
+        "off": {
+          "instructions:u": 194582798.5,
+          "cycles:u": 143719534.0
+        },
+        "record": {
+          "instructions:u": 195357523.5,
+          "cycles:u": 143891397.5
+        }
+      },
+      "paired_differences": [
+        {
+          "round": 0,
+          "record_minus_off": {
+            "instructions:u": 776448,
+            "cycles:u": -1891697
+          },
+          "off_minus_accepted": {
+            "instructions:u": 177592,
+            "cycles:u": 7843355
+          },
+          "record_minus_accepted": {
+            "instructions:u": 954040,
+            "cycles:u": 5951658
+          }
+        },
+        {
+          "round": 1,
+          "record_minus_off": {
+            "instructions:u": 772021,
+            "cycles:u": 25241060
+          },
+          "off_minus_accepted": {
+            "instructions:u": 173929,
+            "cycles:u": 1837856
+          },
+          "record_minus_accepted": {
+            "instructions:u": 945950,
+            "cycles:u": 27078916
+          }
+        },
+        {
+          "round": 2,
+          "record_minus_off": {
+            "instructions:u": 756400,
+            "cycles:u": -7678460
+          },
+          "off_minus_accepted": {
+            "instructions:u": 156749,
+            "cycles:u": 7346065
+          },
+          "record_minus_accepted": {
+            "instructions:u": 913149,
+            "cycles:u": -332395
+          }
+        },
+        {
+          "round": 3,
+          "record_minus_off": {
+            "instructions:u": 767233,
+            "cycles:u": -23968367
+          },
+          "off_minus_accepted": {
+            "instructions:u": 177008,
+            "cycles:u": 8613123
+          },
+          "record_minus_accepted": {
+            "instructions:u": 944241,
+            "cycles:u": -15355244
+          }
+        },
+        {
+          "round": 4,
+          "record_minus_off": {
+            "instructions:u": 787011,
+            "cycles:u": 2504515
+          },
+          "off_minus_accepted": {
+            "instructions:u": 161197,
+            "cycles:u": -29761121
+          },
+          "record_minus_accepted": {
+            "instructions:u": 948208,
+            "cycles:u": -27256606
+          }
+        },
+        {
+          "round": 5,
+          "record_minus_off": {
+            "instructions:u": 786592,
+            "cycles:u": 7223981
+          },
+          "off_minus_accepted": {
+            "instructions:u": 183353,
+            "cycles:u": -1822211
+          },
+          "record_minus_accepted": {
+            "instructions:u": 969945,
+            "cycles:u": 5401770
+          }
+        }
+      ],
+      "incremental_I_median": 774234.5,
+      "incremental_I_min": 756400,
+      "incremental_I_max": 787011
+    }
+  ],
+  "distortion_and_limits": {
+    "PMU_no_multiplexing": true,
+    "new_cycles_and_timers": "Debuggercycles/timers excluded. Six plainpairedrecord-offcycle differences have bothsigns; no cyclesavings or causal cache/branch claim. No formal timing screen, retry or extension.",
+    "instrumentation": "No per-term counters/allocobserver. Global lifecycletelemetry costs included inhelper/wholecost; no free-overhead subtraction. Markers always present inoff/on. NewShadowfield changes layout; originalcompiledreleaseacceptedunchanged.",
+    "scope": "WholeCLIcounts include parse/output; originaleliminateandhelperGDBscopes arecomplete namedinclusive boundaries. Do not mix with acceptedsolve-only total/selfpools.",
+    "FP_contract": "Observedcost andpositiveguards covertesteddefaultmaskedreleaseFPstate. This observational shadow isnot a generallyqualified optimizer. A future replacement mustexplicitlyreject unsupportedunmaskedexceptioncontrols aswellasR80,directedrounding/DAZ/FTZ,quotientoverflow/nonfinite,nonunit/duplicates/droppedpivot etc; allnumericfallback andWORK obligations remain.",
+    "arithmetic": "Originalkernel lines andorder literal afterremovinginsertions; shadowbookkeeping localsneverreplaceoriginal dense_est, WORK or outputs. CSRstatus restoredbeforeoriginalkernel; verifycomparesoriginalFPstate/rawvalues."
+  },
+  "reconciliation": "No accepted gain:45.784/16.696ms2.74x remains. ExistingF/Bselfgap51.863M I/22.439M C andoutside76.132M I/66.876M C unchanged. Eliminate belongsfactorupdate stagealreadycounted; never addit to F/B oroverallgap. Diagnosticinstructionbudget cannotclose gap alone.",
+  "one_proposed_experiment": {
+    "design": "Only after endingdiagnostic: one isolated guarded same-live-pivot U-to-eliminate transfer trial, with complete originalkernels retained asindependentoracles and explicit supportedFPmask/structural/ownership guards. Preserveoriginalfallback arithmetic, visited/dense/WORKorder, allrecords. Qualify ownfixed39TCMalloc, cheapcounters, then predeclaredtwoindependent32AB+32AA screens onlyifcounterspositive. Stop firstfailed/inconclusive; no retune/rescue.",
+    "benefit": "Unknown timebenefit; instructionbudgetorder0.8\u20130.95% ofsolve beforecandidatecodegen. No claim itcloses2.74xgap.",
+    "rejected_check": "Transferssamepivot pre-eta/LT U values tooriginaleliminationconsumer, not rejected completeBTRANmemoacrossclones, Lhandoff/sharedL-etafusion, rowmap/workspace/arena or Uindex maintenance. No closed trial repeated."
+  },
+  "artifacts": {
+    "target/perf-degen2-btran-shadow/source-proof.json": "a201fe66f3778885e14e6dcbeed8d689ab0aa28e96200c67a098d030227f68db",
+    "target/perf-degen2-btran-shadow/edits.json": "8accfc97eb7758f1670351c44b94c1f5d1fc1f32c75300c6c8cb670cf058e6f9",
+    "target/perf-degen2-btran-shadow/shadow_diag.rs": "dc29d0f0bacc89ab11022cea8df7fe62035bb11f417f6e82724e59ba9a81b1ab",
+    "target/perf-degen2-btran-shadow/build-plan.json": "e0b6728969d4dca13d20a4b130478cec3518b914aae600ee1b5e3ffef8826c0e",
+    "target/perf-degen2-btran-shadow/build-final.json": "2562d1c9af74432133e1d0bcd01e1e570bfbefbc089118fef0ee382e952d949a",
+    "target/perf-degen2-btran-shadow/build-training.log": "ab3d327336984172f9ce4d1f78130a48b3b001cf92a7d0c0f9d1d5d8e1e6bb92",
+    "target/perf-degen2-btran-shadow/rose-shadow": "df44416ecaa47ca0f92346e6551ba6420accdb990c8efd3e2a8d1905846926b4",
+    "target/perf-degen2-btran-shadow/check-results.json": "6aca870c79e78e6827eb6419f4def98439253e9391fb7d5f0188935a7c81971d",
+    "target/perf-degen2-btran-shadow/parity-full.log": "73e3e66473c7cdc45502a61b9ec6bda99dc10d722efa842b68fac16983b34fd4",
+    "target/perf-degen2-btran-shadow/dump-checks.json": "f05212682611606b1c42d02c2b2d8d7d8ab058bcc2cdecfc08a685b494143fec",
+    "target/perf-degen2-btran-shadow/counter-plan.json": "6baff6662c386ee891b08220acea76f10bf172a5502d9397c2373807a2c6ac05",
+    "target/perf-degen2-btran-shadow/counter-runs.json": "b95af45630dfce3c63064d97dc1bd2903353ba4356c0256e40eb743fdc35efef",
+    "target/perf-degen2-btran-shadow/counter-summary.json": "b27ac2d08a272292fde3efa900585bea87ad077e34afc6835a7d117056dcdb90",
+    "target/perf-degen2-btran-shadow/gdb-cost-results.json": "624ae80ba1818f3165650b3a5904f6fbd95f4abccb8c5657e03b21b8c2cdb36b",
+    "target/perf-degen2-btran-shadow/helper-results.json": "4f2d45b93f949243175ccb7b8ddaa42082756c604c007f4af009178f5dd3e2e1",
+    "target/perf-degen2-btran-shadow/btran.asm": "9feb26b04fbcc2de9128fdff6c35614a40a4b21b21a49541715a65130d64d774",
+    "target/perf-degen2-btran-shadow/test-source-proof.json": "3bed9b4c183006f19296147038f1755552267bdca2dd33389216b4f242ea7e84",
+    "target/perf-degen2-btran-shadow/lifetime-test.log": "3f9f7467a0d3fab85021d0f31a21d3adc930e0b1ca8e2a8b4f13b38e62fba9bf",
+    "target/perf-degen2-btran-shadow/test-source/src/shadow_diag.rs": "f89b504d45f0ae66e8a36ba079e57aa379ee278c3352c154d5921fa679aaba00",
+    "target/perf-degen2-btran-shadow/test-target/release/deps/rose-1647c29dde43abc1": "273b4bf04ca005ae6ce4ff8441e4cba9faa96180b2b429ab62ba820865dd6886",
+    "target/perf-degen2-btran-shadow/be2171a22e6ff33a2f1d550155784aba68cb4f83543294e2d40cd56d592bf685.profdata": "be2171a22e6ff33a2f1d550155784aba68cb4f83543294e2d40cd56d592bf685",
+    "target/perf-degen2-btran-shadow/degen2-20-off.stats": "0ce4e9f299fa8f4705e4ba570531e3c644a491914306b7250f847c9620417a31",
+    "target/perf-degen2-btran-shadow/degen2-640-record.stats": "9eab5679f467a6222da7b3c2b62867189ce3299cf229ec5b55e9f53c1ac78d59",
+    "target/perf-degen2-btran-shadow/sc50a-20-instrumented.stats": "18b37a312c8878079c11cf38a6c4e89746924e6e0c53ee8e51527d1950c54b9b",
+    "target/perf-degen2-btran-shadow/sc50a-20-verify.stats": "18b37a312c8878079c11cf38a6c4e89746924e6e0c53ee8e51527d1950c54b9b",
+    "target/perf-degen2-btran-shadow/afiro-3-record.stats": "1bd09d2bf7c1fdc885db340711e406516301f073c3ea91894d42c24aa2c456c5",
+    "target/perf-degen2-btran-shadow/degen2-20-instrumented.stats": "d393750a6e9d788ac5a6d287b08812b755deb26c4c6fc84dc04898ea317a9976",
+    "target/perf-degen2-btran-shadow/afiro-3-verify.stats": "565eda8b4be22b1c55029d670f0ed04394e01c21149fab24e1015941eea5f284",
+    "target/perf-degen2-btran-shadow/degen2-640-off.stats": "0ce4e9f299fa8f4705e4ba570531e3c644a491914306b7250f847c9620417a31",
+    "target/perf-degen2-btran-shadow/afiro-3-off.stats": "0ce4e9f299fa8f4705e4ba570531e3c644a491914306b7250f847c9620417a31",
+    "target/perf-degen2-btran-shadow/degen2-20-verify.stats": "d393750a6e9d788ac5a6d287b08812b755deb26c4c6fc84dc04898ea317a9976",
+    "target/perf-degen2-btran-shadow/degen2-640-verify.stats": "cf6ce27005ba9300ed333f70fa72912139549ec094e377f3917b05611c265df5",
+    "target/perf-degen2-btran-shadow/degen2-20-record.stats": "d4947590a0fa3ff693bd2b601bdf9297ac0057be00ff999b68697063e1581b3c",
+    "target/perf-degen2-btran-shadow/sc50a-20-off.stats": "0ce4e9f299fa8f4705e4ba570531e3c644a491914306b7250f847c9620417a31",
+    "target/perf-degen2-btran-shadow/afiro-3-instrumented.stats": "565eda8b4be22b1c55029d670f0ed04394e01c21149fab24e1015941eea5f284",
+    "target/perf-degen2-btran-shadow/sc50a-20-record.stats": "3a7b7dfa9f86579b9a62d33b240768506439d174cef14f1edfc9fed3517ab1e4",
+    "target/perf-degen2-btran-shadow/counters.py": "46f6ba62c17fd9e3e64c7b77b711b235684cd3c3e3c290f4efb09fe899af7cd5",
+    "target/perf-degen2-btran-shadow/check.py": "106d9ecbe170de56fcbcf211555d1cdaba8643e75c7e14f8041102fc6a0e2695",
+    "target/perf-degen2-btran-shadow/helper_gdb.py": "bcccad334596a5646966fe4d24b9545d6df2b463622b86b6a2958d4afa2c620a",
+    "target/perf-degen2-btran-shadow/prepare.py": "76f6568e11fa7696c7aa7d684ac48b6b6d9bc7cb1e1c4c57a274b53ffeaa6b02",
+    "target/perf-degen2-btran-shadow/run_helpers.py": "38f8d1f6a4c8e948dbfd4e86a225c03a44ba1a5fe642cea9fb990fa369478527",
+    "target/perf-degen2-btran-shadow/cost_gdb.py": "d40767571e7720febe9b0a4dc9315e62d61dbd68de81284927267bc821506c7e",
+    "target/perf-degen2-btran-shadow/build.py": "97d8054241a73978701cc628a6ae0c2d81bd18ed6158f8b24df55d2a19e96582",
+    "target/perf-degen2-btran-shadow/run_cost_gdb.py": "65463e6b8ec0501c27f2f0ecf78412be39ac55af5fd5275ee70849cebbb23fee",
+    "target/perf-degen2-btran-shadow/count-afiro-3-4-accepted.csv": "fee0bf79005936035af608034d80b8bf7d77744af0dd79e3fec88fcd8053d51e",
+    "target/perf-degen2-btran-shadow/count-sc50a-20-5-accepted.csv": "82b3770ef3ffd1367d024f94704bf69024071da4109b70476e74dc204233af85",
+    "target/perf-degen2-btran-shadow/count-afiro-3-1-record.csv": "a03d8c28ab0849860f85e28eb0e7be456e5f8a11519b4599e97e927019f0f0f4",
+    "target/perf-degen2-btran-shadow/count-degen2-20-4-off.csv": "955f48320c0e64e8688825b9b8c6d542a5be20e727ffb520948b36f35d770316",
+    "target/perf-degen2-btran-shadow/count-sc50a-20-4-accepted.csv": "6eab975c64945360c9199ab4c47fc605ee3ab026b5d971a229c8850dae7f0324",
+    "target/perf-degen2-btran-shadow/count-degen2-640-3-record.csv": "6ea35bcabf86eec952edda3617c5552122f0196083d00e0e1b1ee8e081ca3b41",
+    "target/perf-degen2-btran-shadow/count-afiro-3-2-record.csv": "f416dc8526aa161a86224810f3dfc4a5059073b9dd23341ddaab7bed788014cd",
+    "target/perf-degen2-btran-shadow/count-degen2-640-3-accepted.csv": "e142e1b08a22eece2c728e9b4d6db405553e8bad268506d982926c2daf769ad4",
+    "target/perf-degen2-btran-shadow/count-sc50a-20-2-record.csv": "6984dcfa2f36d940006f074a8dbc38f2334ef7f04e55daa7582283c7e7d50953",
+    "target/perf-degen2-btran-shadow/count-degen2-640-1-accepted.csv": "4e6868fe871b29ea2e9050f51fd6a8fbede6f78f2938448f44cdf957dedd80de",
+    "target/perf-degen2-btran-shadow/count-sc50a-20-0-accepted.csv": "5b27ab0e31cb93369fadbabc05d7d3e361409cd412c964e90ee6ad19dccc2990",
+    "target/perf-degen2-btran-shadow/count-degen2-640-2-off.csv": "79e11de65fe2d96972762d9c6bc4ca2296012f1d95c0ec6d3dba5bddbaec92bd",
+    "target/perf-degen2-btran-shadow/count-degen2-640-2-accepted.csv": "46cd2dbb3b9c31c45266dae45c7ab10db40d60e8eb7e62461a8a559813cdcb3f",
+    "target/perf-degen2-btran-shadow/count-afiro-3-0-off.csv": "35f5add0270285a9ad1a4ed66ae31dde093da4687fd64789db3f85431238a33d",
+    "target/perf-degen2-btran-shadow/count-afiro-3-4-off.csv": "adff625a9fd578cfb34c4ad8c29ea7e2f1f247184560679075414bd7fd54bdb2",
+    "target/perf-degen2-btran-shadow/count-afiro-3-3-record.csv": "1eb9344b35982e3f244cbbe134b2d937668604bc2efbf9565020f24ae85acbde",
+    "target/perf-degen2-btran-shadow/count-degen2-640-5-record.csv": "07be1cead57be2cdd73e835e41fe133fd16159b3bea7bf9ea3784f65af486265",
+    "target/perf-degen2-btran-shadow/count-degen2-640-2-record.csv": "c2494e88612f10e3b250680aa516fab5fff735283d0e9f31d405f256913b67c8",
+    "target/perf-degen2-btran-shadow/count-sc50a-20-3-off.csv": "3b8bdb85ab1fff3d05f3e48fa62e58987235a46d057f26724a6c0a0f5a04e3eb",
+    "target/perf-degen2-btran-shadow/count-degen2-640-0-record.csv": "da62f3458d2ba0f655eb4d9854c879d4ed5e65e87634e690adff8c61fefe2382",
+    "target/perf-degen2-btran-shadow/count-degen2-640-1-off.csv": "f64980fae7017372212e0008d28e9a676de568f84876eacf2072f89076929377",
+    "target/perf-degen2-btran-shadow/count-degen2-20-2-off.csv": "6392982184a8f113c4c6062cf7e030c773255f2ef13f6946ae4867bffc5ddf32",
+    "target/perf-degen2-btran-shadow/count-degen2-20-3-accepted.csv": "5f58eccd9325f861e549d34e0bc565b84940527e8d567a941b46b6c857fe23c1",
+    "target/perf-degen2-btran-shadow/count-degen2-20-4-accepted.csv": "5c81c21cbf52a34b8b614d98850fdc3bab257ebe69601b1323f57c852894be54",
+    "target/perf-degen2-btran-shadow/count-sc50a-20-5-record.csv": "8fb719908bcb2fb20ffa28c51744b01fcceaeaf14bea4b88f619621a5b72ce0d",
+    "target/perf-degen2-btran-shadow/count-sc50a-20-4-record.csv": "31377f70c8025fb11009c79ce4fbdf36b7d5ee53a142c579d4df1187f670eef0",
+    "target/perf-degen2-btran-shadow/count-sc50a-20-4-off.csv": "3d32fa14abe93e05a8117fa2cf9fc8e907aa0351f743875a173a3a3ad66d8e66",
+    "target/perf-degen2-btran-shadow/count-degen2-640-4-record.csv": "c791adda801a9ef7f8ea26bbd8651cc10146c529435cfdb03a8fff73a4196545",
+    "target/perf-degen2-btran-shadow/count-degen2-20-1-record.csv": "30f1ef119d142bf34caaa20aa7d6f73b737d572276ba8d4953939eab4e1cb85f",
+    "target/perf-degen2-btran-shadow/count-afiro-3-0-record.csv": "64075371feaf5ccd595368abde64784fe5e1896e4fbfc4553116917610ab9282",
+    "target/perf-degen2-btran-shadow/count-sc50a-20-1-accepted.csv": "80084f666ec84817c32abc561a095c628cce8776d7f013430093726659137b29",
+    "target/perf-degen2-btran-shadow/count-degen2-640-3-off.csv": "7bce6fbac85eb914785e9b593730c1afc117c7a4efb524929e81c18c1fb80680",
+    "target/perf-degen2-btran-shadow/count-degen2-640-4-accepted.csv": "21708a77c820f7818c9370fce549b4ff2d79cf54e0122d9882fd89f9d3fdf7fc",
+    "target/perf-degen2-btran-shadow/count-afiro-3-3-accepted.csv": "852c5e9c52f779de1a89f95535c2d91bbd08d4c461e90b8e05eb0354a936606f",
+    "target/perf-degen2-btran-shadow/count-degen2-20-3-record.csv": "27f9088c0a90767398ffca996343779cf55e9ee4683dd3c226dec1d74ba4292a",
+    "target/perf-degen2-btran-shadow/count-afiro-3-2-off.csv": "55a4ba71b4b2cc531c54e43affbc21d135604065f56c69e38160c9b370e655f5",
+    "target/perf-degen2-btran-shadow/count-degen2-640-0-accepted.csv": "ac55342804d8a60f53af59c861de1f10fa2202e25b4f6f59edf909a80e38d47e",
+    "target/perf-degen2-btran-shadow/count-afiro-3-5-accepted.csv": "e05e8258ba7d5320682b1d58edc53f100a39d44327ce8c5254148905cdab86ed",
+    "target/perf-degen2-btran-shadow/count-sc50a-20-2-off.csv": "69e9cdf5019ac54588085dda7fff481792da0e74a2fe8401843d9d89af4e1765",
+    "target/perf-degen2-btran-shadow/count-degen2-640-5-accepted.csv": "c8c909ead4f34228d67025e0884fc0fca4d8bf2e5f46b1e374a84cffdbc3bff7",
+    "target/perf-degen2-btran-shadow/count-sc50a-20-5-off.csv": "23694523b940e651a325ae77c8e21ea718c3a4f96e68e95afcf168a828b0c912",
+    "target/perf-degen2-btran-shadow/count-afiro-3-4-record.csv": "471c1618ece7b031f9d700de7b1da5ffae75512b3fdbd48c1f0b70caa95e454b",
+    "target/perf-degen2-btran-shadow/count-degen2-20-1-accepted.csv": "9fc22985e1900bffdc351d575440f109ce93a28f928c505ac4fa385dcf5aafec",
+    "target/perf-degen2-btran-shadow/count-sc50a-20-3-record.csv": "b735d3f63f8aa02df88319918bb8d182dd2b4199bb6604e39bf76b8e14b13150",
+    "target/perf-degen2-btran-shadow/count-sc50a-20-2-accepted.csv": "cdd51c356d16aedf2c4311343bfdc6af0ad24d6537145021512e05e52674e7b4",
+    "target/perf-degen2-btran-shadow/count-afiro-3-3-off.csv": "9d1adca3677cce7c3c0d2ed946187505e9f9a3bc2a0a48c23b5f237f90480013",
+    "target/perf-degen2-btran-shadow/count-afiro-3-2-accepted.csv": "ed7d91651b910083350949fbb181df8947d3e24d85898a78972f7fc60fe39239",
+    "target/perf-degen2-btran-shadow/count-degen2-640-4-off.csv": "ffbbcd3ee03115a58a280c27885242854fc1c8d1e306ec920f9a7f06a6fcbff6",
+    "target/perf-degen2-btran-shadow/count-afiro-3-1-accepted.csv": "8351b2090a1895fbd87042aa486af74717cfddea642b2ef5f7a04195e227e563",
+    "target/perf-degen2-btran-shadow/count-degen2-20-0-accepted.csv": "c8a59b3977afe0833f6e880bb46f7352c14c853434c37e9f3d5aabfe78dc126b",
+    "target/perf-degen2-btran-shadow/count-degen2-20-2-record.csv": "8370a7dfbf099c485fa2c442d76d30782291ca4d65ab34cec409dd6fd684bb83",
+    "target/perf-degen2-btran-shadow/count-sc50a-20-0-record.csv": "0b8e1bc400fc8a6d5dab7eaf65a1781c7c43b6c385aadec140491e325c6bbf3b",
+    "target/perf-degen2-btran-shadow/count-afiro-3-0-accepted.csv": "fa8f834a98f9d57c99a8cf596bd5bef2fdb3f42d8969f5ad9e8b69a316c6875b",
+    "target/perf-degen2-btran-shadow/count-degen2-20-5-record.csv": "82763906cd8a7ae3c9311e8b3e632786e0bbfe142a2666ea225ef090c027de30",
+    "target/perf-degen2-btran-shadow/count-sc50a-20-0-off.csv": "ba890adad388ba0c686f8f733c67d4af25e6fd41e608ceeeb6d23887ca3f6560",
+    "target/perf-degen2-btran-shadow/count-degen2-20-0-off.csv": "357eb6738533edd750f3c7012baa80c3cbdae93545cb8f62594c49b58cca5570",
+    "target/perf-degen2-btran-shadow/count-afiro-3-1-off.csv": "d894d4ce523b16e5229861fac4ca67b5f5f106c23efbc5bc0626e82ec92a8c32",
+    "target/perf-degen2-btran-shadow/count-degen2-20-3-off.csv": "bcb140ac8d05db3624088a2a9b5cddb8ebad674068223c90e6d2097c6bb5657f",
+    "target/perf-degen2-btran-shadow/count-degen2-20-4-record.csv": "fbd7e163f865d90d33635132bd474b5d238f88f3c275ccd9acedea7859c7d47e",
+    "target/perf-degen2-btran-shadow/count-degen2-20-2-accepted.csv": "a426a6ebcc99038ca1280adeb0a5aba2ea75f484ab22f46ede94a1a9eaa513ed",
+    "target/perf-degen2-btran-shadow/count-degen2-20-1-off.csv": "15c1b6ecb33f7684da56dd66d0f53cc7651e7e0f3929d66f8280f28788452e62",
+    "target/perf-degen2-btran-shadow/count-sc50a-20-1-off.csv": "11db5dcf9e90f50e4a34e5f41add7a61593c4a684a3a2dc1963fa12c10084955",
+    "target/perf-degen2-btran-shadow/count-degen2-20-5-off.csv": "8671e925276886fe2ea1d5187141344dec5f505a95d1046672456e7291cdb4dc",
+    "target/perf-degen2-btran-shadow/count-degen2-20-5-accepted.csv": "39dbfc3f57e5b53da55605d2ee0ad1089bac646ae48efe5f5793d88c3539e04a",
+    "target/perf-degen2-btran-shadow/count-afiro-3-5-record.csv": "58eeb489caecfab24623ef7d6d5e4ff6d829620939d58611ba6363faf8df4a68",
+    "target/perf-degen2-btran-shadow/count-degen2-640-1-record.csv": "58bc74cc44852158836bf4b6ff531916758e0cb7b318e657289214e6cfedb875",
+    "target/perf-degen2-btran-shadow/count-sc50a-20-3-accepted.csv": "d3d0a65a77b1e320d9c8a2cb29814cea2f85584dc1b4ae8bad4fe7e4b080b96b",
+    "target/perf-degen2-btran-shadow/count-sc50a-20-1-record.csv": "d34e57c6072ce0da3594601fb73c33a44b67b52749f56b41eecb9ea4fccc3fdc",
+    "target/perf-degen2-btran-shadow/count-afiro-3-5-off.csv": "095ea204e530ca425077ffe2541664e95af9327718c64ce16eba92f417c7608f",
+    "target/perf-degen2-btran-shadow/count-degen2-640-0-off.csv": "d30da62b601a85a28f9b23d41ba720a5e7fdd9bcd606462ad03691b30ae6f757",
+    "target/perf-degen2-btran-shadow/count-degen2-640-5-off.csv": "823c70f5cbe8056b1c0ec46bbf382f08f66be60465d917a7627ecd1896c8913f",
+    "target/perf-degen2-btran-shadow/count-degen2-20-0-record.csv": "489333d04a5665bea6ad68eaf625d6a90dd87c5b42429f8b78def5a607a002f6",
+    "target/perf-degen2-btran-shadow/afiro-3-off-gdb-cal.json": "09622c748fcdf9f0ca6afd8fc7f200534205e2e086b8d7ec6b1436ffda6d010a",
+    "target/perf-degen2-btran-shadow/degen2-20-off-gdb.json": "63c6cc2197ce3079d11a9d08b0c7e50c22ea471b62855aac7e978080dcb03720",
+    "target/perf-degen2-btran-shadow/afiro-3-off-gdb.json": "36aeceeb7c149631495b822e5971a282cdfb0627a084f4c3956b1c828ea3ebe0",
+    "target/perf-degen2-btran-shadow/afiro-3-off-gdb-cal-result.json": "d06198940da32ebe8cc33db00974a4c377c85c2540592b28cc65b70355fa71b7",
+    "target/perf-degen2-btran-shadow/degen2-20-off-gdb-result.json": "900d021a8722194c72d622900e0ef1faed9efca1efc52e7fd55651621e1a7e29",
+    "target/perf-degen2-btran-shadow/afiro-3-off-gdb-result.json": "4d42461430fe8db3bb5de36508b38acd59acdb4d3c66e6143a5194ce7e58d5ea",
+    "target/perf-degen2-btran-shadow/degen2-640-off-gdb-result.json": "d2e4a13073511f9e76b594a3f492a2f48f766e8aee367671151a9cc5671452e6",
+    "target/perf-degen2-btran-shadow/degen2-640-record-gdb.json": "86e82fbbc2a3d79ae04c2ed1b98333c1ec751cfc2ad9d2bc04feab52e207e71a",
+    "target/perf-degen2-btran-shadow/degen2-640-record-gdb-result.json": "dc055360d4c5ab9aecb3caaeed9b85d84e34de05246f0503a105527643b5ad1a",
+    "target/perf-degen2-btran-shadow/degen2-640-off-gdb.json": "d85902e6637c604c3189492134c40f87836efda3a5829e1e0392760d4410da35",
+    "target/perf-degen2-btran-shadow/sc50a-20-off-gdb-result.json": "a312c0fe868651b01a8a449a17ad4dd2fa7cd55af10c51316a1f6f476c6b999f",
+    "target/perf-degen2-btran-shadow/sc50a-20-off-gdb.json": "c11cb2c53cab1415f1941363b86ed51614883cc5cd98663bf6f86742a26f475f",
+    "target/perf-degen2-btran-shadow/helpers-sc50a-20-record.json": "2565a7cd421c9fb54ef496345886713049001a8b5ea0ebcc257156e37eca340a",
+    "target/perf-degen2-btran-shadow/helpers-sc50a-20-record-result.json": "52d67e9fc26987c0c49ca0df1232d4435089862707c002c40dbc33ec5e3f760f",
+    "target/perf-degen2-btran-shadow/helpers-degen2-640-off-result.json": "ce3623738c4097aa62309ad6b0775daee56ba75bda77fd56a8e36da6e0f60766",
+    "target/perf-degen2-btran-shadow/helpers-degen2-20-record.json": "8e222643aea71f47d7eb18eea821d17c38a63bd26d595c88a878f9ee89596e61",
+    "target/perf-degen2-btran-shadow/helpers-afiro-3-record.json": "14ba9521bf08c9c5f61bd051cecd2dfcc2f463940943b6d3fe3a64b836de3d0e",
+    "target/perf-degen2-btran-shadow/helpers-afiro-3-record-result.json": "deb812c8e8bacd5718e5a2be625c43dbfb6f4ef24db0c37feed085558d714d33",
+    "target/perf-degen2-btran-shadow/helpers-degen2-640-off.json": "10ade102f34b631999c23c070ccabc624a5b20febd82b3d932e8c61cc82c08d9",
+    "target/perf-degen2-btran-shadow/helpers-degen2-640-record.json": "542e2198ede20a774b6ea54febe6063ef4fe009137053c59804e3521075684b4",
+    "target/perf-degen2-btran-shadow/helpers-degen2-640-record-result.json": "e10f33d97fb0e52b3bee972ca5bd7b05ca1e075962a9fc8f5ad5927b7841a0cb",
+    "target/perf-degen2-btran-shadow/helpers-degen2-20-record-result.json": "41cd1a0cb255b7e1e564553c4c2837316382b25edfe5d4c3e471ae3a28857ca5",
+    "target/perf-degen2-btran-shadow/lifetime-test-initial-binary": "34da21ce8c901e3bc0d18643c6b0e3fb272af91b1a73d8043641021ea0412abb",
+    "target/perf-degen2-btran-shadow/lifetime-test-initial-source.rs": "3beadbcbc08f65f625632b95d17ed004909c89b75d4947bed0495ff59afb0716",
+    "target/perf-degen2-btran-shadow/lifetime-test-initial-setup-failure.log": "37a4d8923c18157014af4e83129eceb07ddd37088406672cbc3f85d071f0dce4",
+    "target/perf-degen2-btran-shadow/dump-degen2-20.stderr": "78b41e70daeae2a5dcffac53f6b47a05f915027e19639a71a1dede7a923d4bbf",
+    "target/perf-degen2-btran-shadow/dump-degen2-640.stderr": "2c13340073b424642607471fd762ebd2d7f811445f71b72e33b413cda8cfc98e"
+  },
+  "completed_guarded_transfer_trial": "degen2-row-transfer.json",
+  "completed_trial_verdict": "Rejectedpredeclaredcountergate:instructions\u2212.826385%,cycles+1.241369%; no84117/84189 orpromotion."
+}

@@ -1,0 +1,736 @@
+{
+  "previous_goal_turn_classification": "Progress: previous matched sparse/dense BTRAN boundaries pluswholepackingcensus established actualremainingU/etaquestion. Thisturnexecutesitandquantifieswholepurposecosts ratherthanproposinganotherclosedoptimization.",
+  "scope": "Oneboundeddiagnostic, nooptimization/solvernewbuild/numerical/WORK/dump/paritybaselinechange. Accepted55af vsreference26a505. Refcapture/comparisondelegated;centralcompare.py dual-btran-u-eta. No numericalcomparisonbeyondstrict162pivotprefix.",
+  "selected_source_instruction_table": [
+    {
+      "pricing": 1,
+      "r": 6,
+      "upd": 0,
+      "U": 308,
+      "eta": 3,
+      "U_parts": [
+        {
+          "begin": "entry",
+          "end": "U_select",
+          "I": 76
+        },
+        {
+          "begin": "U_select",
+          "end": "U_reset_begin",
+          "I": 14
+        },
+        {
+          "begin": "U_reset_begin",
+          "end": "U_reset_end",
+          "I": 62
+        },
+        {
+          "begin": "U_reset_end",
+          "end": "U_input_begin",
+          "I": 26
+        },
+        {
+          "begin": "U_input_begin",
+          "end": "U_input_end",
+          "I": 67
+        },
+        {
+          "begin": "U_input_end",
+          "end": "U_schedule_begin",
+          "I": 20
+        },
+        {
+          "begin": "U_schedule_begin",
+          "end": "U_tail_end",
+          "I": 29
+        },
+        {
+          "begin": "U_tail_end",
+          "end": "U_finish",
+          "I": 5
+        },
+        {
+          "begin": "U_finish",
+          "end": "U_done",
+          "I": 9
+        }
+      ],
+      "eta_parts": [
+        {
+          "begin": "U_done",
+          "end": "eta_done",
+          "I": 3
+        }
+      ]
+    },
+    {
+      "pricing": 149,
+      "r": 138,
+      "upd": 16,
+      "U": 2133,
+      "eta": 1345,
+      "U_parts": [
+        {
+          "begin": "entry",
+          "end": "U_select",
+          "I": 72
+        },
+        {
+          "begin": "U_select",
+          "end": "U_reset_begin",
+          "I": 14
+        },
+        {
+          "begin": "U_reset_begin",
+          "end": "U_reset_end",
+          "I": 62
+        },
+        {
+          "begin": "U_reset_end",
+          "end": "U_input_begin",
+          "I": 26
+        },
+        {
+          "begin": "U_input_begin",
+          "end": "U_input_end",
+          "I": 241
+        },
+        {
+          "begin": "U_input_end",
+          "end": "U_schedule_begin",
+          "I": 20
+        },
+        {
+          "begin": "U_schedule_begin",
+          "end": "U_tail_end",
+          "I": 1684
+        },
+        {
+          "begin": "U_tail_end",
+          "end": "U_finish",
+          "I": 5
+        },
+        {
+          "begin": "U_finish",
+          "end": "U_done",
+          "I": 9
+        }
+      ],
+      "eta_parts": [
+        {
+          "begin": "U_done",
+          "end": "eta_sparse_begin",
+          "I": 3
+        },
+        {
+          "begin": "eta_sparse_begin",
+          "end": "eta_mark_begin",
+          "I": 32
+        },
+        {
+          "begin": "eta_mark_begin",
+          "end": "eta_scan_begin",
+          "I": 153
+        },
+        {
+          "begin": "eta_scan_begin",
+          "end": "eta_scan_end",
+          "I": 903
+        },
+        {
+          "begin": "eta_scan_end",
+          "end": "eta_filter_begin",
+          "I": 21
+        },
+        {
+          "begin": "eta_filter_begin",
+          "end": "eta_done",
+          "I": 233
+        }
+      ]
+    }
+  ],
+  "selected_source_exclusive_loop_partitions": {
+    "U_schedule_begin": {
+      "U_schedule_begin": 10,
+      "tail_schedule": 415,
+      "tail_div_threshold": 45,
+      "tail_output_WORK": 521,
+      "tail_scatter": 621,
+      "tail_advance": 72
+    },
+    "eta_scan_begin": {
+      "eta_scan_begin": 11,
+      "eta_check": 102,
+      "eta_WORK": 90,
+      "eta_term": 345,
+      "eta_advance": 170,
+      "eta_support": 185
+    }
+  },
+  "selected_native_existing_cost_scopes": {
+    "source_pricing": 149,
+    "native_context_it": 147,
+    "native_pivot": 148,
+    "row": 138,
+    "upd": 16,
+    "core_prep": 51,
+    "Uhelper": 824,
+    "postU_eta_preLT": 981,
+    "preLT_total": 1856,
+    "Rose_preLT_total": 3478,
+    "difference": 1622,
+    "qualification": "Native981span isdeliberatelywiderthanpureeta: includescachedUrowcopy/materialization,inputconversion,WORK/dispatchandlocalcleanup. Nativewrapperprep8I isoutsidethiscorepre-Lscope, retainedinpreviouscompletetransactionledger. No nativeexclusivearithmetic/support cost inferredfromopcounts."
+  },
+  "central_comparison": {
+    "status": "FIRST_ORDERED_U_SCATTER_DIFFERENCE",
+    "witnesses": [
+      {
+        "native_context_it": 0,
+        "source_pricing": 1,
+        "row": 6,
+        "factor_upd": 0,
+        "native_capture": "target/perf-degen2-btran-U-eta/captures/degen2-dual-release/dual_rho_u_eta.624f648076.jsonl",
+        "native_capture_sha256": "9c9173f990c0faa227afcb59306fe4e0506a0fdf03454be352f1635adaa843a5",
+        "counts_only": {
+          "native_U_DIV": 1,
+          "Rose_U_DIV": 1,
+          "native_U_products": 0,
+          "Rose_U_products": 0,
+          "native_U_numeric_updates": 0,
+          "Rose_U_numeric_updates": 0,
+          "native_U_WORK_control_FP_ops": {
+            "addsd": 1
+          },
+          "native_eta_visits": 0,
+          "Rose_eta_visits": 0,
+          "Rose_eta_active": 0,
+          "native_eta_active": 0,
+          "native_eta_numeric_FP_ops": {},
+          "Rose_eta_terms": 0,
+          "native_eta_WORK_control_FP_ops": {}
+        },
+        "native_extra_divisions_structural": [],
+        "native_eta_visits_structural": [],
+        "matched_DIV_prefix": 1,
+        "matched_scatter_prefix": 0,
+        "status": "SPARSE_SELECTED_NUMERIC_AND_PUBLICATION_PROJECTION_PASS"
+      },
+      {
+        "native_context_it": 147,
+        "source_pricing": 149,
+        "row": 138,
+        "factor_upd": 16,
+        "native_capture": "target/perf-degen2-btran-U-eta/captures/degen2-dual-release/dual_rho_u_eta.5c98621e86.jsonl",
+        "native_capture_sha256": "40952af69dd2a0f80e732c8d9537a91f100380ea8dbb065081a903aadc2f2299",
+        "counts_only": {
+          "native_U_DIV": 16,
+          "Rose_U_DIV": 10,
+          "native_U_products": 18,
+          "Rose_U_products": 18,
+          "native_U_numeric_updates": 18,
+          "Rose_U_numeric_updates": 18,
+          "native_U_WORK_control_FP_ops": {
+            "mulsd": 10,
+            "addsd": 10
+          },
+          "native_eta_visits": 8,
+          "Rose_eta_visits": 8,
+          "Rose_eta_active": 6,
+          "native_eta_active": 6,
+          "native_eta_numeric_FP_ops": {
+            "mulsd": 23,
+            "addsd": 17
+          },
+          "Rose_eta_terms": 23,
+          "native_eta_WORK_control_FP_ops": {
+            "addsd": 11,
+            "mulsd": 9
+          }
+        },
+        "native_extra_divisions_structural": [
+          {
+            "phase": "tail",
+            "position": 386,
+            "slot": 431,
+            "numerator_bits": "0000000000000000",
+            "diag_bits": "bff0000000000000",
+            "quotient_bits": "8000000000000000",
+            "pc": "0x131497",
+            "native_event": 42
+          },
+          {
+            "phase": "tail",
+            "position": 440,
+            "slot": 432,
+            "numerator_bits": "0000000000000000",
+            "diag_bits": "3ff0000000000000",
+            "quotient_bits": "0000000000000000",
+            "pc": "0x131497",
+            "native_event": 43
+          },
+          {
+            "phase": "tail",
+            "position": 441,
+            "slot": 433,
+            "numerator_bits": "0000000000000000",
+            "diag_bits": "3ff0000000000000",
+            "quotient_bits": "0000000000000000",
+            "pc": "0x131497",
+            "native_event": 44
+          },
+          {
+            "phase": "tail",
+            "position": 442,
+            "slot": 434,
+            "numerator_bits": "0000000000000000",
+            "diag_bits": "bff0000000000000",
+            "quotient_bits": "8000000000000000",
+            "pc": "0x131497",
+            "native_event": 45
+          },
+          {
+            "phase": "tail",
+            "position": 443,
+            "slot": 435,
+            "numerator_bits": "0000000000000000",
+            "diag_bits": "3ff0000000000000",
+            "quotient_bits": "0000000000000000",
+            "pc": "0x131497",
+            "native_event": 46
+          },
+          {
+            "phase": "tail",
+            "position": 428,
+            "slot": 436,
+            "numerator_bits": "0000000000000000",
+            "diag_bits": "bff0000000000000",
+            "quotient_bits": "8000000000000000",
+            "pc": "0x131497",
+            "native_event": 47
+          }
+        ],
+        "native_eta_visits_structural": [
+          {
+            "eta_index": 7,
+            "pivot": 315,
+            "source_bits": "3fe0000000000000",
+            "ind": [
+              315,
+              408
+            ],
+            "val_bits": [
+              "3ff0000000000000",
+              "3ff0000000000000"
+            ],
+            "pc": "0x12ea89"
+          },
+          {
+            "eta_index": 6,
+            "pivot": 22,
+            "source_bits": "3fe0000000000000",
+            "ind": [
+              22,
+              102,
+              70
+            ],
+            "val_bits": [
+              "3ff0000000000000",
+              "bff0000000000000",
+              "3ff0000000000000"
+            ],
+            "pc": "0x12ea89"
+          },
+          {
+            "eta_index": 5,
+            "pivot": 439,
+            "source_bits": "bfe0000000000000",
+            "ind": [
+              439,
+              440,
+              441,
+              442,
+              419,
+              102
+            ],
+            "val_bits": [
+              "3ff0000000000000",
+              "3ff0000000000000",
+              "3ff0000000000000",
+              "3ff0000000000000",
+              "3ff0000000000000",
+              "3ff0000000000000"
+            ],
+            "pc": "0x12ea89"
+          },
+          {
+            "eta_index": 4,
+            "pivot": 408,
+            "source_bits": "0000000000000000",
+            "ind": [
+              408,
+              146
+            ],
+            "val_bits": [
+              "3ff0000000000000",
+              "3ff0000000000000"
+            ],
+            "pc": "0x12ea89"
+          },
+          {
+            "eta_index": 3,
+            "pivot": 406,
+            "source_bits": "3fe0000000000000",
+            "ind": [
+              406,
+              146,
+              136,
+              386,
+              419
+            ],
+            "val_bits": [
+              "3ff0000000000000",
+              "3ff0000000000000",
+              "3ff0000000000000",
+              "bff0000000000000",
+              "3ff0000000000000"
+            ],
+            "pc": "0x12ea89"
+          },
+          {
+            "eta_index": 2,
+            "pivot": 70,
+            "source_bits": "bfe0000000000000",
+            "ind": [
+              70,
+              419,
+              102
+            ],
+            "val_bits": [
+              "3ff0000000000000",
+              "3ff0000000000000",
+              "3ff0000000000000"
+            ],
+            "pc": "0x12ea89"
+          },
+          {
+            "eta_index": 1,
+            "pivot": 419,
+            "source_bits": "3fe0000000000000",
+            "ind": [
+              419,
+              440,
+              441,
+              442
+            ],
+            "val_bits": [
+              "3ff0000000000000",
+              "bff0000000000000",
+              "bff0000000000000",
+              "bff0000000000000"
+            ],
+            "pc": "0x12ea89"
+          },
+          {
+            "eta_index": 0,
+            "pivot": 428,
+            "source_bits": "0000000000000000",
+            "ind": [
+              428,
+              440,
+              441,
+              442
+            ],
+            "val_bits": [
+              "3ff0000000000000",
+              "bff0000000000000",
+              "bff0000000000000",
+              "bff0000000000000"
+            ],
+            "pc": "0x12ea89"
+          }
+        ],
+        "matched_DIV_prefix": 1,
+        "matched_scatter_prefix": 0
+      }
+    ],
+    "limits": [
+      "No numerical pairing past native162/source163.",
+      "Numerical operation comparison stops at first ordered Uscatter difference. Later U/eta counts are structural only.",
+      "No trace PMU/cycles/timers used; cost824/981I comes from prior separate fixed-PC observations."
+    ],
+    "accepted_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "source_trace_sha256": "e52648d4a7f9ae21b0471ac430c84b21f57f0c492e373815de789f65d7b32c74",
+    "authoritative_DSX_sha256": "b31b8176986cb5bfe54f048a9dae05dcdf751aca1d388974ba5822c527020c6d",
+    "head_rule": "Match actual DSX context/r/head atsourcepricing; no invalid RefStruct+Dualoffset head field is used.",
+    "first_difference": {
+      "native_context_it": 147,
+      "source_pricing": 149,
+      "numeric_scatter_ordinal": 1,
+      "field_differences": [
+        "destination"
+      ],
+      "native": {
+        "source_position": 138,
+        "destination": 419,
+        "coefficient_bits": "3ff0000000000000",
+        "source_bits": "3ff0000000000000",
+        "destination_before": "0000000000000000",
+        "product_bits": "3ff0000000000000",
+        "after_bits": "bff0000000000000",
+        "pc": "0x131094",
+        "native_event": 3,
+        "actual_opcode": "MUL / signXOR / ADD",
+        "raw_ADD_lhs": "bff0000000000000",
+        "raw_ADD_rhs": "0000000000000000"
+      },
+      "Rose": {
+        "source_position": 138,
+        "destination": 22,
+        "coefficient_bits": "3ff0000000000000",
+        "source_bits": "3ff0000000000000",
+        "destination_before": "0000000000000000",
+        "pc": "0x11bc85",
+        "actual_opcode": "MUL/SUB",
+        "product_bits": "3ff0000000000000",
+        "after_bits": "bff0000000000000"
+      }
+    },
+    "scope_stop": "Matched initialunitDIV138, thenfirstactualcoefficientupdate targets native419/Rose22. No later Udivision/scatter or eta operand comparison performed; global trace counts remain observations only. Literal MUL/signXOR/ADD versusMUL/SUB differs independently and is retained."
+  },
+  "reference_summary": {
+    "scope": "Originalaccepted55af/reference26a, source149/nativeit147/pivot148 plusinitialsparsewitness. No optimization/newbuild; stops firstorderedcoverednumericaloperationdifference.",
+    "central_status": "FIRST_ORDERED_U_SCATTER_DIFFERENCE",
+    "first_difference": {
+      "native_context_it": 147,
+      "source_pricing": 149,
+      "numeric_scatter_ordinal": 1,
+      "field_differences": [
+        "destination"
+      ],
+      "native": {
+        "source_position": 138,
+        "destination": 419,
+        "coefficient_bits": "3ff0000000000000",
+        "source_bits": "3ff0000000000000",
+        "destination_before": "0000000000000000",
+        "product_bits": "3ff0000000000000",
+        "after_bits": "bff0000000000000",
+        "pc": "0x131094",
+        "native_event": 3,
+        "actual_opcode": "MUL / signXOR / ADD",
+        "raw_ADD_lhs": "bff0000000000000",
+        "raw_ADD_rhs": "0000000000000000"
+      },
+      "Rose": {
+        "source_position": 138,
+        "destination": 22,
+        "coefficient_bits": "3ff0000000000000",
+        "source_bits": "3ff0000000000000",
+        "destination_before": "0000000000000000",
+        "pc": "0x11bc85",
+        "actual_opcode": "MUL/SUB",
+        "product_bits": "3ff0000000000000",
+        "after_bits": "bff0000000000000"
+      }
+    },
+    "native_structural_counts": {
+      "native_U_DIV": 16,
+      "Rose_U_DIV": 10,
+      "native_U_products": 18,
+      "Rose_U_products": 18,
+      "native_U_numeric_updates": 18,
+      "Rose_U_numeric_updates": 18,
+      "native_U_WORK_control_FP_ops": {
+        "mulsd": 10,
+        "addsd": 10
+      },
+      "native_eta_visits": 8,
+      "Rose_eta_visits": 8,
+      "Rose_eta_active": 6,
+      "native_eta_active": 6,
+      "native_eta_numeric_FP_ops": {
+        "mulsd": 23,
+        "addsd": 17
+      },
+      "Rose_eta_terms": 23,
+      "native_eta_WORK_control_FP_ops": {
+        "addsd": 11,
+        "mulsd": 9
+      }
+    },
+    "independent_prior_endpoint_gate": "degen2-btran-boundary/central-report.json hadrawU10publishedvalues/order, actualpreparedLT444/afterLT444andreturned/filtered49pass; separatefromnewhistorycomparison.",
+    "instruction_accounting": {
+      "native_existing_coreprep": 51,
+      "native_existing_Uhelper": 824,
+      "native_existing_postU_eta_dispatch": 981,
+      "native_total_preLT": 1856,
+      "source_U": 2133,
+      "source_eta": 1345,
+      "source_total_preLT": 3478,
+      "difference_preLT": 1622,
+      "source_occupied_entry_helper_calls": 18,
+      "source_occupied_entry_helper_I": 486,
+      "source_extra_input_min_slot_rescan_I": 43,
+      "limits": "Uhelper486Iandrescan43I include requiredwork, not removable bound. Native824/981 come from previous separate instruction-only fullroot/detail ledger; no finer native numeric/support exclusivecost established. Eta981 alsoowns cachedUrowcopy/materialization, inputconversion, WORK andcleanup. Counts are not time/cycle shares."
+    },
+    "whole_source_only_exposure": {
+      "all1095physical_BTRAN_U_eta_I": 4065380,
+      "percent_whole_solve_I": 2.244,
+      "rho634_U_eta_I": 3658169,
+      "rho_percent_whole_solve_I": 2.019,
+      "qualification": "Parent verified source-only cost census; not nativepairedpaststrictfrontier andincludesrequiredwork. Not a speedup estimate orremovable ceiling."
+    },
+    "remaining_missing": [
+      "Correspondingordered Uscatters/eta operands beyond first Uscatterdifference not compared.",
+      "UnmatchedsixnativezeroDIVs andlatereta matchingcounts do not establish identical histories.",
+      "Nativeexclusive instruction ownership for numericloads/stores vs scans/support/WORK not fullypartitioned; actual arithmeticfrequency alone cannot account824/981.",
+      "GenericFPtrace captures arithmetic/storeevents, not every integerheap/support visit orallmemorytraffic."
+    ]
+  },
+  "source_support_mechanisms": {
+    "occupied_entry": {
+      "calls": 18,
+      "instructions": 486,
+      "input_calls": 3,
+      "input_I": 90,
+      "tail_calls": 15,
+      "tail_I": 396,
+      "paths_I_per_call": [
+        24,
+        30
+      ],
+      "meaning": "CompletefixedcallerCALL/returnincludinghelperbounds,slotlookup,bitsettest/update,newslot+0initializeandaddresscalculation. Requiredoperandaddressing/semanticsremain;notaremovablebound."
+    },
+    "repeated_input_UT_slot_scan": {
+      "instructions": 43,
+      "entries": 3,
+      "meaning": "Aftercoefficients havebeenscattered throughslot-awareentry, sourceagainwalks3UTdestinations forlowestslot. Includeslength/bounds/loopsetup;replacementandWORKownershipnotassumedfree."
+    },
+    "eta_representation": {
+      "seed_mark_I": 153,
+      "eta_scan_with_arithmetic_marks_WORK_I": 903,
+      "final_WORK_I": 21,
+      "output_filter_I": 233,
+      "meaning": "Eightetas/sixactive. Visitedmarkgeneration,seedmarking,perentrybounds/supportgrowthandpostpasssupportfilter areincludedwiththeiractualarithmetic. No directnativecorrespondingexclusivecost established."
+    }
+  },
+  "whole_source_only_purpose_table": {
+    "true_d": {
+      "calls": 16,
+      "U": 251553,
+      "eta": 48,
+      "rest": 363573,
+      "unpartitioned": 0,
+      "root": 615174
+    },
+    "initial": {
+      "calls": 444,
+      "U": 131899,
+      "eta": 1333,
+      "rest": 332759,
+      "unpartitioned": 0,
+      "root": 465991
+    },
+    "rho": {
+      "calls": 634,
+      "U": 1790826,
+      "eta": 1867343,
+      "rest": 7132732,
+      "unpartitioned": 0,
+      "root": 10790901
+    },
+    "readout": {
+      "calls": 1,
+      "U": 22375,
+      "eta": 3,
+      "rest": 29849,
+      "unpartitioned": 0,
+      "root": 52227
+    }
+  },
+  "whole_source_U_paths": {
+    "denseU": 17,
+    "sparseU": 1078
+  },
+  "whole_source_totals": {
+    "roots": 1095,
+    "root_I": 11924293,
+    "U_I": 2196653,
+    "eta_I": 1868727,
+    "LT_publication_cleanup_I": 7858913,
+    "preLT_I": 4065380,
+    "preLT_percent_solve_I": 2.2436738726109726,
+    "rho_preLT_I": 3658169,
+    "rho_preLT_percent_solve_I": 2.0189350581976124,
+    "scope": "Physical1095mirrorBTRANroots. Source-onlystructural/instructioncensusafterfrontier; nolate numericalpairing. Localconstruction/copy/drop staysinexecutingregion; retainedfactor/workspace retirementstaysfactorlifecycle. AuxiliaryBTRANandfiveauxFTRAN arenotpartofthismirrorcensus. Instructionproportionsnot timeshares/removablebounds."
+  },
+  "conclusions": {
+    "operations": "First Uscatter targets differ afteramatchingunitDIV;stoporderedhistorythere. Native16DIVvsRose10 includes6extra zerodivisions, whileboth18products/updatesandeta8visits/6active/23MUL17ADD arelaterstructuralcounts only. No extra Rosefloatingarithmetic mechanismestablished.",
+    "representation": "Rose wholepre-Lscopeissmalland containsrequiredwork. Selected486Ioccupiedhelper+43Isecondslotpassareconcretesupport/indexcosts, notcompletecrosssolverexcess. Eta981nativehasdifferentadditionalresponsibilities.",
+    "machine_code": "Literalfirstscatter nativeMUL/signXOR/ADD vssourceMUL/SUB, samefiniteoperand/product/resultbitsatdifferentdestinations. Doesnot establishcorrespondingcompletearithmetic-history,latency,cacheorbranch cause. No newvalidcycle/timecost.",
+    "decision": "No solverprototype justifiedbythislocalcostledger. Do notturn529Iorwhole2.244%instructionexposureintoaspeedupforecast, reviveoccupancy/workspace/memo/rowtransfer ordeleteWORK."
+  },
+  "distortion": {
+    "source_codegen": 0,
+    "source_fixed_scope_calibration": "Known5PUSH7raw\u21925after2I/stop correction. Coarse/fine/helper/partitionU2133/eta1345selected149agree; source1U308/eta3agree.",
+    "source_trace_costs_excluded": "Trace U2087vs2133(\u221246I),eta1328vs1345(\u221217I) withconsecutiveprimitive-instructionbreakpoints; allnumericaltracePMUcosts excluded. Useonlyregister/memorybits/counts.",
+    "native_trace_excluded_initial": {
+      "spec": "native-op-spec-excluded-v0.json",
+      "reason": "Wrapped objdump lines truncated9instruction lengths, so9after-PC addresses were not validated instructionboundaries. Exclude initialtraces3301c6d146/35c8a2a1d5/2a00a9ff95. Replaced usingobjdump-w plusallstart/nextPCboundaryassertions, specSHA inrefcap key, and repeatedsmallqualification."
+    },
+    "native_corrected": "Wideobjdump(-w)instructionlengths validateeverypre/postPCandSPECSHA. AFIRO3/SC50A20requalified; noarithmeticfloatmodelandnotracecosts.",
+    "cycles": "Allnewdebuggercycles/walltimesexcluded. No instructionsharetotimeclaim.",
+    "PMU": "No sourceinstructioncensus multiplexing;allmeasuredmarkers enabled==running."
+  },
+  "validation": {
+    "source_complete_result_exit_zero_sign_controls": 17,
+    "source_small_quals": "AFIRO3/SC50A20; DEGEN2cap20census1.365s precedescap6402.733s. Selectedroot/cost/trace .77-.79s. Allwithin20sdeadlines.",
+    "central_replay": "Expectedexit1 FIRST_ORDERED_U_SCATTER_DIFFERENCE afterinitialstateandunitDIVgates; no laterorderedarithmeticcomparison.",
+    "prior_endpoint_gate": "Earlierdegen2-btran-boundary rawpublishedU10,consumedLT444input/output,returned/filtered49passedseparately. Doesnot normalizeorreordernewhistory.",
+    "frozen_parity": "No newsolvercode/build. Existingaccepted987qualification preserved,notrerunorclaimednew."
+  },
+  "reconciliation": {
+    "whole_solve_gap_I": 127995000,
+    "whole_solve_gap_C": 89315000,
+    "known_FB_sampled_self_gap_I": 51863005,
+    "known_FB_sampled_self_gap_C": 22439119,
+    "outside_FB_pools_I": 76131995,
+    "outside_FB_pools_C": 66875881,
+    "selected_dense_complete_previous_Rose_I": 18179,
+    "selected_dense_complete_previous_native_I": 14215,
+    "selected_dense_complete_previous_gap_I": 3964,
+    "new_preLT_localization_I": 1622,
+    "remaining_selected_complete_gap_I": 2342,
+    "note": "1622+2342=3964. Includesnativewrapper8outsidepreLT andnativewiderpostUresponsibilities. Newcosts nestedinexistingowner/selfpools,notadditive; no newwholeinclusivecyclepairing."
+  },
+  "one_proposed_experiment": {
+    "type": "Largerconstructor diagnostic, noimplementation",
+    "question": "Accountforcomplete non-emptyfactor construction/installation, reusingwholeRose-onlyprofiles/census toseparatearithmetic,selection,supportmaterializationandcleanup. Cachedprefrontierpricing82(3nucleuscolumns)/132(5) cansupplysmallnativewitnessesonly;neverextrapolatetheirtinycoststolaternumericsorcomparepastdivergence. Delegate reference/centralmapping.",
+    "basis": "Completedfactor16proofhadnoMarkowitznucleus. Wholeacceptednucleus7.294644M Iincludeslaterunpairedworkandrequirednumerics; broaderdiagnosticconstructionstage9.625msbelongsanotherELF. Neitherisaremovablebound. Needrepresentativenon-emptyconstructorbeforeproposingchange.",
+    "plausible_whole_solve_benefit": "Diagnosticdirectbenefit0; no qualified optimizationforecast. Nucleuswholeinstructionexposure4.026%solveIindicatesscalebutreplacement/remainingconstructionmustbemeasured. Rose still2.74x sloweroverall.",
+    "rejected_check": "No repeatofempty-nucleussetup,auxiliarylengthsort75117,prescribed-pivotauxvalidator,constructorchainqueues, arenas/workspace/LUownership or Markowitzrowheap trials. Measurecompleteexistingnumerictransaction; stopwithoutprototypeifitonlyrecoverssettledmechanism."
+  },
+  "preservation": {
+    "target/release/rose": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "target/perf-optimized-build/rose-pgo-tcmalloc": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "target/perf-reference/reconstructed/libgurobi130.so": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "src/ftran_order.rs": "57c86340f6959717954e2cb1c58f06c285ab7ce564a25d7d0e9e9c429d802ef1",
+    "src/bin/rose.rs": "63d282ccf37597706b28ecbf0cc6d18a0a37b41e9c9b06defd7cf643b6902962"
+  },
+  "artifacts": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-btran-U-eta",
+  "reference_provenance": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-btran-U-eta/provenance.json",
+  "central_command": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-btran-U-eta/central-command.txt",
+  "artifact_hashes": {
+    "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-btran-U-eta/rose_gdb-v1.py": "139a779f24164e35d026cdfdd5e297802ce6fcf3bbb753cd0ded0f51ed51521a",
+    "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-btran-U-eta/rose_gdb-v2.py": "f8187e0e4b103614a47fade2a439ac9a41213d041fb9566bf6a9d92610984b14",
+    "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-btran-U-eta/rose_gdb.py": "448c6d4c5e1e01f2eaa1efdf6aa1fe34b78796839ba6764024a8bee2177692c5",
+    "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-btran-U-eta/census_gdb.py": "fc2cd3a7411d6758dfc9010dfea3ced34af40be4df1face0cfb7ca9b1104d489",
+    "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-btran-U-eta/central-report.json": "cf6b6a7f2c9657fbafdc8d7033e6bb383d772309c4e78ed2990994f770d5161a",
+    "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-btran-U-eta/central-command.txt": "564e6da55c9289efffac9f25016bdd9f64bb869f6aa7fa50376f1da8a9346610",
+    "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-btran-U-eta/diagnosis-summary.json": "55161553b5f143e7f97cfcd7334dd1e06a9dbda178d0e79c5d530f4557e76f90",
+    "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-btran-U-eta/provenance.json": "61f98bb30c2f3922387b9103876e739e2051c0aa378a49b71170c14aa82c3c05",
+    "../reverse-engineer/tools/compare.py": "627f825cbc2fa3dd475c000dc918a31199ce774566d040115307c5698c876c3e"
+  }
+}

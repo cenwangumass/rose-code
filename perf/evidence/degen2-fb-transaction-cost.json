@@ -1,0 +1,509 @@
+{
+  "previous_goal_turn_classification": "progress: cached strict alignment audited; complete-boundary accounting requirements and unknown native inclusive costs identified. This turn obtains new immutable-ELF instruction evidence.",
+  "scope": "Bounded diagnostic only, no optimization or solver/baseline/numerical changes. Selected cross-solver states1/20/115/native135(Rose136); native comparisons never cross strict divergence163. WholeRose census is unpaired structural/instruction accounting only.",
+  "configuration": {
+    "rose_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "ordinary_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "rose": "Qualified fixed39 PGO/systemTCMalloc accepted ELF55af",
+    "reference": "Reconstructed26a505, matching dual-release profile",
+    "counter_scope": "User-only instructions from perf_event_open attached to inferiorPID. RoseCPU2/nativeCPU3; no cycle or timing comparison is made. All codegen unchanged."
+  },
+  "matched_complete_transaction_instruction_table": [
+    {
+      "rose_pricing": 1,
+      "native_pivot": 1,
+      "rose_total": 13020,
+      "native_total": 1785,
+      "difference": 11235,
+      "rose_parts": {
+        "begin": 148,
+        "full_call": 8021,
+        "full_return": 328,
+        "needed_call": 3462,
+        "needed_return": 103,
+        "expand": 386,
+        "check": 61,
+        "publish": 210
+      },
+      "rose_deferred_cleanup": {
+        "seven_input_temporaries": 282,
+        "published_col_tau": 80
+      },
+      "excluded_caller_check": 61
+    },
+    {
+      "rose_pricing": 20,
+      "native_pivot": 20,
+      "rose_total": 8592,
+      "native_total": 1696,
+      "difference": 6896,
+      "rose_parts": {
+        "begin": 142,
+        "full_call": 4714,
+        "full_return": 315,
+        "needed_call": 2402,
+        "needed_return": 103,
+        "expand": 378,
+        "check": 73,
+        "publish": 176
+      },
+      "rose_deferred_cleanup": {
+        "seven_input_temporaries": 282,
+        "published_col_tau": 80
+      },
+      "excluded_caller_check": 73
+    },
+    {
+      "rose_pricing": 115,
+      "native_pivot": 115,
+      "rose_total": 43495,
+      "native_total": 18138,
+      "difference": 25357,
+      "rose_parts": {
+        "begin": 253,
+        "full_call": 28953,
+        "full_return": 411,
+        "needed_call": 11994,
+        "needed_return": 316,
+        "expand": 530,
+        "check": 114,
+        "publish": 676
+      },
+      "rose_deferred_cleanup": {
+        "seven_input_temporaries": 282,
+        "published_col_tau": 80
+      },
+      "excluded_caller_check": 114
+    },
+    {
+      "rose_pricing": 136,
+      "native_pivot": 135,
+      "rose_total": 81377,
+      "native_total": 23001,
+      "difference": 58376,
+      "rose_parts": {
+        "begin": 150,
+        "full_call": 33493,
+        "full_return": 682,
+        "needed_call": 43354,
+        "needed_return": 1459,
+        "expand": 658,
+        "check": 150,
+        "publish": 1219
+      },
+      "rose_deferred_cleanup": {
+        "seven_input_temporaries": 282,
+        "published_col_tau": 80
+      },
+      "excluded_caller_check": 150
+    }
+  ],
+  "complete_boundary_definition": {
+    "native": "11f620 entry through verifiedreturnc58d5: input preparation, paired125f50 including helpers, WORK/count and pivot-removal publication. Persistent buffers remain alive.",
+    "rose": "Disjoint12629a..126fa0 preparation/full/needed/WORK/tau expansion plus1270dd..127179 clone/pivot removal/tau gather. Exclude126fa0..1270dd caller check. Add deferred cleanup127a92..127b42 for seveninputtemporaries and1157db..1157f5 for publishedcol/tau after post_inner, excluding intervening flips/basis/rrows work. These are original compiled caller/allocator costs, not a new wrapper implementation.",
+    "retained_lifecycle": "Lcache/etaindices/mirror spike/F2workspaces remain live; full1024B output transfers into auxiliaryEta. Do not assign their later factor retirement to this solve. Any later retirement not observed here remains in separate factor lifecycle, not zero.",
+    "limits": "Counts quantify complete stated transaction cost including transient cleanup, with differing retained-buffer/lazy-construction policies. They do not amortize retained factor construction or prove all L/eta/U term histories. Dense-needed zero-slot input equivalence remains incomplete."
+  },
+  "selected135_partition": {
+    "rose_root_full": 33493,
+    "rose_root_needed": 43354,
+    "rose_outside_roots": 4530,
+    "native_paired_roots": 22650,
+    "native_outside_pair": 351,
+    "root_excess": 54197,
+    "outside_root_excess": 4179,
+    "total_excess": 58376,
+    "native_preparation": 295,
+    "native_publication": 56,
+    "rose_numeric_rows": 21,
+    "rose_numeric_row_prepare": 997,
+    "rose_numeric_row_gather": 1462,
+    "rose_numeric_row_dot_divide": 737,
+    "native_row_core_initial": 448,
+    "native_row_core_initial_scope": "Incomplete relative to Rose: excludesmetadata,diag,store; do not call737minus448 an arithmetic implementation gap.",
+    "native_complete_numeric_rows": 996,
+    "native_complete_row_scope": "129294..129492 kinddispatch,metadata+WORK,dot,division,store,pivothandling;excludesglobalfull-outputscanand3followingloopI/output. Rose3196rowparts omitinitialkinddispatch/finaloutputstore/control:scopesareasymmetric,notpurearithmeticdelta.",
+    "native_pre_U_wider_prefix": 12211,
+    "native_L_only_helper_calls": [
+      1985,
+      4806
+    ],
+    "rose_L_eta_roots": 56868,
+    "L_scope_comparison": "Native12211prefixincludesL+inlineetas+input/support/dispatch, deliberatelywiderthanRoseL+etaroots. Strongselectedlocalization,notanexactcorrespondingL-stagegap. Initialnative448coreandRose737dot_dividemustnotbesubtractedasidenticalarithmeticboundaries."
+  },
+  "whole_Rose_needed_census": {
+    "calls": 634,
+    "numeric_rows": 19765,
+    "parts_instructions": {
+      "prepare": 1609438,
+      "gather": 2349915,
+      "dot_divide": 1114315
+    },
+    "needed_root_instructions": 32787624,
+    "remaining_needed_root": 27713956,
+    "prepare_gather_instructions": 3959353,
+    "prepare_gather_percent_accepted_solve_instructions": 2.1851578151473845,
+    "phase_table": [
+      {
+        "phase": "positive_level_listwalk",
+        "calls": 131,
+        "numeric_rows": 684,
+        "parts": {
+          "prepare": 43465,
+          "gather": 60644,
+          "dot_divide": 28284
+        },
+        "needed_root": 799305,
+        "remaining_needed_root": 666912
+      },
+      {
+        "phase": "level0_listwalk",
+        "calls": 147,
+        "numeric_rows": 3416,
+        "parts": {
+          "prepare": 224441,
+          "gather": 327361,
+          "dot_divide": 153627
+        },
+        "needed_root": 4094919,
+        "remaining_needed_root": 3389490
+      },
+      {
+        "phase": "value_mode",
+        "calls": 356,
+        "numeric_rows": 15665,
+        "parts": {
+          "prepare": 1341532,
+          "gather": 1961910,
+          "dot_divide": 932404
+        },
+        "needed_root": 27893400,
+        "remaining_needed_root": 23657554
+      }
+    ],
+    "scope": "Complete pivot-needed root includes helper/memory costs and root-local cleanup. Returned-vector/factor lifetimes remain separate. Row parts cover numeric nucleus rows, not all requestedtail/singleton/output/control work. Calibrated one-run instruction census, not sampledself; selected fixed-probe controls agree within1I, no exact whole-run error bound asserted. No later numerical/reference pairing claim.",
+    "L_eta_instructions": 15421024,
+    "remaining_after_L_eta_and_numeric_row_parts": 12292932
+  },
+  "allocation_lifetimes": {
+    "selected_owner_counts": [
+      {
+        "owner": "full",
+        "kind": "calloc",
+        "calls": 3
+      },
+      {
+        "owner": "full",
+        "kind": "free",
+        "calls": 14
+      },
+      {
+        "owner": "full",
+        "kind": "malloc",
+        "calls": 21
+      },
+      {
+        "owner": "full",
+        "kind": "realloc",
+        "calls": 12
+      },
+      {
+        "owner": "input_column",
+        "kind": "malloc",
+        "calls": 2
+      },
+      {
+        "owner": "needed",
+        "kind": "calloc",
+        "calls": 5
+      },
+      {
+        "owner": "needed",
+        "kind": "free",
+        "calls": 17
+      },
+      {
+        "owner": "needed",
+        "kind": "malloc",
+        "calls": 15
+      },
+      {
+        "owner": "needed",
+        "kind": "realloc",
+        "calls": 19
+      },
+      {
+        "owner": "publication",
+        "kind": "malloc",
+        "calls": 2
+      },
+      {
+        "owner": "rho_needed_input",
+        "kind": "free",
+        "calls": 1
+      },
+      {
+        "owner": "rho_needed_input",
+        "kind": "malloc",
+        "calls": 4
+      },
+      {
+        "owner": "tau_expansion",
+        "kind": "calloc",
+        "calls": 1
+      }
+    ],
+    "deferred_frees": [
+      {
+        "ptr": "0x555556304000",
+        "size": 3552,
+        "caller_return_pc": "0x127aba",
+        "owner": "tau_expansion"
+      },
+      {
+        "ptr": "0x555556188500",
+        "size": 624,
+        "caller_return_pc": "0x127ad3",
+        "owner": "needed"
+      },
+      {
+        "ptr": "0x555556186500",
+        "size": 312,
+        "caller_return_pc": "0x127ae9",
+        "owner": "rho_needed_input"
+      },
+      {
+        "ptr": "0x555556237420",
+        "size": 112,
+        "caller_return_pc": "0x127afd",
+        "owner": "rho_needed_input"
+      },
+      {
+        "ptr": "0x5555562373b0",
+        "size": 112,
+        "caller_return_pc": "0x127b16",
+        "owner": "rho_needed_input"
+      },
+      {
+        "ptr": "0x55555616fa10",
+        "size": 40,
+        "caller_return_pc": "0x127b2f",
+        "owner": "input_column"
+      },
+      {
+        "ptr": "0x55555616f9e0",
+        "size": 40,
+        "caller_return_pc": "0x127b42",
+        "owner": "input_column"
+      },
+      {
+        "ptr": "0x555556188280",
+        "size": 624,
+        "caller_return_pc": "0x1157e8",
+        "owner": "publication"
+      },
+      {
+        "ptr": "0x555556186780",
+        "size": 304,
+        "caller_return_pc": "0x1157f5",
+        "owner": "publication"
+      }
+    ],
+    "still_live_next_iteration": [
+      {
+        "owner": "full",
+        "size": 10656,
+        "kind": "malloc"
+      },
+      {
+        "owner": "full",
+        "size": 32,
+        "kind": "malloc"
+      },
+      {
+        "owner": "full",
+        "size": 32,
+        "kind": "malloc"
+      },
+      {
+        "owner": "full",
+        "size": 32,
+        "kind": "malloc"
+      },
+      {
+        "owner": "full",
+        "size": 32,
+        "kind": "malloc"
+      },
+      {
+        "owner": "full",
+        "size": 32,
+        "kind": "malloc"
+      },
+      {
+        "owner": "full",
+        "size": 32,
+        "kind": "malloc"
+      },
+      {
+        "owner": "full",
+        "size": 7104,
+        "kind": "malloc"
+      },
+      {
+        "owner": "full",
+        "size": 192,
+        "kind": "malloc"
+      },
+      {
+        "owner": "full",
+        "size": 1024,
+        "kind": "realloc"
+      },
+      {
+        "owner": "needed",
+        "size": 256,
+        "kind": "realloc"
+      },
+      {
+        "owner": "needed",
+        "size": 1024,
+        "kind": "realloc"
+      },
+      {
+        "owner": "needed",
+        "size": 444,
+        "kind": "calloc"
+      },
+      {
+        "owner": "needed",
+        "size": 3552,
+        "kind": "malloc"
+      }
+    ],
+    "qualification": "Ownertracecounts only, no ownertrace instruction/cycle claims. Growth target sizes not bytescopied or residentmemory. Native matchedwrapper0observedexportedallocatorcalls doesnot establish0privateallocation."
+  },
+  "distortion": {
+    "codegen": 0,
+    "known_five_instruction_sequence": "New detailcontrols observe7instructions for5original, consistent with2I/stoppedinterval. Selected135 macro boundaries81181raw, detail81389raw:208extraI for104extrastops, bothcorrect81165. Repeated boundaries/detail reproduce exactcorrected81165. Otherselectedcontrols differbyatmost1instruction. AllPMUenabled==running.",
+    "whole_census_probe_instruction_correction": 198488,
+    "whole_census_wall_seconds": 36.430387453998264,
+    "all_cycles_and_timers_excluded": true,
+    "ownertrace": "DynamicFinishBreakpoint allocatortrace changes countedrootinstructions aftersimple2Icorrection; excludedfromallcosttables. Onlyownership/countdata used;cleanupcosts remeasuredwithfixedPCblocks.",
+    "native_extra_detail_residual": "Complete-staticoutercounts23002..23005versusrobustroot/detail23001:1-4Iresidual(~.017%). Complete21rows996andLonly1985/4806/widerprefix12211stable. U/publication10425..10428ismoredetail-sensitive;use22650jointrootforreconciliation."
+  },
+  "validation": {
+    "Rose_complete_result_exit_signedzero_pairs": 24,
+    "all_match": true,
+    "native_central_capture_count": 30,
+    "native_central_qualification": "Native context, actual pair inputs/outputs when observed, wrapper pivot-removal publication, alpha and rho norm all agree bitwise with cached strict-prefix evidence. Root-only modes validate context and published outputs. No new cross-solver arithmetic-visit equivalence claimed.",
+    "central_alignment": "../reverse-engineer/tools/compare.py dual-wrapper-cost, delegatedref_compare",
+    "strict_prefix": 162,
+    "first_divergence": "163 native-minuszero/Rose-pluszero basis22. Unchanged, no normalization.",
+    "frozen_parity": "No newsolver codeorbaseline; existing full987qualification retained, not rerun or claimed as newtest."
+  },
+  "excluded_prototypes": [
+    "Initialsmallscope qualification usedbegin126163insidepriorratio work andend127171whichskippednonemptytaupublication. Failedwithmissingmacro; excluded. Replacedwithdisassemblyverified12629aand127179, anddisabledpointsatnextiteration.",
+    "Adaptive outputbreakpoint row-census640 rootcount understatesselectedneeded rootby20I due to breakpointenable/disable effects. Excludedrootcost; fixedbreakpoints reproduce43354I exactly atselected136 andsupersede wholecensus. Earlierrowparts differonly19Iinprepare/gather total; no optimization measurementsrepeated.",
+    "Initialownertraceusedrdxinsteadofrsiforreallocsize. Correctedowners-v3isusedforsizes; earlierownertracesizesexcluded. Numericresults unchanged."
+  ],
+  "interpretation": "Extra work is real but rowconstructionalone is modest:3.959353M instructions,2.185%solveI, including necessarypreparation/gather. Dot/divide1.114317M isrequiredarithmetic. Mostselectedrootexcess lies inL/etaandotherrootwork, not thisone rowrepresentationloop. The earlierLhandoff opportunity isalreadybounded0.84%solveI andtrialrejected; no rescue/retry follows.",
+  "reconciliation": {
+    "overall_gap_instructions": 127995000,
+    "overall_gap_cycles": 89315000,
+    "known_FB_sampled_self_gap_instructions": 51863005,
+    "known_FB_sampled_self_gap_cycles": 22439119,
+    "outside_known_FB_pools_instructions": 76131995,
+    "outside_known_FB_pools_cycles": 66875881,
+    "scope": "Newtransaction/census costs are already inside previouswhole/selfpools; do not add them. Selected58376I delta cannot be multipliedby634:paths,lazyconstruction,etasupport andphase differ. No newcompletewhole-solve cross-solverinclusive orcyclegap established."
+  },
+  "rejected_experiment_check": "No restart of rowmapcache(+.1937%I/+6.7515%C), completedLhandoff(-.5606%I/+4.0016%C), F2workspace,shorttau,outputordering, preUownership,dense/sharedLfusion,WORKdeferral orarenas. Newwork measures originaloperations; no optimizationcode added.",
+  "one_next_experiment": {
+    "type": "Diagnostic phase/purpose split of the pivot/state stage using existingacceptedprofiles and isolatedscopes onlywherefixedPCcosts cannotseparate it.",
+    "question": "Does the remaining ROW/pivot stage11.042msdiagnostic contain a distinct substantial whole pass beyond settledrowproduct/workspace/ownertrials? Separate rowproduct+WORK,rho_norm/inputpacking/pivotcheck,basis/rrows,dualupdate,DSE,basicflags/priorities,recomputation,objectconstruction/retirement andresidual; partitionpositivelevel/level0listwalk/valuemode.",
+    "alignment": "SelectedRose136\u2192137/native135\u2192nextpricing only; laterwholeRose phasecosts unpaired, no newnativecomparison after163.",
+    "benefit": "Directmeasurementbenefit0. The11.042ms belongsanotherdiagnosticELF andisnot an acceptedremovable bound orpredictedgain. No defensible whole-solve saving until a distinct redundantpass is measured. Rowprepare/gather3.959M now limits the measured smalllead; doesnot justify anothercachetrial."
+  },
+  "artifacts": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-fb-cost",
+  "reference_artifacts": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-native-transaction-cost",
+  "hashes": {
+    "target/perf-degen2-fb-cost/measure_rose.py": "ea29edf3ac6c690ecaf584a40e96bd816ce02056eb21e3b67b207630458af856",
+    "target/perf-degen2-fb-cost/measure_rose-v2.py": "f4b3e627fd7539930ff26e6f0c41809d2f6da8e34660702bff9acdcdb3ea75d7",
+    "target/perf-degen2-fb-cost/measure_rose-owners-v3.py": "0f9770738f3680885efb031eaa99d0420fdbf0afabab68a6902a37b5bc65035f",
+    "target/perf-degen2-fb-cost/row_census_gdb.py": "7ff11490df640d4bbefa850045dcc42aafec48d7109054d0064007f0b9e64084",
+    "target/perf-degen2-fb-cost/row_census_gdb-v1.py": "891e008baf1af2e89a4ec8117a6b20370eab2d9ebabf9895659ad96f0523ceec",
+    "target/perf-degen2-fb-cost/row-fixed-census136/manifest.json": "e8b13d5a48f45e2cc5ce2ea182497a073960c9e2cdfc62643e6ef6e63b54c857",
+    "target/perf-degen2-fb-cost/row-fixed-census640/manifest.json": "00cd7add359e5d064350c83394f24e7247c117674706b15bbca171f4b8c01f23",
+    "target/perf-degen2-fb-cost/rose-v2/manifest.json": "a3b2a2d66e62a1de7c16302c4d6c5318fa81b7390b52532f12de5db0059d3236",
+    "target/perf-degen2-fb-cost/rose-cleanup/manifest.json": "5886abd07a36be961ca03e9652dcf8d33b1a531634eabe73ed8ffae59c49be38",
+    "target/perf-degen2-fb-cost/rose-owners-v3/manifest.json": "432551c3bb1865ae6fd09c14fcb8c907767fba5e8b37e853ab3f6596b68109b1",
+    "target/perf-degen2-fb-cost/row-census136/manifest.json": "dd535ab86799cf662714f1c58fe7044f6a9dd3eb2f0af785875f490c2c0c744e",
+    "target/perf-degen2-fb-cost/row-census640/manifest.json": "82957819a45e21b4700d6071c0792fae6139fdb00e0d1ec3ad2fd29470297ff8",
+    "target/perf-degen2-fb-cost/l_census_gdb.py": "fcc391bbf3dd5b15b696e6b635bb04339f7c4a3a230d0b637281c862694bbc3a",
+    "target/perf-degen2-fb-cost/l-census136/manifest.json": "3234692fcb663ed20916ee503422ba73e188ff424b391c763de16c9c7fbf2245",
+    "target/perf-degen2-fb-cost/l-census640/manifest.json": "4d44b8ee0fd3e61990ab3011010fd8b8c2c01d291ea5375f8bb339be29068239",
+    "target/perf-degen2-native-transaction-cost/central-comparison.json": "7443d801501dc1a2ab0fe89fafeb170acd6a772472401a26cb57a4b097872342",
+    "target/perf-degen2-native-transaction-cost/summary.json": "dbde20ed66a0c187d68945d837b592d0385ef4d3ffc805cb98e18a8c17308f10"
+  },
+  "whole_Rose_L_eta_census": {
+    "families": {
+      "full": {
+        "calls": 747,
+        "instructions": 9965993
+      },
+      "needed": {
+        "calls": 634,
+        "instructions": 15421024
+      }
+    },
+    "total_instructions": 25387017,
+    "phase_table": [
+      {
+        "family": "full",
+        "phase": "setup",
+        "calls": 1,
+        "instructions": 28279
+      },
+      {
+        "family": "full",
+        "phase": "positive_level_listwalk",
+        "calls": 232,
+        "instructions": 1182271
+      },
+      {
+        "family": "needed",
+        "phase": "positive_level_listwalk",
+        "calls": 131,
+        "instructions": 332096
+      },
+      {
+        "family": "full",
+        "phase": "level0_listwalk",
+        "calls": 150,
+        "instructions": 1646141
+      },
+      {
+        "family": "needed",
+        "phase": "level0_listwalk",
+        "calls": 147,
+        "instructions": 2215476
+      },
+      {
+        "family": "full",
+        "phase": "value_mode",
+        "calls": 364,
+        "instructions": 7109302
+      },
+      {
+        "family": "needed",
+        "phase": "value_mode",
+        "calls": 356,
+        "instructions": 12873452
+      }
+    ],
+    "selected_full": 22421,
+    "selected_needed": 34447,
+    "scope": "Entry144740 throughverifiedfixedcallerreturns134f2c/14318c, includeshelpers/WORK/localcleanup andRET. Returnedspike andretainedcachelifecycle remainoutside. No numericaltraces/newnativepairingbeyond163. Cheapcap1361.05s thenwhole6402.04s,allresults/exits/signedzeroagree."
+  }
+}

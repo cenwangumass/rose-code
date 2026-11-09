@@ -1,0 +1,714 @@
+{
+  "configuration": "Qualified optimized accepted ELF55af6617/systemTCMalloc vs reference26a50517. New rootkernel scopes are a separate diagnostic ELF39f6d08d using same originalsource/fixed39 profile. Trace-only ELF0100f699 is separate and excluded from all costs. CPU2costs,CPU3traces,cap640(634iterations).",
+  "family_ids": {
+    "1": "mirror full FTRAN, including keep/basic preparation+restore",
+    "2": "needed FTRAN",
+    "3": "mirror BTRAN",
+    "4": "auxiliary objective FTRAN",
+    "5": "auxiliary readout BTRAN",
+    "6": "joint U WORK accounting"
+  },
+  "purpose_ids": {
+    "1": "pivot (rho for BTRAN)",
+    "2": "boundflip",
+    "3": "basic solution recompute",
+    "4": "initial weight",
+    "5": "true_d setup/subsequent recompute",
+    "7": "fresh_objective",
+    "8": "readout"
+  },
+  "family_inclusive_diagnostic": {
+    "1": {
+      "calls": 747,
+      "mean_ms": 7.882311166666666,
+      "mean_instructions": 29485485.166666664,
+      "mean_cycles": 25120217.666666664,
+      "alloc": 12171,
+      "realloc": 7974,
+      "free": 11298,
+      "bytes": 9688196
+    },
+    "2": {
+      "calls": 634,
+      "mean_ms": 6.8961835,
+      "mean_instructions": 34784060.16666667,
+      "mean_cycles": 22259924.333333332,
+      "alloc": 6051,
+      "realloc": 1390,
+      "free": 4054,
+      "bytes": 11316440
+    },
+    "3": {
+      "calls": 1095,
+      "mean_ms": 3.0572765000000004,
+      "mean_instructions": 13019953.666666666,
+      "mean_cycles": 10379624.5,
+      "alloc": 3382,
+      "realloc": 601,
+      "free": 2119,
+      "bytes": 3176424
+    },
+    "4": {
+      "calls": 5,
+      "mean_ms": 0.063606,
+      "mean_instructions": 195863.16666666666,
+      "mean_cycles": 187744.16666666666,
+      "alloc": 5,
+      "realloc": 0,
+      "free": 5,
+      "bytes": 17760
+    },
+    "5": {
+      "calls": 1,
+      "mean_ms": 0.012713666666666667,
+      "mean_instructions": 54663,
+      "mean_cycles": 38634.666666666664,
+      "alloc": 2,
+      "realloc": 0,
+      "free": 2,
+      "bytes": 7104
+    },
+    "6": {
+      "calls": 634,
+      "mean_ms": 0.7476175,
+      "mean_instructions": 3047065.5,
+      "mean_cycles": 2638996,
+      "alloc": 89,
+      "realloc": 87,
+      "free": 89,
+      "bytes": 21252
+    }
+  },
+  "paths": [
+    {
+      "family": 1,
+      "path": 1,
+      "calls": 3,
+      "mean_ms": 0.036304333333333334,
+      "mean_instructions": 136766,
+      "mean_cycles": 90114.33333333333,
+      "alloc": 33,
+      "realloc": 35,
+      "free": 36,
+      "bytes": 72628
+    },
+    {
+      "family": 1,
+      "path": 2,
+      "calls": 182,
+      "mean_ms": 2.2674061666666665,
+      "mean_instructions": 8405468.333333334,
+      "mean_cycles": 7294767.333333333,
+      "alloc": 4809,
+      "realloc": 2263,
+      "free": 4237,
+      "bytes": 3463940
+    },
+    {
+      "family": 1,
+      "path": 3,
+      "calls": 201,
+      "mean_ms": 2.3981035,
+      "mean_instructions": 9967185.666666666,
+      "mean_cycles": 7549133,
+      "alloc": 1401,
+      "realloc": 1314,
+      "free": 1561,
+      "bytes": 3644420
+    },
+    {
+      "family": 1,
+      "path": 8,
+      "calls": 361,
+      "mean_ms": 3.1804971666666666,
+      "mean_instructions": 10976065.166666666,
+      "mean_cycles": 10186203,
+      "alloc": 5928,
+      "realloc": 4362,
+      "free": 5464,
+      "bytes": 2507208
+    },
+    {
+      "family": 2,
+      "path": 6,
+      "calls": 54,
+      "mean_ms": 0.5337466666666666,
+      "mean_instructions": 2266538.5,
+      "mean_cycles": 1720552.3333333333,
+      "alloc": 1337,
+      "realloc": 582,
+      "free": 1131,
+      "bytes": 1251240
+    },
+    {
+      "family": 2,
+      "path": 7,
+      "calls": 388,
+      "mean_ms": 6.011933666666667,
+      "mean_instructions": 31057589.666666668,
+      "mean_cycles": 19223583.166666668,
+      "alloc": 3512,
+      "realloc": 679,
+      "free": 2318,
+      "bytes": 8387280
+    },
+    {
+      "family": 2,
+      "path": 8,
+      "calls": 192,
+      "mean_ms": 0.3505031666666667,
+      "mean_instructions": 1459932,
+      "mean_cycles": 1315788.8333333333,
+      "alloc": 1202,
+      "realloc": 129,
+      "free": 605,
+      "bytes": 1677920
+    },
+    {
+      "family": 3,
+      "path": 0,
+      "calls": 17,
+      "mean_ms": 0.1473095,
+      "mean_instructions": 735358,
+      "mean_cycles": 491585,
+      "alloc": 65,
+      "realloc": 0,
+      "free": 0,
+      "bytes": 238016
+    },
+    {
+      "family": 3,
+      "path": 1,
+      "calls": 343,
+      "mean_ms": 2.3784683333333336,
+      "mean_instructions": 10306346.666666666,
+      "mean_cycles": 7726926.333333333,
+      "alloc": 388,
+      "realloc": 101,
+      "free": 0,
+      "bytes": 2520744
+    },
+    {
+      "family": 3,
+      "path": 3,
+      "calls": 735,
+      "mean_ms": 0.5314986666666667,
+      "mean_instructions": 1978249,
+      "mean_cycles": 2161113.1666666665,
+      "alloc": 2929,
+      "realloc": 500,
+      "free": 2119,
+      "bytes": 417664
+    },
+    {
+      "family": 4,
+      "path": 0,
+      "calls": 5,
+      "mean_ms": 0.063606,
+      "mean_instructions": 195863.16666666666,
+      "mean_cycles": 187744.16666666666,
+      "alloc": 5,
+      "realloc": 0,
+      "free": 5,
+      "bytes": 17760
+    },
+    {
+      "family": 5,
+      "path": 0,
+      "calls": 1,
+      "mean_ms": 0.012713666666666667,
+      "mean_instructions": 54663,
+      "mean_cycles": 38634.666666666664,
+      "alloc": 2,
+      "realloc": 0,
+      "free": 2,
+      "bytes": 7104
+    },
+    {
+      "family": 6,
+      "path": 0,
+      "calls": 634,
+      "mean_ms": 0.7476175,
+      "mean_instructions": 3047065.5,
+      "mean_cycles": 2638996,
+      "alloc": 89,
+      "realloc": 87,
+      "free": 89,
+      "bytes": 21252
+    }
+  ],
+  "purposes": [
+    {
+      "family": 1,
+      "purpose": 1,
+      "calls": 634,
+      "mean_ms": 7.108037833333333,
+      "mean_instructions": 26650341.166666668,
+      "mean_cycles": 22932328.5,
+      "alloc": 10618,
+      "realloc": 7055,
+      "free": 9705,
+      "bytes": 8649160
+    },
+    {
+      "family": 1,
+      "purpose": 2,
+      "calls": 97,
+      "mean_ms": 0.449587,
+      "mean_instructions": 1504486.5,
+      "mean_cycles": 1281259.3333333333,
+      "alloc": 1444,
+      "realloc": 809,
+      "free": 1532,
+      "bytes": 508444
+    },
+    {
+      "family": 1,
+      "purpose": 3,
+      "calls": 16,
+      "mean_ms": 0.3246863333333333,
+      "mean_instructions": 1330657.5,
+      "mean_cycles": 906629.8333333334,
+      "alloc": 109,
+      "realloc": 110,
+      "free": 61,
+      "bytes": 530592
+    },
+    {
+      "family": 2,
+      "purpose": 1,
+      "calls": 634,
+      "mean_ms": 6.8961835,
+      "mean_instructions": 34784060.166666664,
+      "mean_cycles": 22259924.333333332,
+      "alloc": 6051,
+      "realloc": 1390,
+      "free": 4054,
+      "bytes": 11316440
+    },
+    {
+      "family": 3,
+      "purpose": 1,
+      "calls": 634,
+      "mean_ms": 2.8191316666666664,
+      "mean_instructions": 11678313.666666666,
+      "mean_cycles": 9325858.666666666,
+      "alloc": 1963,
+      "realloc": 601,
+      "free": 1215,
+      "bytes": 2864960
+    },
+    {
+      "family": 3,
+      "purpose": 4,
+      "calls": 444,
+      "mean_ms": 0.09083533333333332,
+      "mean_instructions": 606282,
+      "mean_cycles": 562180.8333333334,
+      "alloc": 1354,
+      "realloc": 0,
+      "free": 904,
+      "bytes": 73448
+    },
+    {
+      "family": 3,
+      "purpose": 5,
+      "calls": 16,
+      "mean_ms": 0.13587633333333335,
+      "mean_instructions": 676795,
+      "mean_cycles": 454845.8333333333,
+      "alloc": 64,
+      "realloc": 0,
+      "free": 0,
+      "bytes": 230912
+    },
+    {
+      "family": 3,
+      "purpose": 8,
+      "calls": 1,
+      "mean_ms": 0.011433166666666666,
+      "mean_instructions": 58563,
+      "mean_cycles": 36739.166666666664,
+      "alloc": 1,
+      "realloc": 0,
+      "free": 0,
+      "bytes": 7104
+    },
+    {
+      "family": 4,
+      "purpose": 7,
+      "calls": 5,
+      "mean_ms": 0.063606,
+      "mean_instructions": 195863.16666666666,
+      "mean_cycles": 187744.16666666666,
+      "alloc": 5,
+      "realloc": 0,
+      "free": 5,
+      "bytes": 17760
+    },
+    {
+      "family": 5,
+      "purpose": 8,
+      "calls": 1,
+      "mean_ms": 0.012713666666666667,
+      "mean_instructions": 54663,
+      "mean_cycles": 38634.666666666664,
+      "alloc": 2,
+      "realloc": 0,
+      "free": 2,
+      "bytes": 7104
+    },
+    {
+      "family": 6,
+      "purpose": 1,
+      "calls": 634,
+      "mean_ms": 0.7476175,
+      "mean_instructions": 3047065.5,
+      "mean_cycles": 2638996,
+      "alloc": 89,
+      "realloc": 87,
+      "free": 89,
+      "bytes": 21252
+    }
+  ],
+  "modes": {
+    "plain": {
+      "median_ms": 49.945571,
+      "mean_ms": 50.361704833333334,
+      "range_ms": [
+        47.097829,
+        56.530048
+      ],
+      "whole_process_instructions": 196696418.16666666,
+      "whole_process_cycles": 159627492.16666666
+    },
+    "off": {
+      "median_ms": 47.1558815,
+      "mean_ms": 47.043168666666666,
+      "range_ms": [
+        45.949719,
+        48.057478
+      ],
+      "whole_process_instructions": 203047841.0,
+      "whole_process_cycles": 153037586.83333334
+    },
+    "timers-noalloc": {
+      "median_ms": 48.965715,
+      "mean_ms": 48.604688499999995,
+      "range_ms": [
+        44.389371,
+        54.597025
+      ],
+      "whole_process_instructions": 206089778.66666666,
+      "whole_process_cycles": 157981388.5
+    },
+    "timers": {
+      "median_ms": 49.607020500000004,
+      "mean_ms": 49.754649,
+      "range_ms": [
+        44.048877,
+        55.044709999999995
+      ],
+      "whole_process_instructions": 206752720.5,
+      "whole_process_cycles": 160454599.16666666
+    },
+    "pmu": {
+      "median_ms": 83.0462075,
+      "mean_ms": 83.70573350000001,
+      "range_ms": [
+        80.554643,
+        88.231352
+      ]
+    }
+  },
+  "calibration_per_kernel": {
+    "timers-noalloc": {
+      "ns": 63.4185,
+      "instructions": 0.0,
+      "cycles": 0.0,
+      "outer_ns_per_call": 123.4061
+    },
+    "timers": {
+      "ns": 65.20175,
+      "instructions": 0.0,
+      "cycles": 0.0,
+      "outer_ns_per_call": 125.28605
+    },
+    "pmu": {
+      "ns": 4557.3671,
+      "instructions": 308.0001,
+      "cycles": 428.463,
+      "outer_ns_per_call": 9099.8268
+    }
+  },
+  "path_bits": {
+    "full": "1=L initiallydense;2=Udense;8=cachedlevelL successfullyreturned. Noncached non-dense branch not further split by new costprobe.",
+    "needed": "1=L initiallydense;2=joint_dense;4=tau_dense;8=cachedlevelL successfullyreturned.",
+    "btran": "1=sparseU branch;2=sparseLT branch;4=emptyearlyreturn beforeLT. Count0=denseU/denseLT."
+  },
+  "accepted_self": {
+    "instructions": {
+      "rose": {
+        "full_self": 21430721.354166668,
+        "needed_self": 24695810.666666668,
+        "shared_L_eta_publication": 15701211.822916655,
+        "BTRAN_self": 8187411.708333337,
+        "joint_WORK": 4769597.510416666
+      },
+      "reference": {
+        "FTRAN_pair_single_shared": 17120885.9140625,
+        "BTRAN_self": 5800862.296875
+      },
+      "difference_total": 51863004.8515625,
+      "caveat": "sampledselfonly; root-boundaries/caller setup, outputretirement and unowned libraryleaves excluded; reference125f50mixedfull+needed"
+    },
+    "cycles": {
+      "rose": {
+        "full_self": 13524287.489583341,
+        "shared_L_eta_publication": 13662401.135416683,
+        "needed_self": 9847640.312499998,
+        "BTRAN_self": 6809846.937499996,
+        "joint_WORK": 2017238.3541666667
+      },
+      "reference": {
+        "FTRAN_pair_single_shared": 18355782.37499997,
+        "BTRAN_self": 5066513.28125
+      },
+      "difference_total": 22439118.572916716,
+      "caveat": "sampledselfonly; root-boundaries/caller setup, outputretirement and unowned libraryleaves excluded; reference125f50mixedfull+needed"
+    }
+  },
+  "numeric_reconstruction": {
+    "ftran_order.rs": {
+      "reconstructs_original_ignoring_whitespace": true,
+      "original_sha256": "57c86340f6959717954e2cb1c58f06c285ab7ce564a25d7d0e9e9c429d802ef1",
+      "probe_sha256": "31979ec344e2fdf004a7e88c3dcb28d3fb3181b502edaca00e477dc23e189b69"
+    },
+    "lu.rs": {
+      "reconstructs_original_ignoring_whitespace": true,
+      "original_sha256": "7104adbfcae0f73030fcf7136c1624715d33e6f686383fa7a41bd95fa4a074e4",
+      "probe_sha256": "1d0c1f4ef73dd4249f926a5112afa56817efbf97be45ce1f2dd266f50a68b7ff"
+    },
+    "dual.rs": {
+      "reconstructs_original_ignoring_whitespace": true,
+      "original_sha256": "dce94c76006809b9befabb79f04b658bd31213b86f07193341b0791c2e09eccd",
+      "probe_sha256": "b59f5f05d78436d779ccb012469698094b0e6563028406542e1cf6354603e0d0"
+    }
+  },
+  "checks": [
+    {
+      "model": "afiro",
+      "cap": 3,
+      "original_dump_records": 0,
+      "agree": true
+    },
+    {
+      "model": "degen2",
+      "cap": 3,
+      "original_dump_records": 0,
+      "agree": true
+    },
+    {
+      "model": "degen2",
+      "cap": 20,
+      "original_dump_records": 1002,
+      "agree": true
+    },
+    {
+      "model": "degen2",
+      "cap": 115,
+      "original_dump_records": 3226,
+      "agree": true
+    },
+    {
+      "model": "degen2",
+      "cap": 640,
+      "original_dump_records": 17201,
+      "agree": true
+    }
+  ],
+  "full_parity": "987/987,pmumode,84.1s",
+  "preservation": {
+    "target/release/rose": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "target/perf-optimized-build/rose-pgo-tcmalloc": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "target/perf-reference/reconstructed/libgurobi130.so": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "target/perf-degen2-kernels/rose-cost": "39f6d08dc658850191bb65864f87418ccf243d4da21590646d6ab612435267d2",
+    "target/perf-degen2-kernels/rose-trace": "0100f699406846c5ca8d6421f2cf7297e26539f28c3445c4bf3dc95d00fd7743"
+  },
+  "artifacts": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-kernels",
+  "findings": {
+    "cost_boundary": "Each root guard begins before original method-local preparation and ends after locals drop. ftran_keep/basic outer guards include saved snapshot preparation/restoration and share inner fullFTRAN guard. Callee helper allocation/copy/WORK included in inclusive root. Returned-vector retirement at caller and retained factor construction/update/retirement are NOT charged to root; these stay separate at known stage/lifecycle scope. Therefore no equivalent complete Rose/reference inclusive delta is claimed.",
+    "self_boundary_correction": "Reference125f50 is a two-vector wrapper (full plusneeded), not needed-only. RoseTauRow::append_terms belonged to factor-other in older broad classifier but actually serves neededFTRAN. Reclassification is a diagnostic query of existing accepted samples, not a changed baseline. Sample self pools differ from inclusive roots and are not time shares. No allocations are silently dropped or assumed zero in reference.",
+    "main_localization": "634needed calls split192non-joint cached-sparse cases and442jointdense cases(54 initiallynondenseL,388denseL). Dense/joint accounts6.5456ms of6.8962ms diagnostic neededcost, not a removable bound. Full747mix383denseU/364sparseU. BTRAN1095mix17denseU+denseLT,343sparseU+denseLT,735sparseU+sparseLT. SparseU+denseLT dominates BTRAN diagnosticcost(~2.38ms). Only selected corresponding native paths/operands proven; output-order transport handled centrally.",
+    "memory_lifetime": "Rootscope allocation+growth counts full20145,needed7441,BTRAN3983,jointWORK176; auxiliaryfull5/auxB2 separately. Requested bytes are allocator targetsize sums, not live/DRAM/copied bytes. Neededx_tau clones444doubles634times=2251968logicalbytes; storedF2columnworkspace already retained. TauRow numericmap/term scratch retained but rebuilt per requestednucleusrow. Avoiding all rowallocations is not supported. Factor lifecycle costs remain stagefactor scope and cannot be assigned to five objective solves by mixedaverage.",
+    "machine_code": "Acceptedneeded14368d..1436cd loop checks kind and bounds for every numericUentry before tail-onlyscatter; raw samples6.933Minstructions/3.511Mcycles include required arithmetic and skid. Acceptedneededclosure94940..94ed0 includes stampedTauRowprepare,rowdot,division/output and8.169Minstruction self; append_terms adds3.440M. Native normal/joint reads numericrow directly. Both scalar multiply/subtract for shortrows, packedmul/sub longrows; no broad different-arithmetic-speed claim. Native denseL is four-wayunrolled with32-bitindexarrays; Roseuses64-bitindices/Vecmetadata/bounds. No causal branch/cache-stall proof.",
+    "auxiliary_costs": "Measured individually in same diagnostic ELF:fiveobjectiveFTRANsum~.0636ms/.196Mins/.188Mcycles;additionalmirrorreadoutBTRAN~.0114ms/.059Mins/.037Mcycles;additionalauxreadoutBTRAN~.0127ms/.055Mins/.039Mcycles. Timeremptykernel~65ns makes veryshortinitialweight calls overheadsensitive. Extra retainedauxfactor construction/621updates/retirement outside these calls remain unassigned; do not infer totalauxlifetime savings from these bodycosts.",
+    "distortion": "Six shuffled repeats/mode. Plainbyteidentical accepted, off+3.229%,timers-noalloc+4.776%,timers+5.113% whole-process instructions. PMUwall median83.046ms vsplain49.946/timer49.607; PMUwall times excluded. Emptyrootinside~65.2ns,whole~125.3ns; PMUinside4557ns/308instructions/428cycles,whole~9100ns. Newrootcounters include read/probe cost and codegenskew; do not transfer their totals/shares to accepted. Traceper-element build has no performanceclaims.",
+    "rejected_trials": "Two-vector denseinterleaving,sparsecol/densetaujoint,individual/combinedUestimate deferral,shorttaudirectlookup,F2predicate/workspace reuse,post-Uoutputordering,pre-Uownerrewrite,packedLindices,dense-Loutlining/WORKbookkeeping andlongeta variants already rejected/inconclusive. None restarted. Scalar/packed arithmetic evidence does not reopen longeta orshorttau trials.",
+    "next_experiment": "Completed joint135 census now supports one next exclusive cost/proof experiment for failed cached-L admission plus fallback construction/execution/cleanup and copying needed for safe handoff. Diagnostic directbenefit0; no qualified whole-solve saving. Entire accepted Lself11.050M cycles about8.05% whole137.330M is a loose ceiling including requiredwork, not attainable savings. Different from settled denseL/sharedL/pre-Uowner/workspace/rowcache trials.",
+    "precise_missing_evidence": "Exact complete-boundary matched reference helper/allocation/cleanup instruction and cycle costs; exhaustive L/eta/U entry and arithmetic census; raw97flip/16basic pairing; initial444/recompute16 BTRAN output enumeration; strict numerical state pairing beyond162 remains unavailable. Zero-origin is explained but raw output mismatch remains. No substantial construction-inclusive removable mechanism is established.",
+    "selected_tail_mechanism": "At sourcepricing136/nativepivot135 jointneededU:8tailcolumns scanned,6nonzero;Rose checks40numericUCentries,8actualscatterproducts;nativevisits8Acoefficients.32Rosekindchecksdiscard nucleusdestinations without multiplication. Destinationorder differs locally; matchingactualscatterterms/outputs proves this selected independent-update arithmetic, not wholehistory identity. Prior sourcepricing135/nativepivot13432candidate/5scatter example remainsunverifiednativeactualtraversal and is not used as cross-solverproof.",
+    "accepted_self_correction": "Requeried existing healthy accepted profiles include needed TauRow append_terms and levelworkspace helpers previously grouped factor-other. KnownFTRAN/full+needed+L/eta/WORKpublication self pools66.597M instructions/39.052M cycles Rose versus17.121M/18.356M reference; differences49.476M/20.696M. KnownmirrorBTRAN self8.187M/6.810M versus5.801M/5.067M; differences2.387M/1.743M. Mirrorpool includes oneextraRose readout whose acceptedself cannot be separated; diagnosticbodycost is measured separately and never subtracted acrossbuilds. These are whole-solve structuralprofilepools, not strictlymatchedcosts after divergence163 or inclusive allocator/cleanup costs.",
+    "overall_reconciliation": "Acceptedoverall gap127.995M instructions/89.315M cycles; reclassified knownF/Bselfpool difference51.863M/22.439M, leaving76.132M/66.876M outside these pools, including otherstages,unowned helpermemory andsampling residual. No exact perfull/perneeded inclusive gap follows because native125f50 executesboth insharedjointboundary and strictpairing stops163.",
+    "sampling_limits": "All reused retainedprofiles no loss/throttle. Originaldirectcountercoverage93.40/94.25%instructions and95.16/100.78%cycles; retagging symbols adds no samples. Fixed/primeperiodphasebiased probes remainexcluded. BroadhotIPregioncosts includes required arithmetic/skid and cannot be called removable or timeshares.",
+    "small_call_overhead": "Timerinside65.2ns,outer125.3ns per emptykernel.3116kernel/WORKentries imply~.203msinside/.390msouter overhead; initialweightBTRAN~.091ms/444is particularly clock-sensitive. PMUinside4.557us andouter9.100us; exclude all PMUwalltimes. Sixrepeatsalloutputs match, PMUenabled==running. TotalPMUscope snapshotincludesprobe codegen/readcost; no cross-build fraction transfer.",
+    "qualification_note": "Full987 frozenparity and17201originaldump equality prove regression preservation, not Gurobi internalbit equality. Previous637state comparator usednumeric equality for zeros; newcentral strictbit kernel comparator deliberately catches\u22120/+0 at163. Originalacceptedbinaryprofiles andtraces retainprovenance. No optimization/solverfix/baselinechange performed.",
+    "accounting_audit": "Structured accepted_self.cycles and raw target/perf-degen2-kernels/accepted-self-cycles.json agree: Rose BTRAN6.8098469375M, difference1.74333365625M; totalF/B22.4391185729M cycle difference. Earlier prose6.743/22.372 was a transcription inconsistency; no samples or binary changed.",
+    "zero_origin_followup": "Completed delegated compare.py dual-zero-origin: native dense tail divides +0 by -1 at pivot163/basis22; Rose sparse visit omits row22 and retains+0. Requested/consumed tau22 differs; observed DSE subtraction erases sign and W22 becomes identical26.25. Strict raw comparison still stops163; no later numerical-equivalence inference. See degen2-zero-origin-and-search.json.",
+    "completed_transaction_followup": "See degen2-joint-transaction.json: delegated central pivot135 fullL46/needed132 native terms each once, Rose each twice at cached density fallback, all ordered operand/destination-before bits and444rawslots match. Rootfull/needed allocation-growth36/39 versus nativewrapper0; lifecycle ownership explicitly traced. No performance extrapolation or optimization."
+  },
+  "reference_comparison": {
+    "builds": {
+      "accepted_rose_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+      "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30"
+    },
+    "strict_output_prefix": 162,
+    "first_internal_bit_difference": {
+      "pivot_ordinal": 163,
+      "pricing_call": 164,
+      "context_it": 162.0,
+      "entering": 120,
+      "leaving_basis_position": 36,
+      "field": "needed-output",
+      "basis_position": 22,
+      "native_compact_index": 0,
+      "native_full_output_count": 35,
+      "native_compact_output": -0.0,
+      "native_compact_f64_be": "8000000000000000",
+      "native_immediate_needed_U_output": -0.0,
+      "native_immediate_needed_U_f64_be": "8000000000000000",
+      "rose_output": 0.0,
+      "rose_f64_be": "0000000000000000",
+      "native_routes": [
+        "0x12bd30",
+        "0x12a990",
+        "0x129aa0",
+        "0x121ef0",
+        "0x123690"
+      ],
+      "full_output_value_support_match": true,
+      "note": "Only proven native dense-first wrapper publication permutation applied; zero signs compared strictly. No comparison after this pivot."
+    },
+    "publication_order_difference_first": {
+      "pivot": 115,
+      "context_it": 114,
+      "native_requested_positions": "ascending nonpivot positions followed by pivot300",
+      "rose_requested_positions": "ascending with pivot300 in place",
+      "proof": "native fullU121ef0 returns dense\u22121; wrapper1297c4..12982f compacts excludingpivot andappends; independent output visitation differs, preserved"
+    },
+    "full_native_outer_route_census": {
+      "normal_pair": 192,
+      "normal_full_sparse_U": 162,
+      "joint_sparse_column_dense_tau": 105,
+      "normal_full_dense_U": 30,
+      "inline_joint_dense": 337
+    },
+    "route_census_scope": "All634 bounded native calls, structural census only. Strict numeric pairing stops163; do not claim all634 input/visited-entry equivalence. Jointtotal105+337=442; normal192.",
+    "btran_census": {
+      "recompute_d": {
+        "calls": 16,
+        "dense_u": 16,
+        "dense_l": 16
+      },
+      "initial_weight": {
+        "calls": 444,
+        "sparse_u": 444,
+        "sparse_l": 444
+      },
+      "rho": {
+        "calls": 634,
+        "sparse_u": 634,
+        "sparse_l": 291,
+        "dense_l": 343
+      }
+    },
+    "selected_proofs": {
+      "pricing_1_20_115": "degen2-115.raw-btran.json",
+      "raw_115": "15nucleusrows/29ordered coefficientandsolved-value operands; scalarinitial/diag/par andfull/neededrawinput bits match",
+      "pricing136_nativepivot135": "degen2-136.raw-kernels.json; raw fullinput andall444full-Uinputslots match; neededinputnonzero supportvalues match;21nucleusrows25terms match",
+      "dense_needed_input_limit": "Selected native dense needed-U input comparison filters zero slots; noall444zero-sign claim for this vector.",
+      "btran_rho": "pricing1/20/115 basisunitinputandoriginal-rowoutput bits/support/order match;Grows sign rule central"
+    },
+    "tail_local_evidence": {
+      "source_pricing135_native_pivot134": {
+        "source_nonzero_columns": 5,
+        "candidate_numeric_uc": 32,
+        "actual_tail_scatter": 5,
+        "discarded_nucleus_checks": 27,
+        "native_A_storage": "captured; actualnormalneededtail iteration not instrumented"
+      },
+      "source_pricing136_native_pivot135": {
+        "source_tail_scans": 8,
+        "source_nonzero_columns": 6,
+        "source_candidate_numeric_uc": 40,
+        "source_actual_scatter": 8,
+        "source_discarded_nucleus_checks": 32,
+        "native_active_A_spans": 6,
+        "native_A_coeff_entries": 8,
+        "native_destinations_all_kind_tail": true,
+        "native_A_destination_order_differs": true,
+        "native_capture": "dual_ftran2.DETAIL=134,135,LIM=135,PROVENANCE=2,ROUTES=5.jsonl"
+      }
+    },
+    "limitations": [
+      "Full637state comparator uses numeric equality and can hide signedzero; preserve thatqualification.",
+      "No strictnumeric comparison beyond pivot163; cached laterreference data not usedfor numericalalignment.",
+      "No initial444BTRAN input/output enumeration; onlypurpose/pathcounts plus3selectedrho rawproofs.",
+      "Flip97/basic16 rawFTRANinput/output pairing not separatelyimplemented.",
+      "No allkernelL/eta/Uvisitedterm equivalence orreferenceinclusive per-purposePMU costs.",
+      "Native Ujointcost not separable intofull/neededtiming.",
+      "FirstLTcountprobe undercounted directdenseeta route by182; excluded in favor ofcorrected12fef8marker census."
+    ]
+  },
+  "artifact_hashes": {
+    "../reverse-engineer/tools/compare.py": "3de3c0d849ee4ff9d0e1ec1c6300689671404a88f065cdbacd45dcf20a16182b",
+    "../reverse-engineer/replay/gdb_dual_ftran2.py": "bbe20accedec12f24c5f50fe5dc744622409c9447ffbed3ce5e403f0517f72fb"
+  },
+  "central_reproduction_commands": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-kernels/comparison-commands.txt",
+  "first_difference": {
+    "pivot_ordinal": 163,
+    "pricing_call": 164,
+    "context_it": 162.0,
+    "entering": 120,
+    "leaving_basis_position": 36,
+    "field": "needed-output",
+    "basis_position": 22,
+    "native_compact_index": 0,
+    "native_full_output_count": 35,
+    "native_compact_output": -0.0,
+    "native_compact_f64_be": "8000000000000000",
+    "native_immediate_needed_U_output": -0.0,
+    "native_immediate_needed_U_f64_be": "8000000000000000",
+    "rose_output": 0.0,
+    "rose_f64_be": "0000000000000000",
+    "native_routes": [
+      "0x12bd30",
+      "0x12a990",
+      "0x129aa0",
+      "0x121ef0",
+      "0x123690"
+    ],
+    "full_output_value_support_match": true,
+    "note": "Only proven native dense-first wrapper publication permutation applied; zero signs compared strictly. No comparison after this pivot."
+  },
+  "booked_btran_diagnostic": {
+    "calls": 1094,
+    "mean_ms": 3.045843333333333,
+    "mean_instructions": 12961390.666666666,
+    "mean_cycles": 10342885.333333332,
+    "alloc": 3381,
+    "realloc": 601,
+    "free": 2119,
+    "bytes": 3169320
+  },
+  "extra_readout_btran_diagnostic": {
+    "calls": 2,
+    "mean_ms": 0.024146833333333333,
+    "mean_instructions": 113226,
+    "mean_cycles": 75373.83333333333,
+    "alloc": 3,
+    "realloc": 0,
+    "free": 2,
+    "bytes": 14208
+  }
+}

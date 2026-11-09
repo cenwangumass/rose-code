@@ -1,0 +1,958 @@
+{
+  "scope": "One bounded accepted-binary U cost diagnostic. No optimization, solver-source edit, WORK/dump/parity change or performance acceptance claim.",
+  "configuration": {
+    "rose_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "ordinary_cli_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "build": "Qualified fixed39 PGO/system TCMalloc; CPU2; dual release. Other trial ELFs excluded."
+  },
+  "alignment": {
+    "source_pricing": 149,
+    "native_pivot": 148,
+    "context_iteration": 147,
+    "leaving_position": 138,
+    "entering_column": 448,
+    "strict_prefix": 162,
+    "first_difference": "Needed-output signed zero at pivot163; no later raw operation pairing.",
+    "reuse": "degen2-dense-L-diagnosis.json central raw needed444/L403term/eta19 comparisons. Native U capture/comparison delegated to ref_compare; no mapping in these source-only scripts.",
+    "new_central_gate": "compare.py dual-u-boundary PASS: cachedeta/nativeactualUentry gate, sourceactual19positions/kinds and published23positions/rawbits. Neededcompact23cachedbits agree, pivot138removal yields22. SourcefreshU-tailoperands/ordered arithmetic remain uncaptured."
+  },
+  "accepted_sampled_self_pools": {
+    "full_needed_shared_L_eta_WORK_publication": {
+      "rose_instructions": 66597341.35416666,
+      "native_instructions": 17120885.9140625,
+      "instruction_difference": 49476455.44010416,
+      "rose_cycles": 39051567.29166669,
+      "native_cycles": 18355782.37499997,
+      "cycle_difference": 20695784.916666716,
+      "rose_cycles_per_instruction": 0.586383277434294,
+      "native_cycles_per_instruction": 1.0721280701907585
+    },
+    "BTRAN": {
+      "rose_instructions": 8187411.708333337,
+      "native_instructions": 5800862.296875,
+      "instruction_difference": 2386549.4114583367,
+      "rose_cycles": 6809846.937499996,
+      "native_cycles": 5066513.28125,
+      "cycle_difference": 1743333.6562499963
+    },
+    "caveat": "Approximate whole-run self pools; exclude unowned allocator/helper/caller leaves. Native two-vector boundary is shared, so no per-full/per-needed cross-solver cost difference is supported. Pooled CPI does not establish arithmetic, branch or cache causality."
+  },
+  "purpose_inclusive_separate_diagnostic_build": [
+    {
+      "family": 1,
+      "purpose": 1,
+      "calls": 634,
+      "mean_ms": 7.108037833333333,
+      "mean_instructions": 26650341.166666668,
+      "mean_cycles": 22932328.5,
+      "alloc": 10618,
+      "realloc": 7055,
+      "free": 9705,
+      "bytes": 8649160,
+      "label": "full pivot",
+      "instructions_per_call": 42035.23843322818,
+      "cycles_per_call": 36170.86514195584
+    },
+    {
+      "family": 1,
+      "purpose": 2,
+      "calls": 97,
+      "mean_ms": 0.449587,
+      "mean_instructions": 1504486.5,
+      "mean_cycles": 1281259.3333333333,
+      "alloc": 1444,
+      "realloc": 809,
+      "free": 1532,
+      "bytes": 508444,
+      "label": "full flip",
+      "instructions_per_call": 15510.170103092783,
+      "cycles_per_call": 13208.85910652921
+    },
+    {
+      "family": 1,
+      "purpose": 3,
+      "calls": 16,
+      "mean_ms": 0.3246863333333333,
+      "mean_instructions": 1330657.5,
+      "mean_cycles": 906629.8333333334,
+      "alloc": 109,
+      "realloc": 110,
+      "free": 61,
+      "bytes": 530592,
+      "label": "full basic recompute",
+      "instructions_per_call": 83166.09375,
+      "cycles_per_call": 56664.364583333336
+    },
+    {
+      "family": 2,
+      "purpose": 1,
+      "calls": 634,
+      "mean_ms": 6.8961835,
+      "mean_instructions": 34784060.166666664,
+      "mean_cycles": 22259924.333333332,
+      "alloc": 6051,
+      "realloc": 1390,
+      "free": 4054,
+      "bytes": 11316440,
+      "label": "needed pivot",
+      "instructions_per_call": 54864.44821240799,
+      "cycles_per_call": 35110.29074658254
+    },
+    {
+      "family": 3,
+      "purpose": 1,
+      "calls": 634,
+      "mean_ms": 2.8191316666666664,
+      "mean_instructions": 11678313.666666666,
+      "mean_cycles": 9325858.666666666,
+      "alloc": 1963,
+      "realloc": 601,
+      "free": 1215,
+      "bytes": 2864960,
+      "label": "BTRAN rho",
+      "instructions_per_call": 18420.053101997895,
+      "cycles_per_call": 14709.556256572028
+    },
+    {
+      "family": 3,
+      "purpose": 4,
+      "calls": 444,
+      "mean_ms": 0.09083533333333332,
+      "mean_instructions": 606282,
+      "mean_cycles": 562180.8333333334,
+      "alloc": 1354,
+      "realloc": 0,
+      "free": 904,
+      "bytes": 73448,
+      "label": "BTRAN initial weight",
+      "instructions_per_call": 1365.5,
+      "cycles_per_call": 1266.173048048048
+    },
+    {
+      "family": 3,
+      "purpose": 5,
+      "calls": 16,
+      "mean_ms": 0.13587633333333335,
+      "mean_instructions": 676795,
+      "mean_cycles": 454845.8333333333,
+      "alloc": 64,
+      "realloc": 0,
+      "free": 0,
+      "bytes": 230912,
+      "label": "BTRAN true-d",
+      "instructions_per_call": 42299.6875,
+      "cycles_per_call": 28427.864583333332
+    },
+    {
+      "family": 3,
+      "purpose": 8,
+      "calls": 1,
+      "mean_ms": 0.011433166666666666,
+      "mean_instructions": 58563,
+      "mean_cycles": 36739.166666666664,
+      "alloc": 1,
+      "realloc": 0,
+      "free": 0,
+      "bytes": 7104,
+      "label": "extra mirror readout BTRAN",
+      "instructions_per_call": 58563.0,
+      "cycles_per_call": 36739.166666666664
+    },
+    {
+      "family": 4,
+      "purpose": 7,
+      "calls": 5,
+      "mean_ms": 0.063606,
+      "mean_instructions": 195863.16666666666,
+      "mean_cycles": 187744.16666666666,
+      "alloc": 5,
+      "realloc": 0,
+      "free": 5,
+      "bytes": 17760,
+      "label": "extra auxiliary objective FTRAN",
+      "instructions_per_call": 39172.63333333333,
+      "cycles_per_call": 37548.83333333333
+    },
+    {
+      "family": 5,
+      "purpose": 8,
+      "calls": 1,
+      "mean_ms": 0.012713666666666667,
+      "mean_instructions": 54663,
+      "mean_cycles": 38634.666666666664,
+      "alloc": 2,
+      "realloc": 0,
+      "free": 2,
+      "bytes": 7104,
+      "label": "extra auxiliary readout BTRAN",
+      "instructions_per_call": 54663.0,
+      "cycles_per_call": 38634.666666666664
+    },
+    {
+      "family": 6,
+      "purpose": 1,
+      "calls": 634,
+      "mean_ms": 0.7476175,
+      "mean_instructions": 3047065.5,
+      "mean_cycles": 2638996,
+      "alloc": 89,
+      "realloc": 87,
+      "free": 89,
+      "bytes": 21252,
+      "label": "joint U WORK",
+      "instructions_per_call": 4806.097003154574,
+      "cycles_per_call": 4162.454258675079
+    }
+  ],
+  "path_census": {
+    "native": {
+      "normal_pair": 192,
+      "normal_full_sparse_U": 162,
+      "joint_sparse_column_dense_tau": 105,
+      "normal_full_dense_U": 30,
+      "inline_joint_dense": 337
+    },
+    "native_BTRAN": {
+      "recompute_d": {
+        "calls": 16,
+        "dense_u": 16,
+        "dense_l": 16
+      },
+      "initial_weight": {
+        "calls": 444,
+        "sparse_u": 444,
+        "sparse_l": 444
+      },
+      "rho": {
+        "calls": 634,
+        "sparse_u": 634,
+        "sparse_l": 291,
+        "dense_l": 343
+      }
+    },
+    "rose_diagnostic_paths": [
+      {
+        "family": 1,
+        "path": 1,
+        "calls": 3,
+        "mean_ms": 0.036304333333333334,
+        "mean_instructions": 136766,
+        "mean_cycles": 90114.33333333333,
+        "alloc": 33,
+        "realloc": 35,
+        "free": 36,
+        "bytes": 72628
+      },
+      {
+        "family": 1,
+        "path": 2,
+        "calls": 182,
+        "mean_ms": 2.2674061666666665,
+        "mean_instructions": 8405468.333333334,
+        "mean_cycles": 7294767.333333333,
+        "alloc": 4809,
+        "realloc": 2263,
+        "free": 4237,
+        "bytes": 3463940
+      },
+      {
+        "family": 1,
+        "path": 3,
+        "calls": 201,
+        "mean_ms": 2.3981035,
+        "mean_instructions": 9967185.666666666,
+        "mean_cycles": 7549133,
+        "alloc": 1401,
+        "realloc": 1314,
+        "free": 1561,
+        "bytes": 3644420
+      },
+      {
+        "family": 1,
+        "path": 8,
+        "calls": 361,
+        "mean_ms": 3.1804971666666666,
+        "mean_instructions": 10976065.166666666,
+        "mean_cycles": 10186203,
+        "alloc": 5928,
+        "realloc": 4362,
+        "free": 5464,
+        "bytes": 2507208
+      },
+      {
+        "family": 2,
+        "path": 6,
+        "calls": 54,
+        "mean_ms": 0.5337466666666666,
+        "mean_instructions": 2266538.5,
+        "mean_cycles": 1720552.3333333333,
+        "alloc": 1337,
+        "realloc": 582,
+        "free": 1131,
+        "bytes": 1251240
+      },
+      {
+        "family": 2,
+        "path": 7,
+        "calls": 388,
+        "mean_ms": 6.011933666666667,
+        "mean_instructions": 31057589.666666668,
+        "mean_cycles": 19223583.166666668,
+        "alloc": 3512,
+        "realloc": 679,
+        "free": 2318,
+        "bytes": 8387280
+      },
+      {
+        "family": 2,
+        "path": 8,
+        "calls": 192,
+        "mean_ms": 0.3505031666666667,
+        "mean_instructions": 1459932,
+        "mean_cycles": 1315788.8333333333,
+        "alloc": 1202,
+        "realloc": 129,
+        "free": 605,
+        "bytes": 1677920
+      },
+      {
+        "family": 3,
+        "path": 0,
+        "calls": 17,
+        "mean_ms": 0.1473095,
+        "mean_instructions": 735358,
+        "mean_cycles": 491585,
+        "alloc": 65,
+        "realloc": 0,
+        "free": 0,
+        "bytes": 238016
+      },
+      {
+        "family": 3,
+        "path": 1,
+        "calls": 343,
+        "mean_ms": 2.3784683333333336,
+        "mean_instructions": 10306346.666666666,
+        "mean_cycles": 7726926.333333333,
+        "alloc": 388,
+        "realloc": 101,
+        "free": 0,
+        "bytes": 2520744
+      },
+      {
+        "family": 3,
+        "path": 3,
+        "calls": 735,
+        "mean_ms": 0.5314986666666667,
+        "mean_instructions": 1978249,
+        "mean_cycles": 2161113.1666666665,
+        "alloc": 2929,
+        "realloc": 500,
+        "free": 2119,
+        "bytes": 417664
+      },
+      {
+        "family": 4,
+        "path": 0,
+        "calls": 5,
+        "mean_ms": 0.063606,
+        "mean_instructions": 195863.16666666666,
+        "mean_cycles": 187744.16666666666,
+        "alloc": 5,
+        "realloc": 0,
+        "free": 5,
+        "bytes": 17760
+      },
+      {
+        "family": 5,
+        "path": 0,
+        "calls": 1,
+        "mean_ms": 0.012713666666666667,
+        "mean_instructions": 54663,
+        "mean_cycles": 38634.666666666664,
+        "alloc": 2,
+        "realloc": 0,
+        "free": 2,
+        "bytes": 7104
+      },
+      {
+        "family": 6,
+        "path": 0,
+        "calls": 634,
+        "mean_ms": 0.7476175,
+        "mean_instructions": 3047065.5,
+        "mean_cycles": 2638996,
+        "alloc": 89,
+        "realloc": 87,
+        "free": 89,
+        "bytes": 21252
+      }
+    ],
+    "qualifications": {
+      "full": "1=L initiallydense;2=Udense;8=cachedlevelL successfullyreturned. Noncached non-dense branch not further split by new costprobe.",
+      "needed": "1=L initiallydense;2=joint_dense;4=tau_dense;8=cachedlevelL successfullyreturned.",
+      "btran": "1=sparseU branch;2=sparseLT branch;4=emptyearlyreturn beforeLT. Count0=denseU/denseLT."
+    }
+  },
+  "selected_source_complete_scopes": [
+    {
+      "index": 4,
+      "model": "degen2",
+      "mode": "fine",
+      "wall_seconds": 2.747955673999968,
+      "result_exit_zero_sign_match": true,
+      "scopes": [
+        {
+          "family": "full",
+          "total": 33556,
+          "parts": [
+            {
+              "start": "full",
+              "end": "L_entry",
+              "instructions": 23
+            },
+            {
+              "start": "L_entry",
+              "end": "full_after_L",
+              "instructions": 7819
+            },
+            {
+              "start": "full_after_L",
+              "end": "full2_tail_done",
+              "instructions": 3576
+            },
+            {
+              "start": "full2_tail_done",
+              "end": "full2_numeric_done",
+              "instructions": 884
+            },
+            {
+              "start": "full2_numeric_done",
+              "end": "full2_inp_begin",
+              "instructions": 22
+            },
+            {
+              "start": "full2_inp_begin",
+              "end": "full2_est_begin",
+              "instructions": 132
+            },
+            {
+              "start": "full2_est_begin",
+              "end": "full2_est_done",
+              "instructions": 1055
+            },
+            {
+              "start": "full2_est_done",
+              "end": "full2_work_published",
+              "instructions": 7
+            },
+            {
+              "start": "full2_work_published",
+              "end": "full2_order_begin",
+              "instructions": 16
+            },
+            {
+              "start": "full2_order_begin",
+              "end": "full2_order_ready",
+              "instructions": 16622
+            },
+            {
+              "start": "full2_order_ready",
+              "end": "full2_filter_done",
+              "instructions": 2857
+            },
+            {
+              "start": "full2_filter_done",
+              "end": "full2_publish_begin",
+              "instructions": 81
+            },
+            {
+              "start": "full2_publish_begin",
+              "end": "full2_f2_done",
+              "instructions": 153
+            },
+            {
+              "start": "full2_f2_done",
+              "end": "full2_spike_done",
+              "instructions": 206
+            },
+            {
+              "start": "full2_spike_done",
+              "end": "full_cleanup",
+              "instructions": 7
+            },
+            {
+              "start": "full_cleanup",
+              "end": "end",
+              "instructions": 96
+            }
+          ]
+        },
+        {
+          "family": "needed",
+          "total": 34433,
+          "parts": [
+            {
+              "start": "needed",
+              "end": "L_entry",
+              "instructions": 19
+            },
+            {
+              "start": "L_entry",
+              "end": "needed_after_L",
+              "instructions": 23280
+            },
+            {
+              "start": "needed_after_L",
+              "end": "needed_tail_begin",
+              "instructions": 3914
+            },
+            {
+              "start": "needed_tail_begin",
+              "end": "needed_tail_done",
+              "instructions": 3469
+            },
+            {
+              "start": "needed_tail_done",
+              "end": "needed_est_done",
+              "instructions": 520
+            },
+            {
+              "start": "needed_est_done",
+              "end": "needed_snapshot_done",
+              "instructions": 440
+            },
+            {
+              "start": "needed_snapshot_done",
+              "end": "needed_rows_begin",
+              "instructions": 80
+            },
+            {
+              "start": "needed_rows_begin",
+              "end": "needed_rows_done",
+              "instructions": 2532
+            },
+            {
+              "start": "needed_rows_done",
+              "end": "needed_cleanup",
+              "instructions": 9
+            },
+            {
+              "start": "needed_cleanup",
+              "end": "end",
+              "instructions": 170
+            }
+          ]
+        },
+        {
+          "family": "joint",
+          "total": 1693,
+          "parts": [
+            {
+              "start": "joint",
+              "end": "end",
+              "instructions": 1693
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "model": "degen2",
+      "mode": "fine",
+      "wall_seconds": 2.6326320029984345,
+      "result_exit_zero_sign_match": true,
+      "scopes": [
+        {
+          "family": "full",
+          "total": 33556,
+          "parts": [
+            {
+              "start": "full",
+              "end": "L_entry",
+              "instructions": 23
+            },
+            {
+              "start": "L_entry",
+              "end": "full_after_L",
+              "instructions": 7819
+            },
+            {
+              "start": "full_after_L",
+              "end": "full2_tail_done",
+              "instructions": 3576
+            },
+            {
+              "start": "full2_tail_done",
+              "end": "full2_numeric_done",
+              "instructions": 884
+            },
+            {
+              "start": "full2_numeric_done",
+              "end": "full2_inp_begin",
+              "instructions": 22
+            },
+            {
+              "start": "full2_inp_begin",
+              "end": "full2_est_begin",
+              "instructions": 132
+            },
+            {
+              "start": "full2_est_begin",
+              "end": "full2_est_done",
+              "instructions": 1055
+            },
+            {
+              "start": "full2_est_done",
+              "end": "full2_work_published",
+              "instructions": 7
+            },
+            {
+              "start": "full2_work_published",
+              "end": "full2_order_begin",
+              "instructions": 16
+            },
+            {
+              "start": "full2_order_begin",
+              "end": "full2_order_ready",
+              "instructions": 16622
+            },
+            {
+              "start": "full2_order_ready",
+              "end": "full2_filter_done",
+              "instructions": 2857
+            },
+            {
+              "start": "full2_filter_done",
+              "end": "full2_publish_begin",
+              "instructions": 81
+            },
+            {
+              "start": "full2_publish_begin",
+              "end": "full2_f2_done",
+              "instructions": 153
+            },
+            {
+              "start": "full2_f2_done",
+              "end": "full2_spike_done",
+              "instructions": 206
+            },
+            {
+              "start": "full2_spike_done",
+              "end": "full_cleanup",
+              "instructions": 7
+            },
+            {
+              "start": "full_cleanup",
+              "end": "end",
+              "instructions": 96
+            }
+          ]
+        },
+        {
+          "family": "needed",
+          "total": 34432,
+          "parts": [
+            {
+              "start": "needed",
+              "end": "L_entry",
+              "instructions": 19
+            },
+            {
+              "start": "L_entry",
+              "end": "needed_after_L",
+              "instructions": 23280
+            },
+            {
+              "start": "needed_after_L",
+              "end": "needed_tail_begin",
+              "instructions": 3914
+            },
+            {
+              "start": "needed_tail_begin",
+              "end": "needed_tail_done",
+              "instructions": 3469
+            },
+            {
+              "start": "needed_tail_done",
+              "end": "needed_est_done",
+              "instructions": 520
+            },
+            {
+              "start": "needed_est_done",
+              "end": "needed_snapshot_done",
+              "instructions": 440
+            },
+            {
+              "start": "needed_snapshot_done",
+              "end": "needed_rows_begin",
+              "instructions": 80
+            },
+            {
+              "start": "needed_rows_begin",
+              "end": "needed_rows_done",
+              "instructions": 2532
+            },
+            {
+              "start": "needed_rows_done",
+              "end": "needed_cleanup",
+              "instructions": 9
+            },
+            {
+              "start": "needed_cleanup",
+              "end": "end",
+              "instructions": 169
+            }
+          ]
+        },
+        {
+          "family": "joint",
+          "total": 1693,
+          "parts": [
+            {
+              "start": "joint",
+              "end": "end",
+              "instructions": 1693
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "selected_order_construction": {
+    "input_count": 19,
+    "input_kind_counts": {
+      "singleton": 11,
+      "tail": 7,
+      "nucleus": 1
+    },
+    "ordered_candidates": 92,
+    "nonzero_return_count": 23,
+    "pivot_removal": "Pivot138 is still present; wrapper later removes it, yielding22. Do not confuse these boundaries.",
+    "inclusive_order_instructions": 16622,
+    "ordered_filter_and_buffer_drop_instructions": 2857,
+    "leftover_touched_scan": 81,
+    "allocation_calls": {
+      "calloc": 3,
+      "malloc": 6,
+      "realloc": 11,
+      "free": 8
+    },
+    "requested_allocation_and_growth_bytes": 5012,
+    "mechanism": "uorder deduplicates input, constructs three kind lists, discovers structural tail/nucleus reachability, orders and concatenates candidates, then drops local buffers. Caller rechecks touched/nonzero and builds returned sparse output. These required ordering responsibilities are not all removable.",
+    "cost_ownership": "Order scope includes called allocator/reallocator/free/helper work and local cleanup. Caller output-vector growth/filter cleanup is separate. Full F2 publication153I and spike206I, local final cleanup103I. Needed input/tail construction3914I, F2 clone/publication440I, final cleanup169-170I. Retained F2/spike/cache and returned column lifetime retirement remain factor/pivot lifecycle costs, not repeatedly charged to this root."
+  },
+  "selected_reconciliation": {
+    "rose_complete_I": 72460,
+    "native_complete_I": 14018,
+    "gap_I": 58442,
+    "rose_L_eta": 31099,
+    "rose_U_related_plus_entry": 36889,
+    "rose_outside_roots": 4472,
+    "native_preU": 9480,
+    "native_joint_U_and_publication": 4050,
+    "native_paired_return": 17,
+    "native_wrapper_prepare_and_publication": 471,
+    "ledger": "Rose31099+36889+4472=72460; native9480+4050+17+471=14018. Differences21619+32839+3984=58442 are disjoint accounting bins, not equivalent L-only/U-only arithmetic differences. Source jointWORK1693 is already inside4472; never add twice.",
+    "limits": "Source sequential roots and native joint root have different input/eta/WORK/publication boundaries. 36889-4050 is not a removable U gap and selected149 cannot be multiplied by634."
+  },
+  "largest_supported_mechanisms": {
+    "extra_L_visits": "Already centrally matched403 actual Lterms; native dense visits112positions, Rose444, extra332 empty columns cost7018-7019I of8956 selected walk excess. Previous isolated empty-gap trial closed inconclusive, not reopened.",
+    "order_support": "New complete16,622I order-construction observation plus2938I filter/remaining-support work, for92candidates/23nonzeros. At least local support/ownership machinery is material; exact matching native counterpart is jointU/publication4050I and must not be allocated arbitrarily to full/needed.",
+    "needed_tail": "Earlier matched135: Rose40 numeric UC candidates/8 scatters versus native8 coefficient entries. Rose checks nucleus entries that cannot scatter to tail. Destination visitation order differs; no current149 ordered Uterm equivalence claim.",
+    "needed_row": "Earlier13521 requested nucleus rows prepare/gather25terms before25dotterms; native reads row numerics directly. Whole accepted source prepare/gather3.959M I includes necessary support work and is not all removable."
+  },
+  "machine_code": {
+    "L": "Both scalar multiply/subtract in matched dense L. Native four-way unroll/32-bit indices, Rose64-bit indices/Vec metadata/bounds. Similar term arithmetic plus extra visited columns/index/support operations, not evidence that f64 arithmetic itself is slower.",
+    "U": "Disassembly confirms kind/bounds checks on needed tail candidates and stamped support gather for needed rows. No complete matched ordered Uterm/machine-code comparison at149, so no broad arithmetic-lowering or cache/stall claim.",
+    "cycles": "Accepted self FTRAN pool CPI Rose0.586/native1.072; fewer native instructions cost more cycles per instruction in this aggregate. This is not causal evidence for arithmetic/cache/branch cost; sampled self and inclusive counters must remain separate."
+  },
+  "distortion": {
+    "codegen": "Accepted ELF observed in memory only; no rebuild or disk mutation. Numerical/order observation separate from PMU capture.",
+    "PMU": "Reuse known5I sequence measures7I; subtract2I per stopped interval; user-space target-pid only, enabled==running. Root33556/34433 versus fine33556/34432-34433 differ0-1I. Same-stopped double-read equal. No exact universal error bound.",
+    "controls": "Two fine repeats each AFIROcap3,SC50Acap3,DEGEN2cap150; all six complete result/exit/float.hex signed-zero controls pass. Order observation DEGEN2cap150 complete control passes.",
+    "wall_seconds": [
+      0.6442103179942933,
+      0.5977388359970064,
+      0.6356777629989665,
+      0.6583339729986619,
+      2.747955673999968,
+      2.6326320029984345
+    ],
+    "cycles": "All debugger cycles/times excluded: stops alter execution/cache scheduling; prior root/detail showed roughly48%/101% cycle inflation. Existing accepted low-overhead profiles alone support cycle comparisons.",
+    "excluded": "Initial coarse unhit138f9a marker invalid instruction start removed; initial fine0 invalid13cd8b breakpoint caused disposable inferior SIGBUS. fine0 excluded entirely; corrected13cdae and all active full-body marker PCs checked against accepted disassembly. Archived v0 scripts retained.",
+    "fine_fixed_PC_interval_counts": {
+      "4": {
+        "full": 16,
+        "needed": 10,
+        "joint": 1
+      },
+      "5": {
+        "full": 16,
+        "needed": 10,
+        "joint": 1
+      }
+    },
+    "fine_fixed_PC_interval_correction_I": {
+      "4": {
+        "full": 32,
+        "needed": 20,
+        "joint": 2
+      },
+      "5": {
+        "full": 32,
+        "needed": 20,
+        "joint": 2
+      }
+    }
+  },
+  "reconciliation": {
+    "accepted_solve_ms": [
+      45.784,
+      16.696
+    ],
+    "overall_instruction_gap": 127995000,
+    "overall_cycle_gap": 89315000,
+    "known_FB_self_instruction_gap": 51863004.8515625,
+    "known_FB_self_cycle_gap": 22439118.572916716,
+    "outside_pools_instruction_gap": 76131995.1484375,
+    "outside_pools_cycle_gap": 66875881.42708328,
+    "meaning": "Outside pools includes other measured stages, unowned memory/helpers and sampling residual. Do not add duplicate-L or tail-region costs to self-pool delta; they are already included. No exact complete inclusive per-family cross-solver reconciliation exists."
+  },
+  "missing_evidence": [
+    "Complete actual ordered full/needed U input/arithmetic term comparisons at149 including native zero divisions; current cost evidence cannot prove those arithmetic streams equivalent.",
+    "Equivalent per-purpose BTRAN complete root/helper/cleanup costs and exhaustive initial444/recompute16 output pairing. Selected rho1/20/115 outputs previously pass.",
+    "Raw97flip/16basic full FTRAN operation pairing; whole paths after163 remain structural counts only.",
+    "Native-private retained-factor allocation and cleanup costs, complete accepted inclusive cycles, whole-solve output-order construction exposure."
+  ],
+  "one_proposed_experiment": {
+    "type": "One diagnostic-only whole-solve order-construction/lifetime census on unchanged accepted ELF.",
+    "design": "Count all compiled full-FTRAN order-construction paths and their complete helper/allocation/local-cleanup instruction scopes; retain purpose/path distinctions and separate retained-factor retirement. Qualify small models and cap20 first, then one boundedDEGEN2cap640 structural cost census. Numerical pairing remains only through162 using cached central gates.",
+    "benefit": "The diagnostic itself saves0. No defensible whole-solve speedup estimate yet: local19560I order/filter exposure cannot be multiplied by634. A later1% instruction-reduction proposal would need evidence for at least1.812M net instructions after construction/cleanup and valid cycle measurements; instruction reduction does not predict elapsed-time gain.",
+    "rejected_trial_check": "Measures complete existing structural-discovery/order ownership frequency and cost, not an output-order bypass, direct dense publication, reserve tweak, pre-U ownership/F2workspace, WORK deferral, fusion, arena, completed-L handoff or empty-gap retry. All those implementation trials stay closed."
+  },
+  "artifacts": {
+    "fine": "target/perf-degen2-U/cost-fine-summary.json",
+    "order": "target/perf-degen2-U/order149.json",
+    "scripts": [
+      "target/perf-degen2-U/cost_fine_gdb.py",
+      "target/perf-degen2-U/order_observe_gdb.py",
+      "target/perf-degen2-U/run_cost_fine_v1.py"
+    ],
+    "native_central_boundary": "target/perf-degen2-U-native/central-boundary.json",
+    "native_reproducer": "target/perf-degen2-U-native/central-command.txt",
+    "native_summary": "target/perf-degen2-U-native/summary.json"
+  },
+  "artifact_hashes": {
+    "target/perf-degen2-U/cost-fine-summary.json": "f1c96122cd83cbd45797e61456169c2cd9f1b6f416f389231aca2f2ff0f3bcf1",
+    "target/perf-degen2-U/order149.json": "7d1ee7c25455f5d148f58db3b1845374f445d8834ccbac655ad9d71a4c96333f",
+    "target/perf-degen2-U/cost_fine_gdb.py": "ce646f2be771bb4cdeb68f928dfd3ebf5b06e87d4db0c4d8713ce5f3b882fa92",
+    "target/perf-degen2-U/order_observe_gdb.py": "429389ad1a0482c790c4d58d9e1a2458d5ca9d50e3c0eee27a4d8b1cfe34b3f7",
+    "target/perf-degen2-U/run_cost_fine_v1.py": "d5e0b2ad71fcbcb68ce4dbc03c0ea1075dda501cc5f6922a2c5cf65cd62814d0",
+    "target/perf-degen2-U-native/central-boundary.json": "d74527a39deb3aadcff103effbfd5e135e4019c46c4fc423fe2c2ef10716c7e9",
+    "target/perf-degen2-U/order149.meta.json": "9183619444550ad090d90d161eae8f7c303d1281cbc9238d6a5bf09e4c9ccaf8",
+    "target/perf-degen2-U-native/central-command.txt": "03932e38173ab799e3d140df44de5ee69d3b0fe7c37e8467d9c9ad96ca097133",
+    "target/perf-degen2-U-native/summary.json": "39793f7e6d9a01c5edfd72e5ac4be1b2aae69afe18b187a9ee1d154ee179fc17"
+  },
+  "central_U_boundary": {
+    "profile": "dual-release",
+    "native_pivot": 148,
+    "Rose_pricing": 149,
+    "accepted_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "native_trace_sha256": "3eb4a60cd3aea157d3b74eb2d0e9cf599945847faf3ded8c08265231ea2badaf",
+    "source_order_sha256": "7d1ee7c25455f5d148f58db3b1845374f445d8834ccbac655ad9d71a4c96333f",
+    "entry_gate": "Native actualU entry equalscachednativeetaexit. Source actualneeded444etaexit bits and full19sparsevalues/positions/kinds agree; source fresh U-tail operands not captured.",
+    "published_full_count": 23,
+    "published_full_raw_position_bits_match": true,
+    "published_needed_compact_count": 23,
+    "published_needed_bits_match_cached": true,
+    "wrapper_after_pivot_removal_count": 22,
+    "pivot": 138,
+    "source_order_candidates": 92,
+    "native_observed_instructions": {
+      "addsd": 85,
+      "mulsd": 110,
+      "divsd": 192,
+      "movsd": 115,
+      "subsd": 57
+    },
+    "native_divisions": [
+      {
+        "purpose": "full_singleton",
+        "pc": "0x12dd43",
+        "count": 11,
+        "zero_quotients": 0,
+        "classification": "Purpose from original pointer roles/disassembly and actual row/diagonal address bits; no corresponding source inner-frequency comparison."
+      },
+      {
+        "purpose": "full_tail_joint",
+        "pc": "0x12d534",
+        "count": 19,
+        "zero_quotients": 16,
+        "classification": "Purpose from original pointer roles/disassembly and actual row/diagonal address bits; no corresponding source inner-frequency comparison."
+      },
+      {
+        "purpose": "full_tail_needed_zero",
+        "pc": "0x12d870",
+        "count": 1,
+        "zero_quotients": 1,
+        "classification": "Purpose from original pointer roles/disassembly and actual row/diagonal address bits; no corresponding source inner-frequency comparison."
+      },
+      {
+        "purpose": "full_nucleus",
+        "pc": "0x12da96",
+        "count": 122,
+        "zero_quotients": 113,
+        "classification": "Purpose from original pointer roles/disassembly and actual row/diagonal address bits; no corresponding source inner-frequency comparison."
+      },
+      {
+        "purpose": "needed_tail",
+        "pc": "0x12d4d8",
+        "count": 19,
+        "zero_quotients": 0,
+        "classification": "Purpose from original pointer roles/disassembly and actual row/diagonal address bits; no corresponding source inner-frequency comparison."
+      },
+      {
+        "purpose": "needed_singleton",
+        "pc": "0x12ddad",
+        "count": 11,
+        "zero_quotients": 3,
+        "classification": "Purpose from original pointer roles/disassembly and actual row/diagonal address bits; no corresponding source inner-frequency comparison."
+      },
+      {
+        "purpose": "needed_nucleus",
+        "pc": "0x12dcd9",
+        "count": 9,
+        "zero_quotients": 0,
+        "classification": "Purpose from original pointer roles/disassembly and actual row/diagonal address bits; no corresponding source inner-frequency comparison."
+      }
+    ],
+    "source_inner_arithmetic_alignment": "NOT_ESTABLISHED: no source actual full/needed U terms/divisions captured. Do not infer matching operation histories from endpoint equality.",
+    "cost_scope": "Existingnative4050I bracket129547CALLthrough12954c includes joint U input/support/scans/WORK/publication/epilogue; no internal PMU split. Source36889I(rootminusLeta) has different width/lifecycle and may not be directly subtracted. No newcycles/timing claim.",
+    "limits": "Full nativeinput sparse19 has no444rawmemory equivalent. Neededraw444eta/U entry proved; actualsourcearithmeticstreams unpaired. Native operations retaininterleaving andzeroquotients; no normalization or comparisonafterstrict163.",
+    "context": {
+      "it": 147.0,
+      "r": 138,
+      "q": 448
+    }
+  },
+  "completed_output_order_followup": {
+    "evidence": "perf/evidence/degen2-output-order-census.json",
+    "status": "Complete diagnostic; no optimization.",
+    "whole_order_I": 4315376,
+    "whole_sparse_filter_and_remaining_I": 871841,
+    "whole_dense_output_I": 2136981,
+    "whole_output_and_local_lifecycle_I": 7844751,
+    "next": "SourceactualUoperationhistory at149/native148 usingcachednativecapture; no rejectedtrialreopened."
+  },
+  "completed_actual_U_operation_followup": {
+    "evidence": "perf/evidence/degen2-U-operation-diagnosis.json",
+    "status": "Complete diagnostic, no optimization.",
+    "central": "Freshinputbits,72DIV/52scatter/21orderedrowdot arithmetic projections PASS; exactrowdotcolumnIDs unproved;native120extra fullzeroDIV.",
+    "concrete": "205rejectedneededUCchecks cost2050static/2051measuredI inside3469tailroot; wholeexposure unknown.",
+    "next": "Whole neededU rejectedcandidate/lifetime census before any prototype; no rejectedtrialreopened."
+  }
+}

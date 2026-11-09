@@ -1,0 +1,286 @@
+{
+  "previous_goal_turn_classification": "Progress: exactdense149/native148 andwholeemptygapinstructionmechanism established, changingnextactiontooneisolatedexactproof.",
+  "scope": "One fixed isolated emptyLcolumn specialization experiment, notproductionpromotion. Acceptedsource/binaries/reference/paritybaselines remainunchanged.",
+  "plan": {
+    "scope": "Isolated exact empty-column processing experiment; acceptedsource/binaries/baselines untouched. No optimizer promotion without full required gates.",
+    "design": "One fixed design: originalLhead, emptygap original threshold/+0WORK addition, originalLtail. Gapcertificate bounds + cumulativeLspan equality; absent/invalid/nonemptygap retains fulloriginalwalk. No threshold tuning or rescue.",
+    "proof": "Independent complete originalL oracle first validated against unchangedcode, then candidate; f64/F80 captured149/SC50A existingtests/generated cases, exactoutputs/order/count/WORK/cache/snapshotstate andMXCSR flags.",
+    "build": "Candidate ownfixed39 PGO/systemTCMalloc, pinnedRust. Parentprofile tests/build mayqualify only, no runtimeclaim fromparentprofile.",
+    "counter_gate": {
+      "cpu": 2,
+      "target": "degen2.dual-release cap640",
+      "pairs": 8,
+      "small_controls": [
+        "afiro cap300",
+        "sc50a cap300",
+        "adlittle cap300"
+      ],
+      "small_pairs_each": 3,
+      "decision": "Require lower median targetinstructions and cycles plus unchanged fullresults/exits; stop otherwise without timings. Descriptivegate, not causalproof.",
+      "scope": "Wholeprocess userinstructions/cycles, separatefrom181.193M solvescope."
+    },
+    "timing": {
+      "seeds": [
+        83117,
+        83189
+      ],
+      "pairs_each": 32,
+      "same_binary_AA_each": 32,
+      "decision": "Existing perf/paired.py strictcriterion; secondonlyafterfirsthealthypositive. Stop first failed/inconclusive; do not extend/tune/rename.",
+      "after_positive": "Full987 parity/allrelease tests/full23rowcomparison and benchmarks perPLAN beforeproductionpromotion."
+    }
+  },
+  "source_reversal_proof": {
+    "source_reversal_exact": true,
+    "complete_original_body_hash": "93ec8b150776bf0a1c6064d24a8f5c9d308766928cd461d78852b52007d52964",
+    "candidate_body_hash": "d212a563cd836216e472e6194f32ac6e1672cae885a78d54421291fdc16f3908",
+    "reference_unchanged": true,
+    "production_source_untouched": true,
+    "changes": "Dense branch only; conditional head/empty-middle/tail in original order. Original middle abs<=TOL predicate/+0 WORKaddition retained. Nonempty/invalidgap fallback uses original fullwalk. No factor/state/alloc/publicationchanges.",
+    "tests_module_sha256": "b0abaee5f3f4ac230eeb5e7363e50d77ec32ddd0a04f9457f1945973e1a077f3"
+  },
+  "frozen_source": {
+    "original_source": "57c86340f6959717954e2cb1c58f06c285ab7ce564a25d7d0e9e9c429d802ef1",
+    "original_lstage": "93ec8b150776bf0a1c6064d24a8f5c9d308766928cd461d78852b52007d52964",
+    "reference_module": "18777c8782a9b6c8e19a4b030ed5dd7a473dcba63107e9dcdf863b68fd6d7c7d",
+    "fixture": "c8c8b1774494dc143e5f992d5ddfc99248ac5b3593dfc6b96c8f7f79e7a2e7b6",
+    "accepted": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "ordinary": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "predeclared_screen_seeds": [
+      83117,
+      83189
+    ],
+    "screen_rule": "Only afterexactproof,matchingownfixed39PGO,cheapcountergate. Twoindependent32AB+32AAhealthypositive screensrequired; stopfirstfailed/inconclusive; no retry/tune/rescue.",
+    "oracle_signature_changes": "Name, pub(super)visibility andinline(never) only; body exactcopy. Initial testcompile visibilityerror retained inoriginal logs, no candidate change."
+  },
+  "candidate": {
+    "binary_sha256": "8ead3797791817ba5f02625aa57dd396e160ee563cbfcbb8dd65a41c0b6322e7",
+    "profile": "bf1ee89abc64eb1d69d7afe6e349c4b6ba3cc9848ed56edc426907d98f9a4019",
+    "training_cases": 39,
+    "L_start": "0x144640",
+    "L_end": "0x149640",
+    "L_bytes": 20480,
+    "assembly_sha256": "f02bb302b0d228978c121ce982874d421f2bef8e6e50041d7251dba6db1b22c8"
+  },
+  "proof": {
+    "unchanged_oracle_harness_tests": 19,
+    "initial_candidate_tests": 19,
+    "expanded_candidate_tests": 20,
+    "own_profile_candidate_tests": 20,
+    "f64_F80_values_counts_WORK_cache_snapshots": "PASS",
+    "MXCSR_rounding_flush_modes_each_f64_and_F80": 16,
+    "captured_cases": "SC50Aexistingoraclefixtures andactual149full/needed factor/etas/inputs. ImmutableL135cachedfixture matches149all661orderedcoefficients/indices andperm.",
+    "initial_visibility_compile_error": "Reference testmethod neededpub(super); initialerrorlogretained, bodyunchanged, unchangedimplementationbaseline19passedbeforecandidate.",
+    "all_661_immutable_L_entries_match_135_149_bits": true
+  },
+  "checks": [
+    {
+      "model": "afiro",
+      "cap": 3,
+      "original_dump_records": 0,
+      "complete_result_exit_zero_sign_agree": true
+    },
+    {
+      "model": "sc50a",
+      "cap": 3,
+      "original_dump_records": 0,
+      "complete_result_exit_zero_sign_agree": true
+    },
+    {
+      "model": "degen2",
+      "cap": 20,
+      "original_dump_records": 1002,
+      "complete_result_exit_zero_sign_agree": true
+    },
+    {
+      "model": "degen2",
+      "cap": 149,
+      "original_dump_records": 4049,
+      "complete_result_exit_zero_sign_agree": true
+    },
+    {
+      "model": "degen2",
+      "cap": 640,
+      "original_dump_records": 17201,
+      "complete_result_exit_zero_sign_agree": true
+    }
+  ],
+  "fast_parity": {
+    "runs": 940,
+    "passed": true,
+    "binary": "Ownfixed39PGO/systemTCMalloc candidate8ead3797"
+  },
+  "current_status": "INCONCLUSIVE timing screen83117; stopped without83189, extensions, variants, tuning orpromotion.",
+  "artifacts": "target/perf-empty-L-gap",
+  "no_production_promotion": true,
+  "goal_achieved": false,
+  "reference_check": {
+    "candidate_sha256": "8ead3797791817ba5f02625aa57dd396e160ee563cbfcbb8dd65a41c0b6322e7",
+    "candidate_profile_sha256": "bf1ee89abc64eb1d69d7afe6e349c4b6ba3cc9848ed56edc426907d98f9a4019",
+    "candidate_dump_sha256": "3a87b671819aab07bd148f960ac49e8990a97431321f6abbe10d2bae47fddcde",
+    "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "strict_prefix162": true,
+    "expected_first163": true,
+    "selected149_output_gate": true,
+    "selected_context": {
+      "k": 149,
+      "context_it": 147.0,
+      "r": 138,
+      "q": 448
+    },
+    "extended_DSX_exact_accepted_prefix_records": 164,
+    "first_candidate_vs_accepted_DSX_difference": null,
+    "record_scope": "CandidateROSE_DUMP=dsx all164DSXrecords exactlyacceptedcachedprefix. The initial ROSE_DUMPall file usesleanDSX andcannotfeedrawcomparator. Newboundedcandidateonlydumpcap163 suppliedextendedstate. No newreferencecapture.",
+    "numerical_scope": "Prefix outputs/fullneeded/rhoinputs/context through162;expectednative\u22120/Rose+0neededbasis22pivot163retained. SelectedRose149/native148 full/neededoutputandrhopublishedstategateonly;candidate rawL/eta innertrace not captured or borrowedfromacceptedtrace.",
+    "no_after163_comparison": true,
+    "commands": "target/perf-empty-L-gap/reference-check/central-commands.txt",
+    "dump_command": "target/perf-empty-L-gap/reference-check/dump-command.json",
+    "no_counter_measurements": true,
+    "no_solver_source_edits": true
+  },
+  "counter_gate": {
+    "wholeprocess_user_counts": {
+      "afiro": {
+        "pairs": 3,
+        "events": {
+          "instructions:u": {
+            "before": 6902519.0,
+            "after": 6902735.0,
+            "change_percent": 0.0031292923641457193
+          },
+          "cycles:u": {
+            "before": 10819120.0,
+            "after": 10353525.0,
+            "change_percent": -4.303446121311161
+          }
+        }
+      },
+      "sc50a": {
+        "pairs": 3,
+        "events": {
+          "instructions:u": {
+            "before": 9809061.0,
+            "after": 9805272.0,
+            "change_percent": -0.03862755058817724
+          },
+          "cycles:u": {
+            "before": 12407731.0,
+            "after": 12141679.0,
+            "change_percent": -2.1442437783346535
+          }
+        }
+      },
+      "adlittle": {
+        "pairs": 3,
+        "events": {
+          "instructions:u": {
+            "before": 15045269.0,
+            "after": 15029156.0,
+            "change_percent": -0.10709678903049191
+          },
+          "cycles:u": {
+            "before": 16583796.0,
+            "after": 16736552.0,
+            "change_percent": 0.9211160098689053
+          }
+        }
+      },
+      "degen2": {
+        "pairs": 8,
+        "events": {
+          "instructions:u": {
+            "before": 196500891.0,
+            "after": 195095011.0,
+            "change_percent": -0.7154573156617383
+          },
+          "cycles:u": {
+            "before": 145988699.5,
+            "after": 144137232.0,
+            "change_percent": -1.2682265862639541
+          }
+        }
+      }
+    },
+    "target_gate_passed": true,
+    "all34_complete_results_exits_match": true,
+    "not_causal_timing_evidence": true
+  },
+  "timing": {
+    "seed": 83117,
+    "AB_pairs": 32,
+    "AA_pairs": 32,
+    "summary": {
+      "ab_median_percent": -2.920643937306181,
+      "ab_ci_percent": [
+        -6.736784845734434,
+        4.998057564202907
+      ],
+      "aa_median_percent": -2.94335417165988,
+      "aa_ci_percent": [
+        -6.153170260735875,
+        6.77304128735805
+      ],
+      "improving_pairs": 18,
+      "pairs_per_kind": 32,
+      "ab_sign_p": 0.29830744792707264,
+      "aa_sign_p": 0.37708558747544885,
+      "order_median_percent": {
+        "AB": -2.920643937306181,
+        "BA": -2.1839678542171512
+      },
+      "criteria": {
+        "sign_p_at_most_001": false,
+        "aa_not_biased_at_005": true,
+        "median_gain_at_least_half_percent": true,
+        "ab_upper_ci_below_aa_error": false,
+        "both_orders_improve": true
+      },
+      "positive_screen": false
+    },
+    "second_seed_83189_not_run": true,
+    "interpretation": "Median improvement doesnotseparate from AAuncertainty; both sign and noise-separation criteria fail. Counter reduction isnot verified solver-speed improvement."
+  },
+  "validation": {
+    "focused_release_tests_original": 19,
+    "focused_release_tests_candidate_expanded": 20,
+    "focused_release_tests_own_profile": 20,
+    "fast_parity": 940,
+    "DEGEN2_original_records_cap640": 17201,
+    "complete_results_and_exit_controls": true,
+    "central_reference_prefix162": "PASS",
+    "central_first163": "ExpectedFAIL native-minuszero/candidate-pluszero basis22; stopunchanged",
+    "central_selected149": "Published full/needed/rho/contextPASS; no candidateinnernumerictraceclaim",
+    "full987_and_allrelease_and_fullpanel": "Not run: predeclaredstop after inconclusive firstscreen; no productionpromotion."
+  },
+  "accepted_binaries_preserved": true,
+  "numerical_findings": "Complete originalL sourcefrozen independently; generated/captured f64/F80 values/outputorder/count/WORK/cache/snapshots and16MXCSR modes pass. Candidatekeeps explicitmiddlethresholdand+0WORKaddition; acceptedownPGOassembly146140..146169 confirms both. Numericalfeasibility established, runtimeprofitability unproved.",
+  "rejected_trial_rule": "Close this tested empty-middle specialization. Do not run83189, retry/extend83117, tune gap thresholds/PGO/layout, alter WORK orrescue helper/loop/buffer variants.",
+  "one_next_experiment": {
+    "type": "Diagnostic only, different remaining boundary.",
+    "question": "At matched source149/native148, do full/needed U solve roots repeat numerical work or spend excess on structural scans/bookkeeping versus nativejoint12c300?",
+    "basis": "Complete sourcefull+needed roots67988I minusL+eta31099I leaves36889I; nativejointU/publication4050I. Scopeendpoint/lifetimes mustbe reconciled before subtracting. RawL/neededaftereta states and403actualLterm projections alreadyaligned.",
+    "design": "Reusecached149states, strictlycentral compare.py pairing anddelegatedreferencecapture. Observe actualUorderedterms, scans/WORK/input-output helper costs withincomplete disjoint boundaries, usingimmutableELFs andcalibratedfixedPCinstructions. No comparisonpast163, no debuggercycles.",
+    "benefit": "Diagnostic0. Local36889/4050scope exposure isnot an equivalent/removablegap and cannotbe multipliedby634. No whole-solve benefitprediction before actualoperationandlifecycle proof.",
+    "rejected_check": "No retry of empty-gap83117/83189, rowmapcache, shorttau, two-vectorfusion, WORKdeferral, F2workspace, outputorder, preUownership, packedL, completedLhandoff orarenas."
+  },
+  "artifact_hashes": {
+    "target/perf-empty-L-gap/trial-plan.json": "b9ef328e3a4594db815484ffc26fd9e3e08c4403d2dfe29e0c42b628a56b2390",
+    "target/perf-empty-L-gap/freeze.json": "a151e124e7fcb7fcee57ef1a9ce4a0028abb667ab5cb9ad116c450876000166a",
+    "target/perf-empty-L-gap/original-lstage.rs": "93ec8b150776bf0a1c6064d24a8f5c9d308766928cd461d78852b52007d52964",
+    "target/perf-empty-L-gap/reference-module.rs": "18777c8782a9b6c8e19a4b030ed5dd7a473dcba63107e9dcdf863b68fd6d7c7d",
+    "target/perf-empty-L-gap/tests-module.rs": "b0abaee5f3f4ac230eeb5e7363e50d77ec32ddd0a04f9457f1945973e1a077f3",
+    "target/perf-empty-L-gap/candidate-lstage.rs": "d212a563cd836216e472e6194f32ac6e1672cae885a78d54421291fdc16f3908",
+    "target/perf-empty-L-gap/reversal-proof.json": "da903f74cd30710c21eed82f12a52f25034cc100524f02763bca184fdf57bb1d",
+    "target/perf-empty-L-gap/source/target/perf-pgo/build.json": "6b0515bc35b33125a14d03e66baa2c727f9b35eb63a85c6f226c400e8baf5f97",
+    "target/perf-empty-L-gap/candidate-meta.json": "1036c68fe2870efb2519ffe6557f83c68b448d4623f121e33d86835e630944bd",
+    "target/perf-empty-L-gap/own-test-command.json": "0729ae1411505a01e7449cfb8ebfb7513af3c8aa83cf3f6d6340d6a5074a3be9",
+    "target/perf-empty-L-gap/checks.json": "c447fd01e0940b4bc636c55def15a4d0ee3a05aedffdb660f1413fba58f22c7c",
+    "target/perf-empty-L-gap/fast-parity.stdout": "8a01f5fd6891a5388042506b74b6850797ffbc5d31122de2f6854d62f8611986",
+    "target/perf-empty-L-gap/reference-check/summary.json": "136990352387269a9048646c3d09a6a6124ba657df63f2a3213b27650ad6242a",
+    "target/perf-empty-L-gap/counters-own/manifest.json": "e89b4b10053695fd9eba0209082090507cd518d1e8670871e6919eb4d174bf9d",
+    "target/perf-empty-L-gap/counters-own/results.json": "b301a8082d16999c6b5bb0a93ec99c896c90e7b42137074b03c2ba97f8f76649",
+    "target/perf-empty-L-gap/screen83117.json": "f71acb68efd7f638ae1d252405836595534a5c35bc43a82a39168f96f255c45f",
+    "target/perf-empty-L-gap/screen83117-command.json": "cfa936f2680f9bd844af282975b14a409918d3781d658b2b62ed284d6600d7a7",
+    "target/perf-empty-L-gap/candidate-L.asm": "f02bb302b0d228978c121ce982874d421f2bef8e6e50041d7251dba6db1b22c8"
+  }
+}

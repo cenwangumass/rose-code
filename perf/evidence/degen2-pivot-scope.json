@@ -1,0 +1,94 @@
+{
+  "configuration": "Qualified accepted55af/fixed39PGO/systemTCMalloc DEGEN2dual-release; read-only existingcaptures/profiles/spec/source audit, no newmeasurement or codechange.",
+  "pricing_mode": "pmode1 throughout634pivots: no suppliedbasis; mode3 switch needs>m+1000=1444pivots andmode2 activation gate1e100form<15000. framework_rhs inactive. SecondFTRAN preparation copies filteredrho andcomputes ordered rho_norm.",
+  "source_phase_census": [
+    {
+      "value_mode": false,
+      "level": 425,
+      "pricing_states": 16,
+      "full_needed_calls_with_col_record": 16,
+      "first_pricing": 1,
+      "last_pricing": 16
+    },
+    {
+      "value_mode": false,
+      "level": 194,
+      "pricing_states": 21,
+      "full_needed_calls_with_col_record": 21,
+      "first_pricing": 17,
+      "last_pricing": 37
+    },
+    {
+      "value_mode": false,
+      "level": 134,
+      "pricing_states": 45,
+      "full_needed_calls_with_col_record": 45,
+      "first_pricing": 38,
+      "last_pricing": 82
+    },
+    {
+      "value_mode": false,
+      "level": 41,
+      "pricing_states": 50,
+      "full_needed_calls_with_col_record": 49,
+      "first_pricing": 83,
+      "last_pricing": 132
+    },
+    {
+      "value_mode": false,
+      "level": 0,
+      "pricing_states": 147,
+      "full_needed_calls_with_col_record": 147,
+      "first_pricing": 133,
+      "last_pricing": 279
+    },
+    {
+      "value_mode": true,
+      "level": 0,
+      "pricing_states": 358,
+      "full_needed_calls_with_col_record": 356,
+      "first_pricing": 280,
+      "last_pricing": 637
+    }
+  ],
+  "phase_scope": "Rose-only cached structuralmetadata:637pricing states,634full/needed solves; no new nativecomparison afterfirststrict divergence163. Prefix<=162alllistwalk(132positivelevel,30level0), later358valuepricingstates/356pivots unpaired. Cannot extrapolate listwalk136 cost acrosswhole11.042msROW stage.",
+  "selected_transaction": {
+    "source_pricing": 136,
+    "native_F2_ordinal": 135,
+    "context_it": 134,
+    "next_PIN_pricing": 137,
+    "next_context_it": 135,
+    "rho_entries": 14,
+    "pivot_row_entries": 105,
+    "col_tau_entries": 39,
+    "boundflips": 0,
+    "w": 14,
+    "mode": "pmode1,listwalk,level0",
+    "qualification": "Existing raw triangular input/output proofs and DSX/PIN/F2 observations. Pricing20 isrho1,row9,col4 with4flips; not clean DSE/xB witness."
+  },
+  "boundaries": {
+    "row_product": "Rosepivot_row+row_product_work vsnative134d90/WORK135e92.",
+    "norm_and_second_input": "Mode1rho_normandpacking atnative11f620prep before125f50; norm11f9..11fa5. Triangular root doesnotown allpreparation.",
+    "basis_and_rrows": "c5d63..c5eb0,134680/1348b0.",
+    "dual_reducedcost": "e45c0.",
+    "DSE_weight": "c0050:c02fb..c03e7;w=orderedrho squarednorm,notstaleWorassumedtau_r. Keepallscalar FPorder.",
+    "basic_flags_priority": "c0050:c0410onward. Separatelistwalk fromvalue mode.",
+    "recompute": "recompute_d/true_d\u2192136b00;recompute_xb residual/flags\u2192c0050recompute;boundflips cd720 haveadditionalFTRANandstatuswork.",
+    "retirement": "PivotBox,row,col,tau,flipsdropafterpost_inner mainloopmatcharm, outsideROWguards. pending_alpha transfersintoauxEta/factor lifetime."
+  },
+  "cost_evidence": "Existing14stage diagnosticROWmean11.042ms includesproducts,controller,packing,basis/rrows,dual,DSE,xB,flags,recomputation andbookkeeping. Accepted32.010MI Rosecontrol/update andnative6.140rowproduct+4.549basicDSE+1.921control+.254dual selfpools aredifferent selfboundaries, notinclusivegap orsubdivisions. Do nottreat wholeiteration asgenericcontrol orallocationsasremovabletime.",
+  "existing_method_counts": {
+    "iteration": 637,
+    "post_inner": 636,
+    "pivot_row": 634,
+    "row_product_WORK": 634,
+    "update_weights": 634,
+    "fast_primal_updates": 621
+  },
+  "missing": "Exclusive sourcecosts bypurpose andlistwalk/valuephase, complete matched136 prep/arithmetic/retirement cost andnative rowprod/DSEI/DSEO boundaries. Existing PIN/DSX/F2 delimit values, notinternal helper/cleanup costs; no DSEI/DSEO/RPcaptures found.",
+  "next_experiment": "One bounded ROW cost split with nonoverlappingpurpose andphase ownership: rowproduct+WORK;mode1norm/packing/pivotcheck;basis/rrows;dualupdate;DSE;basic/flags/priorities;recomputes;construction/retirement;residual. Useoriginalacceptedprofiles/low-overheadscopesfirst, preservecode/binaries; compareonlymatched136\u2192137 withinstrictprefix. WholeRose-onlystructural/counter costs maycoverallphases, clearlyunpairedafter163. Quantifyanyinstrumentation distortion. No framework workspace orconstructorprototype.",
+  "rejected_review": "Do notrestartworkspace/wholepivotowner/rowprefilter/weightedtraversal orauxlengthsort variants. Need a distinct substantial operation/machinecode mechanism beforeimplementation.",
+  "source_dump_sha256": "b31b8176986cb5bfe54f048a9dae05dcdf751aca1d388974ba5822c527020c6d",
+  "scope_audit": "Delegatedref_compare,cached/read-only,no capture/build/edit",
+  "goal_achieved": false
+}

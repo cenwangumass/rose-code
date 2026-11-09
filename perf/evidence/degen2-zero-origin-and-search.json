@@ -1,0 +1,178 @@
+{
+  "previous_goal_turn_classification": "progress",
+  "basis": "Established first strict kernel sign mismatch plus central paired-prefix rules and accepted profile accounting; this turn explains origin/consumer and tests distinct mapping lifetime.",
+  "zero_origin_consumer": {
+    "status": "observed_origin_explained_without_normalization",
+    "pivot_ordinal": 163,
+    "pricing_call": 164,
+    "context_it": 162.0,
+    "basis_position": 22,
+    "raw_output_bit_equal": false,
+    "strict_kernel_comparison_still_fails": true,
+    "native_before_division": {
+      "phase": "before_division",
+      "pivot_ordinal": 163,
+      "row": 22,
+      "pc": "0x124045",
+      "input_bits": "0000000000000000",
+      "input_value": 0.0,
+      "diag_bits": "bff0000000000000",
+      "diag": -1.0,
+      "memory_bits": "0000000000000000"
+    },
+    "native_after_division_stopped_before_store": {
+      "phase": "after_division_first_difference",
+      "pivot_ordinal": 163,
+      "row": 22,
+      "pc": "0x12404b",
+      "quotient_bits": "8000000000000000",
+      "memory_before_store_bits": "0000000000000000"
+    },
+    "native_dense_tail_slot_count": 32,
+    "rose_visited_tail_columns": [
+      162,
+      136,
+      349
+    ],
+    "requested_output": true,
+    "discarded_result": false,
+    "rose_diag": -1.0,
+    "dependent_needed_rows": [
+      {
+        "row": 124,
+        "initial": 0.0,
+        "virtual_order": [
+          136,
+          65,
+          386,
+          162,
+          22,
+          66
+        ],
+        "prepared_source_operands": [
+          [
+            1.0,
+            1.0
+          ],
+          [
+            -1.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0
+          ],
+          [
+            1.0,
+            -1.0
+          ],
+          [
+            1.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0
+          ]
+        ],
+        "native_output_bits": "0000000000000000",
+        "rose_output_bits": "0000000000000000",
+        "native_row_operand_traversal": "not captured after origin; only cached output observation"
+      },
+      {
+        "row": 223,
+        "initial": 0.0,
+        "virtual_order": [
+          22
+        ],
+        "prepared_source_operands": [
+          [
+            -1.0,
+            0.0
+          ]
+        ],
+        "native_output_bits": "0000000000000000",
+        "rose_output_bits": "0000000000000000",
+        "native_row_operand_traversal": "not captured after origin; only cached output observation"
+      }
+    ],
+    "dse_consumer": {
+      "coefficient": -1.0,
+      "pivot_row": 36,
+      "alpha": -1.0,
+      "w": 1.0,
+      "a": 1.0,
+      "positive_term": 1.0,
+      "signed_zero_product_bits": [
+        "8000000000000000",
+        "0000000000000000"
+      ],
+      "subtraction_bits": [
+        "3ff0000000000000",
+        "3ff0000000000000"
+      ],
+      "zero_sign_erased_at": "native SUBSD 0xc03ce; ((w*a)*a) - ((2*a)*tau)",
+      "W_before": 25.25,
+      "W_after": 26.25,
+      "W_after_bits": "403a400000000000",
+      "native_and_rose_cached_next_pricing_W_bits_agree": true
+    },
+    "cost_boundary": "Compare the corresponding solve+consumer transaction ending at the observed DSE weight update; raw needed-U outputs/private scratch are not bit-identical. This is a local canonical consumer boundary, not proof of all later internal states.",
+    "other_uses": {
+      "tau_r_and_pair_check": "pivot36 versus observed row22; pair check uses alpha_row/alpha_col, not tau22",
+      "diagnostic_records": "DSX/optional DTAU preserve the differing raw sign; unchanged",
+      "WORK": "Normal paired route: joint_u returns None before x_tau-dependent branches. tau_u_work uses support/count/absolute-threshold predicates, not zero sign; no WORK rewrite authorized.",
+      "retained_f2_scratch": "x_tau clone keeps Rose +0; this private state is not normalized or claimed identical. It is replaced by the next full FTRAN's F2 assignment."
+    },
+    "provenance": {
+      "rose_dump": "target/perf-degen2-alignment/rose-dsx640.stderr",
+      "kernel_dump": "target/perf-degen2-kernels/trace163.stderr",
+      "origin": "target/perf-degen2-alignment/captures/degen2-dual-release/dual_needed_zero_origin.cee2fd856d.jsonl",
+      "cached_f2": "target/perf-degen2-alignment/captures/degen2-dual-release/dual_ftran2.LIM=640,PROVENANCE=2,ROUTES=1.jsonl",
+      "cached_price": "target/perf-degen2-alignment/captures/degen2-dual-release/dual_price.LIM=640.jsonl",
+      "hashes": {
+        "target/perf-degen2-alignment/rose-dsx640.stderr": "b31b8176986cb5bfe54f048a9dae05dcdf751aca1d388974ba5822c527020c6d",
+        "target/perf-degen2-kernels/trace163.stderr": "7209140c7a584bda1fca936a9c6f5ebd7c335587e114ba7ca627407fce93db9e",
+        "target/perf-degen2-alignment/captures/degen2-dual-release/dual_needed_zero_origin.cee2fd856d.jsonl": "c6d6dc07b23234d36607490ca55b07ea2f1b40ef808cf61816bfedf98c69f020",
+        "target/perf-degen2-alignment/captures/degen2-dual-release/dual_ftran2.LIM=640,PROVENANCE=2,ROUTES=1.jsonl": "8eb002a95deacec7eaa2316b7a3c9974f1f33894c0e9ee2716fa543c5621db56",
+        "target/perf-degen2-alignment/captures/degen2-dual-release/dual_price.LIM=640.jsonl": "18ac42d731b0eeb78b3dcf46025cc4a329d262548243599883be59f6314e548c"
+      }
+    }
+  },
+  "strict_check_retained": {
+    "status": "first_bit_difference",
+    "profile": "dual-release",
+    "strict_pivot_prefix": 162,
+    "pivot": 163,
+    "field": "needed_output",
+    "basis_position": 22,
+    "native_value": -0.0,
+    "rose_value": 0.0,
+    "native_f64_le": "0000000000000080",
+    "rose_f64_le": "0000000000000000",
+    "rose_dump_sha256": "b31b8176986cb5bfe54f048a9dae05dcdf751aca1d388974ba5822c527020c6d",
+    "reference_capture_sha256": "8eb002a95deacec7eaa2316b7a3c9974f1f33894c0e9ee2716fa543c5621db56",
+    "stats_including_completed_subchecks_of_divergent_call": {
+      "full_output_entries": 2395,
+      "needed_output_entries": 2360,
+      "needed_input_rho_entries": 665,
+      "full_output_sparse": 162,
+      "needed_input_sparse": 162,
+      "single_needed_U": 131,
+      "paired_pivots": 162,
+      "joint_needed_U": 31,
+      "native_wrapper_transport_entries": 85,
+      "dense_U_wrapper_compaction": 3,
+      "output_publication_order_differs": 11,
+      "needed_requested_position_order_differs": 3,
+      "native_joint_publication_entries": 333,
+      "inline_joint_dense_U": 8
+    }
+  },
+  "production_binary_hashes": {
+    "target/release/rose": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "target/perf-optimized-build/rose-pgo-tcmalloc": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb"
+  },
+  "no_optimization_promoted": true,
+  "goal_achieved": false
+}

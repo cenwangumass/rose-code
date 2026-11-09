@@ -1,0 +1,527 @@
+{
+  "previous_goal_turn_classification": "Progress: accepted U boundary/cost diagnosis established actual19\u219292\u219223 construction and central endpoint equality, changing next action to whole-solve exposure accounting. Current turn completes that census; no optimization.",
+  "configuration": {
+    "rose_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "ordinary_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "cpu": 2,
+    "profile": "Qualified fixed39 PGO/system TCMalloc dual-release",
+    "cap": 640,
+    "actual_pivots": 634
+  },
+  "scope": {
+    "boundary": "RefStruct<f64>::ftran_with entry134ec0 through pre-RET13f7d3. Includes all called helper/memory work. Excludes callerCALL/RET, ftran_keep/basic wrapper spike preservation/restore, returned sparse-column eventual auxiliaryEta retirement, and final retained-factor destruction.",
+    "all_paths": "Both compiled order/dense clones instrumented; all747calls select clone2, clone1 zero. 364sparse/383dense paths exhaust calls;634pivot+97boundflip+16basic. No unsupported U_dense equivalence assumed from output path.",
+    "numerical": "New source-only costs/structural observations; no new reference capture/comparison or alignment rule. Reuse compare.py dual-u-boundary selected149/native148 and strict prefix162; no later numeric pairing."
+  },
+  "whole_complete_function_I": 28035830,
+  "whole_root_control_I": 28035779,
+  "disjoint_root_partition": {
+    "entry\u2192after_L": 9982448,
+    "after_L\u2192dense_begin": 6971318,
+    "dense_begin\u2192output_done": 2136981,
+    "output_done\u2192publish_begin": 4083,
+    "publish_begin\u2192F2_done": 115965,
+    "F2_done\u2192publish_done": 330844,
+    "publish_done\u2192cleanup": 5229,
+    "cleanup\u2192return": 64432,
+    "after_L\u2192order_begin": 3237313,
+    "order_begin\u2192order_ready": 4315376,
+    "order_ready\u2192filter_done": 848464,
+    "filter_done\u2192output_done": 23377
+  },
+  "output_scopes": [
+    {
+      "stage": "Sparse output-order construction including helper/local cleanup",
+      "calls": 364,
+      "instructions": 4315376,
+      "instructions_per_call": 11855.42857142857,
+      "whole_solve_instruction_percent": 2.381646090080743
+    },
+    {
+      "stage": "Sparse ordered filter/result growth and order-buffer retirement",
+      "calls": 364,
+      "instructions": 848464,
+      "instructions_per_call": 2330.945054945055,
+      "whole_solve_instruction_percent": 0.4682653303383685
+    },
+    {
+      "stage": "Sparse remaining-support scan",
+      "calls": 364,
+      "instructions": 23377,
+      "instructions_per_call": 64.22252747252747,
+      "whole_solve_instruction_percent": 0.012901712538563852
+    },
+    {
+      "stage": "Dense result scan/growth",
+      "calls": 383,
+      "instructions": 2136981,
+      "instructions_per_call": 5579.584856396867,
+      "whole_solve_instruction_percent": 1.1793948993614543
+    },
+    {
+      "stage": "Post-output ownership flags",
+      "calls": 747,
+      "instructions": 4083,
+      "instructions_per_call": 5.465863453815261,
+      "whole_solve_instruction_percent": 0.002253398310089242
+    },
+    {
+      "stage": "F2 publication and retirement of prior retained buffers",
+      "calls": 747,
+      "instructions": 115965,
+      "instructions_per_call": 155.24096385542168,
+      "whole_solve_instruction_percent": 0.06400081680859636
+    },
+    {
+      "stage": "Spike publication/filter/sort and prior-spike retirement",
+      "calls": 747,
+      "instructions": 330844,
+      "instructions_per_call": 442.8969210174029,
+      "whole_solve_instruction_percent": 0.1825920427389579
+    },
+    {
+      "stage": "Return-object publication before local cleanup",
+      "calls": 747,
+      "instructions": 5229,
+      "instructions_per_call": 7.0,
+      "whole_solve_instruction_percent": 0.0028858730745668984
+    },
+    {
+      "stage": "Final local cleanup/epilogue excluding RET",
+      "calls": 747,
+      "instructions": 64432,
+      "instructions_per_call": 86.25435073627845,
+      "whole_solve_instruction_percent": 0.03555987262201078
+    }
+  ],
+  "output_total_I": 7844751,
+  "by_purpose_and_path": {
+    "basic_recompute:dense": {
+      "calls": 16,
+      "instructions": 1221939,
+      "inputs": 0,
+      "ordered_candidates": 0,
+      "outputs": 5260,
+      "parts": {
+        "entry\u2192after_L": 545299,
+        "after_L\u2192dense_begin": 450374,
+        "dense_begin\u2192output_done": 141307,
+        "output_done\u2192publish_begin": 65,
+        "publish_begin\u2192F2_done": 624,
+        "F2_done\u2192publish_done": 82752,
+        "publish_done\u2192cleanup": 112,
+        "cleanup\u2192return": 1406
+      },
+      "instructions_per_call": 76371.1875
+    },
+    "pivot:sparse": {
+      "calls": 267,
+      "instructions": 9303952,
+      "inputs": 2798,
+      "ordered_candidates": 18820,
+      "outputs": 7992,
+      "parts": {
+        "entry\u2192after_L": 1588200,
+        "after_L\u2192order_begin": 2917518,
+        "order_begin\u2192order_ready": 3965375,
+        "order_ready\u2192filter_done": 713032,
+        "filter_done\u2192output_done": 17167,
+        "output_done\u2192publish_begin": 1871,
+        "publish_begin\u2192F2_done": 39394,
+        "F2_done\u2192publish_done": 38150,
+        "publish_done\u2192cleanup": 1869,
+        "cleanup\u2192return": 21376
+      },
+      "instructions_per_call": 34846.262172284645
+    },
+    "boundflip_keep:sparse": {
+      "calls": 97,
+      "instructions": 1411641,
+      "inputs": 1930,
+      "ordered_candidates": 2216,
+      "outputs": 2021,
+      "parts": {
+        "entry\u2192after_L": 556541,
+        "after_L\u2192order_begin": 319795,
+        "order_begin\u2192order_ready": 350001,
+        "order_ready\u2192filter_done": 135432,
+        "filter_done\u2192output_done": 6210,
+        "output_done\u2192publish_begin": 679,
+        "publish_begin\u2192F2_done": 14841,
+        "F2_done\u2192publish_done": 20679,
+        "publish_done\u2192cleanup": 679,
+        "cleanup\u2192return": 6784
+      },
+      "instructions_per_call": 14553.0
+    },
+    "pivot:dense": {
+      "calls": 367,
+      "instructions": 16098298,
+      "inputs": 0,
+      "ordered_candidates": 0,
+      "outputs": 31323,
+      "parts": {
+        "entry\u2192after_L": 7292408,
+        "after_L\u2192dense_begin": 6520944,
+        "dense_begin\u2192output_done": 1995674,
+        "output_done\u2192publish_begin": 1468,
+        "publish_begin\u2192F2_done": 61106,
+        "F2_done\u2192publish_done": 189263,
+        "publish_done\u2192cleanup": 2569,
+        "cleanup\u2192return": 34866
+      },
+      "instructions_per_call": 43864.57220708447
+    }
+  },
+  "ordered_counts": {
+    "input_positions": 4728,
+    "ordered_candidates": 21036,
+    "nonzero_published": 10013,
+    "qualification": "Input count4728 is measured sum2798pivot+1930flip; candidates18820+2216; outputs7992+2021. No arithmetic frequency or reference cost inferred."
+  },
+  "prefix_split": {
+    "covered_prefix": {
+      "full_calls": 264,
+      "sparse_order_calls": 249,
+      "order_instructions": 977023
+    },
+    "later_source_only": {
+      "full_calls": 483,
+      "sparse_order_calls": 115,
+      "order_instructions": 3338353
+    }
+  },
+  "memory_observation": {
+    "dense": {
+      "malloc": {
+        "calls": 383,
+        "requested_bytes": 24512
+      },
+      "realloc": {
+        "calls": 1816,
+        "requested_bytes": 1627008
+      },
+      "memcpy": {
+        "calls": 1816,
+        "requested_bytes": 813504
+      }
+    },
+    "local_cleanup": {
+      "free": {
+        "calls": 1322,
+        "requested_bytes": 0
+      }
+    },
+    "order": {
+      "calloc": {
+        "calls": 1092,
+        "requested_bytes": 484848
+      },
+      "memset": {
+        "calls": 1126,
+        "requested_bytes": 609984
+      },
+      "malloc": {
+        "calls": 1766,
+        "requested_bytes": 122560
+      },
+      "realloc": {
+        "calls": 1987,
+        "requested_bytes": 678520
+      },
+      "memcpy": {
+        "calls": 2955,
+        "requested_bytes": 543192
+      },
+      "free": {
+        "calls": 2494,
+        "requested_bytes": 0
+      }
+    },
+    "filter": {
+      "malloc": {
+        "calls": 364,
+        "requested_bytes": 23296
+      },
+      "realloc": {
+        "calls": 882,
+        "requested_bytes": 412672
+      },
+      "memcpy": {
+        "calls": 882,
+        "requested_bytes": 206336
+      },
+      "free": {
+        "calls": 364,
+        "requested_bytes": 0
+      }
+    },
+    "F2_publish_retire": {
+      "free": {
+        "calls": 1975,
+        "requested_bytes": 0
+      }
+    },
+    "spike_publish_retire": {
+      "free": {
+        "calls": 716,
+        "requested_bytes": 0
+      }
+    }
+  },
+  "memory_limits": "Read-only separate observational capture, not PMU data. Exported entry requests include helper/allocator-internal calls, such as realloc copies and calloc clearing. Byte sums are logical requests, can count nested requests and repeated growth; not traffic or livebytes. Order2858malloc/calloc\u22122494free=364 returned order buffers, subsequently364free in filter; growth1987 separate. Retained F2/spike retirement assigned owning scope, not assumed free.",
+  "distortion": {
+    "codegen_changed": false,
+    "calibration": "Known5I\u21927I; subtract2I per consecutive stopped interval; target-pid user counters, enabled==running.",
+    "detailed_correction_I": 13408,
+    "root_detail_total_residual_I": 51,
+    "root_detail_differing_calls": 94,
+    "root_detail_max_call_abs_residual_I": 4,
+    "small_controls": "AFIRO3,SC50A3,DEGEN2cap20 root/detail totalcounts identical; selected149 internalroot33554 versuspriorcaller-root33556 differsbyCALL+RET2I. Full residual51I of28.036M.",
+    "cycles": "All debugger cycles/times excluded. No accepted elapsed-time share or speedup inferred from instructions."
+  },
+  "validation": {
+    "cost_runs": [
+      {
+        "index": 0,
+        "model": "afiro",
+        "cap": 3,
+        "mode": "root",
+        "wall_seconds": 0.8231020149978576,
+        "calls": 5,
+        "total_I": 34429,
+        "callers": {
+          "0x134dd3": 2,
+          "0x1264aa": 3
+        },
+        "controls_exact": true
+      },
+      {
+        "index": 1,
+        "model": "afiro",
+        "cap": 3,
+        "mode": "detail",
+        "wall_seconds": 0.7540828889978002,
+        "calls": 5,
+        "total_I": 34429,
+        "callers": {
+          "0x134dd3": 2,
+          "0x1264aa": 3
+        },
+        "controls_exact": true
+      },
+      {
+        "index": 2,
+        "model": "sc50a",
+        "cap": 3,
+        "mode": "root",
+        "wall_seconds": 0.8480905120013631,
+        "calls": 6,
+        "total_I": 33392,
+        "callers": {
+          "0x134dd3": 2,
+          "0x1264aa": 3,
+          "0x134bee": 1
+        },
+        "controls_exact": true
+      },
+      {
+        "index": 3,
+        "model": "sc50a",
+        "cap": 3,
+        "mode": "detail",
+        "wall_seconds": 2.333914967995952,
+        "calls": 6,
+        "total_I": 33392,
+        "callers": {
+          "0x134dd3": 2,
+          "0x1264aa": 3,
+          "0x134bee": 1
+        },
+        "controls_exact": true
+      },
+      {
+        "index": 4,
+        "model": "degen2",
+        "cap": 20,
+        "mode": "root",
+        "wall_seconds": 1.3330663169981563,
+        "calls": 43,
+        "total_I": 939806,
+        "callers": {
+          "0x134dd3": 3,
+          "0x1264aa": 20,
+          "0x134bee": 20
+        },
+        "controls_exact": true
+      },
+      {
+        "index": 5,
+        "model": "degen2",
+        "cap": 20,
+        "mode": "detail",
+        "wall_seconds": 1.0154447060049279,
+        "calls": 43,
+        "total_I": 939806,
+        "callers": {
+          "0x134dd3": 3,
+          "0x1264aa": 20,
+          "0x134bee": 20
+        },
+        "controls_exact": true
+      },
+      {
+        "index": 6,
+        "model": "degen2",
+        "cap": 150,
+        "mode": "detail",
+        "wall_seconds": 1.9002834030034137,
+        "calls": 252,
+        "total_I": 3612885,
+        "callers": {
+          "0x134dd3": 5,
+          "0x1264aa": 150,
+          "0x134bee": 97
+        },
+        "controls_exact": true
+      },
+      {
+        "index": 7,
+        "model": "degen2",
+        "cap": 640,
+        "mode": "root",
+        "wall_seconds": 1.5796254830056569,
+        "calls": 747,
+        "total_I": 28035779,
+        "callers": {
+          "0x134dd3": 16,
+          "0x1264aa": 634,
+          "0x134bee": 97
+        },
+        "controls_exact": true
+      },
+      {
+        "index": 8,
+        "model": "degen2",
+        "cap": 640,
+        "mode": "detail",
+        "wall_seconds": 4.261886257001606,
+        "calls": 747,
+        "total_I": 28035830,
+        "callers": {
+          "0x134dd3": 16,
+          "0x1264aa": 634,
+          "0x134bee": 97
+        },
+        "controls_exact": true
+      }
+    ],
+    "observation_runs": [
+      {
+        "index": 0,
+        "model": "afiro",
+        "cap": 3,
+        "mode": "observe",
+        "wall_seconds": 0.7144730899963179,
+        "calls": 5,
+        "total_I": null,
+        "callers": {
+          "0x1264aa": 3,
+          "0x134dd3": 2
+        },
+        "controls_exact": true
+      },
+      {
+        "index": 1,
+        "model": "sc50a",
+        "cap": 3,
+        "mode": "observe",
+        "wall_seconds": 0.683857074000116,
+        "calls": 6,
+        "total_I": null,
+        "callers": {
+          "0x1264aa": 3,
+          "0x134bee": 1,
+          "0x134dd3": 2
+        },
+        "controls_exact": true
+      },
+      {
+        "index": 2,
+        "model": "degen2",
+        "cap": 20,
+        "mode": "observe",
+        "wall_seconds": 1.2017140070020105,
+        "calls": 43,
+        "total_I": null,
+        "callers": {
+          "0x1264aa": 20,
+          "0x134bee": 20,
+          "0x134dd3": 3
+        },
+        "controls_exact": true
+      },
+      {
+        "index": 3,
+        "model": "degen2",
+        "cap": 640,
+        "mode": "observe",
+        "wall_seconds": 8.749277648996213,
+        "calls": 747,
+        "total_I": null,
+        "callers": {
+          "0x1264aa": 634,
+          "0x134bee": 97,
+          "0x134dd3": 16
+        },
+        "controls_exact": true
+      }
+    ],
+    "all_complete_result_exit_and_zero_sign_controls": true,
+    "solver_source_unchanged": true,
+    "accepted_ELF_hashes_unchanged": true,
+    "full_parity": "Not rerun: immutable qualified accepted binary, no solver source changes or new builds. Existing987 baseline qualification retained."
+  },
+  "interpretation": {
+    "whole_order_percent": 2.381646090080743,
+    "whole_sparse_order_filter_and_remaining_I": 5187217,
+    "upper_limit": "Deleting allorder construction would remove at most2.382% of Rose instructions, before replacement costs and mandatory ordering behavior. This is not feasible deletion or time saving and cannot bridge128M-I/89.315M-cycle gap.",
+    "late_share": "3.338353M of4.315376M order instructions occur after strict frontier and are source-only costs; no native arithmetic/excess claim there.",
+    "rejected_check": "Existing natural-numeric-traversal output reuse timing inconclusive; slot heaps inconclusive; generic/f64 fallback removal rejected; output capacity reserve no gain; dense direct emission no gain; F2workspace/pre-Uowner/fusion/WORKdeferral/arenas closed. No retry, rescue or implementation follows from this census."
+  },
+  "one_next_experiment": {
+    "type": "Diagnostic actual source U arithmetic observation at already matched149/native148.",
+    "design": "Reuse native captured Uoperations and central boundary gates; observe source actual tail/nucleus operands, ordered terms, zero tests and divisions in a separate read-only capture. Delegate comparison to ref_compare and add any missing alignment only to compare.py. Stop at first actual term difference; do not normalize or infer from endpoints. Qualify small/capped inputs beforeselectedDEGEN2.",
+    "basis": "Output-order exposure is now bounded; remaining accepted full post-L/pre-output input/tail/arithmetic/individualWORK scopes total10.208631M I. Their split and corresponding operations are not proved. Native computes many zeroquotients; do not assume Rose has extra arithmetic.",
+    "benefit": "Diagnostic0. Whole-solve optimization benefit remains unquantified until corresponding operation and lifecycle costs are established;10.209M is a mixed required-work exposure, not removable/time share.",
+    "distinct": "Measures uncaptured original numerical operation histories; does not retry any output-order/WORK-deferral/fusion/empty-column implementation."
+  },
+  "artifacts": {
+    "root": "target/perf-degen2-order-census",
+    "root_control": "7/counts.json",
+    "detail": "8/counts.json",
+    "memory": "observe-3/counts.json",
+    "summary": "summary.json",
+    "observation_summary": "observe-summary.json"
+  },
+  "artifact_hashes": {
+    "target/perf-degen2-order-census/measure_gdb.py": "c7867d51fe98284253f55bde068ac8acb63f32d91cbd0d2ccf680fdfb4eb8fb8",
+    "target/perf-degen2-order-census/observe_gdb.py": "1bbc8426c4b37222d41dd7b45470dd2fbab2b546e513bca078a1aee1c23a41d7",
+    "target/perf-degen2-order-census/run.py": "5fbf9b2c43ffbae38d9931282c0daee76504dfa5f0361dddda03130ec11d0e4d",
+    "target/perf-degen2-order-census/run_observe.py": "2ab1dfeb99cddc6839b7e9942038e4ff9498a29b5f617b66f6aba848712d7ee8",
+    "target/perf-degen2-order-census/summary.json": "60fbf3a1852468271e67c2363a7e5cbc53ccb7e79b99167c2ef531e91823a7ce",
+    "target/perf-degen2-order-census/observe-summary.json": "2a461d788a3c4e62dee2c71962557a873eeeee2c506b33cdfead8ab01b1faa06",
+    "target/perf-degen2-order-census/7/counts.json": "99bf4bd660e845a7f31e2520e293d8c22f8404a2f31238389f4327c686f956e4",
+    "target/perf-degen2-order-census/8/counts.json": "3fdcdbc6ceddfa50548be1215ccc36a2c331dab9bdeac173c6eba93521deda98",
+    "target/perf-degen2-order-census/observe-3/counts.json": "44b3951928883a3aaa87b37275cf1ec2536605ddeb53adb75d49bbdb07eb0cb5",
+    "target/perf-degen2-order-census/summarize.py": "893fb924acdaa354d7306579ca39602bebd26134e93e8c535aede7e02c6927dc"
+  },
+  "completed_actual_U_operation_followup": {
+    "evidence": "perf/evidence/degen2-U-operation-diagnosis.json",
+    "status": "Complete diagnostic, no optimization.",
+    "central": "Freshinputbits,72DIV/52scatter/21orderedrowdot arithmetic projections PASS; exactrowdotcolumnIDs unproved;native120extra fullzeroDIV.",
+    "concrete": "205rejectedneededUCchecks cost2050static/2051measuredI inside3469tailroot; wholeexposure unknown.",
+    "next": "Whole neededU rejectedcandidate/lifetime census before any prototype; no rejectedtrialreopened."
+  }
+}

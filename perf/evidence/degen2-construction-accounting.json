@@ -1,0 +1,528 @@
+{
+  "previous_goal_turn_classification": "Progress: BTRANU/etaaccountingandfirstorderedscatterdifferencecompleted;scopewas2.244%solveinstructionswithrequiredwork. Thisturnexecuteslargerconstructoraccountingandextendsreferenceboundarytoactualinstallation.",
+  "scope": "Boundeddiagnostic, immutablequalified55af/systemTCMallocfixed39 vsreference26a505matchingdual-release. Nosolveroptimization,newbuild,numerical/FPorder/WORK/dump/paritybaselinechange. WholeRose-onlylatecostscensusnotnativepairingpaststrict162frontier.",
+  "selected_complete_parent_instruction_table": [
+    {
+      "ordinal": 3,
+      "source_pricing": 82,
+      "native_context": 82,
+      "Rose_parent_I": 1259082,
+      "native_parent_I": 178471,
+      "parent_difference_I": 1080611,
+      "Rose_direct_children": [
+        {
+          "kind": "attempt",
+          "I": 560292
+        },
+        {
+          "kind": "pricing_reset",
+          "I": 223933
+        },
+        {
+          "kind": "mirror_drop",
+          "I": 40525
+        },
+        {
+          "kind": "factor_WORK",
+          "I": 42150
+        },
+        {
+          "kind": "aux",
+          "I": 258333
+        },
+        {
+          "kind": "aux_drop",
+          "I": 8769
+        },
+        {
+          "kind": "Structure_drop",
+          "I": 22384
+        }
+      ],
+      "Rose_parent_residual_I": 102696,
+      "native_parts": [
+        {
+          "begin": "driver_entry",
+          "end": "constructor_entry",
+          "I": 227
+        },
+        {
+          "begin": "constructor_entry",
+          "end": "constructor_return",
+          "I": 144473
+        },
+        {
+          "begin": "constructor_return",
+          "end": "successful_constructor_bookkeeping",
+          "I": 3589
+        },
+        {
+          "begin": "successful_constructor_bookkeeping",
+          "end": "pricing_reset_entry",
+          "I": 5613
+        },
+        {
+          "begin": "pricing_reset_entry",
+          "end": "pricing_reset_return",
+          "I": 17272
+        },
+        {
+          "begin": "pricing_reset_return",
+          "end": "driver_return",
+          "I": 7297
+        }
+      ],
+      "qualification": "Correspondingselectedinput/basis/factoroutputandinstalledprojectiongatespass. Notfullintermediatefactor/transposes/cache/poolidentityorarithmeticvisitproof. Eachrootincludeslocalhelper/allocator/copy/drop;retainedobjects beyondreturn remainlifecycle. AuxiliaryLUhasnoseparatelymatchednativechild,notassumedzeroequivalentwork."
+    },
+    {
+      "ordinal": 4,
+      "source_pricing": 132,
+      "native_context": 131,
+      "Rose_parent_I": 1412585,
+      "native_parent_I": 198156,
+      "parent_difference_I": 1214429,
+      "Rose_direct_children": [
+        {
+          "kind": "attempt",
+          "I": 617348
+        },
+        {
+          "kind": "pricing_reset",
+          "I": 265617
+        },
+        {
+          "kind": "mirror_drop",
+          "I": 46736
+        },
+        {
+          "kind": "factor_WORK",
+          "I": 44079
+        },
+        {
+          "kind": "aux",
+          "I": 299011
+        },
+        {
+          "kind": "aux_drop",
+          "I": 11071
+        },
+        {
+          "kind": "Structure_drop",
+          "I": 29036
+        }
+      ],
+      "Rose_parent_residual_I": 99687,
+      "native_parts": [
+        {
+          "begin": "driver_entry",
+          "end": "constructor_entry",
+          "I": 240
+        },
+        {
+          "begin": "constructor_entry",
+          "end": "constructor_return",
+          "I": 162251
+        },
+        {
+          "begin": "constructor_return",
+          "end": "successful_constructor_bookkeeping",
+          "I": 3589
+        },
+        {
+          "begin": "successful_constructor_bookkeeping",
+          "end": "pricing_reset_entry",
+          "I": 5450
+        },
+        {
+          "begin": "pricing_reset_entry",
+          "end": "pricing_reset_return",
+          "I": 19291
+        },
+        {
+          "begin": "pricing_reset_return",
+          "end": "driver_return",
+          "I": 7336
+        }
+      ],
+      "qualification": "Correspondingselectedinput/basis/factoroutputandinstalledprojectiongatespass. Notfullintermediatefactor/transposes/cache/poolidentityorarithmeticvisitproof. Eachrootincludeslocalhelper/allocator/copy/drop;retainedobjects beyondreturn remainlifecycle. AuxiliaryLUhasnoseparatelymatchednativechild,notassumedzeroequivalentwork."
+    }
+  ],
+  "whole_source_inclusive_and_exclusive_table": {
+    "reference_order": {
+      "calls": 16,
+      "inclusive_I": 15791328,
+      "exclusive_I": 1297683
+    },
+    "ordered": {
+      "calls": 16,
+      "inclusive_I": 14493645,
+      "exclusive_I": 7180906
+    },
+    "nucleus": {
+      "calls": 16,
+      "inclusive_I": 7312739,
+      "exclusive_I": 7312739
+    },
+    "fresh": {
+      "calls": 16,
+      "inclusive_I": 8688487,
+      "exclusive_I": 8688487
+    },
+    "aux": {
+      "calls": 16,
+      "inclusive_I": 8480433,
+      "exclusive_I": 8480433
+    },
+    "refactor": {
+      "calls": 15,
+      "inclusive_I": 41965850,
+      "exclusive_I": 1696648
+    },
+    "attempt": {
+      "calls": 15,
+      "inclusive_I": 24083326,
+      "exclusive_I": 7622
+    },
+    "pricing_reset": {
+      "calls": 15,
+      "inclusive_I": 5200393,
+      "exclusive_I": 5200393
+    },
+    "mirror_drop": {
+      "calls": 15,
+      "inclusive_I": 924192,
+      "exclusive_I": 924192
+    },
+    "factor_WORK": {
+      "calls": 15,
+      "inclusive_I": 767629,
+      "exclusive_I": 767629
+    },
+    "aux_drop": {
+      "calls": 15,
+      "inclusive_I": 295957,
+      "exclusive_I": 295957
+    },
+    "Structure_drop": {
+      "calls": 15,
+      "inclusive_I": 656968,
+      "exclusive_I": 656968
+    }
+  },
+  "whole_source_root_union": {
+    "instructions": 42509657,
+    "percent_of_181193000_solve_I": 23.460981936388272,
+    "components": "15completeDualrefactorroots+initialreference_order/fresh/auxroots. Initialoutersetup/finalretainedfactorretirementoutsideunion;notzero. Initialchildrenarenotaddedagainwithparent15.",
+    "complete_constructor_16_union_I": 32960248,
+    "initial_three_roots_I": 543807
+  },
+  "whole_ordered_exclusive_partition_I": {
+    "entry -> nucleus_call": 4572160,
+    "nucleus_call -> nucleus_return": 7312739,
+    "nucleus_return -> singleton_setup": 3996,
+    "singleton_setup -> singleton_loop": 71345,
+    "singleton_loop -> singleton_end": 2376342,
+    "singleton_end -> return": 157063
+  },
+  "central_alignment": {
+    "report": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-factor-boundary/central-factor4.json",
+    "command": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-factor-boundary/central-command.txt",
+    "root_replay": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-factor-boundary/root-validation.json",
+    "input_proofs": [
+      {
+        "ordinal": 0,
+        "source_pricing": 0,
+        "native_context_it": 0.0,
+        "columns": 444,
+        "coefficient_bits": 466,
+        "same_actual_scaled_inputs": true
+      },
+      {
+        "ordinal": 1,
+        "source_pricing": 16,
+        "native_context_it": 16.0,
+        "columns": 444,
+        "coefficient_bits": 584,
+        "same_actual_scaled_inputs": true
+      },
+      {
+        "ordinal": 3,
+        "source_pricing": 82,
+        "native_context_it": 82.0,
+        "columns": 444,
+        "coefficient_bits": 961,
+        "same_actual_scaled_inputs": true
+      },
+      {
+        "ordinal": 4,
+        "source_pricing": 132,
+        "native_context_it": 131.0,
+        "columns": 444,
+        "coefficient_bits": 1138,
+        "same_actual_scaled_inputs": true
+      }
+    ],
+    "factor_numerics": [
+      {
+        "ordinal": 1,
+        "context_it": 16.0,
+        "diagonal_slots": 444,
+        "ordered_L_entries": 140,
+        "logical_U_coefficients": 0,
+        "U_transport": "CSR p68[col:col+2], pivotpositions; fresh native physicalrows descending versus Rose ascending. Published valuesbits match through explicit reversal; no internaloperationorder identity.",
+        "constructor_metadata_qualification": "p70/p78/kind/nuc at d4190 return not admitted as uniformly installed/fresh state. No installedmetadata equality claim."
+      },
+      {
+        "ordinal": 2,
+        "context_it": 37.0,
+        "diagonal_slots": 444,
+        "ordered_L_entries": 259,
+        "logical_U_coefficients": 0,
+        "U_transport": "CSR p68[col:col+2], pivotpositions; fresh native physicalrows descending versus Rose ascending. Published valuesbits match through explicit reversal; no internaloperationorder identity.",
+        "constructor_metadata_qualification": "p70/p78/kind/nuc at d4190 return not admitted as uniformly installed/fresh state. No installedmetadata equality claim."
+      },
+      {
+        "ordinal": 3,
+        "context_it": 82.0,
+        "diagonal_slots": 444,
+        "ordered_L_entries": 491,
+        "logical_U_coefficients": 25,
+        "U_transport": "CSR p68[col:col+2], pivotpositions; fresh native physicalrows descending versus Rose ascending. Published valuesbits match through explicit reversal; no internaloperationorder identity.",
+        "constructor_metadata_qualification": "p70/p78/kind/nuc at d4190 return not admitted as uniformly installed/fresh state. No installedmetadata equality claim."
+      },
+      {
+        "ordinal": 4,
+        "context_it": 131.0,
+        "diagonal_slots": 444,
+        "ordered_L_entries": 661,
+        "logical_U_coefficients": 32,
+        "U_transport": "CSR p68[col:col+2], pivotpositions; fresh native physicalrows descending versus Rose ascending. Published valuesbits match through explicit reversal; no internaloperationorder identity.",
+        "constructor_metadata_qualification": "p70/p78/kind/nuc at d4190 return not admitted as uniformly installed/fresh state. No installedmetadata equality claim."
+      }
+    ],
+    "basis_pivots_threshold": "PASS",
+    "driver_installed_projection": [
+      {
+        "ordinal": 3,
+        "native_context": 82.0,
+        "source_first_FSTRUCT_n": 79,
+        "capture_sha256": "da8221064c4d911ef3a20c7852a0964e4f61a35c2c308bd4e2385894d1255d70",
+        "mode": "root",
+        "root_instructions": 178471,
+        "parts": [
+          {
+            "begin": "driver_entry",
+            "end": "driver_return",
+            "I": 178471
+          }
+        ],
+        "installed_projection": "i3/i21/kind/slot/all444 diagonal bits at actual f15c0 return match first FSTRUCT after same LUOUT; not full fresh transpose/rowl/A/B/cache/pool identity.",
+        "scope": "Native f15c0 complete parent driver; nested d4190 constructor and 132460 pricing-reset. Allocator calls included but not separately counted; retained lifetime outside actual return unmeasured.",
+        "correction": "2I per stopped interval; root/detail residual separately retained; no cycles or debugger time."
+      },
+      {
+        "ordinal": 3,
+        "native_context": 82.0,
+        "source_first_FSTRUCT_n": 79,
+        "capture_sha256": "eccfe8c9b11004707254ea3ae8fa47c0ede53d355d6ad2af9ea1261ad21f0391",
+        "mode": "detail",
+        "root_instructions": 178471,
+        "parts": [
+          {
+            "begin": "driver_entry",
+            "end": "constructor_entry",
+            "I": 227
+          },
+          {
+            "begin": "constructor_entry",
+            "end": "constructor_return",
+            "I": 144473
+          },
+          {
+            "begin": "constructor_return",
+            "end": "successful_constructor_bookkeeping",
+            "I": 3589
+          },
+          {
+            "begin": "successful_constructor_bookkeeping",
+            "end": "pricing_reset_entry",
+            "I": 5613
+          },
+          {
+            "begin": "pricing_reset_entry",
+            "end": "pricing_reset_return",
+            "I": 17272
+          },
+          {
+            "begin": "pricing_reset_return",
+            "end": "driver_return",
+            "I": 7297
+          }
+        ],
+        "installed_projection": "i3/i21/kind/slot/all444 diagonal bits at actual f15c0 return match first FSTRUCT after same LUOUT; not full fresh transpose/rowl/A/B/cache/pool identity.",
+        "scope": "Native f15c0 complete parent driver; nested d4190 constructor and 132460 pricing-reset. Allocator calls included but not separately counted; retained lifetime outside actual return unmeasured.",
+        "correction": "2I per stopped interval; root/detail residual separately retained; no cycles or debugger time."
+      },
+      {
+        "ordinal": 4,
+        "native_context": 131.0,
+        "source_first_FSTRUCT_n": 128,
+        "capture_sha256": "38884fc06eb41fdcf9769e7dab9cfc038a748cdbcb65316e6a7c64430d2ffc5e",
+        "mode": "root",
+        "root_instructions": 198156,
+        "parts": [
+          {
+            "begin": "driver_entry",
+            "end": "driver_return",
+            "I": 198156
+          }
+        ],
+        "installed_projection": "i3/i21/kind/slot/all444 diagonal bits at actual f15c0 return match first FSTRUCT after same LUOUT; not full fresh transpose/rowl/A/B/cache/pool identity.",
+        "scope": "Native f15c0 complete parent driver; nested d4190 constructor and 132460 pricing-reset. Allocator calls included but not separately counted; retained lifetime outside actual return unmeasured.",
+        "correction": "2I per stopped interval; root/detail residual separately retained; no cycles or debugger time."
+      },
+      {
+        "ordinal": 4,
+        "native_context": 131.0,
+        "source_first_FSTRUCT_n": 128,
+        "capture_sha256": "1b2d88ae3ad32edbb6b05096389e8f45ddefa4dcf82b4d7ae418467a6dd64dd4",
+        "mode": "detail",
+        "root_instructions": 198157,
+        "parts": [
+          {
+            "begin": "driver_entry",
+            "end": "constructor_entry",
+            "I": 240
+          },
+          {
+            "begin": "constructor_entry",
+            "end": "constructor_return",
+            "I": 162251
+          },
+          {
+            "begin": "constructor_return",
+            "end": "successful_constructor_bookkeeping",
+            "I": 3589
+          },
+          {
+            "begin": "successful_constructor_bookkeeping",
+            "end": "pricing_reset_entry",
+            "I": 5450
+          },
+          {
+            "begin": "pricing_reset_entry",
+            "end": "pricing_reset_return",
+            "I": 19291
+          },
+          {
+            "begin": "pricing_reset_return",
+            "end": "driver_return",
+            "I": 7336
+          }
+        ],
+        "installed_projection": "i3/i21/kind/slot/all444 diagonal bits at actual f15c0 return match first FSTRUCT after same LUOUT; not full fresh transpose/rowl/A/B/cache/pool identity.",
+        "scope": "Native f15c0 complete parent driver; nested d4190 constructor and 132460 pricing-reset. Allocator calls included but not separately counted; retained lifetime outside actual return unmeasured.",
+        "correction": "2I per stopped interval; root/detail residual separately retained; no cycles or debugger time."
+      }
+    ],
+    "limits": "Native d4190constructorreturnCSR/diag/Lfreshbutkind/p70/p78mixedoldstate. FreshUcompareswithprovenlunumphysicalreversepublicationtransport,notoperationorder. Atactualf15c0driverreturn i3/i21/kind/slot/444diag matchfirstsourceFSTRUCTinselectedepoch. FullA/B,rowl,transpose/cache/poolandallFPoperationidentityunproved."
+  },
+  "concrete_mechanisms_and_limits": {
+    "multiple_representations": "RoseconstructsStructurewithLrowindices/multipliers/rawvalues,thenRefStructL/LT/Uandmetadata,thenindependentlypivotedauxiliaryLU. Nativecombinednumericconstructorandlaterdriverinstallationdonotprovideaseparatelymatchedauxconstructor. Sourcememory/numericalworkinsidetheseownersisreal,butcannotdeclareanentirerootremovable.",
+    "ordered": "Wholeordered14.493645M I contains7.312739M nestednucleus+7.180906M otherwork. Exclusivepre-nucleusphases/inputformation4.572M, singletoncolumnmaterialization2.376M include actual numericdivisions, threefilters, allocations/growth andhelpercleanup. No fusion/prototypefromaggregateexposure.",
+    "pricing_reset": "15sourcepricingresetcalls5.200393M I vsselectednative17272/19291. Correspondingselectedsource223933/265617I. Sourcesplitgraphconstruction+sorting/dedup+recurrence+cleanupnotyetexclusive;nativealreadyusesitsfactorlists. Completeweights/edgehistorymappingisthenextneededproof,notanallocation-timeshareclaim.",
+    "discarded_weight_recurrence_hypothesis": "RuledoutasRose-vs-nativeextraarithmetic:cachedP68type2fromfactor7onward,butnativealsoexecutesbothrecurrencesandsumbeforeloadingpricingtypeat13279b,thenconstantfills. Nativepositivetype1/2callssamehelper; noearlytype2bypass. Onlyread-onlystaticaudit,noextracapture.",
+    "unused_growth_L": "Sourcegrowthtestnumerics().0buildsanddropsunusedLcolumns;exactdirect-diagonal-readtrialalreadyREJECTEDatperf/STATE.md. Do notrevivefromthisnewattribution.",
+    "parent_residual": "1.696648M I remainsparentexclusiveafterallregisteredchildren, includingqualitychecks/copies,permutation/publication,input/localretirementandbookkeeping. Theseareownedfactorwork,notglobalunattributedoraremovablepass.",
+    "aux": "16auxiliaryfactorroots8.480433M I includeactualleftlookingnumericfactorizationandconstruction/cleanup. Onlyresultrecordslaterdroppedoutsiderootandretainedfactorlifetimeareoutside. Prescribed-pivotauxvalidator andauxlengthsorttrialsalreadyclosed."
+  },
+  "distortion": {
+    "source_codegen_change": 0,
+    "calibration": "16known5-instructionsequencesread7;2I/stoppedintervalcorrection. All sourcePMUenabled==running.",
+    "within_current_observers": {
+      "parent_totals_I": {
+        "v2-rose-degen2-640-coarse": 41965629,
+        "v3-rose-degen2-640-detail": 41965719,
+        "v5-rose-degen2-640-detail": 41965850
+      },
+      "meaning": "FewhundredI variationandboundaryuncertaintyretained. Detailedtreeclosesexactlywithinitself;notstaticexactperopcodecounts."
+    },
+    "nucleus_probe_sensitivity": {
+      "current_nested_I": 7312739,
+      "minimal_controls": [
+        {
+          "mode": "minimal",
+          "calls": 16,
+          "raw_I": 7294640,
+          "rough_2I_corrected": 7294608,
+          "complete_result_exit_zero_sign_match": true
+        },
+        {
+          "mode": "dynamic_old",
+          "calls": 16,
+          "raw_I": 7297479,
+          "rough_2I_corrected": 7297447,
+          "complete_result_exit_zero_sign_match": true
+        }
+      ],
+      "delta_nested_vs_minimal_corrected_I": 18131,
+      "meaning": "Currentnested~.249%higherthanminimalnucleusobserver;about.010%whole-solveI. Causeunassigned:observer/method/privateallocatorpathsensitivity. Donotmixminimalchildwithnestedparentortreatdifferenceasnewalgorithmwork."
+    },
+    "native": "Selectedcompleteparentroot/detail0\u20131Iresidual. Allnewnative/sourcecyclesanddebuggertimesexcluded;no instruction-to-time conversion.",
+    "excluded_v4": "Initialpricing-reset/destructorentry/standaloneRETobserverfailedstackcompletiononSC50A becausevalidnormalcallee tailcalls skipRET. Targetresultcompletedunchanged;allv4costsexcluded. FixedcallerCALL/returnv5requalifiedAFIRO/SC50A/DEGEN133/640.",
+    "capture_source_versions": "Sourceinputcaptureusespreservedsites-v1.json/rose_gdb-v1.py;earliersizesincludedotherRETsitesguardedbyactualframeRSP. Authoritativecostsv5useactualnm-sizefunctionsandfixedcallreturnforleafscopes. Earlynmparsererrorwasadministrative;no solver/sourcechange."
+  },
+  "validation": {
+    "successful_source_complete_result_exit_zero_sign_controls": 21,
+    "source_small_qualification": "AFIRO3/SC50A20beforeDEGEN2;longestretainedmainobserver1.401s,deadline20s. Twoextraminimal/dynamicnucleuschecks\u2264.8sandmatchwholeacceptedresult.",
+    "source_input_ABI": "Accepted274340actualRsi=m,Rdx=cols,Rcx=len. Tuple56B:rowVecptr8/len16,slack24,valueVecptr40/len48;all extentsvalidatedandactualbitsmatchednative. No guessedDualheadpointer.",
+    "central": "Replayedcommandexit0;basis/threshold/pivots/444diag/orderedL/logicalUplusinstalledprojectiongatespass. Sourcepricing132mapsnativecontext131;rawscaledinputs961/1138bits.",
+    "frozen_parity": "Noproductionedit/build;accepted987qualificationpreserved,notrerunorclaimednew."
+  },
+  "rejected_followup_check": "No empty-nucleussetup,Markowitzrowheap/chainqueue, input-sharingbasislayout,lowerfactorgeometry-sharing,wholefactorarena/storagebank,unusedgrowthdiag,auxlengthsort75117,prescribed-pivotauxvalidator orbuffer/PGO/layoutrescue. No solvercandidate.",
+  "one_proposed_experiment": {
+    "type": "Pricing-reset numerical/representation diagnostic, nooptimization",
+    "question": "Atcachedselectedsource82/native82and132/native131, pair actual forward/backward predecessor visitsandweightarithmetic withP68outputs;partition source5.200M resetroot into step/adjacency/bwdconstruction,sort/dedup,recurrences,cap/publicationandallcleanup. ReusecachedP68;newreferenceobserveronlyifneeded,delegated/central,stopfirstmismatch. WholelateRosecountssource-only.",
+    "benefit": "Diagnosticdirectbenefit0. Whole5.200M instructionsis2.87%ofacceptedsolveIincludingrequiredwork,notremovable/time. No speedupforecastbeforeactualgeometry/term/lifecycleproof. Constructor3/5nucleuswitnessesmustnotbeextrapolatedtolatewholephase.",
+    "distinct": "Measuresactualresetalgorithm/edgehistoryandcompletecosts,notanewtrialoftheclosedlowerfactor/predecessorgeometrysharingorallocatorownershipdesigns. Already-ptype2dead-recurrenceideaexplicitlydoesnotexplainnativegap."
+  },
+  "reconciliation": {
+    "accepted_solve_ms": [
+      45.784,
+      16.696
+    ],
+    "overall_instruction_gap": 127995000,
+    "overall_cycle_gap": 89315000,
+    "known_FB_self_gap_I": 51863005,
+    "known_FB_self_gap_C": 22439119,
+    "outside_FB_pools_I": 76131995,
+    "outside_FB_pools_C": 66875881,
+    "meaning": "Newconstructor/refactorcostsownexistingfactorstageandhelpers;notadditiveto127.995M gap. No whole-native16constructorcosttableorvalidnewcycleattribution; selectedinstructiongapsmustnotbemultipliedby16."
+  },
+  "artifacts": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-construction-accounting",
+  "reference_artifacts": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-factor-boundary",
+  "preservation": {
+    "target/release/rose": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "target/perf-optimized-build/rose-pgo-tcmalloc": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "target/perf-reference/reconstructed/libgurobi130.so": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "src/ftran_order.rs": "57c86340f6959717954e2cb1c58f06c285ab7ce564a25d7d0e9e9c429d802ef1",
+    "src/lu_order.rs": "530ff158c6d8c1263ed4317ad6d67d3bd6a8509bbc4e55b4c5a3e00bdfa89123",
+    "src/dual.rs": "dce94c76006809b9befabb79f04b658bd31213b86f07193341b0791c2e09eccd",
+    "src/bin/rose.rs": "63d282ccf37597706b28ecbf0cc6d18a0a37b41e9c9b06defd7cf643b6902962"
+  },
+  "artifact_hashes": {
+    "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-construction-accounting/rose_gdb-v1.py": "6307d9928e52d90fd0a3de70f22abb840e47b9c5035ded6433ae68a9bba6822a",
+    "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-construction-accounting/rose_gdb-v2.py": "6307d9928e52d90fd0a3de70f22abb840e47b9c5035ded6433ae68a9bba6822a",
+    "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-construction-accounting/rose_gdb-v3.py": "a18b5c54408a68f11b113b8d88a943f6ba9c6da83481fc5a6cc25397da34563a",
+    "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-construction-accounting/rose_gdb.py": "95de38ac52c06dd19018cde47865dcb3d91e703dce86e190de84e4db466616e1",
+    "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-construction-accounting/sites-v1.json": "295971ef5d2e240d80bb6fe7a3ab49425016aee53d605a9325c21a1813de74dd",
+    "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-construction-accounting/sites-v3.json": "c4c398a10f6b98c4373670ebf5a6dec0ff6103155c3fa33f7d16082a512b01f2",
+    "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-construction-accounting/sites.json": "b2dbd96edd2bf50cd6ceeb450cbc375b519915ec87a97f9ed75da6f8fd8cab07",
+    "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-factor-boundary/central-factor4.json": "ff770bfeedca43489e3b9d197270072fc082a5b0787433d970514f897818a251",
+    "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-factor-boundary/central-command.txt": "6bc73d26c69d4858e9e5b017af0c655599074eac5ffcb461ef022929a3705ba1",
+    "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-factor-boundary/native-ledger.json": "9aee554dbdba28e185edff5a5d6a590821bb218b858ce123cbeb6426ef9737f4",
+    "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-factor-boundary/provenance.json": "fe95d550af4f09594be75e2f54f62fbd67b04cd7f003686cbb8670a4a61e47b7",
+    "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-factor-boundary/native-pricing-reset.asm": "c89cd9f36069a1c04e66efcbfaa1212a1d01c39214e496fe984a484a946a9daa",
+    "../reverse-engineer/tools/compare.py": "2b46da432c556661a672707df11c07d63c635299ed1e5a99ef49429693c89d1d"
+  }
+}

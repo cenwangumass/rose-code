@@ -1,0 +1,307 @@
+{
+  "previous_goal_turn_classification": "Progress: completed cached F/B synthesis, corrected selected rho path qualification, and identified precise missing BTRAN boundaries. Current turn executes that diagnostic.",
+  "scope": "One bounded BTRAN diagnostic on immutable accepted55af/reference26a505; no solver optimization, arithmetic, WORK, dump, toolchain or parity-baseline changes.",
+  "configuration": {
+    "Rose": "qualified fixed39 PGO/systemTCMalloc",
+    "reference": "matching dual-release reconstructed library",
+    "instructions": "perf_event_open user-only target-pid; calibrated2I/stop interval. CPU2Rose/CPU3native; no cycle/time comparison."
+  },
+  "source_complete_instruction_table": [
+    {
+      "pricing": 1,
+      "r": 6,
+      "upd": 0,
+      "path": "sparse U / sparse LT",
+      "parts": {
+        "input": 11,
+        "root_call": 1022,
+        "filter": 68,
+        "WORK": 21,
+        "row_lengths": 24,
+        "drop_filter": 40,
+        "drop_raw": 40
+      },
+      "total": 1226
+    },
+    {
+      "pricing": 149,
+      "r": 138,
+      "upd": 16,
+      "path": "sparse U / dense LT",
+      "parts": {
+        "input": 11,
+        "root_call": 15958,
+        "filter": 1701,
+        "WORK": 21,
+        "row_lengths": 408,
+        "drop_filter": 40,
+        "drop_raw": 40
+      },
+      "total": 18179
+    }
+  ],
+  "source_root_instruction_partition": [
+    {
+      "pricing": 1,
+      "parts": {
+        "U_and_setup": 308,
+        "eta": 3,
+        "LT": 539,
+        "publication": 114,
+        "clear_local_cleanup": 58
+      }
+    },
+    {
+      "pricing": 149,
+      "parts": {
+        "U_and_setup": 2133,
+        "eta": 1345,
+        "LT": 5891,
+        "publication": 6329,
+        "clear_local_cleanup": 260
+      }
+    }
+  ],
+  "source_boundary": "input11fa37..call11fa78..return11fa7d..filter11fbf6..WORK11fc87..row-length count11fd1f, plus disjoint deferred filtered/raw Vec cleanup127b58..127b84. Intervening pivot,ratio,update,FTRAN work excluded. Row-length bookkeeping remains pivot-product owner in overall ledger; aggregate here only for matching native consumer responsibilities.",
+  "root_boundary_limit": "Root and fine scopes include local construction/allocation/copy/cleanup. Retained factor/workspace construction or retirement stays lifecycle; no amortization by mixed BTRAN count. Native caller prep/filter/rowlength prefix requires matching Rose row-length prefix, not root-only comparison.",
+  "source_dense_LT_observation": {
+    "visits": 444,
+    "nonzero_nodes": 49,
+    "terms": 65,
+    "raw_term_source": "rose-degen2-visits/capture.json, original registers/memory, no modeled f64 operations"
+  },
+  "source_dense_output_construction": {
+    "selected_helper_instructions": 6297,
+    "selected_input_entries": 444,
+    "selected_output_entries": 49,
+    "loop_instructions_per_entry": 14,
+    "loop_instructions": 6216,
+    "includes": "complete11d2f8..11d2fe call inclmalloc7104B,14-instruction branchless packing loop,epilogue/return",
+    "separate_caller_filter_instructions": 1701,
+    "separate_two_deferred_vector_drops_instructions": 80,
+    "raw_full_result_other_consumer": "Unbounded/Farkas certificate branch uses unfiltered rho_full; cannot drop raw representation simply because successful pivots filter it."
+  },
+  "whole_source_only_dense_output_helper": {
+    "groups": {
+      "true_d": {
+        "calls": 16,
+        "instructions": 100774,
+        "inputs": 7104,
+        "outputs": 2978
+      },
+      "rho": {
+        "calls": 343,
+        "instructions": 2159875,
+        "inputs": 152292,
+        "outputs": 57712
+      },
+      "mirror_readout": {
+        "calls": 1,
+        "instructions": 6297,
+        "inputs": 444,
+        "outputs": 332
+      }
+    },
+    "calls": 360,
+    "instructions": 2266946,
+    "solve_instruction_percent": 1.2511222839734426,
+    "scope": "Source-only structural/instruction census after strictprefix; includesrequiredpacking andallocation, not removable/time bound or matched whole native excess. Does not include callerfilter or later Vecdrops."
+  },
+  "distortion": {
+    "codegen_change": 0,
+    "calibration": "four5-instruction sequences observed7; correction2I/interval. Adjacent stopped CALL/RET each reports0aftercorrection ratherthan1; carryfewI boundaryuncertainty, no exact staticinstructionclaim.",
+    "coarse_detail_control": "Source sparse/dense complete transactions and root calls reproduce exactly in coarse/detail/trace/lengths; per-node dense root+1I/LT+2I residual retained.",
+    "debug_cycles": "Dense root cycles54626coarse/106485detail/1943100per-node; debuggercycle andalltimerattribution excluded.",
+    "PMU_multiplexing": "none:allsourcemarkers enabled==running",
+    "qualification": "AFIRO3/SC50A20 controls first; all17sourcecomplete results/exits/signedzeros match plainaccepted. Source full640 packrun2.62s, selectedtrace\u2264.99s; wall solely execution-bound evidence.",
+    "native": "Root504/detail504sparse; dense root14215/detail14217,2Iresidual retained; knownfivePUSH7raw\u21925corrected. Allnewnativecycles/walltimesexcluded."
+  },
+  "rejected_trial_check": "No revival of BTRAN memoization/within-pivot row transfer, sparseworkspace/arena reuse, denseLT bounds/unrolling/gather, FTRAN natural-order/slotheap, L handoff/empty-gap, rowmap, U-index or PGO/layout tuning. This records originaloperations; no candidate.",
+  "one_proposed_experiment": {
+    "type": "Read-only residual attribution, no optimization",
+    "question": "At the now-matched dense149/native148 BTRAN, partition sparseU plus eta preparation into actualnumericalterms versus support/heap/index maintenance and buffer construction, using cachedstate first and bounded fixedPC originalbinary observers.",
+    "benefit": "Diagnosticdirectbenefit0; no defensible whole-solve speedup forecast. Selected root pre-L exposureRose3478/native1856I cannot be extrapolated across634mixedrho calls; quantify repetition/construction beforeanycandidate. Densepacking alone is1.251%solveI sourceexposure, includesrequiredpublication andreplacementcost, and cannot close2.74xgap.",
+    "distinct": "Targets unassigned corresponding operations aftercompleteboundary/termproof, not a retry of rejected wholeBTRANmemo, rowtransfer, workspace or LTkernel trials."
+  },
+  "reconciliation": {
+    "overall_gap_I": 127995000,
+    "overall_gap_C": 89315000,
+    "known_FB_sampled_self_gap_I": 51863005,
+    "known_FB_sampled_self_gap_C": 22439119,
+    "outside_known_FB_pools_I": 76131995,
+    "outside_known_FB_pools_C": 66875881,
+    "note": "Allnewcosts are inside existing owner stages/selfpools; neveradd to totalgap. No valid newinclusivecycle delta or whole-run cross-solver BTRAN arithmetic proof.",
+    "missing": "Remaining rawflip/basic/initial/recompute enumeration and whole BTRAN visited-entry coverage; native-private retained storage lifecycle; per-purpose inclusive cycles; no strict numerical pairing beyondpivot162."
+  },
+  "preservation": {
+    "target/release/rose": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "target/perf-optimized-build/rose-pgo-tcmalloc": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "target/perf-reference/reconstructed/libgurobi130.so": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "src/ftran_order.rs": "57c86340f6959717954e2cb1c58f06c285ab7ce564a25d7d0e9e9c429d802ef1",
+    "src/bin/rose.rs": "63d282ccf37597706b28ecbf0cc6d18a0a37b41e9c9b06defd7cf643b6902962"
+  },
+  "artifacts": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-btran-boundary",
+  "central_comparison": {
+    "status": "FIRST_ORDERED_LT_OPERATION_DIFFERENCE",
+    "stage_checks": [
+      {
+        "native_context_it": 0,
+        "source_pricing": 1,
+        "row": 6,
+        "factor_upd": 0,
+        "lt": "LT_sparse",
+        "native_return_count": 1,
+        "source_return_count": 1,
+        "filtered_count": 1,
+        "input_and_head_matched": true,
+        "U_publication_bits_and_order_match": true,
+        "LT_raw444_input_output_match": false
+      },
+      {
+        "native_context_it": 147,
+        "source_pricing": 149,
+        "row": 138,
+        "factor_upd": 16,
+        "lt": "LT_dense",
+        "native_return_count": -1,
+        "source_return_count": 49,
+        "filtered_count": 49,
+        "input_and_head_matched": true,
+        "U_publication_bits_and_order_match": true,
+        "LT_raw444_input_output_match": true
+      }
+    ],
+    "head_transport_qualification": "Rootobserver incorrectly reads Dualhead offsets858/860 relative to RefStructpointerRSI at11adc0. That rawfield is retained unpaired; authoritative acceptedDSX actualhead/context/r atsamepricing supplies basisstate gate. No pointerpayload is normalized into ahead.",
+    "accepted_DSX_sha256": "b31b8176986cb5bfe54f048a9dae05dcdf751aca1d388974ba5822c527020c6d",
+    "all444_actual_LT_node_bits_match": true,
+    "LT_node_count": 444,
+    "LT_term_count_native": 65,
+    "LT_term_count_Rose": 65,
+    "LT_terms_aligned_prefix": 0,
+    "first_ordered_LT_difference": {
+      "ordinal": 1,
+      "native_raw": {
+        "source": 442,
+        "coefficient": "bff0000000000000",
+        "source_bits": "bff0000000000000",
+        "mul_pc": "0x1301a0",
+        "destination": 98,
+        "destination_before": "0000000000000000",
+        "product_bits": "3ff0000000000000",
+        "sub_pc": "0x1301ae",
+        "after_bits": "bff0000000000000",
+        "store_pc": "0x1301b2"
+      },
+      "native_basis_projection": {
+        "source": 441,
+        "destination": 98,
+        "coefficient": "bff0000000000000",
+        "source_bits": "bff0000000000000",
+        "destination_before": "0000000000000000"
+      },
+      "Rose": {
+        "source": 441,
+        "destination": 15,
+        "coefficient": "bff0000000000000",
+        "source_bits": "bff0000000000000",
+        "destination_before": "0000000000000000"
+      }
+    },
+    "LT_node_transport": "RawRAX L-column one-past boundary444..1 maps to basisnode443..0, from13010a/130122/130158 and loopdecrements. Original raw values retained in capture.",
+    "command": "target/perf-degen2-btran-boundary/central-command.txt",
+    "report": "target/perf-degen2-btran-boundary/central-report.json",
+    "replay": "target/perf-degen2-btran-boundary/central-validation.json",
+    "expected_exit": 1,
+    "scope": "Endpoint andconsumednodevalue proofs are separatefromorderedtermcomparison, whichstopsatfirstdifference. No comparisonbeyondstrictprefix."
+  },
+  "native_instruction_table": [
+    {
+      "context_it": 0,
+      "source_pricing": 1,
+      "complete": 504,
+      "wrapper": 457,
+      "input": 16,
+      "caller_post": 31,
+      "detail_residual": 0
+    },
+    {
+      "context_it": 147,
+      "source_pricing": 149,
+      "complete": 14215,
+      "wrapper": 10276,
+      "input": 16,
+      "caller_post": 3923,
+      "detail_complete": 14217,
+      "detail_residual": 2
+    }
+  ],
+  "matched_complete_instruction_table": [
+    {
+      "source_pricing": 1,
+      "native_context_it": 0,
+      "path": "sparseU/sparseLT",
+      "Rose": 1226,
+      "Gurobi": 504,
+      "difference": 722
+    },
+    {
+      "source_pricing": 149,
+      "native_context_it": 147,
+      "path": "sparseU/denseLT",
+      "Rose": 18179,
+      "Gurobi": 14215,
+      "difference": 3964
+    }
+  ],
+  "native_dense_wrapper_parts": {
+    "wrapper_prep": 8,
+    "core_prep": 51,
+    "U": 824,
+    "eta_dispatch": 981,
+    "LT_input_prep": 533,
+    "LT_numeric_node_walk": 5620,
+    "publication": 2249,
+    "wrapper_WORK_return": 10,
+    "sum": 10276
+  },
+  "native_boundary": "c517f..c52cc includesinputsetup,whole131710wrapper/core,scaledWORK,inplacedensefilter andoccurrence/rowlengthlookup. Helper134aa0 is4I read-only rowlength lookup; old rowindexset_insert labels inrawcaptures aremisleading, notmetadataconstruction. Targetedobservedallocator/copyhelper sites0hits isnotcompleteallocation/privatepool/lifecycleproof.",
+  "supported_mechanism_and_unexplained": {
+    "main": "Outputrepresentation costs arethe largest selectedlocalization. Rose stores(index,value)pairs for444candidatepositions in14I/entryloop, then filters49nonzeros intoasecondVec andeventuallyretiresboth. Native publishes dense444workspace thenfiltersinplace andcountsrowlengths. Publication-only4080I difference overstatescompleteexcessbecause nativecallerpostcostshigher.",
+    "reconciliation_dense": {
+      "root_difference": 5682,
+      "outside_difference": -1718,
+      "complete_difference": 3964,
+      "post_LT_plus_all_caller_and_cleanup_Rose": 8810,
+      "post_LT_plus_all_caller_and_cleanup_native": 6198,
+      "difference": 2612,
+      "pre_LT_and_LT_remaining_difference": 1352,
+      "sum": 3964
+    },
+    "numeric_limit": "Both444orderednodevaluebits and65termcounts agree, butfirstcoefficientdestinationorder differs. Cannotclaim65orderedcorrespondingoperations orarithmetic-only machinecode/cyclecause. No extraLTcolumnscanmechanism here: unlikeforwardL,witnessLTvisits444inbothsolvers.",
+    "arithmetic_machinecode": "ActualdenseLTbothscalarMUL/SUB; source storespairs/indexbounds while nativeunrolls numericspan. No floatingarithmetic-throughput cause established.",
+    "remaining": "Pre-L1622I selecteddifferencefromcoarseU/eta scopes isnot separatedintosupport/scans/allocation/bookkeeping versusarithmetic. LTsource5891/native6153I spans differ byinputpreparation responsibilities; no puredot/arithmetic subtraction. Returned storage andprivatefactor lifecycle remainunamortized."
+  },
+  "validation": {
+    "source_complete_result_controls": 17,
+    "central_replay": "2selectedstate/output gatesPASS,expectedfirstorderedLTdifferenceat1;exit1",
+    "solver_tests": "No newsolvercodeorbuild; accepted987 frozenparityqualification retained,notrerunorclaimednew.",
+    "capture_provenance": "Eachsourcecapturemanifest hashesmodel,ELF,capture,script andexactfullresult/exit/zeros control. rose_gdb-v1.py/v2.py preserveearlierobserverversions. Packmanifests correctedscript hash toactualargvpack_gdb.py; no measurementchange."
+  },
+  "artifact_hashes": {
+    "target/perf-degen2-btran-boundary/rose_gdb-v1.py": "6643107860a3b200c0836c2f71074b8ffb7c86829a0181dfd895590d6aec08de",
+    "target/perf-degen2-btran-boundary/rose_gdb-v2.py": "b6b255cffaf9399fbb60738c333e79b8ab926d6832b192b3f1169186babb3f9d",
+    "target/perf-degen2-btran-boundary/rose_gdb.py": "ff4401fa68c5973cdfcc0a82f5ff07c947f27352def2c1b77f590b24b6b3e694",
+    "target/perf-degen2-btran-boundary/pack_gdb.py": "a12d3f258687de0cc4753d1eabc4e781c94dd47370c11dc471c5b32fa475d066",
+    "target/perf-degen2-btran-boundary/central-command.txt": "494b64f28675113d4adf39458a403a9b2259a314781d060923631fbe33bd06f3",
+    "target/perf-degen2-btran-boundary/central-report.json": "81ca55b1c38fb2a80e04f2f77cb8c9a41bd1cf80183dd9dbc7ca0ca82877fd2c",
+    "../reverse-engineer/tools/compare.py": "b4c006b08cc93d047fae72e99b08cb596f5307658caffa6ff53b5c370a55a5c4",
+    "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-btran-boundary/native-ledger.json": "c395161cd323cf7891ebf9b24042dd4d82dc521270ae33abc8f28fd74a300cbb",
+    "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-btran-boundary/provenance.json": "3c352564b322738a4a8abafa5e895df1ac6234463fa0909132e0e9e86fd60937",
+    "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-btran-boundary/central-report.json": "81ca55b1c38fb2a80e04f2f77cb8c9a41bd1cf80183dd9dbc7ca0ca82877fd2c"
+  },
+  "reference_artifacts": {
+    "ledger": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-btran-boundary/native-ledger.json",
+    "provenance": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-btran-boundary/provenance.json"
+  },
+  "completed_U_eta_followup": "degen2-btran-u-eta.json"
+}

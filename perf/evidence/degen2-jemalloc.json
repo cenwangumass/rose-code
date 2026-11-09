@@ -1,0 +1,65 @@
+{
+  "decision": "Reject this default jemalloc preload configuration; DEGEN2 solver median+17.52%,wholeprocess instructions+18.96%,cycles+22.76%; no formal timing/full qualification requested or run.",
+  "configuration": "Same qualified55af fixed39PGO ELF,TCMalloclinked; child-onlyjemalloc interposesmalloc/calloc/realloc/free/posix_memalign. Source/numericoptions unchanged. No system install.",
+  "smoke": {
+    "smoke": [
+      {
+        "model": "afiro",
+        "cap": 3,
+        "complete_result_exit_agrees": true
+      },
+      {
+        "model": "degen2",
+        "cap": 3,
+        "complete_result_exit_agrees": true
+      },
+      {
+        "model": "degen2",
+        "cap": 640,
+        "complete_result_exit_agrees": true
+      }
+    ],
+    "bindings_exit": 3,
+    "hashes": {
+      "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+      "/usr/lib/x86_64-linux-gnu/libjemalloc.so.2": "88abf640d394354438475ed5978616475fb28d95390f347ecfcee6ddf3beffc8"
+    }
+  },
+  "counters": {
+    "afiro": {
+      "instructions:u": {
+        "before": 6903814.0,
+        "after": 13996932.0,
+        "percent": 102.74202057007909
+      },
+      "cycles:u": {
+        "before": 10230112.0,
+        "after": 18790996.0,
+        "percent": 83.68318939225689
+      },
+      "seconds": {
+        "tcmalloc": 0.00055853,
+        "jemalloc": 0.000534336
+      }
+    },
+    "degen2": {
+      "instructions:u": {
+        "before": 196503566.0,
+        "after": 233761346.5,
+        "percent": 18.960358459856153
+      },
+      "cycles:u": {
+        "before": 143675906.0,
+        "after": 176377003.5,
+        "percent": 22.76032106594128
+      },
+      "seconds": {
+        "tcmalloc": 0.044550546499999996,
+        "jemalloc": 0.052357055
+      }
+    }
+  },
+  "scope": "wholeprocessincludes extra preload startup in wrappers; solver seconds independent and slower. Allocation counts are not time shares.",
+  "bindings": "target/perf-jemalloc-degen2/bindings.log",
+  "artifacts": "/home/derekwang/rose-reverse-engineer/rose/target/perf-jemalloc-degen2"
+}

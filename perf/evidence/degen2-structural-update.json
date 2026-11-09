@@ -1,0 +1,1481 @@
+{
+  "previous_goal_turn_classification": "Progress: closed the guarded transfer trial at its failed gate. This turn completes accepted-binary walk/pop accounting and actual native operation pairing, identifying overlap with rejected trials and preventing an unsupported local optimization.",
+  "scope": "Bounded diagnostic only; no solver algorithm, arithmetic, WORK, source or build edits. All measured costs use unchanged accepted optimized55af and reference26a50517. Whole-run source observations after the strict frontier are unpaired.",
+  "configuration": {
+    "optimized_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "ordinary_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "source_sha256": "57c86340f6959717954e2cb1c58f06c285ab7ce564a25d7d0e9e9c429d802ef1"
+  },
+  "line_build_limit": "Existing profiling line tables locate source only. Its text VMA/bytes differ from accepted55af, so none of its costs or addresses are transferred.",
+  "source_coarse": [
+    {
+      "index": 0,
+      "model": "afiro",
+      "cap": 3,
+      "target": -1,
+      "mode": "cost",
+      "wall_seconds": 0.7499814290058566,
+      "updates": 3,
+      "costs": {},
+      "calibration": [],
+      "complete_result_exit_zero_sign_exact": true
+    },
+    {
+      "index": 1,
+      "model": "sc50a",
+      "cap": 20,
+      "target": -1,
+      "mode": "cost",
+      "wall_seconds": 0.6231903299922124,
+      "updates": 18,
+      "costs": {
+        "drop_pivot": {
+          "calls": 12,
+          "instructions": 252
+        },
+        "walk": {
+          "calls": 9,
+          "instructions": 4809
+        }
+      },
+      "calibration": [],
+      "complete_result_exit_zero_sign_exact": true
+    },
+    {
+      "index": 2,
+      "model": "degen2",
+      "cap": 20,
+      "target": -1,
+      "mode": "cost",
+      "wall_seconds": 0.6617103320022579,
+      "updates": 19,
+      "costs": {
+        "walk": {
+          "calls": 4,
+          "instructions": 877
+        },
+        "drop_pivot": {
+          "calls": 2,
+          "instructions": 42
+        },
+        "drop_unheld": {
+          "calls": 12,
+          "instructions": 180
+        }
+      },
+      "calibration": [],
+      "complete_result_exit_zero_sign_exact": true
+    },
+    {
+      "index": 3,
+      "model": "degen2",
+      "cap": 137,
+      "target": 136,
+      "mode": "trace",
+      "wall_seconds": 0.9912292149965651,
+      "updates": 134,
+      "costs": {
+        "drop_pivot": {
+          "calls": 1,
+          "instructions": 21
+        },
+        "walk": {
+          "calls": 1,
+          "instructions": 326
+        }
+      },
+      "calibration": [],
+      "complete_result_exit_zero_sign_exact": true
+    },
+    {
+      "index": 4,
+      "model": "degen2",
+      "cap": 137,
+      "target": 136,
+      "mode": "cal",
+      "wall_seconds": 0.9433790430048248,
+      "updates": 134,
+      "costs": {
+        "drop_pivot": {
+          "calls": 1,
+          "instructions": 21
+        },
+        "walk": {
+          "calls": 1,
+          "instructions": 304
+        }
+      },
+      "calibration": [
+        {
+          "expected_instructions": 5,
+          "observed": {
+            "instructions": 7,
+            "cycles": 3829,
+            "enabled": 89027,
+            "running": 89027
+          },
+          "stops": 1
+        },
+        {
+          "expected_instructions": 5,
+          "observed": {
+            "instructions": 7,
+            "cycles": 3988,
+            "enabled": 93426,
+            "running": 93426
+          },
+          "stops": 1
+        },
+        {
+          "expected_instructions": 5,
+          "observed": {
+            "instructions": 7,
+            "cycles": 3647,
+            "enabled": 83817,
+            "running": 83817
+          },
+          "stops": 1
+        },
+        {
+          "expected_instructions": 5,
+          "observed": {
+            "instructions": 7,
+            "cycles": 4422,
+            "enabled": 90229,
+            "running": 90229
+          },
+          "stops": 1
+        },
+        {
+          "expected_instructions": 5,
+          "observed": {
+            "instructions": 7,
+            "cycles": 3704,
+            "enabled": 96411,
+            "running": 96411
+          },
+          "stops": 1
+        },
+        {
+          "expected_instructions": 5,
+          "observed": {
+            "instructions": 7,
+            "cycles": 3566,
+            "enabled": 75080,
+            "running": 75080
+          },
+          "stops": 1
+        },
+        {
+          "expected_instructions": 5,
+          "observed": {
+            "instructions": 7,
+            "cycles": 3487,
+            "enabled": 84087,
+            "running": 84087
+          },
+          "stops": 1
+        },
+        {
+          "expected_instructions": 5,
+          "observed": {
+            "instructions": 7,
+            "cycles": 3459,
+            "enabled": 92092,
+            "running": 92092
+          },
+          "stops": 1
+        }
+      ],
+      "complete_result_exit_zero_sign_exact": true
+    },
+    {
+      "index": 5,
+      "model": "degen2",
+      "cap": 640,
+      "target": -1,
+      "mode": "cost",
+      "wall_seconds": 2.336683568006265,
+      "updates": 621,
+      "costs": {
+        "walk": {
+          "calls": 510,
+          "instructions": 3341818
+        },
+        "drop_pivot": {
+          "calls": 299,
+          "instructions": 6147
+        },
+        "drop_unheld": {
+          "calls": 97,
+          "instructions": 1455
+        }
+      },
+      "calibration": [],
+      "complete_result_exit_zero_sign_exact": true
+    }
+  ],
+  "source_detail": {
+    "stages_nonoverlapping": [
+      {
+        "stage": "setup",
+        "calls": 510,
+        "instructions": 10711,
+        "I_per_entry": 21.001960784313727,
+        "cycles": null
+      },
+      {
+        "stage": "first_length",
+        "calls": 7195,
+        "instructions": 990797,
+        "I_per_entry": 137.7063238359972,
+        "cycles": null
+      },
+      {
+        "stage": "choice",
+        "calls": 7195,
+        "instructions": 14413,
+        "I_per_entry": 2.0031966643502432,
+        "cycles": null
+      },
+      {
+        "stage": "repeat_length",
+        "calls": 7006,
+        "instructions": 862783,
+        "I_per_entry": 123.14915786468741,
+        "cycles": null
+      },
+      {
+        "stage": "jump_WORK_formation",
+        "calls": 7006,
+        "instructions": 63075,
+        "I_per_entry": 9.002997430773622,
+        "cycles": null
+      },
+      {
+        "stage": "dependency_scan",
+        "calls": 7006,
+        "instructions": 1200087,
+        "I_per_entry": 171.29417642021124,
+        "cycles": null
+      },
+      {
+        "stage": "slot_swap_and_addWORK",
+        "calls": 7006,
+        "instructions": 105113,
+        "I_per_entry": 15.00328290037111,
+        "cycles": null
+      },
+      {
+        "stage": "loop_control",
+        "calls": 7006,
+        "instructions": 14030,
+        "I_per_entry": 2.002569226377391,
+        "cycles": null
+      },
+      {
+        "stage": "final_WORK_install",
+        "calls": 510,
+        "instructions": 22087,
+        "I_per_entry": 43.3078431372549,
+        "cycles": null
+      },
+      {
+        "stage": "shift_WORK",
+        "calls": 189,
+        "instructions": 6226,
+        "I_per_entry": 32.94179894179894,
+        "cycles": null
+      },
+      {
+        "stage": "slot_shift",
+        "calls": 189,
+        "instructions": 52689,
+        "I_per_entry": 278.77777777777777,
+        "cycles": null
+      }
+    ],
+    "walks": 510,
+    "total_I": 3342011,
+    "counts": {
+      "steps": 7195,
+      "first_length_entries": 127742,
+      "repeated_length_entries": 124183,
+      "dependency_entries": 83272,
+      "shift_positions": 2417,
+      "jumps": 7006,
+      "shifts": 189
+    },
+    "coarse_walk_I": 3341818,
+    "root_detail_residual_I": 193,
+    "root_detail_residual_percent": 0.005775299552519018,
+    "prefix": {
+      "last_source_pricing": 163,
+      "walks": 65,
+      "I": 33748
+    },
+    "later_source_only": {
+      "walks": 445,
+      "I": 3308263
+    },
+    "all_cases": [
+      {
+        "model": "sc50a",
+        "cap": 20,
+        "target": -1,
+        "seconds": 0.9767357189994073,
+        "walks": 9,
+        "instructions": 4809,
+        "parts": {
+          "setup": 189,
+          "first_length": 1306,
+          "choice": 68,
+          "shift_WORK": 160,
+          "slot_shift": 824,
+          "final_WORK_install": 473,
+          "repeat_length": 454,
+          "jump_WORK_formation": 234,
+          "dependency_scan": 659,
+          "slot_swap_and_addWORK": 390,
+          "loop_control": 52
+        },
+        "counts": {
+          "steps": 34,
+          "first_length_entries": 109,
+          "repeated_length_entries": 61,
+          "dependency_entries": 38,
+          "shift_positions": 32,
+          "jumps": 26,
+          "shifts": 8
+        },
+        "complete_control": true
+      },
+      {
+        "model": "degen2",
+        "cap": 137,
+        "target": 136,
+        "seconds": 1.0191217250103364,
+        "walks": 1,
+        "instructions": 304,
+        "parts": {
+          "setup": 21,
+          "first_length": 75,
+          "choice": 2,
+          "shift_WORK": 20,
+          "slot_shift": 183,
+          "final_WORK_install": 3
+        },
+        "counts": {
+          "steps": 1,
+          "first_length_entries": 9,
+          "repeated_length_entries": 0,
+          "dependency_entries": 0,
+          "shift_positions": 8,
+          "jumps": 0,
+          "shifts": 1
+        },
+        "complete_control": true
+      },
+      {
+        "model": "degen2",
+        "cap": 162,
+        "target": -1,
+        "seconds": 1.2809144830098376,
+        "walks": 65,
+        "instructions": 33749,
+        "parts": {
+          "setup": 1365,
+          "first_length": 10858,
+          "choice": 258,
+          "repeat_length": 3975,
+          "jump_WORK_formation": 729,
+          "dependency_scan": 2457,
+          "slot_swap_and_addWORK": 1215,
+          "loop_control": 163,
+          "final_WORK_install": 1982,
+          "shift_WORK": 1143,
+          "slot_shift": 9604
+        },
+        "counts": {
+          "steps": 129,
+          "first_length_entries": 1283,
+          "repeated_length_entries": 572,
+          "dependency_entries": 150,
+          "shift_positions": 425,
+          "jumps": 81,
+          "shifts": 48
+        },
+        "complete_control": true
+      },
+      {
+        "model": "degen2",
+        "cap": 640,
+        "target": -1,
+        "seconds": 23.244494668004336,
+        "walks": 510,
+        "instructions": 3342011,
+        "parts": {
+          "setup": 10711,
+          "first_length": 990797,
+          "choice": 14413,
+          "repeat_length": 862783,
+          "jump_WORK_formation": 63075,
+          "dependency_scan": 1200087,
+          "slot_swap_and_addWORK": 105113,
+          "loop_control": 14030,
+          "final_WORK_install": 22087,
+          "shift_WORK": 6226,
+          "slot_shift": 52689
+        },
+        "counts": {
+          "steps": 7195,
+          "first_length_entries": 127742,
+          "repeated_length_entries": 124183,
+          "dependency_entries": 83272,
+          "shift_positions": 2417,
+          "jumps": 7006,
+          "shifts": 189
+        },
+        "complete_control": true
+      }
+    ]
+  },
+  "count_method": "Actual root/head/branch PC visits. Length predicate entries use live Vec metadata at each executed head/repeat branch. Dependency reads and shift positions use actual compiled induction-register differences, with selected eight writes directly observed too. No numerical replay or native state comparison beyond the frontier.",
+  "source_boundaries": {
+    "walk": "cf582..cf9f6 (or d1251 empty loop): setup, filters, dependency scan, slot mutations and WORK tuple formation/growth/memmove. Existing buffers remain factor-owned. Deferred WORK publication/tuple retirement are outside this root in the existing caller ledger.",
+    "drop_pivot": "CEBDD..CEC34: current kind-index lookup, pop, last replacement and index repair; removed-pivot kind store is outside.",
+    "drop_unheld": "d4f60..d4f9e or d4fe3: pop/swap only; held-decision and precomputed kind lookup are outside. These two source families are not equivalent complete held-decision routines."
+  },
+  "selected_pair": {
+    "source_pricing": 136,
+    "native_pivot": 135,
+    "delegate": "/root/ref_compare",
+    "central_tool": "../reverse-engineer/tools/compare.py dual-update-walk",
+    "central_result": {
+      "status": "SELECTED_CONSUMED_SLOT_BRANCH_AND_MUTATION_PROJECTIONS_PASS",
+      "native_pivot": 135,
+      "source_pricing": 136,
+      "context_it": 135.0,
+      "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+      "capture_sha256": "23026b374cdd46fb28189a15ee3c31417fa7a3fa0491c94e54fae5f02321882a",
+      "cached_update_sha256": "162731de00d1d8bd50772e4e5d52d384cf28667724d87684ecaa9cb5a9f031a4",
+      "counts": {
+        "drop_before2": 1,
+        "drop_after2": 1,
+        "walk_head": 1,
+        "shift_begin": 1,
+        "shift_store0": 4,
+        "shift_store1": 4,
+        "shift_after": 1
+      },
+      "walk_consumed": {
+        "r": 419,
+        "hole": 435,
+        "cur": 443,
+        "pos": 428,
+        "length": 9,
+        "distance": 8,
+        "stored_A": [
+          441,
+          440,
+          443
+        ],
+        "stored_B": [
+          438,
+          431,
+          430,
+          429,
+          423,
+          117
+        ]
+      },
+      "shift_writes": [
+        {
+          "destination_slot": 435,
+          "index": 146,
+          "before_index": 419,
+          "pc": "0xf3cf5"
+        },
+        {
+          "destination_slot": 436,
+          "index": 136,
+          "before_index": 146,
+          "pc": "0xf3d07"
+        },
+        {
+          "destination_slot": 437,
+          "index": 439,
+          "before_index": 136,
+          "pc": "0xf3cf5"
+        },
+        {
+          "destination_slot": 438,
+          "index": 440,
+          "before_index": 439,
+          "pc": "0xf3d07"
+        },
+        {
+          "destination_slot": 439,
+          "index": 441,
+          "before_index": 440,
+          "pc": "0xf3cf5"
+        },
+        {
+          "destination_slot": 440,
+          "index": 442,
+          "before_index": 441,
+          "pc": "0xf3d07"
+        },
+        {
+          "destination_slot": 441,
+          "index": 443,
+          "before_index": 442,
+          "pc": "0xf3cf5"
+        },
+        {
+          "destination_slot": 442,
+          "index": 428,
+          "before_index": 443,
+          "pc": "0xf3d07"
+        }
+      ],
+      "nucleus_drop": {
+        "site": "0xf2a7f",
+        "position": 419,
+        "index": 1,
+        "last": 117,
+        "size_before": 51,
+        "size_after": 50
+      },
+      "source_intermediate_pairing": "Actual head/length/A+B/slot/at anddropnucleus mutation projections, plus8orderedwrites agree; kind/nucleus timing differences retained, no intermediatewholefactor identity.",
+      "limits": "No cost/cycles/timing inference. Native selected branch is inline; events count execution sites, not source calls. Stored A/B order is not visited in immediate-shift path. No later reference pivot captured.",
+      "source_capture_sha256": "a6f9b0e915eb4e066ce956f94af26c318283c0bacea325ae13275f2dee133a86",
+      "source_accepted_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+      "temporal_kind_differences_retained": [
+        {
+          "stage": "drop_after",
+          "raw_kind_differences": [
+            {
+              "index": 419,
+              "native": -2,
+              "Rose": 1
+            }
+          ],
+          "native_nuc": [
+            418,
+            117,
+            420,
+            421,
+            422,
+            423,
+            424,
+            425,
+            426,
+            427,
+            166,
+            429,
+            430,
+            431,
+            432,
+            433,
+            434,
+            435,
+            436,
+            437,
+            438,
+            405,
+            234,
+            342,
+            63,
+            406,
+            64,
+            105,
+            404,
+            210,
+            254,
+            66,
+            133,
+            106,
+            212,
+            387,
+            83,
+            222,
+            124,
+            51,
+            78,
+            53,
+            407,
+            408,
+            409,
+            410,
+            411,
+            412,
+            417,
+            54
+          ],
+          "Rose_nuc": [
+            418,
+            117,
+            420,
+            421,
+            422,
+            423,
+            424,
+            425,
+            426,
+            427,
+            166,
+            429,
+            430,
+            431,
+            432,
+            433,
+            434,
+            435,
+            436,
+            437,
+            438,
+            405,
+            234,
+            342,
+            63,
+            406,
+            64,
+            105,
+            404,
+            210,
+            254,
+            66,
+            133,
+            106,
+            212,
+            387,
+            83,
+            222,
+            124,
+            51,
+            78,
+            53,
+            407,
+            408,
+            409,
+            410,
+            411,
+            412,
+            417,
+            54
+          ],
+          "raw_nucleus_equal": true,
+          "interpretation": "Native andsource write removedpivot/newnucleus membership atdifferent times. These arrays are not inputs of this walked slot/length/shift branch; rawdifferences retained, no intermediatefactorstate identity claimed."
+        },
+        {
+          "stage": "walk_head",
+          "raw_kind_differences": [
+            {
+              "index": 32,
+              "native": -1,
+              "Rose": 50
+            },
+            {
+              "index": 70,
+              "native": -1,
+              "Rose": 51
+            },
+            {
+              "index": 77,
+              "native": -1,
+              "Rose": 52
+            },
+            {
+              "index": 98,
+              "native": -1,
+              "Rose": 53
+            },
+            {
+              "index": 138,
+              "native": -1,
+              "Rose": 54
+            },
+            {
+              "index": 140,
+              "native": -1,
+              "Rose": 55
+            },
+            {
+              "index": 244,
+              "native": -1,
+              "Rose": 56
+            },
+            {
+              "index": 256,
+              "native": -1,
+              "Rose": 57
+            },
+            {
+              "index": 350,
+              "native": -1,
+              "Rose": 58
+            },
+            {
+              "index": 351,
+              "native": -1,
+              "Rose": 59
+            },
+            {
+              "index": 352,
+              "native": -1,
+              "Rose": 60
+            },
+            {
+              "index": 353,
+              "native": -1,
+              "Rose": 61
+            },
+            {
+              "index": 394,
+              "native": -1,
+              "Rose": 62
+            },
+            {
+              "index": 419,
+              "native": -2,
+              "Rose": 1
+            }
+          ],
+          "native_nuc": [
+            418,
+            117,
+            420,
+            421,
+            422,
+            423,
+            424,
+            425,
+            426,
+            427,
+            166,
+            429,
+            430,
+            431,
+            432,
+            433,
+            434,
+            435,
+            436,
+            437,
+            438,
+            405,
+            234,
+            342,
+            63,
+            406,
+            64,
+            105,
+            404,
+            210,
+            254,
+            66,
+            133,
+            106,
+            212,
+            387,
+            83,
+            222,
+            124,
+            51,
+            78,
+            53,
+            407,
+            408,
+            409,
+            410,
+            411,
+            412,
+            417,
+            54
+          ],
+          "Rose_nuc": [
+            418,
+            117,
+            420,
+            421,
+            422,
+            423,
+            424,
+            425,
+            426,
+            427,
+            166,
+            429,
+            430,
+            431,
+            432,
+            433,
+            434,
+            435,
+            436,
+            437,
+            438,
+            405,
+            234,
+            342,
+            63,
+            406,
+            64,
+            105,
+            404,
+            210,
+            254,
+            66,
+            133,
+            106,
+            212,
+            387,
+            83,
+            222,
+            124,
+            51,
+            78,
+            53,
+            407,
+            408,
+            409,
+            410,
+            411,
+            412,
+            417,
+            54,
+            32,
+            70,
+            77,
+            98,
+            138,
+            140,
+            244,
+            256,
+            350,
+            351,
+            352,
+            353,
+            394
+          ],
+          "raw_nucleus_equal": false,
+          "interpretation": "Native andsource write removedpivot/newnucleus membership atdifferent times. These arrays are not inputs of this walked slot/length/shift branch; rawdifferences retained, no intermediatefactorstate identity claimed."
+        },
+        {
+          "stage": "shift_begin",
+          "raw_kind_differences": [
+            {
+              "index": 32,
+              "native": -1,
+              "Rose": 50
+            },
+            {
+              "index": 70,
+              "native": -1,
+              "Rose": 51
+            },
+            {
+              "index": 77,
+              "native": -1,
+              "Rose": 52
+            },
+            {
+              "index": 98,
+              "native": -1,
+              "Rose": 53
+            },
+            {
+              "index": 138,
+              "native": -1,
+              "Rose": 54
+            },
+            {
+              "index": 140,
+              "native": -1,
+              "Rose": 55
+            },
+            {
+              "index": 244,
+              "native": -1,
+              "Rose": 56
+            },
+            {
+              "index": 256,
+              "native": -1,
+              "Rose": 57
+            },
+            {
+              "index": 350,
+              "native": -1,
+              "Rose": 58
+            },
+            {
+              "index": 351,
+              "native": -1,
+              "Rose": 59
+            },
+            {
+              "index": 352,
+              "native": -1,
+              "Rose": 60
+            },
+            {
+              "index": 353,
+              "native": -1,
+              "Rose": 61
+            },
+            {
+              "index": 394,
+              "native": -1,
+              "Rose": 62
+            },
+            {
+              "index": 419,
+              "native": -2,
+              "Rose": 1
+            }
+          ],
+          "native_nuc": [
+            418,
+            117,
+            420,
+            421,
+            422,
+            423,
+            424,
+            425,
+            426,
+            427,
+            166,
+            429,
+            430,
+            431,
+            432,
+            433,
+            434,
+            435,
+            436,
+            437,
+            438,
+            405,
+            234,
+            342,
+            63,
+            406,
+            64,
+            105,
+            404,
+            210,
+            254,
+            66,
+            133,
+            106,
+            212,
+            387,
+            83,
+            222,
+            124,
+            51,
+            78,
+            53,
+            407,
+            408,
+            409,
+            410,
+            411,
+            412,
+            417,
+            54
+          ],
+          "Rose_nuc": [
+            418,
+            117,
+            420,
+            421,
+            422,
+            423,
+            424,
+            425,
+            426,
+            427,
+            166,
+            429,
+            430,
+            431,
+            432,
+            433,
+            434,
+            435,
+            436,
+            437,
+            438,
+            405,
+            234,
+            342,
+            63,
+            406,
+            64,
+            105,
+            404,
+            210,
+            254,
+            66,
+            133,
+            106,
+            212,
+            387,
+            83,
+            222,
+            124,
+            51,
+            78,
+            53,
+            407,
+            408,
+            409,
+            410,
+            411,
+            412,
+            417,
+            54,
+            32,
+            70,
+            77,
+            98,
+            138,
+            140,
+            244,
+            256,
+            350,
+            351,
+            352,
+            353,
+            394
+          ],
+          "raw_nucleus_equal": false,
+          "interpretation": "Native andsource write removedpivot/newnucleus membership atdifferent times. These arrays are not inputs of this walked slot/length/shift branch; rawdifferences retained, no intermediatefactorstate identity claimed."
+        },
+        {
+          "stage": "shift_after",
+          "raw_kind_differences": [
+            {
+              "index": 32,
+              "native": -1,
+              "Rose": 50
+            },
+            {
+              "index": 70,
+              "native": -1,
+              "Rose": 51
+            },
+            {
+              "index": 77,
+              "native": -1,
+              "Rose": 52
+            },
+            {
+              "index": 98,
+              "native": -1,
+              "Rose": 53
+            },
+            {
+              "index": 138,
+              "native": -1,
+              "Rose": 54
+            },
+            {
+              "index": 140,
+              "native": -1,
+              "Rose": 55
+            },
+            {
+              "index": 244,
+              "native": -1,
+              "Rose": 56
+            },
+            {
+              "index": 256,
+              "native": -1,
+              "Rose": 57
+            },
+            {
+              "index": 350,
+              "native": -1,
+              "Rose": 58
+            },
+            {
+              "index": 351,
+              "native": -1,
+              "Rose": 59
+            },
+            {
+              "index": 352,
+              "native": -1,
+              "Rose": 60
+            },
+            {
+              "index": 353,
+              "native": -1,
+              "Rose": 61
+            },
+            {
+              "index": 394,
+              "native": -1,
+              "Rose": 62
+            },
+            {
+              "index": 419,
+              "native": -2,
+              "Rose": 1
+            }
+          ],
+          "native_nuc": [
+            418,
+            117,
+            420,
+            421,
+            422,
+            423,
+            424,
+            425,
+            426,
+            427,
+            166,
+            429,
+            430,
+            431,
+            432,
+            433,
+            434,
+            435,
+            436,
+            437,
+            438,
+            405,
+            234,
+            342,
+            63,
+            406,
+            64,
+            105,
+            404,
+            210,
+            254,
+            66,
+            133,
+            106,
+            212,
+            387,
+            83,
+            222,
+            124,
+            51,
+            78,
+            53,
+            407,
+            408,
+            409,
+            410,
+            411,
+            412,
+            417,
+            54
+          ],
+          "Rose_nuc": [
+            418,
+            117,
+            420,
+            421,
+            422,
+            423,
+            424,
+            425,
+            426,
+            427,
+            166,
+            429,
+            430,
+            431,
+            432,
+            433,
+            434,
+            435,
+            436,
+            437,
+            438,
+            405,
+            234,
+            342,
+            63,
+            406,
+            64,
+            105,
+            404,
+            210,
+            254,
+            66,
+            133,
+            106,
+            212,
+            387,
+            83,
+            222,
+            124,
+            51,
+            78,
+            53,
+            407,
+            408,
+            409,
+            410,
+            411,
+            412,
+            417,
+            54,
+            32,
+            70,
+            77,
+            98,
+            138,
+            140,
+            244,
+            256,
+            350,
+            351,
+            352,
+            353,
+            394
+          ],
+          "raw_nucleus_equal": false,
+          "interpretation": "Native andsource write removedpivot/newnucleus membership atdifferent times. These arrays are not inputs of this walked slot/length/shift branch; rawdifferences retained, no intermediatefactorstate identity claimed."
+        }
+      ],
+      "native_instruction_brackets": {
+        "repeats": [
+          {
+            "capture": "target/perf-degen2-walk-audit/captures/degen2-dual-release/dual_update_walk_cost.0bacd1038d.jsonl",
+            "sha256": "5328fa570270da8fd35c025b89052a0a2b78d722bdb419db960bdc1e3707ed5b",
+            "intervals": [
+              {
+                "family": "drop2",
+                "raw_I": 17,
+                "corrected_I": 15,
+                "stopped_intervals": 1,
+                "correction_I": 2
+              },
+              {
+                "family": "walk",
+                "raw_I": 133,
+                "corrected_I": 131,
+                "stopped_intervals": 1,
+                "correction_I": 2
+              }
+            ],
+            "calibration": {
+              "raw_I": 7,
+              "corrected_I": 5,
+              "expected_I": 5
+            },
+            "walk_boundary": "f2ef9..f3da4"
+          },
+          {
+            "capture": "target/perf-degen2-walk-audit/captures/degen2-dual-release/dual_update_walk_cost.2ea70b35cf.jsonl",
+            "sha256": "5328fa570270da8fd35c025b89052a0a2b78d722bdb419db960bdc1e3707ed5b",
+            "intervals": [
+              {
+                "family": "drop2",
+                "raw_I": 17,
+                "corrected_I": 15,
+                "stopped_intervals": 1,
+                "correction_I": 2
+              },
+              {
+                "family": "walk",
+                "raw_I": 133,
+                "corrected_I": 131,
+                "stopped_intervals": 1,
+                "correction_I": 2
+              }
+            ],
+            "calibration": {
+              "raw_I": 7,
+              "corrected_I": 5,
+              "expected_I": 5
+            },
+            "walk_boundary": "f2ef9..f3da4"
+          }
+        ],
+        "boundaries": {
+          "walk": "f2ef9..f3da4: dependency walk through shift, inline WORKcounter writes andfinal at+slot restoration. Wide f2ef9 includes loopsetup plus caller-register save/restore; retained conservatively, not exact sourcehelper equivalence.",
+          "drop": "f2a7f..f2abc pop/lastreplacement/kindindex repair; removedpivot kind assignment atf2ac4 outside."
+        },
+        "limits": "Instruction counts only; all debuggercycles/timers excluded. Source cf582..cf9f6 304I includes helper preparation andWORKtuple formation; deferred WORKpublication lies outside and remains unmeasured. Native writes WORKcounter inline within this bracket. Narrow110I / wide131I are not automatic equivalent inclusive deltas against304I. Drop sourceCEBDD..CEC34 21I andnative f2a7f..f2abc15I both exclude removedpivot kind callerstore. No future retirement free or whole-run extrapolation assumed."
+      }
+    },
+    "consumed_projection": "Drop index1,last117,size51\u219250; walk r419,hole435,cur443,column428,length9 versus distance8; one shift, eight ordered writes, zero dependency reads/jumps. All444 at/slot entries at head/begin/end match.",
+    "temporal_difference": "Retained all raw arrays: fourteen kind entries and thirteen earlier nucleus promotions differ because Rose promotes spike entries before walking and marks the pivot tail later. The walk does not consume kind/nuc. No complete intermediate-factor identity or normalization is claimed. Previously qualified captured endpoint projections remain valid; full source/native factor identity is not established. Native capture endpoints reproduce the cached validated native capture.",
+    "Rose_walk_I": 304,
+    "native_wide_I": 131,
+    "native_narrow_loop_I": 110,
+    "Rose_pop_I": 21,
+    "native_pop_I": 15,
+    "boundary_limit": "Native wide root includes setup/caller saves, shift, inline WORK publication and final slot restoration. Rose includes tuple formation but excludes deferred publication. Thus304\u2212131 is not an exact complete inclusive gap; no whole-run extrapolation. Both pop brackets exclude the caller pivot-kind store.",
+    "strict_frontier": "Native162/source163 remains last strict pass, native163/source164 signed-zero failure preserved. No later reference pivot captured. Whole source counts are not numerical pairings."
+  },
+  "mechanisms": {
+    "length_filter": {
+      "first_I": 990797,
+      "repeat_I": 862783,
+      "total_I": 1853580,
+      "predicate_entries": 251925,
+      "solve_I_percent": 1.0229865392150912,
+      "status": "Already covered by rejected walklen/walkrefs. Selected native loads length9 while Rose evaluates nine row!=r comparisons. Whole native step counts remain unmeasured; no retry."
+    },
+    "dependency_scan": {
+      "I": 1200087,
+      "entries": 83272,
+      "solve_I_percent": 0.6623252553906608,
+      "status": "Slot-maximum algebra trial walkmax is timing-inconclusive and closed. Selected pair performs no scan, so native jump visit order remains unpaired."
+    },
+    "slot_mutations": {
+      "shift_I": 52689,
+      "swap_plus_WORK_I": 105113,
+      "total_I": 157802,
+      "solve_I_percent": 0.08709056089363276,
+      "status": "Only0.0871% of solve instructions, including required writes and7006 jump WORK accumulator adds. No bounds/copy/outline prototype justified."
+    },
+    "nucleus_pop": {
+      "calls": 396,
+      "I": 7602,
+      "solve_I_percent": 0.004195526317241836,
+      "status": "Only0.0042% of solve instructions; held-decision search excluded. No pop optimization."
+    }
+  },
+  "distortion": {
+    "codegen_skew": 0,
+    "PMU_no_multiplexing": true,
+    "calibration": "Eight source intervals observe7I for5 originals; native five PUSH intervals also7\u22122=5. Correct2I per stopped interval. Fine probe counts every stop; all segments reconcile exactly with its roots.",
+    "excluded": "All debugger cycles/timers. Original selected semantic trace shows326I because eleven extra observer stops add22I; excluded from cost claims, calibrated304I is used. Whole detail23.24s versus coarse2.34s demonstrates overhead, not solve time.",
+    "uncertain": "Whole root/detail residual193I (0.0058%) remains unassigned to allocator/control/counter effects. Do not add it to other costs or silently erase it.",
+    "controls": "All six coarse and four detailed complete result/exit/float.hex signed-zero controls match accepted plain runs. AFIRO/SC50A qualify first. Native operation and repeated PMU captures match cached validated update projections.",
+    "parity": "No new parity run needed for read-only accepted-ELF probes. Accepted binaries/source and frozen baseline unchanged."
+  },
+  "reconciliation": {
+    "parent_transition_I": 7330873,
+    "walk_fine_I": 3342011,
+    "walk_coarse_I": 3341818,
+    "pop_I": 7602,
+    "parent_remaining_using_fine_I": 3981260,
+    "parent_remaining_using_coarse_I": 3981453,
+    "note": "About3.981M transition instructions remain outside these helpers, including required structural/list/diagonal/eta work. This is not removable time or unexplained whole-solve work. All scopes are already inside the15.441646M factor-update ledger, not additive with the51.863M F/B self gap or127.995M overall gap. Accepted45.784/16.696ms2.74x remains."
+  },
+  "one_next_experiment": {
+    "design": "Measure ordinary factor B-list front insertion/front-fill deletion: actual move/grow caller counts, bytes, searches, allocation and cleanup at complete owner boundaries on accepted ELF. Compare equivalent cached native operations before the frontier where observed. Include all16 constructor/retirement lifetimes before proposing another representation.",
+    "benefit": "Unknown. The remaining3.981M transition instructions include much necessary work and are not a removable bound. Exact missing evidence is complete B-front mutation invocation/byte/instruction/lifecycle cost and corresponding native cost.",
+    "rejected_check": "This measures B-front movement during ordinary updates, not rejected B-reference-count membership, spikemark deduplication, LU constructor chain queues, walker length/max/ref caches, workspace/arena or U-transfer trials. No deque/storage prototype justified by logical bytes alone."
+  },
+  "artifacts": {
+    "target/perf-degen2-structural-update/report.py": "76535c57ee2af4190df64ab46603bcf954dc20979d65f7bdc6d09acad62df965",
+    "target/perf-degen2-structural-update/run_detail.py": "969d2ebe1463337ebf61527fc36a278634c2bd579465f84460dc1ad75a42a328",
+    "target/perf-degen2-structural-update/rose_detail_gdb.py": "c8dade5421ca20d9988997ff7e20e8b1a6406faed58e0481275cebb03b7aa9f9",
+    "target/perf-degen2-structural-update/run.py": "8e5fbac8056a63a821738a8709817df1fee62c4e67579f4cfc46b0c16582dee5",
+    "target/perf-degen2-structural-update/rose_gdb.py": "6c028b1fa94bd41e28aafd0f321c0c895bfa70bb5c50d19c5313d36589efba7b",
+    "target/perf-degen2-structural-update/summary.json": "f38e1b0f515933ff0a2de730b522031a7aab891c04d5e2f54e145158b16a619e",
+    "target/perf-degen2-structural-update/plan.json": "6ca3b1e12f2ac1d16855fd678516bea55fe633cf7c479aa69a1cd0eac8363a05",
+    "target/perf-degen2-structural-update/detail-summary.json": "16ae8c52a240226a6c12bdcd4088d07bf586f7411949045eab8053c5775c6784",
+    "target/perf-degen2-structural-update/runner.log": "cf91a25397c975855fa4325e397813564312845396a7b7069a350ded19dcebe5",
+    "target/perf-degen2-structural-update/detail-runner.log": "40882123ecabfc4529fe542a6236a7638b0bcc141dea03db1d49d7084cf8b516",
+    "target/perf-degen2-structural-update/line-update.asm": "990f741b7da03c1115cdec8064a8e3a12eed090b218c5871e2f1ca46e5bb8cf1",
+    "target/perf-degen2-structural-update/detail-degen2-162--1/capture.json": "5ce94a4475dc581d1f4cc1da82e29e68947579a3c267f8ff3baa777465bb511d",
+    "target/perf-degen2-structural-update/5/capture.json": "0049ce76be991a479cb4560e9a6130bf27e138a23406b17c01b1710ee968fa86",
+    "target/perf-degen2-structural-update/3/capture.json": "a6f9b0e915eb4e066ce956f94af26c318283c0bacea325ae13275f2dee133a86",
+    "target/perf-degen2-structural-update/detail-degen2-137-136/capture.json": "4470f66114ed5307705fd1c48d157efdc16066dccf14fff476aeb94280c1c9da",
+    "target/perf-degen2-structural-update/2/capture.json": "f1d3e3de60a70e6c05410ae5f0c82bed10930667ac248cce00de00e10bda62c9",
+    "target/perf-degen2-structural-update/0/capture.json": "6ca61d0b319fe35c3d009cd7e8a3b5724be06af1708d2efb2f48baec3a7be4b4",
+    "target/perf-degen2-structural-update/detail-degen2-640--1/capture.json": "911574b76f9848885802151e267be82679c510f0256728e5a857eedbcebd9068",
+    "target/perf-degen2-structural-update/4/capture.json": "f5e0987c4a59783099ca4eba6a098c144272523b2668da7705eadf702bb0bfdb",
+    "target/perf-degen2-structural-update/detail-sc50a-20--1/capture.json": "2f91d8527d15e53c2c88c81666fc89886db6811085406f6214e972c0a5817f15",
+    "target/perf-degen2-structural-update/1/capture.json": "4aa61b3c8e55851cb5a05c265144cceceb0ea25c7b1514fccee2824e0985259f",
+    "target/perf-degen2-structural-update/5/capture.meta.json": "1a8520a97141bdc3da834c21884c72a7fec646e0c52dce2746ba8c2c27673444",
+    "target/perf-degen2-structural-update/3/capture.meta.json": "41bdaaa8199443a358dcc9362b9036e3b4fc609a8cf949af842779fcf9b66e4f",
+    "target/perf-degen2-structural-update/2/capture.meta.json": "c0a344791455795128547a75971cd94ba8cc36f33bd6db6acd3f577c362f4d6b",
+    "target/perf-degen2-structural-update/0/capture.meta.json": "71844ab643ef464eb08d9967f1f8accda8968422fee9dc1ff0251c1c7ac17284",
+    "target/perf-degen2-structural-update/4/capture.meta.json": "91f72dd41b8d0265b90519a59d219c95ab777706e43e0d74e0b7dec9bdae1da3",
+    "target/perf-degen2-structural-update/1/capture.meta.json": "1ffee41913584a5dc9e86ce64cd273889767c770efd5a6e1ac170c50628927f8",
+    "target/perf-degen2-structural-update/detail-degen2-162--1/run.log": "1c78d868e53f0552c1518f9a41b2c124e4bf28d6076f06dba9ea0d1968087a76",
+    "target/perf-degen2-structural-update/5/run.log": "efef903151c8996bd7d00ec5b1fc3683a6322b8ade9e93bf520993a8bc935f2b",
+    "target/perf-degen2-structural-update/3/run.log": "45ecca65949cbee50c18ef5573466f0bc2034ae425b47f2ae4548e69cf6ed907",
+    "target/perf-degen2-structural-update/detail-degen2-137-136/run.log": "8fa54f45bde0ad0de1a17833553469bac75296b39c39e102ff96ba7299d8026e",
+    "target/perf-degen2-structural-update/2/run.log": "6c13dfbd4b04a82eb33234b4a9eea5e747f8004e4116042b13a83dd96e1113f3",
+    "target/perf-degen2-structural-update/0/run.log": "31c64a9fdddfec9cdae8fe99b2a65bb81b77012ba7defd405e87f45c9e0ba522",
+    "target/perf-degen2-structural-update/detail-degen2-640--1/run.log": "86f992b9bc1704976c325aaed78b669ef48197c03dac041c33ef414b9f2e24cc",
+    "target/perf-degen2-structural-update/4/run.log": "5595ad7ff9c3b7cfbce46ce4c382a2247a3e853eb055f38ae032595207c7e0ac",
+    "target/perf-degen2-structural-update/detail-sc50a-20--1/run.log": "b34b9b5a9235fa3c636ac28985cdc122898c35c3d70ba257f30c7179c9dcf306",
+    "target/perf-degen2-structural-update/1/run.log": "c5f1806bee020a7952bc903d46ffda451f3faaba2416f4cef9c34172f1a31eac",
+    "target/perf-degen2-structural-update/detail-degen2-162--1/result.json": "e3167e38260fc987383803790d00e4aff51f4c902dd7f79cfc7af0baf5d06ae2",
+    "target/perf-degen2-structural-update/5/result.json": "7fe628929a0fa734d848dcb6ca098e79a5348b3bf626ffe4d32b0fa30c45398f",
+    "target/perf-degen2-structural-update/3/result.json": "4a28627a8f8a326d8e5a0f636b9fab3546187b68c1bba0bec996baf2c7f97be7",
+    "target/perf-degen2-structural-update/detail-degen2-137-136/result.json": "0cb0cb6c55bb0a34874b0df8a10737b64c45bb12e5eb67f3445d98ee9d1e83d9",
+    "target/perf-degen2-structural-update/2/result.json": "c41cf80af75fc96126d5dc75ac70909aa39d43f96f8504bac4f0a25548aa50ad",
+    "target/perf-degen2-structural-update/0/result.json": "411cf938ba667443bb9546b7061c0649a5a957d77f2d0630cbb6406f341ca083",
+    "target/perf-degen2-structural-update/detail-degen2-640--1/result.json": "a1129f30ed7ce955b4d35d888f5f410a4791c94d2c35c801c7cd0cfe45efe15b",
+    "target/perf-degen2-structural-update/4/result.json": "0205a9b2993b1c1bdca1f42eb4e46a0c9fc7fad31c7389c06b4d284f1a056379",
+    "target/perf-degen2-structural-update/detail-sc50a-20--1/result.json": "ef3f3c4548a282d5beaa295183748a6b6e1fccfdf147d233dd04b36843e44639",
+    "target/perf-degen2-structural-update/1/result.json": "88d59fa9d241a627297a746e9df070a6dc5905ee756b6b72411567bdeaf7c964",
+    "target/perf-degen2-structural-update/detail-degen2-162--1/plain.json": "cdbc9ac628bcebda19e3be1782eabe59f6189b1cc490df27ece47567942aa849",
+    "target/perf-degen2-structural-update/5/plain.json": "8a3289b8ca89d953dac424146a7862a3691ca940fb5143800f5848af20903a54",
+    "target/perf-degen2-structural-update/3/plain.json": "018042953c3338d14d641211572107a0dde9ceeeb8869bca05ff2669a66e53f3",
+    "target/perf-degen2-structural-update/detail-degen2-137-136/plain.json": "0560c20714cd7de88ccd9853052e222293826aa3ddef6468edc2663f461e5ad7",
+    "target/perf-degen2-structural-update/2/plain.json": "86596ca939019ddf4b8c58a30c05b5470883c272724d1ed06dcce3a1e92ba129",
+    "target/perf-degen2-structural-update/0/plain.json": "c5e992336153484eb89cce265ad0a3589616a30175ac03795668312fdb721ad3",
+    "target/perf-degen2-structural-update/detail-degen2-640--1/plain.json": "03f0ee09a3c643017157dfcfa194a0804a018d6642243493b37b0c2aea0f78fc",
+    "target/perf-degen2-structural-update/4/plain.json": "0c64a6735fa4fa1adde8fc964fccea9c125ef9ad28e878c64b5cc28eaef32152",
+    "target/perf-degen2-structural-update/detail-sc50a-20--1/plain.json": "3b4e7621b63afb54d8bcceb1655d11e0fd84afa091e563993d1dc4d98681ada1",
+    "target/perf-degen2-structural-update/1/plain.json": "bb290332b6a2281d256b72b06fad80d0e13f5970f74b87f86d2b11c83b2e1f20",
+    "target/perf-degen2-walk-audit/central-pair-wide-command.txt": "f6e7ae24811e8cff3b97a90aa25b2b0f76ae58382613ffb78500bf1266b83b19",
+    "target/perf-degen2-walk-audit/central-pair-command.txt": "27baabb20970045f0e825fcdb2dad7d6b4ff81dde41aedf64e1bbee80589479a",
+    "target/perf-degen2-walk-audit/central-command.txt": "cb9eef40bfd298f9743a476a891f1e819469a65b77129c324af8fa3446482c26",
+    "target/perf-degen2-walk-audit/cached-audit.txt": "6f1958e46efbc6c59f2372e4c605d036a8fcc04c3582356380e9936d407f21fc",
+    "target/perf-degen2-walk-audit/provenance.json": "da86996f805ca02feb8b2162e379333d5d08a681fa36546fcae8ebfbb8be592c",
+    "target/perf-degen2-walk-audit/central-source-wide.json": "81ecd117c4701ca1b2541dda463fdce2429a1ebc73e0e2fd409148d20402ae1b",
+    "target/perf-degen2-walk-audit/central-source.json": "daab3ff7037248ac23775977b7f7521d10334b9c7f6b8b873de1be0e60f21ec9",
+    "target/perf-degen2-walk-audit/central-native.json": "8c843d77ea331eff71444f66239cb2ad421ec24cf3f3eda53dbf37f31ebbf54b",
+    "target/perf-degen2-walk-audit/gdb_dual_update_walk_cost-wide.py": "9ca510ce037a2b4b15e48d6a518baee24b4c1e7f917e691108bb90293dd701dd",
+    "target/perf-degen2-walk-audit/capture-cost.py": "551afd8547f004958af662efabd1e3a790dd890cb6648ee9470004d3265ee2a4",
+    "target/perf-degen2-walk-audit/gdb_dual_update_walk_cost-narrow.py": "63075273bc2626c6cc2eb365090945291dfcd7e2788a27543e56e84e842f8e5e",
+    "target/perf-degen2-walk-audit/capture.py": "6699ac4e3bde1053c5bbb0518bc866ee5cb2e94b78fb54f37cdd902e7666ab83",
+    "target/perf-degen2-walk-audit/gdb_dual_update_walk.py": "0fc1d8682a53e793651321d715ca70d7dc63a233683575097125056e52b4f7bc",
+    "target/perf-degen2-walk-audit/gdb_dual_update_walk_cost.py": "63075273bc2626c6cc2eb365090945291dfcd7e2788a27543e56e84e842f8e5e",
+    "target/perf-degen2-walk-audit/central-mode.pyfrag": "00cf36ec57e5946c0cf06b7cf887a8627a9ea7dc2e26d571622d87613d6aa81e",
+    "target/perf-degen2-walk-audit/source-gate.pyfrag": "1ea8bc77b4d4fec0c128c2cb636690e077e1f491af2750a19ae689b0c83b729f",
+    "target/perf-degen2-walk-audit/cost-gate.pyfrag": "17eaebb9e1029709a5b7996781f5f27a56cfa05c26ad92e43ac0a4227df0ea8d",
+    "target/perf-degen2-walk-audit/captures/afiro-dual-release/dual_update_walk_cost.a238b78936.jsonl": "410086ab8bc81a048f77c49db7aac778ae7aba52c5d1e5794324a422b0816d63",
+    "target/perf-degen2-walk-audit/captures/afiro-dual-release/dual_update_walk.032f1d117b.jsonl": "98637c873597bcb69c50ec83ce2fb94bfb17d144a105dc427805200f5751782c",
+    "target/perf-degen2-walk-audit/captures/afiro-dual-release/dual_update_walk_cost.7d790155ce.jsonl": "4093a99841f569f508021be0f9c1ad8890baafbcf4372ce52b2d9c526eb881d1",
+    "target/perf-degen2-walk-audit/captures/afiro-dual-release/dual_update_walk_cost.c40d9c8be0.jsonl": "4093a99841f569f508021be0f9c1ad8890baafbcf4372ce52b2d9c526eb881d1",
+    "target/perf-degen2-walk-audit/captures/sc50a-dual-release/dual_update_walk_cost.c8758062b4.jsonl": "4b513ece33499e7c53ade89cfbadaa55c2820f6528634d523f51db6e774ee75b",
+    "target/perf-degen2-walk-audit/captures/sc50a-dual-release/dual_update_walk_cost.b99b1af811.jsonl": "5d4bc2eb47bdf48b998e9b7be12208e443411be4de6f54b8711fb8fb60d714c9",
+    "target/perf-degen2-walk-audit/captures/sc50a-dual-release/dual_update_walk_cost.9fb4b28992.jsonl": "23c95f4f42a1c611a00474b21e5bccb1e5c64d5e34ce10dae7756d641848c2fd",
+    "target/perf-degen2-walk-audit/captures/sc50a-dual-release/dual_update_walk.c6ef53942c.jsonl": "9211b081bc0ca703e55686fea6f2295cca6796012f9fa49b428a7a4ea90952f2",
+    "target/perf-degen2-walk-audit/captures/degen2-dual-release/dual_update_walk.fdadb67ab6.jsonl": "23026b374cdd46fb28189a15ee3c31417fa7a3fa0491c94e54fae5f02321882a",
+    "target/perf-degen2-walk-audit/captures/degen2-dual-release/dual_update_walk_cost.2ea70b35cf.jsonl": "5328fa570270da8fd35c025b89052a0a2b78d722bdb419db960bdc1e3707ed5b",
+    "target/perf-degen2-walk-audit/captures/degen2-dual-release/dual_update_walk_cost.46c9fb4a3e.jsonl": "4ade9af99cff6aab0da3345e2dfa5386a05e7b6cae133978851a5339bd6cf366",
+    "target/perf-degen2-walk-audit/captures/degen2-dual-release/dual_update_walk_cost.0bacd1038d.jsonl": "5328fa570270da8fd35c025b89052a0a2b78d722bdb419db960bdc1e3707ed5b",
+    "target/perf-degen2-walk-audit/captures/degen2-dual-release/dual_update_walk_cost.88efa725a3.jsonl": "4ade9af99cff6aab0da3345e2dfa5386a05e7b6cae133978851a5339bd6cf366",
+    "target/perf-degen2-walk-audit/captures/afiro-dual-release/dual_update_walk.032f1d117b.meta.json": "d60991ee1b117449b302e01b30757076ab037f465ce1b055ec8dc0f139ab5ebc",
+    "target/perf-degen2-walk-audit/captures/afiro-dual-release/dual_update_walk_cost.7d790155ce.meta.json": "781b6fa2a1c3377bdef3920deb4341bfdb0f5fbc928cfb54a5e6fe4a60ad5d96",
+    "target/perf-degen2-walk-audit/captures/afiro-dual-release/dual_update_walk_cost.a238b78936.meta.json": "01e64ddeb5393edcfa9d371e2c51ab68e9656c9edaa0c57fd74d9517f27960be",
+    "target/perf-degen2-walk-audit/captures/afiro-dual-release/dual_update_walk_cost.c40d9c8be0.meta.json": "de69223acf88b4b492d61fbcba1f1f59f5b2f2df940facabb8f713961584e94f",
+    "target/perf-degen2-walk-audit/captures/sc50a-dual-release/dual_update_walk_cost.c8758062b4.meta.json": "ca0550918fbf205e92342fd1f2cb13a43eef8d8161daf5f5f799e100403bcd79",
+    "target/perf-degen2-walk-audit/captures/sc50a-dual-release/dual_update_walk_cost.9fb4b28992.meta.json": "1149c4edce6a3345b88da8ecc8882fea420421c08b720582d3d47efbcd546528",
+    "target/perf-degen2-walk-audit/captures/sc50a-dual-release/dual_update_walk.c6ef53942c.meta.json": "7384b87dd4f0c8374df318e1146515a635a3b100650d98908be0e7f2519ab0dd",
+    "target/perf-degen2-walk-audit/captures/sc50a-dual-release/dual_update_walk_cost.b99b1af811.meta.json": "317ad72c50bc770fbe9159ffdc515eced192d425d1d07395688a8dca8ab75c9f",
+    "target/perf-degen2-walk-audit/captures/degen2-dual-release/dual_update_walk.fdadb67ab6.meta.json": "4c519edca0b25c9a2d1bb9c062e36adbbd796a5f1fb5c1fba47f75edb619720a",
+    "target/perf-degen2-walk-audit/captures/degen2-dual-release/dual_update_walk_cost.0bacd1038d.meta.json": "1ba0f23304c0e246afd1027059dbfae3b9f4ee01d8b4da39c2e8b09ff245b943",
+    "target/perf-degen2-walk-audit/captures/degen2-dual-release/dual_update_walk_cost.2ea70b35cf.meta.json": "890f599e73d68b413d0fd0fb442f6f1fbdd3a38cb19f7f669a04033fa3b0a173",
+    "target/perf-degen2-walk-audit/captures/degen2-dual-release/dual_update_walk_cost.88efa725a3.meta.json": "77916068190582bd26623c64b0b498ffa515f0feb6ac006793e6095816821378",
+    "target/perf-degen2-walk-audit/captures/degen2-dual-release/dual_update_walk_cost.46c9fb4a3e.meta.json": "3012b2e214101dbf11be5eb9c3cf873e4e093894be7c05d21094af4a32fd07e2"
+  }
+}

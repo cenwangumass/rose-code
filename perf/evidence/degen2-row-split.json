@@ -1,0 +1,1129 @@
+{
+  "previous_goal_turn_classification": "Progress: immutable-ELF complete FTRAN costs and wholeRose phasecensuses changed nextaction. This turn measures remainingROWpurpose/phase scopes and identifies inactive priority payload mismatch.",
+  "configuration": {
+    "accepted_rose_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "ordinary_rose_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "probe_sha256": "9de5c7c42281f0c5cc437af4350bbc62730d9eda3b88bc493572c10fc153151f",
+    "source_profile": "Same originalfixed39PGO/systemTCMalloc, separate isolated22stage diagnosticELF, notacceptedcosts. No optimizer/source promotion.",
+    "accepted_CPU": 2,
+    "native_CPU": 3,
+    "probe_CPU": 2
+  },
+  "diagnostic_exclusive_stage_table": {
+    "DSE_weights": {
+      "mean_ms": 0.14276283333333334,
+      "mean_probe_instructions": 1116437.6666666667,
+      "mean_probe_cycles": 777184.5,
+      "entries": 634,
+      "requested_entries": 634,
+      "alloc_calls": 0,
+      "free_calls": 0,
+      "realloc_calls": 0,
+      "requested_bytes": 0
+    },
+    "auxiliary_factor_construction": {
+      "mean_ms": 2.5016043333333333,
+      "mean_probe_instructions": 8694640,
+      "mean_probe_cycles": 7852040.166666667,
+      "entries": 15,
+      "requested_entries": 16,
+      "alloc_calls": 5403,
+      "free_calls": 105,
+      "realloc_calls": 2824,
+      "requested_bytes": 1519976
+    },
+    "auxiliary_update": {
+      "mean_ms": 0.4042641666666667,
+      "mean_probe_instructions": 1958179,
+      "mean_probe_cycles": 1719390.5,
+      "entries": 621,
+      "requested_entries": 621,
+      "alloc_calls": 15,
+      "free_calls": 0,
+      "realloc_calls": 57,
+      "requested_bytes": 68000
+    },
+    "basic_flags_priorities": {
+      "mean_ms": 1.5498143333333332,
+      "mean_probe_instructions": 6301165.5,
+      "mean_probe_cycles": 6197596.5,
+      "entries": 621,
+      "requested_entries": 621,
+      "alloc_calls": 824,
+      "free_calls": 824,
+      "realloc_calls": 2980,
+      "requested_bytes": 1331448
+    },
+    "basis_rrows": {
+      "mean_ms": 0.41963866666666666,
+      "mean_probe_instructions": 1031906.8333333334,
+      "mean_probe_cycles": 2489443.6666666665,
+      "entries": 634,
+      "requested_entries": 634,
+      "alloc_calls": 0,
+      "free_calls": 0,
+      "realloc_calls": 0,
+      "requested_bytes": 0
+    },
+    "dual_cost_update": {
+      "mean_ms": 0.4598885,
+      "mean_probe_instructions": 3651836.8333333335,
+      "mean_probe_cycles": 1778891.1666666667,
+      "entries": 634,
+      "requested_entries": 634,
+      "alloc_calls": 0,
+      "free_calls": 0,
+      "realloc_calls": 0,
+      "requested_bytes": 0
+    },
+    "factor_update_refactor": {
+      "mean_ms": 1.4687021666666666,
+      "mean_probe_instructions": 5428008,
+      "mean_probe_cycles": 6860028.166666667,
+      "entries": 15,
+      "requested_entries": 15,
+      "alloc_calls": 16279,
+      "free_calls": 31117,
+      "realloc_calls": 28,
+      "requested_bytes": 1567084
+    },
+    "ftran_btran": {
+      "mean_ms": 16.947321666666667,
+      "mean_probe_instructions": 77324753,
+      "mean_probe_cycles": 60676898.166666664,
+      "entries": 2034,
+      "requested_entries": 2482,
+      "alloc_calls": 20147,
+      "free_calls": 16457,
+      "realloc_calls": 9958,
+      "requested_bytes": 24056064
+    },
+    "input_norm_check_bookkeeping": {
+      "mean_ms": 1.4976748333333332,
+      "mean_probe_instructions": 6225830.333333333,
+      "mean_probe_cycles": 6809395.333333333,
+      "entries": 1268,
+      "requested_entries": 1268,
+      "alloc_calls": 4527,
+      "free_calls": 723,
+      "realloc_calls": 87,
+      "requested_bytes": 3917516
+    },
+    "mirror_fresh": {
+      "mean_ms": 2.7435505,
+      "mean_probe_instructions": 9795420,
+      "mean_probe_cycles": 8258337.5,
+      "entries": 15,
+      "requested_entries": 16,
+      "alloc_calls": 19118,
+      "free_calls": 7693,
+      "realloc_calls": 6644,
+      "requested_bytes": 4061852
+    },
+    "mirror_retirement": {
+      "mean_ms": 0.2956353333333333,
+      "mean_probe_instructions": 1194374.8333333333,
+      "mean_probe_cycles": 1216905.8333333333,
+      "entries": 15,
+      "requested_entries": 15,
+      "alloc_calls": 0,
+      "free_calls": 17285,
+      "realloc_calls": 0,
+      "requested_bytes": 0
+    },
+    "mirror_update": {
+      "mean_ms": 4.6027008333333335,
+      "mean_probe_instructions": 16174163.5,
+      "mean_probe_cycles": 17232232.833333332,
+      "entries": 621,
+      "requested_entries": 621,
+      "alloc_calls": 11181,
+      "free_calls": 5032,
+      "realloc_calls": 11414,
+      "requested_bytes": 3033228
+    },
+    "objects_and_deferred_cleanup": {
+      "mean_ms": 0.6723775,
+      "mean_probe_instructions": 3612489.6666666665,
+      "mean_probe_cycles": 3926842.8333333335,
+      "entries": 1905,
+      "requested_entries": 1905,
+      "alloc_calls": 1909,
+      "free_calls": 2638,
+      "realloc_calls": 0,
+      "requested_bytes": 1052976
+    },
+    "ordered_factor_construction": {
+      "mean_ms": 4.442343166666667,
+      "mean_probe_instructions": 17498428.5,
+      "mean_probe_cycles": 13944216,
+      "entries": 15,
+      "requested_entries": 16,
+      "alloc_calls": 28617,
+      "free_calls": 19111,
+      "realloc_calls": 9127,
+      "requested_bytes": 5448498
+    },
+    "pivot_state": {
+      "mean_ms": 1.8776716666666668,
+      "mean_probe_instructions": 8054712.5,
+      "mean_probe_cycles": 11413850.333333334,
+      "entries": 1273,
+      "requested_entries": 1303,
+      "alloc_calls": 1227,
+      "free_calls": 7029,
+      "realloc_calls": 2529,
+      "requested_bytes": 2972512
+    },
+    "pricing_ratio": {
+      "mean_ms": 1.5048373333333334,
+      "mean_probe_instructions": 5622261.666666667,
+      "mean_probe_cycles": 6215516.5,
+      "entries": 1892,
+      "requested_entries": 1892,
+      "alloc_calls": 3600,
+      "free_calls": 3505,
+      "realloc_calls": 1710,
+      "requested_bytes": 402952
+    },
+    "pricing_weight_reset": {
+      "mean_ms": 1.4283415,
+      "mean_probe_instructions": 5671010.666666667,
+      "mean_probe_cycles": 4121328.5,
+      "entries": 15,
+      "requested_entries": 16,
+      "alloc_calls": 12521,
+      "free_calls": 12521,
+      "realloc_calls": 4549,
+      "requested_bytes": 1520544
+    },
+    "recomputations": {
+      "mean_ms": 1.4210365,
+      "mean_probe_instructions": 6406695.666666667,
+      "mean_probe_cycles": 4754284.5,
+      "entries": 45,
+      "requested_entries": 64,
+      "alloc_calls": 8192,
+      "free_calls": 8236,
+      "realloc_calls": 257,
+      "requested_bytes": 1399964
+    },
+    "row_product_and_WORK": {
+      "mean_ms": 3.8571221666666666,
+      "mean_probe_instructions": 14426151.666666666,
+      "mean_probe_cycles": 13634571.166666666,
+      "entries": 1268,
+      "requested_entries": 1268,
+      "alloc_calls": 2536,
+      "free_calls": 1902,
+      "realloc_calls": 2878,
+      "requested_bytes": 10000132
+    },
+    "setup_initial": {
+      "mean_ms": 1.3026975,
+      "mean_probe_instructions": 4768607.833333333,
+      "mean_probe_cycles": 2729583,
+      "entries": 1,
+      "requested_entries": 0,
+      "alloc_calls": 9683,
+      "free_calls": 3854,
+      "realloc_calls": 1349,
+      "requested_bytes": 1893304
+    },
+    "termination": {
+      "mean_ms": 0.2359065,
+      "mean_probe_instructions": 909738.8333333334,
+      "mean_probe_cycles": 722376.1666666666,
+      "entries": 1,
+      "requested_entries": 0,
+      "alloc_calls": 550,
+      "free_calls": 8289,
+      "realloc_calls": 7,
+      "requested_bytes": 111986
+    },
+    "unattributed": {
+      "mean_ms": 0.13315483333333333,
+      "mean_probe_instructions": 643087.5,
+      "mean_probe_cycles": 1213903.1666666667,
+      "entries": 1,
+      "requested_entries": 0,
+      "alloc_calls": 0,
+      "free_calls": 0,
+      "realloc_calls": 0,
+      "requested_bytes": 0
+    }
+  },
+  "diagnostic_phase_table": [
+    {
+      "phase": "setup_before_iteration",
+      "iteration_entries": 0,
+      "stages": {
+        "DSE_weights": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "auxiliary_factor_construction": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "auxiliary_update": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "basic_flags_priorities": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "basis_rrows": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "dual_cost_update": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "factor_update_refactor": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "ftran_btran": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "input_norm_check_bookkeeping": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "mirror_fresh": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "mirror_retirement": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "mirror_update": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "objects_and_deferred_cleanup": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "ordered_factor_construction": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "pivot_state": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "pricing_ratio": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "pricing_weight_reset": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "recomputations": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "row_product_and_WORK": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "setup_initial": {
+          "mean_ms": 1.3026975,
+          "mean_probe_instructions": 4768607.833333333
+        },
+        "termination": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "unattributed": {
+          "mean_ms": 0.0009516666666666666,
+          "mean_probe_instructions": 362
+        }
+      }
+    },
+    {
+      "phase": "positive_level_listwalk",
+      "iteration_entries": 132,
+      "stages": {
+        "DSE_weights": {
+          "mean_ms": 0.0125485,
+          "mean_probe_instructions": 76246
+        },
+        "auxiliary_factor_construction": {
+          "mean_ms": 0.18135833333333334,
+          "mean_probe_instructions": 966807.6666666666
+        },
+        "auxiliary_update": {
+          "mean_ms": 0.0456545,
+          "mean_probe_instructions": 146021.33333333334
+        },
+        "basic_flags_priorities": {
+          "mean_ms": 0.24482283333333335,
+          "mean_probe_instructions": 1082245.1666666667
+        },
+        "basis_rrows": {
+          "mean_ms": 0.06981766666666667,
+          "mean_probe_instructions": 198016.33333333334
+        },
+        "dual_cost_update": {
+          "mean_ms": 0.03867416666666666,
+          "mean_probe_instructions": 157077.16666666666
+        },
+        "factor_update_refactor": {
+          "mean_ms": 0.20296116666666666,
+          "mean_probe_instructions": 1132229.3333333333
+        },
+        "ftran_btran": {
+          "mean_ms": 1.0586118333333332,
+          "mean_probe_instructions": 4784982
+        },
+        "input_norm_check_bookkeeping": {
+          "mean_ms": 0.0898645,
+          "mean_probe_instructions": 411551.1666666667
+        },
+        "mirror_fresh": {
+          "mean_ms": 0.2793718333333333,
+          "mean_probe_instructions": 720641.3333333334
+        },
+        "mirror_retirement": {
+          "mean_ms": 0.054363166666666664,
+          "mean_probe_instructions": 186092.16666666666
+        },
+        "mirror_update": {
+          "mean_ms": 0.24204716666666665,
+          "mean_probe_instructions": 862069.6666666666
+        },
+        "objects_and_deferred_cleanup": {
+          "mean_ms": 0.08293266666666667,
+          "mean_probe_instructions": 357904.5
+        },
+        "ordered_factor_construction": {
+          "mean_ms": 0.35169083333333334,
+          "mean_probe_instructions": 1398920.6666666667
+        },
+        "pivot_state": {
+          "mean_ms": 0.4753348333333333,
+          "mean_probe_instructions": 2046244.8333333333
+        },
+        "pricing_ratio": {
+          "mean_ms": 0.17098483333333334,
+          "mean_probe_instructions": 669024.8333333334
+        },
+        "pricing_weight_reset": {
+          "mean_ms": 0.237971,
+          "mean_probe_instructions": 902349.5
+        },
+        "recomputations": {
+          "mean_ms": 0.381387,
+          "mean_probe_instructions": 1913348.1666666667
+        },
+        "row_product_and_WORK": {
+          "mean_ms": 0.11316416666666668,
+          "mean_probe_instructions": 431838.5
+        },
+        "setup_initial": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "termination": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "unattributed": {
+          "mean_ms": 0.024721,
+          "mean_probe_instructions": 133188
+        }
+      }
+    },
+    {
+      "phase": "level0_listwalk",
+      "iteration_entries": 147,
+      "stages": {
+        "DSE_weights": {
+          "mean_ms": 0.02255333333333333,
+          "mean_probe_instructions": 165003.16666666666
+        },
+        "auxiliary_factor_construction": {
+          "mean_ms": 0.300313,
+          "mean_probe_instructions": 1257589.8333333333
+        },
+        "auxiliary_update": {
+          "mean_ms": 0.10261766666666668,
+          "mean_probe_instructions": 413525.6666666667
+        },
+        "basic_flags_priorities": {
+          "mean_ms": 0.3986848333333333,
+          "mean_probe_instructions": 1715578
+        },
+        "basis_rrows": {
+          "mean_ms": 0.10919333333333332,
+          "mean_probe_instructions": 304180.6666666667
+        },
+        "dual_cost_update": {
+          "mean_ms": 0.06098516666666667,
+          "mean_probe_instructions": 468575.1666666667
+        },
+        "factor_update_refactor": {
+          "mean_ms": 0.20914583333333334,
+          "mean_probe_instructions": 986205.3333333334
+        },
+        "ftran_btran": {
+          "mean_ms": 2.5446445,
+          "mean_probe_instructions": 11022340
+        },
+        "input_norm_check_bookkeeping": {
+          "mean_ms": 0.22058883333333335,
+          "mean_probe_instructions": 834463.3333333334
+        },
+        "mirror_fresh": {
+          "mean_ms": 0.3681546666666667,
+          "mean_probe_instructions": 1335156.5
+        },
+        "mirror_retirement": {
+          "mean_ms": 0.04856116666666666,
+          "mean_probe_instructions": 217049.16666666666
+        },
+        "mirror_update": {
+          "mean_ms": 0.6397883333333334,
+          "mean_probe_instructions": 2118529.6666666665
+        },
+        "objects_and_deferred_cleanup": {
+          "mean_ms": 0.12588366666666667,
+          "mean_probe_instructions": 589572.1666666666
+        },
+        "ordered_factor_construction": {
+          "mean_ms": 0.4354398333333333,
+          "mean_probe_instructions": 1795278.3333333333
+        },
+        "pivot_state": {
+          "mean_ms": 0.2922808333333333,
+          "mean_probe_instructions": 1375815.1666666667
+        },
+        "pricing_ratio": {
+          "mean_ms": 0.20012816666666666,
+          "mean_probe_instructions": 783806.6666666666
+        },
+        "pricing_weight_reset": {
+          "mean_ms": 0.24527466666666667,
+          "mean_probe_instructions": 1009603.5
+        },
+        "recomputations": {
+          "mean_ms": 0.2683375,
+          "mean_probe_instructions": 1282902.1666666667
+        },
+        "row_product_and_WORK": {
+          "mean_ms": 0.5392338333333334,
+          "mean_probe_instructions": 1739392.6666666667
+        },
+        "setup_initial": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "termination": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "unattributed": {
+          "mean_ms": 0.03127933333333333,
+          "mean_probe_instructions": 148323.33333333334
+        }
+      }
+    },
+    {
+      "phase": "value_mode",
+      "iteration_entries": 358,
+      "stages": {
+        "DSE_weights": {
+          "mean_ms": 0.107661,
+          "mean_probe_instructions": 875188.5
+        },
+        "auxiliary_factor_construction": {
+          "mean_ms": 2.019933,
+          "mean_probe_instructions": 6470242.5
+        },
+        "auxiliary_update": {
+          "mean_ms": 0.255992,
+          "mean_probe_instructions": 1398632
+        },
+        "basic_flags_priorities": {
+          "mean_ms": 0.9063066666666666,
+          "mean_probe_instructions": 3503342.3333333335
+        },
+        "basis_rrows": {
+          "mean_ms": 0.24062766666666666,
+          "mean_probe_instructions": 529709.8333333334
+        },
+        "dual_cost_update": {
+          "mean_ms": 0.3602291666666667,
+          "mean_probe_instructions": 3026184.5
+        },
+        "factor_update_refactor": {
+          "mean_ms": 1.0565951666666666,
+          "mean_probe_instructions": 3309573.3333333335
+        },
+        "ftran_btran": {
+          "mean_ms": 13.344065333333335,
+          "mean_probe_instructions": 61517431
+        },
+        "input_norm_check_bookkeeping": {
+          "mean_ms": 1.1872215,
+          "mean_probe_instructions": 4979815.833333333
+        },
+        "mirror_fresh": {
+          "mean_ms": 2.096024,
+          "mean_probe_instructions": 7739622.166666667
+        },
+        "mirror_retirement": {
+          "mean_ms": 0.192711,
+          "mean_probe_instructions": 791233.5
+        },
+        "mirror_update": {
+          "mean_ms": 3.7208653333333337,
+          "mean_probe_instructions": 13193564.166666666
+        },
+        "objects_and_deferred_cleanup": {
+          "mean_ms": 0.4635611666666667,
+          "mean_probe_instructions": 2665013
+        },
+        "ordered_factor_construction": {
+          "mean_ms": 3.6552125,
+          "mean_probe_instructions": 14304229.5
+        },
+        "pivot_state": {
+          "mean_ms": 1.110056,
+          "mean_probe_instructions": 4632652.5
+        },
+        "pricing_ratio": {
+          "mean_ms": 1.1337243333333333,
+          "mean_probe_instructions": 4169430.1666666665
+        },
+        "pricing_weight_reset": {
+          "mean_ms": 0.9450958333333334,
+          "mean_probe_instructions": 3759057.6666666665
+        },
+        "recomputations": {
+          "mean_ms": 0.771312,
+          "mean_probe_instructions": 3210445.3333333335
+        },
+        "row_product_and_WORK": {
+          "mean_ms": 3.2047241666666664,
+          "mean_probe_instructions": 12254920.5
+        },
+        "setup_initial": {
+          "mean_ms": 0.0,
+          "mean_probe_instructions": 0
+        },
+        "termination": {
+          "mean_ms": 0.2359065,
+          "mean_probe_instructions": 909738.8333333334
+        },
+        "unattributed": {
+          "mean_ms": 0.07620283333333333,
+          "mean_probe_instructions": 361214.1666666667
+        }
+      }
+    }
+  ],
+  "phase_definition": "Originaliteration entry self.value_mode/self.level, retainedthroughpost;637states split132positivelevel/147level0listwalk/358value. Not an assertion that flags neverchangeinsidecall. WholeRose phasecosts areunpairedafter163.",
+  "ownership": {
+    "overrides": "Setup/termination override nestedoperations; FB/factor/pricing children override ROWparents. Rowproduct andWORK shareonefamily. Basic parent hasDSEchild. recompute_d/true_d andxb/flags children shareRECOMPUTE. No framework_rhs runtime inpmode1.",
+    "input": "Packing,norm,count/WORKwrapper,tau expansion,pivotcheck; FBchildnumerics separate. Originalinputlocal destruction happensafternewguarddrops and remainsphysicalROWresidual; notsilentlyfree or acompleteinclusiveinputcost.",
+    "objects": "colclone/pivot-removal/taugather andPivotBoxconstruction;driver matchclause andeventualrow/col/tau/flips/Boxretirement aroundpostchildren. ThisincludesoldOTHERwork, sonewROWplusOBJECT cannotbe subtractedfromold14stageROW asif sameELF.",
+    "residual": "pivot_state retains rho filtering,clock/branch/controller/flip state,postfactorWORKloops anddeferredoriginalinput/localdrops outsideexplicitguards. This1.878ms isnotfullyattributedpurposework. Returnedfullcolumn transfersintoauxEta, retainedfactor lifecycle staysFACTOR.",
+    "allocator": "Counts are by physicalscope. Deferredfrees keep separate retirement/residual ownership; stageallocationcounts alone do not give completeallocationlifecycle costs. Requestedsize sums are not livebytes,copytraffic orRSS."
+  },
+  "accepted_instruction_scopes": {
+    "selected_controls": [
+      {
+        "index": 0,
+        "target": 136,
+        "cap": 137,
+        "wall_seconds": 1.0369010170034016,
+        "groups": {
+          "rowproduct_WORK": {
+            "calls": 1,
+            "instructions": 10157
+          },
+          "basis_rrows": {
+            "calls": 1,
+            "instructions": 319
+          },
+          "fast_DSE": {
+            "calls": 1,
+            "instructions": 840
+          },
+          "fast_DSE_basic_with_WORK": {
+            "calls": 1,
+            "instructions": 4423
+          }
+        },
+        "result_exit_signedzero_match": true
+      },
+      {
+        "index": 1,
+        "target": 136,
+        "cap": 137,
+        "wall_seconds": 0.994152330000361,
+        "groups": {
+          "rowproduct_WORK": {
+            "calls": 1,
+            "instructions": 10157
+          },
+          "basis_rrows": {
+            "calls": 1,
+            "instructions": 319
+          },
+          "fast_DSE": {
+            "calls": 1,
+            "instructions": 840
+          },
+          "fast_DSE_basic_with_WORK": {
+            "calls": 1,
+            "instructions": 4423
+          }
+        },
+        "result_exit_signedzero_match": true
+      }
+    ],
+    "whole_Rose": {
+      "rowproduct_WORK": {
+        "calls": 634,
+        "instructions": 12610329
+      },
+      "basis_rrows": {
+        "calls": 634,
+        "instructions": 798761
+      },
+      "fast_DSE": {
+        "calls": 621,
+        "instructions": 824340
+      },
+      "fast_DSE_basic_with_WORK": {
+        "calls": 621,
+        "instructions": 6537985
+      }
+    },
+    "whole_phase": [
+      {
+        "scope": "rowproduct_WORK",
+        "phase": "positive_level_listwalk",
+        "calls": 131,
+        "instructions": 293254
+      },
+      {
+        "scope": "basis_rrows",
+        "phase": "positive_level_listwalk",
+        "calls": 131,
+        "instructions": 147164
+      },
+      {
+        "scope": "fast_DSE",
+        "phase": "positive_level_listwalk",
+        "calls": 128,
+        "instructions": 31466
+      },
+      {
+        "scope": "fast_DSE_basic_with_WORK",
+        "phase": "positive_level_listwalk",
+        "calls": 128,
+        "instructions": 959390
+      },
+      {
+        "scope": "rowproduct_WORK",
+        "phase": "level0_listwalk",
+        "calls": 147,
+        "instructions": 1460105
+      },
+      {
+        "scope": "basis_rrows",
+        "phase": "level0_listwalk",
+        "calls": 147,
+        "instructions": 247888
+      },
+      {
+        "scope": "fast_DSE",
+        "phase": "level0_listwalk",
+        "calls": 144,
+        "instructions": 107588
+      },
+      {
+        "scope": "fast_DSE_basic_with_WORK",
+        "phase": "level0_listwalk",
+        "calls": 144,
+        "instructions": 1628170
+      },
+      {
+        "scope": "rowproduct_WORK",
+        "phase": "value_mode",
+        "calls": 356,
+        "instructions": 10856970
+      },
+      {
+        "scope": "basis_rrows",
+        "phase": "value_mode",
+        "calls": 356,
+        "instructions": 403709
+      },
+      {
+        "scope": "fast_DSE",
+        "phase": "value_mode",
+        "calls": 349,
+        "instructions": 685286
+      },
+      {
+        "scope": "fast_DSE_basic_with_WORK",
+        "phase": "value_mode",
+        "calls": 349,
+        "instructions": 3950425
+      }
+    ],
+    "bounds": {
+      "rowproduct_WORK": "11fc87..1205b8 includingrrowslengthestimate,accumulator/support/outputconstruction,localcleanup andWORK;returnedrowretirement remainsOBJECTlater.",
+      "basis_rrows": "1271b2..12783c includingt0,status/head/rrows,stall/iteration/publicationbookkeeping. Native includesleavingdclamp performedelsewhereinRose; notexactper-ownerarithmeticboundaries.",
+      "fast_DSE_basic_with_WORK": "Compiled fastclones102cde/106649..103bc0(beforeRET), includingWORK,DSE,basicupdates/flags/listlogic andlocalchangedbuffercleanup. OneRET outsideRosebracket; nativec0050 includesreturn. 621fastcalls only;13before-refactorweightupdates notcoveredhere.",
+      "fast_DSE": "102dd7/10675d..102f1f/1068a5 includesmode/dumpdispatch,weightrecurrence; native640weightloop excludes109entryprelude. Do notsubtract840minus640 as identical completeboundaryexcess."
+    },
+    "instruction_qualification": "Original55af fixedPC targetpidPMU,2I/interval calibratedbyprior5instructioncontrol/nativefreshcontrol. Selectedrow10157,basis319,DSE840,combined4423 reproducedtwice; wholeearlierrow/basiscensus agreeswithin13/3instructions. No codegen changes. Allcycles/timesexcluded."
+  },
+  "native_selected": {
+    "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "rose_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "CPU": 3,
+    "selected": {
+      "native_pivot": 135,
+      "rose_pricing": 136,
+      "entry_it": 134,
+      "next_it": 135,
+      "r": 419,
+      "q": 140,
+      "rho_count": 14,
+      "row_count": 105,
+      "column_tau_count_without_pivot": 38,
+      "flips": 0,
+      "mode": 1,
+      "listwalk": true,
+      "level": 0
+    },
+    "scopes_instructions": {
+      "row_product_including_WORK": 4394,
+      "basis_and_rrows": 190,
+      "dual_update": 841,
+      "DSE_basic_flags": 1650,
+      "scope_sum": 7075,
+      "whole_inclusive_pass": 38453,
+      "other_pass_work": 31378
+    },
+    "DSE_instructions": {
+      "dispatch_prelude": 109,
+      "weights": 640,
+      "weight_WORK": 8,
+      "basic_flags_pending_count_running_average": 893,
+      "priority_payload_read_write": 0
+    },
+    "final_row_WORK_count_publication": 9,
+    "calibration": {
+      "known_first_five_pushes_instructions": 5,
+      "observed": 7,
+      "per_interval_correction": 2,
+      "no_multiplexing": true,
+      "root_repeats": 3,
+      "final_detail_repeats": 3,
+      "final_root_detail_scopes_identical": true,
+      "initial_partial_detail_whole_residual": 1,
+      "cycles_and_timers_excluded": true
+    },
+    "priority_raw_difference": {
+      "status": "RAW_PRIORITY_FAIL_RETAINED",
+      "field": "P+0x18 payload versus Rose DSX.prio",
+      "pricing": 136,
+      "context_it": 134,
+      "first_checked_difference": {
+        "index": 0,
+        "native": 1.0,
+        "rose": 0.0,
+        "native_f64_be": "3ff0000000000000",
+        "rose_f64_be": "0000000000000000"
+      },
+      "different_slots": 444,
+      "native_first3": [
+        1.0,
+        4.0,
+        6.0
+      ],
+      "rose_first3": [
+        0.0,
+        1.6286572477472467e+59,
+        1.3316275447769497e+59
+      ],
+      "native_first3_bits": [
+        "3ff0000000000000",
+        "4010000000000000",
+        "4018000000000000"
+      ],
+      "rose_first3_bits": [
+        "0000000000000000",
+        "4c39f22d81a95640",
+        "4c3536cc06dddd14"
+      ],
+      "native_payload_stable_before_after": true,
+      "qualification": "Not full-state bit equality. P40=0 inactive payload classified by selected-path disassembly; no value normalization. Native own PIN136/137 match validated separately.",
+      "failure_stdout": "target/perf-degen2-native-row-cost/central-attempt.stdout"
+    },
+    "consumed_state_proof": "Selected consumed row input/output, basis/status transition, dual output and final DSE/basic/flags match cached Rose DSX and next native PIN bits. Native own priority payload matches PIN136/137 and stays unchanged; raw Rose priority differs and remains explicitly unpaired in P40=0. This is not full-state bit parity. No signed-zero normalization. DSE column/tau uses independently proven publication support association; no new visited-order proof.",
+    "boundaries": {
+      "row": "134d90entry\u2192c5381return includeshelpers,allocationandWORK; final9I135e68\u2192135e92isnotallWORKestimatearithmetic",
+      "basis": "c5d63\u2192c5eb5includesstatus/head/leavingcostclampandconditional134680/1348b0rowmaintenance",
+      "dual": "e45c0entry\u2192f6ce5return, ordinary nonrefactor reduced-cost update",
+      "DSE": "c0050entry\u2192bf5de return includesW,xb,flags,pendingcount/runningaverage andlocals;P40=0payloadprioritiesinactive",
+      "outside": "WholeinclusivepasscontainsBTRAN,ratio,FTRAN,factoranddriverwork;7075namedscopeIarenotacompleteROWstageorwhole-solvecost. Retainedfactorandcallerresultretirementarenotassumedzero."
+    },
+    "limits": [
+      "No full-state bit-parity claim: all444inactivepriorityslotsdifferandrawfailureisretained.",
+      "No value-mode witness in strictprefix<=162; do not extrapolate listwalkcost to whole-solve11.042ms ROWtime.",
+      "No complete coefficient/visited-order proof or causalcycles/cache/branchclaim.",
+      "No optimization,solver/referencebuild,numerical/WORK/paritybaselinechange; no newcaptureafterpricing136/nativepivot135."
+    ],
+    "artifacts": {
+      "central_report": "target/perf-degen2-native-row-cost/central-comparison.json",
+      "raw_failure": "target/perf-degen2-native-row-cost/raw-priority-difference.json",
+      "first_failure_output": "target/perf-degen2-native-row-cost/central-attempt.stdout",
+      "capture_commands": "target/perf-degen2-native-row-cost/results.json",
+      "central_command": "target/perf-degen2-native-row-cost/central-command.json"
+    }
+  },
+  "paired_selected_summary": {
+    "Rose_pricing": 136,
+    "native_pivot": 135,
+    "rho": 14,
+    "row": 105,
+    "column_tau_without_pivot": 38,
+    "flips": 0,
+    "rowproduct_WORK": [
+      10157,
+      4394
+    ],
+    "basis_rrows": [
+      319,
+      190
+    ],
+    "DSE_basic_WORK": [
+      4423,
+      1650
+    ],
+    "native_dual_update": 841,
+    "Rose_dual_accepted_cost": "Notseparatelymeasured;0.460ms separate diagnostic cannot be convertedtoacceptedI/C.",
+    "whole_scope_limits": "These are matched operationfamilies on consumed inputs, with explicitcaller/clamp/return differences above. No exactcompleteROWstage excess orwholevaluephase nativecost is established."
+  },
+  "priority_alignment": {
+    "raw_failure_retained": true,
+    "raw": {
+      "status": "RAW_PRIORITY_FAIL_RETAINED",
+      "field": "P+0x18 payload versus Rose DSX.prio",
+      "pricing": 136,
+      "context_it": 134,
+      "first_checked_difference": {
+        "index": 0,
+        "native": 1.0,
+        "rose": 0.0,
+        "native_f64_be": "3ff0000000000000",
+        "rose_f64_be": "0000000000000000"
+      },
+      "different_slots": 444,
+      "native_first3": [
+        1.0,
+        4.0,
+        6.0
+      ],
+      "rose_first3": [
+        0.0,
+        1.6286572477472467e+59,
+        1.3316275447769497e+59
+      ],
+      "native_first3_bits": [
+        "3ff0000000000000",
+        "4010000000000000",
+        "4018000000000000"
+      ],
+      "rose_first3_bits": [
+        "0000000000000000",
+        "4c39f22d81a95640",
+        "4c3536cc06dddd14"
+      ],
+      "native_payload_stable_before_after": true,
+      "qualification": "Not full-state bit equality. P40=0 inactive payload classified by selected-path disassembly; no value normalization. Native own PIN136/137 match validated separately.",
+      "failure_stdout": "target/perf-degen2-native-row-cost/central-attempt.stdout"
+    },
+    "rule": "compare.py centralconsumed-state gate explicitlyexcludesP18payloadonlyinP40=0 afterselectedpath disassemblyproves no payloadread. Pointerload/spillremainscounted. Not a value normalization orfullstatePASS; sourceprio remainsfrozenbitforbit. Do notapplythisruleinvalue mode.",
+    "strict_kernel_frontier": "Full/neededstrictoutputs match162pivots then\u22120/+0at163unchanged. No newnativecapture pastselected135. Initial rawprioritycomparisonstoppedatfirstcheckedindex0; cachedlayout/consumptionauditqualifiesonlyselectedoperationinputs."
+  },
+  "distortion": {
+    "modes": {
+      "timers-noalloc": {
+        "n": 6,
+        "mean_ms": 51.65911216666667,
+        "median_ms": 51.362239,
+        "range_ms": [
+          45.748716,
+          57.470633
+        ],
+        "wholeprocess_instructions": 218751995.33333334,
+        "instruction_skew_percent": 11.213675103275488
+      },
+      "plain": {
+        "n": 6,
+        "mean_ms": 45.112715333333334,
+        "median_ms": 44.613769999999995,
+        "range_ms": [
+          40.832293,
+          51.642711
+        ],
+        "wholeprocess_instructions": 196695231.16666666,
+        "instruction_skew_percent": 0.0
+      },
+      "timers": {
+        "n": 6,
+        "mean_ms": 49.908257,
+        "median_ms": 47.808038999999994,
+        "range_ms": [
+          46.98504,
+          60.416554999999995
+        ],
+        "wholeprocess_instructions": 223785439.5,
+        "instruction_skew_percent": 13.772681814730369
+      },
+      "pmu": {
+        "n": 6,
+        "mean_ms": 186.932614,
+        "median_ms": 185.6436415,
+        "range_ms": [
+          170.948553,
+          206.54203199999998
+        ]
+      },
+      "off": {
+        "n": 6,
+        "mean_ms": 49.59396483333334,
+        "median_ms": 47.8361175,
+        "range_ms": [
+          44.271293,
+          60.131513
+        ],
+        "wholeprocess_instructions": 208090066.16666666,
+        "instruction_skew_percent": 5.793142483634872
+      }
+    },
+    "empty_calibration": {
+      "timers-noalloc": {
+        "inside_ns_per_entry": 53.35445,
+        "outer_ns_per_entry": 110.294025,
+        "inside_instructions": 0.0
+      },
+      "timers": {
+        "inside_ns_per_entry": 54.526125,
+        "outer_ns_per_entry": 113.4633125,
+        "inside_instructions": 0.0
+      },
+      "pmu": {
+        "inside_ns_per_entry": 4711.267225,
+        "outer_ns_per_entry": 9285.010075,
+        "inside_instructions": 314.01535
+      }
+    },
+    "entries": 13543,
+    "approx_empty_timer_budget_ms": 1.5366336411875,
+    "PMUwall_excluded": true,
+    "meaning": "Newsource/layout/PGOflowandbooktracking raiseoff/timerinstructions. Timerwallspread prevents exactnetoverheadclaim. PMUstageinstructions/cyclesincluderead/probecost; nevertransferthese totalsorpercentstoacceptedELF. Emptybudget ispracticalcalibration,not automaticper-stage subtraction."
+  },
+  "reconciliation": {
+    "all_stage_mean_ms": 49.909046833333335,
+    "solver_ownclock_mean_ms": 49.908257,
+    "boundary_edge_difference_us": 0.789833333335821,
+    "ROW_purpose_plus_objects_ms": 11.897987,
+    "ROW_residual_ms": 1.8776716666666668,
+    "all_phase_sums_exact": true,
+    "alloc_totals": {
+      "alloc_calls": 146329,
+      "free_calls": 146321,
+      "realloc_calls": 56398,
+      "requested_bytes": 64358036
+    },
+    "prior14stage_ROW_ms": 11.042,
+    "crossbuild_caveat": "NewROW+OBJECTincludesadditionaloutside-retirement/control andincreasedinstrumentation. No exactcrossELFtimedelta oracceptedtimefraction claimed.",
+    "overall_accepted_gap_instructions": 127995000,
+    "overall_accepted_gap_cycles": 89315000,
+    "known_FB_self_gap_instructions": 51863005,
+    "known_FB_self_gap_cycles": 22439119,
+    "outside_known_FB_pools_instructions": 76131995,
+    "outside_known_FB_pools_cycles": 66875881,
+    "new_counts_not_additive": "ROWacceptedcounts arealreadyinsidepreviouswhole/selfpools. Reference6.140M rowproductself isnotcompleteinclusive counterpartofRose12.610Mroot; do notsubtractthem. Accepted2.74xgapunchanged."
+  },
+  "validation": {
+    "source_inverse": {
+      "dual.rs": {
+        "literal_parent_restored": true,
+        "parent_sha256": "2d72327d985fb46acdec46683978ff2ffa4eedb4b61a2fd372f124279f04bed9",
+        "probe_sha256": "4f802b95b46fe5fbb9836f7fbdd2a5d6a5e6e7674f3cf96bc6d5a3676f1c8cc5"
+      }
+    },
+    "parent_numeric_proof": "target/perf-degen2-followup/numeric-reconstruction.json; modifieddualreconstructs14stageparentliterally, othernumericalfilesidenticalto14stageparent. stage_diag bookkeepingonly.",
+    "bounded_checks": {
+      "3": {
+        "result_exit_equal": true,
+        "all_records_equal": false,
+        "dump_records": null
+      },
+      "20": {
+        "result_exit_equal": true,
+        "all_records_equal": true,
+        "dump_records": 1002
+      },
+      "640": {
+        "result_exit_equal": true,
+        "all_records_equal": true,
+        "dump_records": 17201
+      }
+    },
+    "all30_measurement_results_exit_match": true,
+    "new_full987": "All987frozenparityrunsagree,releaseprobe,timers-noalloc,351.4s;baselineunchanged.",
+    "accepted_GDB_results_exit_signedzero_controls": 6,
+    "native_central_qualification": "7consumed-statecapturesPASS;rawinactiveprioritymismatchretained.3root/3finaldetailcountercontrolsagree.",
+    "accepted_hashes_unchanged": true
+  },
+  "largest_supported_findings": [
+    "RowproductsleadnewROWsplit3.857msdiagnostic;acceptedwhole634roots12.610M instructions,10.857M in356valuephasecalls. Selected10157vs4394 includesconstruction/cleanup/WORK,notpurearithmeticdifference. Needactualvisited-term/dispatch/setupcensus toseparatemoreoperationsfrommoreexpensivecorrespondingoperations.",
+    "DSEweightsalone0.143msdiagnostic/acceptedfast824340I isnotalargelead. Its634entries have~.0346msemptyinside-timerequivalentcost; thisisoverheadsensitive andnotanautomaticsubtraction. CombinedfastDSE/basic root6.538M I;differencefromDSEincludeschangedvector,xb,flags/listprocessing,rebuilds andcleanup,notremovablebookkeeping.",
+    "Recomputations1.421msdiagnostic have8192allocations,but true_dpresortingtrialalreadyrejected. Basis0.420/dual0.460msdiagnosticaremuchsmallerthanrowproducts. ROWresidual1.878ms remainsuncertainbyoperation."
+  ],
+  "one_next_experiment": {
+    "type": "Bounded diagnostic census, no optimizer implementation.",
+    "question": "Separateactualrowproduct coefficientvisits/arithmetic from length/support scans,zeroing,indexing,outputconstruction,WORK andlocal/deferredcleanup. Usecachedmatched136onlyfornativearithmeticpairing; Rosewholevaluephasecostcanbeobservedwithoutnativecomparison.",
+    "method": "StartwithtinyAFIRO/SC50A;reusecurrentimmutableELFscopes andcachedRPstates;delegate nativecapture/comparisonandcentralizevisitedentrymapsincompare.py. Probeonlyselected135/136ifnewnativeevidenceneeded;stoponfirstconsumedstatedifference. Quantifyinstrumentationcostbeforeproposinga kernelchange.",
+    "plausible_whole_solve_benefit": "Directdiagnosticbenefit0. Wholeacceptedrowproduct12.610M instructions(~6.96%solveI)islooseexposureincludingrequiredwork,notremovabletime. Aconditional10-25%instructionreductionwouldbudget0.70-1.74%whole-solveI; no runtimebenefitispredicteduntilanactualdistinctredundancyisproved.",
+    "rejected_trial_check": "Notaretryofdualworkspace/touchedreset,wholepivotownership,rowprefilter/weightedtraversal,ordinaryscatterboundselision,true_dpresorting orrowmapcache. Newworkmeasuresactualoperations; ifleadisoneoftheseclosedmechanisms,stopwithoutprototype."
+  },
+  "artifacts": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-row-split",
+  "native_artifacts": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-native-row-cost",
+  "hashes": {
+    "target/perf-degen2-row-split/source-proof.json": "e9ea461befd2a9f74275bbc607d95acbc58e32fc97571c6d6b367fd6ebc6751a",
+    "target/perf-degen2-row-split/probe-build-command.json": "0a7edf1a14f107de5161fd10fb2cf292064e5fd3cf6405ce8b60b1dfca34ceeb",
+    "target/perf-degen2-row-split/prepare.py": "cb5d29c6fb154e8b1f334c91eb29881f0d1cccc228f8b6c08493a49937192147",
+    "target/perf-degen2-row-split/measure.py": "606c41560c9911171540bc4f81b705b7b218598b0747b2e3e9c0e5fc0d6b3cf6",
+    "target/perf-degen2-row-split/measurement/manifest.json": "b37827f50f3ca077011e35d82af3b8b728c99cbf311411103b8782ad0792b81f",
+    "target/perf-degen2-row-split/full-parity.log": "d82dd4a8c2ac75eaf71d61cf12d8456242e6a8f45fa57ed1a1ed581bcf9d2b9c",
+    "target/perf-degen2-row-split/accepted_cost_gdb.py": "16c6465d8444ea2b1375b010b4a6ade3b1bedb838ce84a681495653cf2d48cae",
+    "target/perf-degen2-row-split/accepted_cost_gdb-v1.py": "c3ef4acbe5eb6a88970c65aa01ff54ba3128fc59ca9c9a8cf023e3cbffafdd49",
+    "target/perf-degen2-row-split/accepted-cost/manifest.json": "e1ba1608164e594c1a594db615c8de95160f0dba5683b74bf1604bd8320e081d",
+    "target/perf-degen2-row-split/accepted-cost-v2/manifest.json": "3ee570efe82096598b808c9beb813fe745df47def26b45a1965c9c7e14c0339f",
+    "target/perf-degen2-native-row-cost/central-comparison.json": "44e9661e11ab6c6d9622f03165dd82651769796bf924c8a2dd15d9ebd6ec3f01",
+    "target/perf-degen2-native-row-cost/summary.json": "af080b2b097a6be2427683e3096c3aecc8efd8affb549c4e4800112187333980",
+    "target/perf-degen2-native-row-cost/raw-priority-difference.json": "9fd0fe48b4eb8d58d31c3f610f11e5cba4747265a96b446f153dd433bdcb46c4"
+  }
+}

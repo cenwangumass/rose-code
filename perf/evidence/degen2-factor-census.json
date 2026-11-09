@@ -1,0 +1,213 @@
+{
+  "previous_goal_turn_classification": "progress",
+  "basis": "Previous trial was settled at countergate and factor-stage scope reconciled. This turn completes source/native numerical-state and operation census and isolates one new bounded integer-ordering cost.",
+  "configuration": {
+    "accepted_rose_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "census_elf_sha256": "af9e5dd082a0d1756bf9d2f145c7b0403668947134bdf1345e441d2cf57c3c72",
+    "census_build": "Separate unchanged-numeric source/fixed39a018/TCMalloc with registeredisolatedFC tags and allocation/counter hooks; no performanceclaims for this ELF. PGO hash warnings retained.",
+    "scope": "Selectedfactorordinal1/pricing16/contextit16; first strict divergence163unchanged. Rawinput584bits matched; source all1002originalrecords andresults match. LaterRoseonly PMU observations carry no numerical vectors or nativepairing."
+  },
+  "matched_state": {
+    "basis_and_pivot_rows_match": true,
+    "diagonal_slots": 444,
+    "ordered_L_entries": 140,
+    "U_storage_extent": 0,
+    "native_i21": 444,
+    "matched_input_coefficients": 584,
+    "rose_input_all_original_records_match": true,
+    "rose_input_original_records_checked": 1002
+  },
+  "native_operations": {
+    "logical_input_coefficients": 584,
+    "structural_input_columns": 20,
+    "structural_input_entries": 160,
+    "implicit_slacks": 424,
+    "structural_row_index_count_scan_dfc0d": 160,
+    "structural_row_index_formation_scan_dfe50": 160,
+    "eligible_numeric_row_adjacency_copies_dfe61_dfe66": 28,
+    "structural_diagonal_coefficient_copies_e001f_e002f": 20,
+    "implicit_unit_diagonal_stores_e01e4": 424,
+    "L_coefficient_divisions_e2cc4": 140,
+    "coefficient_elimination_products_in_selected_d4190_df800": 0,
+    "packed_FP_ops": 0,
+    "df800_calls": 1,
+    "memset_calls": 4,
+    "memset_bytes": [
+      1776,
+      1780,
+      1776,
+      1780
+    ],
+    "observed_exported_alloc_free_calls": 0
+  },
+  "rose_operations": {
+    "aux_L_candidate_visits": 586,
+    "aux_L_divisions": 6,
+    "aux_elimination_products": 2,
+    "aux_heap_pops": 136,
+    "aux_heap_pushes": 136,
+    "aux_input_adds": 584,
+    "aux_maxabs_visits": 586,
+    "aux_pivot_selection_visits": 586,
+    "aux_reset_visits": 586,
+    "aux_rowcount_entries": 584,
+    "aux_touched_sorted_entries": 586,
+    "aux_touched_sorts": 444,
+    "basis_index_copies": 584,
+    "basis_value_copies": 584,
+    "fresh_LT_transpose_entries": 140,
+    "fresh_L_mapping_entries": 140,
+    "fresh_U_columns": 0,
+    "fresh_level_edges": 140,
+    "fresh_multiplier_products": 0,
+    "fresh_raw_products_divisions": 0,
+    "fresh_subtractions": 0,
+    "nucleus_calls": 1,
+    "nucleus_input_columns": 0,
+    "row_adjacency_count_entries": 584,
+    "row_adjacency_materialized_indices": 584,
+    "singleton_L_divisions": 140,
+    "singleton_L_index_filter_entries": 584,
+    "singleton_L_raw_copies": 140,
+    "singleton_L_raw_filter_entries": 584,
+    "singleton_L_value_filter_entries": 584,
+    "singleton_pivot_search_entries": 510
+  },
+  "rose_allocation_counts": {
+    "parent_reset_work_retirement": {
+      "alloc": 1468,
+      "growth": 5,
+      "free": 1871,
+      "requested_bytes": 133580
+    },
+    "ordered": {
+      "alloc": 77,
+      "growth": 62,
+      "free": 13,
+      "requested_bytes": 86636
+    },
+    "fresh": {
+      "alloc": 126,
+      "growth": 0,
+      "free": 9,
+      "requested_bytes": 144956
+    },
+    "aux": {
+      "alloc": 37,
+      "growth": 23,
+      "free": 7,
+      "requested_bytes": 52760
+    },
+    "nucleus": {
+      "alloc": 12,
+      "growth": 0,
+      "free": 12,
+      "requested_bytes": 46748
+    }
+  },
+  "auxiliary_representation": {
+    "L_entries": 6,
+    "U_entries": 136,
+    "interpretation": "Independent auxiliary ordering/factorization: sixLdivisions andtwoelimination products are additional Rose work, not duplicate corresponding mainfactor arithmetic; native main140L/U0 doesnot establish nativeauxconstructor absence outsidecaptured boundary."
+  },
+  "formation_interpretation": "Rose copies584inputindices+584values, creates584integer rowadjacency indices after584count visits, runs three584entry singletonfilters and510pivotlookup visits; mainnumeric140divisions. Freshmaps140Lcoefficients, transposes140LT andvisits140level edges, Utail0. Native160+160structuralindexscans and28eligible numericrowadjacencycopies are differentfamilies from Roseintegerrowlists, not subtractable. Main scalarLdivision operands/outputs match bycoordinate; actualcross-solver divisionexecution-order equality not claimed.",
+  "allocation_interpretation": "Diagnosticallocation counts only, not acceptedELF or elapsed costs. Ordered139allocation/growth excl12emptyNucleus; fresh126;aux60; parent includesbasisinput,reset,WORK andretirement. Construction scopes includecallee-local cleanup; returnedStructure/main/aux storage persists. Oldmain/aux/localstructure retirement belongsparent. Native0observed exportedalloc/free inside d4190 excludes retainedworkspace lifetime/drivercaller anddoesnot provezero privateallocation.",
+  "empty_nucleus": {
+    "calls": 3,
+    "raw_instructions": 39247,
+    "approximately_calibrated_instructions": 39241,
+    "percent_of_accepted_solve_instructions": 0.021660329041408886,
+    "selected_call_raw_instructions": 12625,
+    "selected_diag_alloc": {
+      "alloc": 12,
+      "growth": 0,
+      "free": 12,
+      "requested_bytes": 46748
+    },
+    "decision": "Insubstantialinstructionopportunity: threeemptycalls/39247rawI(~.0217%solveI), not a time bound. No empty-nucleus prototype. All16nucleus calls total7.294644MI includesrequired laternumericalwork; not removable."
+  },
+  "auxiliary_column_sort": {
+    "calls": 16,
+    "raw_instructions": 1025200,
+    "approximately_calibrated_instructions": 1025168,
+    "percent_of_accepted_solve_instructions": 0.5658055222883887,
+    "per_call_raw_instructions": [
+      30695,
+      31749,
+      31474,
+      43649,
+      44362,
+      48505,
+      53361,
+      65371,
+      71422,
+      77879,
+      79710,
+      85823,
+      88798,
+      92923,
+      89445,
+      90034
+    ],
+    "scope": "Accepted55af c852a..c853e: complete stable sorthelper including its allocation/cleanup for col_order by(column_length,incoming_position). Initial identityvector construction and any alternative histogram/prefix/scatter/cleanup costs excluded from opportunity.",
+    "qualification": "SC50A60 first, thenone bounded completeRose-only DEGEN2run. PMU target-pid userinstructiongroup/no multiplexing; known5\u21927calibration applies. All debugcycles/timers excluded; no new numericalvectors/comparison beyond163."
+  },
+  "checks": {
+    "complete_result_checks": [
+      "sc50a60-result",
+      "degen2-20-result",
+      "degen2-20-all-result",
+      "nucleus-sc50a60-result",
+      "nucleus-degen2-640-result",
+      "auxsort-sc50a60-result",
+      "auxsort-degen2-640-result"
+    ],
+    "all_match": true,
+    "original_records": {
+      "agree": true,
+      "records": 1002,
+      "excluded_observational_tags": [
+        "FCINPUT",
+        "FCAUX",
+        "FCENSUS"
+      ],
+      "complete_result_and_exit3_match": true
+    },
+    "literal_source_reversal": {
+      "literal_reconstruction": true,
+      "files": {
+        "dual.rs": "fe1906402ab140438f3c1f5b4636d4871d2bcea18dba2dd090d8b7488851753c",
+        "lu_order.rs": "709d2e49b3ccf0313fb17aefb352f1975a2476196320ca54715d8d0966ac38cb",
+        "ftran_order.rs": "51428eab990e9913b12bbbba226fd5d76bd828c3da2069aa57dcf5e419aa9ad4",
+        "lu.rs": "5b3d2b6034763194e17a3be9846d1bd419851a3e936175fc999ddf42ae8b7dd9",
+        "dump.rs": "c8141087e80390c23afbb8313ec019bf969690c861141cbb5313f3b7828bc4b5",
+        "bin/rose.rs": "b13a95a0ec767833ba4d9ca06f44861cac2a54ea6b5587655472055fcc7946f8"
+      }
+    },
+    "full987": "Not newlyrun for diagnostic probe; no acceptedsourcechange or optimizationpromoted."
+  },
+  "rejected_trial_review": "No restartof freshfrontier/overlay, closure-sort fusion, direct-coordinateMarkowitz, sharedL/transpose, flatAux, auxpanels, columnownership, arenas or Lhandoff. Existing true_d presorted-column trial concerns coefficient-row sorting insidecolumns, not auxiliarycol_order sorting of basispositions bylength/tieindex. No prior col_order stable/counting sort trial found inSTATE.",
+  "next_experiment": "One isolated integer column-order trial: bounded length histogram/prefix/scatter producing exactly the same(length,incoming_position) order; retain originalsort for unsuitablekeyrange/smallcases, includehistogramconstruction/cleanup. Prove exactpermutation againstoriginal oncapturedfactor16 lengths andrandom/tie/empty/extremekeys, thenmatching fixed39PGO countergate beforetiming/fullgates. Numericfactor body/FPorder/WORK/dumpsmustremainunchanged. Entirecurrent sort~.566%solveI is a ceiling before replacementcost, not achievable time saving or enough toclose2.74x.",
+  "reconciliation": "No substantial new repeated numeric elimination or completecross-solverinclusive factor delta established in thissimplefactor. Newinstruction scopes arealreadywithinacceptedoverall181.193MIandexistingfactor/F-Bpools; do notaddthem to127.995MI/89.315Mcycle overallgap. Existing76.132MI/66.876Mcycle outside-F/B residual remains unchanged/unexplained by thiscensus.",
+  "goal_achieved": false,
+  "no_optimization_implemented": true,
+  "artifacts": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-factor-census",
+  "central_command": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-factor-census/central-factor16.command.txt",
+  "script_hashes": {
+    "target/perf-degen2-factor-census/rose/prepare.py": "3ae089a32abbaf2e931cfe3ee624202f83667655b244f8016d7f65fd2db532f3",
+    "target/perf-degen2-factor-census/rose/nucleus_cost.py": "9b177aa819a9c2a060aec2e2d5605835629acd32ede38b2e4c26178fdd5fd71e",
+    "target/perf-degen2-factor-census/rose/aux_sort_cost.py": "ec0a7011568f27b63ac950bbe7bb8831956346e3ad99adc1c3d00699c20294a1",
+    "target/perf-degen2-factor-census/rose/summarize.py": "ca9b3b43aa68e8e064456688fecbe8c42d54a0362198e87b0360d2d130815457",
+    "target/perf-degen2-factor-census/rose/build.py": "f003ea19b620f080e6d084bc01e8d229630a4e1a3c3f95e30145f9ae8297f908"
+  },
+  "central_compare_sha256": "018272f621f67a91bc4ef35e1b21ae89e8212b23215cc9692c1ce33becb08c59",
+  "production_hashes": {
+    "target/release/rose": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "target/perf-optimized-build/rose-pgo-tcmalloc": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "target/perf-reference/reconstructed/libgurobi130.so": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30"
+  },
+  "completed_auxiliary_order_trial": "degen2-aux-length-order.json: exactintegerbucketorder tests6/6,fast940,17201dumps;ownPGO\u2212.3951%I/\u22121.2937%C, firsttiming75117inconclusive. No75189/retry/retuning/promotion. Nextindependent evidence source ismode1 ROW/pivot-state cost split in degen2-pivot-scope.json.",
+  "completed_nonempty_constructor_followup": "degen2-construction-accounting.json",
+  "constructor_return_qualification": "d4190 numeric CSR/diag/L fresh, but live update headers installed later. Compare actual f15c0 driver return for installed projection; see completed_nonempty_constructor_followup."
+}

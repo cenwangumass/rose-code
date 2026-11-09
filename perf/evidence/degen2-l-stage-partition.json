@@ -1,0 +1,315 @@
+{
+  "previous_goal_turn_classification": "Progress: completed cached strict alignment/complete-boundary synthesis and changed next action to L+eta cost decomposition; no speedup credited.",
+  "scope": "Bounded diagnostic, immutable accepted ELF. No optimization, numeric-source or dump/WORK/parity changes. New Rose whole instruction ledger is unpaired after strict frontier; no numerical trace or native comparison past163.",
+  "configuration": {
+    "Rose_ELF": "target/perf-optimized-build/rose-pgo-tcmalloc",
+    "Rose_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "ordinary_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "CPU": 2,
+    "profile": "dual-release",
+    "full_cap": 640
+  },
+  "alignment": {
+    "tool": "../reverse-engineer/tools/compare.py",
+    "delegate": "/root/ref_compare",
+    "prefix": 162,
+    "first_difference": "needed pivot163 basis22 native-minuszero / Rose-pluszero",
+    "reused_checks": "target/perf-degen2-fb-cached-audit/summary.json"
+  },
+  "whole_Rose_L_eta": {
+    "calls": {
+      "full": 747,
+      "needed": 634
+    },
+    "instructions": 25387227,
+    "family_instructions": {
+      "full": 9966112,
+      "needed": 15421115
+    },
+    "nonoverlapping_parts": {
+      "dense_L_numeric_walk": 9344032,
+      "dense_L_support_recount": 870241,
+      "dense_spike_construction_and_publication": 4130082,
+      "general_eta_operand_gather": 1767646,
+      "general_eta_dot": 2065352,
+      "cached_L_numeric_and_scheduling": 1718040,
+      "fallback_L_numeric_and_scheduling": 991367,
+      "successful_cached_suffix_including_eta_output": 1219813,
+      "remaining_input_prepare_WORK_dispatch_cleanup": 3280654
+    },
+    "raw_parts": "target/perf-degen2-l-partition/whole-parts.json",
+    "known_previous_total": 25387017,
+    "difference_from_previous_total": 210,
+    "meaning": "Complete original L+eta roots including helpers/WORK/local cleanup/return. Returned spike and retained factor/cache lifetimes remain separate. Cost partitions include required work; not removable or time shares."
+  },
+  "selected_135": {
+    "Rose_pricing": 136,
+    "native_pivot": 135,
+    "full_L_eta": 22421,
+    "needed_L_eta": 34447,
+    "total": 56868,
+    "combined_cache_prepare_and_reset": 5846,
+    "combined_cache_input_scatter_queue": 1500,
+    "combined_cached_numeric_scheduling": 18763,
+    "combined_fallback_numeric_scheduling": 15574,
+    "combined_dense_spike_call": 9932,
+    "eta_count_each": 1,
+    "eta_terms_each": 4,
+    "eta_gather_each": 99,
+    "eta_dot_each": 33,
+    "queue_calls": {
+      "full_inputs": 5,
+      "full_terms": 46,
+      "needed_inputs": 14,
+      "needed_terms": 132
+    },
+    "combined_queue_calls_inclusive": 6460,
+    "limits": "Queue cost is a subset of input/numeric scopes. Fine total residual0-2I. Corresponding L ordered operands/raw444 slots already pass central proof; exact all-eta numerical histories not claimed."
+  },
+  "accepted_sampled_self_exposure": {
+    "queue_instructions": 397531.1875,
+    "queue_cycles": 532897.8333333334,
+    "dense_spike_instructions": 3368642.3229166665,
+    "dense_spike_cycles": 1171718.0833333333,
+    "qualification": "Reused healthy profiles; self samples, not inclusive costs or calibrated exact counts. Queue exposure0.22% whole solve instructions closes standalone queue-microoptimization lead. Dense spike already uses accepted branch-free compaction; no output/owner trial reopened."
+  },
+  "distortion": {
+    "new_code_generation_distortion": 0,
+    "calibration": "Reused known5originalI->7observedI; subtract2I per stopped interval. All PMU enabled==running.",
+    "whole_intervals": 57675,
+    "whole_instruction_correction": 115350,
+    "selected_root_detail_residual_instructions": "0-2",
+    "whole_repeated_partitions_difference": 45,
+    "whole_original_root_census_difference": 210,
+    "instruction_error_bound": "No exact whole-run bound claimed. Residual includes calibration/allocation/control variation.",
+    "cycles_and_debugger_wall_attribution": "All excluded. Whole last debugger run24.22s, not solve time.",
+    "qualified_small_first": "AFIRO3/SC50A3 root/detail/repeat controls under.64s; DEGEN2 cap20 .76s, cap1371.81s; whole bounded40s completes24.22s."
+  },
+  "validation": {
+    "complete_result_exit_and_zero_sign_controls": 16,
+    "all_pass": true,
+    "artifacts": [
+      "target/perf-degen2-l-partition/8",
+      "target/perf-degen2-l-partition/dense640",
+      "target/perf-degen2-l-partition/fine0",
+      "target/perf-degen2-l-partition/6",
+      "target/perf-degen2-l-partition/5",
+      "target/perf-degen2-l-partition/3",
+      "target/perf-degen2-l-partition/census640",
+      "target/perf-degen2-l-partition/census20",
+      "target/perf-degen2-l-partition/census137",
+      "target/perf-degen2-l-partition/2",
+      "target/perf-degen2-l-partition/0",
+      "target/perf-degen2-l-partition/dense137",
+      "target/perf-degen2-l-partition/fine1",
+      "target/perf-degen2-l-partition/4",
+      "target/perf-degen2-l-partition/1",
+      "target/perf-degen2-l-partition/7"
+    ],
+    "accepted_hashes_unchanged": true,
+    "full_parity": "Not rerun: production source and binaries untouched. Prior qualified build parity retained, no new numerical claim."
+  },
+  "mechanism_and_limits": "Selected sparse L excess is chiefly index/support/scheduling plus duplicate traversal and output construction; eta dot is tiny there. Whole source accounting shifts primary exposure to dense L walk9.344M, with9.111M after pricing163, and cannot be explained by selected135 sparse behavior. Native internal inclusive costs and complete visited-entry histories are still necessary before a substantive optimizer.",
+  "one_next_experiment": {
+    "type": "Diagnostic only, different remaining boundary.",
+    "question": "At matched source149/native148, do full/needed U solve roots repeat numerical work or spend excess on structural scans/bookkeeping versus nativejoint12c300?",
+    "basis": "Complete sourcefull+needed roots67988I minusL+eta31099I leaves36889I; nativejointU/publication4050I. Scopeendpoint/lifetimes mustbe reconciled before subtracting. RawL/neededaftereta states and403actualLterm projections alreadyaligned.",
+    "design": "Reusecached149states, strictlycentral compare.py pairing anddelegatedreferencecapture. Observe actualUorderedterms, scans/WORK/input-output helper costs withincomplete disjoint boundaries, usingimmutableELFs andcalibratedfixedPCinstructions. No comparisonpast163, no debuggercycles.",
+    "benefit": "Diagnostic0. Local36889/4050scope exposure isnot an equivalent/removablegap and cannotbe multipliedby634. No whole-solve benefitprediction before actualoperationandlifecycle proof.",
+    "rejected_check": "No retry of empty-gap83117/83189, rowmapcache, shorttau, two-vectorfusion, WORKdeferral, F2workspace, outputorder, preUownership, packedL, completedLhandoff orarenas."
+  },
+  "reconciliation": {
+    "accepted_gap_instructions": 127995000,
+    "accepted_gap_cycles": 89315000,
+    "known_FB_self_gap_instructions": 51863004.8515625,
+    "known_FB_self_gap_cycles": 22439118.572916716,
+    "outside_FB_pools_instructions": 76131995.1484375,
+    "outside_FB_pools_cycles": 66875881.42708328,
+    "note": "All new L+eta costs are nested inside existing F/B/whole pools, never added. Local selected differences cannot be multiplied by634."
+  },
+  "artifact_hashes": {
+    "target/perf-degen2-l-partition/measure.py": "a892d2be373a1748bfd1c8b1732ea8bcd6a33a46b075e2b8c572d7c338ac4209",
+    "target/perf-degen2-l-partition/measure-fine.py": "9da6a645c2baaccc7aa4af163736d5f2d74fd062f5b0d81c6ec24a21d3ef3112",
+    "target/perf-degen2-l-partition/measure-census.py": "cfb588d26049ca6e83443f47cf8e5f759b4595d0b2d110df618cc1efb650fa6e",
+    "target/perf-degen2-l-partition/measure-dense.py": "2f46c80cdd13d4adeb0a38f00eb0576256e93202b9d66a351d21fbc2f682980f",
+    "target/perf-degen2-l-partition/accepted-L.asm": "fed41afbc4ae41a3995da0b20e24319147bc4ec48f250a0194d88b925aa3cf73",
+    "target/perf-degen2-l-partition/whole-parts.json": "719a6a8925e60e8b2c2322bc2ebe2e6c03a7bca73499ca2df90dd5e6148bd263",
+    "target/perf-degen2-l-eta-audit/summary.json": "71f6ea6b79679d8539bf59388fd913d874d06aaa1acfbad8a06a72e77eb6a9e7"
+  },
+  "delegated_reference_partition": {
+    "configuration": {
+      "Rose": "accepted55af",
+      "native": "immutable26a505",
+      "profile": "dual-release",
+      "native_selected": 135,
+      "Rose_pricing": 136,
+      "context_it": 134,
+      "r": 419,
+      "q": 140,
+      "nativecap": 135,
+      "cycles_and_timers": "EXCLUDED"
+    },
+    "central_validation": {
+      "captures": 7,
+      "all_input_output_boundary_gates_pass": true,
+      "command": "target/perf-degen2-l-eta-audit/central-command.txt",
+      "no_numerical_comparison_past162": true
+    },
+    "native_complete_wrapper_I": {
+      "control_range": [
+        23001,
+        23002
+      ],
+      "final_two_partitions": [
+        23001,
+        23001
+      ],
+      "pre_U_prefix": 12211,
+      "paired_full_needed": 22650,
+      "whole_wrapper": 23001
+    },
+    "native_pre_U_partition_I": {
+      "paired_preparation_to_full_CALL": 269,
+      "full_L_inclusive": 1985,
+      "between_L_calls": 19,
+      "needed_L_inclusive": 4806,
+      "post_L_to_U": 5132
+    },
+    "native_L_detail_I": {
+      "full": {
+        "call_prologue_dispatch_bucket_reset": 76,
+        "input_scatter_bucket_construction": 109,
+        "numeric_L_with_node_support_scheduling_output": 1776,
+        "WORK_publication_epilogue_return": 24
+      },
+      "needed": {
+        "call_prologue_dispatch_bucket_reset": 76,
+        "input_scatter_bucket_construction": 244,
+        "numeric_L_with_node_support_scheduling_output": 4462,
+        "WORK_publication_epilogue_return": 24
+      }
+    },
+    "native_post_L_detail_I": [
+      {
+        "begin": "L_needed_return",
+        "end": "eta_dispatch",
+        "instructions": 6
+      },
+      {
+        "begin": "eta_dispatch",
+        "end": "eta_dense_pair",
+        "instructions": 18
+      },
+      {
+        "begin": "eta_dense_pair",
+        "end": "full_dense_clear_begin",
+        "instructions": 13
+      },
+      {
+        "begin": "full_dense_clear_begin",
+        "end": "full_dense_clear_end",
+        "instructions": 429
+      },
+      {
+        "begin": "full_dense_clear_end",
+        "end": "needed_dense_clear_begin",
+        "instructions": 214
+      },
+      {
+        "begin": "needed_dense_clear_begin",
+        "end": "needed_dense_clear_end",
+        "instructions": 429
+      },
+      {
+        "begin": "needed_dense_clear_end",
+        "end": "eta_dots_begin",
+        "instructions": 596
+      },
+      {
+        "begin": "eta_dots_begin",
+        "end": "eta_output_admission",
+        "instructions": 127
+      },
+      {
+        "begin": "eta_output_admission",
+        "end": "dense_spike_begin",
+        "instructions": 5
+      },
+      {
+        "begin": "dense_spike_begin",
+        "end": "dense_spike_end",
+        "instructions": 3285
+      },
+      {
+        "begin": "dense_spike_end",
+        "end": "joint_U_begin",
+        "instructions": 10
+      }
+    ],
+    "coarser_post_L_partition_I": {
+      "Lreturn_to_eta_dispatch": 6,
+      "density_dispatch": 18,
+      "pair_setup": 13,
+      "full_dense_clear_444_slots": 429,
+      "full_sparse_scatter_and_next_setup": 214,
+      "needed_dense_clear_444_slots": 429,
+      "needed_sparse_scatter_and_eta_setup": 596,
+      "both_eta_dots_metadata_WORK": 127,
+      "dense_full_spike_scan_dispatch_to_U": 3300
+    },
+    "spike_partition_I": {
+      "dispatch": 5,
+      "444slot_scan_and_publish24entry_spike": 3285,
+      "U_admission": 10
+    },
+    "native_required_L_machine_execution_count": {
+      "proven_selected_terms": 178,
+      "full": 46,
+      "needed": 132,
+      "MULSD": 178,
+      "XORPS_sign_negation": 178,
+      "ADDSD": 178,
+      "store": 178,
+      "contiguous_numeric_store_instructions": 712,
+      "scope": "Static original instruction execution census from prior ordered actual LTERM trace plus contiguous disassembly12b888..12b899; no arithmetic-only PMU measurement or time share."
+    },
+    "interpretation": "Large selected native/Rose gap is not eta arithmetic. Native2L calls6791I andtwoeta-dots/metadata/WORK127I; source duplicate cached+fallbackL, support/scheduling, andtwo4966I dense_spike constructions account for large selected exposure. Construction/support costs include required work, not removable time. Sourceselected135unrepresentativewholemode: wholeRose dense L numeric9.344032MI dominates wholeL25.387227MI; cachednumeric1.718040MI andfallback.991367MI are smaller. No optimization/retry.",
+    "calibration": {
+      "ordinary_interval_extra_I": 2,
+      "five_PUSH_observed_I": 7,
+      "same_stopped_inferior_reads_equal": true,
+      "multiplexing": false,
+      "root_detail_reconciles": true,
+      "excluded": "Initialpartition b131823829 includes nested L_entry stops; one CALL\u2192callee-entry interval observes1I perturbation rather than2I, leaving2I aggregate deficit. Retained but excluded; finalpartition omits unnecessary calleeentry markers and reconciles without a special correction. All clocks/cycles excluded."
+    },
+    "alignment_limits": "Input/output gate exactatdeclaredtransactionboundaries. OrderedLoperands before previously proved46/132 nativeonce/Rosetwice remain priorcachedproof. No neweta visitedoperand comparison or exhaustedL/eta/U innerstate equivalence. Root/body construction/lifecycle not amortized. Retained factor buffers outside thistransaction.",
+    "next_dense_witness_cached_only": {
+      "Rose_pricing": 149,
+      "native_pivot": 148,
+      "context_it": 147,
+      "r": 138,
+      "q": 448,
+      "mapping": "Exactcontextit/r/q selectedfromsavedDSX/F2,headalreadygatedbystrictprefix162;notassumedordinaloffset",
+      "native_routes": [
+        "0x12a990",
+        "0x12bd30",
+        "0x129aa0",
+        "0x12c300"
+      ],
+      "available": "Strict full/needed outputs and neededrhoinput underprovenmapping;native rawin1/in2 saved",
+      "missing": "No source149 KERNEL rawLstate/ordered denseLoperand capture, no native selected149 innerLtrace or inclusivecostpartition. No new149capturethisturn."
+    },
+    "artifacts": {
+      "comparison": "target/perf-degen2-l-eta-audit/central-comparison.json",
+      "commands": "target/perf-degen2-l-eta-audit/central-command.txt",
+      "provenance": "target/perf-degen2-l-eta-audit/capture-provenance.json",
+      "L_asm": "target/perf-degen2-l-eta-audit/native-L.asm",
+      "preU_asm": "target/perf-degen2-l-eta-audit/native-pair-preU.asm",
+      "spike_asm": "target/perf-degen2-l-eta-audit/native-dense-spike.asm"
+    },
+    "no_solver_changes": true
+  },
+  "completed_dense_witness_followup": "degen2-dense-L-diagnosis.json",
+  "completed_empty_gap_followup": "degen2-empty-L-gap.json"
+}

@@ -1,0 +1,257 @@
+{
+  "previous_goal_turn_classification": "Progress: ROWphase/purpose split and immutableELF row/basis/DSEcounters narrowed nextaction. This turn separates rowproduct operations andobserves first actualADDoperand difference.",
+  "scope": "Bounded diagnostic only; no optimization, solveredit, baseline/WORK/FPorder change. Reuses accepted55af/systemTCMalloc andnative26a505 withmatchingdualrelease; newtraces/countersseparate, codegenunchanged.",
+  "configuration": {
+    "rose_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "ordinary_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "source_cost_CPU": 2,
+    "native_capture_CPU": 3,
+    "cycles_and_timers_excluded": true
+  },
+  "selected": {
+    "Rose_pricing": 136,
+    "native_pivot": 135,
+    "context_it": 134,
+    "rho_rows": 14,
+    "rho_nonempty_rows": 13,
+    "coefficient_entries": 179,
+    "mul_instructions_each_solver": 179,
+    "add_instructions_each_solver": 179,
+    "first_touches_each_solver": 135,
+    "structural_entries_after_tolerance": 91,
+    "slacks": 14,
+    "published_outputs": 105,
+    "source_coef_histogram": {
+      "bff0000000000000": 46,
+      "3ff0000000000000": 133
+    },
+    "source_distinct_row_coef_products": 24,
+    "source_dense_order": false,
+    "Rose_root_instructions": 10157,
+    "native_root_instructions": 4394,
+    "root_excess": 5763,
+    "Rose_nonoverlap_parts": {
+      "rho_row_length_estimate": 135,
+      "dense_arrays_allocation_zero_and_dispatch": 738,
+      "coefficient_arithmetic_first_touch_and_sparse_order": 5110,
+      "dense_support_order_scan_and_growth": 7,
+      "tolerance_filter_compaction": 1561,
+      "slack_arithmetic_indexing_and_order_growth": 583,
+      "result_allocation_and_setup": 60,
+      "output_gather_status_sign_and_multiply": 1799,
+      "local_order_touched_acc_cleanup": 126,
+      "WORK_estimate_and_booking": 38
+    },
+    "native_matched_scatter_subcost": "Unmeasured; cannot subtractRose5110fromnativewhole4394ascomparablearithmeticscopes."
+  },
+  "central_numerical_comparison": {
+    "profile": "dual-release",
+    "pricing": 136,
+    "context_it": 134.0,
+    "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "accepted_rose_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "reference_capture_sha256": "540d9f73a0b9fcc2b1f0393d9eb7e013aebb4fa6abef1941942db3488b0f65ef",
+    "rose_trace_sha256": "319e91fd31d3943bf375da9b2d6322079b8deeec948e77930154272e71c01028",
+    "rho_rows": 14,
+    "ordered_coefficient_visits": 179,
+    "input_row_and_coefficient_order_match": true,
+    "independent_product_projection": {
+      "input_roles_and_result_bits_match": true,
+      "products": 179,
+      "native_coef_times_rho": 172,
+      "native_rho_times_coef": 7,
+      "scope": "Projection compares logical coefficient/rho roles and actual product-result bits. It does not assert identical operand placement or ADD inputs/results."
+    },
+    "native_uniform_precomputes": 0,
+    "native_exported_allocations": [],
+    "native_memory_helpers": [],
+    "native_output_count": 105,
+    "rose_output_count": 105,
+    "native_first_touch_sentinel_operands": 135,
+    "source_input_distinct_columns": 135,
+    "strict_trace_status": "FAIL_FIRST_ADD_INPUT",
+    "scope": "Original immutable binaries; semantic trace excluded from costs. Existing published105entry row endpoint proof is separate; numeric ADD trace stops at first raw operand difference. Inactive priority mismatch remains outside this operation input gate, unchanged.",
+    "first_difference": {
+      "term_ordinal": 1,
+      "row": 295,
+      "destination": 1,
+      "field": "actual_ADD_accumulator_input",
+      "native_bits": "16687e92154ef7ac",
+      "rose_bits": "0000000000000000",
+      "native_value": 1e-200,
+      "rose_value": 0.0,
+      "native_add_pc": "0x135ee9",
+      "native_instruction": "addsd xmm3,xmm0; xmm3 contains sentinel; all first-touch branches converge before MUL+ADD",
+      "native_product_bits": "3ff0000000000000",
+      "rose_product_bits": "3ff0000000000000",
+      "later_add_states_compared": false
+    },
+    "strict_add_states_matched": 0
+  },
+  "arithmetic_qualification": {
+    "input_rows": "14ordered rho/rrows inputrows and179coefficientvisits agree exactly.",
+    "products": "179logical coefficient/rho roles andactual productbits agree. Native172coef*rho and7rho*coef retainactualoperandplacement; no generalizedcommutationclaim.",
+    "ADD": "RawcomparisonFAILsatfirstterm,row295,column1:nativeactualADDinput1e-200bits16687e92154ef7ac, Rose+0bits0000000000000000. Bothproducts+1. Nativeinstruction135ee9addsactualsentinel, notfirsttouchproductcopy. StrictADDcomparisonstopsthere; no lateraccumulator-state pass.",
+    "published_endpoint": "Existing105entryrow outputbitproof isseparatefromstrictintermediateADDcomparison. Sourceoriginaloutput/dumpbehavior isunchanged. No sentinelnormalization orport proposed.",
+    "frontiers": "Triangularfull/neededOUTPUTprefix162 and\u22120/+0needed163 remainseparate. NewlyobservedROWinternalADDdifference isselected136term1, notanassertion about earliestROWdifference acrossallpivots. Inactivepriorityfailurealso remainsunpaired underselectedlistwalkconsumed-stategate."
+  },
+  "native_representation": {
+    "actual_selected_route": "179explicitnumericcoefficients; numeric-countpointerNULL; uniformprecomputes0. Uniformsuffixdisassemblyisnotaruntimeopportunityproofhere.",
+    "first_touch": "Retainedaccumulatorstarts1e-200andservesasfirsttouchmarker;135firsttouchsentinelsactuallyfeedADD. Sourcezeroaccandseparatetouchedflagsperformsame179MUL/179ADDbutdifferentinitialADDinputs.",
+    "ownership": "0observedexportedallocator/free and0memory-helpercallsinselectedroot. Nativepersistentworkspaceconstruction/retirement outsideitsroot; notassumedfree orprivatelyallocation-free. Sourcearrays/resultallocation/localcleanupincluded inowningregions; returnedrowretirementlaterinOBJECT."
+  },
+  "whole_Rose_census": {
+    "calls": 634,
+    "metrics": {
+      "rho_count": 52238,
+      "coefficient_occurrences": 220946,
+      "distinct": 87251,
+      "structural_kept": 60679,
+      "offered_slacks": 52238,
+      "output_count": 112917,
+      "distinct_row_coefficient_products": 64318
+    },
+    "coefficient_histogram": {
+      "3ff0000000000000": 142986,
+      "bff0000000000000": 77960
+    },
+    "dense_order_calls": 324,
+    "sparse_order_calls": 310,
+    "calibrated_root_instructions": 12610334,
+    "parts": {
+      "rho_row_length_estimate": 432487,
+      "dense_arrays_allocation_zero_and_dispatch": 470572,
+      "coefficient_arithmetic_first_touch_and_sparse_order": 4011396,
+      "dense_support_order_scan_and_growth": 2413717,
+      "tolerance_filter_compaction": 996745,
+      "slack_arithmetic_indexing_and_order_growth": 2201101,
+      "result_allocation_and_setup": 53692,
+      "output_gather_status_sign_and_multiply": 1927192,
+      "local_order_touched_acc_cleanup": 79885,
+      "WORK_estimate_and_booking": 23547
+    },
+    "phase_table": [
+      {
+        "phase": "positive_level_listwalk",
+        "calls": 131,
+        "dense_order_calls": 0,
+        "rho_entries": 212,
+        "coefficient_visits": 2217,
+        "instructions": 293255,
+        "parts": {
+          "rho_row_length_estimate": 4710,
+          "dense_arrays_allocation_zero_and_dispatch": 97026,
+          "coefficient_arithmetic_first_touch_and_sparse_order": 95068,
+          "dense_support_order_scan_and_growth": 918,
+          "tolerance_filter_compaction": 14877,
+          "slack_arithmetic_indexing_and_order_growth": 13109,
+          "result_allocation_and_setup": 11186,
+          "output_gather_status_sign_and_multiply": 34607,
+          "local_order_touched_acc_cleanup": 16506,
+          "WORK_estimate_and_booking": 5248
+        }
+      },
+      {
+        "phase": "level0_listwalk",
+        "calls": 147,
+        "dense_order_calls": 33,
+        "rho_entries": 3251,
+        "coefficient_visits": 24939,
+        "instructions": 1460108,
+        "parts": {
+          "rho_row_length_estimate": 29389,
+          "dense_arrays_allocation_zero_and_dispatch": 109825,
+          "coefficient_arithmetic_first_touch_and_sparse_order": 498156,
+          "dense_support_order_scan_and_growth": 250328,
+          "tolerance_filter_compaction": 161916,
+          "slack_arithmetic_indexing_and_order_growth": 140420,
+          "result_allocation_and_setup": 14095,
+          "output_gather_status_sign_and_multiply": 232290,
+          "local_order_touched_acc_cleanup": 18522,
+          "WORK_estimate_and_booking": 5167
+        }
+      },
+      {
+        "phase": "value_mode",
+        "calls": 356,
+        "dense_order_calls": 291,
+        "rho_entries": 48775,
+        "coefficient_visits": 193790,
+        "instructions": 10856971,
+        "parts": {
+          "rho_row_length_estimate": 398388,
+          "dense_arrays_allocation_zero_and_dispatch": 263721,
+          "coefficient_arithmetic_first_touch_and_sparse_order": 3418172,
+          "dense_support_order_scan_and_growth": 2162471,
+          "tolerance_filter_compaction": 819952,
+          "slack_arithmetic_indexing_and_order_growth": 2047572,
+          "result_allocation_and_setup": 28411,
+          "output_gather_status_sign_and_multiply": 1660295,
+          "local_order_touched_acc_cleanup": 44857,
+          "WORK_estimate_and_booking": 13132
+        }
+      }
+    ],
+    "root_percent_of_accepted_solve_instructions": 6.959614333887071,
+    "explicit_array_result_alloc_and_local_cleanup_instructions": 604149,
+    "logical_dense_array_zero_bytes": 5580468,
+    "qualification": "WholeRoseonly aggregates, no persistedlaternumericvectors ornewnativepairingafterstrictfrontiers. Per-sourcebody allcoefficiententries performoneMUL/ADD; oneactualselectedruntime179termtracevalidatesthiscensusmodel. Regionsincludehelpercallsandrequiredarithmetic; growthreallocation remainsinsidescatter/order/slackloops. Bytecountislogicalzeroextent, notDRAMtraffic orremovabletime."
+  },
+  "distortion": {
+    "new_code_generation": 0,
+    "counter": "Target-pid perf_event_open userinstructions. Known5originalinstructionsmeasure7 inprioraccepted/nativecalibrations. Newroot-only10157, twodetail10157;trace10158andnativeproducttraceexcludedfromcosts. Everyintervalenabled==running.",
+    "whole_repeat_consistency": "Newwhole634roots12610334vspriorROWscope12610329/12610316, residual5\u201318I. Scopeparts reconcileexactly tothiscount. Countersarecalibratedestimates, notanexacterrorbound.",
+    "semantic_trace_separate": true,
+    "all_new_cycles_timers_excluded": true,
+    "whole_Rose_GDB_wall_seconds": 5.630523423998966,
+    "excluded_probes": "TwoinitialAFIROqualifications stoppedatinvalidGDBmemoryview-byteconversion forrouteflag; terminal, no timing/costclaims. Corrected.tobytes()[0] version passesAFIRO/SC50AbeforeDEGEN2. Initialscripts/logs retained."
+  },
+  "validation": {
+    "Rose_result_exit_signedzero_controls": 7,
+    "all_match": true,
+    "native_small_qualification": "AFIRO/SC50A captures precedeselectedDEGEN2cap135",
+    "central_comparator": "../reverse-engineer/tools/compare.py dual-row-operations; expectedexit1firstADDinput mismatch retained",
+    "source_optimization_changes": false,
+    "accepted_hashes_preserved": true,
+    "new_full_parity": "Notrerun: no solverbinary/sourcechange. Prior22stageprobe987/987qualification isseparate andnotclaimed asnewtest."
+  },
+  "reconciliation": {
+    "new_rowproduct_ledger_sum": 12610334,
+    "known_accepted_whole_solve_instructions": 181193000,
+    "overall_gap_instructions": 127995000,
+    "overall_gap_cycles": 89315000,
+    "known_FB_sampled_self_gap_instructions": 51863005,
+    "known_FB_sampled_self_gap_cycles": 22439119,
+    "outside_FB_pools_instructions": 76131995,
+    "outside_FB_pools_cycles": 66875881,
+    "meaning": "NewROWledger already liesinsidewhole/selfcosts; neveraddit tothegap. Native4394I isoneoperation, cannotmultiplyby634orcomparewithsourcevaluephasewholecostwithoutmatchingpaths. No wholeROWinclusive crosssolvercyclegap orremovabletime measured. Target45.784/16.696ms(2.74x)unchanged."
+  },
+  "conclusions": [
+    "Selectedgap isnotmorecoefficientvisits ormoreMUL/ADD counts:179each. ActualADDinitialstates differ, so notabitmatchedarithmeticmicrobenchmark. Representation,firsttouch/order/filter/output/WORK/helperbookkeeping explainobservedadditionalinstructionregions, butexactnativecorrespondingsubregiondeltas remainunmeasured.",
+    "Wholeexplicitarray/resultallocationandlocalcleanup604149I is~.333%solveI. Thisexcludesgrowthinsideotherloops; notatotalallocatorcost ortimeestimate. Do notreviveworkspace/touchedreset/combinedcelltrials fromlogicalzeroing alone.",
+    "Wholecoefficientarithmetic+firsttouch/ordergrowth4.011M I; supportorder2.414M,slackprocessing2.201M,outputgather/sign1.927M containrequiredoperations. No entirehotregion isremovable.",
+    "Cachingoneproductperdistinctrowcoefficient wouldtheoreticallyavoid156628scalarMULinstructions(~.0864%solveI)beforechecks/setup/cleanup, while native179MULs already matchselectedRose. Notasubstantialmechanism; no productreuseprototype.",
+    "No newsubstantialremovablepass isestablishedwithinROW. Its6.96%instructionexposurecannotbyitselfexplain70.6%wholeinstructiongap orprovea2.74xruntimefix."
+  ],
+  "rejected_trial_check": "Workspace/touchedreset,combinedvalue+flagcells(REJECTEDDEGEN2+.59%I),wholepivotownership,rowprefilter/weightedtraversal,rowmapcache,ordinaryscatterboundselision,true_dpresortingremainclosed. No variantsimplemented orscreensrepeated.",
+  "one_next_experiment": {
+    "scope": "Bounded complete mirror-factor-update cost/operation census; nooptimizationyet.",
+    "question": "Split original621mirrorupdates into numeric elimination/etaoperations, transpose/support/pool maintenance, WORK publication anddiagnostic-onlymetadata construction/cleanup. Reuseexistingcaptures/profiles andvalidatedupdateinputs insideprefix; delegate reference comparisons, stopfirstconsumedinput/outputdifference.",
+    "specific_source_lead": "RefStruct::update unconditionallybuilds fp_rows tuplesduringpoolgrowth; onlyconsumer is dump::on(fillparts). Measurethatowner aspartofcompleteupdate, includingcreation/cleanup andrequiredpoolchanges. Do not assumeitscostlarge orskiprequiredWORK/filloperations.",
+    "plausible_benefit": "Directdiagnosticbenefit0. Existingmirror-update4.603ms isanotherdiagnosticELFscope; acceptedfactor-update selfexcess7.857Mcycles(~5.72%solvecycles)includesrequiredworkanddifferentboundaries. Neitherisaremovabletimebudget orspeedupprediction. Need distinct substantialredundancybeforeimplementation.",
+    "why_distinct": "Numerical-operation/optionaldiagnostic-consumer accounting differsfromsettledtouched-updatebuffers,arenas/banks,constructorownership,auxpanels/flatstorage andLhandoff. Ifobservedcostiscoveredbythoseclosedmechanisms, stopwithoutrescue."
+  },
+  "artifacts": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-row-product",
+  "hashes": {
+    "target/perf-degen2-row-product/rose_gdb.py": "81ebc815cf0fd093646f1febd86d2f5cd8dac877c1bdc3515f2b877c9e745ca4",
+    "target/perf-degen2-row-product/rose_gdb-initial.py": "8e62004d3996105a8e898d26dd69421ebb11efea5026f5790b7988590f023554",
+    "target/perf-degen2-row-product/rose-v3/manifest.json": "d0f03b43069735806669bcef78f515b96992dccb9a359791a2e7dec10a40ab51",
+    "target/perf-degen2-row-product/rose-trace136.json": "319e91fd31d3943bf375da9b2d6322079b8deeec948e77930154272e71c01028",
+    "target/perf-degen2-row-product/central-operations.json": "6fe6235d595bddb2367c7abc75e4aac92e28c102a88de19d2922baa9ea220d3e",
+    "target/perf-degen2-row-product/central-operations-command.json": "044702abf276bd621388456740675dd47250545154332f0ad6ffae2cfdf2bd52",
+    "target/perf-degen2-row-product/operations-summary.json": "96e898fd710a2ba8c9251145cd1164b96425ddf367534b81b5a45af29f8823e1",
+    "../reverse-engineer/tools/compare.py": "9f532dcac181e17b878630a27a648cb7040945dc78423fd08bae613ed30f191b",
+    "../reverse-engineer/replay/gdb_dual_row_operations.py": "a085744632146d4b54cf3c2b5610031a33dc831c3a972f4144929c26323b64b4"
+  }
+}

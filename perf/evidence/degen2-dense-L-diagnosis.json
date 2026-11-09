@@ -1,0 +1,490 @@
+{
+  "previous_goal_turn_classification": "Progress: accepted wholeL/eta partition and central dense149/native148 map established; nextaction was matching densepath arithmetic/complete costs.",
+  "scope": "Bounded diagnostic, no optimization or solver/numerical/WORK/dump/parity changes. Selectedsource149/native148; strictfrontier162 preserved. WholeRose aggregate structural/instructioncensus is unpaired, no raw numericvectors afterfrontier.",
+  "configuration": {
+    "Rose_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "ordinary_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "build": "Qualifiedfixed39PGO/systemTCMalloc accepted55af",
+    "profile": "dual-release",
+    "source_counter_CPU": 2,
+    "cycles_and_GDB_timings": "EXCLUDED"
+  },
+  "alignment": {
+    "central_tool": "../reverse-engineer/tools/compare.py",
+    "delegate": "/root/ref_compare",
+    "Rose_pricing": 149,
+    "native_pivot": 148,
+    "context_it": 147,
+    "r": 138,
+    "q": 448,
+    "strict_frontier": 162
+  },
+  "source_observation": {
+    "full": {
+      "input": 10,
+      "visits": 19,
+      "active": 14,
+      "terms": 14,
+      "path": "cached sparse success",
+      "raw_state_limit": "Native sparse afterL is logicalembedding for comparison to Roseworkspace, not actual444nativeoutputmemory. Aftereta fullnativepublishes19slots; unpublishedslots remainunpaired."
+    },
+    "needed": {
+      "input": 49,
+      "visits": 444,
+      "active": 188,
+      "active_nonempty_columns": 54,
+      "terms": 389,
+      "path": "dense L",
+      "raw_state_limit": "All444raw before/inputscatter/afterL/aftereta slots match actualnativeincludingzerosigns. No eta-entry arithmetic-traversal claim."
+    },
+    "schema": "Actualbefore/product/aftermachinebits,raw444vectors; rootreturnaftereta separate from rawL."
+  },
+  "complete_transaction": {
+    "Rose": 72460,
+    "native": 14018,
+    "difference": 58442,
+    "Rose_parts": {
+      "begin": 217,
+      "full_call": 33556,
+      "full_return": 1112,
+      "needed_call": 34432,
+      "needed_return": 1756,
+      "expand": 530,
+      "check": 72,
+      "publish": 495
+    },
+    "Rose_transient_cleanup": {
+      "seven_input_temporaries": 282,
+      "published_col_tau": 80
+    },
+    "Rose_caller_check_excluded": 72,
+    "Rose_full_root": 33556,
+    "Rose_needed_root": 34432,
+    "Rose_outside_roots": 4472,
+    "native_paired_root": 13547,
+    "native_outside_roots": 471,
+    "root_excess": 54441,
+    "outside_excess": 4001,
+    "scope": "Same proven disjoint boundaries as degen2-fb-transaction-cost.json. Native complete wrapper contains inputpreparation405I/paired13547I/publication66I. Rose includes deferredtransientcleanup362I; callercheck72I/interveningupdates excluded. Retainedfactor/cache/F2/spike/auxEta construction/retirement stays factorlifecycle, not assumedfree."
+  },
+  "source_L_eta": {
+    "full": 7819,
+    "needed": 23280,
+    "needed_dense_walk": 14435,
+    "needed_support_recount": 1470,
+    "needed_input_prepare": 1257,
+    "needed_eta_gather": 555,
+    "needed_eta_dot": 256,
+    "needed_dense_result_publication": 4988,
+    "needed_afterpublication_cleanup": 95,
+    "full_cached_walk": 2144,
+    "root_detail_residual": "0\u20131I"
+  },
+  "concrete_mechanism": {
+    "native_dense_intervals_inclusive": [
+      [
+        0,
+        106
+      ],
+      [
+        439,
+        443
+      ]
+    ],
+    "native_visits": 112,
+    "Rose_visits": 444,
+    "extra_interval_half_open": [
+      107,
+      439
+    ],
+    "extra_nodes": 332,
+    "active_extra_nodes": 130,
+    "inactive_extra_nodes": 202,
+    "all_extra_L_columns_empty": true,
+    "selected_gap_PMUI": [
+      7019,
+      7018
+    ],
+    "selected_static_instruction_census": 7018,
+    "inactive_empty_path_I": 9,
+    "active_empty_path_I": 40,
+    "description": "Rose thresholdscans all332;130activeempty nodes additionally load/check zero-lengthspan, convertzero tofloat and add+0 to originalWORKestimate. No coefficient multiplication/scatter in gap. Native denseL skips middle emptyspan.",
+    "limits": "Exposure includes requiredWORK/comparison/FPexception semantics, not safelyremovable cost. Preserve values/sites/order,dumps,signalingNaNs/MXCSR."
+  },
+  "whole_Rose_census": {
+    "calls": 592,
+    "gap_nodes": 119415,
+    "active_empty_nodes": 41338,
+    "static_instruction_exposure": 2356201,
+    "percent_solve_instructions": 1.3003819132085677,
+    "direct_dense_numeric_I": 9344025,
+    "previous_direct_dense_numeric_I": 9344032,
+    "geometries": 16,
+    "strictly_forward_L_and_empty_gap_proved": true,
+    "NaNs_observed_in_gap": 0,
+    "qualification": "Instruction-executionmodel from accepteddisassembly plus aggregateactivity; selectedPMU validateswithin1I, not whole-gap PMU/errorbound. Gapvalues afterL equalvalues atvisitation because allLdestinationsstrictlyforward and gapcolumns empty. No crosssolvernumericalpairing after162."
+  },
+  "machine_code": "Both ordinary denseL implementations use scalarMUL/SUB; native fourwayunroll/32bitdestinationarrays, Rose perentrybounds/64bitindices. Broad arithmetic-speed claim unsupported. Existinglengthcasts, cachedWORKcharges andoutlining trials closed.",
+  "distortion": {
+    "codegen_changed": false,
+    "numeric_trace": "Read-onlyGDB, separatefromcosts. AFIRO3/SC50A3 complete-output controls hitno dense/cacheinnerpath and are instrumentationcontrols only. DEGEN2cap1509.19s exactoutput.",
+    "cost": "Reuse5I=>7I calibration,2I/stoppedinterval includingignorednodehits. Selectedgap332intervals,root445. Root23281\u201323283 versusunprobed23280:1\u20133Iresidual. Allcycles/timersexcluded.",
+    "whole": "Lightdensebegin/end census2.35s aftercap20.64s/cap150.89s; densecount9.344025M vsold9.344032M differs7I."
+  },
+  "one_next_experiment": {
+    "type": "Diagnostic only, different remaining boundary.",
+    "question": "At matched source149/native148, do full/needed U solve roots repeat numerical work or spend excess on structural scans/bookkeeping versus nativejoint12c300?",
+    "basis": "Complete sourcefull+needed roots67988I minusL+eta31099I leaves36889I; nativejointU/publication4050I. Scopeendpoint/lifetimes mustbe reconciled before subtracting. RawL/neededaftereta states and403actualLterm projections alreadyaligned.",
+    "design": "Reusecached149states, strictlycentral compare.py pairing anddelegatedreferencecapture. Observe actualUorderedterms, scans/WORK/input-output helper costs withincomplete disjoint boundaries, usingimmutableELFs andcalibratedfixedPCinstructions. No comparisonpast163, no debuggercycles.",
+    "benefit": "Diagnostic0. Local36889/4050scope exposure isnot an equivalent/removablegap and cannotbe multipliedby634. No whole-solve benefitprediction before actualoperationandlifecycle proof.",
+    "rejected_check": "No retry of empty-gap83117/83189, rowmapcache, shorttau, two-vectorfusion, WORKdeferral, F2workspace, outputorder, preUownership, packedL, completedLhandoff orarenas."
+  },
+  "reconciliation": {
+    "whole_gap_I": 127995000,
+    "whole_gap_C": 89315000,
+    "known_FB_self_gap_I": 51863004.8515625,
+    "known_FB_self_gap_C": 22439118.572916716,
+    "outside_FB_pools_I": 76131995.1484375,
+    "outside_FB_pools_C": 66875881.42708328,
+    "note": "Newcosts are nestedin existingL/F/B/solvepools, neveradd. No selectedgap extrapolationtocallsafterfrontier."
+  },
+  "artifact_hashes": {
+    "target/perf-degen2-dense-L/trace_gdb.py": "0d96a63fa49dbaa1e8b6212772de0a681366caa96ed06493f72b24f19467165f",
+    "target/perf-degen2-dense-L/rose-trace149.json": "c0448da14cf2154b602cc4bdca17d407838d18cf4872e416c2ed96ba62da9b63",
+    "target/perf-degen2-dense-L/rose-trace149.meta.json": "3f644586d485f006cd43aa06d7544415003224d0fa4741e1812daefe18abc851",
+    "target/perf-degen2-dense-L/gap_cost_gdb.py": "89e4bd3b35fc3886cf477caf374a31fff0636e10c01a95267d74772aec3a808e",
+    "target/perf-degen2-dense-L/empty-node-static-paths.json": "cb1c8bb7ce3c144797821d0c05bbd3ab2710fdada98e0323b2df8acccfa64192",
+    "target/perf-degen2-dense-L/gap_census_gdb.py": "fed216d6c8fad67ed8b8cf076e1660d3c273199ca75671912ceb0c157ecbf899",
+    "target/perf-degen2-dense-L/gap-census640/counts.json": "827c079454983ce66358fab06eb550a89c1a37cf6cb8953c6e17e0d39d4975f8",
+    "target/perf-degen2-dense-L/gap-census640/manifest.json": "ff4a03ba026c08644b979f94933b5a962b6b6a8faea6ee9efaecb097f675d5a2",
+    "target/perf-degen2-dense-L/native-dense-L.asm": "3d371d5e757af2e56bf3fcf450428d52aac82dfcdfabd0215fc6881e190be40c",
+    "target/perf-degen2-dense-L-native/central-numerical.json": "5fcf5ef132b5786445c84e96532269fb0c4e0eca68aae7fe799cf31ae92cc0cd",
+    "target/perf-degen2-dense-L-native/central-cost.json": "bdec6f7201119f9921fd4276c08f589d81437d1e27e40ca0cad87479d1533085",
+    "target/perf-degen2-dense-L/rose-trace149-eta.json": "8502ebb0bdd0cc46de81620ee0d2b1f795d9386c4756bdeb0cb7125871f52af6",
+    "target/perf-degen2-dense-L/rose-trace149-eta.meta.json": "6447be63c0e343a2824c04ad772744b24b97d2da3308b9af8e38534869cc954f",
+    "target/perf-degen2-dense-L-native/summary.json": "7148781244f20991395f27d5d17c3f04137577eca9e0f366a49a3a1f450ebb7a",
+    "target/perf-degen2-dense-L-native/capture-provenance.json": "7051485453cd4052d1d084690b6515f326abafccdb3721aa4965848f435d80e7",
+    "target/perf-degen2-dense-L-native/central-numerical-command.txt": "3b498add99f232dc30aac67f9be28c47610f045f4e54083bce8a7d9f8dd1ff60",
+    "target/perf-degen2-dense-L-native/central-cost-command.txt": "b1c69987f591ffb60d6d95f65ce505bc35ebb5b066fcee5eb5c39cea5217ddbe"
+  },
+  "supported_selected_difference": {
+    "Rose_dense_walk_I": 14435,
+    "native_dense_walk_row_WORK_I": 5479,
+    "difference_I": 8956,
+    "Rose_extra_empty_walk_I": 7018,
+    "explained_fraction_percent": 78.36087539079946,
+    "remaining_I": 1938,
+    "limits": "Both walk scopes include numeric/index/threshold/control/rowWORK. Emptygap is concrete extra-operation mechanism. Remaining1938I mixes indexing/bounds/unroll/WORK/codegen; not a demonstrated arithmetic-only or cycle difference. Do not inferwholematched difference after162."
+  },
+  "native_L_cost_partition": {
+    "complete_wrapper": 14018,
+    "wrapper_prepare": 405,
+    "paired": 13547,
+    "wrapper_publication": 66,
+    "pre_U": 9480,
+    "pre_U_prepare": 627,
+    "full_L": 1131,
+    "between_L": 13,
+    "needed_L": 6205,
+    "post_L_eta_spike_admission": 1504,
+    "needed_L_parts": {
+      "prologue_initialWORK": 33,
+      "clear444": 428,
+      "input_scatter49": 245,
+      "setupWORK": 12,
+      "numeric_nodewalk_rowWORK": 5479,
+      "publication_return": 8
+    },
+    "native_row_WORK_blocks": 58,
+    "native_row_WORK_block_I": 469,
+    "joint_U": 4050,
+    "paired_return_bookkeeping": 17
+  },
+  "validation": {
+    "source_complete_result_exit_zero_sign_controls": 16,
+    "passed": true,
+    "accepted_codegen_unchanged": true,
+    "reference_central_status": "PASS allcapturedraw neededstates/403orderedactual term projections; sparsefull representation/visitation limits explicit.",
+    "reference_cost_repeats": 4,
+    "reference_cost_root_detail_reconcile": true
+  },
+  "central_numerical_result": {
+    "profile": "dual-release",
+    "native_pivot": 148,
+    "Rose_pricing": 149,
+    "context_it": 147.0,
+    "r": 138,
+    "q": 448,
+    "accepted_rose_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "native_capture_sha256": "7d18d94a5e1a938b952cdf8fd4ce62922986fd1703513741bd589573f7e4f7d4",
+    "Rose_trace_sha256": "c0448da14cf2154b602cc4bdca17d407838d18cf4872e416c2ed96ba62da9b63",
+    "Rose_actual_eta_trace_sha256": "8502ebb0bdd0cc46de81620ee0d2b1f795d9386c4756bdeb0cb7125871f52af6",
+    "calls": [
+      {
+        "purpose": "full",
+        "native_method": "sparse",
+        "input_count": 10,
+        "all444_before_scatter_after_bits_match": true,
+        "ordered_term_count": 14,
+        "ordered_actual_operand_product_result_bits_match": true,
+        "node_visitation_identical": false,
+        "first_recorded_node_visitation_difference": {
+          "ordinal": 5,
+          "native_row": 89,
+          "Rose_row": 221
+        },
+        "native_recorded_nodes": 14,
+        "Rose_recorded_nodes": 19,
+        "visitation_scope": "Native14nodes are numeric-node publication hooks, source19 includes inactive/copy-only cached visits; no full sparse-node visitation equivalence claim.",
+        "state_representation_qualification": "Native/source before and input-scatter are raw444slots. Needed after-L is raw444 versusraw444. Full nativeafter-L is sparsepublishedoutput logicalembedding into+0 slots versussourceactualworkspace; no nativeunused444memory claim.",
+        "after_eta": "Actual native sparse19count/order/valuebits andsourceactualworkspace at19positions agree; native has no corresponding444slot denseoutput, unusedzeros not claimed rawmatched."
+      },
+      {
+        "purpose": "needed",
+        "native_method": "dense",
+        "input_count": 49,
+        "all444_before_scatter_after_bits_match": true,
+        "ordered_term_count": 389,
+        "ordered_actual_operand_product_result_bits_match": true,
+        "node_visitation_identical": false,
+        "first_recorded_node_visitation_difference": {
+          "ordinal": 108,
+          "native_row": 439,
+          "Rose_row": 107
+        },
+        "native_recorded_nodes": 112,
+        "Rose_recorded_nodes": 444,
+        "empty_middle_omitted_nodes": 332,
+        "omitted_active_empty": 130,
+        "omitted_inactive_empty": 202,
+        "visitation_scope": "Actual dense native112 versusRose444. No visitation normalization; only independent actual403term projection is equal. Source stored coefficient counts prove omitted middle empty; no full native unused coefficient-array comparison.",
+        "state_representation_qualification": "Native/source before and input-scatter are raw444slots. Needed after-L is raw444 versusraw444. Full nativeafter-L is sparsepublishedoutput logicalembedding into+0 slots versussourceactualworkspace; no nativeunused444memory claim.",
+        "after_eta": "All444actualnative/source prepublication eta-output bits agree including zero signs;189publishedsource sparsevalues also agree."
+      }
+    ],
+    "eta_table_entries": 8,
+    "eta_table_terms": 29,
+    "status": "EXACT_CAPTURED_NUMERICAL_STATES_AND_ORDERED_TERM_PROJECTION_PASS_VISITATION_DIFFERENCES_RETAINED",
+    "scope": "No all-kernel-state or identical visitation claim. Strict full/needed output frontier162 remains; first signed-zero163 unchanged. Trace cycles/timers excluded. No optimization."
+  },
+  "central_reference_costs": {
+    "profile": "dual-release",
+    "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "rose_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "rows": [
+      {
+        "native_pivot": 148,
+        "rose_pricing_call": 149,
+        "mode": "dense-root",
+        "raw_root_instructions": 14036,
+        "calibrated_root_instructions": 14018,
+        "row_core_calls": 0,
+        "row_core_instructions": 0,
+        "wrapper_output_entries": 22,
+        "capture": "target/perf-degen2-dense-L-native/cost-captures/degen2-dual-release/dual_dense_l_cost.d7cefc6259.jsonl",
+        "capture_sha256": "49d6cba4bdbdbea6aa65225ae9de90a51b09257dcf3f92c824190ed536dafef2",
+        "numeric_inputs_outputs_match": true,
+        "scope": "11f620 entry to c58d5 before caller checks/updates; retained lifecycle outside; cycles/timers excluded",
+        "disjoint_instructions": {
+          "wrapper_preparation": 405,
+          "paired_125f50": 13547,
+          "wrapper_publication": 66
+        },
+        "L_calls_instructions": {
+          "full_L_call": 1131,
+          "needed_L_call": 6205
+        },
+        "paired_subdivision": {
+          "input_L_inline_eta_dispatch": 9480,
+          "joint_U_and_publication": 4050,
+          "paired_return_bookkeeping": 17
+        }
+      },
+      {
+        "native_pivot": 148,
+        "rose_pricing_call": 149,
+        "mode": "dense-root",
+        "raw_root_instructions": 14036,
+        "calibrated_root_instructions": 14018,
+        "row_core_calls": 0,
+        "row_core_instructions": 0,
+        "wrapper_output_entries": 22,
+        "capture": "target/perf-degen2-dense-L-native/cost-captures/degen2-dual-release/dual_dense_l_cost.2b2053f73d.jsonl",
+        "capture_sha256": "7cc2b2df6212b7f6b8fa2c12e674aacc16ad6b68d50b6f7449e582839fec5a23",
+        "numeric_inputs_outputs_match": true,
+        "scope": "11f620 entry to c58d5 before caller checks/updates; retained lifecycle outside; cycles/timers excluded",
+        "disjoint_instructions": {
+          "wrapper_preparation": 405,
+          "paired_125f50": 13547,
+          "wrapper_publication": 66
+        },
+        "L_calls_instructions": {
+          "full_L_call": 1131,
+          "needed_L_call": 6205
+        },
+        "paired_subdivision": {
+          "input_L_inline_eta_dispatch": 9480,
+          "joint_U_and_publication": 4050,
+          "paired_return_bookkeeping": 17
+        }
+      },
+      {
+        "native_pivot": 148,
+        "rose_pricing_call": 149,
+        "mode": "dense-partition",
+        "raw_root_instructions": 14292,
+        "calibrated_root_instructions": 14018,
+        "row_core_calls": 0,
+        "row_core_instructions": 0,
+        "wrapper_output_entries": 22,
+        "capture": "target/perf-degen2-dense-L-native/cost-captures/degen2-dual-release/dual_dense_l_cost.10c95c8853.jsonl",
+        "capture_sha256": "71be3ac78e3c60293d03fd5dfea7c697872eb0a608ce4dc71b73779dea554bc8",
+        "numeric_inputs_outputs_match": true,
+        "scope": "11f620 entry to c58d5 before caller checks/updates; retained lifecycle outside; cycles/timers excluded",
+        "disjoint_instructions": {
+          "wrapper_preparation": 405,
+          "paired_125f50": 13547,
+          "wrapper_publication": 66
+        },
+        "L_calls_instructions": {
+          "full_L_call": 1131,
+          "needed_L_call": 6205
+        },
+        "paired_subdivision": {
+          "input_L_inline_eta_dispatch": 9480,
+          "joint_U_and_publication": 4050,
+          "paired_return_bookkeeping": 17
+        },
+        "full_sparse_L_partition": {
+          "setup_reset": 76,
+          "input_buckets": 184,
+          "numeric_support_output": 847,
+          "WORK_return": 24
+        },
+        "dense_needed_L_partition": {
+          "prologue_initial_WORK": 33,
+          "clear444": 428,
+          "scatter49": 245,
+          "setup_WORK": 12,
+          "numeric_nodewalk_with_row_WORK": 5479,
+          "publication_return": 8
+        },
+        "dense_row_WORK": {
+          "calls": 58,
+          "instructions": 469,
+          "remaining_numeric_index_support": 5010
+        },
+        "post_L_partition": [
+          {
+            "begin": "L_needed_return",
+            "end": "eta_dispatch",
+            "instructions": 5
+          },
+          {
+            "begin": "eta_dispatch",
+            "end": "eta_helper_call",
+            "instructions": 31
+          },
+          {
+            "begin": "eta_helper_call",
+            "end": "eta_helper_return",
+            "instructions": 1288
+          },
+          {
+            "begin": "eta_helper_return",
+            "end": "eta_output_admission",
+            "instructions": 5
+          },
+          {
+            "begin": "eta_output_admission",
+            "end": "joint_U_begin",
+            "instructions": 175
+          }
+        ],
+        "partition_scope": "Native148/Rose149 only. Dense numeric scope includes112node visits/index/support and58WORK updates. Subtracting measured row-WORK leaves numeric plus required indexing/control, not arithmetic-only.129aa0 helper cost remains combined eta representation/metadata/arithmetic. No new internal numerical equivalence implied; dual-dense-l records independent exact states/terms and visitation differences."
+      },
+      {
+        "native_pivot": 148,
+        "rose_pricing_call": 149,
+        "mode": "dense-partition",
+        "raw_root_instructions": 14292,
+        "calibrated_root_instructions": 14018,
+        "row_core_calls": 0,
+        "row_core_instructions": 0,
+        "wrapper_output_entries": 22,
+        "capture": "target/perf-degen2-dense-L-native/cost-captures/degen2-dual-release/dual_dense_l_cost.cf3153b2d1.jsonl",
+        "capture_sha256": "993dd0c91b0d2bf1737d08f70cb55764ab7e8072b8302bd927cb613f06db647d",
+        "numeric_inputs_outputs_match": true,
+        "scope": "11f620 entry to c58d5 before caller checks/updates; retained lifecycle outside; cycles/timers excluded",
+        "disjoint_instructions": {
+          "wrapper_preparation": 405,
+          "paired_125f50": 13547,
+          "wrapper_publication": 66
+        },
+        "L_calls_instructions": {
+          "full_L_call": 1131,
+          "needed_L_call": 6205
+        },
+        "paired_subdivision": {
+          "input_L_inline_eta_dispatch": 9480,
+          "joint_U_and_publication": 4050,
+          "paired_return_bookkeeping": 17
+        },
+        "full_sparse_L_partition": {
+          "setup_reset": 76,
+          "input_buckets": 184,
+          "numeric_support_output": 847,
+          "WORK_return": 24
+        },
+        "dense_needed_L_partition": {
+          "prologue_initial_WORK": 33,
+          "clear444": 428,
+          "scatter49": 245,
+          "setup_WORK": 12,
+          "numeric_nodewalk_with_row_WORK": 5479,
+          "publication_return": 8
+        },
+        "dense_row_WORK": {
+          "calls": 58,
+          "instructions": 469,
+          "remaining_numeric_index_support": 5010
+        },
+        "post_L_partition": [
+          {
+            "begin": "L_needed_return",
+            "end": "eta_dispatch",
+            "instructions": 5
+          },
+          {
+            "begin": "eta_dispatch",
+            "end": "eta_helper_call",
+            "instructions": 31
+          },
+          {
+            "begin": "eta_helper_call",
+            "end": "eta_helper_return",
+            "instructions": 1288
+          },
+          {
+            "begin": "eta_helper_return",
+            "end": "eta_output_admission",
+            "instructions": 5
+          },
+          {
+            "begin": "eta_output_admission",
+            "end": "joint_U_begin",
+            "instructions": 175
+          }
+        ],
+        "partition_scope": "Native148/Rose149 only. Dense numeric scope includes112node visits/index/support and58WORK updates. Subtracting measured row-WORK leaves numeric plus required indexing/control, not arithmetic-only.129aa0 helper cost remains combined eta representation/metadata/arithmetic. No new internal numerical equivalence implied; dual-dense-l records independent exact states/terms and visitation differences."
+      }
+    ],
+    "qualification": "Native context, actual pair inputs/outputs when observed, wrapper pivot-removal publication, alpha and rho norm all agree bitwise with cached strict-prefix evidence. Root-only modes validate context and published outputs. No new cross-solver arithmetic-visit equivalence claimed.",
+    "correction": "2target instructions per stopped interval, validated on five push instructions and root-only/detail controls. Initial rows mode (1292e0..129467,448I) includes local dot-loop control but excludes metadata preparation/division/store. Complete-static mode (129294..129492,996I) adds numeric-kind dispatch, metadata and WORK, diagonal division, needed-output store and pivot handling; global full-output scan and following three loop-control instructions per output remain outside. Complete-static outer correction has1\u20134I residual versus robust root/detail23001I; retain this uncertainty. Remaining paired root includes other required numerical work and is not pure support/control."
+  },
+  "reference_summary": "target/perf-degen2-dense-L-native/summary.json",
+  "reference_capture_provenance": "target/perf-degen2-dense-L-native/capture-provenance.json",
+  "completed_empty_gap_followup": "degen2-empty-L-gap.json"
+}

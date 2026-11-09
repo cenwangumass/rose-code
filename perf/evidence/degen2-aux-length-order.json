@@ -1,0 +1,196 @@
+{
+  "previous_goal_turn_classification": "progress",
+  "basis": "Completed factor16 numerical/operation census and accepted-ELF columnsortcost isolated a distinct exactinteger permutation trial; current turn tests andsettles it.",
+  "decision": "INCONCLUSIVE at first predeclared timing screen75117. Stop without75189,extension/retry/threshold/histogram/cached-key/radix/allocator/codegen rescue. No full candidateacceptance gates or production sourcepromotion.",
+  "mechanism": "Boundedstable lengthhistogram/prefix/scatter emits the exactoriginal(columnlength,incomingposition) totalorder. Initialidentityvector retained; n<32 ormaxkey>=n retainsoriginalsort. Histogramsize<=n; core numeric factorbody and prescribedrow path are literalunchanged.",
+  "evidence_before_trial": "Accepted helpercost1.0252MIover16builds(~.566%solveI), including helperallocation/cleanup. Alternativehistogram/scatter/cleanupcostnotassumedzero; no instruction-as-time claim.",
+  "configuration": {
+    "before_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "candidate_sha256": "ed4051b79c28ec6e568b5b7a70013ce162a3a40e2ec06db15b8d4d0242c6ec5b",
+    "profile_sha256": "542a54052d9ba2c5286787d6c3d0d2c83e2f49970e665db782f13e5f412a3688",
+    "features": [
+      "system-tcmalloc"
+    ],
+    "compiler": "rustc 1.98.1 (48a229cea 2026-09-01)\nbinary: rustc\ncommit-hash: 48a229ceaefd4985c50990b14116b6d856af0985\ncommit-date: 2026-09-01\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.1\nLLVM version: 22.1.8\n",
+    "rustflags": [
+      "-Cllvm-args=--align-loops=64",
+      "-Cprofile-use=/home/derekwang/rose-reverse-engineer/rose/target/perf-aux-length-order/source/target/perf-pgo/542a54052d9ba2c5286787d6c3d0d2c83e2f49970e665db782f13e5f412a3688.profdata"
+    ],
+    "training_runs": 39,
+    "build_seconds": 72.9059621599954,
+    "policy": "Own fixedsame39trainingcases/systemTCMalloc/pinnedcompiler/64byte loopalignment exactlyonce; no parentprofile performanceclaims."
+  },
+  "proof": {
+    "original_numeric_factor_body_reconstructs_literally": true,
+    "only_existing_call_changed": "sort_by_key((length,position)) to exact equivalent integerhistogram order",
+    "original_lu_sha256": "7104adbfcae0f73030fcf7136c1624715d33e6f686383fa7a41bd95fa4a074e4",
+    "candidate_lu_sha256": "0914c3313619851b58e7f6403831d1e3109f3f4451fd684075825ffc513a3f25",
+    "invariant": "Identityinitialization and all numericexpressions/traversals, prescribed-row path, outputs andWORK unchanged when permutationmatches. Histogram size<=n; short/keyrange fallbackretains original sort."
+  },
+  "tests": {
+    "focused_release": "6/6:two newexactordering tests plusfour existing LUtests;49.61s build/run, .17s tests, parentfixed39 flags for testcodegen.",
+    "ordering_scope": "Capturedfactor16 reorderedbasis lengths andexpectedaux col_order; random/tie/zero/empty/reverse andboundary n0..1024/keyrange fallback cases. Everypermutation equals frozenoriginalstable sort by(length,p). No unsafe code; maxkey<n ensureshistogram bound and no overflow.",
+    "fast_frozen_parity": "940/940 final own-PGO candidate,3.2s",
+    "bounded_dump_checks": [
+      {
+        "model": "afiro",
+        "cap": 3,
+        "original_dump_records": 0,
+        "agree": true
+      },
+      {
+        "model": "degen2",
+        "cap": 3,
+        "original_dump_records": 0,
+        "agree": true
+      },
+      {
+        "model": "degen2",
+        "cap": 20,
+        "original_dump_records": 1002,
+        "agree": true
+      },
+      {
+        "model": "degen2",
+        "cap": 136,
+        "original_dump_records": 3747,
+        "agree": true
+      },
+      {
+        "model": "degen2",
+        "cap": 640,
+        "original_dump_records": 17201,
+        "agree": true
+      }
+    ],
+    "all_34_counter_results_exits_match": true,
+    "timing_complete_results_exits": "All128measured+2warmup solveoutputs/exits andbinaryhash checks preserved bypaired.py.",
+    "full987_and_full_tests_not_run": "Stoppedatfirstinconclusive screen; no acceptanceclaim."
+  },
+  "counters": {
+    "afiro": {
+      "before": {
+        "instructions:u": 6902809.0,
+        "cycles:u": 10436283.0
+      },
+      "after": {
+        "instructions:u": 6904562.0,
+        "cycles:u": 10760019.0
+      },
+      "percent_change": {
+        "instructions:u": 0.025395458573451712,
+        "cycles:u": 3.10202396772874
+      },
+      "pairs": 3
+    },
+    "sc50a": {
+      "before": {
+        "instructions:u": 9810054.0,
+        "cycles:u": 13331335.0
+      },
+      "after": {
+        "instructions:u": 9778320.0,
+        "cycles:u": 13191377.0
+      },
+      "percent_change": {
+        "instructions:u": -0.32348445788371594,
+        "cycles:u": -1.0498423451214767
+      },
+      "pairs": 3
+    },
+    "adlittle": {
+      "before": {
+        "instructions:u": 15045074.0,
+        "cycles:u": 18236781.0
+      },
+      "after": {
+        "instructions:u": 14997046.0,
+        "cycles:u": 15958566.0
+      },
+      "percent_change": {
+        "instructions:u": -0.3192274095827008,
+        "cycles:u": -12.492418481090494
+      },
+      "pairs": 3
+    },
+    "degen2": {
+      "before": {
+        "instructions:u": 196497920.5,
+        "cycles:u": 145830468.5
+      },
+      "after": {
+        "instructions:u": 195721460.5,
+        "cycles:u": 143943824.5
+      },
+      "percent_change": {
+        "instructions:u": -0.39514921991248286,
+        "cycles:u": -1.2937241575137648
+      },
+      "pairs": 8
+    }
+  },
+  "counter_scope": "Wholeprocess freshuserinstructions/cycles,8targetpairs+3per smallmodel. Targetcounter gate passes, not a solve-only phase attribution or timingscreen.",
+  "timing_summary": {
+    "ab_median_percent": -2.1456558256183818,
+    "ab_ci_percent": [
+      -4.961045995029789,
+      2.398797948220377
+    ],
+    "aa_median_percent": -1.7476433705993932,
+    "aa_ci_percent": [
+      -4.569703114217527,
+      4.312143521900902
+    ],
+    "improving_pairs": 17,
+    "pairs_per_kind": 32,
+    "ab_sign_p": 0.4300250329542905,
+    "aa_sign_p": 0.860050065908581,
+    "order_median_percent": {
+      "AB": -4.603489624079455,
+      "BA": 2.0725140921294445
+    },
+    "criteria": {
+      "sign_p_at_most_001": false,
+      "aa_not_biased_at_005": true,
+      "median_gain_at_least_half_percent": true,
+      "ab_upper_ci_below_aa_error": false,
+      "both_orders_improve": false
+    },
+    "positive_screen": false
+  },
+  "timing_seed": 75117,
+  "timing_scope": "32AB+32AA sameCPU2cap640 with original diagnostics.seconds, randomizedschedule frozenbeforewarmup. HealthyAA but insufficient sign/noise separation andoppositeorder direction; observedmedian gain not credited.",
+  "reserved_confirmation_run": false,
+  "screen_plan": {
+    "target": "degen2.dual-r",
+    "cpu": 2,
+    "max_iterations": 640,
+    "pairs_AB": 32,
+    "pairs_AA": 32,
+    "seeds": [
+      75117,
+      75189
+    ],
+    "before": "target/perf-optimized-build/rose-pgo-tcmalloc",
+    "after": "target/perf-aux-length-order/source/target/release/rose",
+    "counter_rule": "Ownfixed39PGO/systemTCMalloc once; eighttargetAB/BApairs andthreesmallmodelpairs; requirelower targetmedianinstructions andcycles beforetimings. No tuning/retry/extension/rescue; stopfirstfailed/inconclusive gate. Full acceptancegates onlyaftertwohealthypositive timings.",
+    "opportunity": "Accepted sorthelper1.0252MI/.566%solveI includinghelperallocation/cleanup, beforehistogram/prefix/scatter cost; no timebenefit claimed."
+  },
+  "no_optimization_promoted": true,
+  "production_hashes": {
+    "target/release/rose": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "target/perf-optimized-build/rose-pgo-tcmalloc": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "target/perf-reference/reconstructed/libgurobi130.so": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30"
+  },
+  "goal_achieved": false,
+  "artifacts": "/home/derekwang/rose-reverse-engineer/rose/target/perf-aux-length-order",
+  "script_hashes": {
+    "counters.py": "9a51cc962cf2a2aa1a50dffe83033796ec22938bc915ef0e28bdf64f0dc83854",
+    "check.py": "8c0ec8fdada9e86a0d13ecef026f54321432d8750368a11638b7b6f05789720f",
+    "own_pgo.py": "e1ac65314a9595ea8102b25882b8b361dedfafdfafebd75f250badc2f0261a85",
+    "prepare.py": "82686eadf9cc3c370b3c6cc39c87c9123a03fe9e6302f34fdc23fbca3888d94b",
+    "apply.py": "a0ae867eefc2653cd8772f959d2158af0dd5931b2bb7fdb3e5ef184f85dd2b92",
+    "test.py": "c18aea7cdabd8c68840bd5fe7c69eab66cdb92f36ca65618119aa4376acee1fe",
+    "summarize.py": "023e76df0d930cfecd37b2370a908b018b6f0a6e7608866d0ddc331286903387"
+  }
+}

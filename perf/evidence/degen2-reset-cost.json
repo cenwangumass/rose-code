@@ -1,0 +1,144 @@
+{
+  "scope": "Preserved completed pricing-reset diagnostic evidence; no optimization. Separate from FTRAN/BTRAN published-output matching.",
+  "configuration": {
+    "Rose": "qualified optimized55af6617 fixed39PGO/systemTCMalloc",
+    "Gurobi": "reconstructed26a50517 dual-release",
+    "codegen_changes": 0
+  },
+  "whole_Rose_only_instruction_accounting": {
+    "calls": 15,
+    "coarse": 5199564,
+    "fine": 5199606,
+    "disjoint_ledger": {
+      "step_maps_preparation": 108451,
+      "forward_graph": 918647,
+      "row_pos_graph": 1617500,
+      "backward_graph": 864523,
+      "weight_initialization": 9420,
+      "forward_sort_dedup_recurrence": 874535,
+      "backward_recurrence": 193791,
+      "sum_and_cap": 23754,
+      "publication_and_previous_weights_cleanup": 825,
+      "local_cleanup": 588160
+    },
+    "previous_constructor_nested": 5200393,
+    "uncertainty": "Coarse/fine42I; prior nested787I above fine. Observer/method/private allocator variation not assigned. Whole costs after numerical frontier are source-only, not reference-paired."
+  },
+  "selected_source_calls": {
+    "pricing82_factor3": {
+      "instructions": 223936,
+      "native_context": 82,
+      "native_prior_complete_reset_I": 17272
+    },
+    "pricing132_factor4": {
+      "instructions": 263930,
+      "native_context": 131,
+      "native_prior_complete_reset_I": 19291,
+      "pairing": "No actual numerical comparison after reset3 TOTAL mismatch; prior cached endpoint proof separate."
+    }
+  },
+  "reference_comparison": {
+    "scope": "Bounded pricing-reset diagnostic, accepted Rose55af/reference26a only. No optimization or later raw comparison.",
+    "status": "STOP_AT_NATIVE82_TOTAL_8ULP_DIFFERENCE",
+    "strict_published_kernel_frontier": "Nativepivot162/sourcepricing163 applies only to its previously established published-kernel family. This deeper reset reduction gate differs at native82/sourcepricing82.",
+    "literal_order_first_difference": {
+      "term": 0,
+      "phase": "forward",
+      "position": 16,
+      "native_pc": "0x13254d",
+      "native": [
+        "MUL",
+        "ADD",
+        "DIV",
+        "SUB"
+      ],
+      "rose": [
+        "ADD",
+        "MUL",
+        "DIV",
+        "SUB"
+      ]
+    },
+    "literal_multiply_operand_order_first_difference": {
+      "term": 4,
+      "phase": "forward",
+      "position": 48,
+      "native": [
+        "3ff0000000000000",
+        "3ffff6c657a3bf6c"
+      ],
+      "rose": [
+        "3ffff6c657a3bf6c",
+        "3ff0000000000000"
+      ],
+      "transport": "actual native role bits through unchanged register/load operands between recorded begin PC and MUL; source actual MUL registers"
+    },
+    "matched_role_projection": {
+      "status": "PASS",
+      "terms": 516,
+      "qualification": "Corresponding before/other/ADD/product/division/result bits match; literal instruction/MUL-operand order differences retained separately. No global machine-operation-order identity."
+    },
+    "after_forward_backward_444_bits": "PASS",
+    "total_difference": {
+      "field": "reset3.total_bits",
+      "native": "409ca37aef572848",
+      "rose": "409ca37aef572850",
+      "native_repr": "1832.8700536363922",
+      "rose_repr": "1832.870053636394",
+      "ulp": 8
+    },
+    "actual_reset4": "NOT COMPARED after first numeric reduction difference; captured observations retained as unpaired.",
+    "independent_cached_gates": [
+      {
+        "native_context": 82,
+        "source_factor_ordinal": 3,
+        "reference_capture_sha256": "bf2892dcee387a5b5be18f7dbe9fc85b384a2ec9d22769dcef9e359c8d8c3227",
+        "forward_terms": 491,
+        "backward_terms": 25,
+        "cached_graph_and_published_output_gate": "PASS"
+      },
+      {
+        "native_context": 131,
+        "source_factor_ordinal": 4,
+        "reference_capture_sha256": "6e3240084126b3216003beccac04a5657b7f02cf4dc55094dc529ce451ce53bf",
+        "forward_terms": 661,
+        "backward_terms": 32,
+        "cached_graph_and_published_output_gate": "PASS"
+      }
+    ],
+    "static_reduction_explanation": "Native total uses packed reduction132729..132771; source scalar sum has another addition order. No bit normalization or FP modelling. Native computes both recurrences before ptype read13279b/type2 branch1327ce.",
+    "native_counts": {
+      "context82": {
+        "forward": 491,
+        "backward": 25,
+        "actual_terms": 516
+      },
+      "context131_unpaired_actual": {
+        "forward": 661,
+        "backward": 32,
+        "actual_terms": 693
+      }
+    },
+    "cost_scope": "Existing complete native132460 helper17272/19291I from parent driver brackets; no new numeric-trace costs/time used. Native prebuilt predecessor CSR production/lifetime belongs constructor and is not free; no reset-only removable whole-solve claim.",
+    "small_qualification": "AFIRO3/SC50A20 no positive-type reset helper; safe observer controls only, not arithmetic-path qualification.",
+    "missing_evidence": "No ordered actual reset4 proof after stop; no whole-run reference predecessor/arithmetic pairing. Graph-construction/elimination opportunities require complete producer/consumer ownership, original exact bwd ordering and parity\u2014not a geometry-sharing inference."
+  },
+  "distortion": {
+    "calibration": "Known5PUSH7raw; subtract2I per stopped interval; no multiplexing.",
+    "trace_costs": "Exclude all per-arithmetic trace counters/timers: source82 trace221872 vs cost223936 differs2064=516*4I. Trace holds bits/counts only.",
+    "cycles": "All debugger cycles/timers excluded; no accepted time or removable instruction-share claim."
+  },
+  "validation": {
+    "source_complete_result_exit_signedzero_controls": 8,
+    "all_controls_exact": true,
+    "small_controls": "AFIRO3 no reset, SC50A20 type0; DEGEN20 positive body before larger bounded caps.",
+    "parity": "No solver edits/builds; accepted frozen behavior preserved."
+  },
+  "artifacts": [
+    "target/perf-degen2-reset-cost/",
+    "target/perf-degen2-reset-ops/central-actual-command.txt",
+    "target/perf-degen2-reset-ops/central-actual-report.json",
+    "target/perf-degen2-reset-ops/central-cached-report.json"
+  ],
+  "decision": "Stop at first actual SUM8ULP difference. No reset4 continuation, no numeric normalization, no optimization. Type2 recurrence-elision hypothesis ruled out: both execute recurrence before testing type2."
+}

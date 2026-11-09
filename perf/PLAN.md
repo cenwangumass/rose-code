@@ -141,6 +141,268 @@ baseline. No exceptions, no "within a ULP", no re-recording.
 
 ## The loop
 
+The next bounded F/B diagnostic is the earliest pre-reset82 true-d recomputation
+BTRAN, whose dense-U/dense-LT purpose has no complete paired arithmetic/lifecycle
+proof. Reuse caches; delegate reference work and centralize pairing in compare.py.
+Stop at the first difference. All16 calls are only0.136ms in the separate timer
+build; no accepted speedup forecast or optimization follows from that scope.
+This does not reopen settled rho reuse, empty-gap, L handoff or owner trials.
+
+The bounded DEGEN2 triangular diagnosis stops at the first strict internal
+bit difference: needed pivot163/pricingk164/basis22 is native−0 versus Rose+0.
+Central dual-kernels publication mappings prove the162-pivot prefix; the prior
+637state trace treated signedzeros equal. Preserve this boundary and do not
+normalize or fix it during performance work. Zero provenance is explained:
+native divides a dense +0 slot by -1, while Rose skips that sparse slot. The
+observed DSE consumer erases the sign, but this does not extend strict pairing.
+The joint-pivot135 transaction census is complete: native full/needed L executes
+46/132 ordered terms once, while accepted Rose executes each sequence twice
+before density fallback. All444 intermediate raw slots and ordered operands
+match centrally. The bounded162-pivot Rose census finds27 such fallbacks,
+1473 repeated multiply/subtract pairs; small AFIRO/SC50A controls find none.
+Complete selected construction/cleanup shows36/39 full/needed allocation-growth
+requests, mostly L, versus no exported allocator calls in native's wrapper.
+Returned/retained buffers remain charged to caller or factor lifecycle as proved.
+
+The bounded rejection-cost investigation is complete without optimization.
+Rose-only full-solve fixed-PC counters find236 completed-prefix rejections:
+182full/54needed, about1.520M calibrated instructions for fallback construction,
+repeated L, WORK and all local-buffer cleanup. That is a0.84% instruction ceiling
+before preserving WORK and paying handoff costs, not a time saving. An existing
+3552-byte clone allocation+copy proxy costs411 instructions. Target-pid PMU
+calibration qualifies instructions; debugger cycle/timer distortion excludes
+all new cycle/timing claims. All29 complete results/exits agree. Numerical
+pairing still stops163; no new numerical traces cross it. Existing accepted
+whole-solve and sampled-profile totals remain separate and unchanged.
+
+The isolated completed-L handoff trial is REJECTED:19 focused release tests,
+fast940 parity,17201 bounded dump records and all34 complete counter results pass,
+but matching ownfixed39 PGO gives−0.5606% targetinstructions/+4.0016% cycles.
+Do not run74117/74189, retry/extend/tune its PGO or rescue enum/flag/layout/buffer
+ownership. No optimization was promoted. See evidence/degen2-l-handoff.json.
+
+The completed factor split gives17.826ms diagnostic factor total:9.625ms ordered/
+mirror/aux construction,4.669ms mirror updates, remaining reset/auxupdate/retirement/
+bookkeeping. It reconciles127777 allocation/growth events, with explicit probe
+skew and no accepted-time/removable bound. Native d4190 combines construction and
+installation; do not count its one event against two Rose constructors. The
+separate Rose auxiliary factor has no matched native auxiliary constructor.
+
+The factor16 census is complete: basis444, all584inputbits, diag444 and
+orderedL140/emptyU match centrally. MainL has140divisions on each side and no
+freshU products; auxiliaryordering producesL6/U136 with2products/6divisions,
+not a duplicate corresponding mainfactor pass. Distinguish integerrowlists from
+native numericrowadjacency. Source1002originalrecords/results pass. Three empty
+nucleus calls cost only39247rawI(~.0217%solveI); no empty-case trial follows.
+Settled frontier/overlay, closure-sort, direct-coordinateMarkowitz, auxiliary
+panels, sharedL/transpose, flat auxiliary storage, ownership and arenas stayclosed.
+
+The auxiliarylength-order trial isINCONCLUSIVE. Sixrelease tests,fast940,
+17201dumps and34counterresults pass. Ownfixed39PGO counters−.3951%I/−1.2937%C;
+screen75117 median−2.1457%,CI[−4.9610,+2.3988]%,17/32,p.4300,oppositeorder
+medians. HealthyAA uncertainty defeatsseparation. Do notrun75189,extend/retry or
+rescuekey/threshold/histogram/radix/allocator/codegen. No optimizationpromoted.
+See evidence/degen2-aux-length-order.json.
+
+Accepted-ELF F/B complete-transaction diagnosis is now measured: source136/native135
+81377/23001 instructions including owned transient cleanup, with caller checks and
+retained factor lifetimes explicitly separate. Whole-Rose L+eta25.387M instructions;
+needed numeric-row prepare/gather3.959M(2.185%solveI), dot/divide1.114M. Native's wider
+pre-U12211I versus selected Rose L+eta56868I localizes this expensive pair but cannot
+be extrapolated to all634. No new cycle/time saving or substantial removable pass
+is proven; the old cache/workspace/handoff trials stay closed. See
+evidence/degen2-fb-transaction-cost.json before further F/B implementation.
+
+The accepted L+eta partition now sums25.387227M I with210I residual versus prior
+root census. Dense numeric9.344M and dense outputconstruction4.130M dominate
+wholeRose; selected sparse135 cannot explain them. General eta gather/dot
+1.768/2.065M, cached/fallback numeric1.718/.991M, other5.371M close the ledger.
+Sixteen exact result/exit controls pass; no code changes or valid new cycle costs.
+Dense149/native148 diagnosis completes389needed/14full orderedterm comparison,
+neededraw444Lstate and complete72460/14018Itransaction costs. Native skips332
+empty Lcolumns thatRosevisits; selectedgap7018I explains78.36%of8956Idensewalk
+excess. WholeRose119415gapvisits/41338active have2.356201M staticIexposure,
+inside9.344M densewalk. No pair beyond163 andno validdebugcycles/timeclaims.
+Empty-gap exactproof succeeds: independent completeoriginalL/source-reversal,
+20focusedrelease tests including f64/F80/16MXCSRmodes, ownfixed39PGO bf1ee89a,
+fast940/all17201dumps/candidatecentralprefix162 pass. Candidate8ead3797 target
+I−.715457%/cycles−1.268227%, all34counterresults agree. Screen83117 isINCONCLUSIVE:
+median−2.92064%, CI[−6.73678,+4.99806]%,18/32,p.2983, AA[−6.15317,+6.77304]%.
+Do notrun83189,extend/retry/tune/rescue orpromote. No fullcandidategates after
+failedscreen. See evidence/degen2-empty-L-gap.json. Acceptedbinaries unchanged.
+Accepted-ELF U diagnostic separates source149 full33556I/needed34432–34433I
+and native148 jointU/publication4050I, retaining different boundary widths.
+Complete72460/14018I costs still reconcile; source jointWORK1693I is nested
+insideoutside4472I. Full output-order16622I includes20allocation/growth calls
+and8frees;19inputs become92candidates then23nonzeros. Filter/retirement2938I
+is separate. This is concrete support/order cost, not a removable arithmetic gap.
+No optimization or new valid cycle/timing claim. Whole-order exposure and selected
+Uarithmetic projections are now measured below. Selected BTRAN sparse1/dense149
+complete caller boundaries now cost1226/504I and18179/14215I; source raw/filtered
+Vec retirement and both row-length consumers are included. Dense packing scope
+is2.266946M I wholeRose, not a removable/time share. Central consumed LT444input/
+output/node values agree;65term counts agree but first ordered destination differs
+(native98/Rose15), so stop there. No equivalent complete all-purpose BTRAN or
+cycle claim follows. See evidence/degen2-btran-boundary.json. The
+selected U/eta residual is now measured on original binaries: source3478/native1856I
+(wider nativepostU/cache/dispatch), no pureeta subtraction. First actualUscatter
+visitsnative419/Rose22 aftermatchedunitDIV; stophistorythere. LaterDIV16/10,
+product18/18 andeta8visit/6active/23MUL17ADD counts are structural only. Source
+helper486I+rescan43I includesrequiredwork. Whole1095roots11.924293M I reconcile
+U2.196653M/eta1.868727M/rest7.858913M; preL2.244%solveI nottime/removable scope.
+No packing/workspace/row-transfer/occupancy or LT prototype follows. Numerical
+traces are excluded from costs;17source controls exact. See
+ evidence/degen2-btran-u-eta.json. Move to complete non-empty construction costs,
+using wholeRose-only later evidence and cached prefrontier3/5-column witnesses
+without extrapolating their tiny numeric costs. This constructor accounting now
+closes42.509657M I across15refactors+initial construction roots; basis prep1.298M,
+ordered14.494M(includingnucleus7.313M),fresh8.688M,aux8.480M,reset5.200M,
+retirement1.877M,WORK.768M and parent/attempt1.704M. Source21controls exact;
+nucleus method sensitivity18,131I is explicit, no cycles/times claims. Native
+constructor return has stale update metadata; actual driver return establishes
+installed i3/i21/kind/slot/444diag with matching basis,input andL/U bits. Parent
+selectedsource82/132cost1.259M/1.413M versusnative.178M/.198M; do not extrapolate.
+See evidence/degen2-construction-accounting.json. Next diagnose actual pricing-
+reset geometry/weight recurrence inputs and complete costs before implementation.
+Native also computes recurrences before type2fill, so that hypothesis is closed.
+Do not revive direct growth-diagonal access, shared factor/predecessor geometry,
+input-sharing,auxvalidator/lengthsort,Markowitz/chainqueue,arena/storagebank or
+buffer/PGO rescue. Exact source gathered-row column identities remain missing.
+See evidence/degen2-U-diagnosis.json for all disjoint scopes and exclusions.
+Complete unchanged-ELF full-FTRAN output/lifetime census now covers747calls,
+364sparse/383dense, both compiled branch probes (allcallsclone2). Order4.315376M I
+(2.381646%solveI), filter/remainder.871841M, denseoutput2.136981M, ownership/
+retirement/localcleanup.520553M. Entireinnerroot28.035830M reconciles including
+entry/L9.982448M and pre-output10.208631M. Root/detail51I residual,13exact complete
+controls, no validnewcycles/timeclaims. Later3.338353M orderI isunpairednative.
+Orderallocator2858newbuffers−2494localfrees=364returnedbuffers droppedinfilter;
+1987growthcalls and nestedmemcpy/memset requests remain logicalrequest counts.
+This bounds the selected hotcall lead; it doesnot justify reopening closed
+naturaltraversal/output/slot-heap/workspace/owner/fusion/WORK/handoff/emptygap trials.
+See evidence/degen2-output-order-census.json before further output work.
+Actualsource Ucapture149/native148 now passes central dual-u-operations:
+freshfull19/needed444inputbits;72correspondingDIV triples;52scatter coefficient/
+source/before/product/after tuples;21orderedrowdot operand/accumulator/product/
+result projections. Source gathered-row columnIDs unobserved; globaloperation
+order differs and retained. Native-only120fullDIV (9tail111nuc) allzero; Rose
+performsless full arithmetic, same39neededDIV. No newnativecapture/normalization.
+Source needed237UCcandidatechecks−32scatters=205rejectednucleuschecks, actual
+7Icoreeach/3Iadvance:2050static/2051PMU I inside3469Itailroot. Root/detail1I
+residual; sevencomplete result/exit/zerosigncontrols agree. Alltraceclocks/cycles
+excluded (~1097x trace solverclockdistortion), unchangedacceptedbinaries.
+See evidence/degen2-U-operation-diagnosis.json.
+Whole neededU census now covers634calls/44322executedactivecolumns,339979UC
+candidates/161569tail entries/178410rejections. At10I/reject wholeexposure1.7841M
+(.984641%solveI); most1.75251M liesafterstrictfrontier andisstructuralonly.
+Count/geometry modes agree percall; all637states/16constructors/621updates plus
+unusedfinalconstructor lifecycleincluded; elevenexact complete controls pass.
+Standalone non-PGO Rustrelease/TCMalloc lifecycle replay verifiesall637states.
+Eager59043refreshes/463057scans costs7.936M I; dirty3425refreshes/41297scans costs
+.937M I withfreeinvalidation/exactcapacityandretainedbuffers. These proxycosts
+are separate fromacceptedsolver. Missingdirtydetection/updatehook/indexlookup
+costs make the illustrative.847M-I budget(.4675%solveI) unproved; no timinggain.
+Do notintegratetested eagerdesign orstart a solverprototype/rescuefromthisstudy.
+See evidence/degen2-U-candidate-census.json. DirectBTRANU/eliminate source-only
+projection now passesall621updates; guarded differential and lifecycle costs are
+complete below. Nativefrontier unchanged; no unconditional reuse/speedup proof.
+No optimizationpromoted.
+
+The ROW/pivot-state phase/purpose split is complete. Separate22stage diagnostic
+hasrowproduct3.857ms,input/norm/check1.498,basis.420,dual.460,DSE.143,basic/flags1.550,
+recompute1.421,objects/deferredcleanup.672 andROWresidual1.878. Full987 and17201dumps
+pass; timer/codegenskew+13.773%I andallPMUwalltimes areexcludedfromacceptedclaims.
+AcceptedfixedPCcounts give634rowproduct/WORK12.610M I,634basis.799M and621fast
+DSE/basic6.538M(includingDSE.824M). Source136/native135 familycosts10157/4394,
+319/190 and4423/1650I, withcaller/clamp/return scope caveats. MostwholeRose rowcost
+isvaluephase afterpricing280, strictlyunpairedafter163.
+
+The expandedcentralstatecheck preservesa rawP18priorityfailure atselected136:
+all444slots differ, butbothselectedP40=0paths neverreadpayload. Compareonlyproven
+consumedstates, markinactivepayloadunpaired, andnevercallthisfullstateparity or
+applytheexclusioninvalue mode. No normalization orsolverfix; nativecapturestops135.
+Sourceinputlocalretirement remainsROWresidual; returnedfullcolumn remainsauxEta.
+See evidence/degen2-row-split.json beforefurtherROWwork.
+
+The rowproductcensus iscomplete: selectedsource/native179MUL+179ADD have matching
+coefficient/rho/product projections, butactualADDinput failsimmediately(native
+1e-200sentinel,Rose+0). Preservefirstfailure; no normalization orlaterADDstatepass.
+Nativeuniformprecomputes0closesdisassembly-onlyreusehypothesis. Source634rootledger
+12.610334M I separatesarithmetic/firsttouch4.011M,denseorder2.414M,slacks2.201M,
+output1.927M,other2.057M. Explicitarray/resultalloc+localcleanup604149I excludes
+loopgrowth; no oldworkspace/combinedcell/prefilter/weightedtrial reopened. Product
+reuseinstructionceilingonly.0864%solveI beforecosts, so no trial. Sevennewresult/
+exit/signedzerocontrolsagree,cycles/timersexcluded. See evidence/degen2-row-product.json.
+
+The mirror-update census is complete: accepted Rose621 complete caller scopes cost
+15.441646M instructions. Selected pricing136/native135 costs15337–15340/3182I,
+including deferred WORK publication and pricing touch. Spike/eta/diagonal/captured
+factor projections and actual pricing-helper support/P60/P68 inputs/outputs match
+centrally; full native nucleus coefficients/pool layout remain unpaired. No new
+cycle/time claim or source optimization. See evidence/degen2-mirror-update.json.
+
+Diagnostic-only fp_rows construction/cleanup costs223479I(.1233%solveI), so close
+that small lead without a gating prototype. Source row elimination costs2.469725M I
+(1.363%solveI), of which2.442811M is433 nonempty-output calls. All621 source markers
+say the pivot row was cached, yet the solve still runs; the native selected update
+uses cached data without calling131760. Numerical reuse is not proved.
+
+Original source within-pivotU/eliminate projection passes159updatepairs through
+sourcepricing163/nativepivot162, plus bounded AFIRO/SC50A controls. DirectU162
+captures include3unusedoutputs;43nonemptyetas/112entries, allorderedrawbits,
+capturedUfactorfields(exceptexpectedepochincrement),FPstate andscratch agree.
+Uwork12≠dense_est27 inselected136; faithfulestimateaccounting remainsmandatory.
+No nativecomparisonpastfrontier; no whole arithmetic-historyidentityclaim.
+Capturedprefixcovers68746I of2.469725M eliminatecost; later2.400979M unprovedfor
+reuse, so no prefix-onlyoptimizer or whole-stage benefitprojection.
+
+Independent completeoriginal-kernel release test proves unconditionalreusefalse:
+valid3nodeU with0.1coefficient has onebitdifferent eta under upward/downward
+rounding, despiteRN-equality andmatchingstatusflags. Frozen source reversal exact;
+onlydiagnostictest appended inisolatedordinaryrelease/glibc, not acceptedPGO ELF.
+Onegreen test assertscounterexample, not optimizerparity. No solverchange.
+See evidence/degen2-btran-eliminate-reuse.json and central dual-btran-eliminate.
+Complete frozen-kernel eligibility study passes23,888 comparisons;905 admitted
+cases match orderedvalues/WORK/dense/scratch/FPflags. Complete source-only central
+U/eliminate comparison passes621updates with634captures/13unusedoutputs. No
+native pairing past162/source163. All four component original-oracle replays and
+negative owner/epoch/row/FP guards pass. Full non-PGO release/TCmalloc proxycosts
+3.077533M I original versus0.974576M complete guarded lifecycle; guard/copy/cleanup
+0.357391M andconsume/bookkeeping/install0.617185M. Accepted original is2.469725M,
+so no crossbuild absolute subtraction or solvergain. Cycles/timers inconclusive.
+See evidence/degen2-btran-lifecycle.json. Matching ownfixed39PGO/systemTCMalloc
+actual shadow is now qualified: full987,17201records,16completecontrols and72
+counterobjects agree;621sourceoracle checks,634captures,13unusedretirements.
+Lifetime guardtests coverclone/restore/move/epoch/row/FP/overwrite/Drop. Samebuild
+originaleliminate2.488818M I; shadowhelpers773795I, wholeCLIrecording−offmedian
+774234.5I. Off−acceptedmedian+.172873M includesbranchlessfinitechecks evenoff
+andcodegen/layout/profileeffects. Smallresidual belowprocessIvariation cannotbe
+split; cyclesmixed, noactualspeedup. See evidence/degen2-btran-shadow.json.
+The one same-live-pivot typedtransfer trial is now REJECTED. CompletefrozenU/
+eliminate oracles qualify24832releasecomparisons(1849admitted),all64FPmaskguards,
+clone/restore/move/one-shot/epoch/row/FPcontrols. Ownfixed39TCMalloc f8db0260 passes
+fast940 and17201DEGEN2records; all34counterobjects/exits agree. Actual621reuse/
+0fallback, centralstrictnativefrontierunchanged. Eight-pairCPU2gate gives
+instructions−.826385%,cycles+1.241369%; requiredbothlower, so stopbefore84117/
+84189 andfullcandidategates. Cyclepairs mixed; no causalregression orspeedupclaim.
+No retry/tuning/helper/flag/layout/PGO/WORKpolicyrescue orproductionpromotion.
+See evidence/degen2-row-transfer.json. Accepted2.74xgap remains.
+Accepted-ELF walk/pop accounting is complete:510walks3.342011M I,396pops7602I;
+7195steps/7006jumps/189shifts. First+repeatlengthfilters1.853580M I anddependency
+scan1.200087M overlapclosedwalklen/walkrefs/walkmax. Slotmutation.157802M andpop
+.007602M together<.1%solveI before necessarywork; no localbounds/copy/outline
+prototype. Beforefrontier only65walks33749I; wholelatercounts unpairedsource-only.
+Selected136/135 actualconsumedlength/slot/drop/writeprojections pass; temporal
+14kind/13promotiondifferencesretained. Rose304/nativewide131I notequivalentcomplete
+boundaries(deferredsourceWORKoutside); no exactinclusivegap extrapolation.
+Calibration/rootdetail/controlresults pass; cycles/timers excluded. See
+ evidence/degen2-structural-update.json. No solver/source/build changes.
+Next singleexperiment: ordinaryfactorB-listfrontinsert/frontfill-delete complete
+owner movement/search/growth/cleanupcosts onacceptedELF, withcachednativepairing
+whereobserved; include16constructor/retirementlifetimes beforeproposingstorage.
+Remaining~3.981MtransitionI includesmuchotherrequiredwork,notaremovablebudget.
+Do notreopenB-referencecountmembership,spikemarkdedup,constructorchainqueues,
+walklen/max/refcache,workspace/arena orUtransfer. Accepted2.74xgap remains.
+
 The qualified matching-PGO/system-TCMalloc frame-pointer/line-table Quad
 controller review is closed without a prototype; seek a distinct substantial
 mechanism outside these reviewed paths. Full987 and72 complete profiling/counter

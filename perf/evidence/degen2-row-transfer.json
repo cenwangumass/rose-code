@@ -1,0 +1,1015 @@
+{
+  "previous_goal_turn_classification": "Progress: completed actual-solver shadowcost qualified1849-case candidateproof andone fixed isolated transfer trial. Currentturntests that trial andcloses itat failedpredeclaredcountergate.",
+  "status": "REJECTED_COUNTER_GATE_NO_PROMOTION",
+  "design": "One same-live-pivot directU-to-eliminate transfer usingtyped cacheownedbyRefStruct; move carriesbothnumericstate/cache, Clone/clone_from/restore/freshclear; nextBTRANoverwrites, updateconsumesonce. Originalrow_cachedbehavior separate/unchanged. No pointeraddresses used.",
+  "scope": "Optimizationtrial follows completedboundeddiagnostic. Isolatedtarget/source only, no productionchanges/acceptedbinaryreplacement orbaselineupdates.",
+  "configuration": {
+    "candidate_sha256": "f8db0260951e776f3af3e9aa71e08bd0d2b2d0e0812591dfff245a42e0df77bf",
+    "accepted_optimized_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "ordinary_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "own_fixed39_PGO_system_TCMalloc": {
+      "compiler": "rustc 1.98.1 (48a229cea 2026-09-01)\nbinary: rustc\ncommit-hash: 48a229ceaefd4985c50990b14116b6d856af0985\ncommit-date: 2026-09-01\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.1\nLLVM version: 22.1.8\n",
+      "profile": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-row-transfer/source/target/perf-pgo/4af6f06685d83b9cf2268c2677da4233eaddf99dbf6a73c31be5ead8f85c0ec8.profdata",
+      "sha256": "4af6f06685d83b9cf2268c2677da4233eaddf99dbf6a73c31be5ead8f85c0ec8",
+      "rustflags": [
+        "-Cllvm-args=--align-loops=64",
+        "-Cprofile-use=/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-row-transfer/source/target/perf-pgo/4af6f06685d83b9cf2268c2677da4233eaddf99dbf6a73c31be5ead8f85c0ec8.profdata"
+      ],
+      "features": [
+        "system-tcmalloc"
+      ],
+      "training": [
+        [
+          "solve",
+          "tests/fixtures/afiro.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/afiro.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/afiro.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/afiro.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/afiro.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/afiro.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/afiro.mps",
+          "--method",
+          "pdhg",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--pdhg-iter-limit",
+          "2000"
+        ],
+        [
+          "solve",
+          "tests/fixtures/sc50a.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/sc50a.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/sc50a.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/sc50a.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/sc50a.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/sc50a.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/sc50a.mps",
+          "--method",
+          "pdhg",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--pdhg-iter-limit",
+          "2000"
+        ],
+        [
+          "solve",
+          "tests/fixtures/blend.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/blend.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/blend.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/blend.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/blend.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/blend.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/blend.mps",
+          "--method",
+          "pdhg",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--pdhg-iter-limit",
+          "2000"
+        ],
+        [
+          "solve",
+          "tests/fixtures/adlittle.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/adlittle.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/adlittle.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/adlittle.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/adlittle.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/adlittle.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/adlittle.mps",
+          "--method",
+          "pdhg",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--pdhg-iter-limit",
+          "2000"
+        ],
+        [
+          "solve",
+          "tests/fixtures/bore3d.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/bore3d.mps",
+          "--method",
+          "primal",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/bore3d.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/bore3d.mps",
+          "--method",
+          "dual",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/bore3d.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "controlled"
+        ],
+        [
+          "solve",
+          "tests/fixtures/bore3d.mps",
+          "--method",
+          "barrier",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--barrier-profile",
+          "release"
+        ],
+        [
+          "solve",
+          "tests/fixtures/bore3d.mps",
+          "--method",
+          "pdhg",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null",
+          "--pdhg-iter-limit",
+          "2000"
+        ],
+        [
+          "solve",
+          "tests/fixtures/inf_itest6.mps",
+          "--method",
+          "primal",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null"
+        ],
+        [
+          "solve",
+          "tests/fixtures/inf_itest6.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null"
+        ],
+        [
+          "solve",
+          "tests/fixtures/fx_midsing_1106.mps",
+          "--method",
+          "primal",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null"
+        ],
+        [
+          "solve",
+          "tests/fixtures/fx_midsing_1106.mps",
+          "--method",
+          "dual",
+          "--profile",
+          "release",
+          "--max-iterations",
+          "200",
+          "--output",
+          "/dev/null"
+        ]
+      ]
+    },
+    "build_seconds": 73.91979945699859,
+    "CPU": 2
+  },
+  "fidelity": {
+    "complete_original_U_and_eliminate_frozen_before_runtime_edits": {
+      "original_ftran_sha256": "57c86340f6959717954e2cb1c58f06c285ab7ce564a25d7d0e9e9c429d802ef1",
+      "original_U_sha256": "f60620626bc36dea0023e3c7d5fc383f7a4163dbae22fa35d2726b3fff495f87",
+      "original_eliminate_sha256": "3c9f1f1e3fc4f167116bf52676f09e573c9db1a86796172af8dfed9f64a9fb6b",
+      "oracle_sha256": "0bfd32fdf1388c8d790e1f25658999ed65fcbc3c05daf99b4835376e6b01f473",
+      "metadata_only_source_sha256": "d82a5e9c5f0fd5e810b472d7c7f56fa540520abc45c6ca1ea09bd69a3ec33599",
+      "helper_sha256": "9e15a61924160487ac03baffb083f516888f79ff177293e049845145d27085f0",
+      "accepted_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+      "ordinary_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+      "differential_tests_sha256": "42f733d2c8a70f96d9197c59fc180a2a2b442614a3507377b5f831c5980b581e"
+    },
+    "literal_source_reversal_to_original_plus_cfg_tests": true,
+    "fallback_complete_original_eliminate_unchanged": true,
+    "WORK_sites_values_order_unmodified": true,
+    "arithmetic": "Uoriginalexpressions/order unchanged, twofiniteclassifiers andpre-etaoutputcapture inserted. Admitted path transfersalreadycomputednonpivotUvalues; faithfullycomputesoriginalvisited/dense additions inoriginalorder. All unsupportedcases executeoriginaleliminate.",
+    "guards": "f64/directsingletonunit+1; allcomputedUquotientsfinite includingdropped ones; firstpivot retained; initialUTrowunique; allnonpivotpublishedouttail. MXCSRcontrolffc0==1f80 requiresall6exceptionmasks,nearest,noDAZFTZ; invalid/divzero/overflowstickyflagsreject. Atconsumeoldcached_upd+1=currentupd,row/source_row_cachedmatch, controlsstable, captureflagscovered. FailedbookFPstatus restoresoriginalCSR andfallback.",
+    "representation": "Relies onvalidmanagedupper-triangularslotorder andsortedUT representation; numericalfields private. Delegatedsourceaudit foundno partialrestoration otherthanexhaustiverestore_fields andallstructuralmutations occurafterconsume.",
+    "sign_and_FP_limits": "Defaultnearestfinite sign symmetry withzero intermediates discardedbeforepublishedeta; duplicateinitial/droppedpivot/directedrounding/nonfinite cases fallback. No general F80 reuse; original remainsfor allF80cases."
+  },
+  "proof": {
+    "original_before_candidate": {
+      "F80": {
+        "cases": 11782,
+        "fallback": 11782
+      },
+      "all_output_order_WORK_dense_scratch_FP_exact": true,
+      "applied": false,
+      "captured": {
+        "cases": 1268,
+        "fallback": 1268
+      },
+      "f64": {
+        "cases": 11782,
+        "fallback": 11782
+      },
+      "quick": false
+    },
+    "candidate_differential": {
+      "F80": {
+        "cases": 11782,
+        "fallback": 11782
+      },
+      "all_output_order_WORK_dense_scratch_FP_exact": true,
+      "applied": true,
+      "captured": {
+        "admitted": 1268,
+        "cases": 1268
+      },
+      "f64": {
+        "admitted": 581,
+        "cases": 11782,
+        "fallback": 11201
+      },
+      "quick": false
+    },
+    "comparisons": 24832,
+    "admitted": 1849,
+    "admitted_generated_f64": 581,
+    "admitted_captured634_times2_schedules": 1268,
+    "F80_all_fallback": 11782,
+    "tests": "Bothrelease tests pass: completeoriginalvsruntimeUallrawx/order/WORK/FP; finaleta/visited/dense/scratch/FP versuscompleteoriginaleliminate. Randomvalidpermutedtriangular factors, fullmantissaf64/F80, extremes/nonfinites/signedzeros/TOLneighbors/initialduplicates/nonunit/droppedpivot;16FPcontexts,bothsparschedules. Lifecycle tests coverclone/restore/moveownership,one-shot,overwrite,epoch/row/FPguards,andall64exceptionmaskcomboswithoutunsupportedexceptionalarithmetic.",
+    "first_difference_artifact_absent": true,
+    "fast_parity": "940/940frozenrecords/results/statuses/exits,3.3s",
+    "dump_checks": [
+      {
+        "model": "afiro",
+        "cap": 3,
+        "original_dump_records": 0,
+        "complete_result_exit_zero_sign_agree": true,
+        "exit": 3
+      },
+      {
+        "model": "sc50a",
+        "cap": 3,
+        "original_dump_records": 0,
+        "complete_result_exit_zero_sign_agree": true,
+        "exit": 3
+      },
+      {
+        "model": "degen2",
+        "cap": 20,
+        "original_dump_records": 1002,
+        "complete_result_exit_zero_sign_agree": true,
+        "exit": 3
+      },
+      {
+        "model": "degen2",
+        "cap": 149,
+        "original_dump_records": 4049,
+        "complete_result_exit_zero_sign_agree": true,
+        "exit": 3
+      },
+      {
+        "model": "degen2",
+        "cap": 640,
+        "original_dump_records": 17201,
+        "complete_result_exit_zero_sign_agree": true,
+        "exit": 0
+      }
+    ],
+    "full987_and_allrelease_and_full23panel": "Not run forrejectedcandidate; predeclared gate stopped before timingandfullcandidatepromotiongates. Frozenbaselineunchanged."
+  },
+  "delegated_alignment": {
+    "delegate": "/root/ref_compare",
+    "actual_source_success_fallback_counts": {
+      "binary_sha256": "f8db0260951e776f3af3e9aa71e08bd0d2b2d0e0812591dfff245a42e0df77bf",
+      "script_sha256": "e19e9f951a3ab0a3093147caa8db5acad58e6beb4eab10c3c13bb6efa8bc939d",
+      "count_scope": "candidate source-only actual compiled caller branch census; no native numeric pairing/no cycle or timing measurement",
+      "rows": [
+        {
+          "case": "afiro-3",
+          "update_entry": 3,
+          "consume_return": 3,
+          "reuse": 3,
+          "fallback": 0,
+          "exit": 3,
+          "complete_result_exit_zero_sign_control": true,
+          "argv": [
+            "timeout",
+            "30s",
+            "taskset",
+            "-c",
+            "3",
+            "gdb",
+            "-q",
+            "-nx",
+            "-batch",
+            "-x",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-row-transfer/decisions/count.py",
+            "--args",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-row-transfer/source/target/release/rose",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/afiro.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "3",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-row-transfer/decisions/afiro-3.result.json"
+          ]
+        },
+        {
+          "case": "sc50a-20",
+          "update_entry": 18,
+          "consume_return": 18,
+          "reuse": 18,
+          "fallback": 0,
+          "exit": 3,
+          "complete_result_exit_zero_sign_control": true,
+          "argv": [
+            "timeout",
+            "30s",
+            "taskset",
+            "-c",
+            "3",
+            "gdb",
+            "-q",
+            "-nx",
+            "-batch",
+            "-x",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-row-transfer/decisions/count.py",
+            "--args",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-row-transfer/source/target/release/rose",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/sc50a.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "20",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-row-transfer/decisions/sc50a-20.result.json"
+          ]
+        },
+        {
+          "case": "degen2-20",
+          "update_entry": 19,
+          "consume_return": 19,
+          "reuse": 19,
+          "fallback": 0,
+          "exit": 3,
+          "complete_result_exit_zero_sign_control": true,
+          "argv": [
+            "timeout",
+            "30s",
+            "taskset",
+            "-c",
+            "3",
+            "gdb",
+            "-q",
+            "-nx",
+            "-batch",
+            "-x",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-row-transfer/decisions/count.py",
+            "--args",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-row-transfer/source/target/release/rose",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen2.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "20",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-row-transfer/decisions/degen2-20.result.json"
+          ]
+        },
+        {
+          "case": "degen2-640",
+          "update_entry": 621,
+          "consume_return": 621,
+          "reuse": 621,
+          "fallback": 0,
+          "exit": 0,
+          "complete_result_exit_zero_sign_control": true,
+          "argv": [
+            "timeout",
+            "30s",
+            "taskset",
+            "-c",
+            "3",
+            "gdb",
+            "-q",
+            "-nx",
+            "-batch",
+            "-x",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-row-transfer/decisions/count.py",
+            "--args",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-row-transfer/source/target/release/rose",
+            "solve",
+            "/home/derekwang/rose-reverse-engineer/rose/tests/fixtures/degen2.mps",
+            "--method",
+            "dual",
+            "--profile",
+            "release",
+            "--max-iterations",
+            "640",
+            "--output",
+            "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-row-transfer/decisions/degen2-640.result.json"
+          ]
+        }
+      ]
+    },
+    "full_DEGEN2_reused": 621,
+    "full_DEGEN2_fallback": 0,
+    "method": "Actualcompiledcaller success/fallback PCs, no guessedOptionABI. Sourceonlycounting; tracedcompleteoutputs/exits/signedzerosmatchplaincandidatecontrols.",
+    "reference": "Central compare.py cachedreference/nativeprefix1..162pass ending source163; expectedfirstnative163/source164basis22\u22120/+0 remains. No normalization,no comparisonpastfrontier,no newnativecapture.",
+    "files": "target/perf-degen2-row-transfer/decisions/{central-commands.json,prefix162.json,prefix163.json}"
+  },
+  "counter_gate": {
+    "predeclared_plan": {
+      "scope": "One isolated same-live-pivot U-to-eliminate transfer trial after completed diagnosis; no production promotion before all gates.",
+      "design": "Owned typedcache, Clone/restore clear, moves preserve ownership; explicit f64/unit+1/maskednearest/noDAZFTZ and all computedquotientsfinite/uniqueinitialrow/retainedpivot/tailoutput guards; epoch+1/r/row_cached/FPflags; faithfuloriginal-orderbookkeeping; completeoriginalfallback.",
+      "proof": "Freeze complete original U/eliminate; validate unchanged original first then candidate on validgenerated f64/F80/extreme/nonfinite/duplicate/threshold and16FPmodes+captured634actualU histories. Test all64exceptionmask combinations rejectunsupported controls without executingexceptional arithmetic. Clone/restore/move/one-shot/lifetime controls.",
+      "counter_gate": {
+        "cpu": 2,
+        "pairs": 8,
+        "target": "DEGEN2dual-release cap640",
+        "small_pairs": 3,
+        "small_controls": [
+          "AFIROcap300",
+          "SC50Acap300",
+          "ADLITTLEcap300"
+        ],
+        "require": "Median target instructions ANDcycles lower; all completeobjects/exits exact. Stop otherwise."
+      },
+      "timing": {
+        "seeds": [
+          84117,
+          84189
+        ],
+        "pairs": 32,
+        "AA": 32,
+        "rule": "Existingstrict perf/paired.py; secondonlyif firsthealthypositive. Stop firstfailed/inconclusive; no retuning/extending/rescuing."
+      },
+      "build": "Ownfixed39PGO/systemTCMalloc, pinnedRust1.98.1. Separate target; ordinary andoptimizedaccepted untouched.",
+      "rejected_check": "Not completeBTRANmemoacrossclones, Lhandoff/sharedL-etafusion, rowmap/workspace/arena/Uindex maintenance. No failedscreenrepeated."
+    },
+    "results": [
+      {
+        "model": "afiro",
+        "cap": 300,
+        "pairs": 3,
+        "changes_percent": {
+          "instructions:u": 0.03829979059690736,
+          "cycles:u": 2.042285157792656
+        }
+      },
+      {
+        "model": "sc50a",
+        "cap": 300,
+        "pairs": 3,
+        "changes_percent": {
+          "instructions:u": -0.09427492427722672,
+          "cycles:u": -6.396253688880482
+        }
+      },
+      {
+        "model": "adlittle",
+        "cap": 300,
+        "pairs": 3,
+        "changes_percent": {
+          "instructions:u": -0.31335815242981013,
+          "cycles:u": -9.645269993636951
+        }
+      },
+      {
+        "model": "degen2",
+        "cap": 640,
+        "pairs": 8,
+        "changes_percent": {
+          "instructions:u": -0.8263849149466207,
+          "cycles:u": 1.2413693135646664
+        }
+      }
+    ],
+    "all_34_complete_results_exits_float_hex_identical": true,
+    "PMU_all100percent_running": true,
+    "DEGEN2_medians": {
+      "before": {
+        "instructions:u": 196504071.0,
+        "cycles:u": 145405439.0
+      },
+      "after": {
+        "instructions:u": 194880191.0,
+        "cycles:u": 147210457.5
+      }
+    },
+    "DEGEN2_pair_differences": [
+      {
+        "instructions:u": -1621556.0,
+        "cycles:u": 8639554.0
+      },
+      {
+        "instructions:u": -1614529.0,
+        "cycles:u": -10455503.0
+      },
+      {
+        "instructions:u": -1639475.0,
+        "cycles:u": 3123002.0
+      },
+      {
+        "instructions:u": -1617887.0,
+        "cycles:u": -5659259.0
+      },
+      {
+        "instructions:u": -1633991.0,
+        "cycles:u": -3614633.0
+      },
+      {
+        "instructions:u": -1620074.0,
+        "cycles:u": -10983197.0
+      },
+      {
+        "instructions:u": -1632402.0,
+        "cycles:u": 11501759.0
+      },
+      {
+        "instructions:u": -1626460.0,
+        "cycles:u": 19612477.0
+      }
+    ],
+    "decision": "FAIL: ratioofperbinarymedians instructions\u22120.8263849%,cycles+1.2413693%; requiredbothlower. Stopbefore84117/84189, no retry/extension/profile/layout/helper/flag/WORKpolicyrescue.",
+    "interpretation": "Wholeprocess usercounters separatefromaccepted181.193Msolve-only. Eachinstructionpair improves; cyclepairs havebothsigns (4each), so descriptivefailedgate isnot a causalmicroarchitecturalregressionproof orsupportedspeedup. Do notswitchaggregationorresampletosavecandidate."
+  },
+  "rejected_experiment_check": "This newtrial was distinct from fullBTRANmemoacrossclones,Lhandoff/sharedL-etafusion,rowmap/workspace/arena/Uindex. Its ownwithin-pivottypedtransferimplementation isnow closed too. Retain numericalfeasibilityfinding, no runtimegaincredited.",
+  "reconciliation": "Accepted45.784/16.696ms2.74x unchanged. F/Bselfgap51.863M I/22.439M C andoutside76.132M I/66.876M C remain. Candidate1.624MwholeCLIinstructionmedianreduction not anacceptedtimegain andnot addedtoanygapledger. Eliminatebelongsfactorupdate scopealreadycounted.",
+  "one_next_observation": {
+    "design": "Boundedaccepted-binary cost-and-operation pairing for slot-permutation/row-list mutation insidewalk/drop_nuc inmirrorupdate, startingAFIRO/SC50A thenDEGEN2beforestrictfrontier; delegatecachednativecomparison andcentralizealignment. Split actualhelpercounts/instructioncost andownedcopy/bookkeeping/cleanup frombroader7.331Mspike-transitionledger. No optimizationunlessadistinctsubstantialmechanism established.",
+    "why": "Targets remainingstructuralmutation work ratherthanretryingcache/WORK/heap/layout variants. Previouslyrejected spikemarkcontains dedup, reverse-rowdependencylength/tailcache, constructorMarkowitz/frontier andworkspace/arena remainclosed. Whole7.331M isnotremovabletime; specifichelpercoststillmissing."
+  },
+  "artifacts": {
+    "target/perf-degen2-row-transfer/counters.py": "e3191d0c67beb225a8fc28982fb692fafb97ff67f519e1020f76c35ece84b3f2",
+    "target/perf-degen2-row-transfer/own_pgo.py": "3d05970c89c1fbe4412e4b113c5435c990ec91e841b3491dd4df5f77dfdfbaec",
+    "target/perf-degen2-row-transfer/prepare.py": "26fd010af4b885b3a29576a81ab60df89ecae9d967f187cb863f73f9a9eac5e5",
+    "target/perf-degen2-row-transfer/apply.py": "09116cb787691b90f531143567b7bf37047624c95ed8d100ffcb8ea95f35a304",
+    "target/perf-degen2-row-transfer/row_reuse.rs": "9e15a61924160487ac03baffb083f516888f79ff177293e049845145d27085f0",
+    "target/perf-degen2-row-transfer/differential-tests.rs": "42f733d2c8a70f96d9197c59fc180a2a2b442614a3507377b5f831c5980b581e",
+    "target/perf-degen2-row-transfer/original-eliminate.rs": "3c9f1f1e3fc4f167116bf52676f09e573c9db1a86796172af8dfed9f64a9fb6b",
+    "target/perf-degen2-row-transfer/lifetime-tests.rs": "c6b1e9b5a6e4881baf7f25815481abe9551c3bb92a9627f444955005c93659f0",
+    "target/perf-degen2-row-transfer/original-sparse-U.rs": "f60620626bc36dea0023e3c7d5fc383f7a4163dbae22fa35d2726b3fff495f87",
+    "target/perf-degen2-row-transfer/frozen-oracle.rs": "0bfd32fdf1388c8d790e1f25658999ed65fcbc3c05daf99b4835376e6b01f473",
+    "target/perf-degen2-row-transfer/runtime-edits.json": "55c501828408aa9123f6191fe7709c7e87a7cb92b39de56499a7440613c2a5c1",
+    "target/perf-degen2-row-transfer/original-full.json": "3c578d1d657625b1ffb093330eee056ec4777cf7ad2473c6c4e9e59082caf14c",
+    "target/perf-degen2-row-transfer/dump-checks.json": "d28e1c1bd661ffb66fda2d9a67160ef47ecb44652aa48aad945ff0cc27b762ee",
+    "target/perf-degen2-row-transfer/candidate-degen2-20.json": "6fd6de49f6689319defe6480387e147cff13252b98e017d02beee367dba925c9",
+    "target/perf-degen2-row-transfer/trial-plan.json": "4a7e39b82e77966eb8221373424ed876eee4e64752561393b75a650ebaf9c26f",
+    "target/perf-degen2-row-transfer/freeze.json": "4ac30b76b38ddaae8385bad9c558b3d127ce380e11179d4898cb2f4f6c266ec2",
+    "target/perf-degen2-row-transfer/candidate-degen2-149.json": "71d5c59b038e94c49dcac0ec3eb1bbf878ac7d99878823915dba2b27d733f365",
+    "target/perf-degen2-row-transfer/applied-proof.json": "820f8837b6da52d11a8193a6015d809bbb8e980afec9b7fe9733ddedbf50d5f4",
+    "target/perf-degen2-row-transfer/own-build-command.json": "6affb337b06532dd5b26b05ae8c88e476bea0a8674a252d014c2ee54cfa976b8",
+    "target/perf-degen2-row-transfer/candidate-full.json": "02920bf8b9abdbaa94e0a63646a7e28cee943f1e5aeee6ad5c430e9e53f35478",
+    "target/perf-degen2-row-transfer/candidate-sc50a-3.json": "aab0e45c8d5599859248611d9a8796933196d6227b7cd7dd7877c1ff69d50327",
+    "target/perf-degen2-row-transfer/original-quick.json": "a981f7ccd841fbd056ba84cc7f825456e17d19c3d82a45afd46f5d56bda33501",
+    "target/perf-degen2-row-transfer/candidate-quick.json": "5508cb8117c751791aceff1d637cb27bb4cfe06b06dfacd1282a679f96d542f8",
+    "target/perf-degen2-row-transfer/candidate-afiro-3.json": "b8dba9dcbf0a753b1c5709254675d73be4cb3c62abb2377bba032fe3cc359dac",
+    "target/perf-degen2-row-transfer/candidate-degen2-640.json": "dcb9e51003a7a5b9c20b8218f8961b9840f0bfd68e454014ecc3395ece09a3de",
+    "target/perf-degen2-row-transfer/metadata-edits.json": "5030dc07f5066aa4ec9e610879969925a1d8620ff85a90d1c9ada34ebf783242",
+    "target/perf-degen2-row-transfer/parity-fast.log": "deb54da8535ff76166e3c7933e8408df873ed1c5f8725b22b7ffe2047b29e4be",
+    "target/perf-degen2-row-transfer/original-quick.log": "f5220ce192ba2489b12ab18c4b2ba89e26bb32c30addc58d0bf2c5a752ee1e4a",
+    "target/perf-degen2-row-transfer/candidate-full.log": "264838163d4229c3cf8b16b59754d155e03a723a5d7657c788bf9d07eeab55d6",
+    "target/perf-degen2-row-transfer/counter-runner.log": "bd1893b7a4f471e180ed5afea90a5fe6c7efbd4c840f3331bd2f800bd3b56140",
+    "target/perf-degen2-row-transfer/original-full.log": "1684efabfda19dcb3146d184105f165e11a481b1932f365aace3cbff0527a133",
+    "target/perf-degen2-row-transfer/own-build-runner.log": "0bd617783403377d4761e56f8d7a253ed45c10dd928091075d9a16f18c62528d",
+    "target/perf-degen2-row-transfer/candidate-quick.log": "6e598f243064ac563e83afe582b33b38fb045538467e5ce01d7ecdd1a00202cc",
+    "target/perf-degen2-row-transfer/own-build.stdout": "fe6931ad624d3c5bd51a15718164e894f3324386c8a66667baba2c3ecef6207d",
+    "target/perf-degen2-row-transfer/candidate-afiro-3.stderr": "62d21b51224f3d92998c8baa5d2adcaf12cbee6bba1f5fd7e85ee4debcecc5df",
+    "target/perf-degen2-row-transfer/candidate-degen2-149.stderr": "7e32cd43895fb2abf89f2fb913111133c7bfa7476d5934fcadf9e8f2dcb29c4c",
+    "target/perf-degen2-row-transfer/candidate-degen2-20.stderr": "59f3a82954951b76065fd5fa65e780c89e5ec7f11caf15563e3c1d5b0f0e8fa7",
+    "target/perf-degen2-row-transfer/candidate-sc50a-3.stderr": "973c4fd5e517810533b4e19c6f7bf7acb96ac5dce9898a523905e2e6b854156b",
+    "target/perf-degen2-row-transfer/own-build.stderr": "63ace68390d4d7cbf772de23e6514567724d8cb255c8aa7f5a8346f837866d98",
+    "target/perf-degen2-row-transfer/candidate-degen2-640.stderr": "a788d1e93fcd4c17aeeb99555f720bfbd26877b03dc8bf0a7f9938c58aef2f40",
+    "target/perf-degen2-row-transfer/counters/adlittle-2-after.json": "367ecccc50e5a608fa387860049a9ef370d662031da24c3a1d0b42d38f64a0b2",
+    "target/perf-degen2-row-transfer/counters/degen2-3-after.json": "8311e142ea84607776066249db55345a5b87057b80725f850c8665a72bb75c1b",
+    "target/perf-degen2-row-transfer/counters/runs.json": "c47e60425bc14b6a4db2ab2393718daf30633b6d61bd767a13a5b1e0c05157a7",
+    "target/perf-degen2-row-transfer/counters/afiro-0-before.json": "b9403e1e0826782fdf5ac24258196499008abcd6497dbaa644967203b9be795d",
+    "target/perf-degen2-row-transfer/counters/degen2-1-after.json": "4f57b10ca896d136bbd8f5277213209db5d84972e26e0e20368a2f6f4255f51f",
+    "target/perf-degen2-row-transfer/counters/sc50a-2-after.json": "6089bb6aa7f8b2230aa403b43b11c62cdbf4929e75b17d2c1ee13373270573bc",
+    "target/perf-degen2-row-transfer/counters/degen2-6-before.json": "70ef177265bcde3bc4515bfb2713e4e673351d3c02b0c495532434e4f1152736",
+    "target/perf-degen2-row-transfer/counters/degen2-3-before.json": "0ad19c0cc0b8a1d6deb2e9aee3b633f5e44378a24807dabf79b0fc6e32be6af4",
+    "target/perf-degen2-row-transfer/counters/summary.json": "aa99db0c92a38fe1e20709ddf936788d5844e2ab4abffa6adf5669cec6c96a67",
+    "target/perf-degen2-row-transfer/counters/sc50a-1-before.json": "15662f860f539f1b905c05c5ec5b234704d3321125e920d6ad9625b14baea428",
+    "target/perf-degen2-row-transfer/counters/degen2-1-before.json": "a65b2b4d5e11387bbf489f3a991e3bf2304154cc4098bb0253eb6fbe8bf32125",
+    "target/perf-degen2-row-transfer/counters/sc50a-0-after.json": "36e7e71cbc90fa2eab4eb180fed9e0b6b34f0adce163ea7f6b062a517eb4ec6d",
+    "target/perf-degen2-row-transfer/counters/afiro-2-after.json": "a35ee7fce36a17818539bdc49f91754c821728afd5d2e2adb49edc818fbac38d",
+    "target/perf-degen2-row-transfer/counters/sc50a-0-before.json": "6edd3f298ff75e7499f1d8158f38dfa2fcbcf69628f79a5b380c75710191107d",
+    "target/perf-degen2-row-transfer/counters/manifest.json": "96cb2b2100af7d2eb82a592fc0de5aebc3a33c805aa448250a9106d7dce99bd8",
+    "target/perf-degen2-row-transfer/counters/adlittle-0-before.json": "6d8805577ffaa67d390dce53eaf31808aaba15558c4d02c4311a6cb324bd1967",
+    "target/perf-degen2-row-transfer/counters/degen2-4-before.json": "62cbb1ec453c7967e58d6f4bd916cb92be5691713a04944f9f47f67a164b1834",
+    "target/perf-degen2-row-transfer/counters/adlittle-1-before.json": "d23dae4bcec30e1b1e96061d17583b05d19b4efa8f0693a2b79423ff6d6ab747",
+    "target/perf-degen2-row-transfer/counters/degen2-2-before.json": "0e6d23ca143a5fc703ee3f79c0f3ca430090e9a3daac5e92fdd88e5596972981",
+    "target/perf-degen2-row-transfer/counters/afiro-1-after.json": "36b385c39be1c091af0537c2c4d332d9b436a6ba8fdb03a82f2c8738e095fb7a",
+    "target/perf-degen2-row-transfer/counters/afiro-1-before.json": "b6ee59b5830ece4744384130e621bb296ce1d72a5404083e34b543a9cb6095c1",
+    "target/perf-degen2-row-transfer/counters/sc50a-1-after.json": "f966eab533a816f738e50b070be1e9fec76f5b2bcdac8d67df33f153e425143b",
+    "target/perf-degen2-row-transfer/counters/degen2-4-after.json": "89f2fee89da7bfcc6cd0e437e93f302bf3054398fbd0f6125873ad429dfffda9",
+    "target/perf-degen2-row-transfer/counters/adlittle-1-after.json": "9aced4d7118379fc7d78224af8a6ba514df32fe17317a79c9a594a050b0ce4e7",
+    "target/perf-degen2-row-transfer/counters/degen2-6-after.json": "27c4b1a1b645e8bcc0db39a83666b41d05202b89b719c3f325fdf6b7bf8d4677",
+    "target/perf-degen2-row-transfer/counters/degen2-5-after.json": "c7dedd0f0408d92eec5f507cc1506cbd904ae856b1b6aac6b36bc3438d55e483",
+    "target/perf-degen2-row-transfer/counters/degen2-5-before.json": "9f1cbd29135e96c1ece4f1eef48ba90e7213454cb7c44c4fc189f6053fbd0566",
+    "target/perf-degen2-row-transfer/counters/degen2-0-before.json": "d838b3474c8d338d226ef732c5d4eda7953fb852ee140990489ff7735eb201f5",
+    "target/perf-degen2-row-transfer/counters/sc50a-2-before.json": "2a366f970621b8adb495d249d437c136ed1ca390d841cdfb3f48cbbf33632d19",
+    "target/perf-degen2-row-transfer/counters/degen2-7-before.json": "6e1f3795f2b6b5dd6d5aff5b83e403d92f3cdd1a18d1f11e95f2584304f585f5",
+    "target/perf-degen2-row-transfer/counters/afiro-2-before.json": "1a8e8dd4fd16af5c61a64e018bbd6a319410f016f8939c4461741006c84d08ca",
+    "target/perf-degen2-row-transfer/counters/degen2-7-after.json": "2a83ea3aff68bda3926aa5dc125dbc84583dd8a9ce3b6c95bae4d5fd61bf41fa",
+    "target/perf-degen2-row-transfer/counters/degen2-2-after.json": "22c11985678cd33dcf3d8c6b79081d170a15e06f39e7731a56db597bdafc5071",
+    "target/perf-degen2-row-transfer/counters/degen2-0-after.json": "d58a956d4bba554a5d52e951a9158f07bc7ff777d88052f3cbfb7f64ba5c58a8",
+    "target/perf-degen2-row-transfer/counters/afiro-0-after.json": "d95e947006510f1a3f2f9dfc793f086c8173e15749334a0a9f1c2e0511c575be",
+    "target/perf-degen2-row-transfer/counters/adlittle-2-before.json": "672e17205fa6106618635b277b6aea1ca1323377aa7ef16436e60a3d38e0d015",
+    "target/perf-degen2-row-transfer/counters/adlittle-0-after.json": "7fbb7560ce6c54d45b44f2e56d0daa604583171ab8efb5f7c115049fec66074b",
+    "target/perf-degen2-row-transfer/counters/degen2-5-before.csv": "9a42f1d6315c9a5afec042aeb5af2d79651c69ca59999b3fb7850ebe86ba6e5e",
+    "target/perf-degen2-row-transfer/counters/degen2-3-after.csv": "3ac2e6916f77ac2313f5699a7d787cfbb1d85c23d0230866e6559cc26007dfae",
+    "target/perf-degen2-row-transfer/counters/degen2-1-before.csv": "e773bb1f00befb97990fcb2fa2a1e23fc03abb0f5c429d090ea39301dc16b799",
+    "target/perf-degen2-row-transfer/counters/degen2-4-before.csv": "185049125e09d7d76fffa8f442271fb0e07614d940ce577a70b96c02fbd06b73",
+    "target/perf-degen2-row-transfer/counters/degen2-6-after.csv": "0ae8ad874c9253a8a53e735ed045f921f21990dd832d0a92921458efb71d1ba5",
+    "target/perf-degen2-row-transfer/counters/degen2-7-before.csv": "fd82c0fd8d9e1ac5bf2ca15c4939501add394446388de930e80d65362fcccfca",
+    "target/perf-degen2-row-transfer/counters/afiro-0-before.csv": "070702925597b9d7b0e9e5e767393c3b94419e6853533787052f80c9a0409e54",
+    "target/perf-degen2-row-transfer/counters/afiro-0-after.csv": "58a7a3e51c40696a061cc9ac0d3aa47f336506715be2167978ba9f300f2d456c",
+    "target/perf-degen2-row-transfer/counters/afiro-1-after.csv": "953bfc8b7b3c6202e55bb97acb47ea70afeb3c07698d2c98d4df85919350ae6d",
+    "target/perf-degen2-row-transfer/counters/adlittle-2-before.csv": "168680307772d36815a523d680239ca9fa192567a8ec886302cc7e03f0663d4d",
+    "target/perf-degen2-row-transfer/counters/adlittle-1-after.csv": "a748a9c4e408d473b9e7c17552c283cc77d16e64ac69ab7a114ee735bcb8353a",
+    "target/perf-degen2-row-transfer/counters/sc50a-2-before.csv": "fee2b73f14eb2abba7be688a001683448d0d8e05568509f000ae8db82faefb65",
+    "target/perf-degen2-row-transfer/counters/degen2-3-before.csv": "c774c4fdcf98eeda4b6dcb3ec1bb0b42722684809005e5b5944283dd7c0b1aa4",
+    "target/perf-degen2-row-transfer/counters/degen2-0-after.csv": "a2fbb55c716a2ec846b6c9e55f338c13426ff33da7e48cf04623d5ab46571665",
+    "target/perf-degen2-row-transfer/counters/sc50a-0-after.csv": "b4506e847431d25a1f764adf1950b320005ddd7898dff42b0e1d5b7c4db17239",
+    "target/perf-degen2-row-transfer/counters/afiro-2-before.csv": "58e0a3e692058c44e813fa95dc2a6ca27e8e3958ce5dfc85f639d496716071f8",
+    "target/perf-degen2-row-transfer/counters/sc50a-1-before.csv": "6019309b096fb2fb28f99b3fb2c7da3c51ba1e07ae8b2ae3ecf56743af8b1f4f",
+    "target/perf-degen2-row-transfer/counters/degen2-2-before.csv": "157e5fc461b0273f7978d796ae752551c4c8e04fecfa0f9b0d481f2bc4005774",
+    "target/perf-degen2-row-transfer/counters/degen2-0-before.csv": "627df05a6e8ee01e30d245051912c3b456890bab2f90fead424db35425602297",
+    "target/perf-degen2-row-transfer/counters/sc50a-1-after.csv": "5aa0c49349612e2541184883b063ac322c3d75ba92fc0f30d424bb4974d697a0",
+    "target/perf-degen2-row-transfer/counters/adlittle-1-before.csv": "d29dca5cb5801145bde6ca2478ab4b9911b2013fb45298ae0127c8e279de8618",
+    "target/perf-degen2-row-transfer/counters/adlittle-0-after.csv": "48936a1ecdba7758f626b25bdba1a2d2ccd7b5ed33b73e4ee1ab7e6defb5251b",
+    "target/perf-degen2-row-transfer/counters/degen2-4-after.csv": "d007a4fe0ca17599d071b0b8d8533e152b833386efb046792f1e3b44328b3219",
+    "target/perf-degen2-row-transfer/counters/degen2-7-after.csv": "59acf4fff93628d077692b74095742a6fca6f43629fbf644bae2f45038f344d7",
+    "target/perf-degen2-row-transfer/counters/degen2-5-after.csv": "23bf34394e6af189548a35534c2fe92acfa4f1a36302f37533ae087b9181d32c",
+    "target/perf-degen2-row-transfer/counters/afiro-2-after.csv": "b0d8a24dde97b5bf6499064885e0353a24fd034242d85eb0b63f3112756a02b5",
+    "target/perf-degen2-row-transfer/counters/sc50a-0-before.csv": "59021db8b44769b112dc8cc78176973868d152c60bd49d364706c51c78026569",
+    "target/perf-degen2-row-transfer/counters/adlittle-0-before.csv": "165a6e626e7bea0e8a2cb6d7852fca994e2eb5ccda6553f70246d61c9cdaadc2",
+    "target/perf-degen2-row-transfer/counters/afiro-1-before.csv": "a7b432ccd770be3427a3e384f05124c3c59250512963965867e6ff70d796af7e",
+    "target/perf-degen2-row-transfer/counters/adlittle-2-after.csv": "f354078dec4e5401f5e61c8cc5918fe3a1265b0ed5bf65968771167648190772",
+    "target/perf-degen2-row-transfer/counters/sc50a-2-after.csv": "85a80f124d11b9dc86a71dfeffd0334f85f9fea4d7024e2c2e5ba0ac40b039d3",
+    "target/perf-degen2-row-transfer/counters/degen2-6-before.csv": "99ec9fbbd81c6206a18150edccb9d1de1fbfe23d3948ad68d45ed79770afc48b",
+    "target/perf-degen2-row-transfer/counters/degen2-1-after.csv": "f52eaee8124a09bcde08b086dfe60a83c470e0223077617a21b5ef8ea30d2669",
+    "target/perf-degen2-row-transfer/counters/degen2-2-after.csv": "d7dded0048ca77e237bbd13aee9a06e1a2d069ed7a94fb1e47d2d01a578ee18a",
+    "target/perf-degen2-row-transfer/decisions/prefix162.json": "21f8aa07943b3d2f4bcd0a3daaf493646350f93d99be9c0ccff769d72f41ebab",
+    "target/perf-degen2-row-transfer/decisions/afiro-3.json": "375ab0c96273684ae88e3cb53c271af062f18040e109d7325b3abd7e080e2d14",
+    "target/perf-degen2-row-transfer/decisions/degen2-640.json": "1a9aa5b5ecef8f5a2b0b68e55354ea186ffa7f7dd1415f996e20c18e7f3f5208",
+    "target/perf-degen2-row-transfer/decisions/degen2-20.json": "422f8621a5a547cde1036d6651c4151e5a31f940b05db20a2463ab9ba1d9a00c",
+    "target/perf-degen2-row-transfer/decisions/degen2-20.control.json": "5df4288fbe11201a506aced05511dad404f7e6ece56c4d1379d6d5188341c0ee",
+    "target/perf-degen2-row-transfer/decisions/sc50a-20.json": "dbc6530ab8a521886d982e056afcb8c9fc70d7f60f75c7f856f969faa5716575",
+    "target/perf-degen2-row-transfer/decisions/summary.json": "7d7c49424647b234b5ad1e5b53c00d6a57a99beb5b34c2aa6eae499cf6bfd30a",
+    "target/perf-degen2-row-transfer/decisions/candidate-dsx163.stderr.meta.json": "a652899087dab22f1a9c8e2f5ac1db646a86f484ede5d5851b65a26349e133db",
+    "target/perf-degen2-row-transfer/decisions/sc50a-20.control.json": "27b57ce99b8d1d40d5cb40dcd138049d1b76fbaf568a273d1909af3138979820",
+    "target/perf-degen2-row-transfer/decisions/sc50a-20.result.json": "3a7d00b6e1b0a48469c8937c0c16384f348ca5bf75c128dbb737db0b43acf1c9",
+    "target/perf-degen2-row-transfer/decisions/candidate-dsx163.json": "d740c93d39713908571dbb5264372f1a1df1f6d8b3666b5eee81e778412c2d40",
+    "target/perf-degen2-row-transfer/decisions/degen2-640.result.json": "c02b064665b1a069b692d7008e723a2167e5ecb49c6923f7dbca79c7914adcc0",
+    "target/perf-degen2-row-transfer/decisions/prefix163.json": "9002c31ea01b730c8bb4c807944a51789bea7651ab32ee914f5e3f4d02e89be3",
+    "target/perf-degen2-row-transfer/decisions/afiro-3.control.json": "5f625b3ee5d3d56dd63fb2447c4bca6321722ba6ea2d83a5f4a53e95a715dd6b",
+    "target/perf-degen2-row-transfer/decisions/degen2-640.control.json": "9ba2f80d091a60fccdacc57e6148f2d19636d941116cbfe4171e72b1c0a26456",
+    "target/perf-degen2-row-transfer/decisions/degen2-20.result.json": "c6b84ed344da9517c020b3250ee4d407e6fb70a3ff3b264eec2719a0ebf6dccf",
+    "target/perf-degen2-row-transfer/decisions/afiro-3.result.json": "c219215725aac4e57cf1531f87e3451501541bdfa7ad3e6f2f539e3f0644e51f",
+    "target/perf-degen2-row-transfer/decisions/central-commands.json": "dd08723e588a26dfcd30dd47427b322a03fbe8d55d5d1b42c6f99cc58cbaddf4",
+    "target/perf-degen2-row-transfer/decisions/count.py": "e19e9f951a3ab0a3093147caa8db5acad58e6beb4eab10c3c13bb6efa8bc939d",
+    "target/perf-degen2-row-transfer/decisions/sc50a-20.log": "0b19a0e81e01d311c249ad9bedb9f0c6213e35683febeea16dcbcacfde162fdc",
+    "target/perf-degen2-row-transfer/decisions/afiro-3.log": "fd15e6a0d52899b7531ce3a8738bcdeb3e87eb67da69497aa796c06fc2c7a2cd",
+    "target/perf-degen2-row-transfer/decisions/degen2-640.log": "017d075977d9ac3eb24fd19a530569af27d3cbc5e0aad4880001fe227703255f",
+    "target/perf-degen2-row-transfer/decisions/degen2-20.log": "21a2aa79aebae7ac37aef99847be11037dc9bbf73c14ba85a55fe5f568d401ac",
+    "target/perf-degen2-row-transfer/source/src/ftran_order.rs": "3c68ea71fcef1b37e2e76c87b692f99a2df92b9add33a704a0af2f8ae7c2bf09",
+    "target/perf-degen2-row-transfer/source/src/row_reuse.rs": "3564c1b5e7b7d6f04c448ce20e974af330c46657d8203f9cd2f7b82e19510f67",
+    "target/perf-degen2-row-transfer/source/target/release/rose": "f8db0260951e776f3af3e9aa71e08bd0d2b2d0e0812591dfff245a42e0df77bf",
+    "target/perf-degen2-row-transfer/source/target/perf-pgo/build.json": "80fe1939c136d053ed5ab739fa8fe76d0060cccba20a4aa2c65408770298bac7",
+    "target/perf-degen2-row-transfer/test-target/release/deps/rose-1647c29dde43abc1": "34ec4f77fdf8c8e564ad019a647020812a321126b36ac4ec891a41c997fd34bc",
+    "target/perf-degen2-row-transfer/source/target/perf-pgo/4af6f06685d83b9cf2268c2677da4233eaddf99dbf6a73c31be5ead8f85c0ec8.profdata": "4af6f06685d83b9cf2268c2677da4233eaddf99dbf6a73c31be5ead8f85c0ec8"
+  },
+  "completed_structural_observation": "degen2-structural-update.json"
+}

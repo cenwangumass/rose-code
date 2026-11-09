@@ -1,0 +1,373 @@
+{
+  "previous_goal_turn_classification": "Progress: completeROWoperationledger andfirstactualADDinput mismatch changednextaction; this turn measuresmirrorupdates, closesdumpmetadata lead andidentifiesconditionalrow-eliminationreusequestion.",
+  "scope": "One bounded diagnostic, no optimizer implementation, solver/numeric/WORK/dump/baseline changes. Accepted55af/fixed39/systemTCMalloc andreference26a505. ImmutableELF counters, oldcapturesandnewboundedobservations.",
+  "configuration": {
+    "accepted_rose_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "ordinary_sha256": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+    "Rose_CPU": 2,
+    "native_CPU": 3,
+    "cycles_and_timers_excluded": true,
+    "new_codegen_distortion": 0
+  },
+  "selected_transaction": {
+    "Rose_pricing": 136,
+    "native_pivot": 135,
+    "input_context_it": 134,
+    "update_context_it": 135,
+    "r": 419,
+    "q": 140,
+    "upd_before_after": [
+      3,
+      4
+    ],
+    "fill_before_after": [
+      1599,
+      1684
+    ],
+    "i3_before_after": [
+      51,
+      63
+    ],
+    "i21_before_after": [
+      436,
+      435
+    ],
+    "input_spike_count": 24,
+    "published_column_support_count": 38,
+    "new_eta_ind": [
+      419,
+      440,
+      441,
+      442
+    ],
+    "new_eta_value_bits": [
+      "3ff0000000000000",
+      "bff0000000000000",
+      "bff0000000000000",
+      "bff0000000000000"
+    ],
+    "new_eta_peel": 1,
+    "Rose_complete_instructions_range": [
+      15337,
+      15340
+    ],
+    "native_complete_instructions": 3182,
+    "selected_excess_range": [
+      12155,
+      12158
+    ],
+    "Rose_selected_parts": {
+      "call_dispatch": 0,
+      "pre_elimination_preparation": 302,
+      "row_elimination_including_helpers_local_cleanup": 1505,
+      "spike_structural_transitions_diagonal_eta_construction": 5723,
+      "pool_capacity_maintenance_and_diagnostic_metadata": 2173,
+      "numeric_structural_installation_and_local_cleanup": 4985,
+      "return_dispatch": 0,
+      "WORK_publication_retirement_pricing_touch_counter": 652
+    },
+    "Rose_selected_elimination": 1505,
+    "Rose_selected_fp_rows_tuples": 14,
+    "Rose_selected_fp_rows_instructions": 661,
+    "native_pricing_helper_instructions": 311
+  },
+  "boundaries": {
+    "native": "0xf15c0entry throughverifiedcallerreturn0xf6c87 includesupdate,WORKpublicationand132a10pricingtouch. Selectedactualsuccessfulcounter3\u21924,notmerelywrappercount. Borrowedpoolsremainlive.",
+    "Rose_complete": "Twooriginalcompiledcallerpaths1028f3/1062db beforeCALLRefStruct::update to102a0c/1063be afterdeferredupd_workiteration/free,touch_pricingandDual.updatesincrement. AuxiliaryFactor.update_column endsbeforethisboundary andremainsseparate.",
+    "Rose_body": "0xcc080entry..0xd5adcbeforeRET includesoriginalhelpers,vectorconstruction,numerics/structures,WORKtuplecreation,fp_rows andlocalcleanup. CALL/RETdispatch separatelyidentified;0I correctedintervals reflectcounterboundarycalibration,notfreehardwareinstructions.",
+    "elimination": "0xcc437..0xce4e9 startsafterpersistentw/seenresize,includesd0/rowlookup,touched/heap/outputeta construction,arithmetic,visited/denseWORKestimates,clearingtouchedw/seen,heap/touchedcleanup;outputeta-candidate retirementafterconsumptionlieslater.",
+    "fp_rows": "3initializerstores plusd5224..d5267 push/capacitygrowth/helpercost pertuple andd5a3a..d5a53 guardedretirement. Requiredrowcount/rowcap/fill/poolmath staysoutsidepurefp_rowscost. No automaticremoval of allpoolregion.",
+    "remaining_lifetimes": "InstalledU/transpose/eta/factorallocationsremainliveandownedbyfactor; no futurefreecharged repeatedlyperupdate. Nativeobserved0exportedallocation/free andfourmemcpy60B,notproofzeroprivateallocationorpersistentconstructioncost."
+  },
+  "whole_Rose_census": {
+    "calls": 621,
+    "complete_caller_instructions": 15441646,
+    "body_instructions": 14859528,
+    "parts": {
+      "call_dispatch": 1,
+      "pre_elimination_preparation": 205541,
+      "row_elimination_including_helpers_local_cleanup": 2469725,
+      "spike_structural_transitions_diagonal_eta_construction": 7330873,
+      "pool_capacity_maintenance_and_diagnostic_metadata": 1935280,
+      "numeric_structural_installation_and_local_cleanup": 2918109,
+      "return_dispatch": 0,
+      "WORK_publication_retirement_pricing_touch_counter": 582117
+    },
+    "phase_table": [
+      {
+        "phase": "positive_level_listwalk",
+        "calls": 128,
+        "instructions": 741277,
+        "parts": {
+          "call_dispatch": 0,
+          "pre_elimination_preparation": 32407,
+          "row_elimination_including_helpers_local_cleanup": 36900,
+          "spike_structural_transitions_diagonal_eta_construction": 268368,
+          "pool_capacity_maintenance_and_diagnostic_metadata": 114382,
+          "numeric_structural_installation_and_local_cleanup": 255031,
+          "return_dispatch": 0,
+          "WORK_publication_retirement_pricing_touch_counter": 34189
+        }
+      },
+      {
+        "phase": "level0_listwalk",
+        "calls": 144,
+        "instructions": 1951945,
+        "parts": {
+          "call_dispatch": 0,
+          "pre_elimination_preparation": 43468,
+          "row_elimination_including_helpers_local_cleanup": 193337,
+          "spike_structural_transitions_diagonal_eta_construction": 853581,
+          "pool_capacity_maintenance_and_diagnostic_metadata": 264343,
+          "numeric_structural_installation_and_local_cleanup": 507584,
+          "return_dispatch": 0,
+          "WORK_publication_retirement_pricing_touch_counter": 89632
+        }
+      },
+      {
+        "phase": "value_mode",
+        "calls": 349,
+        "instructions": 12748424,
+        "parts": {
+          "call_dispatch": 1,
+          "pre_elimination_preparation": 129666,
+          "row_elimination_including_helpers_local_cleanup": 2239488,
+          "spike_structural_transitions_diagonal_eta_construction": 6208924,
+          "pool_capacity_maintenance_and_diagnostic_metadata": 1556555,
+          "numeric_structural_installation_and_local_cleanup": 2155494,
+          "return_dispatch": 0,
+          "WORK_publication_retirement_pricing_touch_counter": 458296
+        }
+      }
+    ],
+    "row_cached_position_matches": 621,
+    "eta_candidate_entries": 4088,
+    "nonempty_eta_candidate_calls": 433,
+    "elimination_percent_whole_solve_instructions": 1.3630355477308727,
+    "fp_rows_tuples": 4055,
+    "fp_rows_nonempty_calls": 582,
+    "fp_rows_parts": {
+      "init": 1864,
+      "push": 198256,
+      "cleanup": 23359
+    },
+    "fp_rows_total_instructions": 223479,
+    "fp_rows_percent_whole_solve_instructions": 0.12333754615244519,
+    "instruction_scope": "Roseonlyentireacceptedsolve, no nativepairing orstorednumericvectors afterstrictfrontiers. Regioncostsarecalibratedinstructionestimates,notcycle/time shares. Mixedregionsincluderequirednumeric andstructuraloperations.",
+    "elimination_output_families": {
+      "empty": {
+        "calls": 188,
+        "instructions": 26914,
+        "mean_instructions": 143.1595744680851
+      },
+      "nonempty": {
+        "calls": 433,
+        "instructions": 2442811,
+        "mean_instructions": 5641.59584295612
+      }
+    },
+    "fp_rows_subset_note": "FPmetadata cost is alreadyincludedinpool/initandfinalcleanupregions;neveraddittothecompleteledger."
+  },
+  "central_input_output_gate": {
+    "command": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-native-update-cost/central-command.txt",
+    "report": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-native-update-cost/central-comparison.json",
+    "factor": "Acceptedentryspike24orderedindex/valuebits+444logicaldensecells matchnative. Diagonal444bitprojectionsbefore/after,kind/nuc/slots/i3/i21/fill, tailAsets/Border/tailnumericbits andetaindex/valuebitsmatch. Aset/numericbyindextransportdoesnotclaimsamevisitationorder.",
+    "same_epoch": "Sourceglobalupdate131selectedupd3\u21924/fill1599\u21921684, nextglobal132pricing137entryupd4/fill1684; cachedFSTRUCT131/132strictsourcevalidation centralized. No interveningrefactor.",
+    "pricing_helper": "Actualsupport38order,m444,r419,q140,P60bits402c000000000000inclactualnativeargument,all444P68before/afterbitsmatch.38slotschange. SourcePVpointerlayout/fieldoffsetsvalidatedcompiledpostpath; helperonlywritesP68.",
+    "missing": "NativefullnucleusnumericU andphysicalrowpoollayoutuncaptured; no fullfactorstatebitparity orallnumerictermhistoryclaim.",
+    "known_failures_preserved": "RawROWADDsentinelversus+0 firsttermfailure andinactiveP18priorityfailure remainretained; no normalization. Triangularoutputzero-signfrontier163 unchanged. Newreferencecapturesselected135only; no laterstatealignment."
+  },
+  "native": {
+    "selected": {
+      "pricing": 136,
+      "native_pivot": 135,
+      "row": 419,
+      "q": 140,
+      "update": [
+        3,
+        4
+      ]
+    },
+    "configuration": {
+      "rose_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+      "reference_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+      "profile": "dual-release",
+      "counter": "target-pid user instructions; all cycles/timers excluded"
+    },
+    "root": {
+      "entry": "0xf15c0",
+      "return": "0xf6c87",
+      "corrected_I": 3182,
+      "observed_root_only_raw_I": 3184,
+      "detailed_raw_I": 3200,
+      "detail_intervals": 9,
+      "correction": "2I per interval; five PUSH calibration observed7; no multiplexing",
+      "repeats": "two root, two initial detail, one complete detail and one helper observer all correct3182I"
+    },
+    "disjoint_intervals_I": {
+      "dispatch_cached_eta_dot_until_f1c01": 385,
+      "structural_replacement_until_f2521": 513,
+      "new_column_eta_pool_until_f2bb0": 467,
+      "transpose_support_pool_rows_until_f2e13": 1467,
+      "final_WORK_until_f2e63": 11,
+      "counter_and_pricing_touch_dispatch_until_132a10": 15,
+      "pricing_key_touch_including_return": 311,
+      "branch_to_cleanup": 2,
+      "cleanup_epilogue_return": 11
+    },
+    "ownership": "Whole native wrapper includes pricing-key touch, unlike RefStruct::update root.311I helper plus17I dispatch/branch remains explicitly separate; do not silently subtract. Main caller is measuring corresponding combined Rose boundary.",
+    "operations_lifecycle": {
+      "cached_elimination_131760_calls": 0,
+      "new_eta_indices": [
+        419,
+        440,
+        441,
+        442
+      ],
+      "new_eta_values": [
+        1,
+        -1,
+        -1,
+        -1
+      ],
+      "spike_support": 24,
+      "new_U_tail_numeric": 2,
+      "new_U_nucleus_indices": 22,
+      "memcpy_bytes": [
+        16,
+        32,
+        4,
+        8
+      ],
+      "native_allocator_deallocator_observed": 0,
+      "fill": [
+        1599,
+        1684
+      ],
+      "nucleus": [
+        51,
+        63
+      ],
+      "tail_start": [
+        436,
+        435
+      ],
+      "old_kind": 1,
+      "new_kind": -2,
+      "slot": [
+        419,
+        443
+      ]
+    },
+    "comparison": "Central exact captured projections pass6observations:24ordered spike input indices/bits;native444dense slots equal source logical zero-filled sparse spike,not actual source scratch capture;before/after allrowetaindices/valuebits,444diagbits,tailAset/Border+numericbits,kind/nuc/slot/i3/i21/fill/upd. No sign/magnitude normalization. Source global131\u2192132 nextentry upd4/fill1684 proves same epoch. Unobserved nucleus Uvalues/native rowpool/pricing P68/P60 excluded. Actual publishedsupport38order,P60bits+actualnativeargument,andall444P68before/afterbitsalsoagree; helpergateclosed.",
+    "qualification": "AFIRO calibration .8s/SC50A .5s; observer qualifications .5/.6s; DEGEN2 selected<=135 .6-.8s. No native capture past selected update return.",
+    "known_failures_retained": "ROW first ADD sentinel vs+0; inactive priority payload mismatch; first triangular needed signedzero163; no all-state parity claim.",
+    "limitations": "Coarse native update intervals mix numeric and metadata work. No exhaustive native arithmetic traversal census; no extrapolation of selected3182I to621updates. Retained factor/pool retirement lies outside root. Tail A storage order is compared as a set with numeric bits by index, B order strictly; no internal visit-order equivalence claimed.",
+    "files": {
+      "comparison": "target/perf-degen2-native-update-cost/central-comparison.json",
+      "command": "target/perf-degen2-native-update-cost/central-command.txt",
+      "provenance": "target/perf-degen2-native-update-cost/capture-provenance.json",
+      "assembly": "target/perf-degen2-native-update-cost/native-update.asm"
+    },
+    "no_optimization": true,
+    "accepted_source_costs_from_parent": {
+      "selected_complete_caller_I": [
+        15337,
+        15339
+      ],
+      "selected_body_I": [
+        14685,
+        14686
+      ],
+      "selected_WORK_publication_pricing_I": 652,
+      "whole_complete_caller_MI": 15.441505,
+      "whole_body_MI": 14.859,
+      "whole_diagnostic_fp_rows_I": 223478,
+      "qualification": "Supplied accepted55af GDB accounting by root; debuggercycles/timesexcluded;wholecensusunpairedpastfrontiers. Completecaller includesWORKpub/free+pricing touch,auxFactorupdateexcluded."
+    },
+    "comparison_limits": "Selected combined caller gap12155\u201312157I. Exact captured input/output projections including pricing helper pass; no exhaustive intermediate elimination-entrytrace, nucleus numeric U/native rowpool layout or all-factor-statepass. Tail A storage order compared as set/numeric bits by index, B order strict.",
+    "source_snapshot_sha256": "183541cfb88959f54862703c41c007524b9184e0426aaba01c7ccf2f9514737a",
+    "central_tool_sha256": "30f5e10e55283fcfe21a6ce2e9f1ccfd3784ad6ffc1f021ff92e25c47ea93b8c",
+    "helper_gate": {
+      "exact_input_output_bits_match": true,
+      "m": 444,
+      "r": 419,
+      "q": 140,
+      "published_support_order": 38,
+      "P60_bits": "402c000000000000",
+      "P68_before_slots": 444,
+      "P68_after_slots": 444,
+      "changed_slots": 38,
+      "native_semantic_capture": "captures/degen2-dual-release/dual_update_cost.a13f489b7e.jsonl",
+      "source_supplement": "target/perf-degen2-mirror-update/source-helper136.json",
+      "timing_costs_excluded": true
+    }
+  },
+  "source_redundancy_audit": {
+    "fp_rows": "Realdiagnostic-onlyworkbutonly223479I(~.1233%solveI), beforeconditionaldumpchecks/layoutcost. Notasubstantialsolverlead; no gatingprototype orformaloptimizationtrial.",
+    "eliminate": "Sourcealwayscallseliminatebeforetakingrow_cached flag;all621positionsmatchcurrentpivot. Flagcurrently suppressesWORKbookingonly. Native131760eliminationcallabsentselectedupdate; itconsumescachedrowresult. Thisprovesdispatchdifference,notthatRoseBTRANintermediateisexactlyreusable.",
+    "missing_elimination_proof": "ExactsourceBTRANU-stagecandidateorder/bits versuscurrenteliminate result, allvisited/cancellation/tolerance/nonfinite/zero/F80 cases, originalWORK/denseestimates andBTRAN/factorstateeffects;construction andeventualcachecleanupcost. ExistingBTRANtrace136 hasonlyin/out, notU-stageintermediate. Do notsubstitutefinalrho orreusethe391/634mixedaverage.",
+    "selected_current_result": "Currenteliminatecandidates440/441/442withallvaluebitsbff0000000000000;newetaadds419/1. Thisoutputagreementaloneisnotareuseproof."
+  },
+  "distortion": {
+    "target_pid_only": true,
+    "known_interval_correction": "2I perstoppedinterval, independentlyvalidatedprior5PUSH sequence7I. Sourcecoarseroot15337,detail15337\u201315338,finerdetail15339\u201315340. Finerdetailwhole15441646versuscoarse15441505:141Iresidual(.000913%). Keeprawcounters,do notassertexactoriginalinstructionerrorbound.",
+    "all_intervals_unmultiplexed": true,
+    "snapshots_separate": "Source/nativesnapshot/helper observations excludedfromperformanceclaims. Newsourcefineextra2I correction mismatchselected within3I, plusCALL/RETstoppedintervaleffects; no causalIPC/cache explanation.",
+    "excluded_native_observations": "Earlyv0packedserializationofdense-by-indexspikewaswrongandexcludedfromnumericinputproof; rawcapture/provenance retained, correctedrecordssixcostcontrolsall3182I. Helper-onlysemanticcapture excludedfromcostrepeats.",
+    "cycles_timers": "Allnewdebuggercycles/timers excluded. No new acceptedwallbenchmark oroptimizationacceptancescreen."
+  },
+  "validation": {
+    "accepted_result_exit_signedzero_controls": 11,
+    "all_pass": true,
+    "native_gate": "Sixoriginalcorrectedcostobservations+onehelpersemanticcapturequalifycentralfactor/helperinputoutputs,scopesexplicit. No allstateclaim.",
+    "parity": "No solverbinary/source/baseline change; no newfull987runclaimed. Existingfull98722stageprobe isseparatehistoricalqualification.",
+    "preservation": "Ordinary8483/qualified55af/reference26a505 hashesunchanged; no sourcepromotion,WORKedit,FPorderchangeorbaselineupdate."
+  },
+  "reconciliation": {
+    "whole_source_parts_sum": 15441646,
+    "source_body_plus_postwork": 15441646,
+    "all_phase_sums": 15441646,
+    "accepted_whole_gap_instructions": 127995000,
+    "accepted_whole_gap_cycles": 89315000,
+    "known_FB_sampled_self_gap_instructions": 51863005,
+    "known_FB_sampled_self_gap_cycles": 22439119,
+    "outside_FB_pools_instructions": 76131995,
+    "outside_FB_pools_cycles": 66875881,
+    "meaning": "Newupdatecountsarealreadyinacceptedwhole/selfpools,notadditive. Originalfactor-update10.494M I/7.857M C excesswasapproximateSELF,notthiscompleteboundary. Do notmultiplyselected12155Iexcessby621oruseinstructionproportionsastime. No exactwholeupdatecrosssolverinclusivegap; accepted45.784/16.696ms(2.74x)unchanged."
+  },
+  "one_proposed_experiment": {
+    "type": "Boundednumericalproofandconstruction-inclusivecostexperiment beforeanyoptimizerimplementation.",
+    "question": "Can earlierdirectpivotBTRANU-stageproduceexactcurrenteliminate orderedetacandidateswithoutrecomputingthe2.470M-I solve?",
+    "design": "ReusecapturedAFIRO/SC50Aandselected136factorinput;freezecompleteoriginaleliminate/BTRANasindependentoracle, observeU-stagebeforeeta/LT onlyinisolatedtraceoracceptedfixedPCcapture. Comparecandidateorder/valuebits/support, allBTRANoutputs/state andoriginalWORK/denseestimates. Stopfirstdifference; no signedzero/NaN/tolerancenormalization. Accountcapture/materialization/cacheinstall/invalidation andretirementcosts, notjustarithmetic.",
+    "whole_solve_budget": "Directdiagnosticbenefit0; entireeliminationregion2.469725M I is1.363%ofsolveIbeforekeepingWORK,necessaryoutputcreationandcachecosts. Nocycle/timesavingprediction. Thisalonecannotclose2.74x.",
+    "rejected_experiment_check": "Distinctfromproducer-invalidatedrowmaplookupcache,completeBTRANquerymemoacrossclones,failedcompletedLhandoff,dense/sharedLfusion,etaexecutionvariants,workspaces/arenas,buffersandfp_rowsmicrotrial. Itchecksreuseofoneearlierstagewithinonepivot/factorversion. Ifbits/orderdifferorbudgetisinsufficient,stopwithoutrescuingaclosedtrial."
+  },
+  "artifacts": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-mirror-update",
+  "reference_artifacts": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-native-update-cost",
+  "hashes": {
+    "target/perf-degen2-mirror-update/rose_gdb.py": "6960c8a7abd885fc119e86cb2b5e64908324a36d2f890ed2897ba7623427d2b8",
+    "target/perf-degen2-mirror-update/rose_gdb-v1.py": "e3dd7cbc202730f316c13df804fa91f8a49390274461919be63490cade136d2f",
+    "target/perf-degen2-mirror-update/rose_gdb-helper.py": "d49bde0d20ff727849bb00474afd9652dcba5530c30fc7c4e2ac4695c1499c0c",
+    "target/perf-degen2-mirror-update/rose/manifest.json": "731ff0aa045a8edbb9e6a765e2b3a414cec2aebfaac91c99ea4c9142deca21e1",
+    "target/perf-degen2-mirror-update/rose-helper/manifest.json": "388aafc71d40afdc97f3398a4766d6d4ca1ce5b426f73e1630388c5693301ac6",
+    "target/perf-degen2-mirror-update/rose-fine/manifest.json": "e8c7b23267509912c2a03b5b7b23421d2f6d06eec1a75c685336bf8aaaca1455",
+    "target/perf-degen2-mirror-update/source-snapshot136.json": "183541cfb88959f54862703c41c007524b9184e0426aaba01c7ccf2f9514737a",
+    "target/perf-degen2-mirror-update/source-helper136.json": "31f16706c5ae48ea8c7262684e2e14ec9468d6b337a94312e2ff20c4451cb88f",
+    "target/perf-degen2-mirror-update/source-fine136.json": "7d040814a72226ea5ead9ef577c6c63c18de861103501d1576d34bf5aa3e0a02",
+    "target/perf-degen2-mirror-update/source-fstruct131-132.json": "c38d23bee20bd6c3c7cd05302b8f2325303874326012a59831c044769482123d",
+    "target/perf-degen2-native-update-cost/summary.json": "1ac7f55966ad91494612340ce2025c1c0fbe801ad8a4db0b978d557f087c50a6",
+    "target/perf-degen2-native-update-cost/central-comparison.json": "94392c99898eccafbfedd9535dd858fc273bc39ffcd075da12f5b8f6d5220577",
+    "target/perf-degen2-native-update-cost/central-command.txt": "13f8458523e88dcc187996c5427bce62067e2c51bba23f96132d6472ca9315d5",
+    "target/perf-degen2-native-update-cost/capture-provenance.json": "cd5a3bae36ef07f06920e68ae2eda51ad2cea90b3fb3c553b674fb5f25b23bb0",
+    "target/perf-degen2-mirror-update/summarize.py": "f6af946a62853a72acbf97f6af37d85f4d0e4eec7c8d7d23117699c4a23c8cc4"
+  },
+  "completed_direct_BTRAN_U_projection": {
+    "evidence": "perf/evidence/degen2-btran-eliminate-reuse.json",
+    "status": "CapturedprefixstageprojectionPASS;unconditionalgenericreuseFALSEunder directedrounding.",
+    "prefix": "159updates/112etaentries/sourcepricing\u2264163nativepivot\u2264162;only68746I of2.469725M eliminatecost.",
+    "restriction": "Unchanged original3nodekernels differonebit withdirectedrounding;defaultcapturedLPpairsagree. No cacheoptimizationimplemented.",
+    "next": "Frozencompletekernel eligibility/fallback/FPstate study pluslifecyclecosts before anysolverchange; no rejectedtrialretry."
+  }
+}

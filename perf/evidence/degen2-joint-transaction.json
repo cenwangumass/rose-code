@@ -1,0 +1,448 @@
+{
+  "previous_goal_turn_classification": "progress",
+  "basis": "Cached central comparisons and corrected accepted cycle accounting changed authoritative state. Current turn establishes a new matched duplication mechanism without implementing an optimization.",
+  "configuration": "Qualified accepted55af/systemTCMalloc and reference26a505. GDB attaches to original immutable ELFs; original numerical source and binary codegen unchanged.",
+  "selected_pair": {
+    "native_pivot": 135,
+    "rose_pricing_call": 136,
+    "strict_stop_pivot": 163,
+    "full": {
+      "cached_terms": 46,
+      "fallback_terms": 46,
+      "ordered_destination_and_operand_bits_match": true,
+      "all_444_raw_slots_bit_equal": true,
+      "density_product": 690,
+      "m": 444
+    },
+    "needed": {
+      "cached_terms": 132,
+      "fallback_terms": 132,
+      "ordered_destination_and_operand_bits_match": true,
+      "all_444_raw_slots_bit_equal": true,
+      "density_product": 2160,
+      "m": 444
+    }
+  },
+  "rose_allocations": {
+    "full": {
+      "allocations": {
+        "L/malloc": {
+          "calls": 18,
+          "requested_bytes": 18416
+        },
+        "L/calloc": {
+          "calls": 2,
+          "requested_bytes": 3996
+        },
+        "L/realloc": {
+          "calls": 8,
+          "requested_bytes": 1088
+        },
+        "U_and_publication/calloc": {
+          "calls": 1,
+          "requested_bytes": 444
+        },
+        "U_and_publication/malloc": {
+          "calls": 3,
+          "requested_bytes": 320
+        },
+        "U_and_publication/realloc": {
+          "calls": 4,
+          "requested_bytes": 1920
+        }
+      },
+      "free_events": {
+        "root": 19,
+        "caller": 27,
+        "post": 15
+      },
+      "memory_calls": {
+        "allocator/memset": {
+          "calls": 3,
+          "bytes": 4992
+        },
+        "allocator/memcpy": {
+          "calls": 12,
+          "bytes": 1504
+        },
+        "solver/memset": {
+          "calls": 2,
+          "bytes": 992
+        }
+      },
+      "selected_allocations_retired_by_caller": [],
+      "selected_allocations_still_live_after_boundary": [
+        {
+          "requested_size": 10656,
+          "owner": "L",
+          "kind": "malloc"
+        },
+        {
+          "requested_size": 32,
+          "owner": "L",
+          "kind": "malloc"
+        },
+        {
+          "requested_size": 32,
+          "owner": "L",
+          "kind": "malloc"
+        },
+        {
+          "requested_size": 32,
+          "owner": "L",
+          "kind": "malloc"
+        },
+        {
+          "requested_size": 32,
+          "owner": "L",
+          "kind": "malloc"
+        },
+        {
+          "requested_size": 32,
+          "owner": "L",
+          "kind": "malloc"
+        },
+        {
+          "requested_size": 32,
+          "owner": "L",
+          "kind": "malloc"
+        },
+        {
+          "requested_size": 7104,
+          "owner": "L",
+          "kind": "malloc"
+        },
+        {
+          "requested_size": 192,
+          "owner": "U_and_publication",
+          "kind": "malloc"
+        },
+        {
+          "requested_size": 1024,
+          "owner": "U_and_publication",
+          "kind": "realloc"
+        }
+      ],
+      "returned_vector": {
+        "capacity": 64,
+        "len": 39
+      },
+      "interpretation": "Requested sizes include realloc target sizes, not traffic/live size. Allocator memcpy/memset listed separately; do not add internal copy/zero bytes to logical requests. Realloc retires/moves old allocation; internal allocator free symbols may be private. Root instructions/cycles not measured."
+    },
+    "needed": {
+      "allocations": {
+        "L/realloc": {
+          "calls": 19,
+          "requested_bytes": 4864
+        },
+        "L/calloc": {
+          "calls": 2,
+          "requested_bytes": 3996
+        },
+        "L/malloc": {
+          "calls": 12,
+          "requested_bytes": 7672
+        },
+        "U_and_publication/calloc": {
+          "calls": 3,
+          "requested_bytes": 4440
+        },
+        "U_and_publication/malloc": {
+          "calls": 3,
+          "requested_bytes": 4240
+        }
+      },
+      "free_events": {
+        "root": 17,
+        "caller": 9
+      },
+      "memory_calls": {
+        "allocator/memcpy": {
+          "calls": 19,
+          "bytes": 2432
+        },
+        "allocator/memset": {
+          "calls": 5,
+          "bytes": 9536
+        },
+        "solver/memcpy": {
+          "calls": 1,
+          "bytes": 3552
+        }
+      },
+      "selected_allocations_retired_by_caller": [
+        {
+          "phase": "caller",
+          "requested_size": 624,
+          "owner": "U_and_publication",
+          "kind": "malloc"
+        }
+      ],
+      "selected_allocations_still_live_after_boundary": [
+        {
+          "requested_size": 256,
+          "owner": "L",
+          "kind": "realloc"
+        },
+        {
+          "requested_size": 1024,
+          "owner": "L",
+          "kind": "realloc"
+        },
+        {
+          "requested_size": 444,
+          "owner": "U_and_publication",
+          "kind": "calloc"
+        },
+        {
+          "requested_size": 3552,
+          "owner": "U_and_publication",
+          "kind": "malloc"
+        }
+      ],
+      "returned_vector": {
+        "capacity": 39,
+        "len": 39
+      },
+      "interpretation": "Requested sizes include realloc target sizes, not traffic/live size. Allocator memcpy/memset listed separately; do not add internal copy/zero bytes to logical requests. Realloc retires/moves old allocation; internal allocator free symbols may be private. Root instructions/cycles not measured."
+    }
+  },
+  "rose_prefix_census": {
+    "afiro3": {
+      "L_calls": 8,
+      "completed_cached_prefixes": 0,
+      "density_fallbacks": 0,
+      "families": {
+        "full": {
+          "density_fallbacks": 0,
+          "cached_multiply_subtract_pairs": 0,
+          "fallback_multiply_subtract_pairs": 0
+        },
+        "needed": {
+          "density_fallbacks": 0,
+          "cached_multiply_subtract_pairs": 0,
+          "fallback_multiply_subtract_pairs": 0
+        }
+      },
+      "scope": "Rose-only execution census, no assertion that every intermediate is paired with native. Per-term bitwise comparison is selected pivot135 only."
+    },
+    "sc50a60": {
+      "L_calls": 76,
+      "completed_cached_prefixes": 0,
+      "density_fallbacks": 0,
+      "families": {
+        "full": {
+          "density_fallbacks": 0,
+          "cached_multiply_subtract_pairs": 0,
+          "fallback_multiply_subtract_pairs": 0
+        },
+        "needed": {
+          "density_fallbacks": 0,
+          "cached_multiply_subtract_pairs": 0,
+          "fallback_multiply_subtract_pairs": 0
+        }
+      },
+      "scope": "Rose-only execution census, no assertion that every intermediate is paired with native. Per-term bitwise comparison is selected pivot135 only."
+    },
+    "degen2-162": {
+      "L_calls": 426,
+      "completed_cached_prefixes": 404,
+      "density_fallbacks": 27,
+      "families": {
+        "full": {
+          "density_fallbacks": 7,
+          "cached_multiply_subtract_pairs": 265,
+          "fallback_multiply_subtract_pairs": 265
+        },
+        "needed": {
+          "density_fallbacks": 20,
+          "cached_multiply_subtract_pairs": 1208,
+          "fallback_multiply_subtract_pairs": 1208
+        }
+      },
+      "scope": "Rose-only execution census, no assertion that every intermediate is paired with native. Per-term bitwise comparison is selected pivot135 only."
+    }
+  },
+  "checks": [
+    {
+      "trace": "afiro3-l",
+      "complete_result_and_signed_zero_bits_match": true,
+      "expected": "target/perf-degen2-kernels/accepted-afiro-3.json"
+    },
+    {
+      "trace": "sc50a60-l",
+      "complete_result_and_signed_zero_bits_match": true,
+      "expected": "target/perf-rowmap-lifetime/sc50a-60-accepted.json"
+    },
+    {
+      "trace": "degen2-162-l",
+      "complete_result_and_signed_zero_bits_match": true,
+      "expected": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-transaction/degen2-162-accepted.json"
+    },
+    {
+      "trace": "degen2-136",
+      "complete_result_and_signed_zero_bits_match": true,
+      "expected": "target/perf-degen2-kernels/accepted136.json"
+    },
+    {
+      "trace": "degen2-136-prefix",
+      "complete_result_and_signed_zero_bits_match": true,
+      "expected": "target/perf-degen2-kernels/accepted136.json"
+    },
+    {
+      "trace": "degen2-136-full-prefix",
+      "complete_result_and_signed_zero_bits_match": true,
+      "expected": "target/perf-degen2-kernels/accepted136.json"
+    },
+    {
+      "trace": "degen2-136-full-post",
+      "complete_result_and_signed_zero_bits_match": true,
+      "expected": "target/perf-degen2-kernels/accepted136.json"
+    }
+  ],
+  "reference_selected_transaction": {
+    "native_pivot": 135,
+    "rose_pricing_call": 136,
+    "context_it": 134.0,
+    "native_helper_counts": {
+      "0x11f500": 1,
+      "125f50": 1,
+      "0x12a990": 2,
+      "0xbc770": 2,
+      "L_terms_1": 46,
+      "L_terms_2": 132,
+      "0x128742": 1
+    },
+    "observed_allocator_calls": 0,
+    "allocator_scope": "malloc/calloc/realloc/free/posix_memalign/aligned_alloc enabled only within11f620 wrapper; pre-existing retained factor/workspace lifetime excluded",
+    "vector_buffers_all_reused_from_wrapper_entry": true,
+    "memset_sizes": [
+      28,
+      28
+    ],
+    "full_output_count": 39,
+    "after_pivot_removal_count": 38,
+    "stale_second_vector_count": 72,
+    "boundaries": "11f620 wrapper includes input preparation, vector swap,125f50 pair and pivot-removal publication; stops at c58d5 before caller factor/state updates. Persistent buffers are not retired here.",
+    "L_calls": [
+      {
+        "call": 1,
+        "output_count": 23,
+        "nodes": 23,
+        "coefficient_terms": 46
+      },
+      {
+        "call": 2,
+        "output_count": 72,
+        "nodes": 72,
+        "coefficient_terms": 132
+      }
+    ],
+    "needed_L_arithmetic": {
+      "native_terms_once": 132,
+      "rose_cached_terms": 132,
+      "rose_fallback_terms": 132,
+      "ordered_operand_and_destination_before_bits_match": true,
+      "logical_L_output_slots_match": 444,
+      "native_sparse_output_entries": 72,
+      "source_density_product": 2160,
+      "source_m": 444,
+      "interpretation": "Rose computes the same132-term L prefix twice, discards the first result at density admission and repeats it in fallback; native dispatch computes132 once. This proves one bounded numerical pass duplication, not whole-lifetime removable time."
+    },
+    "source_runtime_binary": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "needed_source_trace_sha256": "77d8b551dc712e7136d410f8a6fc87b50333010abef3e2ee1468be25db34a6e7",
+    "full_L_arithmetic": {
+      "native_terms_once": 46,
+      "rose_cached_terms": 46,
+      "rose_fallback_terms": 46,
+      "ordered_operand_and_destination_before_bits_match": true,
+      "logical_L_output_slots_match": 444,
+      "native_sparse_output_entries": 23,
+      "source_density_product": 690,
+      "source_m": 444,
+      "interpretation": "Rose computes the same46-term L prefix twice, discards the first result at density admission and repeats it in fallback; native dispatch computes46 once. This proves one bounded numerical pass duplication, not whole-lifetime removable time."
+    },
+    "full_source_trace_sha256": "34db5a51e87bda33dc57037c99c5d2cc18d825664ef71eba8a6e93608e2b9263",
+    "native_capture_sha256": "cb3cf38fa9ae69a93f04641d5b227cd315e43d34e4e49c1c98794dfbfede25bb"
+  },
+  "source_gather_census": {
+    "needed_nucleus_rows": 21,
+    "numeric_entries_scanned_for_stamps": 25,
+    "virtual_indices_scanned_for_gather": 25,
+    "dot_product_terms": 25,
+    "additional_allocation_for_TauRow_or_terms_in_this_call": 0,
+    "tail_numeric_entries_checked": 40,
+    "tail_scatter_terms": 8,
+    "native_tail_coefficients_visited": 8,
+    "requested_outputs": 39,
+    "native_dense_publication_slots_scanned": 444
+  },
+  "lifetime_findings": "Needed result624B retires in caller; x_tau3552B/tau_raw444B remain inF2 and two grownLcachebuffers remain. Full result1024B survives iteration andpost: Dual.pending_alpha transfers ownership to auxiliaryFactor.update_column Eta::Sparse.entries; its eventual retirement belongs factor lifecycle. Full Lspike7104B remains mirror spike; cache eta-index/bucket buffers remain. Do not charge retained buffers construction/retirement repeatedly per solve body or assume no native-private/inlined allocation outside observed wrapper.",
+  "new_mechanism": "Cached LevelWorkspace::solve completes numeric L, then returns None at density handoff with rowetas. lstage_num reconstructs localbuckets and repeats identical L before executing originalgeneraleta/output path. At pivot135 Rose executes full46 twice andneeded132 twice, native executes each once, all selected tuplebits and444rawslots match. The extra arithmetic and temporarybucket construction are distinct from row-gather lookup, WORKdeferral or dense-Lfusion.",
+  "accepted_cost_reconciliation": "Existing F/B selfgap51.863M instructions/22.439Mcycles already includes this L mechanism; do not add a new cost on top. Wholegap127.995M/89.315M minus these pools leaves76.132M/66.876M outside/unowned/sampling residual. No causal exclusive instructions/cycles or timing saving for failed prefix/fallback is established by debug traces.",
+  "distortion": {
+    "plain_cap136_seconds": 0.006838615,
+    "debug_trace_seconds": {
+      "degen2-136": 0.467134007,
+      "degen2-136-prefix": 0.48763716,
+      "degen2-136-full-prefix": 0.285992166,
+      "degen2-136-full-post": 0.481780876
+    },
+    "interpretation": "Debuggers inflate solve timer about42\u201371x; no debug timing or cycles used as performance evidence. Dynamic counts, addresses and bit comparisons only. This is not a new instrumented-build profile."
+  },
+  "next_experiment": "One bounded cost experiment isolates completed-but-rejected cachedL prefix plus fallback construction/execution/cleanup, including copying required to hand off its result, before any implementation. Keep exact tolerance ties, incompatible/nonfinite and non-level paths separate. Use matched captured states and calibrated isolated counters, with accepted full-solve control. Direct diagnostic speed benefit0; no defensible whole-solve saving yet. Entire accepted lstage_num self pool11.050M/137.330M cycles is about8.05%, a loose ceiling including all required/successful L/eta work, not achievable savings. This cannot by itself close2.74x.",
+  "rejected_trial_check": "Does not restart dense/sharedL fusion, packedL, denseLoutlining, shorttau directlookup, producer-invalidated rowmap cache(REJECTED +.1937%instructions/+6.7515%cycles), F2workspace, outputordering, UWORKdeferral or genericarena trials. It targets a separately observed completed-L rejection and exact replay.",
+  "production_hashes": {
+    "target/release/rose": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "target/perf-optimized-build/rose-pgo-tcmalloc": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "target/perf-reference/reconstructed/libgurobi130.so": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30"
+  },
+  "artifacts": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-transaction",
+  "artifact_hashes": {
+    "target/perf-degen2-transaction/afiro3-l.json": "642b7c564ce1ebbab5a3225ec204cd71ffcdb930960dd2206e1f7f3a9b5896e7",
+    "target/perf-degen2-transaction/afiro3-l.log": "64dafe6d502f27f93968e0399c803a1bd79989ebf0c2b3107d1a53cec2a33486",
+    "target/perf-degen2-transaction/afiro3.json": "355885e70aae6741ec854a62205f5e7fe39f677f5037ec5a7a361320ce2b4180",
+    "target/perf-degen2-transaction/afiro3.log": "72b618f98caf267737a2652471e46b0653ca6f29e02acc5cfbc7b55e37e93438",
+    "target/perf-degen2-transaction/central-native-L135.command.txt": "29f0a0c0f9ef8c9633c31678691e8abaa58513bf859ae20ae7b68962b1612d49",
+    "target/perf-degen2-transaction/central-native-L135.json": "f16fe415aee2ce921e71fe52693db9a23541d6e8ccf0df7d973f03e8d753ec87",
+    "target/perf-degen2-transaction/central-native-L135.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/perf-degen2-transaction/central-native-L135.stdout": "e50e092cebefc50ed3e157f7f683d3891bcd4bb14dfac34f8aa00743f9665940",
+    "target/perf-degen2-transaction/degen2-136-full-post.json": "5ea70f3cd3d3c8bc7124d1bdf33ffd06a8adb7b3855fcda45aa5552e045d0a68",
+    "target/perf-degen2-transaction/degen2-136-full-post.log": "febaadccbe6e19197fec40c10cae26d8684230869d497037179057f20500cdc5",
+    "target/perf-degen2-transaction/degen2-136-full-prefix.json": "8c026705be1ef8daec52b95f196ed5adcffbbf631960ef8203e49fc0a5f9b634",
+    "target/perf-degen2-transaction/degen2-136-full-prefix.log": "f9719392943b1d318f9d44face860a688791282a7c22aefc55629ed9565be092",
+    "target/perf-degen2-transaction/degen2-136-prefix.json": "55dbcac609e584a567a9e62d3db5ca4eb7c6ea52c64bc8e2d8185f4f578d62f9",
+    "target/perf-degen2-transaction/degen2-136-prefix.log": "eb72dd6e9fc224ff5167865e18da4643a729eeb5c28a10001dca7c5df73d62f4",
+    "target/perf-degen2-transaction/degen2-136.json": "714367c155f74ce7291d5f3a09c1c6b515cc1b2d869c1f432cd31e5981949e96",
+    "target/perf-degen2-transaction/degen2-136.log": "4f1b7f6d211ce8e6ed1023d8bc9065be336101c11f22506d9de0c4f7d7ba978f",
+    "target/perf-degen2-transaction/degen2-162-accepted.json": "9717d4f120c6db4c71126adb5adde4d360b422b462a7ffeb67d0f77e6f3097b2",
+    "target/perf-degen2-transaction/degen2-162-accepted.stderr": "a8b9f50fc47aa75eb2983f9de73b52e5ea18e4c37cc1731b779e343f29c1f6c4",
+    "target/perf-degen2-transaction/degen2-162-accepted.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/perf-degen2-transaction/degen2-162-l.json": "306b179f582437711d2b987577a443680809a5d36afd15b9e4cd858ece1d5e83",
+    "target/perf-degen2-transaction/degen2-162-l.log": "b5241692b4e6bde9314988ea672cbdd88d704aaf29b5add53094da9cb228888f",
+    "target/perf-degen2-transaction/rose-afiro1.json": "aa47249f0bff7fac3c70e23c1ed90df6a5ee51f2db53ee4fd240affb0d18ed24",
+    "target/perf-degen2-transaction/rose-degen2-136-full-post.json": "08dd0df23c8fde703a2c7de4262266c88acf42c12602019e27ab0d20bac91a92",
+    "target/perf-degen2-transaction/rose-degen2-136-full-post.meta.json": "2c3e085e30a5c3695e5c04593f0c308a6e3c38bc5b9ed37c7e7720f3f295fbdc",
+    "target/perf-degen2-transaction/rose-degen2-136-full-prefix.json": "34db5a51e87bda33dc57037c99c5d2cc18d825664ef71eba8a6e93608e2b9263",
+    "target/perf-degen2-transaction/rose-degen2-136-full-prefix.meta.json": "4650e5b4eb1eb788eb5993b68f364cc41c685806707679ddfdf550b9208ae2f9",
+    "target/perf-degen2-transaction/rose-degen2-136-prefix.json": "77d8b551dc712e7136d410f8a6fc87b50333010abef3e2ee1468be25db34a6e7",
+    "target/perf-degen2-transaction/rose-degen2-136-prefix.meta.json": "7b345d9de06d59cecc949417f69bf5c162c180fa702e7836f32dff72f917315c",
+    "target/perf-degen2-transaction/rose-degen2-136.json": "607478408b2479195f79cd5443cb232b49ebd9f5d88527414974755c59088f6b",
+    "target/perf-degen2-transaction/rose-degen2-136.meta.json": "6c18868881ec3a73db822225995028087063880db16c83b7f82f9d5b6764e140",
+    "target/perf-degen2-transaction/rose-l-afiro3.json": "2c3df9d8c6c9f5703c1bf07c133c1efdd11e1e74f082980847c51b636f7919af",
+    "target/perf-degen2-transaction/rose-l-degen2-162.json": "72606f71636b183ce60efba6df6b401149e6c4cdac4de50d8c1fd3dfe89bb308",
+    "target/perf-degen2-transaction/rose-l-sc50a60.json": "1fc32a0846498117a2f44ca7cc1b643b3400eac3206a99a98ed4f5ac0e07ea58",
+    "target/perf-degen2-transaction/rose_alloc_trace.py": "ad8f50f447767aeadc2b3dd10727ce8752a6abb44bc1835701db63ccf0375d6d",
+    "target/perf-degen2-transaction/rose_full_post_trace.py": "987312aeaed72c62324976eac2291fff01c247dfa7d9a7b901df46fa4c5e6d55",
+    "target/perf-degen2-transaction/rose_full_prefix_trace.py": "5b9bc362b1436334a90ee44466a29f12ea842c9464cd496ce0c14e73416991ee",
+    "target/perf-degen2-transaction/rose_l_census.py": "7f1df99da4875dda97e311620470881735d4b6437ec89354ec74c6277e0e6f51",
+    "target/perf-degen2-transaction/rose_prefix_trace.py": "37e991e97ba7d8f84a67fc10db76066c91b43e86a324efb1ad061249c358b281",
+    "target/perf-degen2-transaction/sc50a60-l.json": "c0a3cbca3af626543813a8990e2c7109235a0bf171cc4e2b21a6373a55e53d5f",
+    "target/perf-degen2-transaction/sc50a60-l.log": "49d7a1e32ffb0be3776871482915ec03f49d52cc0b530ed71090870a9ed58cec",
+    "target/perf-degen2-transaction/summarize.py": "49eb7350b8e141a2962a199a423bb1191043a4c9823fef4b78bdd8f7291b1d0a",
+    "target/perf-degen2-transaction/summary.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "no_optimization_implemented": true,
+  "goal_achieved": false,
+  "completed_cost_followup": "degen2-l-rejection-cost.json: accepted-ELF fixedPC-only wholeRose counter census236 rejections; fallback plus delayedbuffercleanup~1.520M calibratedinstructions/~0.84% entire solve. No cycle/time saving inferred; no optimization implemented. Generalhandoff safety and real runtimebenefit remain to be tested."
+}

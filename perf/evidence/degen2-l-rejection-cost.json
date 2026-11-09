@@ -1,0 +1,297 @@
+{
+  "previous_goal_turn_classification": "progress",
+  "basis": "Completed paired numerical L duplication census changed next action. This continuation measures complete costs before deciding on optimization.",
+  "configuration": "Original accepted55af ELF/systemTCMalloc, CPU2, dual-release, caps136/162/640; original codegen and binary preserved. New PMU descriptors attach to inferior pid, not GDB. No new native capture or numerical comparison beyond162.",
+  "known_alignment": "Delegated compare.py pivot135 full46 andneeded132 terms once versus twice inRose, matching ordered operands and444rawLslots. First strict zero-sign divergence163 remains unchanged. New whole-solve census is Rose-only instruction accounting, not later state pairing.",
+  "selected_pair": {
+    "full": {
+      "root_instructions": {
+        "root-only": {
+          "mean": 33497,
+          "minimum": 33497,
+          "maximum": 33497,
+          "n": 8
+        },
+        "detail": {
+          "mean": 33513.125,
+          "minimum": 33513,
+          "maximum": 33514,
+          "n": 8
+        }
+      },
+      "L_stage_instructions": {
+        "L_entry..cache_begin": {
+          "mean": 28,
+          "minimum": 28,
+          "maximum": 28,
+          "n": 8
+        },
+        "cache_begin..cache_reject": {
+          "mean": 10598,
+          "minimum": 10598,
+          "maximum": 10598,
+          "n": 8
+        },
+        "cache_reject..fallback_numeric_done": {
+          "mean": 6031,
+          "minimum": 6031,
+          "maximum": 6031,
+          "n": 8
+        },
+        "fallback_numeric_done..fallback_cleanup_done": {
+          "mean": 387,
+          "minimum": 387,
+          "maximum": 387,
+          "n": 8
+        },
+        "fallback_cleanup_done..general_eta_begin": {
+          "mean": 29,
+          "minimum": 29,
+          "maximum": 29,
+          "n": 8
+        },
+        "general_eta_begin..L_return": {
+          "mean": 5366,
+          "minimum": 5366,
+          "maximum": 5366,
+          "n": 8
+        }
+      }
+    },
+    "needed": {
+      "root_instructions": {
+        "root-only": {
+          "mean": 43358.25,
+          "minimum": 43358,
+          "maximum": 43359,
+          "n": 8
+        },
+        "detail": {
+          "mean": 43378.125,
+          "minimum": 43378,
+          "maximum": 43379,
+          "n": 8
+        }
+      },
+      "L_stage_instructions": {
+        "L_entry..cache_begin": {
+          "mean": 28,
+          "minimum": 28,
+          "maximum": 28,
+          "n": 8
+        },
+        "cache_begin..cache_reject": {
+          "mean": 15541,
+          "minimum": 15541,
+          "maximum": 15541,
+          "n": 8
+        },
+        "cache_reject..fallback_numeric_done": {
+          "mean": 13075,
+          "minimum": 13075,
+          "maximum": 13075,
+          "n": 8
+        },
+        "fallback_numeric_done..fallback_cleanup_done": {
+          "mean": 426,
+          "minimum": 426,
+          "maximum": 426,
+          "n": 8
+        },
+        "fallback_cleanup_done..general_eta_begin": {
+          "mean": 29,
+          "minimum": 29,
+          "maximum": 29,
+          "n": 8
+        },
+        "general_eta_begin..L_return": {
+          "mean": 5366.125,
+          "minimum": 5366,
+          "maximum": 5367,
+          "n": 8
+        }
+      }
+    }
+  },
+  "whole_solve": {
+    "full": {
+      "completed_density_rejections": 182,
+      "cached_attempt_instructions": {
+        "mean": 1123460.3333333333,
+        "minimum": 1123458,
+        "maximum": 1123462,
+        "n": 3
+      },
+      "fallback_through_local_bucket_cleanup_and_WORK_instructions": {
+        "mean": 1041958.6666666666,
+        "minimum": 1041958,
+        "maximum": 1041959,
+        "n": 3
+      },
+      "delayed_cleanup_instructions": {
+        "order": 7098,
+        "start": 7098,
+        "x": 7100
+      }
+    },
+    "needed": {
+      "completed_density_rejections": 54,
+      "cached_attempt_instructions": {
+        "mean": 455713,
+        "minimum": 455713,
+        "maximum": 455713,
+        "n": 3
+      },
+      "fallback_through_local_bucket_cleanup_and_WORK_instructions": {
+        "mean": 452441.6666666667,
+        "minimum": 452441,
+        "maximum": 452443,
+        "n": 3
+      },
+      "delayed_cleanup_instructions": {
+        "order": 2106,
+        "start": 2106,
+        "x": 2106
+      }
+    }
+  },
+  "accounting": {
+    "attempts": 789,
+    "completed_rejections": 236,
+    "fallback_plus_delayed_cleanup_raw_instructions": 1522017,
+    "calibrated_extra_instructions": 1888,
+    "calibrated_original_estimate_instructions": 1520129,
+    "accepted_total_instructions": 181193000,
+    "raw_instruction_ceiling_percent": 0.839997682029659,
+    "corrected_instruction_ceiling_percent": 0.8389556991716015,
+    "meaning": "A ceiling for deleting the entire fallback and its buffer cleanup, not a speedup prediction. WORK bookkeeping must remain, required handoff copying/control costs are additional, and some cleanup remains required. Cached attempt is needed to obtain result; do not claim both passes removable."
+  },
+  "copy_proxy": {
+    "logical_bytes": 3552,
+    "alloc_plus_memcpy_instructions": {
+      "mean": 411,
+      "minimum": 411,
+      "maximum": 411,
+      "n": 8
+    },
+    "deallocation_3552_byte_x_observation": "Correct PC147707..14770d: late_cleanup.x, approximately39 rawinstructions/call. Earlier L_temp_free marker1476af..1476b5 observes32-byte eta gather retirement, not3552-byte x.",
+    "meaning": "Existing F2clone allocation+copy is only a proxy for a prospective L handoff, with different cache/allocator state possible. Real handoff may require support copies and must retain WORK. Final cloned-x destruction remains necessary."
+  },
+  "boundaries": {
+    "cached": "144969 admission/prepare/compute through1449af rejection; includes retained cache/index construction.",
+    "fallback": "1449af through14684d: new densex/start/localbuckets/active/output construction, repeatedL, active+buckets cleanup and WORK conversion.",
+    "delayed_cleanup": "Original fallback order/start/x buffers retired after original eta/output at1476d9,1476f2,147707; each free measured separately, non-overlapping. Numerical eta work and output publication remain required and excluded from fallback total.",
+    "outside": "Returned L result, FTRAN output, F2 and retained factor lifetimes retain original owners; no estimated elimination or new native cost assigned to these. Existing F/B self gap already contains this mechanism; do not add new stage counters to existing profile totals."
+  },
+  "calibration": {
+    "known_sequence_original_instructions": 5,
+    "observed": [
+      {
+        "instructions": 7,
+        "cycles": 3857,
+        "enabled": 88235,
+        "running": 88235
+      },
+      {
+        "instructions": 7,
+        "cycles": 4424,
+        "enabled": 74690,
+        "running": 74690
+      }
+    ],
+    "extra_instructions_per_interval": 2,
+    "root_detail_added_expected": {
+      "full": 16,
+      "needed": 20
+    },
+    "root_detail_added_observed": {
+      "full": 16.125,
+      "needed": 19.875
+    },
+    "same_stopped_inferior_double_read_equal": true,
+    "pmu_no_multiplexing": true,
+    "codegen_distortion": 0
+  },
+  "cycles_excluded": {
+    "root_cycles": {
+      "full": {
+        "root-only": 95012,
+        "detail": 140568.125
+      },
+      "needed": {
+        "root-only": 93726.875,
+        "detail": 188817.875
+      }
+    },
+    "reason": "Known fiveinstruction sequence takes thousands of cycles under debug; addingstops inflates rootcyclecounts roughly48%/101%. All new debug cycles and timers excluded; no instructions-as-time claim."
+  },
+  "failed_operational_probes": {
+    "first": "Dynamic FinishBreakpoint whole-solve probe hit15s external deadline and exited124; excluded.",
+    "second": "45s dynamic-return probe exceeded47s outerdeadline; confirmed process172734 terminal/missing. No active job restarted solely from an observation timeout. Excluded.",
+    "replacement": "FixedPC-only scope probes reproduce prefix27 and expected instruction differences from removed probes; full3predeclared runs finish ~1.1s and agree. This is instrumentation simplification, no solver change or failed optimization-screen retry."
+  },
+  "validation": {
+    "complete_results_checked": 29,
+    "result_files": [
+      "target/perf-degen2-l-cost/measurement/0.result.json",
+      "target/perf-degen2-l-cost/measurement/1.result.json",
+      "target/perf-degen2-l-cost/measurement/2.result.json",
+      "target/perf-degen2-l-cost/measurement/3.result.json",
+      "target/perf-degen2-l-cost/measurement/4.result.json",
+      "target/perf-degen2-l-cost/measurement/5.result.json",
+      "target/perf-degen2-l-cost/measurement/6.result.json",
+      "target/perf-degen2-l-cost/measurement/7.result.json",
+      "target/perf-degen2-l-cost/measurement/8.result.json",
+      "target/perf-degen2-l-cost/measurement/9.result.json",
+      "target/perf-degen2-l-cost/measurement/10.result.json",
+      "target/perf-degen2-l-cost/measurement/11.result.json",
+      "target/perf-degen2-l-cost/measurement/12.result.json",
+      "target/perf-degen2-l-cost/measurement/13.result.json",
+      "target/perf-degen2-l-cost/measurement/14.result.json",
+      "target/perf-degen2-l-cost/measurement/15.result.json",
+      "target/perf-degen2-l-cost/measurement/16.result.json",
+      "target/perf-degen2-l-cost/measurement/17.result.json",
+      "target/perf-degen2-l-cost/measurement/18.result.json",
+      "target/perf-degen2-l-cost/measurement/19.result.json",
+      "target/perf-degen2-l-cost/measurement/20.result.json",
+      "target/perf-degen2-l-cost/measurement/21.result.json",
+      "target/perf-degen2-l-cost/measurement/22.result.json",
+      "target/perf-degen2-l-cost/rejection-measurement/0.result.json",
+      "target/perf-degen2-l-cost/rejection-measurement/1.result.json",
+      "target/perf-degen2-l-cost/rejection-measurement/2.result.json",
+      "target/perf-degen2-l-cost/rejections640-cleanup-result.json",
+      "target/perf-degen2-l-cost/rejections162-result.json",
+      "target/perf-degen2-l-cost/qualify-afiro3-result.json"
+    ],
+    "comparison": "Only diagnostics.seconds removed; canonical JSON retains signed zero; exits3 bounded and0optimal retained.",
+    "all_match": true,
+    "numerical_source_changes": false,
+    "optimization_implemented": false,
+    "parity_baseline_changes": false
+  },
+  "next_experiment": "One isolated completed-L-result handoff trial, after freezing the complete original L routine and testing captured135 full/needed plus generated/extreme/tie/incompatible cases. Preserve cached state, generaleta arithmetic/order, all WORK and dumps. Match fixed39 PGO/TCMalloc, run cheap instruction/cycle gate before predeclared timings and full acceptance gates. Optimistic instruction budget is about0.84% before required costs; whole-solve time benefit remains unmeasured. Does not repeat dense/sharedLfusion, denseLoutlining, shorttau, preUstorageownership, rowmapcache or genericworkspace trials: it skips a runtime-proven repeated numerical prefix at a distinct admission failure.",
+  "goal_achieved": false,
+  "production_hashes": {
+    "target/release/rose": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "target/perf-optimized-build/rose-pgo-tcmalloc": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "target/perf-reference/reconstructed/libgurobi130.so": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30"
+  },
+  "artifacts": "/home/derekwang/rose-reverse-engineer/rose/target/perf-degen2-l-cost",
+  "script_hashes": {
+    "run_rejections.py": "a57a90dc5b503f1661359abcc636081f44fd17e10091eb5dd919a6cf26a88cd4",
+    "rejections_cleanup_gdb.py": "23311b29a279f89dde4d37b3743cf624e044cdb041e6db2c54d1b1b8d25c8fdd",
+    "run_full.py": "21f764113dd19a4432f85b647a0a596d0878cfab40b1f779474ba687097d2d49",
+    "rejections_gdb.py": "aff2d6ca484874cf02f3866001c4e2d4ef585e08ffedcd08cc8dba90e7b80079",
+    "pmu_gdb.py": "68a7db55bd70f5d87fdd37e648988621a20320e323ae346e8c7c9fd1d6f4d2cb",
+    "measure_gdb-before-timeout.py": "c0623781ceffb0776677df65bdcc197656009fe88c74ad3330ca8c798ce43b58",
+    "summarize.py": "f49c06f413f6cc3b52bcd6d1c9bf6aaa79c0775a53b65c6534833999da5f8993",
+    "measure_gdb.py": "1aa9696070e6c405a50f9b11ccf63b7bbca21b4dff9732c376e4777ec03a896e",
+    "run.py": "b1664289678e7e929c7186867a7dcdc8a531469832f7c4719fc213ca53711f0c"
+  },
+  "manifest_hashes": {
+    "target/perf-degen2-l-cost/whole-measurement-v2/manifest.json": "d248d4c59d126adb3675b4a462a76416355f9b4dcab2c7a6f6411947ebe9df11",
+    "target/perf-degen2-l-cost/measurement/manifest.json": "201c38e233297fe9d19cd06eae33a933f848f16bd92f6feaa22bed4a4cd346c5",
+    "target/perf-degen2-l-cost/rejection-measurement/manifest.json": "5b7791b8ee9d37b8223eeb2fc6d1e386cfd290a6d8c258d3f9f49876c10f3b3a",
+    "target/perf-degen2-l-cost/whole-measurement/manifest.json": "01a02c744d5caa4ab6d3c7fe7d5a227b558566dc93c193e5e0ad7856f6348ed0"
+  }
+}

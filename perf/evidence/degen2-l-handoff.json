@@ -1,0 +1,186 @@
+{
+  "previous_goal_turn_classification": "progress",
+  "basis": "Completed immutable-ELF cost accounting qualified one distinct handoff trial; current trial settles profitability without changing accepted code.",
+  "decision": "REJECTED at predeclared matching-PGO counter gate. No timing74117/74189, no extension/retry/PGO-tuning or enum/flag/buffer-layout rescue; no full acceptance gates or solver-source promotion.",
+  "mechanism": "On non-tie completed level-L density handoff with etas, clone the exact cached rawvector and use original dense eta/output suffix and original WORK formula instead of allocating level buckets and repeatingL. General fallback retained for tolerance ties/incompatible/nonlevel/F80 paths. Cached private fields retained and marker consumed.",
+  "measured_opportunity": "Prior fixedPC cost estimate1.520M/~0.84% solveinstruction ceiling including buffer cleanup before requiredWORK/handoff costs. Not a promised timing benefit.",
+  "configuration": {
+    "before_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "candidate_sha256": "1329a7ffde7cd934e87124fbfa67b5935233c528c439348abfb2bdce98d87727",
+    "profile_sha256": "111c41c07d284391cd5e5fcd44eeced4b8a86e1f274d84d054fd9cb7413e2aa3",
+    "features": [
+      "system-tcmalloc"
+    ],
+    "rustflags": [
+      "-Cllvm-args=--align-loops=64",
+      "-Cprofile-use=/home/derekwang/rose-reverse-engineer/rose/target/perf-l-handoff/source/target/perf-pgo/111c41c07d284391cd5e5fcd44eeced4b8a86e1f274d84d054fd9cb7413e2aa3.profdata"
+    ],
+    "compiler": "rustc 1.98.1 (48a229cea 2026-09-01)\nbinary: rustc\ncommit-hash: 48a229ceaefd4985c50990b14116b6d856af0985\ncommit-date: 2026-09-01\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.1\nLLVM version: 22.1.8\n",
+    "cpu": 2,
+    "build_seconds": 77.1413482909993,
+    "training_runs": 39,
+    "training_policy": "Fixed same39 cases, pinnedcompiler/systemTCMalloc,64byte loop alignment; trainedonce on its own source. No parent-profile performance claims."
+  },
+  "tests": {
+    "original_oracle_tests": "19/19 release before modifying numerical implementation,50.18s build/run",
+    "candidate_focused_tests": "19/19 release after modification,45.92s build/run; same parentfixed39 profile for test codegen",
+    "scope": "Three new complete-original oracle tests cover capturedDEGEN2full/needed135 andSC50A, generated/extreme/zero/tolerance/duplicate/nonfinite/incompatible/nonlevel/warmcache cases, f64/F80 result bits+count+WORK+existing cache fields, plus captured alternateMXCSR result/stickyflags. Existing16focused tests also pass.",
+    "fast_frozen_parity": "940/940 with final own-PGO candidate,3.4s",
+    "bounded_dump_checks": [
+      {
+        "model": "afiro",
+        "cap": 3,
+        "original_dump_records": 0,
+        "agree": true
+      },
+      {
+        "model": "degen2",
+        "cap": 3,
+        "original_dump_records": 0,
+        "agree": true
+      },
+      {
+        "model": "degen2",
+        "cap": 20,
+        "original_dump_records": 1002,
+        "agree": true
+      },
+      {
+        "model": "degen2",
+        "cap": 136,
+        "original_dump_records": 3747,
+        "agree": true
+      },
+      {
+        "model": "degen2",
+        "cap": 640,
+        "original_dump_records": 17201,
+        "agree": true
+      }
+    ],
+    "all_34_counter_results_and_exits_match": true,
+    "full987_and_full_tests_not_run": "Failedcostgate; no acceptance claim."
+  },
+  "numeric_proof": {
+    "reverse_reconstructs_original_plus_frozen_oracle_and_tests": true,
+    "original_sha256": "57c86340f6959717954e2cb1c58f06c285ab7ce564a25d7d0e9e9c429d802ef1",
+    "new_sha256": "8801d1952c7e28f7d00b658a1a77b9cea1f3c6352e0f15c9471f7123401bd73c",
+    "frozen_methods_unchanged": true,
+    "WORK": "Exact original level-L WORK formula and all original eta WORK remain; only duplicated L execution bypassed after non-tie density handoff.",
+    "suffix": "Original general eta/output arithmetic literal unchanged; dense order is unconsumed at this admission."
+  },
+  "capture_proof": {
+    "records": 2,
+    "complete_result_matches_accepted": true,
+    "binary_sha256": "4ddd0acfae5ba5e0d27c6ccf54832e5c6462f064da47c327c55e4522fd40e152",
+    "fixture_sha256": "ddce9a88510815ba9edf828de5f85225c551021a2135a0172fa98c9ccf774c17",
+    "model_sha256": "19dff2bcc00c24502424e931814633e0b654ec30bfa6b29c9c81c5244198099f",
+    "scope": "Original accepted arithmetic in separate instrumented source, selectedpricing136/nativepivot135. Snapshot contains kernelinputs, no trace performance claim. All capture methods/hooks/newdumpkind removed before optimization."
+  },
+  "frozen_reference": {
+    "original_methods": {
+      "original-lstage.rs": "93ec8b150776bf0a1c6064d24a8f5c9d308766928cd461d78852b52007d52964",
+      "original-cache-solve.rs": "cb4670f951a87fc715ccd0861e72e264dff6fcad14e9d38ef804b3976b004f5d"
+    },
+    "final_reference_module_sha256": "5a992fcba0de14294b3d33c7927cba1c37a58cea3df0fdd6383aa1888a77350e",
+    "initial_reference_module_sha256": "f235495187885c57e0284346cf997fa23ec321374e16c502d9e595523b9237b2",
+    "note": "Only reference method visibility exported pub(super) for sibling tests after initial freeze; original two method bodies remain exactly archived. Reversal proof reconstructs original source plus final oracle/tests."
+  },
+  "counters": {
+    "afiro": {
+      "before": {
+        "instructions:u": 6902734.0,
+        "cycles:u": 10826896.0
+      },
+      "after": {
+        "instructions:u": 6903297.0,
+        "cycles:u": 10168815.0
+      },
+      "percent_change": {
+        "instructions:u": 0.00815618854790312,
+        "cycles:u": -6.078205609437825
+      },
+      "pairs": 3
+    },
+    "sc50a": {
+      "before": {
+        "instructions:u": 9808421.0,
+        "cycles:u": 13437492.0
+      },
+      "after": {
+        "instructions:u": 9815291.0,
+        "cycles:u": 13501280.0
+      },
+      "percent_change": {
+        "instructions:u": 0.07004185485104397,
+        "cycles:u": 0.47470167796193063
+      },
+      "pairs": 3
+    },
+    "adlittle": {
+      "before": {
+        "instructions:u": 15046921.0,
+        "cycles:u": 16266462.0
+      },
+      "after": {
+        "instructions:u": 15060843.0,
+        "cycles:u": 17062653.0
+      },
+      "percent_change": {
+        "instructions:u": 0.09252391236718172,
+        "cycles:u": 4.894678387961693
+      },
+      "pairs": 3
+    },
+    "degen2": {
+      "before": {
+        "instructions:u": 196495978.5,
+        "cycles:u": 134525889.0
+      },
+      "after": {
+        "instructions:u": 195394389.0,
+        "cycles:u": 139909122.0
+      },
+      "percent_change": {
+        "instructions:u": -0.5606168168983627,
+        "cycles:u": 4.001633469970978
+      },
+      "pairs": 8
+    }
+  },
+  "counter_scope": "Fresh-process wholeprocess userinstructions/cycles, with no dumps,8targetAB/BA pairs and3per smallmodel. Descriptive countergate, not solve-only per-stage attribution or formal timing. Individual targetcyclechanges haveboth signs; statedfixedmedian gatefailed; no resampling.",
+  "screen_plan": {
+    "target": "degen2.dual-r",
+    "cpu": 2,
+    "max_iterations": 640,
+    "pairs_AB": 32,
+    "pairs_AA": 32,
+    "seeds": [
+      74117,
+      74189
+    ],
+    "before": "target/perf-optimized-build/rose-pgo-tcmalloc",
+    "after": "target/perf-l-handoff/source/target/release/rose",
+    "rule": "Matching own fixed39PGO/systemTCMalloc once. Eight targetcounterpairs and three small-modelpairs. Stop if target instructions orcycles do not improve atcountergate; do not run timing. Stop at firstfailed/inconclusive timing; no independent74189unless74117passes. No extension/retry/PGOtuning. Promotionneeds full gates and referencequalifications.",
+    "hypothesis": "Reuse exactcompletedLprefix at non-tie densehandoff; keepgeneraleta andoriginalWORK. Measured opportunity ceiling0.84% solveinstructions beforehandoffcost, not a timing prediction."
+  },
+  "timing_screen_run": false,
+  "no_optimization_promoted": true,
+  "production_hashes": {
+    "target/release/rose": "8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410",
+    "target/perf-optimized-build/rose-pgo-tcmalloc": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "target/perf-reference/reconstructed/libgurobi130.so": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30"
+  },
+  "goal_achieved": false,
+  "artifacts": "/home/derekwang/rose-reverse-engineer/rose/target/perf-l-handoff",
+  "script_hashes": {
+    "counters.py": "8f2ae689b4ba417f06dad7ef5d0487b26f7fca548a25cf20a5b2668de7ec8f18",
+    "check.py": "9dfc49f33e4568ee004ac6680cc48d4e4d5ccf22cc2ade918f4c56baf88e13b9",
+    "own_pgo.py": "6949cbcc4365c815ab0dbced1e781b5d26655c42ec1c997b712fb1f32f41d2b3",
+    "prepare.py": "dfc83e7d23aecb75fcfd5acb0670df58ed6d29d517351a30a0e1ebe6eb0ce9a5",
+    "apply.py": "3fc6729685c1e77ce79141d08087e3b9477a0bb73eddc36ddb8bdd7ec1b7e971",
+    "test.py": "8148279f236ba72ac4152bd4ed205fe17b11aeebe247e51842eb272d3e86aecc",
+    "summarize.py": "082f98aca43dedd00b8432706e67b3df7f8d0d250d05c3a411707f6231b112b8",
+    "build.py": "f1bf20bc5f3e9c70fcfbfbe2a8bdb30feb0cae8a28b43975885aef8c0f8188fb"
+  }
+}
