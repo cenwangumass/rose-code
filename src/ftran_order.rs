@@ -2162,7 +2162,12 @@ impl<R: Real> RefStruct<R> {
                 tail.push(p);
             }
         }
-        if joint_dense {
+        let keep_tiny = !tau_dense && !joint_dense && self.tau_u_dense(&spike);
+        if joint_dense || (!R::QUAD && keep_tiny) {
+            // The ordinary dense tail loop (12403b..12405f) divides and stores
+            // every slot before testing the quotient, including unreachable zero
+            // slots. Their signed zeros are consumed by requested rows and F2.
+            tail.clear();
             // Extra zero columns are zeroed by the joint dense kernel. Reached
             // columns keep the same descending slot order as the symbolic walk.
             tail.extend((self.i21..m).rev().map(|s| self.at[s]));
@@ -2185,7 +2190,6 @@ impl<R: Real> RefStruct<R> {
         // slot loop (`0x12403b`: `m <= h33^2 c` or `5 h33^2 t > m - i21`, see `tau_u_work`) stores the quotient and only skips its scatter (FIT2P call 14
         // keeps a tail value of 4e-16 that enters the row dots of the nucleus positions). A dense input (`tau_dense`) zeroes it (FIT2P call 49), and so does the
         // joint dense loop (`joint_dense`, fx_e2_r25 call 6: a tail quotient of -1.8e-14 is 0 in the reference).
-        let keep_tiny = !tau_dense && !joint_dense && self.tau_u_dense(&spike);
         for &c in &tail {
             tau_raw[c] = x[c].abs() > R::c(TOL);
             let xc = x[c] / self.diag[c];
@@ -4780,6 +4784,30 @@ mod dense_tail_tests {
             let bits = |v: &[f64]| v.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
             assert_eq!(bits(&nf.x_col), bits(&of.x_col));
         }
+    }
+
+    #[test]
+    fn needed_dense_tail_divides_unreachable_zero_slots_before_drop() {
+        // Minimal kernel witness of native 12403b..12405f: no path from the
+        // sparse RHS to the negative diagonal, but the dense slot loop visits it.
+        let mut f = identity::<f64>(8);
+        f.lev_dense_ft = false;
+        f.i21 = 4;
+        f.kind[4..].fill(-2);
+        f.h33 = 1.0;
+        f.h34 = 0.0;
+        f.dens = 1.0;
+        f.diag[5] = -1.0;
+        assert!(f.tau_u_dense(&[(4, 1.0)]));
+        let legacy = f.frozen_ftran_needed(&[4], &[1.0], &[5, 6], false);
+        assert_eq!(legacy[0].1.to_bits(), 0.0f64.to_bits());
+        let actual = f.ftran_needed(&[4], &[1.0], &[5, 6], false);
+        assert_eq!(actual[0].1.to_bits(), (-0.0f64).to_bits());
+        assert_eq!(actual[1].1.to_bits(), 0.0f64.to_bits());
+        let pair = f.f2.borrow();
+        assert_eq!(pair.x_tau[5].to_bits(), (-0.0f64).to_bits());
+        assert!(!pair.tau_raw[5]);
+        assert_eq!(f.tau_fin.get(), 4);
     }
 
     #[test]
