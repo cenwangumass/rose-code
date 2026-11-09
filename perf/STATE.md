@@ -250,6 +250,60 @@ CLI are unchanged. [mode-switch-scope.json](evidence/mode-switch-scope.json), al
 recordings, excluded samples, source/offset maps, and raw outcomes are in
 `target/perf-mode-scope/`; PEROLD reproduction is in `target/perf-refactor-stages/`.
 
+### Current compact extended execution
+
+The remaining numerical extended BTRAN is cold after compact state replay.
+A CPU2 ordinary-release library census first checks all six small models
+(cap300), then complete fx/Quad rows (caps5500/17000). All20 complete results
+match plain solves and the numerical source reconstructs literally after
+removing test scopes. Across four runs per extended row, all uncached F80
+BTRAN occupies0.407–0.447% of fx and0.116–0.142% of Quad measured solve time;
+dense-U intersections are0.190–0.207%/0.060–0.067%. Fresh-only intersections
+are smaller still. These diagnostic scopes include original helpers/work/output
+and are not exact optimized-build removable bounds. Provider caches are created
+per Solver; this does not measure a retained cross-solve cache.
+
+The distinct whole-kernel native transaction is closed without a prototype.
+Canonical admission, specified binary80 operation boundaries, cumulative status,
+staged state and software fallback could replace per-primitive validation, but
+current actual call scope cannot justify it. Historical BTRAN shares/attempt
+counts below do not transfer to this source. Conditional subnormal/state proof
+and its limitations are retained, without claiming a tested native executor.
+[Transaction scope](evidence/btran-transaction-scope.json), all probes/logs and
+release-test ELF in `target/perf-btran-transaction/`.
+
+The accepted optimized Quad CLI now has717 solve-only cycle samples, zero
+loss/throttle,716 resolved samples and96.89% independent-counter coverage.
+All64 profiling/counter outputs and exits match the complete optimized panel.
+The numerical F80 BTRAN range has zero self samples. Current self attribution
+is solve_primal23.57%, QuadRhs::update_row4.60%, rank_products_observed3.07%,
+QuadMain::apply2.09%, and memcmp2.09%; these include required work, not removable
+owners. Allocation cannot be assigned to query keys: hits already borrow inputs,
+use stack keys or retained scratch and allocate retained keys only on misses.
+Returned output clones are separate. Persistent component storage also has no
+new qualified residual beyond the settled pivot/basis/arena trials.
+
+An isolated source-matched PGO/system-TCMalloc profiling build with line tables
+and frame pointers passes full frozen parity987/987. Eight DEGEN2 solves precede
+32 Quad profile and32 counter solves; all72 complete objects/exits match the
+optimized panel. Quad has765 cycle samples, zero loss/throttle and764 resolved
+leaves. Direct instructions are1.228% above the accepted optimized build; sampled
+events/direct cycles are103.06% across the separate batches. Keep this ELF's
+fractions separate from the accepted build. Of174 solve_primal self samples,
+30 have outermost source at the Devex update and25 at breakpoint ratio; inline
+chains and unknown locations are retained. Physical external callers remain
+separate from leaf/source attribution, with library unwinding limitations.
+No removable whole-owner bound or runtime optimization follows from these
+fractions. Read-only architecture review closes the controller lead without a
+prototype: ratio/point/classification/pricing fusion crosses required numerical
+and state boundaries; storage replacements overlap settled ownership trials.
+In particular41 external leaves reach only the return from solve_primal and
+cannot identify particular buffers or retirement costs.
+[Controller profile](evidence/quad-current-controller-profile.json),
+commands, separate target, binary and logs are in `target/perf-quad-profile/`;
+normalized stacks/source maps are in `target/perf-optimized-scope/`.
+Both accepted CLIs and numerical source are unchanged.
+
 ### Factor geometry recurrence
 
 A bounded ordinary construction census covers AFIRO, SC50A, BLEND, ADLITTLE,
@@ -1416,6 +1470,10 @@ for both unchanged qualified binaries. No current large structural candidate
 has qualified; closed experiments below must not be retried under new names.
 
 ## Extended BTRAN feasibility
+
+Current compact execution is measured above: actual remaining numerical BTRAN
+is cold. The following baseline/native experiments are historical feasibility
+and rejected-trial records, not current cost shares or priority evidence.
 
 Feasibility-screen baseline CLI hash: `e28b651026b477f0e5741e881efce27d640e2bf3f330f85a4f76b0e53c8804fc`.
 The saved CPU-4 instruction self profiles use eight fx_quad_obj_5371 solves capped

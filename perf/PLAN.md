@@ -141,6 +141,25 @@ baseline. No exceptions, no "within a ULP", no re-recording.
 
 ## The loop
 
+The qualified matching-PGO/system-TCMalloc frame-pointer/line-table Quad
+controller review is closed without a prototype; seek a distinct substantial
+mechanism outside these reviewed paths. Full987 and72 complete profiling/counter
+outputs agree. Of174
+controller self samples,30 attach to the Devex update and25 to breakpoint ratio;
+these are not complete/removable owner costs. Build/source qualification is in
+evidence/quad-current-controller-profile.json, with raw commands/results in
+`target/perf-quad-profile/` and normalized source/stacks in
+`target/perf-optimized-scope/`. Preserve both accepted CLIs. The old extended
+BTRAN priority is superseded: complete
+actual uncached numerical calls occupy less than0.5% of the two extended solves
+in diagnostic scope; a transaction-wide native executor is not justified.
+Current optimized solve-only self attribution puts solve_primal first at23.57%.
+Existing borrowed/stack/scratch hit-key protocols also rule out a broad eager
+heap-key ownership rewrite. Read evidence/btran-transaction-scope.json before
+another native or cache-key proposal; allocator/self shares are not removable
+scope. Require a distinct substantial execution mechanism, not a new label for
+the settled component/basis/buffer lifetimes.
+
 The ordinary phase-one extended accumulator question is settled. Accepted
 machine code executes the dead software pipeline, but whole-kernel live replay
 is only1.361ms per80BAUsolve and timing roles cross. All12468live kernel calls,
