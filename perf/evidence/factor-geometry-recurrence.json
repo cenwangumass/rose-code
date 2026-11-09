@@ -1,0 +1,785 @@
+{
+  "source": "18061fe9",
+  "scope": "Necessary recurrence of complete factor_structure_r construction geometry and ordered parameterized bipartite components on six smallmodels \u00d7 controlled primal/dual, cap300. No reference numeric capture/comparison; no numerical executor prototype.",
+  "decision": "Stop the geometry-program lead on these bounded small histories: all 82 constructor input geometries are unique. Neither complete component recurrence nor the optimistic best-prior matching prefix covers any sparse Cartesian proxy weight. No large-model escalation, new trace capture or program integration.",
+  "schema": {
+    "input": "Ordered(is_slack,physicalrowoccurrences) in incomingbasisposition order; duplicates retained. Numericcoefficients bits kept separately and excludedfromgeometrykeys.",
+    "output": "Orderedpivots,phases,Lrows,Ucolumnpositions,loff,dense_n,pairdiag/Loverride slots beforeconsumption,pair_unz/pair_urow sortedmapkeys. Innerarrays never sorted.",
+    "provenance": "Thresholdbits,pairgateentry/result retained outside optimistic keys; datatype inkeys. Missing exact FPcontrol and effective densebase would require capturing before any executiontrace claim. No dense cases in boundeddata.",
+    "solve_scope": "Each model/method history independent; constructorordinal implicit rawarrayposition. No cross-solve reuse. Firstoccurrence excluded; numericdistinct firstreuses reported separately from exactnumericrepeats."
+  },
+  "qualification": {
+    "source_restoration": "Literal entire lu_order.rs reconstruction passes after deleting only two testobservationhooks, resultbinding and moduleinclude; numerical statements unchanged.",
+    "full_results": "All12instrumented complete library SolveResults match own plain same-buildsolve with tracefalse; DEGEN2 prefixes iteration-limited at300 intentionally. Other models bounded. This is no full987 candidate gate or referencealignment proof.",
+    "run": {
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/home/derekwang/rose-reverse-engineer/rose/target/perf-factor-geometry/source/target/release/deps/rose-1647c29dde43abc1",
+        "factor_geometry_small",
+        "--ignored",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.26658620899979724,
+      "test_elf_sha256": "7805ea31ae30cf129334d7b705b6411e1aa1c01451cc92c4fd29df1062ba933e",
+      "bounded_iterations": 300,
+      "external_timeout_seconds": 30
+    },
+    "timing": "Build47.34s; census~0.285s onCPU2, external30s bound. No benchmark speedup or kernel timing measured."
+  },
+  "totals": {
+    "components": 3331,
+    "sparse_cartesian_proxy": 4717,
+    "eligible_components": 3331,
+    "input_component_reuses": 3180,
+    "oracle_best_prefix_sparse_proxy": 0,
+    "strict_repeated_components": 3180,
+    "strict_repeated_sparse_proxy": 0,
+    "repeated_1x1_components": 3117,
+    "same_as_first_constructor_reuse": 929,
+    "repeated_nontrivial_components": 63,
+    "unique_component_geometry": 151,
+    "nonzero_sparse_components": 63,
+    "new_numeric_reuses": 13,
+    "new_numeric_repeated_sparse_proxy": 0
+  },
+  "whole_constructors": {
+    "scope": "Within-solve whole-constructor geometry recurrence only; final supports are not execution traces. Raw fields preserve ordered occurrences/duplicates; only unordered map keys sorted. Threshold and pair-gate state provenance outside optimistic keys.",
+    "models": [
+      {
+        "cap": 300,
+        "iterations": 10,
+        "method": "Primal",
+        "model": "afiro",
+        "refactorizations": 3,
+        "status": "Optimal",
+        "recurrence": {
+          "input": {
+            "records": 3,
+            "unique": 3,
+            "repeated": 0,
+            "first_occurrence_excluded": true,
+            "first_new_numeric_reuses": 0,
+            "sparse_cartesian_proxy": 0,
+            "repeated_sparse_proxy": 0,
+            "new_numeric_repeated_sparse_proxy": 0,
+            "dense_factorizations": 0,
+            "hits": []
+          },
+          "input_and_output": {
+            "records": 3,
+            "unique": 3,
+            "repeated": 0,
+            "first_occurrence_excluded": true,
+            "first_new_numeric_reuses": 0,
+            "sparse_cartesian_proxy": 0,
+            "repeated_sparse_proxy": 0,
+            "new_numeric_repeated_sparse_proxy": 0,
+            "dense_factorizations": 0,
+            "hits": []
+          }
+        }
+      },
+      {
+        "cap": 300,
+        "iterations": 10,
+        "method": "Dual",
+        "model": "afiro",
+        "refactorizations": 4,
+        "status": "Optimal",
+        "recurrence": {
+          "input": {
+            "records": 4,
+            "unique": 4,
+            "repeated": 0,
+            "first_occurrence_excluded": true,
+            "first_new_numeric_reuses": 0,
+            "sparse_cartesian_proxy": 0,
+            "repeated_sparse_proxy": 0,
+            "new_numeric_repeated_sparse_proxy": 0,
+            "dense_factorizations": 0,
+            "hits": []
+          },
+          "input_and_output": {
+            "records": 4,
+            "unique": 4,
+            "repeated": 0,
+            "first_occurrence_excluded": true,
+            "first_new_numeric_reuses": 0,
+            "sparse_cartesian_proxy": 0,
+            "repeated_sparse_proxy": 0,
+            "new_numeric_repeated_sparse_proxy": 0,
+            "dense_factorizations": 0,
+            "hits": []
+          }
+        }
+      },
+      {
+        "cap": 300,
+        "iterations": 25,
+        "method": "Primal",
+        "model": "sc50a",
+        "refactorizations": 6,
+        "status": "Optimal",
+        "recurrence": {
+          "input": {
+            "records": 6,
+            "unique": 6,
+            "repeated": 0,
+            "first_occurrence_excluded": true,
+            "first_new_numeric_reuses": 0,
+            "sparse_cartesian_proxy": 166,
+            "repeated_sparse_proxy": 0,
+            "new_numeric_repeated_sparse_proxy": 0,
+            "dense_factorizations": 0,
+            "hits": []
+          },
+          "input_and_output": {
+            "records": 6,
+            "unique": 6,
+            "repeated": 0,
+            "first_occurrence_excluded": true,
+            "first_new_numeric_reuses": 0,
+            "sparse_cartesian_proxy": 166,
+            "repeated_sparse_proxy": 0,
+            "new_numeric_repeated_sparse_proxy": 0,
+            "dense_factorizations": 0,
+            "hits": []
+          }
+        }
+      },
+      {
+        "cap": 300,
+        "iterations": 33,
+        "method": "Dual",
+        "model": "sc50a",
+        "refactorizations": 6,
+        "status": "Optimal",
+        "recurrence": {
+          "input": {
+            "records": 6,
+            "unique": 6,
+            "repeated": 0,
+            "first_occurrence_excluded": true,
+            "first_new_numeric_reuses": 0,
+            "sparse_cartesian_proxy": 115,
+            "repeated_sparse_proxy": 0,
+            "new_numeric_repeated_sparse_proxy": 0,
+            "dense_factorizations": 0,
+            "hits": []
+          },
+          "input_and_output": {
+            "records": 6,
+            "unique": 6,
+            "repeated": 0,
+            "first_occurrence_excluded": true,
+            "first_new_numeric_reuses": 0,
+            "sparse_cartesian_proxy": 115,
+            "repeated_sparse_proxy": 0,
+            "new_numeric_repeated_sparse_proxy": 0,
+            "dense_factorizations": 0,
+            "hits": []
+          }
+        }
+      },
+      {
+        "cap": 300,
+        "iterations": 43,
+        "method": "Primal",
+        "model": "blend",
+        "refactorizations": 5,
+        "status": "Optimal",
+        "recurrence": {
+          "input": {
+            "records": 5,
+            "unique": 5,
+            "repeated": 0,
+            "first_occurrence_excluded": true,
+            "first_new_numeric_reuses": 0,
+            "sparse_cartesian_proxy": 383,
+            "repeated_sparse_proxy": 0,
+            "new_numeric_repeated_sparse_proxy": 0,
+            "dense_factorizations": 0,
+            "hits": []
+          },
+          "input_and_output": {
+            "records": 5,
+            "unique": 5,
+            "repeated": 0,
+            "first_occurrence_excluded": true,
+            "first_new_numeric_reuses": 0,
+            "sparse_cartesian_proxy": 383,
+            "repeated_sparse_proxy": 0,
+            "new_numeric_repeated_sparse_proxy": 0,
+            "dense_factorizations": 0,
+            "hits": []
+          }
+        }
+      },
+      {
+        "cap": 300,
+        "iterations": 75,
+        "method": "Dual",
+        "model": "blend",
+        "refactorizations": 8,
+        "status": "Optimal",
+        "recurrence": {
+          "input": {
+            "records": 8,
+            "unique": 8,
+            "repeated": 0,
+            "first_occurrence_excluded": true,
+            "first_new_numeric_reuses": 0,
+            "sparse_cartesian_proxy": 313,
+            "repeated_sparse_proxy": 0,
+            "new_numeric_repeated_sparse_proxy": 0,
+            "dense_factorizations": 0,
+            "hits": []
+          },
+          "input_and_output": {
+            "records": 8,
+            "unique": 8,
+            "repeated": 0,
+            "first_occurrence_excluded": true,
+            "first_new_numeric_reuses": 0,
+            "sparse_cartesian_proxy": 313,
+            "repeated_sparse_proxy": 0,
+            "new_numeric_repeated_sparse_proxy": 0,
+            "dense_factorizations": 0,
+            "hits": []
+          }
+        }
+      },
+      {
+        "cap": 300,
+        "iterations": 63,
+        "method": "Primal",
+        "model": "adlittle",
+        "refactorizations": 9,
+        "status": "Optimal",
+        "recurrence": {
+          "input": {
+            "records": 9,
+            "unique": 9,
+            "repeated": 0,
+            "first_occurrence_excluded": true,
+            "first_new_numeric_reuses": 0,
+            "sparse_cartesian_proxy": 239,
+            "repeated_sparse_proxy": 0,
+            "new_numeric_repeated_sparse_proxy": 0,
+            "dense_factorizations": 0,
+            "hits": []
+          },
+          "input_and_output": {
+            "records": 9,
+            "unique": 9,
+            "repeated": 0,
+            "first_occurrence_excluded": true,
+            "first_new_numeric_reuses": 0,
+            "sparse_cartesian_proxy": 239,
+            "repeated_sparse_proxy": 0,
+            "new_numeric_repeated_sparse_proxy": 0,
+            "dense_factorizations": 0,
+            "hits": []
+          }
+        }
+      },
+      {
+        "cap": 300,
+        "iterations": 84,
+        "method": "Dual",
+        "model": "adlittle",
+        "refactorizations": 9,
+        "status": "Optimal",
+        "recurrence": {
+          "input": {
+            "records": 9,
+            "unique": 9,
+            "repeated": 0,
+            "first_occurrence_excluded": true,
+            "first_new_numeric_reuses": 0,
+            "sparse_cartesian_proxy": 266,
+            "repeated_sparse_proxy": 0,
+            "new_numeric_repeated_sparse_proxy": 0,
+            "dense_factorizations": 0,
+            "hits": []
+          },
+          "input_and_output": {
+            "records": 9,
+            "unique": 9,
+            "repeated": 0,
+            "first_occurrence_excluded": true,
+            "first_new_numeric_reuses": 0,
+            "sparse_cartesian_proxy": 266,
+            "repeated_sparse_proxy": 0,
+            "new_numeric_repeated_sparse_proxy": 0,
+            "dense_factorizations": 0,
+            "hits": []
+          }
+        }
+      },
+      {
+        "cap": 300,
+        "iterations": 62,
+        "method": "Primal",
+        "model": "bore3d",
+        "refactorizations": 6,
+        "status": "Optimal",
+        "recurrence": {
+          "input": {
+            "records": 6,
+            "unique": 6,
+            "repeated": 0,
+            "first_occurrence_excluded": true,
+            "first_new_numeric_reuses": 0,
+            "sparse_cartesian_proxy": 261,
+            "repeated_sparse_proxy": 0,
+            "new_numeric_repeated_sparse_proxy": 0,
+            "dense_factorizations": 0,
+            "hits": []
+          },
+          "input_and_output": {
+            "records": 6,
+            "unique": 6,
+            "repeated": 0,
+            "first_occurrence_excluded": true,
+            "first_new_numeric_reuses": 0,
+            "sparse_cartesian_proxy": 261,
+            "repeated_sparse_proxy": 0,
+            "new_numeric_repeated_sparse_proxy": 0,
+            "dense_factorizations": 0,
+            "hits": []
+          }
+        }
+      },
+      {
+        "cap": 300,
+        "iterations": 147,
+        "method": "Dual",
+        "model": "bore3d",
+        "refactorizations": 8,
+        "status": "Optimal",
+        "recurrence": {
+          "input": {
+            "records": 8,
+            "unique": 8,
+            "repeated": 0,
+            "first_occurrence_excluded": true,
+            "first_new_numeric_reuses": 0,
+            "sparse_cartesian_proxy": 371,
+            "repeated_sparse_proxy": 0,
+            "new_numeric_repeated_sparse_proxy": 0,
+            "dense_factorizations": 0,
+            "hits": []
+          },
+          "input_and_output": {
+            "records": 8,
+            "unique": 8,
+            "repeated": 0,
+            "first_occurrence_excluded": true,
+            "first_new_numeric_reuses": 0,
+            "sparse_cartesian_proxy": 371,
+            "repeated_sparse_proxy": 0,
+            "new_numeric_repeated_sparse_proxy": 0,
+            "dense_factorizations": 0,
+            "hits": []
+          }
+        }
+      },
+      {
+        "cap": 300,
+        "iterations": 300,
+        "method": "Primal",
+        "model": "degen2",
+        "refactorizations": 10,
+        "status": "IterationLimit",
+        "recurrence": {
+          "input": {
+            "records": 10,
+            "unique": 10,
+            "repeated": 0,
+            "first_occurrence_excluded": true,
+            "first_new_numeric_reuses": 0,
+            "sparse_cartesian_proxy": 2524,
+            "repeated_sparse_proxy": 0,
+            "new_numeric_repeated_sparse_proxy": 0,
+            "dense_factorizations": 0,
+            "hits": []
+          },
+          "input_and_output": {
+            "records": 10,
+            "unique": 10,
+            "repeated": 0,
+            "first_occurrence_excluded": true,
+            "first_new_numeric_reuses": 0,
+            "sparse_cartesian_proxy": 2524,
+            "repeated_sparse_proxy": 0,
+            "new_numeric_repeated_sparse_proxy": 0,
+            "dense_factorizations": 0,
+            "hits": []
+          }
+        }
+      },
+      {
+        "cap": 300,
+        "iterations": 300,
+        "method": "Dual",
+        "model": "degen2",
+        "refactorizations": 8,
+        "status": "IterationLimit",
+        "recurrence": {
+          "input": {
+            "records": 8,
+            "unique": 8,
+            "repeated": 0,
+            "first_occurrence_excluded": true,
+            "first_new_numeric_reuses": 0,
+            "sparse_cartesian_proxy": 79,
+            "repeated_sparse_proxy": 0,
+            "new_numeric_repeated_sparse_proxy": 0,
+            "dense_factorizations": 0,
+            "hits": []
+          },
+          "input_and_output": {
+            "records": 8,
+            "unique": 8,
+            "repeated": 0,
+            "first_occurrence_excluded": true,
+            "first_new_numeric_reuses": 0,
+            "sparse_cartesian_proxy": 79,
+            "repeated_sparse_proxy": 0,
+            "new_numeric_repeated_sparse_proxy": 0,
+            "dense_factorizations": 0,
+            "hits": []
+          }
+        }
+      }
+    ],
+    "weight_rule": "Sparse nucleus phase0 before dense suffix: sum |L_rows[k]|*|U_columns[k]|. Cartesian structural proxy, not measured products/instructions/time. Dense, singleton, pair, fresh-U replay and auxiliary LU unweighted. nuc_work is a solver WORK estimate, not product count.",
+    "raw_sha256": "a71c393ba758f47e89b23412d76b62dbd99124b86e246d5be07eae98f2c02f8c"
+  },
+  "components": {
+    "scope": "Optimistic parameterized bipartite-component necessary recurrence; rows sorted locally, columns in incoming order; global pivot projection preserves local relative order. Dense/rectangular/incomplete/cross-link outputs excluded.",
+    "limitations": [
+      "Not an execution trace or an executable plan; global search/chain/WORK remain coupled and live.",
+      "Final component supports do not reveal transient fill/drop, sweep/chain traversal or whether guards would be cheaper.",
+      "Zero-weight singleton repetitions must not establish useful numerical reuse.",
+      "This is a different parameterized lifetime from exact full-constructor address geometry; does not revive component numerical result caching."
+    ],
+    "models": [
+      {
+        "cap": 300,
+        "iterations": 10,
+        "method": "Primal",
+        "model": "afiro",
+        "refactorizations": 3,
+        "status": "Optimal",
+        "counts": {
+          "components": 40,
+          "sparse_cartesian_proxy": 0,
+          "eligible_components": 40,
+          "input_component_reuses": 33,
+          "oracle_best_prefix_sparse_proxy": 0,
+          "strict_repeated_components": 33,
+          "strict_repeated_sparse_proxy": 0,
+          "repeated_1x1_components": 30,
+          "same_as_first_constructor_reuse": 16,
+          "repeated_nontrivial_components": 3,
+          "unique_component_geometry": 7
+        },
+        "nonzero_weight_hits": []
+      },
+      {
+        "cap": 300,
+        "iterations": 10,
+        "method": "Dual",
+        "model": "afiro",
+        "refactorizations": 4,
+        "status": "Optimal",
+        "counts": {
+          "components": 50,
+          "sparse_cartesian_proxy": 0,
+          "eligible_components": 50,
+          "input_component_reuses": 43,
+          "oracle_best_prefix_sparse_proxy": 0,
+          "strict_repeated_components": 43,
+          "strict_repeated_sparse_proxy": 0,
+          "repeated_1x1_components": 39,
+          "same_as_first_constructor_reuse": 16,
+          "repeated_nontrivial_components": 4,
+          "unique_component_geometry": 7
+        },
+        "nonzero_weight_hits": []
+      },
+      {
+        "cap": 300,
+        "iterations": 25,
+        "method": "Primal",
+        "model": "sc50a",
+        "refactorizations": 6,
+        "status": "Optimal",
+        "counts": {
+          "components": 42,
+          "sparse_cartesian_proxy": 166,
+          "eligible_components": 42,
+          "input_component_reuses": 32,
+          "oracle_best_prefix_sparse_proxy": 0,
+          "strict_repeated_components": 32,
+          "strict_repeated_sparse_proxy": 0,
+          "repeated_1x1_components": 27,
+          "same_as_first_constructor_reuse": 16,
+          "repeated_nontrivial_components": 5,
+          "nonzero_sparse_components": 4,
+          "unique_component_geometry": 10
+        },
+        "nonzero_weight_hits": []
+      },
+      {
+        "cap": 300,
+        "iterations": 33,
+        "method": "Dual",
+        "model": "sc50a",
+        "refactorizations": 6,
+        "status": "Optimal",
+        "counts": {
+          "components": 62,
+          "sparse_cartesian_proxy": 115,
+          "eligible_components": 62,
+          "input_component_reuses": 52,
+          "oracle_best_prefix_sparse_proxy": 0,
+          "strict_repeated_components": 52,
+          "strict_repeated_sparse_proxy": 0,
+          "repeated_1x1_components": 42,
+          "same_as_first_constructor_reuse": 19,
+          "repeated_nontrivial_components": 10,
+          "new_numeric_reuses": 1,
+          "new_numeric_repeated_sparse_proxy": 0,
+          "nonzero_sparse_components": 5,
+          "unique_component_geometry": 10
+        },
+        "nonzero_weight_hits": []
+      },
+      {
+        "cap": 300,
+        "iterations": 43,
+        "method": "Primal",
+        "model": "blend",
+        "refactorizations": 5,
+        "status": "Optimal",
+        "counts": {
+          "components": 18,
+          "sparse_cartesian_proxy": 383,
+          "eligible_components": 18,
+          "input_component_reuses": 11,
+          "oracle_best_prefix_sparse_proxy": 0,
+          "strict_repeated_components": 11,
+          "strict_repeated_sparse_proxy": 0,
+          "repeated_1x1_components": 11,
+          "same_as_first_constructor_reuse": 7,
+          "nonzero_sparse_components": 4,
+          "unique_component_geometry": 7
+        },
+        "nonzero_weight_hits": []
+      },
+      {
+        "cap": 300,
+        "iterations": 75,
+        "method": "Dual",
+        "model": "blend",
+        "refactorizations": 8,
+        "status": "Optimal",
+        "counts": {
+          "components": 104,
+          "sparse_cartesian_proxy": 313,
+          "eligible_components": 104,
+          "input_component_reuses": 86,
+          "oracle_best_prefix_sparse_proxy": 0,
+          "strict_repeated_components": 86,
+          "strict_repeated_sparse_proxy": 0,
+          "repeated_1x1_components": 78,
+          "same_as_first_constructor_reuse": 43,
+          "repeated_nontrivial_components": 8,
+          "new_numeric_reuses": 2,
+          "new_numeric_repeated_sparse_proxy": 0,
+          "nonzero_sparse_components": 7,
+          "unique_component_geometry": 18
+        },
+        "nonzero_weight_hits": []
+      },
+      {
+        "cap": 300,
+        "iterations": 63,
+        "method": "Primal",
+        "model": "adlittle",
+        "refactorizations": 9,
+        "status": "Optimal",
+        "counts": {
+          "components": 140,
+          "sparse_cartesian_proxy": 239,
+          "eligible_components": 140,
+          "input_component_reuses": 125,
+          "oracle_best_prefix_sparse_proxy": 0,
+          "strict_repeated_components": 125,
+          "strict_repeated_sparse_proxy": 0,
+          "repeated_1x1_components": 117,
+          "same_as_first_constructor_reuse": 33,
+          "repeated_nontrivial_components": 8,
+          "new_numeric_reuses": 2,
+          "new_numeric_repeated_sparse_proxy": 0,
+          "nonzero_sparse_components": 10,
+          "unique_component_geometry": 15
+        },
+        "nonzero_weight_hits": []
+      },
+      {
+        "cap": 300,
+        "iterations": 84,
+        "method": "Dual",
+        "model": "adlittle",
+        "refactorizations": 9,
+        "status": "Optimal",
+        "counts": {
+          "components": 133,
+          "sparse_cartesian_proxy": 266,
+          "eligible_components": 133,
+          "input_component_reuses": 123,
+          "oracle_best_prefix_sparse_proxy": 0,
+          "strict_repeated_components": 123,
+          "strict_repeated_sparse_proxy": 0,
+          "repeated_1x1_components": 123,
+          "same_as_first_constructor_reuse": 39,
+          "nonzero_sparse_components": 8,
+          "unique_component_geometry": 10
+        },
+        "nonzero_weight_hits": []
+      },
+      {
+        "cap": 300,
+        "iterations": 62,
+        "method": "Primal",
+        "model": "bore3d",
+        "refactorizations": 6,
+        "status": "Optimal",
+        "counts": {
+          "components": 280,
+          "sparse_cartesian_proxy": 261,
+          "eligible_components": 280,
+          "input_component_reuses": 266,
+          "oracle_best_prefix_sparse_proxy": 0,
+          "strict_repeated_components": 266,
+          "strict_repeated_sparse_proxy": 0,
+          "repeated_1x1_components": 256,
+          "same_as_first_constructor_reuse": 69,
+          "repeated_nontrivial_components": 10,
+          "new_numeric_reuses": 3,
+          "new_numeric_repeated_sparse_proxy": 0,
+          "nonzero_sparse_components": 5,
+          "unique_component_geometry": 14
+        },
+        "nonzero_weight_hits": []
+      },
+      {
+        "cap": 300,
+        "iterations": 147,
+        "method": "Dual",
+        "model": "bore3d",
+        "refactorizations": 8,
+        "status": "Optimal",
+        "counts": {
+          "components": 485,
+          "sparse_cartesian_proxy": 371,
+          "eligible_components": 485,
+          "input_component_reuses": 466,
+          "oracle_best_prefix_sparse_proxy": 0,
+          "strict_repeated_components": 466,
+          "strict_repeated_sparse_proxy": 0,
+          "repeated_1x1_components": 453,
+          "same_as_first_constructor_reuse": 104,
+          "repeated_nontrivial_components": 13,
+          "new_numeric_reuses": 5,
+          "new_numeric_repeated_sparse_proxy": 0,
+          "nonzero_sparse_components": 7,
+          "unique_component_geometry": 19
+        },
+        "nonzero_weight_hits": []
+      },
+      {
+        "cap": 300,
+        "iterations": 300,
+        "method": "Primal",
+        "model": "degen2",
+        "refactorizations": 10,
+        "status": "IterationLimit",
+        "counts": {
+          "components": 364,
+          "sparse_cartesian_proxy": 2524,
+          "eligible_components": 364,
+          "input_component_reuses": 352,
+          "oracle_best_prefix_sparse_proxy": 0,
+          "strict_repeated_components": 352,
+          "strict_repeated_sparse_proxy": 0,
+          "repeated_1x1_components": 352,
+          "same_as_first_constructor_reuse": 146,
+          "nonzero_sparse_components": 8,
+          "unique_component_geometry": 12
+        },
+        "nonzero_weight_hits": []
+      },
+      {
+        "cap": 300,
+        "iterations": 300,
+        "method": "Dual",
+        "model": "degen2",
+        "refactorizations": 8,
+        "status": "IterationLimit",
+        "counts": {
+          "components": 1613,
+          "sparse_cartesian_proxy": 79,
+          "eligible_components": 1613,
+          "input_component_reuses": 1591,
+          "oracle_best_prefix_sparse_proxy": 0,
+          "strict_repeated_components": 1591,
+          "strict_repeated_sparse_proxy": 0,
+          "repeated_1x1_components": 1589,
+          "same_as_first_constructor_reuse": 421,
+          "nonzero_sparse_components": 5,
+          "repeated_nontrivial_components": 2,
+          "unique_component_geometry": 22
+        },
+        "nonzero_weight_hits": []
+      }
+    ]
+  },
+  "limitations": [
+    "Final supports are not execution traces. Transient fills/drops, search candidates, chain visits, sweep direction and chronological WORK remain live and unmeasured. A positive match would not establish an executor.",
+    "The sparse weight sums |L rows| times |U columns| for phase-zero pivots before the dense suffix. It is a Cartesian structural proxy, not measured operations, instructions or removable time; uniqueness of live coordinates is not proved.",
+    "Dense, singleton and pair arithmetic, fresh-U replay and auxiliary LU are unweighted. No dense cases occur. Zero sparse weight does not mean zero division/pair work.",
+    "The 3180 strict component repetitions include 3117 one-by-one and 63 nontrivial zero-sparse components. The 13 first reuses with different numerical inputs also have zero sparse weight.",
+    "Rows are localized in ascending physical order; columns retain incoming order. This is order-preserving normalization, not arbitrary graph-isomorphism canonicalization. Prefix comparisons require identical complete component input geometry and do not test arbitrary internal subtraces.",
+    "These twelve controlled histories are capped at 300 iterations. They establish no claim about full/large solves, a runtime bound or a universal impossibility. Global search, interleaving and WORK are coupled even if a component matches."
+  ],
+  "artifacts": {
+    "target/perf-factor-geometry/prepare.py": "d53eb7550dad667ee34698d3584972b81427bd33f32fa23e7122e11c5c0265af",
+    "target/perf-factor-geometry/probe.rs": "da7b6794c6f074bf3494bec00b0a2df6320c6e7bc772a9b6494df721b6014ecd",
+    "target/perf-factor-geometry/original-lu-order.rs": "530ff158c6d8c1263ed4317ad6d67d3bd6a8509bbc4e55b4c5a3e00bdfa89123",
+    "target/perf-factor-geometry/source/src/lu_order.rs": "da109f38418123edfb86b5ff6d1963241a88e1045048cb484c4a0c8b6ed8498a",
+    "target/perf-factor-geometry/source/src/geometry_probe.rs": "da7b6794c6f074bf3494bec00b0a2df6320c6e7bc772a9b6494df721b6014ecd",
+    "target/perf-factor-geometry/source-hashes.json": "fc6b64b7e22520f6bd82622b82b05ae395cfc25d0c419867caec411465fc7c1c",
+    "target/perf-factor-geometry/build.log": "20cc8b13ff3ee81fd969a66cb7252c627b92522a9db35032cdb47d0914d4b3b1",
+    "target/perf-factor-geometry/small.log": "a71c393ba758f47e89b23412d76b62dbd99124b86e246d5be07eae98f2c02f8c",
+    "target/perf-factor-geometry/run.json": "d8b72646fa5bd13340f14acc539fa17aa72fe4d7c72ea4d4d3369f017cfc565c",
+    "target/perf-factor-geometry/analyze.py": "59199b6c20a9e05be3952003f1f2d92662add0c380d1da0a0acb182d90ade9b0",
+    "target/perf-factor-geometry/components.py": "91b01e57aefeac131cdd4714d2c89b83590b17856df5558424c98b433e1515ed",
+    "target/perf-factor-geometry/analysis.json": "cffb7f9bd526908f174973e24f6abccc32add72531f29f6919084b31a56d671a",
+    "target/perf-factor-geometry/component-analysis.json": "6bc3d770dfb672214869df8c546d930781bb402eedff2618f9b71fc92369f182",
+    "target/perf-factor-geometry/census-tests": "7805ea31ae30cf129334d7b705b6411e1aa1c01451cc92c4fd29df1062ba933e"
+  },
+  "accepted_state": "Runtime source, ordinary CLI 84830499 and opt-in PGO/TCMalloc CLI 55af6617 are unchanged. Current fixed 23-row medians remain 0/23 and 2/23 wins respectively; their existing full987 and 292-test qualifications remain separate.",
+  "independent_review": {
+    "reviewer": "factor_destination_review, read-only Astra high",
+    "result": "No normalization/key error invalidates the bounded zero sparse-weight result. The first-constructor reuse metric was renamed to describe its actual meaning; no new solver run was needed."
+  }
+}

@@ -250,6 +250,29 @@ CLI are unchanged. [mode-switch-scope.json](evidence/mode-switch-scope.json), al
 recordings, excluded samples, source/offset maps, and raw outcomes are in
 `target/perf-mode-scope/`; PEROLD reproduction is in `target/perf-refactor-stages/`.
 
+### Factor geometry recurrence
+
+A bounded ordinary construction census covers AFIRO, SC50A, BLEND, ADLITTLE,
+BORE3D and DEGEN2 under both controlled simplex methods, cap300. All12 complete
+library results match their plain same-build solves. None of82 constructors
+repeats its ordered input geometry within a solve. The literal numerical
+constructor source reconstructs after removing only test observation hooks.
+
+An offline order-preserving component census finds3331 components and3180
+strict geometry repetitions, but zero repeated sparse Cartesian weight. All63
+positive-weight components are unique; even an optimistic best-prior matching
+prefix covers zero of4717 proxy units. Repetitions include3117 one-by-one and63
+nontrivial zero-sparse components. Singleton/pair work is unweighted; there are
+no dense cases. These are necessary geometry comparisons, not execution traces
+or cost bounds. They do not test arbitrary row isomorphisms/internal subtraces,
+full/large histories or numerical independence from global search and WORK.
+No large capture or executable program follows this small-history result.
+
+[Factor geometry evidence](evidence/factor-geometry-recurrence.json) records keys,
+source restoration, independent review and limitations. All raw records,
+probe/analyzers and release-test ELF remain in `target/perf-factor-geometry/`.
+Production source and both qualified CLIs are unchanged.
+
 ### Barrier factor executor
 
 The solver compiles child-update geometry once and retains its scratch across

@@ -153,6 +153,14 @@ feasibility-dependent tolerance and deliberate penalty timing separate them.
 Point/classification fusion repeats settled tracking; ratio frames are already
 retained once per entry, while next signatures read post-move distances.
 Seek a distinct substantial numerical execution mechanism before another trial.
+The whole-construction geometry recurrence question is also closed on bounded
+small histories:82 constructors have unique ordered inputs; all63 components
+with sparse Cartesian work are unique under order-preserving localization.
+Complete and optimistic best-prior component prefixes repeat zero of4717 proxy
+units. Singleton/pair work remains unweighted and no dense case occurs. Do not
+escalate to large captures or a geometry executor from zero-weight repetitions.
+This is not a universal statement about graph isomorphisms/internal subtraces or
+large models; global search/WORK stay live. See evidence/factor-geometry-recurrence.json.
 
 Repeat until the goal above is met. Running out of candidates does not end the work: re-profile the run
 with the largest ratio and look one level deeper (inclusive time of the callers, `perf annotate` of the
