@@ -422,6 +422,104 @@ struct Ratio {
     reject: Option<f64>,
 }
 
+/// The independent LU is only read by the stall check and deferred-free setup.
+/// Keep its fallible base build eager: its pivot order and dropping differ from
+/// the mirror, so mirror success does not prove this build will succeed. Updates
+/// cannot fail and are replayed, with their original representation, on demand.
+struct AuxiliaryFactor {
+    base: Factor,
+    pending: Vec<AuxiliaryUpdate>,
+}
+
+enum AuxiliaryUpdate {
+    Column(usize, Column),
+    Dense(usize, Vec<f64>),
+}
+
+impl AuxiliaryFactor {
+    fn new(base: Factor) -> Self {
+        Self { base, pending: Vec::new() }
+    }
+
+    fn update_column<R: Real>(&mut self, r: usize, column: Vec<(usize, R)>) {
+        self.pending.push(AuxiliaryUpdate::Column(
+            r, column.into_iter().map(|(i, v)| (i, v.to_f64())).collect(),
+        ));
+    }
+
+    fn update(&mut self, r: usize, alpha: Vec<f64>) {
+        self.pending.push(AuxiliaryUpdate::Dense(r, alpha));
+    }
+
+    fn materialize(&mut self) -> &Factor {
+        for update in self.pending.drain(..) {
+            match update {
+                AuxiliaryUpdate::Column(r, column) => self.base.update_column(r, column),
+                AuxiliaryUpdate::Dense(r, alpha) => self.base.update(r, alpha),
+            }
+        }
+        &self.base
+    }
+
+    fn ftran(&mut self, rhs: &mut Vec<f64>) {
+        self.materialize().ftran(rhs);
+    }
+
+    fn btran(&mut self, rhs: &mut Vec<f64>) {
+        self.materialize().btran(rhs);
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn auxiliary_updates_are_lazy_and_bit_identical() {
+    fn check<R: Real>(values: &[f64]) {
+        let m = 7;
+        let cols: Vec<Column> = (0..m).map(|i| vec![(i, 2.0), ((i + 1) % m, 0.25)]).collect();
+        let mut eager = Factor::new(m, &cols).unwrap();
+        let mut lazy = AuxiliaryFactor::new(Factor::new(m, &cols).unwrap());
+        for round in 0..32 {
+            let r = round % m;
+            let mut column: Vec<_> = (0..round % (m + 2))
+                .map(|i| ((m - i % m - 1), R::c(values[(round + i) % values.len()])))
+                .collect();
+            column.push((r, R::c(1.25)));
+            eager.update_column(r, column.clone());
+            lazy.update_column(r, column);
+            let mut alpha: Vec<_> = (0..m).map(|i| values[(round + i + 2) % values.len()]).collect();
+            alpha[r] = 1.25;
+            eager.update(r, alpha.clone());
+            lazy.update(r, alpha);
+            assert_eq!(lazy.base.num_updates(), (round / 3 * 3) * 2);
+            if round % 3 == 2 || round == 31 {
+                let bits = |v: Vec<f64>| v.into_iter().map(f64::to_bits).collect::<Vec<_>>();
+                let rhs: Vec<_> = (0..m).map(|i| values[(round + i) % values.len()]).collect();
+                let (mut a, mut b) = (rhs.clone(), rhs.clone());
+                eager.ftran(&mut a);
+                lazy.ftran(&mut b);
+                assert_eq!(bits(a), bits(b));
+                let (mut a, mut b) = (rhs.clone(), rhs);
+                eager.btran(&mut a);
+                lazy.btran(&mut b);
+                assert_eq!(bits(a), bits(b));
+                assert!(lazy.pending.is_empty());
+                assert_eq!(lazy.base.nnz_eta, eager.nnz_eta);
+            }
+        }
+        lazy.update(0, vec![1.0; m]);
+        // Installing a fresh base discards all updates, including unread ones.
+        lazy = AuxiliaryFactor::new(Factor::new(m, &cols).unwrap());
+        assert!(lazy.pending.is_empty());
+        assert_eq!(lazy.base.num_updates(), 0);
+    }
+    let values = [0.0, -0.0, 1.25, -0.75, f64::from_bits(1), f64::INFINITY,
+        f64::from_bits(0x7ff8000000000123), f64::from_bits(0xfff8000000000456)];
+    for values in [&values[..5], &values[..]] {
+        check::<f64>(values);
+        check::<crate::f80::F80>(values);
+    }
+}
+
 struct Dual<'a, R: Real = f64> {
     p: &'a Internal,
     n: usize,
@@ -436,7 +534,7 @@ struct Dual<'a, R: Real = f64> {
     /// Dual steepest-edge weights by position.
     w: Vec<R>,
     mirror: Mirror<R>,
-    factor: Factor,
+    factor: AuxiliaryFactor,
     /// Row-wise copy of the nonbasic, non-fixed structurals in the reference's storage order, with their immutable first-match coefficients.
     rrows: Vec<Vec<(usize, f64)>>,
     /// The ratio test asked for a refactorization (request 5) instead of ending the dual: the iteration returns without a pivot.
@@ -1204,8 +1302,9 @@ impl<'a, R: Real> Dual<'a, R> {
         self.mirror.set_upd_limit(self.upd_limit);
         self.factor_work(&st, &rows, discard);
         let cols: Vec<&Column> = self.head.iter().map(|&j| &self.p.cols[j]).collect();
-        self.factor =
-            Factor::with_floor(self.m, &cols, 0.0).map_err(|_| SolveError::SingularBasis)?;
+        self.factor = AuxiliaryFactor::new(
+            Factor::with_floor(self.m, &cols, 0.0).map_err(|_| SolveError::SingularBasis)?,
+        );
         self.refactorizations += 1;
         self.updates = 0;
         self.bad_rows.clear();
@@ -4406,7 +4505,7 @@ impl<'a, R: Real> Dual<'a, R> {
 
     /// The dual objective as the reference keeps it (`ctx+0x118`): the working costs times the basic solution and the nonbasic values, plus the shift
     /// offset, divided by the objective scale.
-    fn fresh_objective(&self) -> f64 {
+    fn fresh_objective(&mut self) -> f64 {
         let p = self.p;
         let mut r = p.rhs.clone();
         for j in 0..p.n + p.m {
@@ -5779,7 +5878,7 @@ fn solve_pass_callback<R: Real>(
         d: vec![R::ZERO; n + m],
         w: vec![R::ONE; m],
         mirror,
-        factor,
+        factor: AuxiliaryFactor::new(factor),
         rrows: vec![Vec::new(); m],
         absorb_request: false,
         fresh_absorb: false,
@@ -6681,11 +6780,9 @@ fn solve_pass_callback<R: Real>(
         };
     }
     s.cost.clone_from(&p.cost);
-    let mut y: Vec<f64> = s.head.iter().map(|&j| p.cost[j]).collect();
-    s.factor.btran(&mut y);
     let dtrue: Vec<f64> = s.true_d().iter().map(|v| v.to_f64()).collect();
     // The multipliers are those of the same reference btran as the reduced costs (`true_d`; long double in the quad pass), rounded once.
-    y = s.last_y.iter().map(|v| v.to_f64()).collect();
+    let y: Vec<f64> = s.last_y.iter().map(|v| v.to_f64()).collect();
     let nm = model.num_cols();
     let xs: Vec<f64> = x[..nm].to_vec();
     let at_upper: Vec<bool> = s.st.iter().map(|&t| t == UB).collect();
@@ -7322,7 +7419,7 @@ mod captured_bh305_ratio {
             d: vec![0.0; n + m],
             w: vec![1.0; m],
             mirror,
-            factor,
+            factor: AuxiliaryFactor::new(factor),
             rrows: vec![Vec::new(); m],
             absorb_request: false,
             fresh_absorb: false,
