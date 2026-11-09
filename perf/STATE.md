@@ -353,6 +353,30 @@ Production source and both qualified CLIs are unchanged.
 
 ### Barrier factor executor
 
+The whole-register x87 Kahan transaction is timing-inconclusive and unapplied.
+It retains all five rounded intermediates, software zero identities, complete
+numeric state restoration and original software fallback. This differs from
+the historical guarded-product trial and the forbidden interval shortcut.
+An independent complete current kernel precedes edits. Generated64896 terms
+and855947 live terms across224 actual dots match every intermediate sign,
+mantissa and exponent; all seven library histories match complete results/float
+bits. The corrected FP harness passes896 environment cases with actual native
+execution asserted on admitted inputs, including all eight caller registers.
+Its initial standalone restore lacked XMM clobber declarations; the separate
+corrected proof adds them without a production timing variant or retry.
+
+Admission/state-inclusive component ratios on80BAU are0.306–0.357. Matching39-case
+PGO/system-TCMalloc passes fast940. The fixed4mixed/2AA cost pilot preserves
+all28 complete results/exits and gives80BAU solve-9.288%, instructions-6.945%,
+cycles-8.162%. The first fixed32AB/32AA screen58131 gives median-5.213%, interval
+[-7.359%,-0.0473%],23/32 improving, sign p0.0100308; both orders improve. AA has
+p0.05010 and interval[-2.848%,+7.562%]. Sign significance and conservative noise
+separation fail. Stop without58197, extension, zero/schedule/admission rescue,
+full candidate gates or a new benchmark win claim. Root source and both accepted
+CLIs remain unchanged. [Kahan transaction](evidence/kahan-register-transaction.json),
+all original/candidate sources, complete proofs, corrected tests, binaries,
+profiles, schedules and raw outputs: `target/perf-kahan-transaction/`.
+
 The separate generic assembly program lead is closed without a prototype.
 The earlier compiled assembly experiment covers only the standard branch;
 its all-front test calls that standard implementation even on generic-dispatch

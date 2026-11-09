@@ -1,0 +1,921 @@
+{
+  "source": "18061fe9",
+  "mechanism": "Whole-register x87 barrier Kahan transaction. All five original rounded t,y,next,h,c intermediates execute; explicit original Ext zero identities; one save/reset/restore region; memory result; nonprecisionexception rejection and complete original software fallback. Final double conversions unchanged.",
+  "overlap_audit": "Current extended::stream is software. Historical STATE native trial describes guarded products only; its source could not be recovered. This whole recurrence is distinct from that description and from the forbidden interval proposal that skips rounded intermediates.",
+  "configuration": "Initial isolated ordinary ThinLTO/glibc complete-kernel probes and library-history capture. Candidate exact matching39-case PGO/systemTCMalloc, pinnedRust1.98.1, LLVM22.1.8, existing64byte loop alignment. No globaltarget changes. Root source/accepted CLIs unchanged.",
+  "numerical_proof": {
+    "admission": "Normal/zero finite binary64 values only; sufficientlylongb; existing default masked nearest environment. Other domains retain original software selection.",
+    "range": "Rounded normal-input products lie on2^-2107 grid. Exact +/- and precision64 rounding preserve this grid. Withu=2^-64,M=2^2048,T=|sum|+|compensation|, Tnext <= (1+u)^4(T+M); n<=2^64 bounds T<2^2118 and intermediate feedback<2^2120. All nonzero intermediates safely normalbinary80. Ext jammed alignment retains nearest-even round/sticky information; substantial cancellation occurs where alignment is exact.",
+    "zero_semantics": "Productanyzero=>positiveExtZERO. For each add, xzero returnsy first, thenyzero returnsx, else rounded add; subtraction negatesother first. Storedzero decodes exponent0 and exactsign.",
+    "state": "Same asm region FXSAVE64/FNINIT/FXRSTOR64 preserves numericCW/SW,MXCSR,tags and all8live x87 values; no promise about diagnostic instruction/data pointer metadata. Discard nativeprecisionflags; SW&0x1f rejection precedes decoding and software fallback.",
+    "review": "fresh_structural_strategy Astrahigh read-only review finds no production defect; stack depthmax5 (trace6), stack evolution verified.",
+    "source_reconstruction": "Original barrier.rs fallback reconstructs literally after only newmoduleinclude and one try-return branch removal. Frozen full current extended.rs copied before implementation remains byteidentical."
+  },
+  "qualification": {
+    "generated_admitted_cases_includingempty": 1129,
+    "generated_nonempty_terms": 64896,
+    "generated_allfiveintermediate_Ext_records": 324480,
+    "live_dot_calls": 224,
+    "live_admitted_dot_calls": 224,
+    "live_terms": 855947,
+    "live_allfiveintermediate_Ext_records": 4279735,
+    "comparison": "Every intermediate sign/mantissa/exponent vs original full Ext arithmetic; final fast/trace values vs independent frozen complete current stream and original whole software recurrence. Seven full library history captures match plain complete Debug plus allpublicfloatbits.",
+    "FP_initial_caveat": "Initial896environment cases passed but test restore helper lacked arbitraryXMM clobber declarations, so that alone is not compiler-safe proof. Production same-region save/restore unaffected.",
+    "FP_corrected": "Separate corrected-fp source adds onlyclobber_abi(C) to standalone environmenttest restore; all896cases rerun with assertions of actual native execution on admitted normal/zero defaultcontrols, includingfull8callerstack. No production timing/source variant or screenretry.",
+    "corrected_FP_result": {
+      "command": [
+        "taskset",
+        "-c",
+        "2",
+        "target/perf-kahan-transaction/corrected-fp/scope-tests",
+        "kahan_transaction",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed": 0.03402587400341872,
+      "timeout": 60,
+      "binary_sha256": "5ea13d7e13374129289f13808750163ce073ff275d82c0686c9ba27c82406cc7",
+      "environment_cases": 896,
+      "native_execution_assertions": "Supportednormal/zeroinputs underdefaultcontrols must execute native path, includingfull8registerstack; unsupporteddomainfallback retained."
+    },
+    "candidate_fast_parity": "940/940",
+    "candidate_fullgates": "No full987,allrelease tests or full23 sweep after inconclusivefirstscreen."
+  },
+  "component_gate": {
+    "criteria": "At most0.50 median candidate/current wholehistory ratio for80BAU includingadmission/state/decoding; fixed4alternatingpairs aftersixsmallmodels.",
+    "rows": [
+      {
+        "admitted": 18,
+        "cap": 1000,
+        "cases": 18,
+        "iterations": 7,
+        "kernel_ns": [
+          [
+            507135,
+            222705
+          ],
+          [
+            501194,
+            241040
+          ],
+          [
+            492969,
+            232012
+          ],
+          [
+            504700,
+            218147
+          ]
+        ],
+        "loops": 20,
+        "model": "afiro",
+        "refactorizations": 0,
+        "terms": 531
+      },
+      {
+        "admitted": 18,
+        "cap": 1000,
+        "cases": 18,
+        "iterations": 7,
+        "kernel_ns": [
+          [
+            810160,
+            318885
+          ],
+          [
+            806674,
+            334824
+          ],
+          [
+            853721,
+            330085
+          ],
+          [
+            806132,
+            325216
+          ]
+        ],
+        "loops": 20,
+        "model": "sc50a",
+        "refactorizations": 0,
+        "terms": 882
+      },
+      {
+        "admitted": 20,
+        "cap": 1000,
+        "cases": 20,
+        "iterations": 8,
+        "kernel_ns": [
+          [
+            1376335,
+            533684
+          ],
+          [
+            1402153,
+            520240
+          ],
+          [
+            1402474,
+            520410
+          ],
+          [
+            1410219,
+            511173
+          ]
+        ],
+        "loops": 20,
+        "model": "blend",
+        "refactorizations": 0,
+        "terms": 1570
+      },
+      {
+        "admitted": 28,
+        "cap": 1000,
+        "cases": 28,
+        "iterations": 12,
+        "kernel_ns": [
+          [
+            1747607,
+            652966
+          ],
+          [
+            1668930,
+            688954
+          ],
+          [
+            1593279,
+            642357
+          ],
+          [
+            1823138,
+            564111
+          ]
+        ],
+        "loops": 20,
+        "model": "adlittle",
+        "refactorizations": 0,
+        "terms": 2142
+      },
+      {
+        "admitted": 36,
+        "cap": 1000,
+        "cases": 36,
+        "iterations": 16,
+        "kernel_ns": [
+          [
+            6638762,
+            2584887
+          ],
+          [
+            7554510,
+            2518173
+          ],
+          [
+            7088962,
+            2511541
+          ],
+          [
+            7225216,
+            2534514
+          ]
+        ],
+        "loops": 20,
+        "model": "bore3d",
+        "refactorizations": 0,
+        "terms": 10098
+      },
+      {
+        "admitted": 28,
+        "cap": 1000,
+        "cases": 28,
+        "iterations": 12,
+        "kernel_ns": [
+          [
+            11179414,
+            3523778
+          ],
+          [
+            11432146,
+            3638511
+          ],
+          [
+            10906607,
+            3327181
+          ],
+          [
+            10932295,
+            3523006
+          ]
+        ],
+        "loops": 20,
+        "model": "degen2",
+        "refactorizations": 0,
+        "terms": 13692
+      },
+      {
+        "admitted": 76,
+        "cap": 1000,
+        "cases": 76,
+        "iterations": 36,
+        "kernel_ns": [
+          [
+            138120137,
+            42224303
+          ],
+          [
+            132219980,
+            42155035
+          ],
+          [
+            134287233,
+            42640118
+          ],
+          [
+            132516573,
+            47305013
+          ]
+        ],
+        "loops": 4,
+        "model": "80bau3b",
+        "refactorizations": 0,
+        "terms": 827032
+      }
+    ],
+    "decision": "Passed; all224 livecalls admitted; targetratios0.306\u20130.357."
+  },
+  "matching_build": {
+    "exit_code": 0,
+    "elapsed": 72.9728915010055,
+    "binary_sha256": "79eab1c13d1b11aefbe106ecc52c2f0c181b6ada2d2177c618b4a1100f3e4f62"
+  },
+  "pgo_metadata": {
+    "compiler": "rustc 1.98.1 (48a229cea 2026-09-01)\nbinary: rustc\ncommit-hash: 48a229ceaefd4985c50990b14116b6d856af0985\ncommit-date: 2026-09-01\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.1\nLLVM version: 22.1.8\n",
+    "profile": "/home/derekwang/rose-reverse-engineer/rose/target/perf-kahan-transaction/production/target/perf-pgo/5b8ccba3f985e3616a9d883185b09a8adeab06d501c5b93b2e783267e7728b0e.profdata",
+    "sha256": "5b8ccba3f985e3616a9d883185b09a8adeab06d501c5b93b2e783267e7728b0e",
+    "rustflags": [
+      "-Cllvm-args=--align-loops=64",
+      "-Cprofile-use=/home/derekwang/rose-reverse-engineer/rose/target/perf-kahan-transaction/production/target/perf-pgo/5b8ccba3f985e3616a9d883185b09a8adeab06d501c5b93b2e783267e7728b0e.profdata"
+    ],
+    "features": [
+      "system-tcmalloc"
+    ],
+    "training": [
+      [
+        "solve",
+        "tests/fixtures/afiro.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/afiro.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/afiro.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/afiro.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/afiro.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/afiro.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/afiro.mps",
+        "--method",
+        "pdhg",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--pdhg-iter-limit",
+        "2000"
+      ],
+      [
+        "solve",
+        "tests/fixtures/sc50a.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/sc50a.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/sc50a.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/sc50a.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/sc50a.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/sc50a.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/sc50a.mps",
+        "--method",
+        "pdhg",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--pdhg-iter-limit",
+        "2000"
+      ],
+      [
+        "solve",
+        "tests/fixtures/blend.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/blend.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/blend.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/blend.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/blend.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/blend.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/blend.mps",
+        "--method",
+        "pdhg",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--pdhg-iter-limit",
+        "2000"
+      ],
+      [
+        "solve",
+        "tests/fixtures/adlittle.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/adlittle.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/adlittle.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/adlittle.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/adlittle.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/adlittle.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/adlittle.mps",
+        "--method",
+        "pdhg",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--pdhg-iter-limit",
+        "2000"
+      ],
+      [
+        "solve",
+        "tests/fixtures/bore3d.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/bore3d.mps",
+        "--method",
+        "primal",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/bore3d.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/bore3d.mps",
+        "--method",
+        "dual",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/bore3d.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "controlled"
+      ],
+      [
+        "solve",
+        "tests/fixtures/bore3d.mps",
+        "--method",
+        "barrier",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--barrier-profile",
+        "release"
+      ],
+      [
+        "solve",
+        "tests/fixtures/bore3d.mps",
+        "--method",
+        "pdhg",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null",
+        "--pdhg-iter-limit",
+        "2000"
+      ],
+      [
+        "solve",
+        "tests/fixtures/inf_itest6.mps",
+        "--method",
+        "primal",
+        "--profile",
+        "release",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null"
+      ],
+      [
+        "solve",
+        "tests/fixtures/inf_itest6.mps",
+        "--method",
+        "dual",
+        "--profile",
+        "release",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null"
+      ],
+      [
+        "solve",
+        "tests/fixtures/fx_midsing_1106.mps",
+        "--method",
+        "primal",
+        "--profile",
+        "release",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null"
+      ],
+      [
+        "solve",
+        "tests/fixtures/fx_midsing_1106.mps",
+        "--method",
+        "dual",
+        "--profile",
+        "release",
+        "--max-iterations",
+        "200",
+        "--output",
+        "/dev/null"
+      ]
+    ]
+  },
+  "pilot": {
+    "plan": {
+      "seed": 58109,
+      "mixed_pairs_per_model": 4,
+      "AA_pairs_per_model": 2,
+      "models": {
+        "degen2": 1000,
+        "80bau3b": 1000
+      },
+      "CPU": 2,
+      "timeout": 20,
+      "rule": "Fixed cost pilot only. Target80BAU median solve reduction>=3%, instructions and cycles fall, both orders improve, absolute AA median shift smaller than target gain. No extension/retry. Formal58131/58197 only after positive pilot. Full acceptance gates remain.",
+      "binaries": {
+        "A": {
+          "path": "/home/derekwang/rose-reverse-engineer/rose/target/perf-optimized-build/rose-pgo-tcmalloc",
+          "sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb"
+        },
+        "B": {
+          "path": "/home/derekwang/rose-reverse-engineer/rose/target/perf-kahan-transaction/rose-candidate",
+          "sha256": "79eab1c13d1b11aefbe106ecc52c2f0c181b6ada2d2177c618b4a1100f3e4f62"
+        }
+      },
+      "schedules": {
+        "degen2": [
+          [
+            "AB",
+            "BA"
+          ],
+          [
+            "AB",
+            "BA"
+          ],
+          [
+            "AB",
+            "AB"
+          ],
+          [
+            "AB",
+            "AB"
+          ],
+          [
+            "AA",
+            "BA"
+          ],
+          [
+            "AA",
+            "AB"
+          ]
+        ],
+        "80bau3b": [
+          [
+            "AB",
+            "BA"
+          ],
+          [
+            "AA",
+            "BA"
+          ],
+          [
+            "AA",
+            "AB"
+          ],
+          [
+            "AB",
+            "BA"
+          ],
+          [
+            "AB",
+            "AB"
+          ],
+          [
+            "AB",
+            "AB"
+          ]
+        ]
+      }
+    },
+    "summary": {
+      "degen2": {
+        "solve_percent": 1.891884788744358,
+        "instruction_percent": -1.2994581873488231,
+        "cycle_percent": 2.3225787219449012,
+        "AA_median_percent": 4.2062721737313735,
+        "orders": {
+          "AB": -7.6964619761382025,
+          "BA": 9.872964002638462
+        }
+      },
+      "80bau3b": {
+        "solve_percent": -9.2876140207254,
+        "instruction_percent": -6.945047426906492,
+        "cycle_percent": -8.162206038990782,
+        "AA_median_percent": 2.8802508158670914,
+        "orders": {
+          "AB": -10.940811297663068,
+          "BA": -9.2876140207254
+        },
+        "positive_pilot": true
+      }
+    },
+    "results": "All28warm/measuredcompletecanonicalJSON/exitsmatch; signedzero preserved; baseline80BAUalso matchesoriginalfullpanel; twoPMUevents100%running."
+  },
+  "formal": {
+    "seed": 58131,
+    "result": {
+      "ab_median_percent": -5.2132005489273485,
+      "ab_ci_percent": [
+        -7.35909375671201,
+        -0.04731865351679243
+      ],
+      "aa_median_percent": 2.0828983981770848,
+      "aa_ci_percent": [
+        -2.8482891831112633,
+        7.5623104820151
+      ],
+      "improving_pairs": 23,
+      "pairs_per_kind": 32,
+      "ab_sign_p": 0.010030803503468633,
+      "aa_sign_p": 0.050102459732443094,
+      "order_median_percent": {
+        "AB": -5.2132005489273485,
+        "BA": -5.35250121531036
+      },
+      "criteria": {
+        "sign_p_at_most_001": false,
+        "aa_not_biased_at_005": true,
+        "median_gain_at_least_half_percent": true,
+        "ab_upper_ci_below_aa_error": false,
+        "both_orders_improve": true
+      },
+      "positive_screen": false
+    },
+    "samples": 130,
+    "outputs": "All complete result/exit objects match within the screen; binary hashes fixed throughout.",
+    "status": "complete"
+  },
+  "decision": "Stop after inconclusivefirstformal screen. Median gain5.213% is not accepted:23/32improving givesp0.0100308>0.01; AB upperCI-0.0473% doesnotclearAA uncertainty7.5623%. No58197confirmation, extension, repeatedscreen, zero/schedule/admission rescue, fullcandidategates or newbenchmarkwin claim. No runtime source change accepted. CorrectedFPproof resolves test-harness defect without retiming.",
+  "artifacts": {
+    "target/perf-kahan-transaction/criteria.json": "8948506cd7b9d0483eaed782fe1a6651e510da50f877b5da9975ae9ccd198ca1",
+    "target/perf-kahan-transaction/prepare.py": "8e4b57c8c50d7c4c6d40ae43e84afe058e558699e3c21918ec88e75c86cba878",
+    "target/perf-kahan-transaction/generate.py": "a9ff09dc27894cd66611a988817fb49e1c015bfcf8297057a9231a93a3daed86",
+    "target/perf-kahan-transaction/native.rs": "85366dfdc6437b33a56d1e3e6a5c49a1c5facba99224d89fa3287d65c060e8b0",
+    "target/perf-kahan-transaction/tests.rs": "4037ec2a0258d05e2f9481eb21132d466e3de2564dd5539a3400bef8eb65516c",
+    "target/perf-kahan-transaction/frozen-extended.rs": "34c076e795029c46d920b43b960c37cab8f1e9939af03df750ae65d1769b3393",
+    "target/perf-kahan-transaction/original-barrier.rs": "05291d4b59fa02c7bab4802e20db42be517f529f34ac8c5ef112344f6d8dd0cf",
+    "target/perf-kahan-transaction/source-hashes.json": "337fb9d0e00ed5d7b0fd937d267e4b94c3e38f2c96e17443290cbf8a94ce6703",
+    "target/perf-kahan-transaction/fields.log": "fc53940a766a062e2835c23c873ed0956479fa4637adb36e07de6c271270d9b3",
+    "target/perf-kahan-transaction/fields-run.json": "4dc44e218439430f89da55a6c115bc04836cfd3c81f5004bfd2bde9b6b5d4a20",
+    "target/perf-kahan-transaction/small.log": "d426a8e6dbcc271d993f4e2acee40b9b5cbf8668bb469753508d1ccf617fcd05",
+    "target/perf-kahan-transaction/small-records.json": "54a092925d6628259f56f6cdb363b441e7b4bc46796bf345b2b577749070c865",
+    "target/perf-kahan-transaction/target.log": "1a25b6ebd195593869ae5c796a797f0c69c0490b99554ae06a29b17f17337ff8",
+    "target/perf-kahan-transaction/target-records.json": "1ab05f89c08d83ba7886cabd98859dd06b44c6a8453e9494483709c04462833c",
+    "target/perf-kahan-transaction/component-build/binary.json": "d3d33981c0cd9d4baef66a78f6231291e2ffed6137f15aef63930cec1d795b43",
+    "target/perf-kahan-transaction/component-build/scope-tests": "ec99acd6556cffdc78eef10b271de1e2b647f596fe0d9a0e4c47e9cb4a03e47a",
+    "target/perf-kahan-transaction/component-build/native.rs": "85366dfdc6437b33a56d1e3e6a5c49a1c5facba99224d89fa3287d65c060e8b0",
+    "target/perf-kahan-transaction/component-build/tests.rs": "4037ec2a0258d05e2f9481eb21132d466e3de2564dd5539a3400bef8eb65516c",
+    "target/perf-kahan-transaction/environment-tests.rs": "99cbcf2eb891cd05b204902a5b1d6d4683541838dc350cffb3c8adfe0e889a3f",
+    "target/perf-kahan-transaction/environments.log": "6c2a0b766534a256dda18db0d92560c277bcdce499eadea8ca6ce092a9146c4f",
+    "target/perf-kahan-transaction/environments-run.json": "2139f07448b60059f6c352ab1f3114c93047b41838b9370a322b4a744a1a2509",
+    "target/perf-kahan-transaction/production-unit/verification.json": "ad960481451720c9609fd5043e73a39a84bba52eddd13b2227e754155637f470",
+    "target/perf-kahan-transaction/production-unit/checked-kahan-x87.rs": "e960edb50133810589b6f147d74e9b1bd6913ba0528da24a635d644560a52aba",
+    "target/perf-kahan-transaction/production-unit/scope-tests": "9859e9d03c717953407b86d19f287fca54eaafdd5ec3bc522f555af176b31e2d",
+    "target/perf-kahan-transaction/formatting.json": "6c8ff3bab877e2018addd5209adf4e4f3f17851f5f6917b8b042e3d8b58dfe5f",
+    "target/perf-kahan-transaction/prepare_production.py": "58b1e04d5b920b8443dd0cf6de849701cca5159b1e70864181c2ef2a1e0e8f13",
+    "target/perf-kahan-transaction/production-source-hashes.json": "35f39e8385e6603e9cd5d78fd4ff47a0d78c274f63ffa1d91d75427b77ccb8ce",
+    "target/perf-kahan-transaction/production/src/barrier.rs": "200cf55e0a711c0211a844ba33edba039047f9c5e2b43f56f346cb4f5d4e4d7e",
+    "target/perf-kahan-transaction/production/src/barrier/kahan_x87.rs": "68ff737da112165fbb028b37b6399f5f41c68c6b0f321c3b494a3e2ae3eee418",
+    "target/perf-kahan-transaction/production/src/barrier/kahan_original.rs": "34c076e795029c46d920b43b960c37cab8f1e9939af03df750ae65d1769b3393",
+    "target/perf-kahan-transaction/pgo-command.json": "db1d7b49a41c4a6c62c6b51a30a46763c4aa6687f2fdd431024b6d0e47b3960d",
+    "target/perf-kahan-transaction/pgo-result.json": "f74ca6f8dc0d23d89bba855cf037c7a31a13efb552aa286b296863c090267dc7",
+    "target/perf-kahan-transaction/production/target/perf-pgo/build.json": "fa8e9c0fac71ed829b75a9774ae142d18b95347a4e6826a61c83a95dc620489f",
+    "target/perf-kahan-transaction/rose-candidate": "79eab1c13d1b11aefbe106ecc52c2f0c181b6ada2d2177c618b4a1100f3e4f62",
+    "target/perf-kahan-transaction/fast-parity-result.json": "69561d163c87db0e0cc48464be4bccfb0ea5d749e57f3f534818e7f0f08d44dd",
+    "target/perf-kahan-transaction/fast-parity.log": "888d7d5be8cf13f2b18a506ef5ba0c09f55452a51ebe1810656977d09dc68003",
+    "target/perf-kahan-transaction/pilot.py": "ce7357a9fcc496d8bbc6151d85fc21975a950d912c2013f87c1a104de4b564bf",
+    "target/perf-kahan-transaction/pilot/plan.json": "ae12294c3b479b75da1cfe95dbc1f23c73fee299ee7c01a2bdb082cfe20acc48",
+    "target/perf-kahan-transaction/pilot/summary.json": "0aeee16f7a0fc728953d36d91dae20b4c7436ba113819e3a2991d749bd855ad7",
+    "target/perf-kahan-transaction/pilot/rows.json": "18d92e423a4b7b0dad0c2238ecd8f9e6fa8338d0dee21b0bcdf27563fc5f83cb",
+    "target/perf-kahan-transaction/run_formal.py": "5958b954c08458100fe9e9194002e1ef4fca25b46e36fa8ba4ce5ce35e21232f",
+    "target/perf-kahan-transaction/formal-58131.json": "63b50829f1df69cc4f27a9af41709853ed34f08b7255f1697802912d5608f6ad",
+    "target/perf-kahan-transaction/formal-58131-result.json": "cd41395c92f2935f59b6908732291670df7a76badbc5f3d5d95664bb47edeb10",
+    "target/perf-kahan-transaction/corrected-fp/source/src/barrier/kahan_x87.rs": "84e5f7ba1f1b8ea1f527baad43ecc6b19f06f642187cb269bd080270bf9e48fb",
+    "target/perf-kahan-transaction/corrected-fp/build-result.json": "1a787f1cc88c7ded74d9cfc55235c2a179c57438eaea7aae65267e791c4d2697",
+    "target/perf-kahan-transaction/corrected-fp/verification.json": "9f043cc2a37d4dacc681c34ddc5d41f5f3196f70d3c0b3fb899f5734984cd6c5",
+    "target/perf-kahan-transaction/corrected-fp/verification.log": "2b2c0d1177beb846313931efbd4a31b6d7a647bd7d1606200f4d8335659607e6",
+    "target/perf-kahan-transaction/corrected-fp/scope-tests": "5ea13d7e13374129289f13808750163ce073ff275d82c0686c9ba27c82406cc7"
+  }
+}

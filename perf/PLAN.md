@@ -183,6 +183,16 @@ or prototype follows. Existing linked/borrowed-chain failures are separate;
 unchanged maxima do not imply unchanged candidate costs. Read
 evidence/markowitz-summary-scope.json before another search-summary proposal.
 
+The complete five-operation x87 register Kahan transaction remains unapplied.
+Independent full intermediate-field and corrected896-case FP-state proof pass;
+matching-PGO fast940 and the fixed cost pilot pass. The first fixed formal screen
+58131 is inconclusive: sign p0.0100308 misses0.01 and its interval does not clear
+AA uncertainty. Do not run58197, extend/repeat the screen or rescue zero checks,
+assembly scheduling or admission. No full candidate gates follow. Read
+evidence/kahan-register-transaction.json before another native Kahan proposal;
+the whole recurrence, historical product-only trial and forbidden interval
+shortcut are distinct mechanisms.
+
 The ordinary phase-one extended accumulator question is settled. Accepted
 machine code executes the dead software pipeline, but whole-kernel live replay
 is only1.361ms per80BAUsolve and timing roles cross. All12468live kernel calls,
