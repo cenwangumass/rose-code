@@ -1,0 +1,208 @@
+{
+  "source": "18061fe9",
+  "question": "Does the previously unmeasured generic barrier assembly branch provide a substantial distinct execution opportunity?",
+  "proposal": "Output-oriented complete generic assembly program compiling per-cell ordered contributions and original per-column intermediate products, removing accumulator/seen/touched discovery and publication. No prototype built.",
+  "prior_overlap_audit": "Previous compiled standard assembly declines production fronts with w<3 or c*w>30000. Its all-front component test calls standard assemble oracle/current on those shapes; it does not rewrite or time actual assemble_generic. Old complete assembly scopes combine both branches.",
+  "configuration": "Isolated ordinary release ThinLTO/glibc library tests, pinned toolchain, CPU2, cap1000; two rounds per six small models before three rounds per80BAU/GREEN. Test-only timers include complete original assembly bodies/allocations, exclude final timer aggregation; outputs remain alive at timer return. This is diagnostic scope, not accepted PGO removable time.",
+  "qualification": {
+    "source_reconstruction": "Full chol.rs reconstructs literally after removing only two test scope objects and one test-module include; all production source hashes unchanged.",
+    "library_results": 18,
+    "comparison": "Each instrumented library SolveResult matches the complete Debug representation of its own disabled plain solve. This diagnostic check is not full frozen parity or an FP-environment oracle.",
+    "build": {
+      "exit_code": 0,
+      "elapsed": 45.28264262399898
+    },
+    "small": {
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/home/derekwang/rose-reverse-engineer/rose/target/perf-generic-assembly-scope/scope-tests",
+        "assembly_scope_small",
+        "--ignored",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cwd": "/home/derekwang/rose-reverse-engineer/rose/target/perf-generic-assembly-scope/source",
+      "exit_code": 0,
+      "elapsed": 0.21606979900388978,
+      "timeout": 60
+    },
+    "large": {
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/home/derekwang/rose-reverse-engineer/rose/target/perf-generic-assembly-scope/scope-tests",
+        "assembly_scope_large",
+        "--ignored",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cwd": "/home/derekwang/rose-reverse-engineer/rose/target/perf-generic-assembly-scope/source",
+      "exit_code": 0,
+      "elapsed": 11.525387675996171,
+      "timeout": 60
+    }
+  },
+  "summary": {
+    "afiro": {
+      "standard_solve_fractions": [
+        0.04627173224623783,
+        0.03591991646380691
+      ],
+      "generic_solve_fractions": [
+        0.0,
+        0.0
+      ],
+      "calls": [
+        24,
+        0
+      ],
+      "oversized_generic_calls": 0,
+      "maximum_generic_c_times_w": 0
+    },
+    "sc50a": {
+      "standard_solve_fractions": [
+        0.0335726913163492,
+        0.05577940312735984
+      ],
+      "generic_solve_fractions": [
+        0.0019131226830729452,
+        0.002324364950290367
+      ],
+      "calls": [
+        32,
+        8
+      ],
+      "oversized_generic_calls": 0,
+      "maximum_generic_c_times_w": 1
+    },
+    "blend": {
+      "standard_solve_fractions": [
+        0.09521955839506867,
+        0.11013250404961979
+      ],
+      "generic_solve_fractions": [
+        0.0,
+        0.0
+      ],
+      "calls": [
+        72,
+        0
+      ],
+      "oversized_generic_calls": 0,
+      "maximum_generic_c_times_w": 0
+    },
+    "adlittle": {
+      "standard_solve_fractions": [
+        0.0690466959794748,
+        0.06710077343475097
+      ],
+      "generic_solve_fractions": [
+        0.0,
+        0.0
+      ],
+      "calls": [
+        65,
+        0
+      ],
+      "oversized_generic_calls": 0,
+      "maximum_generic_c_times_w": 0
+    },
+    "bore3d": {
+      "standard_solve_fractions": [
+        0.0889500196745022,
+        0.08392060932448982
+      ],
+      "generic_solve_fractions": [
+        0.012774246608363968,
+        0.012945482101319242
+      ],
+      "calls": [
+        357,
+        527
+      ],
+      "oversized_generic_calls": 0,
+      "maximum_generic_c_times_w": 18
+    },
+    "degen2": {
+      "standard_solve_fractions": [
+        0.0511575662382774,
+        0.061781245646255756
+      ],
+      "generic_solve_fractions": [
+        0.02142182632115493,
+        0.023737251981505683
+      ],
+      "calls": [
+        572,
+        975
+      ],
+      "oversized_generic_calls": 0,
+      "maximum_generic_c_times_w": 124
+    },
+    "80bau3b": {
+      "standard_solve_fractions": [
+        0.07702651472071409,
+        0.08162998059902486,
+        0.0792773512989618
+      ],
+      "generic_solve_fractions": [
+        0.021957842024610156,
+        0.02276836921740031,
+        0.022552823340277677
+      ],
+      "calls": [
+        10952,
+        9657
+      ],
+      "oversized_generic_calls": 0,
+      "maximum_generic_c_times_w": 72
+    },
+    "greenbea": {
+      "standard_solve_fractions": [
+        0.0705617872152014,
+        0.06956052652843624,
+        0.07381922821421473
+      ],
+      "generic_solve_fractions": [
+        0.039918310110469125,
+        0.03877271483936037,
+        0.039186034826423875
+      ],
+      "calls": [
+        21008,
+        56056
+      ],
+      "oversized_generic_calls": 0,
+      "maximum_generic_c_times_w": 80
+    }
+  },
+  "decision": "Close without numerical/production prototype. Entire generic scope is2.20\u20132.28% of80BAU and3.88\u20133.99% ofGREEN instrumented solve time, including required arithmetic and output work; no substantial removable owner is demonstrated. All generic calls across measured models are narrow fronts; no oversized-front generic call occurs. Standard assembly remains covered by its separate rejected experiment. No matching-PGO build, formal timing screens, candidate full gates or production source changes.",
+  "limitations": [
+    "Timer entry/drop and test-code inlining can perturb small routines; shares are not exact uninstrumented PGO costs.",
+    "Per-shape clock aggregation occurs outside the timed assembly body but inside instrumented whole solve.",
+    "No claim about oversized generic fronts or unmeasured models.",
+    "Literal unchanged numerical source supports this census; no reordered numerical executor or exception proof was tested."
+  ],
+  "artifacts": {
+    "target/perf-generic-assembly-scope/prepare.py": "195f6f400a1cc52aa5b1ef30775c1ad9c47f48d5b4afcd6c5ff7a22d71b3b299",
+    "target/perf-generic-assembly-scope/probe.rs": "aca707081e1b14ad51c1c9e70ed1d22769f9d746088a2ff05e742d91c9c6de3e",
+    "target/perf-generic-assembly-scope/original-chol.rs": "158e393ca8dc6aef7f98482ca9f4609b49d2df00b03978310873e333ebf51bea",
+    "target/perf-generic-assembly-scope/source/src/chol.rs": "e430ef7ca6baa13427768d67ebe258342e50b25ece4d927dfab0212ed1eeea26",
+    "target/perf-generic-assembly-scope/source/src/assembly_scope_probe.rs": "aca707081e1b14ad51c1c9e70ed1d22769f9d746088a2ff05e742d91c9c6de3e",
+    "target/perf-generic-assembly-scope/source-hashes.json": "fc6b64b7e22520f6bd82622b82b05ae395cfc25d0c419867caec411465fc7c1c",
+    "target/perf-generic-assembly-scope/build-command.json": "eaa6ef253c48240f146201351bb7658b173ba26a66172be0f3fe6fa9bed93945",
+    "target/perf-generic-assembly-scope/build-result.json": "380c1f09e724b70de5cdb8c29edae4d0bc9d39d0771024a7afa36378a33fea0d",
+    "target/perf-generic-assembly-scope/binary.json": "d3791463fa01069e304269095a99c8fa4c501174d5f3b1f7ef78a063e9f011b3",
+    "target/perf-generic-assembly-scope/run.py": "eb5b8a63f068a739cdfcbbf5c9e7d0f435d319cd26daf31ccd691606e5ff6f9b",
+    "target/perf-generic-assembly-scope/small-run.json": "cd82dab74e107aff9fd7cc1d181918ed9996f0857dbad827f03b3fa0f8f3749f",
+    "target/perf-generic-assembly-scope/small-records.json": "bb36cdf8e8705054d3585bdb2d7d387fbd077a67932fbf6e1ad30cd6efdf2db5",
+    "target/perf-generic-assembly-scope/large-run.json": "a559f07d18efe0414bb3d8c756bd23fd6f7ad94df77221407dcf5e54162733f5",
+    "target/perf-generic-assembly-scope/large-records.json": "00bb85e11f5aaaf8b1960506fd262288b8100ceb163c5e47b0b84942239c8d56",
+    "target/perf-generic-assembly-scope/small.log": "485db32b8465870813ce1c7c144a6c09079608c9beda3a2cd3d611f838a91638",
+    "target/perf-generic-assembly-scope/large.log": "1ddcdaebf1034320e5b8fa3813907747d565ca9fd3babbd3569a981c7ff29056",
+    "target/perf-generic-assembly-scope/scope-tests": "0f832cad9e1e1b953493a4406f98765ebcc20700408451326b5812624e345a41"
+  }
+}

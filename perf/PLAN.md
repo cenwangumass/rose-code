@@ -160,6 +160,15 @@ another native or cache-key proposal; allocator/self shares are not removable
 scope. Require a distinct substantial execution mechanism, not a new label for
 the settled component/basis/buffer lifetimes.
 
+The separate output-oriented generic barrier assembly lead is also closed.
+The previous compiled plan covers standard assembly only, but complete generic
+entry scopes now occupy2.20–2.28% of80BAU and3.88–3.99% ofGREEN instrumented
+solves, including required arithmetic/output. All18 complete paired library
+results agree; all generic calls are narrow fronts. No substantial removable
+owner is demonstrated, so no generic executor or timing screen follows.
+Read evidence/generic-assembly-scope.json before another assembly proposal;
+oversized generic fronts remain outside this measured set.
+
 The ordinary phase-one extended accumulator question is settled. Accepted
 machine code executes the dead software pipeline, but whole-kernel live replay
 is only1.361ms per80BAUsolve and timing roles cross. All12468live kernel calls,
@@ -238,7 +247,9 @@ measured.
   Refresh remaining BTRAN, row/control and software arithmetic after these changes.
   Long-only register eta dots pass exact differential checks, including all MXCSR
   modes, but miss conservative timing-noise separation; do not extend that screen.
-  Current post-Devex-cache attribution still puts extended BTRAN first. Bounded
+  Current compact state replay leaves actual numerical extended BTRAN below0.5%
+  in the complete diagnostic scope above; historical post-Devex profiles do not
+  establish its present priority. Bounded
   stack scratch is verified but has no useful counter gain. Before another
   division fast path, isolate its actual call sites: dense U already inlines
   zero-numerator handling, and global zero counts do not imply removable ABI work.

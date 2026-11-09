@@ -329,6 +329,22 @@ Production source and both qualified CLIs are unchanged.
 
 ### Barrier factor executor
 
+The separate generic assembly program lead is closed without a prototype.
+The earlier compiled assembly experiment covers only the standard branch;
+its all-front test calls that standard implementation even on generic-dispatch
+shapes. New complete entry scopes split the two actual production branches.
+All18 instrumented library results match their disabled plain solves across
+the six small models first, then80BAU3B/GREENBEA (cap1000). The numerical source
+reconstructs literally after removing test-only scopes. Entire generic assembly
+occupies2.20–2.28%/3.88–3.99% of the two large instrumented solves, including
+required arithmetic/output work. All generic calls are narrow fronts; no
+oversized-front dispatch occurs. This does not support a substantial removable
+owner. Ordinary ThinLTO/glibc library scopes include instrumentation effects and
+are not exact accepted-PGO removable bounds. No executor, matching PGO or formal
+timing screen follows. [Generic assembly scope](evidence/generic-assembly-scope.json),
+original/probe/source reconstruction, release-test ELF, all shapes and runs:
+`target/perf-generic-assembly-scope/`.
+
 The solver compiles child-update geometry once and retains its scratch across
 Newton factors. Logical GEMM destinations update the parent directly without
 materializing gathered or zero-product buffers when admitted by the exact
@@ -356,8 +372,8 @@ remain within the sweep spreads. Full parity 987/987 and all 292 runnable
 release tests pass (22 ignored).
 
 Configuration is ordinary ThinLTO/glibc, with no global target-CPU flags or PGO.
-The patched reference library remains unavailable on this host; no new Gurobi
-win count or speed ratio is claimed. Source hashes, all 23 before/after rows,
+This acceptance sweep precedes the reconstructed-reference comparison above;
+it supplies no independent Gurobi win count or speed ratio. Source hashes, all 23 before/after rows,
 controls, source variants and exact qualification are in
 [barrier-factor-executor.json](evidence/barrier-factor-executor.json); raw data
 and proof are in `target/perf-factor-engine/`. Prior isolated schedule/packet
