@@ -141,6 +141,19 @@ baseline. No exceptions, no "within a ULP", no re-recording.
 
 ## The loop
 
+The ordinary phase-one extended accumulator question is settled. Accepted
+machine code executes the dead software pipeline, but whole-kernel live replay
+is only1.361ms per80BAUsolve and timing roles cross. All12468live kernel calls,
+32completeSolveResults and3072generated mode cases match the independent full
+originals. No production integration,matchingPGO,formal screen/full candidate
+gates or const-mode rescue follows. See evidence/phase1-dead-extended.json.
+The whole primal-pivot source audit also rejects producer-to-pricing fusion:
+weight resets, entering/leaving updates, basis and reference-order changes,
+feasibility-dependent tolerance and deliberate penalty timing separate them.
+Point/classification fusion repeats settled tracking; ratio frames are already
+retained once per entry, while next signatures read post-move distances.
+Seek a distinct substantial numerical execution mechanism before another trial.
+
 Repeat until the goal above is met. Running out of candidates does not end the work: re-profile the run
 with the largest ratio and look one level deeper (inclusive time of the callers, `perf annotate` of the
 hot loops, cache and branch misses) before declaring a gap forbidden by the invariant.

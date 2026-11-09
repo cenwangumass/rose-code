@@ -1677,6 +1677,7 @@ no new solver speedup or reference timing ratio.
 
 ## Candidates
 
+
 The complete pre-U forward-column publication/expansion/replacement chain is
 2.72–3.64% on SC50A through DEGEN2 in bounded release-test solves, including
 required filtering and clock overhead. Tiny AFIRO measures 7.25%; its short
@@ -1909,6 +1910,24 @@ The remaining candidates below derive from the Ryzen measurements and their hist
 ## Tried, no gain
 
 ### EPYC structural trials
+
+- Ordinary phase-one dead-extended slope pipeline: accepted optimized machine
+  code executes the software-F80 subtraction at232ec8 on ordinary DEGEN2,
+  confirmed by bounded hash-checked GDB witness (parenttool009da8db) and exact
+  complete result/exit comparison. Seven guarded qa/qb updates and the unused
+  partition argument preserve every hardware FP operation; frozen ratio,
+  partition and both lane sums reconstruct literally. All12468live full-kernel
+  calls,32completeSolveResults and3072generated both-mode/16MXCSR cases agree
+  on result bits, passes, callbacks and FPstatus. Whole original breakpoint
+  kernel is only1.361ms per80BAUsolve in CPU2 isolated ordinary-release replay;
+  role ratios cross, so no controlled gain is established. Broadsolve_primal
+  self16.34%cannot be assigned to this cold kernel. Reject without production
+  integration,matchingPGO,formal screens/full candidate gates or const-mode
+  rescue. Both qualified CLIs and runtime source unchanged. Evidence:
+  [phase1-dead-extended.json](evidence/phase1-dead-extended.json), all source,
+  frozenoracles, releaseELFs, rawcaptures/disassembly and tests in
+  `target/perf-phase1-dispatch/`.
+
 
 - Complete corrector trial executor: AVX256 holds primal/dual recurrences for two
   weights; an odd weight uses AVX128 without padded lanes. Original coordinate,

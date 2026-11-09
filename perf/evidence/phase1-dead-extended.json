@@ -1,0 +1,424 @@
+{
+  "source": "18061fe9",
+  "decision": "Reject ordinary phase1 dead-extended accumulator guard as a substantial optimization. The unused integer pipeline is live in accepted machine code, but entire original breakpoint-ratio kernel is only1.361ms/80BAUsolve in isolated live replay. Roles cross; no controlled runtime benefit. No production integration/matchingPGO/formal screens/full candidate gates or const-specialization rescue.",
+  "mechanism": "Guard seven qa/qb software-F80 slope updates and the unused qb+qa argument to find_theta_q with quad. Quad body and both ordinary hardware slope chains unchanged. No numerical rounding or hardware FP operation is removed.",
+  "dataflow_proof": "On quad=false qa/qb only feed s0.to_f64 in the untaken quad branch and find_theta_q.sq read only in its untaken quad branch; weight_q likewise unused. F80from_f64/Add/Sub/Neg/abs/pack chain integer-only, no global/dump/FP-environment effects on valid internal values. entq length invariant retained. Do not remove double slope hardware arithmetic from quad=true.",
+  "accepted_machine_code_witness": {
+    "binary_sha256": "55af661754b952817fe9438dbeb157413f1063d105c27413a4c502acf541f6fb",
+    "pc": "0x232ec8",
+    "GOT": "0x3bbcc8",
+    "relative_relocation_target": "0x1863e0 F80::Sub::sub",
+    "mode": "Standalone controlled primal DEGEN2; all330ENTrecords havequad=false; no handoff",
+    "gdb_exit": 0,
+    "complete_output_exit_match": true,
+    "rule": "Remove only diagnostics.seconds; canonical sorted JSON preserves signed zero",
+    "tool_commit_parent": "009da8db",
+    "tool": "../reverse-engineer/replay/gdb_rose_phase1_dead.py",
+    "artifacts": [
+      "gdb-command.json",
+      "gdb-degen2.stdout",
+      "gdb-degen2.stderr",
+      "gdb-degen2.json",
+      "accepted-solve-primal.asm"
+    ]
+  },
+  "frozen_complete_kernels": {
+    "phase1_ratio": {
+      "literal_restoration": true,
+      "sha256": "68d7aa1d2c9b4c559364e88091bb06df11a723e986768d7fa289d5e5dd7c936e"
+    },
+    "find_theta_q": {
+      "literal_restoration": true,
+      "sha256": "1677d66635df34b95ba2fb4ba03b6f73b2e046832a7a730c05acab58a8559023"
+    },
+    "lane_sum": {
+      "literal_restoration": true,
+      "sha256": "e94695f6f0aa0417ce9b6d248719472826450aded81c212dabf68e69b458146f"
+    },
+    "lane_sum_q": {
+      "literal_restoration": true,
+      "sha256": "15dbdbce321e03a8ec917d9eb22ef3f8593ac59faedd61a3943646ba5cfa6bb8"
+    }
+  },
+  "candidate_reversal": "Literal phase1_ratio restored by undoing only seven quad guards and dead-argument selection; helpers unchanged in candidate; frozen copies independent.",
+  "qualification": {
+    "configuration": "PinnedRust1.98.1 ordinaryThinLTO/glibc release tests CPU2. Isolated source and target; no precedingPGOtraining/no targetCPUflags. Original and candidate same compilation context. Callback sequence collection/snapshot/oracle restoration outside or symmetric around measured kernels. Timing admission is preliminary, not a formal screen.",
+    "live_kernel_calls": 12468,
+    "complete_solve_results": 32,
+    "live_comparison": "Full Phase1Pick bits, orderedpasses including prefixes, callback position sequence, finalMXCSR compare against complete frozenoriginal each live call. Every complete SolveResult matches plainlibrary execution.",
+    "generated_cases": 3072,
+    "generated_comparison": "Both ordinary/quad,16MXCSRrounding+DAZ+FTZ combinations with prestickyflags, finite typedA/B/L/U/N/X/free frames, mirrors, sparse/dense, zero/near-threshold/large signedalphas, own bound, low F80bits, entqSome/None. Fullpick/passes/callbacks/flags compare. Not a full unmasked-trap/exceptional corpus.",
+    "candidate_full_parity": "Not run: rejected at measured scope before integration. Accepted binaries/source unchanged; existingfull987/tests292remain separatelyqualified."
+  },
+  "cost_rows": {
+    "build-small": [
+      {
+        "candidate_ns": "0",
+        "iterations": 10,
+        "model": "afiro",
+        "ordinary": 0,
+        "original_ns": "0",
+        "quad": 0,
+        "round": 0,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "0",
+        "iterations": 10,
+        "model": "afiro",
+        "ordinary": 0,
+        "original_ns": "0",
+        "quad": 0,
+        "round": 1,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "0",
+        "iterations": 10,
+        "model": "afiro",
+        "ordinary": 0,
+        "original_ns": "0",
+        "quad": 0,
+        "round": 2,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "0",
+        "iterations": 10,
+        "model": "afiro",
+        "ordinary": 0,
+        "original_ns": "0",
+        "quad": 0,
+        "round": 3,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "0",
+        "iterations": 25,
+        "model": "sc50a",
+        "ordinary": 0,
+        "original_ns": "0",
+        "quad": 0,
+        "round": 0,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "0",
+        "iterations": 25,
+        "model": "sc50a",
+        "ordinary": 0,
+        "original_ns": "0",
+        "quad": 0,
+        "round": 1,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "0",
+        "iterations": 25,
+        "model": "sc50a",
+        "ordinary": 0,
+        "original_ns": "0",
+        "quad": 0,
+        "round": 2,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "0",
+        "iterations": 25,
+        "model": "sc50a",
+        "ordinary": 0,
+        "original_ns": "0",
+        "quad": 0,
+        "round": 3,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "0",
+        "iterations": 43,
+        "model": "blend",
+        "ordinary": 0,
+        "original_ns": "0",
+        "quad": 0,
+        "round": 0,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "0",
+        "iterations": 43,
+        "model": "blend",
+        "ordinary": 0,
+        "original_ns": "0",
+        "quad": 0,
+        "round": 1,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "0",
+        "iterations": 43,
+        "model": "blend",
+        "ordinary": 0,
+        "original_ns": "0",
+        "quad": 0,
+        "round": 2,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "0",
+        "iterations": 43,
+        "model": "blend",
+        "ordinary": 0,
+        "original_ns": "0",
+        "quad": 0,
+        "round": 3,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "9468",
+        "iterations": 63,
+        "model": "adlittle",
+        "ordinary": 8,
+        "original_ns": "12312",
+        "quad": 0,
+        "round": 0,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "9888",
+        "iterations": 63,
+        "model": "adlittle",
+        "ordinary": 8,
+        "original_ns": "10118",
+        "quad": 0,
+        "round": 1,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "10139",
+        "iterations": 63,
+        "model": "adlittle",
+        "ordinary": 8,
+        "original_ns": "11630",
+        "quad": 0,
+        "round": 2,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "10589",
+        "iterations": 63,
+        "model": "adlittle",
+        "ordinary": 8,
+        "original_ns": "10288",
+        "quad": 0,
+        "round": 3,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "97251",
+        "iterations": 62,
+        "model": "bore3d",
+        "ordinary": 37,
+        "original_ns": "112035",
+        "quad": 0,
+        "round": 0,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "102874",
+        "iterations": 62,
+        "model": "bore3d",
+        "ordinary": 37,
+        "original_ns": "104457",
+        "quad": 0,
+        "round": 1,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "93947",
+        "iterations": 62,
+        "model": "bore3d",
+        "ordinary": 37,
+        "original_ns": "102691",
+        "quad": 0,
+        "round": 2,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "106278",
+        "iterations": 62,
+        "model": "bore3d",
+        "ordinary": 37,
+        "original_ns": "108490",
+        "quad": 0,
+        "round": 3,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "1677037",
+        "iterations": 531,
+        "model": "degen2",
+        "ordinary": 330,
+        "original_ns": "1783777",
+        "quad": 0,
+        "round": 0,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "1935515",
+        "iterations": 531,
+        "model": "degen2",
+        "ordinary": 330,
+        "original_ns": "2088159",
+        "quad": 0,
+        "round": 1,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "1781286",
+        "iterations": 531,
+        "model": "degen2",
+        "ordinary": 330,
+        "original_ns": "2060150",
+        "quad": 0,
+        "round": 2,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "1686516",
+        "iterations": 531,
+        "model": "degen2",
+        "ordinary": 330,
+        "original_ns": "1715020",
+        "quad": 0,
+        "round": 3,
+        "status": "Optimal"
+      }
+    ],
+    "80bau": [
+      {
+        "candidate_ns": "1097395",
+        "iterations": 5022,
+        "model": "80bau3b",
+        "ordinary": 1371,
+        "original_ns": "1466856",
+        "quad": 0,
+        "round": 0,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "1518653",
+        "iterations": 5022,
+        "model": "80bau3b",
+        "ordinary": 1371,
+        "original_ns": "1414221",
+        "quad": 0,
+        "round": 1,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "1107060",
+        "iterations": 5022,
+        "model": "80bau3b",
+        "ordinary": 1371,
+        "original_ns": "1405306",
+        "quad": 0,
+        "round": 2,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "1343305",
+        "iterations": 5022,
+        "model": "80bau3b",
+        "ordinary": 1371,
+        "original_ns": "1165630",
+        "quad": 0,
+        "round": 3,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "999441",
+        "iterations": 5022,
+        "model": "80bau3b",
+        "ordinary": 1371,
+        "original_ns": "1414064",
+        "quad": 0,
+        "round": 4,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "1311790",
+        "iterations": 5022,
+        "model": "80bau3b",
+        "ordinary": 1371,
+        "original_ns": "1194276",
+        "quad": 0,
+        "round": 5,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "1024792",
+        "iterations": 5022,
+        "model": "80bau3b",
+        "ordinary": 1371,
+        "original_ns": "1316472",
+        "quad": 0,
+        "round": 6,
+        "status": "Optimal"
+      },
+      {
+        "candidate_ns": "1295264",
+        "iterations": 5022,
+        "model": "80bau3b",
+        "ordinary": 1371,
+        "original_ns": "1202351",
+        "quad": 0,
+        "round": 7,
+        "status": "Optimal"
+      }
+    ]
+  },
+  "target_original_kernel_median_ns": 1360889.0,
+  "target_candidate_kernel_median_ns": 1201162.0,
+  "target_ratio_by_role": {
+    "0": [
+      0.7481272872047426,
+      0.7877714889141582,
+      0.7067862557847453,
+      0.7784381285739461
+    ],
+    "1": [
+      1.0738441870117896,
+      1.1524283005756544,
+      1.0983976903161414,
+      1.0772761032344131
+    ]
+  },
+  "scope_limit": "Actual whole-kernel cost is tiny on80BAUdespite broadsolve_primalself16.34%. Do not transfer the broad function share to this narrow breakpoint kernel or multiply cross-build kernel savings by it. Recordedkernel times include timers/callbacktrace overhead and codegen differences, not exact acceptedCLI fractions. Fullsolver comparisons from fixed23 remain configuration-specific.",
+  "failed_setup": [
+    "Initialprepareassert expected8source updates; corrected to actual7before anybuild.",
+    "Standalone modes build initially omitted serde_json for inheritedF80unit tests; linked existing release dependency and passed, numerical bodies unchanged."
+  ],
+  "artifacts": {
+    "target/perf-phase1-dispatch/prepare.py": "eb2a255bdc12e4d2e14ebdd9870cf5a11bb6a2e8866a941e597a2d813e4c49fe",
+    "target/perf-phase1-dispatch/original-simplex.rs": "4ff9697cd5627beccce151d2eb03a84852a149dcb39a7249606a6e363c155ac6",
+    "target/perf-phase1-dispatch/frozen.rs": "6860ce7de33d9b38f10c2fb0d1ccb67f2786d9aa87a27572bc855ecd6a164c1e",
+    "target/perf-phase1-dispatch/candidate-ratio.rs": "4453bdcc3e7187295fd24dbcddff6189f6b0fa5c5e93179f677e55527822674b",
+    "target/perf-phase1-dispatch/probe-module.rs": "29dc6751fdd6459721daf0fd0415416bd4bae741b967f6a788ed3ecf1ad5e0be",
+    "target/perf-phase1-dispatch/generated-test.rs": "685c6ad718c6e99478adc41948880d0528fd9d2df88715d84cc75296f8742108",
+    "target/perf-phase1-dispatch/source/src/simplex.rs": "a890ef8f0a7e72e22cf2ce5a7b2870d1b60124a749e31cd4a707cfd02da384ae",
+    "target/perf-phase1-dispatch/source/src/phase1_dead_probe.rs": "a9385f4cd4478397698515bdfd30eb0d9591929ba9b2eedaf4d193d4a3a10c2d",
+    "target/perf-phase1-dispatch/build-small.log": "b8713c3bb6b6048c1afaaae8d04987212223372c813df3a6b03ba1c9518f15ac",
+    "target/perf-phase1-dispatch/80bau.log": "a62bc70aa5e53b23982e3b94922b9dd120a1069029244e66b470e350515df4a5",
+    "target/perf-phase1-dispatch/modes.rs": "fd4a05bcd9639f87490a4d5cd1d4a25d4c6a603da693896615f74b4099cbf49c",
+    "target/perf-phase1-dispatch/modes-build.log": "676c3237afb55e1759132257adcbeeb184d8709b5b172b6af651f17f675c378c",
+    "target/perf-phase1-dispatch/modes-build-fixed.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/perf-phase1-dispatch/modes-build-command.json": "b5940150f264694240ca583a07fdffc1f4ac5d02b845bdda21f5d745911898d6",
+    "target/perf-phase1-dispatch/modes.log": "93c1c3445b07568aa11aa06221aa12afe1e4fb902f06482c33a0de3257ff2b86",
+    "target/perf-phase1-dispatch/modes-tests": "08453aac6742f6da008aecc9328d20967120be6ca82aa4210b98716ea6ce1927",
+    "target/perf-phase1-dispatch/live-oracle-tests": "1dcae13a331a50ae6f0f5e49fe6cb71298662bec5feaef4c757df7ed9050f9ec",
+    "target/perf-phase1-dispatch/source-hashes.json": "fc6b64b7e22520f6bd82622b82b05ae395cfc25d0c419867caec411465fc7c1c",
+    "target/perf-phase1-dispatch/gdb-command.json": "fb4e6d54f8a1dffcde12a15c962a9b139da160e48f4497a83f00b8d2200e513c",
+    "target/perf-phase1-dispatch/gdb-degen2.stdout": "19e8c074b78ffe4c4d4068de52aa77bc234f77182f01ff0e070e39951dad6a65",
+    "target/perf-phase1-dispatch/accepted-solve-primal.asm": "498dcc6d3771403a75c8df369cb5510a6150699290764532c32f3a553f9b1e7e"
+  },
+  "next": "Keep complete ratio/pass/classification order; no pivot/classification/pricing fusion follows the separate dependency audit. Seek a distinct substantial numerical execution phase, not another owner/schedule or const-specialization for this cold boundary."
+}
