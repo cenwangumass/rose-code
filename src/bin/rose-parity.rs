@@ -289,6 +289,10 @@ fn first_diff(a: &Value, b: &Value, path: String) -> Option<(String, String, Str
                 })
             })
         }
+        (Value::Number(x), Value::Number(y)) if x.is_f64() || y.is_f64() => {
+            (x.as_f64().map(f64::to_bits) != y.as_f64().map(f64::to_bits))
+                .then(|| (path, short(Some(a)), short(Some(b))))
+        }
         _ => (a != b).then(|| (path, short(Some(a)), short(Some(b)))),
     }
 }
@@ -588,5 +592,22 @@ fn main() {
             std::process::exit(1);
         }
         _ => usage(),
+    }
+}
+
+#[cfg(test)]
+mod strict_diff_tests {
+    use super::*;
+
+    #[test]
+    fn reports_signed_zero_field_and_preserves_integer_identity() {
+        let a: Value = serde_json::from_str(r#"{"tau":[[32,0.0]]}"#).unwrap();
+        let b: Value = serde_json::from_str(r#"{"tau":[[32,-0.0]]}"#).unwrap();
+        let diff = first_diff(&a, &b, String::new()).unwrap();
+        assert_eq!(diff.0, ".tau[0][1]");
+        assert!(first_diff(&a, &a, String::new()).is_none());
+        let a = json!(9007199254740992u64);
+        let b = json!(9007199254740993u64);
+        assert!(first_diff(&a, &b, String::new()).is_some());
     }
 }
