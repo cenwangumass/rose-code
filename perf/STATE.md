@@ -2,6 +2,38 @@
 
 Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (history is `jj log`).
 
+## Replacement candidate
+
+The retained needed-U numeric-row component and ordinary dense-tail slot fix are
+implemented; the full backend replacement remains incomplete and unaccepted.
+Strict state checks pass738 calls in ten complete small-model/profile runs;
+raw output/RHS kernels pass924 pivots on AFIRO, SC50A, BLEND, BORE3D and DEGEN2
+(release), including signed zeros. Numeric factor projections and update
+structure agree within the comparator's documented coordinate/order mappings.
+ADLITTLE raw rho row50 remains native+1/Rose-1 at pivot48 (G-row coordinates).
+Native physical layout/visitation, shared pool lifetimes, constructor/auxiliary
+duplication and cached update elimination remain unresolved.
+
+The matching current-host fixed23-row reference benchmark completed with0/23
+Rose wins. Dual ratios range1.161–7.533; DEGEN2 is65.925/17.934ms
+(3.676x). These three-sample medians establish a large remaining gap, not a
+candidate-versus-baseline speedup. The full measurement includes all methods;
+parameters, binaries, raw outputs and exits are saved in
+`target/factor-rows/reference-full`. The corpus frozen baseline is unchanged:
+932/940 fast cases are identical; the other8 have exactly29 +0-to--0 tau changes
+in18 of44019 paired records, all other44001 records identical and final results
+bit-identical except elapsed time. Full release tests pass295 with22 ignored, including all131 library tests.
+The full frozen gate has970 unchanged and17 changed runs out of987; all changed
+streams are DTAU and their first differences are tau +0-to--0. Only the8 fast
+cases were exhaustively classified. The additional9 full-tier changes have not
+all been independently checked against native captures; baseline unchanged.
+The numerical traversal fix is committed at0c00d2ce; the retained-row component
+remains an uncommitted candidate without a qualified performance gain. Evidence:
+[evidence/dual-factor-candidate.json](evidence/dual-factor-candidate.json).
+
+The accepted baseline and its prior forensic measurements below remain separate
+from this unaccepted candidate.
+
 ## Current host: AMD EPYC virtual CPU, family 23
 
 Source `zxtxvvvn` (`18061fe9`), pinned Rust 1.98.1, ordinary ThinLTO release,

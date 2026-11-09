@@ -1,0 +1,380 @@
+{
+  "candidate": "post-zero traversal fix",
+  "strict_state": {
+    "profiles": [
+      "dual-controlled",
+      "dual-release"
+    ],
+    "models": [
+      "afiro",
+      "sc50a",
+      "blend",
+      "adlittle",
+      "bore3d"
+    ],
+    "complete_runs": 10,
+    "calls": 738,
+    "controlled_calls": [
+      13,
+      35,
+      78,
+      87,
+      149
+    ],
+    "release_calls": [
+      13,
+      36,
+      78,
+      75,
+      174
+    ],
+    "strict_signed_zero": true,
+    "evidence": "post-zero-strict-small-traces.json"
+  },
+  "structure": {
+    "complete_runs": 10,
+    "updates": 670,
+    "evidence": "post-zero-small-factors.json"
+  },
+  "fresh_factor_projection": {
+    "paired_factors": 58,
+    "checked": [
+      "diag",
+      "ordered L",
+      "U"
+    ],
+    "limitations": "L/diagonal signs normalized and U sorted by existing comparator; not raw physical-layout parity"
+  },
+  "strict_raw": {
+    "profile": "dual-release",
+    "models": {
+      "afiro": 10,
+      "sc50a": 33,
+      "blend": 75,
+      "bore3d": 172,
+      "degen2": 634
+    },
+    "pivots": 924,
+    "full_output_entries": 47561,
+    "needed_output_entries": 47561,
+    "rho_input_entries": 57732,
+    "signed_zero": true,
+    "limits": "Existing proven wrapper publication maps applied; numerical coefficient visitation and physical native publication order are separate obligations."
+  },
+  "remaining_frontier": {
+    "model": "adlittle",
+    "pivot": 48,
+    "field": "needed_input_rho[50]",
+    "native": 1.0,
+    "rose": -1.0,
+    "cause": "Original model row50 is G; native negated-row representation differs from Rose original-row rho. No comparison beyond first difference; explicit adapter/raw representation obligation remains."
+  },
+  "origin_evidence": "sc50a-zero-origin-evidence.json",
+  "status": "partial_backend_candidate_not_accepted",
+  "source_sha256": {
+    "src/factor_rows.rs": "1621a5019e3a1fa8952ba925cc9062b01e94a0bf4fd3ee9ebddb7e0f78fe5388",
+    "src/ftran_order.rs": "8a643acfdc57907505d2d748d8de55b6543b61a9c334ef9741789002a13cf7ac",
+    "src/lib.rs": "5f6fe0aafa6527d1506f2baa1d54a1a5f3608cc07b675001c461097c3262af33"
+  },
+  "cli_sha256": "8ce86f69d968056cca7abcaf55e8c985a51d8014f994db0e2db0e1bf289f04b2",
+  "reference_library_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+  "validation": {
+    "release_library_tests": 131,
+    "fast_frozen_unchanged": 932,
+    "fast_frozen_changed": 8,
+    "baseline_rerecorded": false,
+    "full_release_integration_tests": {
+      "passed": 295,
+      "failed": 0,
+      "ignored": 22,
+      "evidence": "target/factor-rows/release-tests-full.log"
+    },
+    "full_frozen_gate": {
+      "identical_runs": 970,
+      "changed_runs": 17,
+      "total": 987,
+      "changed_tags": [
+        "DTAU"
+      ],
+      "first_differences": "tau +0 to -0 in every changed run",
+      "scope": "Only8 fast cases exhaustively classified; additional9 full-tier changes not exhaustively compared with native captures. Baseline unchanged.",
+      "evidence": "target/factor-rows/full-parity-post-zero.log"
+    },
+    "changed_frozen_records": {
+      "DTAU_records": 18,
+      "numeric_leaves": 29,
+      "only_change": "tau +0 to -0",
+      "paired_records": 44019,
+      "other_records": "byte-identical",
+      "final_results": "bit-identical excluding diagnostics.seconds only",
+      "evidence": "target/factor-rows/frozen-classification/classification.json",
+      "unchanged_records": 44001
+    },
+    "classification_sha256": "013f0cca61203b4fc0581fc2d360aa6005d2200c24eb9c94eefa5c33bac4dd3c"
+  },
+  "reference_small_benchmark": [
+    {
+      "id": "degen2.dual-r",
+      "rose_seconds": 0.06756368,
+      "reference_seconds": 0.0188901424407959,
+      "ratio": 3.576663342362459,
+      "rose_faster": false,
+      "rose_status": "optimal",
+      "reference_status": 2,
+      "samples": {
+        "rose": [
+          {
+            "seconds": 0.069222943,
+            "status": "optimal",
+            "exit_code": 0,
+            "result_sha256": "1fa54a79696c7852580cae6518858bafdf46203374a8700a569e933cde7bdbd6"
+          },
+          {
+            "seconds": 0.060926298,
+            "status": "optimal",
+            "exit_code": 0,
+            "result_sha256": "1fa54a79696c7852580cae6518858bafdf46203374a8700a569e933cde7bdbd6"
+          },
+          {
+            "seconds": 0.06756368,
+            "status": "optimal",
+            "exit_code": 0,
+            "result_sha256": "1fa54a79696c7852580cae6518858bafdf46203374a8700a569e933cde7bdbd6"
+          }
+        ],
+        "reference": [
+          {
+            "seconds": 0.019212961196899414,
+            "status": 2,
+            "exit_code": 0,
+            "result_sha256": "a6194ea21b2341dbf773000717e15551911d6920bf50cda1b1ae3edd931a1e7b"
+          },
+          {
+            "seconds": 0.01778888702392578,
+            "status": 2,
+            "exit_code": 0,
+            "result_sha256": "a6194ea21b2341dbf773000717e15551911d6920bf50cda1b1ae3edd931a1e7b"
+          },
+          {
+            "seconds": 0.0188901424407959,
+            "status": 2,
+            "exit_code": 0,
+            "result_sha256": "a6194ea21b2341dbf773000717e15551911d6920bf50cda1b1ae3edd931a1e7b"
+          }
+        ]
+      }
+    }
+  ],
+  "remaining_backend_work": [
+    "native constructor installation without mirror/auxiliary duplication",
+    "numeric U update and cached BTRAN consumption",
+    "shared numeric pool growth/compaction and view repair",
+    "extended/dense ownership and ultimate teardown",
+    "strict reset82 SUM projection",
+    "complete corpus raw operand/visitation/representation agreement",
+    "performance comparable to Gurobi"
+  ],
+  "reference_full_benchmark": {
+    "rows": 23,
+    "rose_faster": 0,
+    "warmups": 1,
+    "samples_per_solver": 3,
+    "cpu": 2,
+    "evidence": "target/factor-rows/reference-full",
+    "summary": [
+      {
+        "id": "degen2.primal-c",
+        "rose_seconds": 0.081315384,
+        "reference_seconds": 0.023830175399780273,
+        "ratio": 3.412286424075157,
+        "rose_status": "optimal",
+        "reference_status": 2
+      },
+      {
+        "id": "degen2.dual-r",
+        "rose_seconds": 0.065925007,
+        "reference_seconds": 0.01793384552001953,
+        "ratio": 3.67601064291582,
+        "rose_status": "optimal",
+        "reference_status": 2
+      },
+      {
+        "id": "degen3.primal-c",
+        "rose_seconds": 1.228279173,
+        "reference_seconds": 0.34880709648132324,
+        "ratio": 3.521370939383304,
+        "rose_status": "optimal",
+        "reference_status": 2
+      },
+      {
+        "id": "degen3.primal-r",
+        "rose_seconds": 1.211868745,
+        "reference_seconds": 0.41909193992614746,
+        "ratio": 2.8916536672443667,
+        "rose_status": "optimal",
+        "reference_status": 2
+      },
+      {
+        "id": "perold.primal-c",
+        "rose_seconds": 1.182659206,
+        "reference_seconds": 0.33896493911743164,
+        "ratio": 3.489031075247217,
+        "rose_status": "optimal",
+        "reference_status": 2
+      },
+      {
+        "id": "pilot4.primal-r",
+        "rose_seconds": 0.11564165,
+        "reference_seconds": 0.03119492530822754,
+        "ratio": 3.7070660967250326,
+        "rose_status": "optimal",
+        "reference_status": 2
+      },
+      {
+        "id": "80bau3b.primal-c",
+        "rose_seconds": 1.2719589550000001,
+        "reference_seconds": 0.21239185333251953,
+        "ratio": 5.988737020946976,
+        "rose_status": "optimal",
+        "reference_status": 2
+      },
+      {
+        "id": "primal_5959.primal-r",
+        "rose_seconds": 0.10829278,
+        "reference_seconds": 0.08817195892333984,
+        "ratio": 1.2281997737416042,
+        "rose_status": "numerical_failure",
+        "reference_status": 12
+      },
+      {
+        "id": "degen3.dual-c",
+        "rose_seconds": 0.581442553,
+        "reference_seconds": 0.18914794921875,
+        "ratio": 3.0740092895617943,
+        "rose_status": "optimal",
+        "reference_status": 2
+      },
+      {
+        "id": "degen3.dual-r",
+        "rose_seconds": 0.509803877,
+        "reference_seconds": 0.1671140193939209,
+        "ratio": 3.050635002670189,
+        "rose_status": "optimal",
+        "reference_status": 2
+      },
+      {
+        "id": "perold.dual-r",
+        "rose_seconds": 0.305393081,
+        "reference_seconds": 0.07449197769165039,
+        "ratio": 4.0996774480083475,
+        "rose_status": "optimal",
+        "reference_status": 2
+      },
+      {
+        "id": "80bau3b.dual-r",
+        "rose_seconds": 0.653855995,
+        "reference_seconds": 0.15395593643188477,
+        "ratio": 4.247033340538237,
+        "rose_status": "optimal",
+        "reference_status": 2
+      },
+      {
+        "id": "greenbea.dual-c",
+        "rose_seconds": 1.531467264,
+        "reference_seconds": 0.39786219596862793,
+        "ratio": 3.8492404644565896,
+        "rose_status": "optimal",
+        "reference_status": 2
+      },
+      {
+        "id": "greenbea.dual-r",
+        "rose_seconds": 1.709303916,
+        "reference_seconds": 0.47373199462890625,
+        "ratio": 3.6081665063364956,
+        "rose_status": "optimal",
+        "reference_status": 2
+      },
+      {
+        "id": "mode_switch.dual-r",
+        "rose_seconds": 1.632355733,
+        "reference_seconds": 0.21670198440551758,
+        "ratio": 7.532721666015522,
+        "rose_status": "optimal",
+        "reference_status": 2
+      },
+      {
+        "id": "primal_5959.dual-r",
+        "rose_seconds": 0.148042484,
+        "reference_seconds": 0.11294007301330566,
+        "ratio": 1.3108056339095766,
+        "rose_status": "numerical_failure",
+        "reference_status": 12
+      },
+      {
+        "id": "quad_2717.dual-r",
+        "rose_seconds": 0.151708578,
+        "reference_seconds": 0.1096029281616211,
+        "ratio": 1.384165373540839,
+        "rose_status": "optimal",
+        "reference_status": 2
+      },
+      {
+        "id": "fx_quad_obj_5371.dual-r",
+        "rose_seconds": 0.050939513,
+        "reference_seconds": 0.04389190673828125,
+        "ratio": 1.16056732972988,
+        "rose_status": "infeasible",
+        "reference_status": 3
+      },
+      {
+        "id": "degen3.barrier-r",
+        "rose_seconds": 0.297626164,
+        "reference_seconds": 0.15300703048706055,
+        "ratio": 1.9451796630035871,
+        "rose_status": "optimal",
+        "reference_status": 2
+      },
+      {
+        "id": "80bau3b.barrier-r",
+        "rose_seconds": 0.436351842,
+        "reference_seconds": 0.19539999961853027,
+        "ratio": 2.233120997194821,
+        "rose_status": "optimal",
+        "reference_status": 2
+      },
+      {
+        "id": "greenbea.barrier-r",
+        "rose_seconds": 1.65323909,
+        "reference_seconds": 0.7192959785461426,
+        "ratio": 2.2984128082316886,
+        "rose_status": "suboptimal",
+        "reference_status": 13
+      },
+      {
+        "id": "80bau3b.pdhg",
+        "rose_seconds": 4.317113388,
+        "reference_seconds": 3.7769181728363037,
+        "ratio": 1.1430253954265663,
+        "rose_status": "optimal",
+        "reference_status": 2
+      },
+      {
+        "id": "greenbea.pdhg",
+        "rose_seconds": 2.381004855,
+        "reference_seconds": 1.7628190517425537,
+        "ratio": 1.3506802372293214,
+        "rose_status": "iteration_limit",
+        "reference_status": 7
+      }
+    ]
+  },
+  "committed_numerical_fix": "0c00d2ce",
+  "row_component": "integrated working-copy candidate; uncommitted, no qualified performance gain",
+  "evidence_sha256": {
+    "comparison-summary.json": "bc8c36985a5e84b5f289200355f82f4a3baf21df52dc010f264b133d90897205",
+    "release-tests-full.log": "f27dd39c5a5243bf2502f35eebcf76bad42bbb05945bf5a7d10b8bdb0c947439",
+    "full-parity-post-zero.log": "40b7b71c4a35abdd0d759439e1034be8a71243bf67eb9582962a243f0b2272e7",
+    "reference-full/summary.json": "4a2bc44b08f35eb2efdb53854e0561a30cdf6a7d65c3ac08ead11bbf0b3487a8",
+    "reference-full/manifest.json": "3510dbc5720973493f7c051c62a576a8d5490c8cf3eab5b97e2f98b206d00277"
+  }
+}

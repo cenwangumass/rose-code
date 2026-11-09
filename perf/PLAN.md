@@ -141,29 +141,22 @@ baseline. No exceptions, no "within a ULP", no re-recording.
 
 ## The loop
 
-The active task is architecture recovery, not another optimization screen.
-The executed SC50A interval and remaining coverage are in
+The active user request is to implement and validate a replacement dual factor
+backend. Architecture recovery remains its evidence base. The installed SC50A
+interval and unresolved ownership paths are specified in
 [dual-factor-backend.md](../../reverse-engineer/specs/dual-factor-backend.md).
-Initial construction through next actual refactor return is now captured and
-centrally checked, including retained shared pools, installed headers, numeric
-row capacities, copied BTRAN cache payload and common-return invalidation.
-Do not repeat this interval or resume the earlier isolated pre-reset82 true-d
-proposal from its historical schedule. Remaining recovery targets are precise:
-pool exhaustion/compaction and view repair, internal L/eta operand visits,
-extended/dense ownership and ultimate caller teardown. Identify the smallest
-witness for a missing mechanism before capturing more; use refcap.py, delegated
-comparison and compare.py alignment, stopping each raw numeric projection at
-its first difference. No backend implementation, solver restart or tuning screen
-belongs to this recovery task. Matched inclusive whole-lifetime costs are still
-missing, so representation savings are not qualified.
+Reuse the cached interval. Retained numeric needed-U rows are the first candidate
+component; qualify their complete update/solve lifetime before acceptance.
+Construction duplication, auxiliary arithmetic, shared pools, cached BTRAN update
+reuse and strict internal numeric frontiers remain separate obligations. The
+previous recovery-only scope has been superseded by this implementation request.
 
-The bounded DEGEN2 triangular diagnosis stops at the first strict internal
-bit difference: needed pivot163/pricingk164/basis22 is native−0 versus Rose+0.
-Central dual-kernels publication mappings prove the162-pivot prefix; the prior
-637state trace treated signedzeros equal. Preserve this boundary and do not
-normalize or fix it during performance work. Zero provenance is explained:
-native divides a dense +0 slot by -1, while Rose skips that sparse slot. The
-observed DSE consumer erases the sign, but this does not extend strict pairing.
+The candidate ordinary dense-tail fix clears the old SC50A6/DEGEN2 163
+signed-zero frontier: strict raw output/RHS comparisons now pass the complete
+634-pivot cached DEGEN2 solve. Trace --ulps0 also distinguishes signed zeros.
+The former162-pivot forensic measurements below remain bounded observations of
+the accepted baseline, not whole-candidate state or performance proofs. Reset82
+SUM and raw G-row coordinate representation remain separate open obligations.
 The joint-pivot135 transaction census is complete: native full/needed L executes
 46/132 ordered terms once, while accepted Rose executes each sequence twice
 before density fallback. All444 intermediate raw slots and ordered operands
