@@ -10,6 +10,8 @@ pub(super) struct Csr<R> {
     pub start: Vec<u32>,
     pub idx: Vec<u32>,
     pub val: Vec<R>,
+    /// One more than the largest entry index (0 when empty); `check_vector` relies on it.
+    idx_bound: u32,
 }
 
 /// Forward L columns: line `v` lists the destinations `y` and multipliers of step `v`.
@@ -19,12 +21,14 @@ impl<R: Copy> Csr<R> {
     pub fn with_capacity(lines: usize, entries: usize) -> Self {
         let mut start = Vec::with_capacity(lines + 1);
         start.push(0);
-        Csr { start, idx: Vec::with_capacity(entries), val: Vec::with_capacity(entries) }
+        Csr { start, idx: Vec::with_capacity(entries), val: Vec::with_capacity(entries), idx_bound: 0 }
     }
 
     /// Append the next line.
     pub fn push_line(&mut self, entries: impl Iterator<Item = (usize, R)>) {
         for (y, a) in entries {
+            assert!(y < u32::MAX as usize);
+            self.idx_bound = self.idx_bound.max(y as u32 + 1);
             self.idx.push(y as u32);
             self.val.push(a);
         }
@@ -93,66 +97,169 @@ impl<R: Copy> Csr<R> {
                 val[p] = self.val[k];
             }
         }
-        Csr { start, idx, val }
+        let idx_bound = if idx.is_empty() { 0 } else { self.lines() as u32 };
+        Csr { start, idx, val, idx_bound }
+    }
+}
+
+/// `x[y] -= a * xv` for the entries `(idx[k], val[k])` in order, four per iteration (the updates stay sequential, so repeated
+/// destinations and the rounding are those of the plain loop).
+///
+/// # Safety
+/// Every `idx[k] as usize` is `< x.len()`.
+#[inline(always)]
+unsafe fn sub_column<R: Real>(x: &mut [R], idx: &[u32], val: &[R], xv: R) {
+    let n = idx.len().min(val.len());
+    let (idx, val) = (&idx[..n], &val[..n]);
+    let (di, ri) = (idx.chunks_exact(4), idx.chunks_exact(4).remainder());
+    let (dv, rv) = (val.chunks_exact(4), val.chunks_exact(4).remainder());
+    for (y, a) in di.zip(dv) {
+        // SAFETY: the caller guarantees every destination is in range.
+        unsafe {
+            *x.get_unchecked_mut(y[0] as usize) -= a[0] * xv;
+            *x.get_unchecked_mut(y[1] as usize) -= a[1] * xv;
+            *x.get_unchecked_mut(y[2] as usize) -= a[2] * xv;
+            *x.get_unchecked_mut(y[3] as usize) -= a[3] * xv;
+        }
+    }
+    for (&y, &a) in ri.iter().zip(rv) {
+        // SAFETY: as above.
+        unsafe { *x.get_unchecked_mut(y as usize) -= a * xv };
+    }
+}
+
+impl<R: Copy> Csr<R> {
+    /// Per-call O(1) check that `x` can be indexed by every line and every entry index of the pool; `start` is monotone and ends at
+    /// `idx.len() == val.len()` by construction (`push_line` / `transpose` are the only writers).
+    #[inline(always)]
+    fn check_vector(&self, n: usize) {
+        assert!(n >= self.lines() && n >= self.idx_bound as usize);
+        debug_assert!(self.start.windows(2).all(|w| w[0] <= w[1]));
+        debug_assert!(self.start.last().map(|&e| e as usize) == Some(self.idx.len()) && self.idx.len() == self.val.len());
+        debug_assert!(self.idx.iter().all(|&y| y < self.idx_bound));
     }
 }
 
 /// Dense forward L sweep over all steps, in ascending order, for a pool whose destinations all exceed their source (`y > v`):
 /// `x[v]` is final when visited, so the `count_l` filter (`abs > TOL`) runs in the same pass. Steps with `!(abs <= TOL)` (NaN
 /// included) are processed. Returns `(count, sum of the processed column lengths)`.
-#[inline]
+#[inline(never)]
 pub(super) fn fused_forward<R: Real>(l: &LPool<R>, x: &mut [R]) -> (usize, usize) {
+    l.check_vector(x.len());
+    let (idx, val) = (&l.idx[..], &l.val[..]);
+    let tol = R::c(TOL);
     let (mut count, mut len_sum) = (0usize, 0usize);
-    for v in 0..l.lines() {
-        let xv = x[v];
+    for (v, w) in l.start.windows(2).enumerate() {
+        // SAFETY: `v < lines <= x.len()` (checked above).
+        let xv = unsafe { *x.get_unchecked(v) };
         let a = xv.abs();
-        count += usize::from(a > R::c(TOL));
-        if a <= R::c(TOL) {
+        count += usize::from(a > tol);
+        if a <= tol {
             continue;
         }
-        let (dest, mult) = l.col(v);
-        len_sum += dest.len();
-        for (&y, &a) in dest.iter().zip(mult) {
-            x[y as usize] -= a * xv;
-        }
+        let (s, e) = (w[0] as usize, w[1] as usize);
+        len_sum += e - s;
+        // SAFETY: `s <= e <= idx.len() == val.len()` (monotone `start` ending at the entry count); destinations `< idx_bound <= x.len()`.
+        unsafe { sub_column(x, idx.get_unchecked(s..e), val.get_unchecked(s..e), xv) };
     }
     (count, len_sum)
 }
 
 /// Dense forward L sweep without a count (`!(abs <= TOL)` steps); returns the sum of the processed column lengths.
-#[inline]
+#[inline(never)]
 pub(super) fn forward_sweep<R: Real>(l: &LPool<R>, x: &mut [R]) -> usize {
+    l.check_vector(x.len());
+    let (idx, val) = (&l.idx[..], &l.val[..]);
+    let tol = R::c(TOL);
     let mut len_sum = 0usize;
-    for v in 0..l.lines() {
-        let xv = x[v];
-        if xv.abs() <= R::c(TOL) {
+    for (v, w) in l.start.windows(2).enumerate() {
+        // SAFETY: `v < lines <= x.len()` (checked above).
+        let xv = unsafe { *x.get_unchecked(v) };
+        if xv.abs() <= tol {
             continue;
         }
-        let (dest, mult) = l.col(v);
-        len_sum += dest.len();
-        for (&y, &a) in dest.iter().zip(mult) {
-            x[y as usize] -= a * xv;
-        }
+        let (s, e) = (w[0] as usize, w[1] as usize);
+        len_sum += e - s;
+        // SAFETY: as in `fused_forward`.
+        unsafe { sub_column(x, idx.get_unchecked(s..e), val.get_unchecked(s..e), xv) };
     }
     len_sum
 }
 
 /// Dense L^T sweep over all rows, descending, processing `abs > TOL` only (NaN is skipped); returns the sum of the processed
 /// row lengths.
-#[inline]
+#[inline(never)]
 pub(super) fn reverse_sweep<R: Real>(lt: &Csr<R>, x: &mut [R]) -> usize {
+    lt.check_vector(x.len());
+    let (idx, val) = (&lt.idx[..], &lt.val[..]);
+    let tol = R::c(TOL);
     let mut len_sum = 0usize;
-    for i in (0..lt.lines()).rev() {
-        let v = x[i];
-        if v.abs() > R::c(TOL) {
-            let (src, mult) = lt.col(i);
-            len_sum += src.len();
-            for (&j, &lv) in src.iter().zip(mult) {
-                x[j as usize] -= lv * v;
-            }
+    for (i, w) in lt.start.windows(2).enumerate().rev() {
+        // SAFETY: `i < lines <= x.len()` (checked above).
+        let v = unsafe { *x.get_unchecked(i) };
+        if v.abs() > tol {
+            let (s, e) = (w[0] as usize, w[1] as usize);
+            len_sum += e - s;
+            // SAFETY: as in `fused_forward`.
+            unsafe { sub_column(x, idx.get_unchecked(s..e), val.get_unchecked(s..e), v) };
         }
     }
     len_sum
+}
+
+/// The plain checked kernels, kept as references for the differential tests.
+#[cfg(test)]
+mod plain {
+    use super::*;
+
+    pub fn fused_forward<R: Real>(l: &LPool<R>, x: &mut [R]) -> (usize, usize) {
+        let (mut count, mut len_sum) = (0usize, 0usize);
+        for v in 0..l.lines() {
+            let xv = x[v];
+            let a = xv.abs();
+            count += usize::from(a > R::c(TOL));
+            if a <= R::c(TOL) {
+                continue;
+            }
+            let (dest, mult) = l.col(v);
+            len_sum += dest.len();
+            for (&y, &a) in dest.iter().zip(mult) {
+                x[y as usize] -= a * xv;
+            }
+        }
+        (count, len_sum)
+    }
+
+    pub fn forward_sweep<R: Real>(l: &LPool<R>, x: &mut [R]) -> usize {
+        let mut len_sum = 0usize;
+        for v in 0..l.lines() {
+            let xv = x[v];
+            if xv.abs() <= R::c(TOL) {
+                continue;
+            }
+            let (dest, mult) = l.col(v);
+            len_sum += dest.len();
+            for (&y, &a) in dest.iter().zip(mult) {
+                x[y as usize] -= a * xv;
+            }
+        }
+        len_sum
+    }
+
+    pub fn reverse_sweep<R: Real>(lt: &Csr<R>, x: &mut [R]) -> usize {
+        let mut len_sum = 0usize;
+        for i in (0..lt.lines()).rev() {
+            let v = x[i];
+            if v.abs() > R::c(TOL) {
+                let (src, mult) = lt.col(i);
+                len_sum += src.len();
+                for (&j, &lv) in src.iter().zip(mult) {
+                    x[j as usize] -= lv * v;
+                }
+            }
+        }
+        len_sum
+    }
 }
 
 #[cfg(test)]
@@ -315,6 +422,25 @@ mod tests {
                     assert!(same(&xr, &xn));
                     assert_eq!((sum as f64 * 2.0 + e0).to_bits(), er.to_bits());
                 }
+                // plain checked kernels: bitwise identical vector, count and length sum
+                {
+                    let (mut xp, mut xn) = (x0.clone(), x0.clone());
+                    assert_eq!(plain::forward_sweep(&pool, &mut xp), forward_sweep(&pool, &mut xn));
+                    assert!(same(&xp, &xn));
+                    if is_forward {
+                        let (mut xp, mut xn) = (x0.clone(), x0.clone());
+                        assert_eq!(plain::fused_forward(&pool, &mut xp), fused_forward(&pool, &mut xn));
+                        assert!(same(&xp, &xn));
+                    }
+                    let (mut xp, mut xn) = (x0.clone(), x0.clone());
+                    assert_eq!(plain::reverse_sweep(&lt, &mut xp), reverse_sweep(&lt, &mut xn));
+                    assert!(same(&xp, &xn));
+                    // a longer vector is allowed; the tail is untouched
+                    let mut xl = x0.clone();
+                    xl.push(R::c(-0.0));
+                    forward_sweep(&pool, &mut xl);
+                    assert!(bits_eq(xl[m], R::c(-0.0)));
+                }
                 // reverse sweep on the transpose
                 let (mut xr, mut er) = (x0.clone(), e0);
                 reference_reverse(&want, &mut xr, &mut er);
@@ -334,6 +460,15 @@ mod tests {
     #[test]
     fn pools_and_dense_sweeps_match_reference_f80() {
         check::<F80>(0xd1b54a32d192ed03);
+    }
+
+    #[test]
+    #[should_panic]
+    fn short_vector_is_rejected() {
+        let cols: Cols<f64> = vec![vec![(2, 1.0)], vec![], vec![]];
+        let pool = pool_of(&cols);
+        let mut x = vec![1.0, 0.0];
+        forward_sweep(&pool, &mut x);
     }
 
     #[test]
