@@ -520,6 +520,115 @@ fn auxiliary_updates_are_lazy_and_bit_identical() {
     }
 }
 
+/// The retained workspace of the row product: `acc` is +0.0 and `touched` false everywhere between calls.
+struct PivotWs<R: Real> {
+    acc: Vec<R>,
+    touched: Vec<bool>,
+    /// Every index touched by the scatter, in first-touch order (the cleanup list).
+    all: Vec<usize>,
+    /// The coefficient of the first entry of each slack column.
+    slack_coef: Vec<f64>,
+}
+
+impl<R: Real> Default for PivotWs<R> {
+    fn default() -> Self {
+        PivotWs { acc: Vec::new(), touched: Vec::new(), all: Vec::new(), slack_coef: Vec::new() }
+    }
+}
+
+/// The row product (see `Dual::pivot_row`) on a retained workspace; every operation and its order as in `pivot_row_ref`.
+#[allow(clippy::too_many_arguments)]
+fn pivot_row_ws<R: Real>(
+    ws: &mut PivotWs<R>,
+    rrows: &[Vec<(usize, f64)>],
+    slack_nb: &[bool],
+    st: &[i32],
+    cols: &[Vec<(usize, f64)>],
+    n: usize,
+    m: usize,
+    rho: &[(usize, R)],
+    leave: usize,
+    above: bool,
+) -> (Vec<(usize, R)>, usize, usize, usize) {
+    if ws.acc.len() != n + m {
+        ws.acc = vec![R::ZERO; n + m];
+        ws.touched = vec![false; n + m];
+        ws.all = Vec::new();
+        ws.slack_coef = (0..m).map(|i| cols[n + i][0].1).collect();
+    }
+    // Local owners keep the pointers and lengths in registers across the scatter (stores through `ws` could alias them).
+    let mut acc_v = std::mem::take(&mut ws.acc);
+    let mut touched_v = std::mem::take(&mut ws.touched);
+    let mut all_v = std::mem::take(&mut ws.all);
+    let acc = &mut acc_v[..];
+    let touched = &mut touched_v[..acc.len()];
+    let all = &mut all_v;
+    let slack_coef = &ws.slack_coef[..];
+    // The row product runs over the rows of `rho` unless their entries (`0x134aa0` counts them) outnumber the structurals n by 1.8 (`0xc5355`, `ctx+0x68`);
+    // then it is columnwise, in index order.
+    let est: usize = rho.iter().map(|e| rrows[e.0].len()).sum();
+    let sparse = rho.len() == 1 || !((n as f64) < 1.8 * est as f64);
+    all.clear();
+    for &(i, rv) in rho {
+        for &(j, a) in &rrows[i] {
+            acc[j] = acc[j] + rv * R::c(a);
+            if !touched[j] {
+                touched[j] = true;
+                all.push(j);
+            }
+        }
+    }
+    // Entries that cancelled to (nearly) nothing are dropped (the smallest captured entry is 1.04e-13).
+    // A single entry in rho takes the scaled-copy path of `0x134d90` (`0x1360ac`), which has no tolerance test for a scale of 1 or more (fx_e2_r25 call 1: entries of 6e-14 stay);
+    // below 1 the same tolerance filter as the general path follows (`0x136629`: `|scale| < 1.0`; seed 50165 call 5: rho -5e-5, a product of 1.25e-17 is dropped).
+    let filter = rho.len() != 1 || rho[0].1.abs() < R::ONE;
+    let sdir = if above { -1.0 } else { 1.0 };
+    let mut out: Vec<(usize, R)> = Vec::with_capacity(all.len() + rho.len());
+    let keep = |acc: &[R], j: usize| !filter || acc[j].abs() > R::c(DROP_TOL);
+    let mut distinct = all.len();
+    if sparse {
+        for &j in all.iter() {
+            if keep(acc, j) {
+                let s = if st[j] == UB { -1.0 } else { 1.0 };
+                out.push((j, acc[j] * R::c(s * sdir)));
+            }
+        }
+    } else {
+        // Ascending index order over the structurals (the touched slots are only structurals, so the scan sees all of them).
+        distinct = 0;
+        for j in 0..n {
+            if touched[j] {
+                distinct += 1;
+                if keep(acc, j) {
+                    let s = if st[j] == UB { -1.0 } else { 1.0 };
+                    out.push((j, acc[j] * R::c(s * sdir)));
+                }
+            }
+        }
+    }
+    let nst = out.len();
+    // Slack entries; their accumulators are overwritten, so they are restored below with the rest.
+    for &(i, rv) in rho {
+        let j = n + i;
+        if slack_nb[i] || j == leave {
+            acc[j] = rv * R::c(slack_coef[i]);
+            let s = if st[j] == UB { -1.0 } else { 1.0 };
+            out.push((j, acc[j] * R::c(s * sdir)));
+        }
+    }
+    for &(i, _) in rho {
+        acc[n + i] = R::ZERO;
+    }
+    for &j in all.iter() {
+        acc[j] = R::ZERO;
+        touched[j] = false;
+    }
+    ws.acc = acc_v;
+    ws.touched = touched_v;
+    ws.all = all_v;
+    (out, nst, est, distinct)
+}
+
 struct Dual<'a, R: Real = f64> {
     p: &'a Internal,
     n: usize,
@@ -626,6 +735,8 @@ struct Dual<'a, R: Real = f64> {
     /// Slacks the row product offers, by row: those nonbasic at the last factorization and those that have left the basis since. A slack that enters the
     /// basis stays on offer until the next factorization.
     slack_nb: Vec<bool>,
+    /// The retained workspace of the row product.
+    prow_ws: std::cell::RefCell<PivotWs<R>>,
     /// Rows the list walk may still see become infeasible before the list is rebuilt (`P+0x28` in list-walk mode): the candidate capacity
     /// `max(20, m^0.7)` after a rebuild, one less per touched row that is infeasible (negative: rebuild).
     pend: i64,
@@ -2412,57 +2523,9 @@ impl<'a, R: Real> Dual<'a, R> {
         leave: usize,
         above: bool,
     ) -> (Vec<(usize, R)>, usize, usize, usize) {
-        let (n, m) = (self.n, self.m);
-        let p = self.p;
-        // The row product runs over the rows of `rho` unless their entries (`0x134aa0` counts them) outnumber the structurals n by 1.8 (`0xc5355`, `ctx+0x68`);
-        // then it is columnwise, in index order.
-        let est: usize = rho.iter().map(|e| self.rrows[e.0].len()).sum();
-        let mut acc = vec![R::ZERO; n + m];
-        let mut touched = vec![false; n + m];
-        let mut order: Vec<usize> = Vec::new();
-        let sparse = rho.len() == 1 || !((n as f64) < 1.8 * est as f64);
-        for &(i, rv) in rho {
-            for &(j, a) in &self.rrows[i] {
-                acc[j] = acc[j] + rv * R::c(a);
-                if !touched[j] {
-                    touched[j] = true;
-                    if sparse {
-                        order.push(j);
-                    }
-                }
-            }
-        }
-        if !sparse {
-            for j in 0..n {
-                if touched[j] {
-                    order.push(j);
-                }
-            }
-        }
-        let distinct = order.len();
-        // Entries that cancelled to (nearly) nothing are dropped (the smallest captured entry is 1.04e-13).
-        // A single entry in rho takes the scaled-copy path of `0x134d90` (`0x1360ac`), which has no tolerance test for a scale of 1 or more (fx_e2_r25 call 1: entries of 6e-14 stay).
-        // The copy keeps its entries only for a scale of magnitude 1 or more; below 1 the same tolerance filter as the general path follows (`0x136629`: `|scale| < 1.0`; seed 50165 call 5: rho -5e-5, a product of 1.25e-17 is dropped).
-        if rho.len() != 1 || rho[0].1.abs() < R::ONE {
-            order.retain(|&j| acc[j].abs() > R::c(DROP_TOL));
-        }
-        let nst = order.len();
-        for &(i, rv) in rho {
-            let j = n + i;
-            if self.slack_nb[i] || j == leave {
-                acc[j] = rv * R::c(p.cols[j][0].1);
-                order.push(j);
-            }
-        }
-        let sdir = if above { -1.0 } else { 1.0 };
-        let out = order
-            .into_iter()
-            .map(|j| {
-                let s = if self.st[j] == UB { -1.0 } else { 1.0 };
-                (j, acc[j] * R::c(s * sdir))
-            })
-            .collect();
-        (out, nst, est, distinct)
+        // No reentrancy: the workspace is borrowed only for the duration of this call, which calls nothing else of `self`.
+        let mut ws = self.prow_ws.borrow_mut();
+        pivot_row_ws(&mut ws, &self.rrows, &self.slack_nb, &self.st, &self.p.cols, self.n, self.m, rho, leave, above)
     }
 
     /// The second FTRAN vector of the pricing mode 3 (`0xc57d8..0xc58c4`, `0x11faf9..0x11fcd0`): the entries of the pivot row whose variable was basic when the
@@ -5934,6 +5997,7 @@ fn solve_pass_callback<R: Real>(
         cursor: 0,
         walk_len: 0,
         slack_nb: vec![false; m],
+        prow_ws: Default::default(),
         pend: cap,
         cap,
         rebuilds: 40,
@@ -7471,6 +7535,7 @@ mod captured_bh305_ratio {
             cursor: 0,
             walk_len: 0,
             slack_nb: vec![false; m],
+            prow_ws: Default::default(),
             pend: cap,
             cap,
             rebuilds: 40,
@@ -7847,5 +7912,163 @@ mod captured_primal_drift_gate {
             (one + epsilon) / F80::from_f64(100.0),
             one
         ));
+    }
+}
+
+#[cfg(test)]
+mod pivot_row_diff {
+    use super::*;
+
+    /// The previous implementation, kept as the reference of the differential test.
+    #[allow(clippy::too_many_arguments)]
+    fn pivot_row_ref<R: Real>(
+        rrows: &[Vec<(usize, f64)>],
+        slack_nb: &[bool],
+        st: &[i32],
+        cols: &[Vec<(usize, f64)>],
+        n: usize,
+        m: usize,
+        rho: &[(usize, R)],
+        leave: usize,
+        above: bool,
+    ) -> (Vec<(usize, R)>, usize, usize, usize) {
+        let est: usize = rho.iter().map(|e| rrows[e.0].len()).sum();
+        let mut acc = vec![R::ZERO; n + m];
+        let mut touched = vec![false; n + m];
+        let mut order: Vec<usize> = Vec::new();
+        let sparse = rho.len() == 1 || !((n as f64) < 1.8 * est as f64);
+        for &(i, rv) in rho {
+            for &(j, a) in &rrows[i] {
+                acc[j] = acc[j] + rv * R::c(a);
+                if !touched[j] {
+                    touched[j] = true;
+                    if sparse {
+                        order.push(j);
+                    }
+                }
+            }
+        }
+        if !sparse {
+            for j in 0..n {
+                if touched[j] {
+                    order.push(j);
+                }
+            }
+        }
+        let distinct = order.len();
+        if rho.len() != 1 || rho[0].1.abs() < R::ONE {
+            order.retain(|&j| acc[j].abs() > R::c(DROP_TOL));
+        }
+        let nst = order.len();
+        for &(i, rv) in rho {
+            let j = n + i;
+            if slack_nb[i] || j == leave {
+                acc[j] = rv * R::c(cols[j][0].1);
+                order.push(j);
+            }
+        }
+        let sdir = if above { -1.0 } else { 1.0 };
+        let out = order
+            .into_iter()
+            .map(|j| {
+                let s = if st[j] == UB { -1.0 } else { 1.0 };
+                (j, acc[j] * R::c(s * sdir))
+            })
+            .collect();
+        (out, nst, est, distinct)
+    }
+
+    struct Rng(u64);
+    impl Rng {
+        fn next(&mut self) -> u64 {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 7;
+            self.0 ^= self.0 << 17;
+            self.0
+        }
+        fn below(&mut self, k: usize) -> usize {
+            (self.next() % k as u64) as usize
+        }
+    }
+
+    fn value(r: &mut Rng) -> f64 {
+        match r.below(9) {
+            0 => 0.0,
+            1 => -0.0,
+            2 => 1.0,
+            3 => -1.0,
+            4 => 1e-13,
+            5 => 3e-14,
+            6 => 5e-5,
+            7 => (r.below(2001) as f64 - 1000.0) / 8.0,
+            _ => (r.below(2001) as f64 - 1000.0) / 1000.0,
+        }
+    }
+
+    fn same<R: Real>(a: &(Vec<(usize, R)>, usize, usize, usize), b: &(Vec<(usize, R)>, usize, usize, usize)) -> bool {
+        a.1 == b.1
+            && a.2 == b.2
+            && a.3 == b.3
+            && a.0.len() == b.0.len()
+            && a.0.iter().zip(&b.0).all(|(x, y)| x.0 == y.0 && format!("{:?}", x.1).as_bytes() == format!("{:?}", y.1).as_bytes()
+                && x.1.to_f64().to_bits() == y.1.to_f64().to_bits())
+    }
+
+    fn run<R: Real>() {
+        let mut r = Rng(0x9e3779b97f4a7c15);
+        for case in 0..300 {
+            let n = 1 + r.below(40);
+            let m = 1 + r.below(20);
+            let mut rrows: Vec<Vec<(usize, f64)>> = vec![Vec::new(); m];
+            for j in 0..n {
+                for i in 0..m {
+                    if r.below(4) == 0 {
+                        rrows[i].push((j, value(&mut r)));
+                    }
+                }
+            }
+            // Per-row entry order is shuffled-ish to exercise first-touch order.
+            for row in rrows.iter_mut() {
+                if row.len() > 1 && r.below(2) == 0 {
+                    let k = row.len();
+                    row.swap(0, k - 1);
+                }
+            }
+            let slack_nb: Vec<bool> = (0..m).map(|_| r.below(2) == 0).collect();
+            let st: Vec<i32> = (0..n + m).map(|_| if r.below(2) == 0 { UB } else { LB }).collect();
+            let cols: Vec<Vec<(usize, f64)>> = (0..n + m)
+                .map(|j| if j < n { Vec::new() } else { vec![(j - n, if r.below(2) == 0 { 1.0 } else { -1.0 })] })
+                .collect();
+            let mut ws = PivotWs::<R>::default();
+            for call in 0..8 {
+                let k = if r.below(4) == 0 { 1 } else { 1 + r.below(m) };
+                let mut rows: Vec<usize> = (0..m).collect();
+                for t in 0..m {
+                    let u = r.below(m);
+                    rows.swap(t, u);
+                }
+                let rho: Vec<(usize, R)> = rows[..k.min(m)]
+                    .iter()
+                    .map(|&i| (i, R::c(if r.below(3) == 0 { value(&mut r) * 4.0 } else { value(&mut r) })))
+                    .collect();
+                let leave = n + r.below(m);
+                let above = r.below(2) == 0;
+                let want = pivot_row_ref(&rrows, &slack_nb, &st, &cols, n, m, &rho, leave, above);
+                let got = pivot_row_ws(&mut ws, &rrows, &slack_nb, &st, &cols, n, m, &rho, leave, above);
+                assert!(same(&want, &got), "case {case} call {call}");
+                assert!(ws.acc.iter().all(|x| x.to_f64().to_bits() == 0), "acc not restored");
+                assert!(ws.touched.iter().all(|&t| !t));
+            }
+        }
+    }
+
+    #[test]
+    fn matches_reference_f64() {
+        run::<f64>();
+    }
+
+    #[test]
+    fn matches_reference_f80() {
+        run::<crate::f80::F80>();
     }
 }
