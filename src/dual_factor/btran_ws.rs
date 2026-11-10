@@ -56,6 +56,17 @@ pub(super) struct Order {
     pub seen: Marks,
     pub have: Marks,
     pub nm: Marks,
+    pub heap: BinaryHeap<usize>,
+    /// One bit per key for ordering long lists; all zero between calls.
+    pub bits: Vec<u64>,
+    pub inp_d: Vec<usize>,
+    pub sing: Vec<usize>,
+    pub tri: Vec<usize>,
+    pub nuc: Vec<usize>,
+    pub t: Vec<usize>,
+    pub ns: Vec<usize>,
+    pub order: Vec<usize>,
+    pub out: Vec<usize>,
 }
 
 impl Order {

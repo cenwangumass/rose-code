@@ -260,3 +260,77 @@ fn update_without_temporaries_matches_original() {
     }
     assert!(bare > 0 && demoted > 0 && tail_repl > 0, "bare {bare} demoted {demoted} tail {tail_repl} et {et_seen}");
 }
+
+/// `uorder` (bit-ordered lists, slot heap, retained lists) against the previous implementation after fresh factors and random update
+/// sequences, on the solve's own L-stage lists and on random lists with repeats and random zero patterns.
+#[test]
+fn uorder_matches_original_after_updates() {
+    let mut seed = 0x9e3779b97f4a7c15u64;
+    let mut next = || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed as usize
+    };
+    let (mut dense_seen, mut sparse_seen, mut sorted_seen, mut checks) = (0, 0, 0, 0);
+    for m in [24, 70, 200, 700] {
+        for round in 0..10 {
+            let mut cols: Vec<_> = (0..m).map(|i| {
+                let mut rows = vec![i];
+                let mut vals = vec![4.0];
+                for _ in 0..(1 + round % 5) {
+                    let r = next() % m;
+                    if !rows.contains(&r) {
+                        rows.push(r);
+                        vals.push(if next() % 2 == 0 { 0.5 } else { -0.75 });
+                    }
+                }
+                (true, rows, vals)
+            }).collect();
+            let st = crate::lu_order::factor_structure(m, &cols);
+            let mut f = DualFactor::fresh(m, m, &st, &cols);
+            for step in 0..m.min(60) + 1 {
+                let mut lists: Vec<(Vec<usize>, Vec<f64>)> = Vec::new();
+                for k in 0..6 {
+                    let n = [1, 3, 9, m / 8 + 1, m / 3 + 1, m][(k + step) % 6].min(3 * m);
+                    let inp: Vec<usize> = (0..n).map(|_| next() % m).collect();
+                    let x: Vec<f64> = (0..m).map(|_| [0.0, -0.0, 1.0, 0.5][next() % 4]).collect();
+                    lists.push((inp, x));
+                }
+                lists.push((f.f2.get_mut().col_in.clone(), f.f2.get_mut().x_col.clone()));
+                for (inp, x) in lists {
+                    if x.len() != m {
+                        continue;
+                    }
+                    let want = f.uorder_ref(&inp, &x);
+                    let got = f.uorder(&inp, &x);
+                    assert_eq!(got, want, "m {m} round {round} step {step}");
+                    f.uorder_done(got);
+                    let n = {
+                        let mut s = inp.clone();
+                        s.sort_unstable();
+                        s.dedup();
+                        s.len()
+                    };
+                    if (m as f64) <= (n as f64) * f.dens { dense_seen += 1 } else { sparse_seen += 1 }
+                    sorted_seen += usize::from(want.len() >= 24);
+                    checks += 1;
+                }
+                let r = next() % m;
+                let mut rows = vec![r];
+                let mut vals = vec![5.0 + step as f64];
+                for _ in 0..(1 + next() % 8) {
+                    let q = next() % m;
+                    if !rows.contains(&q) {
+                        rows.push(q);
+                        vals.push([0.25, -0.5, 1.5][next() % 3]);
+                    }
+                }
+                f.ftran(&rows, &vals);
+                f.update(r);
+                cols[r] = (true, rows, vals);
+            }
+        }
+    }
+    assert!(dense_seen > 0 && sparse_seen > 0 && sorted_seen > 0, "{dense_seen} {sparse_seen} {sorted_seen} {checks}");
+}

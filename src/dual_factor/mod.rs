@@ -2192,11 +2192,13 @@ impl<R: Real> DualFactor<R> {
         if dense || u_dense {
             out.extend(x.iter().copied().enumerate().filter(|&(_, v)| v != R::ZERO));
         } else {
-            for p in self.uorder(&inp, &x) {
+            let ordered = self.uorder(&inp, &x);
+            for &p in &ordered {
                 if touched.take_sparse(p) && x[p] != R::ZERO {
                     out.push((p, x[p]));
                 }
             }
+            self.uorder_done(ordered);
             touched.for_each(|p| {
                 if x[p] != R::ZERO {
                     out.push((p, x[p]));
@@ -2967,11 +2969,182 @@ impl<R: Real> DualFactor<R> {
         }
     }
 
-    /// Order of the nonzero positions of the solution, given the L-stage list.
+    /// Sorts the distinct keys `key(v)` of `v` ascending (descending with `desc`) and maps each back through `val`, which must
+    /// invert `key`. The keys must be distinct and below `nkeys`, so the order does not depend on the sort algorithm. A long list is
+    /// ordered by setting one bit per key and reading the words back (the words are left zero).
+    fn sort_distinct_keys(
+        bits: &mut Vec<u64>,
+        v: &mut [usize],
+        nkeys: usize,
+        desc: bool,
+        key: impl Fn(usize) -> usize,
+        val: impl Fn(usize) -> usize,
+    ) {
+        if v.len() < 24 {
+            for p in v.iter_mut() {
+                *p = key(*p);
+            }
+            if desc {
+                v.sort_unstable_by(|a, b| b.cmp(a));
+            } else {
+                v.sort_unstable();
+            }
+            for p in v.iter_mut() {
+                *p = val(*p);
+            }
+            return;
+        }
+        bits.resize(nkeys.div_ceil(64), 0);
+        let (mut lo, mut hi) = (usize::MAX, 0);
+        for &p in v.iter() {
+            let k = key(p);
+            let w = k >> 6;
+            debug_assert!(bits[w] >> (k & 63) & 1 == 0, "duplicate key");
+            bits[w] |= 1 << (k & 63);
+            lo = lo.min(w);
+            hi = hi.max(w);
+        }
+        let mut i = 0;
+        if desc {
+            for w in (lo..=hi).rev() {
+                let mut word = std::mem::take(&mut bits[w]);
+                while word != 0 {
+                    let bit = 63 - word.leading_zeros() as usize;
+                    word &= !(1 << bit);
+                    v[i] = val(w << 6 | bit);
+                    i += 1;
+                }
+            }
+        } else {
+            for w in lo..=hi {
+                let mut word = std::mem::take(&mut bits[w]);
+                while word != 0 {
+                    let bit = word.trailing_zeros() as usize;
+                    word &= word - 1;
+                    v[i] = val(w << 6 | bit);
+                    i += 1;
+                }
+            }
+        }
+        debug_assert_eq!(i, v.len());
+    }
+
+    /// Order of the nonzero positions of the solution, given the L-stage list. The result is the retained `Order::out`, taken from the
+    /// scratch; hand it back with `uorder_done`.
     fn uorder(&self, inp: &[usize], x: &[R]) -> Vec<usize> {
         let m = self.m;
         let mut scratch = self.btran_ws.order.borrow_mut();
-        let btran_ws::Order { seen, have, nm } = &mut *scratch;
+        let btran_ws::Order { seen, have, nm, heap, bits, inp_d, sing, tri, nuc, t, ns, order, out } = &mut *scratch;
+        seen.prepare(m);
+        have.prepare(m);
+        nm.prepare(m);
+        inp_d.clear();
+        sing.clear();
+        tri.clear();
+        nuc.clear();
+        for &x in inp {
+            if seen.insert(x) {
+                inp_d.push(x);
+                match self.kind[x] {
+                    -1 => sing.push(x),
+                    -2 => tri.push(x),
+                    _ => nuc.push(x),
+                }
+            }
+        }
+        let n = inp_d.len();
+        let i3 = self.nuc.len();
+        let d2 = self.dens;
+        // The nucleus positions are in nucleus-list order (`kind` is the index into `self.nuc`, so the keys are distinct).
+        let nuc_sorted = |bits: &mut Vec<u64>, v: &mut Vec<usize>| {
+            Self::sort_distinct_keys(bits, v, i3, false, |x| self.kind[x] as usize, |k| self.nuc[k]);
+        };
+        let dense = (m as f64) <= (n as f64) * d2
+            || d2 * ((nuc.len() + tri.len()) as f64) > (i3 + (m - self.i21)) as f64;
+        out.clear();
+        out.extend_from_slice(sing);
+        if dense {
+            t.clear();
+            t.extend_from_slice(tri);
+            for &x in tri.iter() {
+                have.insert(x);
+            }
+            let mut k = 0;
+            while k < t.len() {
+                let c = t[k];
+                k += 1;
+                for &j in &self.a[c] {
+                    if have.insert(j) {
+                        t.push(j);
+                    }
+                }
+            }
+            ns.clear();
+            for &x in nuc.iter().chain(t.iter().flat_map(|&c| self.b[c].iter())) {
+                if nm.insert(x) {
+                    ns.push(x);
+                }
+            }
+            // The positions of `t` are distinct, hence so are their slots (`slot` and `at` are inverse permutations).
+            Self::sort_distinct_keys(bits, t, m, true, |p| self.slot[p], |s| self.at[s]);
+            out.extend_from_slice(t);
+            nuc_sorted(bits, ns);
+            out.extend_from_slice(ns);
+        } else {
+            // Slots are distinct, so the heap of slots pops in the same order as the (slot, position) pairs.
+            heap.clear();
+            for &x in tri.iter() {
+                have.insert(x);
+                heap.push(self.slot[x]);
+            }
+            order.clear();
+            let mut lb = nuc.len();
+            while let Some(s) = heap.pop() {
+                let k = self.at[s];
+                order.push(k);
+                // The reference's counter and nucleus-list discovery only see tail columns that survive the tolerance test.
+                if x[k] != R::ZERO {
+                    lb += self.b[k].len();
+                }
+                for &j in &self.a[k] {
+                    if have.insert(j) {
+                        heap.push(self.slot[j]);
+                    }
+                }
+            }
+            ns.clear();
+            for &y in nuc.iter().chain(
+                order
+                    .iter()
+                    .filter(|&&k| x[k] != R::ZERO)
+                    .flat_map(|&k| self.b[k].iter()),
+            ) {
+                if nm.insert(y) {
+                    ns.push(y);
+                }
+            }
+            out.extend_from_slice(order);
+            if (lb as f64) * 2.5 > i3 as f64 {
+                nuc_sorted(bits, ns);
+            }
+            out.extend_from_slice(ns);
+        }
+        scratch.clear();
+        std::mem::take(&mut scratch.out)
+    }
+
+    /// Returns the buffer of `uorder` to the scratch.
+    fn uorder_done(&self, mut out: Vec<usize>) {
+        out.clear();
+        self.btran_ws.order.borrow_mut().out = out;
+    }
+
+    /// The previous `uorder`, the oracle of the differential test.
+    #[cfg(test)]
+    fn uorder_ref(&self, inp: &[usize], x: &[R]) -> Vec<usize> {
+        let m = self.m;
+        let mut scratch = self.btran_ws.order.borrow_mut();
+        let btran_ws::Order { seen, have, nm, .. } = &mut *scratch;
         seen.prepare(m);
         have.prepare(m);
         nm.prepare(m);
