@@ -1920,7 +1920,11 @@ mod dense_lu_tests {
 
     #[test]
     fn panel_columns_match_frozen_dense_lu_f64() {
-        cases::<f64>(|v| (v.to_bits(), 0));
+        // The two copies of the factorization are compiled separately. A NaN result takes the payload and sign of whichever NaN operand the
+        // hardware (x86: the first operand) or the compiler (operand commutation) picks, so NaN payload bits are codegen-sensitive and
+        // not part of the contract (production decisions only test NaN-ness, dumps write NaN as null). NaN entries compare as NaN-ness
+        // only (the sign is not deterministic either); every other entry compares bit for bit.
+        cases::<f64>(|v| (if v.is_nan() { 0x7ff8_0000_0000_0000 } else { v.to_bits() }, 0));
     }
 
     #[test]

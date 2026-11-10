@@ -965,6 +965,29 @@ impl FlatRows {
     }
 }
 
+/// `d_j = c_j - y a_j` for the nonbasic `j` (`st[j] < 0`). The reference accumulates row-wise (`0x136b00`): rows in ascending order, skipping
+/// |y_i| <= 1e-13 (`ctx+0x3a8`). `p.rwise[i]` lists the entries of row `i` by ascending column in the entry order of `p.cols`, so every column
+/// sees its rows in ascending order.
+fn true_d_rowwise<R: Real>(p: &Internal, st: &[i32], cost: &[f64], cost_lo: &[f64], y: &[R]) -> Vec<R> {
+    let mut d = vec![R::ZERO; p.n + p.m];
+    for j in 0..p.n + p.m {
+        if st[j] < 0 {
+            d[j] = R::c(cost[j]) + R::c(cost_lo[j]);
+        }
+    }
+    for (i, row) in p.rwise.iter().enumerate() {
+        let yi = y[i];
+        if yi.abs() > R::c(DROP_TOL) {
+            for &(j, a) in row {
+                if st[j] < 0 {
+                    d[j] -= yi * R::c(a);
+                }
+            }
+        }
+    }
+    d
+}
+
 /// The retained workspace of the row product: `acc` is +0.0 and `bits` zero everywhere between calls.
 struct PivotWs<R: Real> {
     acc: Vec<R>,
@@ -2603,25 +2626,7 @@ impl<'a, R: Real> Dual<'a, R> {
             y[i] = v;
         }
         self.last_y = y.clone();
-        let mut d = vec![R::ZERO; p.n + p.m];
-        for j in 0..p.n + p.m {
-            if self.st[j] < 0 {
-                d[j] = R::c(self.cost[j]) + R::c(self.cost_lo[j]);
-            }
-        }
-        // The reference accumulates row-wise (`0x136b00`): rows in ascending order, skipping |y_i| <= 1e-13 (`ctx+0x3a8`). `p.rwise[i]` lists the
-        // entries of row `i` by ascending column in the entry order of `p.cols`, so every column sees its rows in ascending order as before.
-        for (i, row) in p.rwise.iter().enumerate() {
-            let yi = y[i];
-            if yi.abs() > R::c(DROP_TOL) {
-                for &(j, a) in row {
-                    if self.st[j] < 0 {
-                        d[j] -= yi * R::c(a);
-                    }
-                }
-            }
-        }
-        d
+        true_d_rowwise(p, &self.st, &self.cost, &self.cost_lo, &y)
     }
 
     // ------------------------------------------------------------------ pricing object
@@ -8864,6 +8869,101 @@ mod true_d_column_order {
                 assert_eq!(old.to_bits(), new.to_bits());
             }
         }
+    }
+}
+
+/// `true_d_rowwise` against the version it replaced: per column, a stably sorted clone of `fcols[j]`, subtracting `y[i] a` in row order for
+/// `|y[i]| > DROP_TOL`. Columns with repeated rows, slack and range columns, signed zeros in the values, costs and `y`.
+#[cfg(test)]
+mod true_d_differential {
+    use super::*;
+
+    fn old_true_d(p: &Internal, st: &[i32], cost: &[f64], cost_lo: &[f64], y: &[f64]) -> Vec<f64> {
+        let mut d = vec![0.0; p.n + p.m];
+        for j in 0..p.n + p.m {
+            if st[j] < 0 {
+                let mut e = p.fcols[j].clone();
+                e.sort_by_key(|x| x.0);
+                let mut acc = cost[j] + cost_lo[j];
+                for &(i, a) in &e {
+                    if y[i].abs() > DROP_TOL {
+                        acc -= y[i] * a;
+                    }
+                }
+                d[j] = acc;
+            }
+        }
+        d
+    }
+
+    #[test]
+    fn rowwise_matches_per_column_clone_and_sort() {
+        let mut seed = 0x1b87_3593_cc9e_2d51u64;
+        let mut next = move || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        let values = [0.0, -0.0, 1.0, -1.0, 0.1, 1e-14, -3.5, f64::MIN_POSITIVE, 1e16];
+        let ys = [0.0, -0.0, 1e-13, -1e-13, 2e-13, 0.37, -1.25, 1e8];
+        let costs = [0.0, -0.0, 1.0, -2.5, 1e-9];
+        let (mut dup_cols, mut range_rows, mut compared) = (0, 0, 0);
+        for round in 0..300 {
+            let m = 1 + next() as usize % 9;
+            let nc = 1 + next() as usize % 12;
+            let mut col_start = vec![0];
+            let (mut row_idx, mut val) = (Vec::new(), Vec::new());
+            for _ in 0..nc {
+                let first = row_idx.len();
+                for _ in 0..next() % 8 {
+                    row_idx.push(next() as usize % m);
+                    val.push(values[next() as usize % values.len()]);
+                }
+                let mut rs = row_idx[first..].to_vec();
+                rs.sort_unstable();
+                rs.dedup();
+                dup_cols += usize::from(rs.len() < row_idx.len() - first);
+                col_start.push(row_idx.len());
+            }
+            let kinds = [(-INF, 1.0), (1.0, INF), (1.0, 1.0), (-1.0, 2.0), (-INF, INF), (0.5, 4.0)];
+            let rows: Vec<(f64, f64)> = (0..m).map(|_| kinds[next() as usize % kinds.len()]).collect();
+            range_rows += rows.iter().filter(|r| r.0 > -INF && r.1 < INF && r.0 != r.1).count();
+            let model = LpModel {
+                name: "true-d".into(),
+                sense: if round % 2 == 0 { Sense::Minimize } else { Sense::Maximize },
+                offset: 0.0,
+                obj: (0..nc).map(|_| costs[next() as usize % costs.len()]).collect(),
+                col_lo: vec![0.0; nc],
+                col_up: vec![INF; nc],
+                row_lo: rows.iter().map(|r| r.0).collect(),
+                row_up: rows.iter().map(|r| r.1).collect(),
+                row_range: vec![],
+                row_kind: vec![],
+                range_order: vec![],
+                range_entries: vec![],
+                range_dup: false,
+                col_start,
+                val,
+                row_idx,
+                col_names: vec![],
+                row_names: vec![],
+            };
+            let p = build(&model);
+            let nv = p.n + p.m;
+            let st: Vec<i32> = (0..nv).map(|_| if next() % 3 == 0 { 0 } else { -1 }).collect();
+            let cost: Vec<f64> = (0..nv).map(|_| costs[next() as usize % costs.len()]).collect();
+            let cost_lo: Vec<f64> = (0..nv).map(|_| costs[next() as usize % costs.len()]).collect();
+            let y: Vec<f64> = (0..p.m).map(|_| ys[next() as usize % ys.len()]).collect();
+            let want = old_true_d(&p, &st, &cost, &cost_lo, &y);
+            let got = true_d_rowwise::<f64>(&p, &st, &cost, &cost_lo, &y);
+            assert_eq!(got.len(), want.len());
+            for (j, (g, w)) in got.iter().zip(&want).enumerate() {
+                assert_eq!(g.to_bits(), w.to_bits(), "round {round} column {j}");
+            }
+            compared += nv;
+        }
+        assert!(dup_cols > 0 && range_rows > 0 && compared > 0, "dup {dup_cols} range {range_rows}");
     }
 }
 

@@ -208,14 +208,22 @@ fn update_without_temporaries_matches_original() {
         seed ^= seed << 17;
         seed as usize
     };
-    let (mut bare, mut demoted, mut tail_repl, mut et_seen) = (0, 0, 0, 0);
+    let (mut bare, mut demoted, mut tail_repl, mut et_seen, mut demoted_multi) = (0, 0, 0, 0, 0);
     for m in [24, 70, 200] {
         for round in 0..16 {
             let mut cols: Vec<_> = (0..m).map(|i| {
                 let mut rows = vec![i];
                 let mut vals = vec![4.0];
                 for _ in 0..(1 + round % 5) {
-                    let r = next() % m;
+                    // Odd rounds: a lower-triangular start (all tail columns), so replacements empty and demote several tail columns.
+                    let r = if round % 2 == 1 {
+                        if i == 0 {
+                            continue;
+                        }
+                        next() % i
+                    } else {
+                        next() % m
+                    };
                     if !rows.contains(&r) {
                         rows.push(r);
                         vals.push(if next() % 2 == 0 { 0.5 } else { -0.75 });
@@ -250,15 +258,21 @@ fn update_without_temporaries_matches_original() {
                 tail_repl += usize::from(new.kind[r] == -2);
                 et_seen += usize::from(!new.empty_tail.list.is_empty() && new.kind[r] != -2);
                 let kinds = new.kind.clone();
+                let et_len = new.empty_tail.list.len();
                 new.update(r);
                 old.update_old(r);
-                demoted += (0..m).filter(|&x| x != r && kinds[x] == -2 && new.kind[x] != -2).count();
+                let dem = (0..m).filter(|&x| x != r && kinds[x] == -2 && new.kind[x] != -2).count();
+                demoted += dem;
+                demoted_multi += usize::from(dem > 0 && et_len >= 2);
                 assert_eq!(update_state(&new), update_state(&old), "m {m} round {round} step {step}");
                 cols[r] = (true, rows, vals);
             }
         }
     }
-    assert!(bare > 0 && demoted > 0 && tail_repl > 0, "bare {bare} demoted {demoted} tail {tail_repl} et {et_seen}");
+    assert!(
+        bare > 0 && demoted > 0 && tail_repl > 0 && et_seen > 0 && demoted_multi > 0,
+        "bare {bare} demoted {demoted} tail {tail_repl} et {et_seen} demoted with |empty_tail| >= 2: {demoted_multi}"
+    );
 }
 
 /// `uorder` (bit-ordered lists, slot heap, retained lists) against the previous implementation after fresh factors and random update
@@ -306,6 +320,11 @@ fn uorder_matches_original_after_updates() {
                     let got = f.uorder(&inp, &x);
                     assert_eq!(got, want, "m {m} round {round} step {step}");
                     f.uorder_done(got);
+                    {
+                        let sc = f.btran_ws.order.borrow();
+                        assert!(sc.heap.is_empty(), "uorder left the heap non-empty");
+                        assert!(sc.bits.iter().all(|&w| w == 0), "uorder left bits set");
+                    }
                     let n = {
                         let mut s = inp.clone();
                         s.sort_unstable();
