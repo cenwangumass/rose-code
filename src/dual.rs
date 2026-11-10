@@ -376,6 +376,170 @@ fn maxr<R: Real>(a: R, b: R) -> R {
     }
 }
 
+/// The row weights of `Dual::reset_pricing` before the cap, without materialized lists: the forward lists are CSR filled by ascending
+/// step `e`, so each is ascending with equal entries adjacent (the dumped lists are sorted descending and deduplicated, which is this
+/// list read backwards skipping an entry equal to the previous one); the backward lists are walked in place in their stored order.
+fn pricing_weights<R: Real>(
+    m: usize,
+    st: &crate::lu_order::Structure<R>,
+    cols: &[(bool, Vec<usize>, Vec<f64>)],
+) -> Vec<f64> {
+    let mut step_of_row = vec![usize::MAX; m];
+    let mut step_of_pos = vec![usize::MAX; m];
+    for (s, &(r, c)) in st.pivots.iter().enumerate() {
+        step_of_row[r] = s;
+        step_of_pos[c] = s;
+    }
+    // Forward lists as CSR, filled by ascending e: each list is ascending with equal entries adjacent.
+    let mut fstart = vec![0u32; m + 1];
+    for e in 0..m {
+        for &r in &st.l_rows[e] {
+            fstart[step_of_row[r] + 1] += 1;
+        }
+    }
+    for k in 0..m {
+        fstart[k + 1] += fstart[k];
+    }
+    let mut next: Vec<u32> = fstart[..m].to_vec();
+    let mut fidx = vec![0u32; fstart[m] as usize];
+    for e in 0..m {
+        for &r in &st.l_rows[e] {
+            let k = step_of_row[r];
+            fidx[next[k] as usize] = e as u32;
+            next[k] += 1;
+        }
+    }
+    // Row-wise basis positions (ascending position) as CSR.
+    let mut rstart = vec![0u32; m + 1];
+    for col in cols.iter() {
+        for &i in &col.1 {
+            rstart[i + 1] += 1;
+        }
+    }
+    for i in 0..m {
+        rstart[i + 1] += rstart[i];
+    }
+    let mut rnext: Vec<u32> = rstart[..m].to_vec();
+    let mut ridx = vec![0u32; rstart[m] as usize];
+    for (c, col) in cols.iter().enumerate() {
+        for &i in &col.1 {
+            ridx[rnext[i] as usize] = c as u32;
+            rnext[i] += 1;
+        }
+    }
+    let n = m as f64;
+    let mut w = vec![1.0f64; m];
+    for k in 0..m {
+        let mut prev = usize::MAX;
+        for &j in fidx[fstart[k] as usize..fstart[k + 1] as usize].iter().rev() {
+            let j = j as usize;
+            if j == prev {
+                continue;
+            }
+            prev = j;
+            w[k] = (w[k] + w[j]) - (w[j] * w[k]) / n;
+        }
+    }
+    for k in (0..m).rev() {
+        if st.phase[k] != 0 {
+            let i = st.pivots[k].0;
+            for &c in &ridx[rstart[i] as usize..rstart[i + 1] as usize] {
+                let j = step_of_pos[c as usize];
+                if j > k {
+                    w[k] = (w[k] + w[j]) - (w[j] * w[k]) / n;
+                }
+            }
+        } else {
+            for &(c, _) in &st.u_rows[k] {
+                let j = step_of_pos[c];
+                if j > k {
+                    w[k] = (w[k] + w[j]) - (w[j] * w[k]) / n;
+                }
+            }
+        }
+    }
+    w
+}
+
+/// The lists and weights of the reference form of `Dual::reset_pricing` (the `p68` dump carries the lists).
+fn pricing_weights_lists<R: Real>(
+    m: usize,
+    st: &crate::lu_order::Structure<R>,
+    cols: &[(bool, Vec<usize>, Vec<f64>)],
+) -> (Vec<Vec<usize>>, Vec<Vec<usize>>, Vec<f64>) {
+    let mut step_of_row = vec![usize::MAX; m];
+    let mut step_of_pos = vec![usize::MAX; m];
+    for (s, &(r, c)) in st.pivots.iter().enumerate() {
+        step_of_row[r] = s;
+        step_of_pos[c] = s;
+    }
+    // Forward lists (`0xf48fd` structure +0x70/+0x80): the earlier steps whose L column holds the row of step k, descending.
+    let mut fwd: Vec<Vec<usize>> = vec![Vec::new(); m];
+    for e in 0..m {
+        for &r in &st.l_rows[e] {
+            fwd[step_of_row[r]].push(e);
+        }
+    }
+    // Backward lists (+0xb0/+0xd0): the later steps in the pivot row of step k: nucleus rows with their fill (`u_rows`), the others with their
+    // original entries, by ascending basis position.
+    let mut row_pos: Vec<Vec<usize>> = vec![Vec::new(); m];
+    for (c, col) in cols.iter().enumerate() {
+        for &i in &col.1 {
+            row_pos[i].push(c);
+        }
+    }
+    let bwd: Vec<Vec<usize>> = (0..m)
+        .map(|k| {
+            if st.phase[k] != 0 {
+                row_pos[st.pivots[k].0]
+                    .iter()
+                    .map(|&c| step_of_pos[c])
+                    .filter(|&t| t > k)
+                    .collect()
+            } else {
+                st.u_rows[k]
+                    .iter()
+                    .map(|&(c, _)| step_of_pos[c])
+                    .filter(|&t| t > k)
+                    .collect()
+            }
+        })
+        .collect();
+    let n = m as f64;
+    let mut w = vec![1.0f64; m];
+    for k in 0..m {
+        fwd[k].sort_unstable_by(|a, b| b.cmp(a));
+        fwd[k].dedup();
+        for &j in &fwd[k] {
+            w[k] = (w[k] + w[j]) - (w[j] * w[k]) / n;
+        }
+    }
+    for k in (0..m).rev() {
+        for &j in &bwd[k] {
+            w[k] = (w[k] + w[j]) - (w[j] * w[k]) / n;
+        }
+    }
+    (fwd, bwd, w)
+}
+
+/// The cap of `Dual::reset_pricing`: the capped weights `min(0.1 m + 100, w + 100)`, or (total above `m (0.1 m + 100)`, or type 2 already)
+/// the constant cap with type 2. Returns the new pricing type.
+fn cap_pricing_weights(ptype: u8, m: usize, w: &mut [f64]) -> u8 {
+    let n = m as f64;
+    let total: f64 = w.iter().sum();
+    let cap = 0.1 * n + 100.0;
+    if ptype == 2 || total > n * cap {
+        w.iter_mut().for_each(|x| *x = cap);
+        2
+    } else {
+        for x in w.iter_mut() {
+            let v = *x + 100.0;
+            *x = if cap < v { cap } else { v };
+        }
+        ptype
+    }
+}
+
 fn minsd(a: f64, b: f64) -> f64 {
     if a < b {
         a
@@ -2127,15 +2291,19 @@ impl<'a, R: Real> Dual<'a, R> {
         let mut d = vec![R::ZERO; p.n + p.m];
         for j in 0..p.n + p.m {
             if self.st[j] < 0 {
-                // The reference accumulates row-wise (`0x136b00`): rows in ascending order, skipping |y_i| <= 1e-13 (`ctx+0x3a8`).
-                // `p.cols[j]` is `p.fcols[j]` stably sorted by row, built once in `simplex::build`.
-                let mut acc = R::c(self.cost[j]) + R::c(self.cost_lo[j]);
-                for &(i, a) in &p.cols[j] {
-                    if y[i].abs() > R::c(DROP_TOL) {
-                        acc -= y[i] * R::c(a);
+                d[j] = R::c(self.cost[j]) + R::c(self.cost_lo[j]);
+            }
+        }
+        // The reference accumulates row-wise (`0x136b00`): rows in ascending order, skipping |y_i| <= 1e-13 (`ctx+0x3a8`). `p.rwise[i]` lists the
+        // entries of row `i` by ascending column in the entry order of `p.cols`, so every column sees its rows in ascending order as before.
+        for (i, row) in p.rwise.iter().enumerate() {
+            let yi = y[i];
+            if yi.abs() > R::c(DROP_TOL) {
+                for &(j, a) in row {
+                    if self.st[j] < 0 {
+                        d[j] -= yi * R::c(a);
                     }
                 }
-                d[j] = acc;
             }
         }
         d
@@ -2184,70 +2352,22 @@ impl<'a, R: Real> Dual<'a, R> {
         if self.ptype == 0 {
             return;
         }
-        let m = self.m;
-        let mut step_of_row = vec![usize::MAX; m];
-        let mut step_of_pos = vec![usize::MAX; m];
-        for (s, &(r, c)) in st.pivots.iter().enumerate() {
-            step_of_row[r] = s;
-            step_of_pos[c] = s;
+        if crate::dump::on("p68") {
+            return self.reset_pricing_ref(st, cols);
         }
-        // Forward lists (`0xf48fd` structure +0x70/+0x80): the earlier steps whose L column holds the row of step k, descending.
-        let mut fwd: Vec<Vec<usize>> = vec![Vec::new(); m];
-        for e in 0..m {
-            for &r in &st.l_rows[e] {
-                fwd[step_of_row[r]].push(e);
-            }
-        }
-        // Backward lists (+0xb0/+0xd0): the later steps in the pivot row of step k: nucleus rows with their fill (`u_rows`), the others with their
-        // original entries, by ascending basis position.
-        let mut row_pos: Vec<Vec<usize>> = vec![Vec::new(); m];
-        for (c, col) in cols.iter().enumerate() {
-            for &i in &col.1 {
-                row_pos[i].push(c);
-            }
-        }
-        let bwd: Vec<Vec<usize>> = (0..m)
-            .map(|k| {
-                if st.phase[k] != 0 {
-                    row_pos[st.pivots[k].0]
-                        .iter()
-                        .map(|&c| step_of_pos[c])
-                        .filter(|&t| t > k)
-                        .collect()
-                } else {
-                    st.u_rows[k]
-                        .iter()
-                        .map(|&(c, _)| step_of_pos[c])
-                        .filter(|&t| t > k)
-                        .collect()
-                }
-            })
-            .collect();
-        let n = m as f64;
-        let mut w = vec![1.0f64; m];
-        for k in 0..m {
-            fwd[k].sort_unstable_by(|a, b| b.cmp(a));
-            fwd[k].dedup();
-            for &j in &fwd[k] {
-                w[k] = (w[k] + w[j]) - (w[j] * w[k]) / n;
-            }
-        }
-        for k in (0..m).rev() {
-            for &j in &bwd[k] {
-                w[k] = (w[k] + w[j]) - (w[j] * w[k]) / n;
-            }
-        }
-        let total: f64 = w.iter().sum();
-        let cap = 0.1 * n + 100.0;
-        if self.ptype == 2 || total > n * cap {
-            self.ptype = 2;
-            w.iter_mut().for_each(|x| *x = cap);
-        } else {
-            for x in w.iter_mut() {
-                let v = *x + 100.0;
-                *x = if cap < v { cap } else { v };
-            }
-        }
+        let mut w = pricing_weights(self.m, st, cols);
+        self.ptype = cap_pricing_weights(self.ptype, self.m, &mut w);
+        self.p68 = w;
+    }
+
+    /// `reset_pricing` with the forward/backward lists materialized, for the `p68` dump (which carries them).
+    fn reset_pricing_ref(
+        &mut self,
+        st: &crate::lu_order::Structure<R>,
+        cols: &[(bool, Vec<usize>, Vec<f64>)],
+    ) {
+        let (fwd, bwd, mut w) = pricing_weights_lists(self.m, st, cols);
+        self.ptype = cap_pricing_weights(self.ptype, self.m, &mut w);
         if crate::dump::on("p68") {
             crate::dump::emit(
                 "p68",
@@ -8255,5 +8375,105 @@ mod true_d_column_order {
                 assert_eq!(old.to_bits(), new.to_bits());
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod reset_pricing_flat {
+    use super::{cap_pricing_weights, pricing_weights, pricing_weights_lists};
+
+    fn bits(v: &[f64]) -> Vec<u64> {
+        v.iter().map(|x| x.to_bits()).collect()
+    }
+
+    /// The flat weights equal the list form bit for bit on random factor structures, with duplicate and out-of-order L rows injected.
+    #[test]
+    fn flat_weights_match_the_list_form() {
+        let mut seed = 0x2545f4914f6cdd1du64;
+        let mut rnd = move |n: usize| {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            (seed % n as u64) as usize
+        };
+        let mut checked = 0;
+        for case in 0..400 {
+            let m = 1 + rnd(40);
+            let extra = rnd(4 * m + 1);
+            let mut cols: Vec<(bool, Vec<usize>, Vec<f64>)> = Vec::new();
+            for c in 0..m {
+                let mut rows = vec![c];
+                for _ in 0..rnd(1 + extra / m.max(1) + 1) {
+                    let r = rnd(m);
+                    if !rows.contains(&r) {
+                        rows.push(r);
+                    }
+                }
+                rows.sort_unstable();
+                let vals = rows.iter().map(|&r| if r == c { 4.0 } else { 0.5 + rnd(7) as f64 }).collect();
+                cols.push((false, rows, vals));
+            }
+            // Permute the columns so the pivot order is not the identity.
+            for i in (1..m).rev() {
+                cols.swap(i, rnd(i + 1));
+            }
+            let mut st = crate::lu_order::factor_structure(m, &cols);
+            if st.pivots.len() != m {
+                continue;
+            }
+            if case % 2 == 1 {
+                for e in 0..m {
+                    let adds = rnd(4);
+                    for _ in 0..adds {
+                        let r = if !st.l_rows[e].is_empty() && rnd(2) == 0 {
+                            st.l_rows[e][rnd(st.l_rows[e].len())]
+                        } else {
+                            rnd(m)
+                        };
+                        st.l_rows[e].push(r);
+                    }
+                    if rnd(5) == 0 {
+                        st.l_rows[e].clear();
+                    }
+                }
+            }
+            let flat = pricing_weights(m, &st, &cols);
+            let (_, _, lists) = pricing_weights_lists(m, &st, &cols);
+            assert_eq!(bits(&flat), bits(&lists), "case {case}, m {m}");
+            checked += 1;
+        }
+        assert!(checked > 200);
+    }
+
+    /// The cap, including the type-2 and the over-total branches, against the original inline code.
+    #[test]
+    fn cap_branches() {
+        fn old(ptype: u8, m: usize, w: &mut Vec<f64>) -> u8 {
+            let mut ptype = ptype;
+            let n = m as f64;
+            let total: f64 = w.iter().sum();
+            let cap = 0.1 * n + 100.0;
+            if ptype == 2 || total > n * cap {
+                ptype = 2;
+                w.iter_mut().for_each(|x| *x = cap);
+            } else {
+                for x in w.iter_mut() {
+                    let v = *x + 100.0;
+                    *x = if cap < v { cap } else { v };
+                }
+            }
+            ptype
+        }
+        for (ptype, m, scale) in [(1u8, 10usize, 1.0), (2, 10, 1.0), (1, 10, 1e3), (1, 200, 0.1), (1, 200, 1e6), (2, 200, 1e6)] {
+            let w0: Vec<f64> = (0..m).map(|i| 1.0 + i as f64 * scale).collect();
+            let (mut a, mut b) = (w0.clone(), w0);
+            let (pa, pb) = (cap_pricing_weights(ptype, m, &mut a), old(ptype, m, &mut b));
+            assert_eq!((pa, bits(&a)), (pb, bits(&b)));
+        }
+        // Both type outcomes occur among the cases above.
+        let mut w = vec![1e9; 10];
+        assert_eq!(cap_pricing_weights(1, 10, &mut w), 2);
+        let mut w = vec![1.0; 10];
+        assert_eq!(cap_pricing_weights(1, 10, &mut w), 1);
     }
 }

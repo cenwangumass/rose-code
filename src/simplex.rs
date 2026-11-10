@@ -826,7 +826,7 @@ pub(crate) struct Internal {
     pub(crate) rhs: Vec<f64>,
     pub(crate) cost: Vec<f64>,
     /// Row-wise copy of `cols` (all columns, slacks included): row `i` holds `(j, a)` in ascending `j`, a column's entries in its order.
-    rwise: Vec<Vec<(usize, f64)>>,
+    pub(crate) rwise: Vec<Vec<(usize, f64)>>,
     /// Offset of each column in the concatenated value array (prefix sums of the column lengths).
     pub(crate) offs: Vec<usize>,
 }
