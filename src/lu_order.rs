@@ -147,21 +147,26 @@ pub fn factor_structure_r<'a, R: Real>(m: usize, cols: impl Into<Cols<'a>>) -> S
         done_r[r] = true;
         done_c[c] = true;
     }
-    let mut nuc: Vec<(usize, Vec<(usize, R)>)> = Vec::new();
+    // The nucleus columns, flat: each column's kept entries in reverse input order.
+    let mut nuc_pos: Vec<usize> = Vec::new();
+    let mut nuc_start: Vec<usize> = vec![0];
+    let mut nuc_ent: Vec<(usize, R)> = Vec::new();
     for (pos, (_, idx, val)) in cols.iter().enumerate() {
         if done_c[pos] {
             continue;
         }
-        let mut d: Vec<(usize, R)> = idx
-            .iter()
-            .copied()
-            .zip(val.iter().copied())
-            // The reference's matrix leaves out entries below the absolute tolerance (fx_e2_r25: a scaled entry 2^-44 in a row of the nucleus changed its count).
-            .filter(|(i, v)| !done_r[*i] && v.abs() >= ABS_TOL)
-            .map(|(i, v)| (i, R::c(v)))
-            .collect();
-        d.reverse();
-        nuc.push((pos, d));
+        let first = nuc_ent.len();
+        nuc_ent.extend(
+            idx.iter()
+                .copied()
+                .zip(val.iter().copied())
+                // The reference's matrix leaves out entries below the absolute tolerance (fx_e2_r25: a scaled entry 2^-44 in a row of the nucleus changed its count).
+                .filter(|(i, v)| !done_r[*i] && v.abs() >= ABS_TOL)
+                .map(|(i, v)| (i, R::c(v))),
+        );
+        nuc_ent[first..].reverse();
+        nuc_pos.push(pos);
+        nuc_start.push(nuc_ent.len());
     }
     // The work estimate counts every input entry in active rows and columns
     // before the numeric nucleus applies its magnitude filter (0xd4e4b,
@@ -179,8 +184,9 @@ pub fn factor_structure_r<'a, R: Real>(m: usize, cols: impl Into<Cols<'a>>) -> S
         })
         .sum();
     let nnz_cols: usize = cols.iter().map(|c| c.1.len()).sum();
-    let (np, nl, nv, npiv, nu, nuc_work) = nucleus(m, nnz_cols, &nuc);
-    seq.extend(np);
+    let nuc = nucleus(m, nnz_cols, &nuc_pos, &nuc_start, &nuc_ent);
+    let nuc_work = nuc.work;
+    seq.extend(nuc.pivots.iter().copied());
     phase.resize(seq.len(), 0);
     let mut step = vec![usize::MAX; m];
     for (s, &(r, _)) in seq.iter().enumerate() {
@@ -218,21 +224,17 @@ pub fn factor_structure_r<'a, R: Real>(m: usize, cols: impl Into<Cols<'a>>) -> S
     for (&s, &d) in &ov.diag {
         diag[s] = d;
     }
-    for (r, v) in nl.into_iter().zip(nv) {
-        l_idx.extend_from_slice(&r);
-        l_raw.extend(std::iter::repeat_n(R::c(f64::NAN), v.len()));
-        l_val.extend(v);
-        l_start.push(l_idx.len());
-    }
-    diag.extend(npiv);
-    let mut u_ent: Vec<(usize, R)> = Vec::with_capacity(nu.iter().map(Vec::len).sum());
+    let l_base = l_idx.len();
+    l_idx.extend_from_slice(&nuc.l_idx);
+    l_raw.extend(std::iter::repeat_n(R::c(f64::NAN), nuc.l_val.len()));
+    l_val.extend_from_slice(&nuc.l_val);
+    l_start.extend(nuc.l_start[1..].iter().map(|&e| l_base + e));
+    diag.extend_from_slice(&nuc.diag);
     // Singleton steps have no U row.
     let mut u_start: Vec<usize> = Vec::with_capacity(nsteps + 1);
     u_start.resize(nsing + 1, 0);
-    for row in nu {
-        u_ent.extend(row);
-        u_start.push(u_ent.len());
-    }
+    u_start.extend(nuc.u_start[1..].iter().copied());
+    let u_ent = nuc.u_ent;
     Structure {
         pivots: seq,
         phase,
@@ -530,19 +532,31 @@ fn phases<R: Real>(
     let pair_gate_record = pair_gate(m - seq.len());
     if pair_gate_record.is_some() && std::env::var_os("ROSE_NO_PAIRS").is_none() {
         let before = seq.len();
-        ov = crate::lu_pairs::run(
-            m, cols, &mut seq, &mut phase, &row_done3, &col_done3, &row_done, &col_done,
-        );
+        #[cfg(test)]
+        let run = if crate::lu_pairs::USE_REF.with(|c| c.get()) {
+            crate::lu_pairs::reference::run::<R>
+        } else {
+            crate::lu_pairs::run::<R>
+        };
+        #[cfg(not(test))]
+        let run = crate::lu_pairs::run::<R>;
+        ov = run(m, cols, &mut seq, &mut phase, &row_done3, &col_done3, &row_done, &col_done);
         pair_gate_end(seq.len() - before);
     }
     (seq, phase, ov, loff, pair_gate_record)
 }
 
+const NIL: usize = usize::MAX;
+
+/// A nucleus entry on two singly linked chains (its row's and its column's); a new entry goes to the front of both.
 struct Node<R> {
     r: usize,
     c: usize,
     v: R,
     alive: bool,
+    /// Next entry of the row chain and of the column chain (`NIL` at the end).
+    rn: usize,
+    cn: usize,
 }
 
 /// Circular lists preserve bucket order while allowing constant-time membership updates.
@@ -557,8 +571,9 @@ impl Buckets {
     fn new(n: usize) -> Self {
         Self {
             heads: vec![usize::MAX; n],
-            next: vec![usize::MAX; n],
-            prev: vec![usize::MAX; n],
+            // `next` and `prev` of a member are written by `insert` before any read.
+            next: vec![0; n],
+            prev: vec![0; n],
             owner: vec![usize::MAX; n],
         }
     }
@@ -616,8 +631,10 @@ impl Buckets {
 
 struct Nucleus<R> {
     nodes: Vec<Node<R>>,
-    colchain: Vec<Vec<usize>>,
-    rowchain: Vec<Vec<usize>>,
+    /// First entry of each column's / row's chain. The chain order is the order of the former `Vec` chains (front insertion
+    /// = new entry first); only live entries are ever read, and cleaning drops dead ones without changing the order.
+    chead: Vec<usize>,
+    rhead: Vec<usize>,
     ccnt: Vec<usize>,
     rcnt: Vec<usize>,
     cb: Buckets,
@@ -664,14 +681,52 @@ impl<R: Real> Nucleus<R> {
         }
     }
 
+    /// Unlinks the dead entries of column `c`'s chain.
     fn clean_col(&mut self, c: usize) {
-        let nodes = &self.nodes;
-        self.colchain[c].retain(|&i| nodes[i].alive);
+        let (mut prev, mut i) = (NIL, self.chead[c]);
+        while i != NIL {
+            let next = self.nodes[i].cn;
+            if self.nodes[i].alive {
+                prev = i;
+            } else if prev == NIL {
+                self.chead[c] = next;
+            } else {
+                self.nodes[prev].cn = next;
+            }
+            i = next;
+        }
     }
 
     fn clean_row(&mut self, r: usize) {
-        let nodes = &self.nodes;
-        self.rowchain[r].retain(|&i| nodes[i].alive);
+        let (mut prev, mut i) = (NIL, self.rhead[r]);
+        while i != NIL {
+            let next = self.nodes[i].rn;
+            if self.nodes[i].alive {
+                prev = i;
+            } else if prev == NIL {
+                self.rhead[r] = next;
+            } else {
+                self.nodes[prev].rn = next;
+            }
+            i = next;
+        }
+    }
+
+    /// First live entry of column `c`'s chain (`NIL` if none).
+    fn first_alive_col(&self, c: usize) -> usize {
+        let mut i = self.chead[c];
+        while i != NIL && !self.nodes[i].alive {
+            i = self.nodes[i].cn;
+        }
+        i
+    }
+
+    fn first_alive_row(&self, r: usize) -> usize {
+        let mut i = self.rhead[r];
+        while i != NIL && !self.nodes[i].alive {
+            i = self.nodes[i].rn;
+        }
+        i
     }
 
     fn add_node(&mut self, r: usize, c: usize, v: R) {
@@ -681,23 +736,28 @@ impl<R: Real> Nucleus<R> {
             c,
             v,
             alive: true,
+            rn: self.rhead[r],
+            cn: self.chead[c],
         });
-        self.rowchain[r].insert(0, id);
-        self.colchain[c].insert(0, id);
+        self.rhead[r] = id;
+        self.chead[c] = id;
         self.rcnt[r] += 1;
         self.ccnt[c] += 1;
     }
 }
 
-/// `cols`: (position, entries (row, value) in column-chain order). Rows and positions are the global indices of the basis.
-type NucleusOut<R> = (
-    Vec<(usize, usize)>,
-    Vec<Vec<usize>>,
-    Vec<Vec<R>>,
-    Vec<R>,
-    Vec<Vec<(usize, R)>>,
-    f64,
-);
+/// Flat output of the Markowitz nucleus: pivots, and per step the L column (`l_start`, `l_idx`, `l_val`), the pivot value and
+/// the U row (`u_start`, `u_ent`), in the entry order of the former per-step lists.
+struct NucleusOut<R> {
+    pivots: Vec<(usize, usize)>,
+    l_start: Vec<usize>,
+    l_idx: Vec<usize>,
+    l_val: Vec<R>,
+    diag: Vec<R>,
+    u_start: Vec<usize>,
+    u_ent: Vec<(usize, R)>,
+    work: f64,
+}
 
 thread_local! {
     /// Doubleton pass gate state kept across factorizations: `(ctx+0x4e0 attempts, ctx+0x4e4 gate word)`, and `ctx+0x2c0`, the number of
@@ -821,13 +881,15 @@ fn gate_log() -> bool {
     *ON.get_or_init(|| std::env::var_os("ROSE_GATE_LOG").is_some())
 }
 
-fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -> NucleusOut<R> {
+/// `ckeys`: the basis positions of the nucleus columns; column `k` has the entries `ents[start[k]..start[k + 1]]` (row, value)
+/// in column-chain order.
+fn nucleus<R: Real>(m: usize, nnz_b: usize, ckeys: &[usize], start: &[usize], ents: &[(usize, R)]) -> NucleusOut<R> {
     DENSE_N.with(|c| c.set(0));
-    let npos = cols.iter().map(|c| c.0 + 1).max().unwrap_or(0);
+    let npos = ckeys.iter().map(|&c| c + 1).max().unwrap_or(0);
     let mut s = Nucleus {
-        nodes: Vec::new(),
-        colchain: vec![Vec::new(); npos],
-        rowchain: vec![Vec::new(); m],
+        nodes: Vec::with_capacity(ents.len() + ents.len() / 2),
+        chead: vec![NIL; npos],
+        rhead: vec![NIL; m],
         ccnt: vec![0; npos],
         rcnt: vec![0; m],
         cb: Buckets::new(m.max(npos) + 2),
@@ -837,44 +899,61 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
         cst: Vec::new(),
         rst: Vec::new(),
     };
-    let ckeys: Vec<usize> = cols.iter().map(|c| c.0).collect();
-    for (pos, ents) in cols {
-        for &(i, x) in ents {
-            let id = s.nodes.len();
+    // Column chains in entry order (ids are consecutive within a column); row chains get every entry at the front, in column
+    // order then entry order, i.e. in descending id order from the head.
+    for (k, &pos) in ckeys.iter().enumerate() {
+        let first = s.nodes.len();
+        for (j, &(i, x)) in ents[start[k]..start[k + 1]].iter().enumerate() {
+            let id = first + j;
             s.nodes.push(Node {
                 r: i,
-                c: *pos,
+                c: pos,
                 v: x,
                 alive: true,
+                rn: s.rhead[i],
+                cn: if first + j + 1 < first + (start[k + 1] - start[k]) { id + 1 } else { NIL },
             });
-            s.colchain[*pos].push(id);
+            s.rhead[i] = id;
+        }
+        if start[k + 1] > start[k] {
+            s.chead[pos] = first;
         }
     }
-    for &c in &ckeys {
-        let ids = s.colchain[c].clone();
-        for id in ids {
-            let r = s.nodes[id].r;
-            s.rowchain[r].insert(0, id);
+    for &c in ckeys {
+        let (mut n, mut i) = (0, s.chead[c]);
+        while i != NIL {
+            n += 1;
+            i = s.nodes[i].cn;
         }
+        s.ccnt[c] = n;
     }
-    let rkeys: Vec<usize> = (0..m).filter(|&r| !s.rowchain[r].is_empty()).collect();
-    for &c in &ckeys {
-        s.ccnt[c] = s.colchain[c].len();
-    }
+    let rkeys: Vec<usize> = (0..m).filter(|&r| s.rhead[r] != NIL).collect();
     for &r in &rkeys {
-        s.rcnt[r] = s.rowchain[r].len();
+        let (mut n, mut i) = (0, s.rhead[r]);
+        while i != NIL {
+            n += 1;
+            i = s.nodes[i].rn;
+        }
+        s.rcnt[r] = n;
     }
-    for &c in &ckeys {
+    for &c in ckeys {
         s.cins(c);
     }
     for &r in &rkeys {
         s.rins(r);
     }
-    let mut out = Vec::new();
-    let mut lout: Vec<Vec<usize>> = Vec::new();
-    let mut lvout: Vec<Vec<R>> = Vec::new();
+    let mut out = Vec::with_capacity(ckeys.len());
+    let mut l_start: Vec<usize> = vec![0];
+    let mut l_idx: Vec<usize> = Vec::new();
+    let mut l_val: Vec<R> = Vec::new();
     let mut pout: Vec<R> = Vec::new();
-    let mut uout: Vec<Vec<(usize, R)>> = Vec::new();
+    let mut u_start: Vec<usize> = vec![0];
+    let mut u_ent: Vec<(usize, R)> = Vec::new();
+    // Per-pivot temporaries, retained: the pivot row's and column's entries (without the pivot), U, L.
+    let mut prow: Vec<usize> = Vec::new();
+    let mut pcol: Vec<usize> = Vec::new();
+    let mut u: Vec<(usize, R)> = Vec::new();
+    let mut l: Vec<(usize, R)> = Vec::new();
     let mut prows = vec![false; m];
     let mut pcols = vec![false; npos];
     // Each temporary seen set gets a fresh generation without clearing or allocating per row/column.
@@ -892,7 +971,8 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
         let mut sing_kind: Option<bool> = None;
         while let Some(c) = s.cst.pop() {
             if s.ccnt[c] == 1 {
-                if let Some(&id) = s.colchain[c].iter().find(|&&i| s.nodes[i].alive) {
+                let id = s.first_alive_col(c);
+                if id != NIL {
                     sing = Some(id);
                     sing_kind = Some(true);
                     break;
@@ -902,7 +982,8 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
         if sing.is_none() {
             while let Some(r) = s.rst.pop() {
                 if s.rcnt[r] == 1 {
-                    if let Some(&id) = s.rowchain[r].iter().find(|&&i| s.nodes[i].alive) {
+                    let id = s.first_alive_row(r);
+                    if id != NIL {
                         sing = Some(id);
                         sing_kind = Some(false);
                         break;
@@ -968,11 +1049,13 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
                         let rpos: std::collections::HashMap<usize, usize> =
                             rows.iter().enumerate().map(|(i, &r)| (r, i)).collect();
                         for (cj, &c) in cols_a.iter().enumerate() {
-                            for &id in &s.colchain[c] {
+                            let mut id = s.chead[c];
+                            while id != NIL {
                                 let nd = &s.nodes[id];
                                 if nd.alive {
                                     a[rpos[&nd.r]][cj] = nd.v;
                                 }
+                                id = nd.cn;
                             }
                         }
                         let base = std::env::var("ROSE_DBASE")
@@ -996,26 +1079,19 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
                         for k in 0..nn {
                             let piv = a[k][k];
                             out.push((rows[perm[k]], cols_a[k]));
-                            let mut lr = Vec::new();
-                            let mut lv = Vec::new();
                             for i in k + 1..nn {
                                 if a[i][k].abs() > R::c(ABS_TOL) {
-                                    lr.push(rows[perm[i]]);
-                                    lv.push(a[i][k]);
+                                    l_idx.push(rows[perm[i]]);
+                                    l_val.push(a[i][k]);
                                 }
                             }
-                            lout.push(lr);
-                            lvout.push(lv);
+                            l_start.push(l_idx.len());
                             pout.push(piv);
-                            uout.push(
-                                (k + 1..nn)
-                                    .filter(|&j| a[k][j] != R::ZERO)
-                                    .map(|j| (cols_a[j], a[k][j]))
-                                    .collect(),
-                            );
+                            u_ent.extend((k + 1..nn).filter(|&j| a[k][j] != R::ZERO).map(|j| (cols_a[j], a[k][j])));
+                            u_start.push(u_ent.len());
                         }
                         DENSE_N.with(|c| c.set(nn));
-                        return (out, lout, lvout, pout, uout, work);
+                        return NucleusOut { pivots: out, l_start, l_idx, l_val, diag: pout, u_start, u_ent, work };
                     }
                 }
             }
@@ -1047,43 +1123,57 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
         pcols[pc] = true;
         s.clean_row(pr);
         s.clean_col(pc);
-        let s_col: usize = s.colchain[pc]
-            .iter()
-            .map(|&i| s.rcnt[s.nodes[i].r] - 1)
-            .sum();
-        let s_row: usize = s.rowchain[pr]
-            .iter()
-            .map(|&i| s.ccnt[s.nodes[i].c] - 1)
-            .sum();
+        // All entries of both chains are live after cleaning. Nothing links or unlinks an entry before the elimination below
+        // adds the fill, so these walks see the lists the former per-pivot clones held.
+        let (mut s_col, mut s_row) = (0usize, 0usize);
+        pcol.clear();
+        let mut i = s.chead[pc];
+        while i != NIL {
+            s_col += s.rcnt[s.nodes[i].r] - 1;
+            if s.nodes[i].r != pr {
+                pcol.push(i);
+            }
+            i = s.nodes[i].cn;
+        }
+        prow.clear();
+        let mut i = s.rhead[pr];
+        while i != NIL {
+            s_row += s.ccnt[s.nodes[i].c] - 1;
+            if s.nodes[i].c != pc {
+                prow.push(i);
+            }
+            i = s.nodes[i].rn;
+        }
         s.rdel(pr);
         s.cdel(pc);
-        let prow: Vec<usize> = s.rowchain[pr]
-            .iter()
-            .copied()
-            .filter(|&i| s.nodes[i].c != pc)
-            .collect();
-        let pcol: Vec<usize> = s.colchain[pc]
-            .iter()
-            .copied()
-            .filter(|&i| s.nodes[i].r != pr)
-            .collect();
-        let u: Vec<(usize, R)> = prow.iter().map(|&i| (s.nodes[i].c, s.nodes[i].v)).collect();
-        let l: Vec<(usize, R)> = pcol
-            .iter()
-            .map(|&i| (s.nodes[i].r, s.nodes[i].v / pv))
-            .collect();
-        lout.push(l.iter().map(|x| x.0).collect());
-        lvout.push(l.iter().map(|x| x.1).collect());
+        u.clear();
+        u.extend(prow.iter().map(|&i| (s.nodes[i].c, s.nodes[i].v)));
+        l.clear();
+        l.extend(pcol.iter().map(|&i| (s.nodes[i].r, s.nodes[i].v / pv)));
+        l_idx.extend(l.iter().map(|x| x.0));
+        l_val.extend(l.iter().map(|x| x.1));
+        l_start.push(l_idx.len());
         pout.push(pv);
-        uout.push(u.clone());
-        let col_ids: Vec<usize> = s.colchain[pc].clone();
-        let row_ids: Vec<usize> = s.rowchain[pr].clone();
+        u_ent.extend_from_slice(&u);
+        u_start.push(u_ent.len());
         // The search's work (site `0xd85e6`): a singleton costs its remaining row (column singleton) or column (row
         // singleton); a Markowitz step its search and the cheaper of the two elimination sweeps.
         work += match sing_kind {
             Some(true) => 10.0 * (prow.len() + 1) as f64,
             Some(false) => 10.0 * (pcol.len() + 1) as f64,
             None => 6.0 * search_cost + 10.0 * (s_row - pcol.len()).min(s_col - prow.len()) as f64,
+        };
+        let kill_chains = |s: &mut Nucleus<R>| {
+            let mut i = s.chead[pc];
+            while i != NIL {
+                s.nodes[i].alive = false;
+                i = s.nodes[i].cn;
+            }
+            let mut i = s.rhead[pr];
+            while i != NIL {
+                s.nodes[i].alive = false;
+                i = s.nodes[i].rn;
+            }
         };
         if s_col < s_row {
             for &i in &prow {
@@ -1096,12 +1186,7 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
                 let r = s.nodes[i].r;
                 s.rdel(r);
             }
-            for &i in &col_ids {
-                s.nodes[i].alive = false;
-            }
-            for &i in &row_ids {
-                s.nodes[i].alive = false;
-            }
+            kill_chains(&mut s);
             for &i in &pcol {
                 let r2 = s.nodes[i].r;
                 s.nodes[i].alive = false;
@@ -1112,17 +1197,20 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
                     seen.fill(0);
                     generation = 1;
                 }
-                let chain = s.rowchain[r2].clone();
-                for mid in chain {
-                    if !s.nodes[mid].alive || s.nodes[mid].c == pc {
+                // The fill is added after the walk, so the chain is not changed while it is read.
+                let mut mid = s.rhead[r2];
+                while mid != NIL {
+                    let cur = mid;
+                    mid = s.nodes[cur].rn;
+                    if !s.nodes[cur].alive || s.nodes[cur].c == pc {
                         continue;
                     }
-                    let c = s.nodes[mid].c;
+                    let c = s.nodes[cur].c;
                     if let Some(&(_, uc)) = u.iter().find(|x| x.0 == c) {
                         seen[c] = generation;
-                        s.nodes[mid].v -= lr * uc;
-                        if s.nodes[mid].v.abs() < R::c(ABS_TOL) {
-                            s.nodes[mid].alive = false;
+                        s.nodes[cur].v -= lr * uc;
+                        if s.nodes[cur].v.abs() < R::c(ABS_TOL) {
+                            s.nodes[cur].alive = false;
                             s.rcnt[r2] -= 1;
                             s.ccnt[c] -= 1;
                         }
@@ -1153,12 +1241,7 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
                 let c = s.nodes[i].c;
                 s.cdel(c);
             }
-            for &i in &col_ids {
-                s.nodes[i].alive = false;
-            }
-            for &i in &row_ids {
-                s.nodes[i].alive = false;
-            }
+            kill_chains(&mut s);
             for &(c2, uc) in &u {
                 s.ccnt[c2] -= 1;
                 generation = generation.wrapping_add(1);
@@ -1166,17 +1249,19 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
                     seen.fill(0);
                     generation = 1;
                 }
-                let chain = s.colchain[c2].clone();
-                for mid in chain {
-                    if !s.nodes[mid].alive || s.nodes[mid].r == pr {
+                let mut mid = s.chead[c2];
+                while mid != NIL {
+                    let cur = mid;
+                    mid = s.nodes[cur].cn;
+                    if !s.nodes[cur].alive || s.nodes[cur].r == pr {
                         continue;
                     }
-                    let r = s.nodes[mid].r;
+                    let r = s.nodes[cur].r;
                     if let Some(&(_, lv)) = l.iter().find(|x| x.0 == r) {
                         seen[r] = generation;
-                        s.nodes[mid].v -= lv * uc;
-                        if s.nodes[mid].v.abs() < R::c(ABS_TOL) {
-                            s.nodes[mid].alive = false;
+                        s.nodes[cur].v -= lv * uc;
+                        if s.nodes[cur].v.abs() < R::c(ABS_TOL) {
+                            s.nodes[cur].alive = false;
                             s.rcnt[r] -= 1;
                             s.ccnt[c2] -= 1;
                         }
@@ -1198,7 +1283,7 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
             }
         }
     }
-    (out, lout, lvout, pout, uout, work)
+    NucleusOut { pivots: out, l_start, l_idx, l_val, diag: pout, u_start, u_ent, work }
 }
 
 /// Markowitz search over the count buckets; returns the node of the chosen pivot (rotating bucket heads as the reference does)
@@ -1246,14 +1331,16 @@ fn search<R: Real>(s: &mut Nucleus<R>, remaining: usize) -> Option<(usize, f64)>
                         s.clean_row(x);
                     }
                     last = x;
-                    let ch: Vec<usize> = if col {
-                        s.colchain[x].clone()
-                    } else {
-                        s.rowchain[x].clone()
-                    };
-                    let mx = ch.iter().map(|&n| s.nodes[n].v.abs()).fold(R::ZERO, R::max);
+                    let first = if col { s.chead[x] } else { s.rhead[x] };
+                    let mut mx = R::ZERO;
+                    let mut n = first;
+                    while n != NIL {
+                        mx = R::max(mx, s.nodes[n].v.abs());
+                        n = if col { s.nodes[n].cn } else { s.nodes[n].rn };
+                    }
                     if mx >= R::c(ABS_TOL) {
-                        for &n in &ch {
+                        let mut n = first;
+                        while n != NIL {
                             let cost = (((if col {
                                 s.rcnt[s.nodes[n].r]
                             } else {
@@ -1268,6 +1355,7 @@ fn search<R: Real>(s: &mut Nucleus<R>, remaining: usize) -> Option<(usize, f64)>
                                 bratio = a / mx;
                                 best = Some(n);
                             }
+                            n = if col { s.nodes[n].cn } else { s.nodes[n].rn };
                         }
                         count += 1;
                         if count >= limit {
@@ -1557,6 +1645,10 @@ fn dense_lu_uncached<R: Real>(a: &mut [Vec<R>], base: usize) -> Vec<usize> {
     }
     perm
 }
+
+#[cfg(test)]
+#[path = "lu_order_ref.rs"]
+mod reference;
 
 #[cfg(test)]
 mod row_column_tests {
@@ -1868,9 +1960,22 @@ mod flat_structure_tests {
         u_rows: Vec<Vec<(usize, R)>>,
         pivots: Vec<(usize, usize)>,
         phase: Vec<u8>,
+        nuc_nnz: usize,
+        nuc_work: f64,
+        loff: usize,
+        dense_n: usize,
+        pair_unz: std::collections::HashMap<usize, usize>,
+        pair_urow: std::collections::HashMap<usize, Vec<usize>>,
     }
 
     fn old_structure<R: Real>(m: usize, cols: Cols<'_>) -> Old<R> {
+        crate::lu_pairs::USE_REF.with(|c| c.set(true));
+        let old = old_structure_ref::<R>(m, cols);
+        crate::lu_pairs::USE_REF.with(|c| c.set(false));
+        old
+    }
+
+    fn old_structure_ref<R: Real>(m: usize, cols: Cols<'_>) -> Old<R> {
     let (mut seq, mut phase, ov, loff, pair_gate_record) = phases(m, cols);
     let nsing = seq.len();
     let mut done_r = vec![false; m];
@@ -1910,7 +2015,8 @@ mod flat_structure_tests {
             }
         })
         .sum();
-    let (np, nl, nv, npiv, nu, nuc_work) = nucleus(m, cols.iter().map(|c| c.1.len()).sum(), &nuc);
+    let (np, nl, nv, npiv, nu, nuc_work) = reference::nucleus(m, cols.iter().map(|c| c.1.len()).sum(), &nuc);
+    let dense_n = DENSE_N.with(|c| c.get());
     seq.extend(np);
     phase.resize(seq.len(), 0);
     let mut step = vec![usize::MAX; m];
@@ -1958,7 +2064,7 @@ mod flat_structure_tests {
     l_vals.extend(nv);
     diag.extend(npiv);
     u_rows.extend(nu);
-        Old { l_rows, l_vals, l_raw, diag, u_rows, pivots: seq, phase }
+        Old { l_rows, l_vals, l_raw, diag, u_rows, pivots: seq, phase, nuc_nnz, nuc_work, loff, dense_n, pair_unz, pair_urow }
     }
 
     struct Rng(u64);
@@ -2010,13 +2116,72 @@ mod flat_structure_tests {
         cols
     }
 
+    /// Dense columns: the nucleus has to be handed to the dense LU.
+    fn dense_cols(rng: &mut Rng, m: usize) -> Vec<Col> {
+        let fill = 40 + rng.below(40);
+        (0..m)
+            .map(|c| {
+                let mut rows: Vec<usize> = (0..m).filter(|&r| r == c || rng.below(100) < fill).collect();
+                if rng.below(2) == 0 {
+                    rows.reverse();
+                }
+                let vals = rows.iter().map(|_| (1 + rng.below(4)) as f64 * if rng.below(2) == 0 { 0.5 } else { -1.0 }).collect();
+                (false, rows, vals)
+            })
+            .collect()
+    }
+
+    /// Columns made of row pairs and column pairs (equal two-entry patterns), so the doubleton pass finds work, with a sparse
+    /// remainder whose counts tie.
+    fn paired_cols(rng: &mut Rng, m: usize) -> Vec<Col> {
+        let mut cols: Vec<Col> = Vec::new();
+        let mut c = 0;
+        while c < m {
+            let (a, b) = (rng.below(m), rng.below(m));
+            let kind = rng.below(4);
+            let width = if kind == 0 { 2 } else { 1 + rng.below(2) };
+            for _ in 0..width {
+                if c >= m {
+                    break;
+                }
+                let mut rows = if a == b { vec![a] } else { vec![a, b] };
+                if kind == 3 {
+                    rows.push(rng.below(m));
+                    rows.dedup();
+                }
+                let vals = rows.iter().map(|_| (1 + rng.below(3)) as f64 * if rng.below(2) == 0 { 0.5 } else { -2.0 }).collect();
+                cols.push((false, rows, vals));
+                c += 1;
+            }
+        }
+        for i in (1..m).rev() {
+            cols.swap(i, rng.below(i + 1));
+        }
+        cols
+    }
+
     fn check<R: Real>(bits: impl Fn(R) -> (u64, u16) + Copy) {
-        let mut rng = Rng(12345);
+        check_gen::<R>(bits, random_cols, 12345, 600, 120);
+        let (_, pairs, _) = check_gen::<R>(bits, paired_cols, 777, 600, 200);
+        assert!(pairs > 100, "the doubleton pass overrides {pairs} steps");
+        let (_, _, dense) = check_gen::<R>(bits, dense_cols, 99, 200, 110);
+        assert!(dense > 5, "dense hand-offs {dense}");
+    }
+
+    fn check_gen<R: Real>(
+        bits: impl Fn(R) -> (u64, u16) + Copy,
+        gen: fn(&mut Rng, usize) -> Vec<Col>,
+        seed: u64,
+        cases: usize,
+        maxm: usize,
+    ) -> (usize, usize, usize) {
+        let mut rng = Rng(seed);
         let mut pair_steps = 0;
         let mut nuc_steps = 0;
-        for case in 0..600 {
-            let m = 1 + rng.below(if case % 10 == 0 { 120 } else { 40 });
-            let cols = random_cols(&mut rng, m);
+        let mut dense_cases = 0;
+        for case in 0..cases {
+            let m = 1 + rng.below(if case % 10 == 0 { maxm } else { maxm / 3 + 1 });
+            let cols = gen(&mut rng, m);
             let gate = (0, GATE_ALWAYS);
             gate_set(gate);
             set_pool_dims(m, cols.iter().map(|c| c.1.len()).sum());
@@ -2028,6 +2193,13 @@ mod flat_structure_tests {
             gate_set(gate);
             assert_eq!(new.pivots, old.pivots, "case {case}");
             assert_eq!(new.phase, old.phase, "case {case}");
+            assert_eq!(new.nuc_nnz, old.nuc_nnz, "case {case}");
+            assert_eq!(new.nuc_work.to_bits(), old.nuc_work.to_bits(), "case {case}");
+            assert_eq!(new.loff, old.loff, "case {case}");
+            assert_eq!(new.dense_n, old.dense_n, "case {case}");
+            assert_eq!(new.pair_unz, old.pair_unz, "case {case}");
+            assert_eq!(new.pair_urow, old.pair_urow, "case {case}");
+            dense_cases += usize::from(new.dense_n > 0);
             assert_eq!(new.steps(), old.l_rows.len(), "case {case}");
             assert_eq!(new.diag.len(), old.diag.len());
             let b = |v: &R| bits(*v);
@@ -2050,8 +2222,8 @@ mod flat_structure_tests {
             assert_eq!(new.l_nnz(), nnz);
             pair_steps += new.pair_unz.len();
         }
-        assert!(nuc_steps > 100, "nucleus steps {nuc_steps}");
-        assert!(pair_steps > 0, "the doubleton pass overrides no step");
+        assert!(nuc_steps > 40, "nucleus steps {nuc_steps}");
+        (nuc_steps, pair_steps, dense_cases)
     }
 
     #[test]
