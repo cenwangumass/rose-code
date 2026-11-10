@@ -149,7 +149,8 @@ pub(super) fn fused_forward<R: Real>(l: &LPool<R>, x: &mut [R]) -> (usize, usize
     let (idx, val) = (&l.idx[..], &l.val[..]);
     let tol = R::c(TOL);
     let (mut count, mut len_sum) = (0usize, 0usize);
-    for (v, w) in l.start.windows(2).enumerate() {
+    let start = &l.start[..];
+    for v in 0..l.lines() {
         // SAFETY: `v < lines <= x.len()` (checked above).
         let xv = unsafe { *x.get_unchecked(v) };
         let a = xv.abs();
@@ -157,7 +158,8 @@ pub(super) fn fused_forward<R: Real>(l: &LPool<R>, x: &mut [R]) -> (usize, usize
         if a <= tol {
             continue;
         }
-        let (s, e) = (w[0] as usize, w[1] as usize);
+        // SAFETY: `v + 1 <= lines < start.len()`.
+        let (s, e) = unsafe { (*start.get_unchecked(v) as usize, *start.get_unchecked(v + 1) as usize) };
         len_sum += e - s;
         // SAFETY: `s <= e <= idx.len() == val.len()` (monotone `start` ending at the entry count); destinations `< idx_bound <= x.len()`.
         unsafe { sub_column(x, idx.get_unchecked(s..e), val.get_unchecked(s..e), xv) };
@@ -172,13 +174,15 @@ pub(super) fn forward_sweep<R: Real>(l: &LPool<R>, x: &mut [R]) -> usize {
     let (idx, val) = (&l.idx[..], &l.val[..]);
     let tol = R::c(TOL);
     let mut len_sum = 0usize;
-    for (v, w) in l.start.windows(2).enumerate() {
+    let start = &l.start[..];
+    for v in 0..l.lines() {
         // SAFETY: `v < lines <= x.len()` (checked above).
         let xv = unsafe { *x.get_unchecked(v) };
         if xv.abs() <= tol {
             continue;
         }
-        let (s, e) = (w[0] as usize, w[1] as usize);
+        // SAFETY: `v + 1 <= lines < start.len()`.
+        let (s, e) = unsafe { (*start.get_unchecked(v) as usize, *start.get_unchecked(v + 1) as usize) };
         len_sum += e - s;
         // SAFETY: as in `fused_forward`.
         unsafe { sub_column(x, idx.get_unchecked(s..e), val.get_unchecked(s..e), xv) };
@@ -194,15 +198,20 @@ pub(super) fn reverse_sweep<R: Real>(lt: &Csr<R>, x: &mut [R]) -> usize {
     let (idx, val) = (&lt.idx[..], &lt.val[..]);
     let tol = R::c(TOL);
     let mut len_sum = 0usize;
-    for (i, w) in lt.start.windows(2).enumerate().rev() {
+    let start = &lt.start[..];
+    let mut i = lt.lines();
+    while i != 0 {
+        i -= 1;
         // SAFETY: `i < lines <= x.len()` (checked above).
         let v = unsafe { *x.get_unchecked(i) };
-        if v.abs() > tol {
-            let (s, e) = (w[0] as usize, w[1] as usize);
-            len_sum += e - s;
-            // SAFETY: as in `fused_forward`.
-            unsafe { sub_column(x, idx.get_unchecked(s..e), val.get_unchecked(s..e), v) };
+        if !(v.abs() > tol) {
+            continue;
         }
+        // SAFETY: `i + 1 <= lines < start.len()`.
+        let (s, e) = unsafe { (*start.get_unchecked(i) as usize, *start.get_unchecked(i + 1) as usize) };
+        len_sum += e - s;
+        // SAFETY: as in `fused_forward`.
+        unsafe { sub_column(x, idx.get_unchecked(s..e), val.get_unchecked(s..e), v) };
     }
     len_sum
 }
@@ -248,7 +257,9 @@ mod plain {
 
     pub fn reverse_sweep<R: Real>(lt: &Csr<R>, x: &mut [R]) -> usize {
         let mut len_sum = 0usize;
-        for i in (0..lt.lines()).rev() {
+        let mut i = lt.lines();
+    while i != 0 {
+        i -= 1;
             let v = x[i];
             if v.abs() > R::c(TOL) {
                 let (src, mult) = lt.col(i);
@@ -468,6 +479,17 @@ mod tests {
         let cols: Cols<f64> = vec![vec![(2, 1.0)], vec![], vec![]];
         let pool = pool_of(&cols);
         let mut x = vec![1.0, 0.0];
+        forward_sweep(&pool, &mut x);
+    }
+
+    #[test]
+    #[should_panic]
+    fn index_beyond_vector_is_rejected() {
+        // Two lines (`n >= lines` holds for n = 2) but an entry index 2 >= n: only the `idx_bound` check can reject it.
+        let cols: Cols<f64> = vec![vec![(2, 1.0)], vec![]];
+        let pool = pool_of(&cols);
+        let mut x = vec![1.0, 0.0];
+        assert!(x.len() >= pool.lines() && (x.len() as u32) < pool.idx_bound);
         forward_sweep(&pool, &mut x);
     }
 
