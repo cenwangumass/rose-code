@@ -258,8 +258,8 @@ mod plain {
     pub fn reverse_sweep<R: Real>(lt: &Csr<R>, x: &mut [R]) -> usize {
         let mut len_sum = 0usize;
         let mut i = lt.lines();
-    while i != 0 {
-        i -= 1;
+        while i != 0 {
+            i -= 1;
             let v = x[i];
             if v.abs() > R::c(TOL) {
                 let (src, mult) = lt.col(i);
