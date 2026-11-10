@@ -792,11 +792,15 @@ struct PivotWs<R: Real> {
     all: Vec<usize>,
     /// The coefficient of the first entry of each slack column.
     slack_coef: Vec<f64>,
+    /// Result of the last call: the position in the returned row of the first entry of the leaving variable (it is only ever a slack entry).
+    leave_pos: Option<usize>,
+    /// Result of the last call: some variable occurs twice in the returned row (a repeated slack index in `rho`), so positions are not unique.
+    slack_dup: bool,
 }
 
 impl<R: Real> Default for PivotWs<R> {
     fn default() -> Self {
-        PivotWs { acc: Vec::new(), touched: Vec::new(), all: Vec::new(), slack_coef: Vec::new() }
+        PivotWs { acc: Vec::new(), touched: Vec::new(), all: Vec::new(), slack_coef: Vec::new(), leave_pos: None, slack_dup: false }
     }
 }
 
@@ -872,16 +876,27 @@ fn pivot_row_ws<R: Real>(
     }
     let nst = out.len();
     // Slack entries; their accumulators are overwritten, so they are restored below with the rest.
+    // The scatter touches structurals only unless a slack is in `rrows`; a slack seen twice (or already touched) is a repeated variable of the row.
+    let (mut leave_pos, mut slack_dup) = (None, false);
     for &(i, rv) in rho {
         let j = n + i;
         if slack_nb[i] || j == leave {
             acc[j] = rv * R::c(slack_coef[i]);
             let s = if st[j] == UB { -1.0 } else { 1.0 };
+            if touched[j] {
+                slack_dup = true;
+            } else {
+                touched[j] = true;
+            }
+            if j == leave && leave_pos.is_none() {
+                leave_pos = Some(out.len());
+            }
             out.push((j, acc[j] * R::c(s * sdir)));
         }
     }
     for &(i, _) in rho {
         acc[n + i] = R::ZERO;
+        touched[n + i] = false;
     }
     for &j in all.iter() {
         acc[j] = R::ZERO;
@@ -890,7 +905,46 @@ fn pivot_row_ws<R: Real>(
     ws.acc = acc_v;
     ws.touched = touched_v;
     ws.all = all_v;
+    ws.leave_pos = leave_pos;
+    ws.slack_dup = slack_dup;
     (out, nst, est, distinct)
+}
+
+/// The dual step over the pivot row: `d[j] -= theta * a` for every entry, with the entry negated when `j` is one of the flipped variables.
+fn d_row_step<R: Real>(d: &mut [R], row: &[(usize, R)], flips: &[usize], theta: R, mark: &mut Vec<bool>) {
+    if flips.is_empty() {
+        for &(j, a) in row {
+            d[j] = d[j] - theta * a;
+        }
+        return;
+    }
+    if mark.len() < d.len() {
+        mark.resize(d.len(), false);
+    }
+    for &j in flips {
+        mark[j] = true;
+    }
+    for &(j, a) in row {
+        let a = if mark[j] { -a } else { a };
+        d[j] = d[j] - theta * a;
+    }
+    for &j in flips {
+        mark[j] = false;
+    }
+}
+
+/// The candidate list of the ratio test (ratios, contributions, row positions) and the kept list; retained across calls, cleared at the start of each.
+struct RatioBufs<R> {
+    ratio_arr: Vec<R>,
+    con: Vec<R>,
+    lst: Vec<usize>,
+    kept: Vec<usize>,
+}
+
+impl<R> Default for RatioBufs<R> {
+    fn default() -> Self {
+        RatioBufs { ratio_arr: Vec::new(), con: Vec::new(), lst: Vec::new(), kept: Vec::new() }
+    }
 }
 
 /// Primal infeasibility of a basic variable with value `x` and bounds `lo`, `up`.
@@ -1015,6 +1069,9 @@ struct Dual<'a, R: Real = f64> {
     slack_nb: Vec<bool>,
     /// The retained workspace of the row product.
     prow_ws: std::cell::RefCell<PivotWs<R>>,
+    /// Retained buffers of the ratio test and the flip marks of the d update (all empty between calls).
+    rbuf: RatioBufs<R>,
+    flip_mark: Vec<bool>,
     /// Rows the list walk may still see become infeasible before the list is rebuilt (`P+0x28` in list-walk mode): the candidate capacity
     /// `max(20, m^0.7)` after a rebuild, one less per touched row that is infeasible (negative: rebuild).
     pend: i64,
@@ -2871,8 +2928,16 @@ impl<'a, R: Real> Dual<'a, R> {
 
     /// The bound-flipping Harris ratio test (`0xc74a0`, `ctx+0x468 != 0`), `specs/dual-simplex.md`.
     // GUROBI: with `ctx+0x468 == 0` the reference takes `0xc6900` instead; not modelled, no witness (never hit by `replay/gdb_dual_branchhits.py`).
-    fn ratio_test(
+    fn ratio_test(&mut self, row: &[(usize, R)], esi: usize, leave: usize, above: bool, xbr: R) -> Ratio {
+        let mut bufs = std::mem::take(&mut self.rbuf);
+        let result = self.ratio_test_with(&mut bufs, row, esi, leave, above, xbr);
+        self.rbuf = bufs;
+        result
+    }
+
+    fn ratio_test_with(
         &mut self,
+        bufs: &mut RatioBufs<R>,
         row: &[(usize, R)],
         esi: usize,
         leave: usize,
@@ -2890,9 +2955,11 @@ impl<'a, R: Real> Dual<'a, R> {
         let mut bound = R::c(-1e100);
         let (mut best, mut best_i, mut bestc) = (R::c(-1e100), -1i64, R::ZERO);
         let (mut xm13, mut xm9) = (R::ZERO, R::ZERO);
-        let mut ratio_arr: Vec<R> = Vec::new();
-        let mut con: Vec<R> = Vec::new();
-        let mut lst: Vec<usize> = Vec::new();
+        let RatioBufs { ratio_arr, con, lst, kept } = bufs;
+        ratio_arr.clear();
+        con.clear();
+        lst.clear();
+        kept.clear();
         macro_rules! track {
             ($i:expr, $ratio:expr, $c:expr) => {{
                 let (ratio, c) = ($ratio, $c);
@@ -2976,7 +3043,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 self.retry_tiny += 1;
                 let mut acc = xmm10;
                 let mut done = 0usize;
-                for &i in &lst {
+                for &i in lst.iter() {
                     let (j, av) = row[i];
                     if 1e30 > p.up[j] {
                         acc = acc + (R::c(p.up[j] - p.lo[j]) * av).abs();
@@ -3196,7 +3263,6 @@ impl<'a, R: Real> Dual<'a, R> {
             };
         }
         let mut b = nflip;
-        let mut kept: Vec<usize> = Vec::new();
         let mut xm3 = R::c(-1e100);
         let mut xm15 = bound;
         for t in b..nn {
@@ -3294,13 +3360,14 @@ impl<'a, R: Real> Dual<'a, R> {
             // The retry of the worst rejected row (`ctx+0x420` < 0, `0x320cb6`; the quad copy of the ratio test only, the double copy rejects: fx_midsing_1031 call 26) chooses among the whole list of the fallback instead of rejecting: the
             // entries whose ratio is not below the largest `(delta + d)/a` are admissible (seed 2238: the entry of 1e-10 wins over the one of 1e-3).
             let mut mx = R::c(-1e100);
-            for &i in &lst {
+            for &i in lst.iter() {
                 let (j, av) = row[i];
                 mx = maxr(mx, (delta + self.d[j]) / av);
             }
             xm3 = mx;
             xm15 = mx;
-            kept = lst.clone();
+            kept.clear();
+            kept.extend_from_slice(lst);
         }
         if kept.is_empty() {
             // Nothing is kept after the relaxed fallback: with the rejected count `ctx+0x420` not negative (`0xcb094`: jump to the rejection `0xc7cfd`) the row is
@@ -3815,6 +3882,9 @@ struct Pivot<R> {
     leave: usize,
     q: usize,
     row: Vec<(usize, R)>,
+    /// The position in `row` of the first entry of `q`, and of the first entry of the leaving variable (`None`: not in the row).
+    q_pos: usize,
+    leave_pos: Option<usize>,
     /// Flipped variables, with their statuses before the flip.
     flips: Vec<usize>,
     /// The pivot column without the pivot entry, tau at the same positions, the pivot alpha and tau_r, true frame.
@@ -4458,24 +4528,29 @@ impl<'a, R: Real> Dual<'a, R> {
         // The factor's update is made by the post-iteration pass (it refactorizes instead when one is due).
         self.pending_alpha = Some(col_out);
         // The ratio test zeroes row entries of magnitude at most 1e-10 (`0xc7747..0xc7769`, `0xcc606`; bh50022 has an entry exactly -1e-10).
-        let row: Vec<(usize, R)> = row
-            .into_iter()
-            .map(|(j, v)| {
-                (
-                    j,
-                    if v.abs() <= R::c(ALPHA_TOL) {
-                        R::ZERO
-                    } else {
-                        v
-                    },
-                )
-            })
-            .collect();
+        let mut row = row;
+        for e in row.iter_mut() {
+            if e.1.abs() <= R::c(ALPHA_TOL) {
+                e.1 = R::ZERO;
+            }
+        }
+        // First-match positions of `q` and the leaving variable: the row's entries are unique by variable unless `rho` repeats a slack index.
+        let (q_pos, leave_pos) = {
+            let ws = self.prow_ws.borrow();
+            if ws.slack_dup {
+                (row.iter().position(|e| e.0 == q).unwrap(), row.iter().position(|e| e.0 == leave))
+            } else {
+                debug_assert_eq!(row[qe].0, q);
+                (qe, ws.leave_pos)
+            }
+        };
         Step::Pivot(Box::new(Pivot {
             r,
             leave,
             q,
             row,
+            q_pos,
+            leave_pos,
             flips,
             col,
             tau,
@@ -5129,7 +5204,7 @@ impl<'a, R: Real> Dual<'a, R> {
             }
             // d update (`0xe45c0`).
             // The reference's row list also holds the leaving variable (rose's only when it is a slack).
-            let aq = pv.row.iter().find(|e| e.0 == pv.q).unwrap().1;
+            let aq = pv.row[pv.q_pos].1;
             // The step divides by the pivot as the double `ctx+0x308` (the row's pivot, stored as a double); the same for the primal step and `ctx+0x300`.
             let theta = self.d[pv.q] / R::c(aq.to_f64());
             // A zero step skips the loop (`0xe4719`): no work.
@@ -5144,17 +5219,15 @@ impl<'a, R: Real> Dual<'a, R> {
             }
             let old_leave = self.d[pv.leave];
             // The reference's row holds a slack leaving variable with its computed coefficient (about 1, 0.9999999999999997 in PILOT.JA call 30657), the step on it uses that.
-            let lcoef = pv.row.iter().find(|e| e.0 == pv.leave).map_or(R::ONE, |e| {
+            let lcoef = pv.leave_pos.map_or(R::ONE, |p| {
+                let e = &pv.row[p];
                 if pv.above {
                     -e.1
                 } else {
                     e.1
                 }
             });
-            for &(j, a) in &pv.row {
-                let a = if pv.flips.contains(&j) { -a } else { a };
-                self.d[j] = self.d[j] - theta * a;
-            }
+            d_row_step(&mut self.d, &pv.row, &pv.flips, theta, &mut self.flip_mark);
             // A leaving variable that becomes fixed keeps the true reduced cost, not the frame value.
             // The leaving variable is in the reference's row with the coefficient 1, so its stored d (0 up to the noise of the last recompute) takes the step too.
             // `0xe45c0` (`0xe47c7..0xe47ff`): the leaving variable is the row entry with coefficient +1 (leaving below) or -1 (above, the row is negated);
@@ -6245,6 +6318,8 @@ fn solve_pass_callback<R: Real>(
         infs: Vec::new(),
         slack_nb: vec![false; m],
         prow_ws: Default::default(),
+        rbuf: Default::default(),
+        flip_mark: Vec::new(),
         pend: cap,
         cap,
         rebuilds: 40,
@@ -7784,6 +7859,8 @@ mod captured_bh305_ratio {
             infs: Vec::new(),
             slack_nb: vec![false; m],
             prow_ws: Default::default(),
+            rbuf: Default::default(),
+            flip_mark: Vec::new(),
             pend: cap,
             cap,
             rebuilds: 40,
@@ -7852,6 +7929,11 @@ mod captured_bh305_ratio {
         // The capture does not record the factor's update count: exercise a
         // fresh factor explicitly (updates = 0).
         let leave = input["var"].as_u64().unwrap() as usize;
+        // Stale contents of the retained buffers must not matter.
+        s.rbuf.lst.extend([7, 3, 9]);
+        s.rbuf.kept.extend([1, 2]);
+        s.rbuf.con.extend([f64::NAN; 4]);
+        s.rbuf.ratio_arr.extend([f64::NAN; 2]);
         let result = s.ratio_test(
             &row,
             input["esi"].as_u64().unwrap() as usize,
@@ -8299,14 +8381,76 @@ mod pivot_row_diff {
                     .iter()
                     .map(|&i| (i, R::c(if r.below(3) == 0 { value(&mut r) * 4.0 } else { value(&mut r) })))
                     .collect();
+                let mut rho = rho;
+                if r.below(3) == 0 {
+                    let first = rho[0];
+                    rho.push((first.0, R::c(value(&mut r))));
+                }
                 let leave = n + r.below(m);
                 let above = r.below(2) == 0;
                 let want = pivot_row_ref(&rrows, &slack_nb, &st, &cols, n, m, &rho, leave, above);
                 let got = pivot_row_ws(&mut ws, &rrows, &slack_nb, &st, &cols, n, m, &rho, leave, above);
-                assert!(same(&want, &got), "case {case} call {call}");
+                // A repeated rho index is not a valid input of the row product (the reference keeps the last value at both entries): positions only.
+                let rho_dup = rho.len() > k.min(m);
+                assert!(rho_dup || same(&want, &got), "case {case} call {call}");
+                // The first-match position of the leaving variable and the duplicate flag.
+                assert_eq!(ws.leave_pos, got.0.iter().position(|e| e.0 == leave), "case {case} call {call}");
+                let dup = (0..got.0.len()).any(|x| got.0[..x].iter().any(|e| e.0 == got.0[x].0));
+                assert_eq!(ws.slack_dup, dup, "case {case} call {call}");
                 assert!(ws.acc.iter().all(|x| x.to_f64().to_bits() == 0), "acc not restored");
                 assert!(ws.touched.iter().all(|&t| !t));
             }
+        }
+    }
+
+    #[test]
+    fn matches_reference_f64() {
+        run::<f64>();
+    }
+
+    #[test]
+    fn matches_reference_f80() {
+        run::<crate::f80::F80>();
+    }
+}
+
+#[cfg(test)]
+mod d_step_diff {
+    use super::*;
+
+    /// The previous d update: a `contains` test per entry.
+    fn d_step_ref<R: Real>(d: &mut [R], row: &[(usize, R)], flips: &[usize], theta: R) {
+        for &(j, a) in row {
+            let a = if flips.contains(&j) { -a } else { a };
+            d[j] = d[j] - theta * a;
+        }
+    }
+
+    fn run<R: Real>() {
+        let mut seed = 0x2545_f491_4f6c_dd1du64;
+        let mut next = move || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        let values = [0.0, -0.0, 1.0, -1.0, 0.1, 1e-14, -3.5, 1e300, -1e300, f64::MIN_POSITIVE, 0.3];
+        let mut mark = Vec::new();
+        for _ in 0..2000 {
+            let len = 1 + next() as usize % 12;
+            let d0: Vec<R> = (0..len).map(|_| R::c(values[next() as usize % values.len()])).collect();
+            let rl = next() as usize % 20;
+            // Repeated variables in the row are allowed: the update then applies once per entry.
+            let row: Vec<(usize, R)> =
+                (0..rl).map(|_| (next() as usize % len, R::c(values[next() as usize % values.len()]))).collect();
+            let nf = if next() % 2 == 0 { 0 } else { next() as usize % 6 };
+            let flips: Vec<usize> = (0..nf).map(|_| next() as usize % len).collect();
+            let theta = R::c(values[next() as usize % values.len()]);
+            let (mut want, mut got) = (d0.clone(), d0.clone());
+            d_step_ref(&mut want, &row, &flips, theta);
+            d_row_step(&mut got, &row, &flips, theta, &mut mark);
+            assert!(want.iter().zip(&got).all(|(x, y)| x.to_f64().to_bits() == y.to_f64().to_bits()));
+            assert!(mark.iter().all(|&b| !b), "marks not cleared");
         }
     }
 
