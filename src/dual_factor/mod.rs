@@ -832,12 +832,13 @@ fn dot<R: Real>(x: &[R], c: &[R], peel: usize) -> R {
 
 impl<R: Real> DualFactor<R> {
     /// Fresh factor from the pivot sequence; `cols[pos]` is the basis column at incoming position `pos` as `(is_slack, rows, values)`.
-    pub fn fresh(
+    pub fn fresh<'a>(
         m: usize,
         ncols: usize,
         st: &Structure<R>,
-        cols: &[(bool, Vec<usize>, Vec<f64>)],
+        cols: impl Into<crate::lu_order::Cols<'a>>,
     ) -> DualFactor<R> {
+        let cols: crate::lu_order::Cols<'a> = cols.into();
         let mut step = vec![usize::MAX; m];
         for (s, &(r, _)) in st.pivots.iter().enumerate() {
             step[r] = s;
@@ -855,9 +856,9 @@ impl<R: Real> DualFactor<R> {
         for s in i21..m {
             kind[s] = -2;
         }
-        let mut lpool = LPool::with_capacity(m, st.l_vals.iter().map(Vec::len).sum());
-        for (rows, vals) in st.l_rows.iter().zip(&st.l_vals) {
-            lpool.push_line(rows.iter().zip(vals).map(|(&r, &v)| (step[r], v)));
+        let mut lpool = LPool::with_capacity(m, st.l_nnz());
+        for s in 0..st.steps() {
+            lpool.push_line(st.l_rows(s).iter().zip(st.l_vals(s)).map(|(&r, &v)| (step[r], v)));
         }
         let lcolumn = |v: usize| lpool.iter(v);
         let lt = lpool.transpose(m);
@@ -865,7 +866,7 @@ impl<R: Real> DualFactor<R> {
         // pivot-row values of the Markowitz steps, by column
         let mut mk: Vec<Vec<(usize, R)>> = vec![Vec::new(); m];
         for s in nseq..m {
-            for &(c, v) in &st.u_rows[s] {
+            for &(c, v) in st.u_row(s) {
                 mk[c].push((s, v));
             }
         }
@@ -927,7 +928,7 @@ impl<R: Real> DualFactor<R> {
                     }
                     // A singleton-phase column subtracts `(x * a) / d` with the raw entry `a`, not `x * (a / d)`; the
                     // multiplier is the only form known for pair overrides and nucleus columns.
-                    let a = st.l_raw[v][e];
+                    let a = st.l_raw(v)[e];
                     let upd = if a.is_nan() {
                         multiplier * x
                     } else {
@@ -1119,7 +1120,7 @@ impl<R: Real> DualFactor<R> {
                     }
                     let order: Vec<usize> = if let Some(u) = st.pair_urow.get(&y) {
                         u.iter().map(|&c| pos_of_col[c]).collect()
-                    } else if st.u_rows[y].is_empty() {
+                    } else if st.u_row(y).is_empty() {
                         // Filtering all basis columns in index order is equivalent to sorting just this row's members by
                         // column. Keep only the positions represented by pos_of_col, and emit each position once.
                         let mut row: Vec<usize> = member[y]
@@ -1132,7 +1133,7 @@ impl<R: Real> DualFactor<R> {
                         rl[y] = row;
                         continue;
                     } else {
-                        st.u_rows[y].iter().map(|&(c, _)| pos_of_col[c]).collect()
+                        st.u_row(y).iter().map(|&(c, _)| pos_of_col[c]).collect()
                     };
                     for &t in &member[y] {
                         stamp[t] = y;

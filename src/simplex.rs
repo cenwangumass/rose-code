@@ -829,9 +829,23 @@ pub(crate) struct Internal {
     pub(crate) rwise: Vec<Vec<(usize, f64)>>,
     /// Offset of each column in the concatenated value array (prefix sums of the column lengths).
     pub(crate) offs: Vec<usize>,
+    /// `fcols` split into `(is_slack, rows, values)` per variable, built on the first dual factorization of the solve (the matrix
+    /// never changes) so a refactorization does not copy the basis columns.
+    split: std::sync::OnceLock<Vec<crate::lu_order::Col>>,
 }
 
 impl Internal {
+    /// The variables' columns as the LU structure reads them (`(v >= n, rows, values)` in the model's entry order).
+    pub(crate) fn split_cols(&self) -> &[crate::lu_order::Col] {
+        self.split.get_or_init(|| {
+            self.fcols
+                .iter()
+                .enumerate()
+                .map(|(v, c)| (v >= self.n, c.iter().map(|&(r, _)| r).collect(), c.iter().map(|&(_, a)| a).collect()))
+                .collect()
+        })
+    }
+
     /// The first slack starts after all structural entries, including range columns.
     fn structural_nnz(&self) -> usize {
         self.offs
@@ -1116,6 +1130,7 @@ pub(crate) fn build(model: &LpModel) -> Internal {
         cost,
         rwise,
         offs,
+        split: std::sync::OnceLock::new(),
     }
 }
 
@@ -2791,7 +2806,7 @@ impl<'a> Solver<'a> {
                     Mir::Q(main)
                 } else {
                     Mir::D(Box::new(growth_factor.unwrap_or_else(|| {
-                        crate::ftran_order::RefStruct::fresh(self.p.m, self.p.n, &st, &rows)
+                        crate::ftran_order::RefStruct::fresh(self.p.m, self.p.n, &st, rows)
                     })))
                 };
                 if crate::dump::on("luout") {

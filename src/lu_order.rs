@@ -7,26 +7,114 @@ use crate::real::Real;
 pub const THRESHOLD: f64 = 0.0078125;
 const ABS_TOL: f64 = 1e-13;
 
+/// A basis column as `(is_slack, rows, values)`.
+pub type Col = (bool, Vec<usize>, Vec<f64>);
+
+/// The basis columns by position `pos` (`(is_slack, rows, values)` in incoming basis-position order): either a slice of columns,
+/// or the columns of a cached per-variable column list selected by a basis head (the problem matrix never changes, so the dual
+/// splits it once per solve and a refactorization only copies the head).
+#[derive(Clone, Copy)]
+pub struct Cols<'a> {
+    src: &'a [Col],
+    order: Option<&'a [usize]>,
+}
+
+impl<'a> Cols<'a> {
+    pub fn len(&self) -> usize {
+        self.order.map_or(self.src.len(), <[usize]>::len)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[inline]
+    pub fn get(&self, pos: usize) -> &'a Col {
+        match self.order {
+            None => &self.src[pos],
+            Some(o) => &self.src[o[pos]],
+        }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &'a Col> + 'a {
+        let c = *self;
+        (0..c.len()).map(move |i| c.get(i))
+    }
+}
+
+impl std::ops::Index<usize> for Cols<'_> {
+    type Output = Col;
+    #[inline]
+    fn index(&self, pos: usize) -> &Col {
+        self.get(pos)
+    }
+}
+
+impl<'a> From<&'a [Col]> for Cols<'a> {
+    fn from(src: &'a [Col]) -> Self {
+        Cols { src, order: None }
+    }
+}
+
+impl<'a> From<&'a Vec<Col>> for Cols<'a> {
+    fn from(src: &'a Vec<Col>) -> Self {
+        Cols { src, order: None }
+    }
+}
+
+impl<'a, const N: usize> From<&'a [Col; N]> for Cols<'a> {
+    fn from(src: &'a [Col; N]) -> Self {
+        Cols { src, order: None }
+    }
+}
+
+/// The columns of a basis head out of the per-variable column list `src` (owns only the head).
+pub struct BasisCols<'p> {
+    src: &'p [Col],
+    order: Vec<usize>,
+}
+
+impl<'p> BasisCols<'p> {
+    pub fn new(src: &'p [Col], head: &[usize]) -> Self {
+        BasisCols { src, order: head.to_vec() }
+    }
+
+    pub fn view(&self) -> Cols<'_> {
+        Cols { src: self.src, order: Some(&self.order) }
+    }
+}
+
+impl<'a> From<&'a BasisCols<'_>> for Cols<'a> {
+    fn from(b: &'a BasisCols<'_>) -> Self {
+        b.view()
+    }
+}
+
 /// `cols[pos] = (is_slack, rows, values)` in incoming basis-position order. Returns `(row, pos)` per pivot step.
-pub fn pivot_order(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Vec<(usize, usize)> {
+pub fn pivot_order<'a>(m: usize, cols: impl Into<Cols<'a>>) -> Vec<(usize, usize)> {
     factor_structure(m, cols).pivots
 }
 
 /// The pivot sequence together with what the sparse FTRAN model needs (`crate::ftran_order`): the singleton phase of each step
 /// (1..=4, 0 for the Markowitz nucleus) and the L column of each step as row indices in chain order.
+///
+/// The L columns and U rows are flat (`*_start[s]..*_start[s + 1]` is the range of step `s`), in the entry order of the former
+/// per-step lists; read them through `l_rows`, `l_vals`, `l_raw` and `u_row`.
 #[derive(Clone)]
 pub struct Structure<R = f64> {
     pub pivots: Vec<(usize, usize)>,
     pub phase: Vec<u8>,
-    pub l_rows: Vec<Vec<usize>>,
-    /// L multipliers matching `l_rows` and the pivot value of each step.
-    pub l_vals: Vec<Vec<R>>,
+    l_start: Vec<usize>,
+    l_idx: Vec<usize>,
+    /// L multipliers matching `l_idx` and the pivot value of each step.
+    l_val: Vec<R>,
     /// The column entries before the division by the pivot, for the singleton-phase steps; NaN where not known (pair
     /// overrides, nucleus steps).
-    pub l_raw: Vec<Vec<R>>,
+    l_raw: Vec<R>,
     pub diag: Vec<R>,
     /// Pivot-row entries `(basis position, value)` of the Markowitz steps (empty for singleton steps).
-    pub u_rows: Vec<Vec<(usize, R)>>,
+    u_start: Vec<usize>,
+    u_ent: Vec<(usize, R)>,
     /// Entries of the nucleus (the columns left after the singleton phases, in the rows left) and the Markowitz search's
     /// work estimate.
     pub nuc_nnz: usize,
@@ -44,16 +132,14 @@ pub struct Structure<R = f64> {
     pair_gate_record: Option<PairGateRecord>,
 }
 
-pub fn factor_structure(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Structure {
+pub fn factor_structure<'a>(m: usize, cols: impl Into<Cols<'a>>) -> Structure {
     factor_structure_r::<f64>(m, cols)
 }
 
 /// `factor_structure` with the numbers of the factor in the number type `R` (the quad mode runs the same LU in extended precision).
-pub fn factor_structure_r<R: Real>(
-    m: usize,
-    cols: &[(bool, Vec<usize>, Vec<f64>)],
-) -> Structure<R> {
-    let (mut seq, mut phase, ov, loff, pair_gate_record) = phases(m, cols);
+pub fn factor_structure_r<'a, R: Real>(m: usize, cols: impl Into<Cols<'a>>) -> Structure<R> {
+    let cols: Cols<'a> = cols.into();
+    let (mut seq, mut phase, mut ov, loff, pair_gate_record) = phases(m, cols);
     let nsing = seq.len();
     let mut done_r = vec![false; m];
     let mut done_c = vec![false; cols.len()];
@@ -92,62 +178,71 @@ pub fn factor_structure_r<R: Real>(
             }
         })
         .sum();
-    let (np, nl, nv, npiv, nu, nuc_work) = nucleus(m, cols.iter().map(|c| c.1.len()).sum(), &nuc);
+    let nnz_cols: usize = cols.iter().map(|c| c.1.len()).sum();
+    let (np, nl, nv, npiv, nu, nuc_work) = nucleus(m, nnz_cols, &nuc);
     seq.extend(np);
     phase.resize(seq.len(), 0);
     let mut step = vec![usize::MAX; m];
     for (s, &(r, _)) in seq.iter().enumerate() {
         step[r] = s;
     }
-    let mut l_rows: Vec<Vec<usize>> = Vec::with_capacity(seq.len());
-    let mut l_vals: Vec<Vec<R>> = Vec::with_capacity(seq.len());
-    let mut l_raw: Vec<Vec<R>> = Vec::with_capacity(seq.len());
-    let mut diag: Vec<R> = Vec::with_capacity(seq.len());
-    let mut u_rows: Vec<Vec<(usize, R)>> = Vec::with_capacity(seq.len());
+    let nsteps = seq.len();
+    let mut l_start: Vec<usize> = Vec::with_capacity(nsteps + 1);
+    let mut l_idx: Vec<usize> = Vec::with_capacity(nnz_cols);
+    let mut l_val: Vec<R> = Vec::with_capacity(nnz_cols);
+    let mut l_raw: Vec<R> = Vec::with_capacity(nnz_cols);
+    let mut diag: Vec<R> = Vec::with_capacity(nsteps);
+    l_start.push(0);
     for (s, &(prow, c)) in seq.iter().enumerate().take(nsing) {
         let (_, idx, val) = &cols[c];
         let pv = R::c(val[idx.iter().position(|&i| i == prow).unwrap()]);
-        l_rows.push(idx.iter().copied().filter(|&i| step[i] > s).collect());
-        l_vals.push(
-            idx.iter()
-                .zip(val)
-                .filter(|(&i, _)| step[i] > s)
-                .map(|(_, &x)| R::c(x) / pv)
-                .collect(),
-        );
-        l_raw.push(
-            idx.iter()
-                .zip(val)
-                .filter(|(&i, _)| step[i] > s)
-                .map(|(_, &x)| R::c(x))
-                .collect(),
-        );
+        // A pair override replaces the column (its multipliers are all that is known: no raw entries).
+        if let Some((r, v)) = ov.l.remove(&s) {
+            l_idx.extend_from_slice(&r);
+            l_raw.extend(std::iter::repeat_n(R::c(f64::NAN), v.len()));
+            l_val.extend(v);
+        } else {
+            for (&i, &x) in idx.iter().zip(val) {
+                if step[i] > s {
+                    l_idx.push(i);
+                    l_val.push(R::c(x) / pv);
+                    l_raw.push(R::c(x));
+                }
+            }
+        }
+        l_start.push(l_idx.len());
         diag.push(pv);
-        u_rows.push(Vec::new());
     }
     let pair_unz = ov.unz.clone();
     let pair_urow = ov.urow.clone();
     for (&s, &d) in &ov.diag {
         diag[s] = d;
     }
-    for (s, (r, v)) in ov.l {
-        l_rows[s] = r;
-        l_raw[s] = vec![R::c(f64::NAN); v.len()];
-        l_vals[s] = v;
+    for (r, v) in nl.into_iter().zip(nv) {
+        l_idx.extend_from_slice(&r);
+        l_raw.extend(std::iter::repeat_n(R::c(f64::NAN), v.len()));
+        l_val.extend(v);
+        l_start.push(l_idx.len());
     }
-    l_rows.extend(nl);
-    l_raw.extend(nv.iter().map(|v| vec![R::c(f64::NAN); v.len()]));
-    l_vals.extend(nv);
     diag.extend(npiv);
-    u_rows.extend(nu);
+    let mut u_ent: Vec<(usize, R)> = Vec::with_capacity(nu.iter().map(Vec::len).sum());
+    // Singleton steps have no U row.
+    let mut u_start: Vec<usize> = Vec::with_capacity(nsteps + 1);
+    u_start.resize(nsing + 1, 0);
+    for row in nu {
+        u_ent.extend(row);
+        u_start.push(u_ent.len());
+    }
     Structure {
         pivots: seq,
         phase,
-        l_rows,
-        l_vals,
+        l_start,
+        l_idx,
+        l_val,
         l_raw,
         diag,
-        u_rows,
+        u_start,
+        u_ent,
         nuc_nnz,
         nuc_work,
         loff,
@@ -160,6 +255,56 @@ pub fn factor_structure_r<R: Real>(
 }
 
 impl<R: Real> Structure<R> {
+    /// Number of steps (`pivots.len()`).
+    #[inline]
+    pub fn steps(&self) -> usize {
+        self.l_start.len() - 1
+    }
+
+    /// Row indices of the L column of step `s`, in chain order.
+    #[inline]
+    pub fn l_rows(&self, s: usize) -> &[usize] {
+        &self.l_idx[self.l_start[s]..self.l_start[s + 1]]
+    }
+
+    /// L multipliers of step `s`, matching `l_rows(s)`.
+    #[inline]
+    pub fn l_vals(&self, s: usize) -> &[R] {
+        &self.l_val[self.l_start[s]..self.l_start[s + 1]]
+    }
+
+    /// Raw column entries of step `s` (NaN where unknown), matching `l_rows(s)`.
+    #[inline]
+    pub fn l_raw(&self, s: usize) -> &[R] {
+        &self.l_raw[self.l_start[s]..self.l_start[s + 1]]
+    }
+
+    /// Pivot-row entries `(basis position, value)` of step `s` (empty for singleton steps).
+    #[inline]
+    pub fn u_row(&self, s: usize) -> &[(usize, R)] {
+        &self.u_ent[self.u_start[s]..self.u_start[s + 1]]
+    }
+
+    /// Total number of L entries.
+    #[inline]
+    pub fn l_nnz(&self) -> usize {
+        self.l_idx.len()
+    }
+
+    /// Replace the row indices of the L column of step `s` (tests of consumers that only read `l_rows`; the values keep their
+    /// old length where they are not rewritten, so only the indices are meaningful afterwards).
+    #[cfg(test)]
+    pub fn set_l_rows_for_test(&mut self, s: usize, rows: Vec<usize>) {
+        let (lo, hi) = (self.l_start[s], self.l_start[s + 1]);
+        self.l_idx.splice(lo..hi, rows.iter().copied());
+        self.l_val.splice(lo..hi, rows.iter().map(|_| R::c(f64::NAN)));
+        self.l_raw.splice(lo..hi, rows.iter().map(|_| R::c(f64::NAN)));
+        let delta = rows.len() as isize - (hi - lo) as isize;
+        for t in s + 1..self.l_start.len() {
+            self.l_start[t] = (self.l_start[t] as isize + delta) as usize;
+        }
+    }
+
     /// Repeat the records of an identical structure build without repeating its numeric work.
     pub fn repeat_dumps(&self) {
         if let Some(record) = self.pair_gate_record {
@@ -169,14 +314,15 @@ impl<R: Real> Structure<R> {
 
     /// The factorization's increments of the reference's work counter (`0xd4190`, `crate::work`) as `(site, estimate)`, given
     /// the factored columns and whether the L solve levels are built (`crate::ftran_order`).
-    pub fn work(&self, cols: &[(bool, Vec<usize>, Vec<f64>)], levels: bool) -> Vec<(u32, f64)> {
+    pub fn work<'a>(&self, cols: impl Into<Cols<'a>>, levels: bool) -> Vec<(u32, f64)> {
+        let cols: Cols<'a> = cols.into();
         let m = self.m as f64;
         let nnz_b: usize = cols.iter().map(|c| if c.0 { 1 } else { c.1.len() }).sum();
         let nsing = self.phase.iter().filter(|&&p| p != 0).count();
-        let nnz_l: usize = self.l_rows.iter().map(Vec::len).sum();
+        let nnz_l: usize = self.l_idx.len();
         // The entries of the singleton steps' columns that go to U (rows pivoted before them), and with the Markowitz pivot
         // rows the off-diagonal U.
-        let nnz_l_sing: usize = (0..nsing).map(|k| self.l_rows[k].len()).sum();
+        let nnz_l_sing: usize = self.l_start[nsing];
         // The U entries of the singleton steps' rows: basis entries in a row pivoted in a singleton step, in a column pivoted
         // later (the reference counts them directly; `nnz(B) - nsing - nnz_l_sing - nuc` differs when a pair step drops or
         // creates L entries).
@@ -220,12 +366,7 @@ impl<R: Real> Structure<R> {
             out.push((0xd8973, 0.15 * n * (n + 1.0)));
         }
         // The reference's U count leaves out the entries that cancelled to rounding noise (`|v| <= 1e-13`).
-        let u_rows_nnz: usize = self
-            .u_rows
-            .iter()
-            .flatten()
-            .filter(|e| e.1.abs() > R::c(1e-13))
-            .count();
+        let u_rows_nnz: usize = self.u_ent.iter().filter(|e| e.1.abs() > R::c(1e-13)).count();
         let nnz_lu = (nnz_l + u_sing + u_rows_nnz) as f64;
         // A size factor that ramps from 1 to 10 between 2e6 and 4e6 for 24 bytes per entry.
         let a = 24.0 * nnz_lu;
@@ -245,9 +386,9 @@ impl<R: Real> Structure<R> {
 }
 
 /// Row incidence in ascending column order, retaining every occurrence of a duplicate row.
-fn row_columns(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> (Vec<usize>, Vec<usize>) {
+fn row_columns(m: usize, cols: Cols<'_>) -> (Vec<usize>, Vec<usize>) {
     let mut offsets = vec![0; m + 1];
-    for (_, rows, _) in cols {
+    for (_, rows, _) in cols.iter() {
         for &r in rows {
             offsets[r + 1] += 1;
         }
@@ -268,7 +409,7 @@ fn row_columns(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> (Vec<usize>, 
 
 fn phases<R: Real>(
     m: usize,
-    cols: &[(bool, Vec<usize>, Vec<f64>)],
+    cols: Cols<'_>,
 ) -> (
     Vec<(usize, usize)>,
     Vec<u8>,
@@ -278,7 +419,7 @@ fn phases<R: Real>(
 ) {
     let n = cols.len();
     let mut rc = vec![0usize; m];
-    for (is_slack, idx, _) in cols {
+    for (is_slack, idx, _) in cols.iter() {
         if *is_slack {
             rc[idx[0]] += 1 + m;
         } else {
@@ -1423,11 +1564,11 @@ mod row_column_tests {
             (false, vec![], vec![]),
             (false, vec![2, 2], vec![]),
         ];
-        let (offsets, columns) = super::row_columns(4, &cols);
+        let (offsets, columns) = super::row_columns(4, (&cols).into());
         assert_eq!(offsets, [0, 3, 4, 8, 8]);
         assert_eq!(columns, [0, 0, 2, 1, 0, 2, 4, 4]);
-        assert_eq!(super::row_columns(0, &[]), (vec![0], vec![]));
-        assert_eq!(super::row_columns(3, &[]), (vec![0; 4], vec![]));
+        assert_eq!(super::row_columns(0, (&[] as &[super::Col]).into()), (vec![0], vec![]));
+        assert_eq!(super::row_columns(3, (&[] as &[super::Col]).into()), (vec![0; 4], vec![]));
     }
 }
 
@@ -1702,6 +1843,245 @@ mod dense_lu_tests {
             for base in 0..=1 {
                 check(&input, base, F80::repr);
             }
+        }
+    }
+}
+
+/// The flat `Structure` against the per-step lists it replaced: the old assembly is kept here verbatim and both are run on the same
+/// bases (random, with singleton chains, column pairs and nuclei), comparing every entry bit for bit.
+#[cfg(test)]
+mod flat_structure_tests {
+    use super::*;
+    use crate::f80::F80;
+
+    #[allow(clippy::type_complexity)]
+    struct Old<R> {
+        l_rows: Vec<Vec<usize>>,
+        l_vals: Vec<Vec<R>>,
+        l_raw: Vec<Vec<R>>,
+        diag: Vec<R>,
+        u_rows: Vec<Vec<(usize, R)>>,
+        pivots: Vec<(usize, usize)>,
+        phase: Vec<u8>,
+    }
+
+    fn old_structure<R: Real>(m: usize, cols: Cols<'_>) -> Old<R> {
+    let (mut seq, mut phase, ov, loff, pair_gate_record) = phases(m, cols);
+    let nsing = seq.len();
+    let mut done_r = vec![false; m];
+    let mut done_c = vec![false; cols.len()];
+    for &(r, c) in &seq {
+        done_r[r] = true;
+        done_c[c] = true;
+    }
+    let mut nuc: Vec<(usize, Vec<(usize, R)>)> = Vec::new();
+    for (pos, (_, idx, val)) in cols.iter().enumerate() {
+        if done_c[pos] {
+            continue;
+        }
+        let mut d: Vec<(usize, R)> = idx
+            .iter()
+            .copied()
+            .zip(val.iter().copied())
+            // The reference's matrix leaves out entries below the absolute tolerance (fx_e2_r25: a scaled entry 2^-44 in a row of the nucleus changed its count).
+            .filter(|(i, v)| !done_r[*i] && v.abs() >= ABS_TOL)
+            .map(|(i, v)| (i, R::c(v)))
+            .collect();
+        d.reverse();
+        nuc.push((pos, d));
+    }
+    // The work estimate counts every input entry in active rows and columns
+    // before the numeric nucleus applies its magnitude filter (0xd4e4b,
+    // 0xdf521..0xdf5ed); scaled entries below ABS_TOL still contribute.
+    let nuc_nnz: usize = cols
+        .iter()
+        .enumerate()
+        .filter(|(pos, _)| !done_c[*pos])
+        .map(|(_, (slack, rows, _))| {
+            if *slack {
+                1
+            } else {
+                rows.iter().filter(|r| !done_r[**r]).count()
+            }
+        })
+        .sum();
+    let (np, nl, nv, npiv, nu, nuc_work) = nucleus(m, cols.iter().map(|c| c.1.len()).sum(), &nuc);
+    seq.extend(np);
+    phase.resize(seq.len(), 0);
+    let mut step = vec![usize::MAX; m];
+    for (s, &(r, _)) in seq.iter().enumerate() {
+        step[r] = s;
+    }
+    let mut l_rows: Vec<Vec<usize>> = Vec::with_capacity(seq.len());
+    let mut l_vals: Vec<Vec<R>> = Vec::with_capacity(seq.len());
+    let mut l_raw: Vec<Vec<R>> = Vec::with_capacity(seq.len());
+    let mut diag: Vec<R> = Vec::with_capacity(seq.len());
+    let mut u_rows: Vec<Vec<(usize, R)>> = Vec::with_capacity(seq.len());
+    for (s, &(prow, c)) in seq.iter().enumerate().take(nsing) {
+        let (_, idx, val) = &cols[c];
+        let pv = R::c(val[idx.iter().position(|&i| i == prow).unwrap()]);
+        l_rows.push(idx.iter().copied().filter(|&i| step[i] > s).collect());
+        l_vals.push(
+            idx.iter()
+                .zip(val)
+                .filter(|(&i, _)| step[i] > s)
+                .map(|(_, &x)| R::c(x) / pv)
+                .collect(),
+        );
+        l_raw.push(
+            idx.iter()
+                .zip(val)
+                .filter(|(&i, _)| step[i] > s)
+                .map(|(_, &x)| R::c(x))
+                .collect(),
+        );
+        diag.push(pv);
+        u_rows.push(Vec::new());
+    }
+    let pair_unz = ov.unz.clone();
+    let pair_urow = ov.urow.clone();
+    for (&s, &d) in &ov.diag {
+        diag[s] = d;
+    }
+    for (s, (r, v)) in ov.l {
+        l_rows[s] = r;
+        l_raw[s] = vec![R::c(f64::NAN); v.len()];
+        l_vals[s] = v;
+    }
+    l_rows.extend(nl);
+    l_raw.extend(nv.iter().map(|v| vec![R::c(f64::NAN); v.len()]));
+    l_vals.extend(nv);
+    diag.extend(npiv);
+    u_rows.extend(nu);
+        Old { l_rows, l_vals, l_raw, diag, u_rows, pivots: seq, phase }
+    }
+
+    struct Rng(u64);
+    impl Rng {
+        fn next(&mut self) -> u64 {
+            self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            self.0 >> 33
+        }
+        fn below(&mut self, n: usize) -> usize {
+            (self.next() % n.max(1) as u64) as usize
+        }
+    }
+
+    fn random_cols(rng: &mut Rng, m: usize) -> Vec<Col> {
+        let style = rng.below(5);
+        let mut cols: Vec<Col> = Vec::new();
+        for c in 0..m {
+            if rng.below(6) == 0 {
+                cols.push((true, vec![rng.below(m)], vec![1.0]));
+                continue;
+            }
+            let mut rows = vec![c];
+            let extra = match style {
+                0 => rng.below(2),
+                1 => rng.below(3),
+                2 => rng.below(1 + m / 3),
+                4 => 1,
+                _ => 1,
+            };
+            for _ in 0..extra {
+                let r = match style {
+                    3 => (c + 1) % m,
+                    4 => (c ^ 1) % m,
+                    _ => rng.below(m),
+                };
+                if !rows.contains(&r) {
+                    rows.push(r);
+                }
+            }
+            if rng.below(3) == 0 {
+                rows.sort_unstable();
+            }
+            let vals = rows.iter().map(|_| (1 + rng.below(9)) as f64 * if rng.below(2) == 0 { 0.25 } else { -1.5 }).collect();
+            cols.push((false, rows, vals));
+        }
+        for i in (1..m).rev() {
+            cols.swap(i, rng.below(i + 1));
+        }
+        cols
+    }
+
+    fn check<R: Real>(bits: impl Fn(R) -> (u64, u16) + Copy) {
+        let mut rng = Rng(12345);
+        let mut pair_steps = 0;
+        let mut nuc_steps = 0;
+        for case in 0..600 {
+            let m = 1 + rng.below(if case % 10 == 0 { 120 } else { 40 });
+            let cols = random_cols(&mut rng, m);
+            let gate = (0, GATE_ALWAYS);
+            gate_set(gate);
+            set_pool_dims(m, cols.iter().map(|c| c.1.len()).sum());
+            set_factorization_number(1 + case);
+            let new = factor_structure_r::<R>(m, &cols);
+            gate_set(gate);
+            set_factorization_number(1 + case);
+            let old = old_structure::<R>(m, (&cols).into());
+            gate_set(gate);
+            assert_eq!(new.pivots, old.pivots, "case {case}");
+            assert_eq!(new.phase, old.phase, "case {case}");
+            assert_eq!(new.steps(), old.l_rows.len(), "case {case}");
+            assert_eq!(new.diag.len(), old.diag.len());
+            let b = |v: &R| bits(*v);
+            assert_eq!(new.diag.iter().map(b).collect::<Vec<_>>(), old.diag.iter().map(b).collect::<Vec<_>>(), "case {case}");
+            let mut nnz = 0;
+            for s in 0..new.steps() {
+                assert_eq!(new.l_rows(s), &old.l_rows[s][..], "case {case} step {s}");
+                // NaN placeholders compare through their bit patterns (the payload is copied).
+                assert_eq!(new.l_vals(s).iter().map(b).collect::<Vec<_>>(), old.l_vals[s].iter().map(b).collect::<Vec<_>>(), "case {case} step {s}");
+                assert_eq!(new.l_raw(s).iter().map(b).collect::<Vec<_>>(), old.l_raw[s].iter().map(b).collect::<Vec<_>>(), "case {case} step {s}");
+                assert_eq!(new.u_row(s).len(), old.u_rows[s].len());
+                for (x, y) in new.u_row(s).iter().zip(&old.u_rows[s]) {
+                    assert_eq!((x.0, bits(x.1)), (y.0, bits(y.1)), "case {case} step {s}");
+                }
+                nnz += old.l_rows[s].len();
+                if new.phase[s] == 0 {
+                    nuc_steps += 1;
+                }
+            }
+            assert_eq!(new.l_nnz(), nnz);
+            pair_steps += new.pair_unz.len();
+        }
+        assert!(nuc_steps > 100, "nucleus steps {nuc_steps}");
+        assert!(pair_steps > 0, "the doubleton pass overrides no step");
+    }
+
+    #[test]
+    fn flat_output_matches_per_step_lists_f64() {
+        check::<f64>(|v| (v.to_bits(), 0));
+    }
+
+    #[test]
+    fn flat_output_matches_per_step_lists_f80() {
+        check::<F80>(F80::repr);
+    }
+
+    /// A basis read through a head over per-variable columns is the same as the copied columns.
+    #[test]
+    fn head_view_matches_copied_columns() {
+        let mut rng = Rng(777);
+        for case in 0..100 {
+            let m = 2 + rng.below(30);
+            let mut all = random_cols(&mut rng, m);
+            all.extend(random_cols(&mut rng, m));
+            let mut head: Vec<usize> = (0..2 * m).collect();
+            for i in (1..head.len()).rev() {
+                head.swap(i, rng.below(i + 1));
+            }
+            head.truncate(m);
+            let copied: Vec<Col> = head.iter().map(|&v| all[v].clone()).collect();
+            let basis = BasisCols::new(&all, &head);
+            let a = factor_structure(m, &copied);
+            let b = factor_structure(m, &basis);
+            assert_eq!(a.pivots, b.pivots, "case {case}");
+            assert_eq!(a.phase, b.phase);
+            for s in 0..a.steps() {
+                assert_eq!(a.l_rows(s), b.l_rows(s));
+            }
+            assert_eq!(a.work(&copied, true), b.work(&basis, true), "case {case}");
         }
     }
 }

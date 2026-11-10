@@ -64,7 +64,7 @@ fn main() {
                 .iter()
                 .map(|v| v.abs().repr())
                 .collect();
-            let mut y: Vec<(u64, u16)> = st.l_vals[s].iter().map(|v| v.abs().repr()).collect();
+            let mut y: Vec<(u64, u16)> = st.l_vals(s).iter().map(|v| v.abs().repr()).collect();
             x.sort();
             y.sort();
             if fl.is_none() && x != y {

@@ -38,7 +38,8 @@ macro_rules! forward {
 }
 
 impl<R: Real> Shadow<R> {
-    pub fn fresh(m: usize, ncols: usize, st: &Structure<R>, cols: &[(bool, Vec<usize>, Vec<f64>)]) -> Self {
+    pub fn fresh<'a>(m: usize, ncols: usize, st: &Structure<R>, cols: impl Into<crate::lu_order::Cols<'a>>) -> Self {
+        let cols: crate::lu_order::Cols<'a> = cols.into();
         let new = DualFactor::fresh(m, ncols, st, cols);
         let old = muted(|| RefStruct::fresh(m, ncols, st, cols));
         let result = Self { new, old, calls: Cell::new(0) };

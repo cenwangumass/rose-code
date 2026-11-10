@@ -26,7 +26,7 @@ pub struct Overrides<R = f64> {
 
 struct Pass<'a, R: Real> {
     m: usize,
-    cols: &'a [(bool, Vec<usize>, Vec<f64>)],
+    cols: crate::lu_order::Cols<'a>,
     /// Active counts (> 0 while active, -1 or 0 once assigned).
     rowc: Vec<i64>,
     colc: Vec<i64>,
@@ -348,7 +348,7 @@ impl<R: Real> Pass<'_, R> {
 /// left then), `row_done`/`col_done` the state after phase 4. Appends the pass's pivots to `seq` and `phase`.
 pub fn run<R: Real>(
     m: usize,
-    cols: &[(bool, Vec<usize>, Vec<f64>)],
+    cols: crate::lu_order::Cols<'_>,
     seq: &mut Vec<(usize, usize)>,
     phase: &mut Vec<u8>,
     row_done3: &[bool],

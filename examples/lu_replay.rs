@@ -65,7 +65,7 @@ fn main() {
                 .iter()
                 .map(|v| v.abs().to_bits())
                 .collect();
-            let mut b: Vec<u64> = st.l_vals[s].iter().map(|v| v.abs().to_bits()).collect();
+            let mut b: Vec<u64> = st.l_vals(s).iter().map(|v| v.abs().to_bits()).collect();
             a.sort();
             b.sort();
             if first_l.is_none() && a != b {
@@ -79,7 +79,7 @@ fn main() {
             println!(
                 "  step {s}: ref {:?} rose {:?}",
                 &lval[lcp[s]..lcp[s + 1]],
-                st.l_vals[s]
+                st.l_vals(s)
             );
         }
         println!(

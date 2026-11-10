@@ -382,7 +382,7 @@ fn maxr<R: Real>(a: R, b: R) -> R {
 fn pricing_weights<R: Real>(
     m: usize,
     st: &crate::lu_order::Structure<R>,
-    cols: &[(bool, Vec<usize>, Vec<f64>)],
+    cols: crate::lu_order::Cols<'_>,
 ) -> Vec<f64> {
     let mut step_of_row = vec![usize::MAX; m];
     let mut step_of_pos = vec![usize::MAX; m];
@@ -393,7 +393,7 @@ fn pricing_weights<R: Real>(
     // Forward lists as CSR, filled by ascending e: each list is ascending with equal entries adjacent.
     let mut fstart = vec![0u32; m + 1];
     for e in 0..m {
-        for &r in &st.l_rows[e] {
+        for &r in st.l_rows(e) {
             fstart[step_of_row[r] + 1] += 1;
         }
     }
@@ -403,7 +403,7 @@ fn pricing_weights<R: Real>(
     let mut next: Vec<u32> = fstart[..m].to_vec();
     let mut fidx = vec![0u32; fstart[m] as usize];
     for e in 0..m {
-        for &r in &st.l_rows[e] {
+        for &r in st.l_rows(e) {
             let k = step_of_row[r];
             fidx[next[k] as usize] = e as u32;
             next[k] += 1;
@@ -450,7 +450,7 @@ fn pricing_weights<R: Real>(
                 }
             }
         } else {
-            for &(c, _) in &st.u_rows[k] {
+            for &(c, _) in st.u_row(k) {
                 let j = step_of_pos[c];
                 if j > k {
                     w[k] = (w[k] + w[j]) - (w[j] * w[k]) / n;
@@ -465,7 +465,7 @@ fn pricing_weights<R: Real>(
 fn pricing_weights_lists<R: Real>(
     m: usize,
     st: &crate::lu_order::Structure<R>,
-    cols: &[(bool, Vec<usize>, Vec<f64>)],
+    cols: crate::lu_order::Cols<'_>,
 ) -> (Vec<Vec<usize>>, Vec<Vec<usize>>, Vec<f64>) {
     let mut step_of_row = vec![usize::MAX; m];
     let mut step_of_pos = vec![usize::MAX; m];
@@ -476,7 +476,7 @@ fn pricing_weights_lists<R: Real>(
     // Forward lists (`0xf48fd` structure +0x70/+0x80): the earlier steps whose L column holds the row of step k, descending.
     let mut fwd: Vec<Vec<usize>> = vec![Vec::new(); m];
     for e in 0..m {
-        for &r in &st.l_rows[e] {
+        for &r in st.l_rows(e) {
             fwd[step_of_row[r]].push(e);
         }
     }
@@ -497,7 +497,7 @@ fn pricing_weights_lists<R: Real>(
                     .filter(|&t| t > k)
                     .collect()
             } else {
-                st.u_rows[k]
+                st.u_row(k)
                     .iter()
                     .map(|&(c, _)| step_of_pos[c])
                     .filter(|&t| t > k)
@@ -1356,26 +1356,12 @@ fn dump_start<R: Real>(
     }
 }
 
-fn reference_order<R: Real>(
-    p: &Internal,
+fn reference_order<'p, R: Real>(
+    p: &'p Internal,
     basic: &[usize],
     fac_no: usize,
-) -> (
-    Vec<usize>,
-    crate::lu_order::Structure<R>,
-    Vec<(bool, Vec<usize>, Vec<f64>)>,
-) {
-    let n = p.n;
-    let cols: Vec<(bool, Vec<usize>, Vec<f64>)> = basic
-        .iter()
-        .map(|&v| {
-            (
-                v >= n,
-                p.fcols[v].iter().map(|&(r, _)| r).collect(),
-                p.fcols[v].iter().map(|&(_, a)| a).collect(),
-            )
-        })
-        .collect();
+) -> (Vec<usize>, crate::lu_order::Structure<R>, crate::lu_order::BasisCols<'p>) {
+    let cols = crate::lu_order::BasisCols::new(p.split_cols(), basic);
     crate::lu_order::set_factorization_number(fac_no);
     let st = crate::lu_order::factor_structure_r::<R>(p.m, &cols);
     let order = st.pivots.iter().map(|&(_, pos)| basic[pos]).collect();
@@ -1515,12 +1501,12 @@ impl<'a, R: Real> Dual<'a, R> {
     ) -> (
         Vec<usize>,
         crate::lu_order::Structure<R>,
-        Vec<(bool, Vec<usize>, Vec<f64>)>,
+        crate::lu_order::BasisCols<'a>,
         Option<Mirror<R>>,
     ) {
         crate::lu_order::set_threshold(self.lu_thr);
         let (order, st, rows) = reference_order::<R>(self.p, &self.head, self.refactorizations + 1);
-        let mi = (order.len() == self.m).then(|| Mirror::fresh(self.m, self.n, &st, &rows));
+        let mi = (order.len() == self.m).then(|| Mirror::fresh(self.m, self.n, &st, rows.view()));
         if crate::dump::on("luin") {
             crate::dump::emit(
                 "luin",
@@ -1654,7 +1640,7 @@ impl<'a, R: Real> Dual<'a, R> {
             if !(mx / mn > if self.scaled { 1e12 } else { 1e15 }) {
                 break;
             }
-            self.factor_work(&st, &rows, discard);
+            self.factor_work(&st, rows.view(), discard);
             self.lu_thr = if self.lu_thr < 0.5 { 0.5 } else { 0.9 };
             (order, st, rows, mi) = self.lu_attempt();
             if order.len() < self.m {
@@ -1672,10 +1658,10 @@ impl<'a, R: Real> Dual<'a, R> {
             self.w[pos] = wv[v];
         }
         self.head = order;
-        self.reset_pricing(&st, &rows);
+        self.reset_pricing(&st, rows.view());
         self.mirror = mi;
         self.mirror.set_upd_limit(self.upd_limit);
-        self.factor_work(&st, &rows, discard);
+        self.factor_work(&st, rows.view(), discard);
         self.factor = AuxiliaryFactor::lazy(self.head.clone());
         // Shadow build: keep the eager build and its error return; the lazy build must agree on success and failure.
         #[cfg(feature = "factor-shadow")]
@@ -1812,7 +1798,7 @@ impl<'a, R: Real> Dual<'a, R> {
     fn factor_work(
         &mut self,
         st: &crate::lu_order::Structure<R>,
-        rows: &[(bool, Vec<usize>, Vec<f64>)],
+        rows: crate::lu_order::Cols<'_>,
         discard: f64,
     ) {
         use crate::work::{CTX, FAC};
@@ -2347,7 +2333,7 @@ impl<'a, R: Real> Dual<'a, R> {
     fn reset_pricing(
         &mut self,
         st: &crate::lu_order::Structure<R>,
-        cols: &[(bool, Vec<usize>, Vec<f64>)],
+        cols: crate::lu_order::Cols<'_>,
     ) {
         if self.ptype == 0 {
             return;
@@ -2364,7 +2350,7 @@ impl<'a, R: Real> Dual<'a, R> {
     fn reset_pricing_ref(
         &mut self,
         st: &crate::lu_order::Structure<R>,
-        cols: &[(bool, Vec<usize>, Vec<f64>)],
+        cols: crate::lu_order::Cols<'_>,
     ) {
         let (fwd, bwd, mut w) = pricing_weights_lists(self.m, st, cols);
         self.ptype = cap_pricing_weights(self.ptype, self.m, &mut w);
@@ -6125,7 +6111,7 @@ fn solve_pass_callback<R: Real>(
     crate::lu_order::set_pool_dims(p.n, p.cols[..p.n].iter().map(Vec::len).sum());
     let (mut order, mut stc, mut rows) = reference_order::<R>(&p, &basis.basic, carry.fac + 1);
     dump_start(&basis.basic, &order, &stc, carry.thr);
-    let mut mirror = Mirror::fresh(m, n, &stc, &rows);
+    let mut mirror = Mirror::fresh(m, n, &stc, rows.view());
     let mut carry_thr = carry.thr;
     // Growth check of the setup factorization (quad setup `0x246d39..0x246df1`, double driver `0xf351d..0xf3629`): max|diag| / min|diag| above 1e15 (1e12 scaled)
     // raises the threshold to 0.5, then 0.9, and the same columns are factorized again.
@@ -6148,7 +6134,7 @@ fn solve_pass_callback<R: Real>(
             if order.len() != m {
                 break;
             }
-            mirror = Mirror::fresh(m, n, &stc, &rows);
+            mirror = Mirror::fresh(m, n, &stc, rows.view());
         }
     }
     let cols: Vec<&Column> = order.iter().map(|&j| &p.cols[j]).collect();
@@ -6345,7 +6331,7 @@ fn solve_pass_callback<R: Real>(
         _ => None,
     };
     s.work.decided(s.work.w);
-    s.factor_work(&stc, &rows, 0.0);
+    s.factor_work(&stc, rows.view(), 0.0);
     let free_phase = (0..n).any(|j| s.st[j] == FREE);
     let mut setup_free = None;
     if free_phase {
@@ -6454,7 +6440,7 @@ fn solve_pass_callback<R: Real>(
         }
     }
     if !free_phase {
-        s.reset_pricing(&stc, &rows);
+        s.reset_pricing(&stc, rows.view());
     }
     s.slack_nb = (0..m).map(|i| s.st[n + i] < 0).collect();
     s.level = (0..n + m).filter(|&j| s.at_artificial(j)).count();
@@ -8425,20 +8411,22 @@ mod reset_pricing_flat {
                 for e in 0..m {
                     let adds = rnd(4);
                     for _ in 0..adds {
-                        let r = if !st.l_rows[e].is_empty() && rnd(2) == 0 {
-                            st.l_rows[e][rnd(st.l_rows[e].len())]
+                        let r = if !st.l_rows(e).is_empty() && rnd(2) == 0 {
+                            st.l_rows(e)[rnd(st.l_rows(e).len())]
                         } else {
                             rnd(m)
                         };
-                        st.l_rows[e].push(r);
+                        let mut rows = st.l_rows(e).to_vec();
+                        rows.push(r);
+                        st.set_l_rows_for_test(e, rows);
                     }
                     if rnd(5) == 0 {
-                        st.l_rows[e].clear();
+                        st.set_l_rows_for_test(e, Vec::new());
                     }
                 }
             }
-            let flat = pricing_weights(m, &st, &cols);
-            let (_, _, lists) = pricing_weights_lists(m, &st, &cols);
+            let flat = pricing_weights(m, &st, (&cols).into());
+            let (_, _, lists) = pricing_weights_lists(m, &st, (&cols).into());
             assert_eq!(bits(&flat), bits(&lists), "case {case}, m {m}");
             checked += 1;
         }
