@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "fx_badscale.pdhg",
   "model": "tests/fixtures/fx_badscale.mps",
-  "ms": 7358,
+  "ms": 9178,
   "order": {
     "chunks": [
       "a771af0cae5be822",

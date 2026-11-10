@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_infeasible.primal-r",
   "model": "tests/fixtures/fx_infeasible.mps",
-  "ms": 3,
+  "ms": 2,
   "order": {
     "chunks": [
       "2d6ff232a63a5b0d"

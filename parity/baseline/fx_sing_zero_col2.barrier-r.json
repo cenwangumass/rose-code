@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_sing_zero_col2.barrier-r",
   "model": "tests/fixtures/fx_sing_zero_col2.mps",
-  "ms": 5,
+  "ms": 4,
   "order": {
     "chunks": [
       "fc823ee230ecfb1a"

@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_infu_nonempty.dual-c",
   "model": "tests/fixtures/fx_infu_nonempty.mps",
-  "ms": 5,
+  "ms": 4,
   "order": {
     "chunks": [
       "3f5225c6dd5d25f9"

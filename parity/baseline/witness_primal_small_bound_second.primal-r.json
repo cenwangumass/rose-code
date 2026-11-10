@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "witness_primal_small_bound_second.primal-r",
   "model": "tests/fixtures/witness_primal_small_bound_second.mps",
-  "ms": 6,
+  "ms": 7,
   "order": {
     "chunks": [
       "75f283398c4063ec"

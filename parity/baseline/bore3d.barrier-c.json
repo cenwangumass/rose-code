@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "bore3d.barrier-c",
   "model": "tests/fixtures/bore3d.mps",
-  "ms": 149,
+  "ms": 100,
   "order": {
     "chunks": [
       "ca2f6c6f502bfcf0",

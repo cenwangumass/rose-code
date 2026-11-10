@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "afiro.dual-c",
   "model": "tests/fixtures/afiro.mps",
-  "ms": 5,
+  "ms": 4,
   "order": {
     "chunks": [
       "1e361dd99d0f7cea"

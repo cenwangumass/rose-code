@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "bore3d.dual-c",
   "model": "tests/fixtures/bore3d.mps",
-  "ms": 103,
+  "ms": 87,
   "order": {
     "chunks": [
       "67724c72eba38d12",
@@ -65,7 +65,7 @@
     },
     "DTAU": {
       "chunks": [
-        "1d846360e4445df3"
+        "4128aeb19363542f"
       ],
       "n": 147
     },

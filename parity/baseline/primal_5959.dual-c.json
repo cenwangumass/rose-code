@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "primal_5959.dual-c",
   "model": "tests/fixtures/primal_5959.mps",
-  "ms": 6,
+  "ms": 4,
   "order": {
     "chunks": [
       "47b29dddecc1e014"

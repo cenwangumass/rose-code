@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "bh50028.primal-r",
   "model": "tests/fixtures/bh50028.mps",
-  "ms": 16,
+  "ms": 12,
   "order": {
     "chunks": [
       "729ffc1e3efad0cc"

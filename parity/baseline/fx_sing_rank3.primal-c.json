@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_sing_rank3.primal-c",
   "model": "tests/fixtures/fx_sing_rank3.mps",
-  "ms": 4,
+  "ms": 5,
   "order": {
     "chunks": [
       "fe7bc2eeb2851592"

@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_sing_dup_attr_ub.dual-c",
   "model": "tests/fixtures/fx_sing_dup_attr_ub.mps",
-  "ms": 2,
+  "ms": 3,
   "order": {
     "chunks": [
       "c326d02782a96f62"

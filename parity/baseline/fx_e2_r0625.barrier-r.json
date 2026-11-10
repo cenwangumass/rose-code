@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "fx_e2_r0625.barrier-r",
   "model": "tests/fixtures/fx_e2_r0625.mps",
-  "ms": 44,
+  "ms": 34,
   "order": {
     "chunks": [
       "4c5eb4e3d927cbc6",

@@ -10,7 +10,7 @@
   "exit": 3,
   "id": "80bau3b.primal-r",
   "model": "tests/fixtures/80bau3b.mps",
-  "ms": 7118,
+  "ms": 8158,
   "order": {
     "chunks": [
       "07bb3c09de75fb49",

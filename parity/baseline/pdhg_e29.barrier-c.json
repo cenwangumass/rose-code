@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "pdhg_e29.barrier-c",
   "model": "tests/fixtures/pdhg_e29.mps",
-  "ms": 2,
+  "ms": 1,
   "order": {
     "chunks": [
       "d63a348822118b2e"

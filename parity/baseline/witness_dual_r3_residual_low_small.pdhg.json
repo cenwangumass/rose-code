@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "witness_dual_r3_residual_low_small.pdhg",
   "model": "tests/fixtures/witness_dual_r3_residual_low_small.mps",
-  "ms": 3,
+  "ms": 4,
   "order": {
     "chunks": [
       "a99e904ff0cffe7a"

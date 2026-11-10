@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "adlittle.barrier-c",
   "model": "tests/fixtures/adlittle.mps",
-  "ms": 14,
+  "ms": 12,
   "order": {
     "chunks": [
       "1f9717ee35184841"

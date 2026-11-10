@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "pdhg_e17.primal-r",
   "model": "tests/fixtures/pdhg_e17.mps",
-  "ms": 5,
+  "ms": 2,
   "order": {
     "chunks": [
       "32c08ca61fd0995e"

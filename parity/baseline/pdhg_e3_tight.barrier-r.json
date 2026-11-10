@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "pdhg_e3_tight.barrier-r",
   "model": "tests/fixtures/pdhg_e3_tight.mps",
-  "ms": 6,
+  "ms": 5,
   "order": {
     "chunks": [
       "8ea98f71697bff46"

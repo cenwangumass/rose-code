@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_neardep.barrier-c",
   "model": "tests/fixtures/fx_neardep.mps",
-  "ms": 2,
+  "ms": 3,
   "order": {
     "chunks": [
       "a1a5176eadd3aa9e"

@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "fx_sing_pairgate.pdhg",
   "model": "tests/fixtures/fx_sing_pairgate.mps",
-  "ms": 3,
+  "ms": 2,
   "order": {
     "chunks": [
       "2ad4b8ff40a87dee"

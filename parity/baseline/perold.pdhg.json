@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "perold.pdhg",
   "model": "tests/fixtures/perold.mps",
-  "ms": 1031,
+  "ms": 594,
   "order": {
     "chunks": [
       "4cdf2dc42709f5ed"

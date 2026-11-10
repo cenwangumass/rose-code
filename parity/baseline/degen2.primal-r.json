@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "degen2.primal-r",
   "model": "tests/fixtures/degen2.mps",
-  "ms": 1743,
+  "ms": 1802,
   "order": {
     "chunks": [
       "323b0e4443beb00f",

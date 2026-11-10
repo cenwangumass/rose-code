@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "quad_s2950.dual-r",
   "model": "tests/fixtures/quad_s2950.mps",
-  "ms": 166,
+  "ms": 127,
   "order": {
     "chunks": [
       "2b0d9af7c6b83002",

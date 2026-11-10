@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_bar_nrow.primal-c",
   "model": "tests/fixtures/fx_bar_nrow.mps",
-  "ms": 3,
+  "ms": 1,
   "order": {
     "chunks": [
       "13d35443806eb67f"

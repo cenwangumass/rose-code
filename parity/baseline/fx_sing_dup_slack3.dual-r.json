@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_sing_dup_slack3.dual-r",
   "model": "tests/fixtures/fx_sing_dup_slack3.mps",
-  "ms": 4,
+  "ms": 2,
   "order": {
     "chunks": [
       "f444ea78c81d9d63"

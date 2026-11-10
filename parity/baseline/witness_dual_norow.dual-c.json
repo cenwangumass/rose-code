@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "witness_dual_norow.dual-c",
   "model": "tests/fixtures/witness_dual_norow.mps",
-  "ms": 3,
+  "ms": 4,
   "order": {
     "chunks": [
       "d398c9608553172f"

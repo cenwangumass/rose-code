@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "perold.primal-c",
   "model": "tests/fixtures/perold.mps",
-  "ms": 23722,
+  "ms": 24468,
   "order": {
     "chunks": [
       "0a8b37a5733b30f7",

@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "fx_tied.pdhg",
   "model": "tests/fixtures/fx_tied.mps",
-  "ms": 4,
+  "ms": 1,
   "order": {
     "chunks": [
       "2a1ce4e47992fc1b"

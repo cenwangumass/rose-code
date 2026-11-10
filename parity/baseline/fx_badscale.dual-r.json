@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_badscale.dual-r",
   "model": "tests/fixtures/fx_badscale.mps",
-  "ms": 5,
+  "ms": 2,
   "order": {
     "chunks": [
       "e2972057f63fb92f"

@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "80bau3b.pdhg",
   "model": "tests/fixtures/80bau3b.mps",
-  "ms": 8865,
+  "ms": 4222,
   "order": {
     "chunks": [
       "5ed0ea5703b0afe3"

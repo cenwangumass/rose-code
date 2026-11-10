@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "primal_5959.pdhg",
   "model": "tests/fixtures/primal_5959.mps",
-  "ms": 32,
+  "ms": 27,
   "order": {
     "chunks": [
       "3cd0dee991dac614"

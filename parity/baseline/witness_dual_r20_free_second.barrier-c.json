@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "witness_dual_r20_free_second.barrier-c",
   "model": "tests/fixtures/witness_dual_r20_free_second.mps",
-  "ms": 8,
+  "ms": 7,
   "order": {
     "chunks": [
       "55e8184ce8cc19fa"

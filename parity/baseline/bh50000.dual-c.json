@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "bh50000.dual-c",
   "model": "tests/fixtures/bh50000.mps",
-  "ms": 10,
+  "ms": 5,
   "order": {
     "chunks": [
       "841fad3a39a1cb22"

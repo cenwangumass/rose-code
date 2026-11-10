@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "fx_sing_all_same3.pdhg",
   "model": "tests/fixtures/fx_sing_all_same3.mps",
-  "ms": 3,
+  "ms": 2,
   "order": {
     "chunks": [
       "a99e904ff0cffe7a"

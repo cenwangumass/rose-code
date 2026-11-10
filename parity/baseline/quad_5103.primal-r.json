@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "quad_5103.primal-r",
   "model": "tests/fixtures/quad_5103.mps",
-  "ms": 9,
+  "ms": 14,
   "order": {
     "chunks": [
       "921329b39ded2d6d"

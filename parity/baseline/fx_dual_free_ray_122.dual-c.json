@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_dual_free_ray_122.dual-c",
   "model": "tests/fixtures/fx_dual_free_ray_122.mps",
-  "ms": 7,
+  "ms": 3,
   "order": {
     "chunks": [
       "4c23434698cf1980"

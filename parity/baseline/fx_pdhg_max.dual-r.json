@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_pdhg_max.dual-r",
   "model": "tests/fixtures/fx_pdhg_max.mps",
-  "ms": 3,
+  "ms": 2,
   "order": {
     "chunks": [
       "4a54ea6478d313c8"

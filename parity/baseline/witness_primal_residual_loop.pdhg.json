@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "witness_primal_residual_loop.pdhg",
   "model": "tests/fixtures/witness_primal_residual_loop.mps",
-  "ms": 2211,
+  "ms": 1617,
   "order": {
     "chunks": [
       "a771af0cae5be822",

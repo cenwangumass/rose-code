@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "randlp50154.barrier-c",
   "model": "tests/fixtures/randlp50154.mps",
-  "ms": 39,
+  "ms": 41,
   "order": {
     "chunks": [
       "cd3eefaa6c816a3c",

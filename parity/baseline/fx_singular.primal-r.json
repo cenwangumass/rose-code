@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_singular.primal-r",
   "model": "tests/fixtures/fx_singular.mps",
-  "ms": 4,
+  "ms": 3,
   "order": {
     "chunks": [
       "a95a01de67b1e879"

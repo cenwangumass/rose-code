@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "pdhg_e3_long.pdhg",
   "model": "tests/fixtures/pdhg_e3_long.mps",
-  "ms": 12,
+  "ms": 7,
   "order": {
     "chunks": [
       "4bc26bc4c8a04d17"

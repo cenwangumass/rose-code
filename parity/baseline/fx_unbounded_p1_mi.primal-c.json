@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_unbounded_p1_mi.primal-c",
   "model": "tests/fixtures/fx_unbounded_p1_mi.mps",
-  "ms": 3,
+  "ms": 4,
   "order": {
     "chunks": [
       "0aedd8ff066f57e2"

@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "bore3d.primal-r",
   "model": "tests/fixtures/bore3d.mps",
-  "ms": 158,
+  "ms": 155,
   "order": {
     "chunks": [
       "847945201ecd181e",

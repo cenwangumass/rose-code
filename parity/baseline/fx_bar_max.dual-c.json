@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_bar_max.dual-c",
   "model": "tests/fixtures/fx_bar_max.mps",
-  "ms": 6,
+  "ms": 4,
   "order": {
     "chunks": [
       "de956b42379aac87"

@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "fx_bar_stall133.pdhg",
   "model": "tests/fixtures/fx_bar_stall133.mps",
-  "ms": 76,
+  "ms": 59,
   "order": {
     "chunks": [
       "3cd0dee991dac614"

@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "inf_itest6.primal-c",
   "model": "tests/fixtures/inf_itest6.mps",
-  "ms": 4,
+  "ms": 11,
   "order": {
     "chunks": [
       "754589337ff79a60"

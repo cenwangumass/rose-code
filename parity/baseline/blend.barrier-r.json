@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "blend.barrier-r",
   "model": "tests/fixtures/blend.mps",
-  "ms": 24,
+  "ms": 19,
   "order": {
     "chunks": [
       "af7e32325a0b3cf8"

@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "adlittle_merit0.barrier-r",
   "model": "tests/fixtures/adlittle_merit0.mps",
-  "ms": 18,
+  "ms": 17,
   "order": {
     "chunks": [
       "897cd2202bc528ce"

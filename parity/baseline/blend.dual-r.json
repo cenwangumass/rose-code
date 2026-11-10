@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "blend.dual-r",
   "model": "tests/fixtures/blend.mps",
-  "ms": 42,
+  "ms": 28,
   "order": {
     "chunks": [
       "9bc024d161cbc933",

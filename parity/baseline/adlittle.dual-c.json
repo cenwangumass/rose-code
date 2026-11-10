@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "adlittle.dual-c",
   "model": "tests/fixtures/adlittle.mps",
-  "ms": 32,
+  "ms": 37,
   "order": {
     "chunks": [
       "971d4e6ed8c22c9c",

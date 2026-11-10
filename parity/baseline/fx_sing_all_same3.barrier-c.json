@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_sing_all_same3.barrier-c",
   "model": "tests/fixtures/fx_sing_all_same3.mps",
-  "ms": 7,
+  "ms": 4,
   "order": {
     "chunks": [
       "a1a5176eadd3aa9e"

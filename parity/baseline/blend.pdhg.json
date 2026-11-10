@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "blend.pdhg",
   "model": "tests/fixtures/blend.mps",
-  "ms": 17,
+  "ms": 8,
   "order": {
     "chunks": [
       "83b4ceb2bf41a193"

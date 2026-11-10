@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "pilot4.primal-c",
   "model": "tests/fixtures/pilot4.mps",
-  "ms": 3547,
+  "ms": 3532,
   "order": {
     "chunks": [
       "72eabb88b16ab857",

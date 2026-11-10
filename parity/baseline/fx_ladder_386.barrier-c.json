@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_ladder_386.barrier-c",
   "model": "tests/fixtures/fx_ladder_386.mps",
-  "ms": 40,
+  "ms": 29,
   "order": {
     "chunks": [
       "26d69ebbb4bfca99"

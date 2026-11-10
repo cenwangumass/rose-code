@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "boeing2.barrier-c",
   "model": "tests/fixtures/boeing2.mps",
-  "ms": 87,
+  "ms": 66,
   "order": {
     "chunks": [
       "e948b8ba54339919",

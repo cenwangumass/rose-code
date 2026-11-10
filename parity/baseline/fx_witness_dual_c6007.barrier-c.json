@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "fx_witness_dual_c6007.barrier-c",
   "model": "tests/fixtures/fx_witness_dual_c6007.mps",
-  "ms": 4,
+  "ms": 5,
   "order": {
     "chunks": [
       "4088765fae60597e"

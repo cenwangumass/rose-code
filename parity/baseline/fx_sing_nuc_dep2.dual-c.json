@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_sing_nuc_dep2.dual-c",
   "model": "tests/fixtures/fx_sing_nuc_dep2.mps",
-  "ms": 2,
+  "ms": 3,
   "order": {
     "chunks": [
       "f3e10acf7e2353c9"

@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "fx_bar_refine.barrier-r",
   "model": "tests/fixtures/fx_bar_refine.mps",
-  "ms": 17,
+  "ms": 13,
   "order": {
     "chunks": [
       "ecb85f1f07d2ccb5",

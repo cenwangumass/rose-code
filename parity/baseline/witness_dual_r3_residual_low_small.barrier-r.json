@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "witness_dual_r3_residual_low_small.barrier-r",
   "model": "tests/fixtures/witness_dual_r3_residual_low_small.mps",
-  "ms": 4,
+  "ms": 6,
   "order": {
     "chunks": [
       "ad7874697f25134c"

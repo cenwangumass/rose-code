@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "fx_bar_rngL.pdhg",
   "model": "tests/fixtures/fx_bar_rngL.mps",
-  "ms": 3,
+  "ms": 1,
   "order": {
     "chunks": [
       "a99e904ff0cffe7a"

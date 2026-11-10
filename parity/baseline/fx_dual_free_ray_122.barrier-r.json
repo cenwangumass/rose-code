@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "fx_dual_free_ray_122.barrier-r",
   "model": "tests/fixtures/fx_dual_free_ray_122.mps",
-  "ms": 6,
+  "ms": 4,
   "order": {
     "chunks": [
       "8a1a79853a9f3d79"

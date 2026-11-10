@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "randlp50154.primal-c",
   "model": "tests/fixtures/randlp50154.mps",
-  "ms": 85,
+  "ms": 49,
   "order": {
     "chunks": [
       "bca51fe7e6c647ef",

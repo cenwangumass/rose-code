@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_infu_independent.primal-c",
   "model": "tests/fixtures/fx_infu_independent.mps",
-  "ms": 4,
+  "ms": 7,
   "order": {
     "chunks": [
       "77bedf9d251247a4"

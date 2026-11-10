@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "sc50a.pdhg",
   "model": "tests/fixtures/sc50a.mps",
-  "ms": 6,
+  "ms": 4,
   "order": {
     "chunks": [
       "e3a8dfe3de797990"

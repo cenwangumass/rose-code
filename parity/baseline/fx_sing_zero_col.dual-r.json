@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_sing_zero_col.dual-r",
   "model": "tests/fixtures/fx_sing_zero_col.mps",
-  "ms": 3,
+  "ms": 2,
   "order": {
     "chunks": [
       "90236e485c475273"

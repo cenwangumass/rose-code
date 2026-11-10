@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "fx_infu_nonempty.barrier-r",
   "model": "tests/fixtures/fx_infu_nonempty.mps",
-  "ms": 5,
+  "ms": 3,
   "order": {
     "chunks": [
       "14cdb7399ff13963"

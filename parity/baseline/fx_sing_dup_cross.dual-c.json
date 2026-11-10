@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_sing_dup_cross.dual-c",
   "model": "tests/fixtures/fx_sing_dup_cross.mps",
-  "ms": 2,
+  "ms": 3,
   "order": {
     "chunks": [
       "b2420d7fc5e7e675"

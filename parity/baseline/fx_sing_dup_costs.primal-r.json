@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_sing_dup_costs.primal-r",
   "model": "tests/fixtures/fx_sing_dup_costs.mps",
-  "ms": 3,
+  "ms": 10,
   "order": {
     "chunks": [
       "a95a01de67b1e879"

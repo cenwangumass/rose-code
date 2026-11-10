@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "quad_s2950.primal-r",
   "model": "tests/fixtures/quad_s2950.mps",
-  "ms": 8,
+  "ms": 6,
   "order": {
     "chunks": [
       "a3dff33237508c8b"

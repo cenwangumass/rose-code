@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "fx_sing_rank3.pdhg",
   "model": "tests/fixtures/fx_sing_rank3.mps",
-  "ms": 3,
+  "ms": 2,
   "order": {
     "chunks": [
       "2ad4b8ff40a87dee"

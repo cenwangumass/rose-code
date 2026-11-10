@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "fx_unbounded_p1.barrier-c",
   "model": "tests/fixtures/fx_unbounded_p1.mps",
-  "ms": 9,
+  "ms": 4,
   "order": {
     "chunks": [
       "0a8c0876a76ccf8c"

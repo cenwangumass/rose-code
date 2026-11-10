@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "inf_galenet.barrier-c",
   "model": "tests/fixtures/inf_galenet.mps",
-  "ms": 6,
+  "ms": 3,
   "order": {
     "chunks": [
       "133e378f0e86ddfb"

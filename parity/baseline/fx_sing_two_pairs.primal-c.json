@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_sing_two_pairs.primal-c",
   "model": "tests/fixtures/fx_sing_two_pairs.mps",
-  "ms": 3,
+  "ms": 9,
   "order": {
     "chunks": [
       "afdb2a79335d3bea"

@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_e2_r0625.dual-c",
   "model": "tests/fixtures/fx_e2_r0625.mps",
-  "ms": 24,
+  "ms": 14,
   "order": {
     "chunks": [
       "908197d6e20558b9",

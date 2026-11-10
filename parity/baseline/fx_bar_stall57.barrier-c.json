@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_bar_stall57.barrier-c",
   "model": "tests/fixtures/fx_bar_stall57.mps",
-  "ms": 24,
+  "ms": 12,
   "order": {
     "chunks": [
       "52a36a146a535171"

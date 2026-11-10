@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "witness_dual_forced1.dual-c",
   "model": "tests/fixtures/witness_dual_forced1.mps",
-  "ms": 2,
+  "ms": 3,
   "order": {
     "chunks": [
       "af7a94e882de2457"

@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_sing_rank3b.barrier-r",
   "model": "tests/fixtures/fx_sing_rank3b.mps",
-  "ms": 5,
+  "ms": 4,
   "order": {
     "chunks": [
       "24dfb2de59854bce"

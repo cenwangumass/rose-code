@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "fx_bar_ubhsd.barrier-c",
   "model": "tests/fixtures/fx_bar_ubhsd.mps",
-  "ms": 4,
+  "ms": 5,
   "order": {
     "chunks": [
       "62764980d2a3caea"

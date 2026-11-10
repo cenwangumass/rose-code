@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "witness_dual_forced1.pdhg",
   "model": "tests/fixtures/witness_dual_forced1.mps",
-  "ms": 5,
+  "ms": 3,
   "order": {
     "chunks": [
       "19289f8a7c30ddcf"

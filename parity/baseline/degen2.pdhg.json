@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "degen2.pdhg",
   "model": "tests/fixtures/degen2.mps",
-  "ms": 166,
+  "ms": 136,
   "order": {
     "chunks": [
       "b88a1a4fbbd1b92f"

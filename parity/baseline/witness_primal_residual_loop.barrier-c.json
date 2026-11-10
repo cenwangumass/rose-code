@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "witness_primal_residual_loop.barrier-c",
   "model": "tests/fixtures/witness_primal_residual_loop.mps",
-  "ms": 128,
+  "ms": 138,
   "order": {
     "chunks": [
       "cc7db340f5cc937a",

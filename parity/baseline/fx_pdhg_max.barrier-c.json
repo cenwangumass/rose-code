@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_pdhg_max.barrier-c",
   "model": "tests/fixtures/fx_pdhg_max.mps",
-  "ms": 5,
+  "ms": 3,
   "order": {
     "chunks": [
       "ada9359f64074ebc"

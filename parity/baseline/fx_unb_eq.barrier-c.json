@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "fx_unb_eq.barrier-c",
   "model": "tests/fixtures/fx_unb_eq.mps",
-  "ms": 10,
+  "ms": 8,
   "order": {
     "chunks": [
       "511cf9f20940e163"

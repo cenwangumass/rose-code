@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "fx_sing_two_pairs.pdhg",
   "model": "tests/fixtures/fx_sing_two_pairs.mps",
-  "ms": 3,
+  "ms": 9,
   "order": {
     "chunks": [
       "a99e904ff0cffe7a"

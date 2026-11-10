@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_bar_stall57.primal-r",
   "model": "tests/fixtures/fx_bar_stall57.mps",
-  "ms": 10,
+  "ms": 6,
   "order": {
     "chunks": [
       "09157020aac1f314"

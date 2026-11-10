@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_singular.dual-r",
   "model": "tests/fixtures/fx_singular.mps",
-  "ms": 3,
+  "ms": 5,
   "order": {
     "chunks": [
       "721ff6efa27a9cbe"

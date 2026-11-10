@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "sc50a.barrier-c",
   "model": "tests/fixtures/sc50a.mps",
-  "ms": 18,
+  "ms": 11,
   "order": {
     "chunks": [
       "2e83e797709a09f2"

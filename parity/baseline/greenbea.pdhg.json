@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "greenbea.pdhg",
   "model": "tests/fixtures/greenbea.mps",
-  "ms": 4268,
+  "ms": 2446,
   "order": {
     "chunks": [
       "2e2bbd1ad6a64b4c"

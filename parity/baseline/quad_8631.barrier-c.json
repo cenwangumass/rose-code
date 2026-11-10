@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "quad_8631.barrier-c",
   "model": "tests/fixtures/quad_8631.mps",
-  "ms": 20,
+  "ms": 21,
   "order": {
     "chunks": [
       "548e0f7fea439876",

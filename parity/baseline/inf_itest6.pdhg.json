@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "inf_itest6.pdhg",
   "model": "tests/fixtures/inf_itest6.mps",
-  "ms": 17,
+  "ms": 13,
   "order": {
     "chunks": [
       "3cd0dee991dac614"

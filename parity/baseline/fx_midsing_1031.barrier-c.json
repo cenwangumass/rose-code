@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "fx_midsing_1031.barrier-c",
   "model": "tests/fixtures/fx_midsing_1031.mps",
-  "ms": 21,
+  "ms": 18,
   "order": {
     "chunks": [
       "2fd7a7b67d68ac1f",

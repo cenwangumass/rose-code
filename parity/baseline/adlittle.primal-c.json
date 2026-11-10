@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "adlittle.primal-c",
   "model": "tests/fixtures/adlittle.mps",
-  "ms": 44,
+  "ms": 26,
   "order": {
     "chunks": [
       "4cda430582c9df91",

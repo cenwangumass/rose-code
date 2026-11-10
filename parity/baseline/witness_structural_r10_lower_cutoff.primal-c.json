@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "witness_structural_r10_lower_cutoff.primal-c",
   "model": "tests/fixtures/witness_structural_r10_lower_cutoff.mps",
-  "ms": 3,
+  "ms": 5,
   "order": {
     "chunks": [
       "23d6f823baee3273"

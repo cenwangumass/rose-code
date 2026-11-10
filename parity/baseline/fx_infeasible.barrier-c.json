@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "fx_infeasible.barrier-c",
   "model": "tests/fixtures/fx_infeasible.mps",
-  "ms": 2,
+  "ms": 4,
   "order": {
     "chunks": [
       "cc3ff676daeab901"

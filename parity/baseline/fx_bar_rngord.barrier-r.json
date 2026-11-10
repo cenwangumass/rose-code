@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_bar_rngord.barrier-r",
   "model": "tests/fixtures/fx_bar_rngord.mps",
-  "ms": 6,
+  "ms": 3,
   "order": {
     "chunks": [
       "bcb6633211324983"

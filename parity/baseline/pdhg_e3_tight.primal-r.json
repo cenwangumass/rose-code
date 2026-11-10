@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "pdhg_e3_tight.primal-r",
   "model": "tests/fixtures/pdhg_e3_tight.mps",
-  "ms": 3,
+  "ms": 7,
   "order": {
     "chunks": [
       "3dc974044a2f8063"

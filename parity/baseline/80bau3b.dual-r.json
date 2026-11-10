@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "80bau3b.dual-r",
   "model": "tests/fixtures/80bau3b.mps",
-  "ms": 11068,
+  "ms": 12281,
   "order": {
     "chunks": [
       "779f003a23892a1a",
@@ -195,11 +195,11 @@
     },
     "DTAU": {
       "chunks": [
-        "21dd6ec26fe86402",
-        "3dbfcd3ba6812873",
-        "26c6069e88291747",
-        "2ab8c2c1eb3bce11",
-        "a07b9a774e0d6b4d",
+        "ab91fa9bfec8b970",
+        "b5ce82e998f4bc4e",
+        "36a65c99c6834eb6",
+        "b522f3dfdfbd75ad",
+        "889ec74ec385f2a8",
         "3c1f9d5594e713b7"
       ],
       "n": 5185

@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "witness_primal_e2_0625.dual-c",
   "model": "tests/fixtures/witness_primal_e2_0625.mps",
-  "ms": 5,
+  "ms": 4,
   "order": {
     "chunks": [
       "6cb1a1b26982728a"

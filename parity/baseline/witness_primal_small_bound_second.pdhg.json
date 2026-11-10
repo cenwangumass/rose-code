@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "witness_primal_small_bound_second.pdhg",
   "model": "tests/fixtures/witness_primal_small_bound_second.mps",
-  "ms": 38,
+  "ms": 29,
   "order": {
     "chunks": [
       "3cd0dee991dac614"

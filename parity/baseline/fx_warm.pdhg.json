@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "fx_warm.pdhg",
   "model": "tests/fixtures/fx_warm.mps",
-  "ms": 5,
+  "ms": 3,
   "order": {
     "chunks": [
       "2ad4b8ff40a87dee"

@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "fx_infeasible.pdhg",
   "model": "tests/fixtures/fx_infeasible.mps",
-  "ms": 12,
+  "ms": 6,
   "order": {
     "chunks": [
       "3cd0dee991dac614"

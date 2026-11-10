@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "randlp50154.pdhg",
   "model": "tests/fixtures/randlp50154.mps",
-  "ms": 47,
+  "ms": 23,
   "order": {
     "chunks": [
       "3cd0dee991dac614"

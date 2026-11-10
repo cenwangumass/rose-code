@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_unb_scaled.dual-r",
   "model": "tests/fixtures/fx_unb_scaled.mps",
-  "ms": 4,
+  "ms": 3,
   "order": {
     "chunks": [
       "753f01f84e8e69e1"

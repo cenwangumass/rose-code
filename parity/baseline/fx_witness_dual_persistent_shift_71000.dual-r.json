@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_witness_dual_persistent_shift_71000.dual-r",
   "model": "tests/fixtures/fx_witness_dual_persistent_shift_71000.mps",
-  "ms": 29,
+  "ms": 24,
   "order": {
     "chunks": [
       "c4bf3a26a456e395",

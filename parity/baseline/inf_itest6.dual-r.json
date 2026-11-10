@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "inf_itest6.dual-r",
   "model": "tests/fixtures/inf_itest6.mps",
-  "ms": 5,
+  "ms": 6,
   "order": {
     "chunks": [
       "c90159b2fd74f2b7"

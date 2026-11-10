@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "quad_5885.dual-r",
   "model": "tests/fixtures/quad_5885.mps",
-  "ms": 59,
+  "ms": 43,
   "order": {
     "chunks": [
       "5896c175657509a3",

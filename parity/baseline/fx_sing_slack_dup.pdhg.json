@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "fx_sing_slack_dup.pdhg",
   "model": "tests/fixtures/fx_sing_slack_dup.mps",
-  "ms": 3,
+  "ms": 4,
   "order": {
     "chunks": [
       "2a1ce4e47992fc1b"

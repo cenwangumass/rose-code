@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "bh50028.dual-r",
   "model": "tests/fixtures/bh50028.mps",
-  "ms": 8,
+  "ms": 10,
   "order": {
     "chunks": [
       "0eecd2a65b1ac26b"

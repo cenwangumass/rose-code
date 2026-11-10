@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "degen2.dual-r",
   "model": "tests/fixtures/degen2.mps",
-  "ms": 732,
+  "ms": 653,
   "order": {
     "chunks": [
       "0d283697f3cf46ed",
@@ -72,7 +72,7 @@
     },
     "DTAU": {
       "chunks": [
-        "1edddbfbe6932a9b"
+        "ff19b77dc929ab72"
       ],
       "n": 634
     },

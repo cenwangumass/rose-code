@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "sc50a_pobj_inf.barrier-c",
   "model": "tests/fixtures/sc50a_pobj_inf.mps",
-  "ms": 10,
+  "ms": 8,
   "order": {
     "chunks": [
       "2e83e797709a09f2"

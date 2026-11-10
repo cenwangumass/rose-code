@@ -10,7 +10,7 @@
   "exit": 3,
   "id": "greenbea.primal-c",
   "model": "tests/fixtures/greenbea.mps",
-  "ms": 13911,
+  "ms": 12473,
   "order": {
     "chunks": [
       "709efa10503cf288",

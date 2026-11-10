@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "sc50a_pobj_inf.dual-r",
   "model": "tests/fixtures/sc50a_pobj_inf.mps",
-  "ms": 15,
+  "ms": 10,
   "order": {
     "chunks": [
       "a5756dbbf0d41515"
@@ -56,7 +56,7 @@
     },
     "DTAU": {
       "chunks": [
-        "a04e73eeedf586ef"
+        "ce72d988124bb6d1"
       ],
       "n": 33
     },

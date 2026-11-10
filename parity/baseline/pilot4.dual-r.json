@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "pilot4.dual-r",
   "model": "tests/fixtures/pilot4.mps",
-  "ms": 1431,
+  "ms": 1318,
   "order": {
     "chunks": [
       "87e42b343b1f27d1",
@@ -82,7 +82,7 @@
     },
     "DTAU": {
       "chunks": [
-        "e8ba5fc763b1c858"
+        "a03e76a9a84b99ed"
       ],
       "n": 603
     },

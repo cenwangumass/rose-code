@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_tied.dual-r",
   "model": "tests/fixtures/fx_tied.mps",
-  "ms": 3,
+  "ms": 2,
   "order": {
     "chunks": [
       "88d930d5b0e9d90a"

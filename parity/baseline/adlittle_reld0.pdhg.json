@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "adlittle_reld0.pdhg",
   "model": "tests/fixtures/adlittle_reld0.mps",
-  "ms": 49,
+  "ms": 29,
   "order": {
     "chunks": [
       "8977bbabc5ae178f"

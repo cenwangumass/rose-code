@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "degen3.barrier-r",
   "model": "tests/fixtures/degen3.mps",
-  "ms": 1736,
+  "ms": 1043,
   "order": {
     "chunks": [
       "31b6321352c22944",

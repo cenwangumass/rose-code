@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "sc50a_pobj_inf.pdhg",
   "model": "tests/fixtures/sc50a_pobj_inf.mps",
-  "ms": 7,
+  "ms": 5,
   "order": {
     "chunks": [
       "e3a8dfe3de797990"

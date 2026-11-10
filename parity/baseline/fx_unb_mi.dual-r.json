@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_unb_mi.dual-r",
   "model": "tests/fixtures/fx_unb_mi.mps",
-  "ms": 2,
+  "ms": 3,
   "order": {
     "chunks": [
       "cecd8ff83f0577b9"

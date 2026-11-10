@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_unb_col.dual-c",
   "model": "tests/fixtures/fx_unb_col.mps",
-  "ms": 3,
+  "ms": 2,
   "order": {
     "chunks": [
       "d5c4ef7a2c91daf8"

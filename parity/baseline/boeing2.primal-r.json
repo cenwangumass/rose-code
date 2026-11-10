@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "boeing2.primal-r",
   "model": "tests/fixtures/boeing2.mps",
-  "ms": 244,
+  "ms": 184,
   "order": {
     "chunks": [
       "91a6c24ffdddf77a",

@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "boeing2.pdhg",
   "model": "tests/fixtures/boeing2.mps",
-  "ms": 77,
+  "ms": 42,
   "order": {
     "chunks": [
       "ba4454b0a90d4089"

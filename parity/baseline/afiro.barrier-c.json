@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "afiro.barrier-c",
   "model": "tests/fixtures/afiro.mps",
-  "ms": 10,
+  "ms": 5,
   "order": {
     "chunks": [
       "d4d8666ff2fd20a0"

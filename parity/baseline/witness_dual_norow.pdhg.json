@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "witness_dual_norow.pdhg",
   "model": "tests/fixtures/witness_dual_norow.mps",
-  "ms": 3,
+  "ms": 7,
   "order": {
     "chunks": [
       "2a1ce4e47992fc1b"

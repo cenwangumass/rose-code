@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_sing_two_deps.barrier-c",
   "model": "tests/fixtures/fx_sing_two_deps.mps",
-  "ms": 3,
+  "ms": 6,
   "order": {
     "chunks": [
       "14959f669917ac11"

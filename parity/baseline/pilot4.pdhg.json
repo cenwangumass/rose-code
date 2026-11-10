@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "pilot4.pdhg",
   "model": "tests/fixtures/pilot4.mps",
-  "ms": 770,
+  "ms": 410,
   "order": {
     "chunks": [
       "04ec2d707076ff88"

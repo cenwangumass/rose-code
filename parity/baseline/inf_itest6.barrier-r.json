@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "inf_itest6.barrier-r",
   "model": "tests/fixtures/inf_itest6.mps",
-  "ms": 12,
+  "ms": 9,
   "order": {
     "chunks": [
       "2dc7f460e565a044"

@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "witness_dual_r4_free_shift.barrier-c",
   "model": "tests/fixtures/witness_dual_r4_free_shift.mps",
-  "ms": 5,
+  "ms": 3,
   "order": {
     "chunks": [
       "fe8a5b6baf080764"

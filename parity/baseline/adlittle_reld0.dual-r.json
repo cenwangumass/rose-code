@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "adlittle_reld0.dual-r",
   "model": "tests/fixtures/adlittle_reld0.mps",
-  "ms": 38,
+  "ms": 33,
   "order": {
     "chunks": [
       "00cdc73677c99708",

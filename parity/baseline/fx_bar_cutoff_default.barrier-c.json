@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "fx_bar_cutoff_default.barrier-c",
   "model": "tests/fixtures/fx_bar_cutoff_default.mps",
-  "ms": 3,
+  "ms": 5,
   "order": {
     "chunks": [
       "d63a348822118b2e"

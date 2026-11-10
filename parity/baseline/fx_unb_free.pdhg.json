@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "fx_unb_free.pdhg",
   "model": "tests/fixtures/fx_unb_free.mps",
-  "ms": 7,
+  "ms": 10,
   "order": {
     "chunks": [
       "3cd0dee991dac614"

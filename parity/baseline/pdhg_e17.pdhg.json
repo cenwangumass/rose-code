@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "pdhg_e17.pdhg",
   "model": "tests/fixtures/pdhg_e17.mps",
-  "ms": 14318,
+  "ms": 13241,
   "order": {
     "chunks": [
       "a771af0cae5be822",

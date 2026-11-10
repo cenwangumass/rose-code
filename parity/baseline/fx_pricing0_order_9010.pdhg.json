@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "fx_pricing0_order_9010.pdhg",
   "model": "tests/fixtures/fx_pricing0_order_9010.mps",
-  "ms": 19,
+  "ms": 11,
   "order": {
     "chunks": [
       "bf1eacd330b18274"

@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_badscale.primal-c",
   "model": "tests/fixtures/fx_badscale.mps",
-  "ms": 5,
+  "ms": 1,
   "order": {
     "chunks": [
       "ee6b4cb6ed831f81"

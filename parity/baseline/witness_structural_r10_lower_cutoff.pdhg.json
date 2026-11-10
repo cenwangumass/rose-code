@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "witness_structural_r10_lower_cutoff.pdhg",
   "model": "tests/fixtures/witness_structural_r10_lower_cutoff.mps",
-  "ms": 4,
+  "ms": 2,
   "order": {
     "chunks": [
       "9b3b41b60e4a1672"

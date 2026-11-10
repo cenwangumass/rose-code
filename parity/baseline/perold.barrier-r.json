@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "perold.barrier-r",
   "model": "tests/fixtures/perold.mps",
-  "ms": 2926,
+  "ms": 2528,
   "order": {
     "chunks": [
       "966ac3d1b9376bbe",

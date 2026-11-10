@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "sc50a_pobj_inf.primal-c",
   "model": "tests/fixtures/sc50a_pobj_inf.mps",
-  "ms": 14,
+  "ms": 10,
   "order": {
     "chunks": [
       "4feed65a1d7d548f"

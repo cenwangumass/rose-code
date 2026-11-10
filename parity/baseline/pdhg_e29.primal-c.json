@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "pdhg_e29.primal-c",
   "model": "tests/fixtures/pdhg_e29.mps",
-  "ms": 2,
+  "ms": 5,
   "order": {
     "chunks": [
       "301d5ffcd6f7b9db"

@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "sc50a.dual-c",
   "model": "tests/fixtures/sc50a.mps",
-  "ms": 18,
+  "ms": 14,
   "order": {
     "chunks": [
       "428b2b41390dfc05"
@@ -56,7 +56,7 @@
     },
     "DTAU": {
       "chunks": [
-        "a9fdea03d152d68a"
+        "3409c127b456933e"
       ],
       "n": 33
     },

@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_tied.barrier-r",
   "model": "tests/fixtures/fx_tied.mps",
-  "ms": 4,
+  "ms": 2,
   "order": {
     "chunks": [
       "8d1a1bdafa33d460"

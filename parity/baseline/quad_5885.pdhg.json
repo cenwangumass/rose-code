@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "quad_5885.pdhg",
   "model": "tests/fixtures/quad_5885.mps",
-  "ms": 31,
+  "ms": 36,
   "order": {
     "chunks": [
       "3cd0dee991dac614"

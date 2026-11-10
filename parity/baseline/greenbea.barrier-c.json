@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "greenbea.barrier-c",
   "model": "tests/fixtures/greenbea.mps",
-  "ms": 11170,
+  "ms": 10119,
   "order": {
     "chunks": [
       "d45c7590b6ef1b20",

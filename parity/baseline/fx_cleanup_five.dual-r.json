@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_cleanup_five.dual-r",
   "model": "tests/fixtures/fx_cleanup_five.mps",
-  "ms": 7,
+  "ms": 6,
   "order": {
     "chunks": [
       "e7432810fde6cfd8"

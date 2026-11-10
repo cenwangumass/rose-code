@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_warm.barrier-r",
   "model": "tests/fixtures/fx_warm.mps",
-  "ms": 7,
+  "ms": 3,
   "order": {
     "chunks": [
       "fc823ee230ecfb1a"

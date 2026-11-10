@@ -8,7 +8,7 @@
   "exit": 1,
   "id": "pdhg_e17.barrier-r",
   "model": "tests/fixtures/pdhg_e17.mps",
-  "ms": 4,
+  "ms": 1,
   "order": {
     "chunks": [],
     "n": 0

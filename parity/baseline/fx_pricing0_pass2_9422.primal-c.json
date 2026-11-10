@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "fx_pricing0_pass2_9422.primal-c",
   "model": "tests/fixtures/fx_pricing0_pass2_9422.mps",
-  "ms": 4,
+  "ms": 3,
   "order": {
     "chunks": [
       "8bc9159e2db0823b"

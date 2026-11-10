@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "fx_unbounded_p1_mi.pdhg",
   "model": "tests/fixtures/fx_unbounded_p1_mi.mps",
-  "ms": 5,
+  "ms": 2,
   "order": {
     "chunks": [
       "a99e904ff0cffe7a"

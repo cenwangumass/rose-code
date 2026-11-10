@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "fx_witness_dual_cc1ca.pdhg",
   "model": "tests/fixtures/fx_witness_dual_cc1ca.mps",
-  "ms": 10,
+  "ms": 8,
   "order": {
     "chunks": [
       "3cd0dee991dac614"

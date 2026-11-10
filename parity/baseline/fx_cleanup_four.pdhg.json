@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "fx_cleanup_four.pdhg",
   "model": "tests/fixtures/fx_cleanup_four.mps",
-  "ms": 9,
+  "ms": 6,
   "order": {
     "chunks": [
       "73a6fbeb50eb6f97"

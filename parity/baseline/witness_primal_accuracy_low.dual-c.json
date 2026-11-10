@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "witness_primal_accuracy_low.dual-c",
   "model": "tests/fixtures/witness_primal_accuracy_low.mps",
-  "ms": 6,
+  "ms": 5,
   "order": {
     "chunks": [
       "6187a9b0fd271d48"

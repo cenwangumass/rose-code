@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_bar_ubhsd.dual-r",
   "model": "tests/fixtures/fx_bar_ubhsd.mps",
-  "ms": 7,
+  "ms": 3,
   "order": {
     "chunks": [
       "0b5bbc9b2efb922f"

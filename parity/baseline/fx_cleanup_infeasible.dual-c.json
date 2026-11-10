@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_cleanup_infeasible.dual-c",
   "model": "tests/fixtures/fx_cleanup_infeasible.mps",
-  "ms": 5,
+  "ms": 4,
   "order": {
     "chunks": [
       "26d499a08be40b57"

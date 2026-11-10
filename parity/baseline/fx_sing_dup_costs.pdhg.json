@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "fx_sing_dup_costs.pdhg",
   "model": "tests/fixtures/fx_sing_dup_costs.mps",
-  "ms": 3,
+  "ms": 12,
   "order": {
     "chunks": [
       "a99e904ff0cffe7a"

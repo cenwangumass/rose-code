@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "adlittle_merit0.pdhg",
   "model": "tests/fixtures/adlittle_merit0.mps",
-  "ms": 35,
+  "ms": 23,
   "order": {
     "chunks": [
       "8977bbabc5ae178f"

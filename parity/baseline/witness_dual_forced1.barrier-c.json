@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "witness_dual_forced1.barrier-c",
   "model": "tests/fixtures/witness_dual_forced1.mps",
-  "ms": 5,
+  "ms": 4,
   "order": {
     "chunks": [
       "df50d8f3787cd168"

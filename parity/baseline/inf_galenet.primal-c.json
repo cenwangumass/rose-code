@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "inf_galenet.primal-c",
   "model": "tests/fixtures/inf_galenet.mps",
-  "ms": 3,
+  "ms": 11,
   "order": {
     "chunks": [
       "5735033c92ad7e93"

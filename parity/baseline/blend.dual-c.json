@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "blend.dual-c",
   "model": "tests/fixtures/blend.mps",
-  "ms": 41,
+  "ms": 37,
   "order": {
     "chunks": [
       "9e8b964597a76b10",
@@ -64,7 +64,7 @@
     },
     "DTAU": {
       "chunks": [
-        "f9413624f0643942"
+        "642e1338c3f9eb7f"
       ],
       "n": 75
     },

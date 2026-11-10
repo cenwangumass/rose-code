@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_e2_r0625.primal-r",
   "model": "tests/fixtures/fx_e2_r0625.mps",
-  "ms": 34,
+  "ms": 24,
   "order": {
     "chunks": [
       "f964c108368aceab",

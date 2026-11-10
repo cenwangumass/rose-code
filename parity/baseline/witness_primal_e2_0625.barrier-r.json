@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "witness_primal_e2_0625.barrier-r",
   "model": "tests/fixtures/witness_primal_e2_0625.mps",
-  "ms": 15,
+  "ms": 8,
   "order": {
     "chunks": [
       "695083421f9db132"

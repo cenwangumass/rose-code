@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "sc50a.primal-c",
   "model": "tests/fixtures/sc50a.mps",
-  "ms": 15,
+  "ms": 12,
   "order": {
     "chunks": [
       "4feed65a1d7d548f"

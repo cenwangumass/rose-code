@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_bar_rngord.primal-c",
   "model": "tests/fixtures/fx_bar_rngord.mps",
-  "ms": 4,
+  "ms": 5,
   "order": {
     "chunks": [
       "3a86674464d38fcd"

@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "80bau3b.barrier-c",
   "model": "tests/fixtures/80bau3b.mps",
-  "ms": 3201,
+  "ms": 3136,
   "order": {
     "chunks": [
       "d45c7590b6ef1b20",

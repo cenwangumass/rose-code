@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "primal_5959.barrier-c",
   "model": "tests/fixtures/primal_5959.mps",
-  "ms": 65,
+  "ms": 54,
   "order": {
     "chunks": [
       "ad55518d870c7821",

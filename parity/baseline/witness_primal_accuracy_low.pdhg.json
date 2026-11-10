@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "witness_primal_accuracy_low.pdhg",
   "model": "tests/fixtures/witness_primal_accuracy_low.mps",
-  "ms": 7,
+  "ms": 15,
   "order": {
     "chunks": [
       "1147edea549c1474"

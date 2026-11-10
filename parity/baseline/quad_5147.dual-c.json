@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "quad_5147.dual-c",
   "model": "tests/fixtures/quad_5147.mps",
-  "ms": 15,
+  "ms": 11,
   "order": {
     "chunks": [
       "c02f12fd0e537c76",

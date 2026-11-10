@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_midsing_1496.primal-c",
   "model": "tests/fixtures/fx_midsing_1496.mps",
-  "ms": 20,
+  "ms": 17,
   "order": {
     "chunks": [
       "cb528d13648baebd",

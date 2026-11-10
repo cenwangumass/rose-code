@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_cleanup_six.barrier-c",
   "model": "tests/fixtures/fx_cleanup_six.mps",
-  "ms": 25,
+  "ms": 14,
   "order": {
     "chunks": [
       "c9be728116fed09a"

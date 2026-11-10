@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_bar_cutoff_default.primal-r",
   "model": "tests/fixtures/fx_bar_cutoff_default.mps",
-  "ms": 5,
+  "ms": 2,
   "order": {
     "chunks": [
       "9720289a3c220d0e"

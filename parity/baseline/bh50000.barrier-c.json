@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "bh50000.barrier-c",
   "model": "tests/fixtures/bh50000.mps",
-  "ms": 34,
+  "ms": 39,
   "order": {
     "chunks": [
       "7cea430bc27f0ab2",

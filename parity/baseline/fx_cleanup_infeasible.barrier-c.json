@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "fx_cleanup_infeasible.barrier-c",
   "model": "tests/fixtures/fx_cleanup_infeasible.mps",
-  "ms": 19,
+  "ms": 23,
   "order": {
     "chunks": [
       "37f0674239710440",

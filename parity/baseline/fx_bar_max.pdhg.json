@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "fx_bar_max.pdhg",
   "model": "tests/fixtures/fx_bar_max.mps",
-  "ms": 3,
+  "ms": 2,
   "order": {
     "chunks": [
       "3b0ac379a698c654"

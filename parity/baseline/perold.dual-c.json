@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "perold.dual-c",
   "model": "tests/fixtures/perold.mps",
-  "ms": 5340,
+  "ms": 4978,
   "order": {
     "chunks": [
       "dad53b3f9275f369",
@@ -116,7 +116,7 @@
     },
     "DTAU": {
       "chunks": [
-        "7ed34fdb7114b823",
+        "379e653f78425f41",
         "ba5ab6861f736d70"
       ],
       "n": 1610

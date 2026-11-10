@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "blend.primal-c",
   "model": "tests/fixtures/blend.mps",
-  "ms": 44,
+  "ms": 48,
   "order": {
     "chunks": [
       "eaf581462a57557b",

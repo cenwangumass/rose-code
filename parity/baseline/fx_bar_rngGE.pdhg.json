@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "fx_bar_rngGE.pdhg",
   "model": "tests/fixtures/fx_bar_rngGE.mps",
-  "ms": 2,
+  "ms": 3,
   "order": {
     "chunks": [
       "a99e904ff0cffe7a"

@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "fx_pricing0_pass2_9422.pdhg",
   "model": "tests/fixtures/fx_pricing0_pass2_9422.mps",
-  "ms": 254,
+  "ms": 235,
   "order": {
     "chunks": [
       "a771af0cae5be822",

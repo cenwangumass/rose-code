@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "fx_bar_refine_free.pdhg",
   "model": "tests/fixtures/fx_bar_refine_free.mps",
-  "ms": 30,
+  "ms": 27,
   "order": {
     "chunks": [
       "3cd0dee991dac614"

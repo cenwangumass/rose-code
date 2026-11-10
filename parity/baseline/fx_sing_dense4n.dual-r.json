@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_sing_dense4n.dual-r",
   "model": "tests/fixtures/fx_sing_dense4n.mps",
-  "ms": 4,
+  "ms": 6,
   "order": {
     "chunks": [
       "5da46cd7f5455660"

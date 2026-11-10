@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "pilot4.barrier-r",
   "model": "tests/fixtures/pilot4.mps",
-  "ms": 1273,
+  "ms": 1179,
   "order": {
     "chunks": [
       "1bff21de2acf2b18",

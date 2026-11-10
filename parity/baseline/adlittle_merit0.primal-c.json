@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "adlittle_merit0.primal-c",
   "model": "tests/fixtures/adlittle_merit0.mps",
-  "ms": 30,
+  "ms": 32,
   "order": {
     "chunks": [
       "4cda430582c9df91",

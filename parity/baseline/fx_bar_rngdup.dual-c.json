@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_bar_rngdup.dual-c",
   "model": "tests/fixtures/fx_bar_rngdup.mps",
-  "ms": 5,
+  "ms": 3,
   "order": {
     "chunks": [
       "8e4f79b186b52562"

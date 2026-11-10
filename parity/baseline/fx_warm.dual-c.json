@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_warm.dual-c",
   "model": "tests/fixtures/fx_warm.mps",
-  "ms": 4,
+  "ms": 2,
   "order": {
     "chunks": [
       "c326d02782a96f62"

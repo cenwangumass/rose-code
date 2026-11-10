@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "fx_sing_zero_col.pdhg",
   "model": "tests/fixtures/fx_sing_zero_col.mps",
-  "ms": 2,
+  "ms": 3,
   "order": {
     "chunks": [
       "19289f8a7c30ddcf"

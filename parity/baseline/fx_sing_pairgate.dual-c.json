@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_sing_pairgate.dual-c",
   "model": "tests/fixtures/fx_sing_pairgate.mps",
-  "ms": 6,
+  "ms": 3,
   "order": {
     "chunks": [
       "5c5f403d0e73c36e"

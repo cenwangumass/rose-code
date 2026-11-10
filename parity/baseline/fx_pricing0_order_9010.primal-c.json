@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_pricing0_order_9010.primal-c",
   "model": "tests/fixtures/fx_pricing0_order_9010.mps",
-  "ms": 7,
+  "ms": 4,
   "order": {
     "chunks": [
       "e62544562164f4d0"

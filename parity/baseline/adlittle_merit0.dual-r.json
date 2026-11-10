@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "adlittle_merit0.dual-r",
   "model": "tests/fixtures/adlittle_merit0.mps",
-  "ms": 38,
+  "ms": 22,
   "order": {
     "chunks": [
       "00cdc73677c99708",

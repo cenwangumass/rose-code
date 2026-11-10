@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "greenbea.dual-r",
   "model": "tests/fixtures/greenbea.mps",
-  "ms": 20054,
+  "ms": 19861,
   "order": {
     "chunks": [
       "b86c65febb06af16",
@@ -192,10 +192,10 @@
     },
     "DTAU": {
       "chunks": [
-        "e479268bf0ed156d",
-        "1410525a85b433c5",
+        "2a61bc7b2cbb4dfe",
+        "40ee9bcaceefadc5",
         "17db3fc9a0941fea",
-        "c016cf013ca92f6b",
+        "4a8e353aa7601c51",
         "5ddce7f92866de7f"
       ],
       "n": 4432

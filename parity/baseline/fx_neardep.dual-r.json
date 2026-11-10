@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_neardep.dual-r",
   "model": "tests/fixtures/fx_neardep.mps",
-  "ms": 5,
+  "ms": 4,
   "order": {
     "chunks": [
       "4ad6a5b6715f5149"

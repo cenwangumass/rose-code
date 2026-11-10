@@ -8,7 +8,7 @@
   "exit": 3,
   "id": "fx_ladder_386.pdhg",
   "model": "tests/fixtures/fx_ladder_386.mps",
-  "ms": 58,
+  "ms": 29,
   "order": {
     "chunks": [
       "5e457de46fc3a75d"

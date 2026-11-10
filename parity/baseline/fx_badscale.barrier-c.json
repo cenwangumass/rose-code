@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_badscale.barrier-c",
   "model": "tests/fixtures/fx_badscale.mps",
-  "ms": 7,
+  "ms": 4,
   "order": {
     "chunks": [
       "5829870f8a1c9152"

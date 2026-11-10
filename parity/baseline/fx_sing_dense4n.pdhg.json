@@ -6,7 +6,7 @@
   "exit": 0,
   "id": "fx_sing_dense4n.pdhg",
   "model": "tests/fixtures/fx_sing_dense4n.mps",
-  "ms": 4,
+  "ms": 1,
   "order": {
     "chunks": [
       "a99e904ff0cffe7a"

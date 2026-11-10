@@ -8,7 +8,7 @@
   "exit": 0,
   "id": "fx_bar_refine_free.dual-c",
   "model": "tests/fixtures/fx_bar_refine_free.mps",
-  "ms": 16,
+  "ms": 11,
   "order": {
     "chunks": [
       "d2d3a2b5e386c289",
