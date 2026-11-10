@@ -13,8 +13,12 @@
 
 use crate::lu_order::Structure;
 use crate::real::Real;
+use pool::{Csr, LPool};
 use std::collections::BinaryHeap;
 mod btran_ws;
+mod pool;
+#[cfg(feature = "factor-shadow")]
+mod adapter;
 #[cfg(test)]
 mod btran_tests;
 
@@ -22,9 +26,6 @@ mod btran_tests;
 pub(crate) mod projection;
 #[cfg(feature = "factor-shadow")]
 pub mod shadow;
-
-#[cfg(feature = "factor-shadow")]
-projection::impl_factor_projection!(DualFactor);
 
 impl<R: Real> DualFactor<R> {
     pub fn work(&self) -> f64 { self.work }
@@ -252,7 +253,9 @@ impl<R: Real> LevelWorkspace<R> {
                     self.order.push(row);
                     self.state[row] = 2;
                     at_tolerance |= x.abs() == R::c(TOL);
-                    for &(to, a) in f.lcolumn(row) {
+                    let (dest, mult) = f.lcolumn(row);
+                    for (&to, &a) in dest.iter().zip(mult) {
+                        let to = to as usize;
                         self.queue(to, levels[to]);
                         high = high.max(levels[to]);
                         self.values[to] -= a * x;
@@ -528,8 +531,9 @@ pub struct DualFactor<R: Real = f64> {
     a: Vec<Vec<usize>>,
     b: Vec<Vec<usize>>,
     /// Immutable forward L columns, preserving coefficient and destination order.
-    lstart: Vec<usize>,
-    lentries: Vec<(usize, R)>,
+    lpool: LPool<R>,
+    /// Every L destination is above its source step (`y > v`), so a dense forward scan sees final values.
+    l_forward: bool,
     perm: Vec<usize>,
     /// Immutable inverse row permutation, initialized at the first BTRAN output.
     row_of: std::cell::OnceCell<Vec<usize>>,
@@ -547,7 +551,7 @@ pub struct DualFactor<R: Real = f64> {
     bt_occupied: bool,
     bt_work: Option<Box<BtranWork<R>>>,
     /// Immutable L transpose, in ascending source-column order, shared by all BTRAN calls of this factor.
-    lt: Vec<Vec<(usize, R)>>,
+    lt: Csr<R>,
     /// Immutable forward levels and their maximum for level-bucket L solves (`0x12a990`). Used only
     /// for `m >= 250`, a small level count (`< m/10`) and a short Markowitz L part.
     levels: Option<(Vec<usize>, usize)>,
@@ -851,20 +855,13 @@ impl<R: Real> DualFactor<R> {
         for s in i21..m {
             kind[s] = -2;
         }
-        let mut lstart = Vec::with_capacity(m + 1);
-        let mut lentries = Vec::with_capacity(st.l_vals.iter().map(Vec::len).sum());
-        lstart.push(0);
+        let mut lpool = LPool::with_capacity(m, st.l_vals.iter().map(Vec::len).sum());
         for (rows, vals) in st.l_rows.iter().zip(&st.l_vals) {
-            lentries.extend(rows.iter().zip(vals).map(|(&r, &v)| (step[r], v)));
-            lstart.push(lentries.len());
+            lpool.push_line(rows.iter().zip(vals).map(|(&r, &v)| (step[r], v)));
         }
-        let lcolumn = |v: usize| &lentries[lstart[v]..lstart[v + 1]];
-        let mut lt = vec![Vec::new(); m];
-        for v in 0..m {
-            for &(y, a) in lcolumn(v) {
-                lt[y].push((v, a));
-            }
-        }
+        let lcolumn = |v: usize| lpool.iter(v);
+        let lt = lpool.transpose(m);
+        let l_forward = (0..lpool.lines()).all(|v| lpool.col(v).0.iter().all(|&y| y as usize > v));
         // pivot-row values of the Markowitz steps, by column
         let mut mk: Vec<Vec<(usize, R)>> = vec![Vec::new(); m];
         for s in nseq..m {
@@ -903,7 +900,7 @@ impl<R: Real> DualFactor<R> {
             while k < lst.len() {
                 let v = lst[k];
                 k += 1;
-                for &(y, _) in lcolumn(v) {
+                for (y, _) in lcolumn(v) {
                     if y <= t && !reached[y] {
                         reached[y] = true;
                         lst.push(y);
@@ -924,7 +921,7 @@ impl<R: Real> DualFactor<R> {
                 if x == R::ZERO || x.abs() <= R::c(TOL) {
                     continue;
                 }
-                for (e, &(y, multiplier)) in lcolumn(v).iter().enumerate() {
+                for (e, (y, multiplier)) in lcolumn(v).enumerate() {
                     if y > t {
                         continue;
                     }
@@ -1018,7 +1015,7 @@ impl<R: Real> DualFactor<R> {
         } else {
             1.5
         };
-        let nnz: usize = lentries.len();
+        let nnz: usize = lpool.len();
         let dthr = if nnz <= m {
             2
         } else {
@@ -1035,14 +1032,14 @@ impl<R: Real> DualFactor<R> {
         let mut lev_dense = false;
         let mut lev_built = false;
         let mut lev_dense_ft = false;
-        let nnz_tail: usize = lentries.len() - lstart[nseq];
+        let nnz_tail: usize = lpool.len() - lpool.begin(nseq);
         let levels = {
             let d = m - nseq;
             let outer = d < 6 || 10 * d * d <= m || nnz_tail <= 10 * d;
             if m >= 250 {
                 let mut lev = vec![0usize; m];
                 for v in 0..m {
-                    for &(y, _) in lcolumn(v) {
+                    for (y, _) in lcolumn(v) {
                         lev[y] = lev[y].max(lev[v] + 1);
                     }
                 }
@@ -1059,7 +1056,7 @@ impl<R: Real> DualFactor<R> {
                 None
             }
         };
-        let nnz_l_tot: usize = lentries.len();
+        let nnz_l_tot: usize = lpool.len();
         let perm = step;
         let znz = (nnz + sa + sb + 2 * m) as f64;
         let mark0 = (i21..m)
@@ -1195,8 +1192,8 @@ impl<R: Real> DualFactor<R> {
             mark: mark0,
             a,
             b,
-            lstart,
-            lentries,
+            lpool,
+            l_forward,
             perm,
             row_of: Default::default(),
             dens: (h33 + h34) * (h33 + h34),
@@ -1226,13 +1223,15 @@ impl<R: Real> DualFactor<R> {
         }
     }
 
-    #[inline]
-    fn lcolumn(&self, v: usize) -> &[(usize, R)] {
-        &self.lentries[self.lstart[v]..self.lstart[v + 1]]
+    /// Destinations and multipliers of L column `v`.
+    #[inline(always)]
+    fn lcolumn(&self, v: usize) -> (&[u32], &[R]) {
+        self.lpool.col(v)
     }
 
-    fn lcolumns(&self) -> impl Iterator<Item = &[(usize, R)]> {
-        self.lstart.windows(2).map(|s| &self.lentries[s[0]..s[1]])
+    /// L columns as `(destination, multiplier)` lists (projection and dump views).
+    pub(crate) fn lcolumns(&self) -> Vec<Vec<(usize, R)>> {
+        (0..self.m).map(|v| self.lpool.iter(v).collect()).collect()
     }
 
     /// Compact dense output without a conditional push for each surviving value.
@@ -1292,7 +1291,8 @@ impl<R: Real> DualFactor<R> {
         while i < lst.len() {
             let v = lst[i];
             i += 1;
-            for &(x, _) in self.lcolumn(v) {
+            for &x in self.lcolumn(v).0 {
+                let x = x as usize;
                 if cnt[x] == 0 {
                     lst.push(x);
                 }
@@ -1310,7 +1310,8 @@ impl<R: Real> DualFactor<R> {
         while i < q.len() {
             let v = q[i];
             i += 1;
-            for &(x, _) in self.lcolumn(v) {
+            for &x in self.lcolumn(v).0 {
+                let x = x as usize;
                 cnt[x] -= 1;
                 if cnt[x] == 0 {
                     q.push(x);
@@ -1359,17 +1360,27 @@ impl<R: Real> DualFactor<R> {
             // Dense L solve (`0x12bd30`): every node in ascending order; the list handed on is the ascending scan.
             e = m as f64 + rows.len() as f64 * 2.0 + e;
             e = (m - self.loff) as f64 * 2.0 + self.n1 as f64 + self.n1 as f64 + e;
-            for v in 0..self.m {
-                let xv = x[v];
-                if xv.abs() <= R::c(TOL) {
-                    continue;
+            let count_l = if self.l_forward {
+                // Every destination is above its source, so `x[v]` is final when visited and `count_l` is counted in the same pass.
+                // `e` is integer-valued here (sums of `m`, counts and doubled counts), so the doubled column lengths are added at once.
+                debug_assert!(e.fract() == 0.0);
+                let (count_l, len_sum) = pool::fused_forward(&self.lpool, &mut x);
+                e = len_sum as f64 * 2.0 + e;
+                count_l
+            } else {
+                for v in 0..self.m {
+                    let xv = x[v];
+                    if xv.abs() <= R::c(TOL) {
+                        continue;
+                    }
+                    let (dest, mult) = self.lcolumn(v);
+                    e = dest.len() as f64 * 2.0 + e;
+                    for (&y, &a) in dest.iter().zip(mult) {
+                        x[y as usize] -= a * xv;
+                    }
                 }
-                e = self.lcolumn(v).len() as f64 * 2.0 + e;
-                for &(y, a) in self.lcolumn(v) {
-                    x[y] -= a * xv;
-                }
-            }
-            let count_l = (0..self.m).filter(|&v| x[v].abs() > R::c(TOL)).count();
+                (0..self.m).filter(|&v| x[v].abs() > R::c(TOL)).count()
+            };
             (Vec::new(), count_l)
         } else if let Some((lev, maxlev)) = &self.levels {
             // Level-bucket L solve: nodes are taken level by level, each level in insertion order (inputs first, then the
@@ -1396,7 +1407,9 @@ impl<R: Real> DualFactor<R> {
                     let xv = x[v];
                     if xv.abs() >= R::c(TOL) {
                         out.push(v);
-                        for &(y, a) in self.lcolumn(v) {
+                        let (dest, mult) = self.lcolumn(v);
+                        for (&y, &a) in dest.iter().zip(mult) {
+                            let y = y as usize;
                             if !active[y] {
                                 active[y] = true;
                                 buckets[lev[y]].push(y);
@@ -1423,8 +1436,9 @@ impl<R: Real> DualFactor<R> {
                     x[v] = R::ZERO;
                     continue;
                 }
-                for &(y, a) in self.lcolumn(v) {
-                    x[y] -= a * xv;
+                let (dest, mult) = self.lcolumn(v);
+                for (&y, &a) in dest.iter().zip(mult) {
+                    x[y as usize] -= a * xv;
                 }
             }
             let count_l = q.iter().filter(|&&v| x[v].abs() > R::c(TOL)).count();
@@ -1445,7 +1459,8 @@ impl<R: Real> DualFactor<R> {
                     }
                 }
                 for &v in q.iter().filter(|&&v| v < loff && x[v].abs() > R::c(TOL)) {
-                    for &(y, _) in self.lcolumn(v) {
+                    for &y in self.lcolumn(v).0 {
+                        let y = y as usize;
                         if y >= loff {
                             lo = lo.min(y);
                         }
@@ -1456,7 +1471,7 @@ impl<R: Real> DualFactor<R> {
                 let mut e2 = (m - lo) as f64 * 2.0 + e1;
                 for v in lo..m {
                     if x[v].abs() > R::c(TOL) {
-                        e2 += self.lcolumn(v).len() as f64 * 2.0;
+                        e2 += self.lpool.col_len(v) as f64 * 2.0;
                     }
                 }
                 e = e2 + e;
@@ -1474,8 +1489,9 @@ impl<R: Real> DualFactor<R> {
                     if xv.abs() <= R::c(TOL) {
                         continue;
                     }
-                    for &(y, a) in self.lcolumn(v) {
-                        x[y] -= a * xv;
+                    let (dest, mult) = self.lcolumn(v);
+                    for (&y, &a) in dest.iter().zip(mult) {
+                        x[y as usize] -= a * xv;
                     }
                 }
                 // With etas the final result is dense; without them this fallback
@@ -2053,7 +2069,7 @@ impl<R: Real> DualFactor<R> {
         if bs {
             crate::dump::emit(
                 "bsolve",
-                serde_json::json!({"l": jv(&x_l), "tail_done": jv(&x_t), "x": jv(&x), "tail": tail, "kind": self.kind, "slot": self.slot, "diag": jv(&self.diag), "u_dense": u_dense, "uc": ju(&self.uc), "lcols": self.lcolumns().map(|c| c.iter().map(|e| e.0).collect::<Vec<_>>()).collect::<Vec<_>>(), "lvals": self.lcolumns().map(|c| c.iter().map(|e| e.1.to_f64()).collect::<Vec<_>>()).collect::<Vec<_>>(), "perm": self.perm, "rows": rows, "vals": jv(&vals)}),
+                serde_json::json!({"l": jv(&x_l), "tail_done": jv(&x_t), "x": jv(&x), "tail": tail, "kind": self.kind, "slot": self.slot, "diag": jv(&self.diag), "u_dense": u_dense, "uc": ju(&self.uc), "lcols": (0..self.m).map(|v| self.lcolumn(v).0.iter().map(|&y| y as usize).collect::<Vec<_>>()).collect::<Vec<_>>(), "lvals": (0..self.m).map(|v| self.lcolumn(v).1.iter().map(|e| e.to_f64()).collect::<Vec<_>>()).collect::<Vec<_>>(), "perm": self.perm, "rows": rows, "vals": jv(&vals)}),
             );
         }
         // A dense result (the reference's `-1` count) is scanned by position index; a sparse one comes in the U solve's order.
@@ -2119,7 +2135,7 @@ impl<R: Real> DualFactor<R> {
 
     /// The fresh factor's numerics for the `luout` dump: the diagonal and each position's L column `(position, value)`.
     pub fn numerics(&self) -> (&[R], Vec<Vec<(usize, R)>>) {
-        let l = self.lcolumns().map(|c| c.to_vec()).collect();
+        let l = self.lcolumns();
         (&self.diag, l)
     }
 
@@ -2421,9 +2437,10 @@ impl<R: Real> DualFactor<R> {
                             w[i] += v;
                         } else {
                             res.push(i);
-                            el = lt[i].len() as f64 * 2.0 + el;
-                            for &(j, lv) in &lt[i] {
-                                w[j] -= lv * v;
+                            let (src, mult) = lt.col(i);
+                            el = src.len() as f64 * 2.0 + el;
+                            for (&j, &lv) in src.iter().zip(mult) {
+                                w[j as usize] -= lv * v;
                             }
                         }
                     } else {
@@ -2438,10 +2455,11 @@ impl<R: Real> DualFactor<R> {
                 for i in (nseq..maxi + 1).rev().chain((0..n1).rev()) {
                     let v = w[i];
                     if v.abs() > R::c(TOL) {
-                        el = lt[i].len() as f64 * 2.0 + el;
+                        let (src, mult) = lt.col(i);
+                        el = src.len() as f64 * 2.0 + el;
                         res.push(i);
-                        for &(j, lv) in &lt[i] {
-                            w[j] -= lv * v;
+                        for (&j, &lv) in src.iter().zip(mult) {
+                            w[j as usize] -= lv * v;
                         }
                     } else {
                         w[i] = R::ZERO;
@@ -2461,8 +2479,8 @@ impl<R: Real> DualFactor<R> {
                     let (lev, maxlev) = self.lt_levels.get_or_init(|| {
                         let mut lev = vec![0usize; m];
                         for v in (0..m).rev() {
-                            for &(y, _) in self.lcolumn(v) {
-                                lev[v] = lev[v].max(lev[y] + 1);
+                            for &y in self.lcolumn(v).0 {
+                                lev[v] = lev[v].max(lev[y as usize] + 1);
                             }
                         }
                         let maxlev = lev.iter().copied().max().unwrap_or(0);
@@ -2486,11 +2504,13 @@ impl<R: Real> DualFactor<R> {
                             let v = x[i];
                             if v.abs() >= R::c(TOL) {
                                 res.push(i);
-                                for &(j, lv) in &lt[i] {
-                                    x[j] -= lv * v;
+                                let (src, mult) = lt.col(i);
+                                for (&j, &lv) in src.iter().zip(mult) {
+                                    x[j as usize] -= lv * v;
                                 }
                                 // The reference walks the row from its last entry.
-                                for &(j, _) in lt[i].iter().rev() {
+                                for &j in src.iter().rev() {
+                                    let j = j as usize;
                                     if ws.marks[j] != stamp {
                                         ws.marks[j] = stamp;
                                         buckets[lev[j]].push(j);
@@ -2513,7 +2533,9 @@ impl<R: Real> DualFactor<R> {
                         let v = x[i];
                         if v.abs() >= R::c(TOL) {
                             res.push(i);
-                            for &(j, lv) in &lt[i] {
+                            let (src, mult) = lt.col(i);
+                            for (&j, &lv) in src.iter().zip(mult) {
+                                let j = j as usize;
                                 x[j] -= lv * v;
                                 if ws.marks[j] != stamp {
                                     ws.marks[j] = stamp;
@@ -2537,12 +2559,19 @@ impl<R: Real> DualFactor<R> {
                 }
             }
             e = m as f64 + m as f64 + e;
-            for i in (0..m).rev() {
-                let v = x[i];
-                if v.abs() > R::c(TOL) {
-                    e = lt[i].len() as f64 * 2.0 + e;
-                    for &(j, lv) in &lt[i] {
-                        x[j] -= lv * v;
+            if e.fract() == 0.0 && e < 4503599627370496.0 {
+                // `e` is integer-valued (below 2^52): adding the doubled row lengths at once is exact.
+                let len_sum = pool::reverse_sweep(lt, &mut x);
+                e = len_sum as f64 * 2.0 + e;
+            } else {
+                for i in (0..m).rev() {
+                    let v = x[i];
+                    if v.abs() > R::c(TOL) {
+                        let (src, mult) = lt.col(i);
+                        e = src.len() as f64 * 2.0 + e;
+                        for (&j, &lv) in src.iter().zip(mult) {
+                            x[j as usize] -= lv * v;
+                        }
                     }
                 }
             }
@@ -2658,16 +2687,10 @@ impl<R: Real> DualFactor<R> {
             x[self.perm[r]] += b[r];
         }
         let mut e = (m - self.loff) as f64 * 2.0 + self.n1 as f64 + self.n1 as f64;
-        for v in 0..m {
-            let xv = x[v];
-            if xv.abs() <= R::c(TOL) {
-                continue;
-            }
-            e = self.lcolumn(v).len() as f64 * 2.0 + e;
-            for &(y, a) in self.lcolumn(v) {
-                x[y] -= a * xv;
-            }
-        }
+        // `e` is integer-valued here, so the doubled column lengths are added at once.
+        debug_assert!(e.fract() == 0.0);
+        let len_sum = pool::forward_sweep(&self.lpool, x);
+        e = len_sum as f64 * 2.0 + e;
         if !self.etas.is_empty() {
             e = self.sum_eta * 2.0 + e;
             for eta in &self.etas {
