@@ -2016,10 +2016,9 @@ impl<'a, R: Real> Dual<'a, R> {
         for j in 0..p.n + p.m {
             if self.st[j] < 0 {
                 // The reference accumulates row-wise (`0x136b00`): rows in ascending order, skipping |y_i| <= 1e-13 (`ctx+0x3a8`).
-                let mut e: Vec<(usize, f64)> = p.fcols[j].clone();
-                e.sort_by_key(|x| x.0);
+                // `p.cols[j]` is `p.fcols[j]` stably sorted by row, built once in `simplex::build`.
                 let mut acc = R::c(self.cost[j]) + R::c(self.cost_lo[j]);
-                for &(i, a) in &e {
+                for &(i, a) in &p.cols[j] {
                     if y[i].abs() > R::c(DROP_TOL) {
                         acc -= y[i] * R::c(a);
                     }
@@ -8070,5 +8069,77 @@ mod pivot_row_diff {
     #[test]
     fn matches_reference_f80() {
         run::<crate::f80::F80>();
+    }
+}
+
+#[cfg(test)]
+mod true_d_column_order {
+    use super::*;
+
+    /// `true_d` sums over `p.cols[j]`; the old code sorted a clone of `p.fcols[j]` by row. Both must be the same list bit for bit,
+    /// ties (repeated rows) and signed zeros included, so the accumulation order is unchanged.
+    #[test]
+    fn sorted_clone_of_fcols_is_cols() {
+        let mut seed = 0x9e37_79b9_7f4a_7c15u64;
+        let mut next = move || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        let values = [0.0, -0.0, 1.0, -1.0, 0.1, 1e-14, -3.5, f64::MIN_POSITIVE];
+        for round in 0..200 {
+            let m = 1 + next() as usize % 9;
+            let nc = 1 + next() as usize % 12;
+            let mut col_start = vec![0];
+            let (mut row_idx, mut val) = (Vec::new(), Vec::new());
+            for _ in 0..nc {
+                for _ in 0..next() % 8 {
+                    row_idx.push(next() as usize % m);
+                    val.push(values[next() as usize % values.len()]);
+                }
+                col_start.push(row_idx.len());
+            }
+            let kinds = [(-INF, 1.0), (1.0, INF), (1.0, 1.0), (-1.0, 2.0), (-INF, INF)];
+            let rows: Vec<(f64, f64)> = (0..m).map(|_| kinds[next() as usize % kinds.len()]).collect();
+            let model = LpModel {
+                name: "order".into(),
+                sense: if round % 2 == 0 { Sense::Minimize } else { Sense::Maximize },
+                offset: 0.0,
+                obj: vec![1.0; nc],
+                col_lo: vec![0.0; nc],
+                col_up: vec![INF; nc],
+                row_lo: rows.iter().map(|r| r.0).collect(),
+                row_up: rows.iter().map(|r| r.1).collect(),
+                row_range: vec![],
+                row_kind: vec![],
+                range_order: vec![],
+                range_entries: vec![],
+                range_dup: false,
+                col_start,
+                val,
+                row_idx,
+                col_names: vec![],
+                row_names: vec![],
+            };
+            let p = build(&model);
+            let y: Vec<f64> = (0..p.m).map(|i| 0.5 + i as f64 * 0.37).collect();
+            for j in 0..p.n + p.m {
+                let mut e: Vec<(usize, f64)> = p.fcols[j].clone();
+                e.sort_by_key(|x| x.0);
+                assert_eq!(e.len(), p.cols[j].len());
+                for (a, b) in e.iter().zip(&p.cols[j]) {
+                    assert_eq!((a.0, a.1.to_bits()), (b.0, b.1.to_bits()), "round {round} col {j}");
+                }
+                let (mut old, mut new) = (0.1f64, 0.1f64);
+                for &(i, a) in &e {
+                    old -= y[i] * a;
+                }
+                for &(i, a) in &p.cols[j] {
+                    new -= y[i] * a;
+                }
+                assert_eq!(old.to_bits(), new.to_bits());
+            }
+        }
     }
 }
