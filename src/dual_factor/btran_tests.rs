@@ -334,3 +334,124 @@ fn uorder_matches_original_after_updates() {
     }
     assert!(dense_seen > 0 && sparse_seen > 0 && sorted_seen > 0, "{dense_seen} {sparse_seen} {sorted_seen} {checks}");
 }
+
+/// The FTRAN work estimates booked inside the U loops (`u_work`, `tau_u_finish`, `third_work`, `dense_pair_work`) against the retained scans
+/// (`*_ref`, asserted inline under cfg(test)) and against the original backend, over random factors with updates, sparse and dense inputs,
+/// tiny and zero values, both vectors sparse or dense.
+#[test]
+fn ftran_work_booked_in_u_loops_matches_scans() {
+    let mut seed = 0x2545f4914f6cdd1du64;
+    let mut next = || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed as usize
+    };
+    // joint selections seen: (third, dense pair, usual pair), tau dense/sparse, column dense/sparse
+    let (mut third, mut pair, mut usual, mut checks) = (0, 0, 0, 0);
+    let (mut tau_dense_seen, mut col_dense_seen, mut tiny_seen) = (0, 0, 0);
+    for m in [24, 70, 200, 700, 1500] {
+        for round in 0..10 {
+            let cols: Vec<_> = (0..m).map(|i| {
+                let mut rows = vec![i];
+                let mut vals = vec![4.0];
+                for _ in 0..(1 + round % 5) {
+                    let r = next() % m;
+                    if !rows.contains(&r) {
+                        rows.push(r);
+                        vals.push(if next() % 2 == 0 { 0.5 } else { -0.75 });
+                    }
+                }
+                (true, rows, vals)
+            }).collect();
+            let st = crate::lu_order::factor_structure(m, &cols);
+            let mut new = DualFactor::fresh(m, m, &st, &cols);
+            let mut old = RefStruct::fresh(m, m, &st, &cols);
+            for step in 0..m.min(40) {
+                let kind = next() % 6;
+                let n = [1, 2, 4, m / 6 + 1, m / 2 + 1, m][(step + kind) % 6].min(m);
+                let mut rows: Vec<usize> = Vec::new();
+                for _ in 0..n {
+                    let r = next() % m;
+                    if !rows.contains(&r) {
+                        rows.push(r);
+                    }
+                }
+                let val = |k: usize| match k % 9 {
+                    0 => 1e-15,
+                    1 => -1e-14,
+                    2 => 0.0,
+                    3 => -0.0,
+                    4 => 1e-9,
+                    5 => 0.25,
+                    6 => -1.5,
+                    7 => 3.0,
+                    _ => 1e-12,
+                };
+                let vals: Vec<f64> = rows.iter().map(|_| val(next())).collect();
+                let rho: Vec<usize> = {
+                    let mut r: Vec<usize> = Vec::new();
+                    for _ in 0..[1, 3, m / 5 + 1, m / 2 + 1, m][next() % 5].min(m) {
+                        let q = next() % m;
+                        if !r.contains(&q) {
+                            r.push(q);
+                        }
+                    }
+                    r
+                };
+                let rvals: Vec<f64> = rho.iter().map(|_| val(next())).collect();
+                let force_dense = next() % 7 == 0;
+                let (a, b) = if force_dense {
+                    (new.ftran_basic(&rows, &vals), old.ftran_basic(&rows, &vals))
+                } else {
+                    (new.ftran(&rows, &vals), old.ftran(&rows, &vals))
+                };
+                assert_eq!(bits(a.clone()), bits(b));
+                assert_eq!(new.work.to_bits(), old.work.to_bits());
+                assert_eq!((new.work_parts.0.to_bits(), new.work_parts.1.to_bits()), (old.work_parts.0.to_bits(), old.work_parts.1.to_bits()));
+                assert_eq!(new.last_dense, old.last_dense());
+                let needed: Vec<usize> = a.iter().map(|e| e.0).collect();
+                let dense_in = next() % 5 == 0;
+                let ta = new.ftran_needed(&rho, &rvals, &needed, dense_in);
+                let tb = old.ftran_needed(&rho, &rvals, &needed, dense_in);
+                assert_eq!(bits(ta), bits(tb));
+                assert_eq!(new.tau_l.get().to_bits(), old.tau_l.get().to_bits());
+                assert_eq!(new.tau_u.get().to_bits(), old.tau_u.get().to_bits());
+                assert_eq!(new.tau_fin.get(), old.tau_fin.get());
+                let (ja, jb) = (new.joint_u(&needed), old.joint_u(&needed));
+                assert_eq!(ja.map(f64::to_bits), jb.map(f64::to_bits), "m {m} round {round} step {step}");
+                {
+                    let f = new.f2.borrow();
+                    tau_dense_seen += usize::from(f.tau_n.is_none());
+                    col_dense_seen += usize::from(f.col_n.is_none());
+                }
+                tiny_seen += usize::from(new.f2.borrow().x_tau.iter().any(|v| *v != 0.0 && v.abs() <= TOL));
+                match ja {
+                    None => usual += 1,
+                    Some(_) if new.f2.borrow().col_n.is_some() => third += 1,
+                    Some(_) => pair += 1,
+                }
+                checks += 1;
+                let b: Vec<_> = (0..m).map(|_| [0.0, -0.0, 0.5, -2.0][next() % 4]).collect();
+                assert_eq!(new.ftran_dense_work(&b).to_bits(), old.ftran_dense_work(&b).to_bits());
+                if next() % 2 == 0 {
+                    let r = next() % m;
+                    let mut rows = vec![r];
+                    let mut vals = vec![5.0 + step as f64];
+                    for _ in 0..(1 + next() % 8) {
+                        let q = next() % m;
+                        if !rows.contains(&q) {
+                            rows.push(q);
+                            vals.push([0.25, -0.5, 1.5][next() % 3]);
+                        }
+                    }
+                    assert_eq!(bits(new.ftran(&rows, &vals)), bits(old.ftran(&rows, &vals)));
+                    new.update(r);
+                    old.update(r);
+                }
+            }
+        }
+    }
+    assert!(third > 0 && pair > 0 && usual > 0, "third {third} pair {pair} usual {usual}");
+    assert!(tau_dense_seen > 0 && col_dense_seen > 0 && tiny_seen > 0, "tau dense {tau_dense_seen} col dense {col_dense_seen} tiny {tiny_seen} checks {checks}");
+}
