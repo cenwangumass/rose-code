@@ -1201,6 +1201,34 @@ fn infeas_of<R: Real>(x: R, lo: f64, up: f64) -> R {
     }
 }
 
+/// Retained per-iteration buffers of `Dual::iteration` and `update_primal_and_weights`. `tau` and `rhs` are either empty or of length `m` with every entry
+/// `R::ZERO`; the user clears the entries it set and puts the buffer back (a path that returns early just drops it).
+struct GlueBufs<R: Real> {
+    tau: Vec<R>,
+    rhs: Vec<R>,
+    changed: Vec<usize>,
+}
+
+impl<R: Real> Default for GlueBufs<R> {
+    fn default() -> Self {
+        GlueBufs { tau: Vec::new(), rhs: Vec::new(), changed: Vec::new() }
+    }
+}
+
+/// Retained workspace of `Dual::framework_rhs`: `dense` (all zero) and `seen` (all false) of length `m` between calls, the other lists empty.
+struct FwWs<R: Real> {
+    dense: Vec<R>,
+    seen: Vec<bool>,
+    order: Vec<usize>,
+    list: Vec<(usize, R)>,
+}
+
+impl<R: Real> Default for FwWs<R> {
+    fn default() -> Self {
+        FwWs { dense: Vec::new(), seen: Vec::new(), order: Vec::new(), list: Vec::new() }
+    }
+}
+
 struct Dual<'a, R: Real = f64> {
     p: &'a Internal,
     n: usize,
@@ -1311,6 +1339,10 @@ struct Dual<'a, R: Real = f64> {
     slack_nb: Vec<bool>,
     /// The retained workspace of the row product.
     prow_ws: std::cell::RefCell<PivotWs<R>>,
+    /// Retained buffers of the per-iteration glue: dense scratch vectors of length `m` (all zero between uses, cleared through the touched lists),
+    /// the changed-row list, and the workspace of `framework_rhs`.
+    glue: GlueBufs<R>,
+    fw_ws: std::cell::RefCell<FwWs<R>>,
     /// Retained buffers of the ratio test and the flip marks of the d update (all empty between calls).
     rbuf: RatioBufs<R>,
     flip_mark: Vec<bool>,
@@ -1801,8 +1833,12 @@ impl<'a, R: Real> Dual<'a, R> {
     /// The infeasibility of every row (`infeas_real` of rows `0..m`) into the retained scratch `infs`; the caller takes it with `mem::take` and puts it back.
     fn fill_infeas(&self, out: &mut Vec<R>) {
         out.clear();
-        let (lo, up) = (&self.p.lo[..], &self.p.up[..]);
-        out.extend(self.head[..self.m].iter().zip(&self.xb[..self.m]).map(|(&v, &x)| infeas_of::<R>(x, lo[v], up[v])));
+        let m = self.m;
+        out.reserve(m);
+        // `up` cut to the length of `lo`: one bounds check per row (`v < lo.len()`) serves both arrays.
+        let lo = &self.p.lo[..];
+        let up = &self.p.up[..lo.len()];
+        out.extend(self.head[..m].iter().zip(&self.xb[..m]).map(|(&v, &x)| infeas_of::<R>(x, lo[v], up[v])));
     }
 
     // ------------------------------------------------------------------ factorization
@@ -3083,7 +3119,14 @@ impl<'a, R: Real> Dual<'a, R> {
     ) -> (Vec<usize>, Vec<R>, R, f64, bool) {
         let p = self.p;
         let sdir = if above { -1.0 } else { 1.0 };
-        let mut list: Vec<(usize, R)> = Vec::new();
+        let mut guard = self.fw_ws.borrow_mut();
+        let FwWs { dense, seen, order, list } = &mut *guard;
+        if dense.len() != self.m {
+            *dense = vec![R::ZERO; self.m];
+            *seen = vec![false; self.m];
+        }
+        list.clear();
+        list.reserve(row.len() + 1);
         for &(j, a) in row {
             if self.dflag[j] {
                 continue;
@@ -3099,12 +3142,10 @@ impl<'a, R: Real> Dual<'a, R> {
         if leave < self.n && !self.dflag[leave] {
             list.push((leave, R::ONE));
         }
-        let w = rho_norm(&list);
-        let mut dense = vec![R::ZERO; self.m];
-        let mut seen = vec![false; self.m];
-        let mut order: Vec<usize> = Vec::new();
+        let w = rho_norm(list);
+        order.clear();
         let mut work = 4.0 * list.len() as f64;
-        for &(j, v) in &list {
+        for &(j, v) in list.iter() {
             if j >= self.n {
                 let i = j - self.n;
                 if !seen[i] {
@@ -3128,14 +3169,17 @@ impl<'a, R: Real> Dual<'a, R> {
         // is a dense vector (count -1) whose entries are all kept, however small (`0x25d7ac`; seed 2772 call 93: a row of 1.9e-14).
         let dense_route = R::QUAD
             && ((self.n + 1) * self.m) as f64 <= list.len() as f64 * 3.0 * self.nnz_a as f64;
-        let mut rows = Vec::new();
-        let mut vals = Vec::new();
+        let mut rows = Vec::with_capacity(order.len());
+        let mut vals = Vec::with_capacity(order.len());
         let order_len = order.len();
-        for i in order {
+        // The scratch goes back to all zero / all false through the touched list.
+        for &i in order.iter() {
             if dense[i].abs() > R::c(1e-13) || (dense_route && dense[i] != R::ZERO) {
                 rows.push(i);
                 vals.push(dense[i]);
             }
+            dense[i] = R::ZERO;
+            seen[i] = false;
         }
         work += 2.0 * order_len as f64 + 2.0 * rows.len() as f64;
         (rows, vals, w, work, dense_route)
@@ -4525,7 +4569,10 @@ impl<'a, R: Real> Dual<'a, R> {
             self.work
                 .add(0x120114, 4.0 * copied as f64 + vec_work, crate::work::CTX);
         }
-        let mut tau_dense = vec![R::ZERO; m];
+        let mut tau_dense = std::mem::take(&mut self.glue.tau);
+        if tau_dense.len() != m {
+            tau_dense = vec![R::ZERO; m];
+        }
         for &(i, v) in &tau_out {
             tau_dense[i] = v;
         }
@@ -4645,11 +4692,18 @@ impl<'a, R: Real> Dual<'a, R> {
             col.swap_remove(k);
         }
         let tau: Vec<R> = col.iter().map(|e| tau_dense[e.0]).collect();
+        for &(i, _) in &tau_out {
+            tau_dense[i] = R::ZERO;
+        }
+        self.glue.tau = tau_dense;
         // Each accepted pivot and each bound flip advances the shared clock.
         crate::simplex::TOTAL_ITERS.with(|c| c.set(c.get() + 1.0 + flips.len() as f64));
         // Bound flips: x_B and the statuses (`0xcd720`).
         if !flips.is_empty() {
-            let mut rhs = vec![R::ZERO; m];
+            let mut rhs = std::mem::take(&mut self.glue.rhs);
+            if rhs.len() != m {
+                rhs = vec![R::ZERO; m];
+            }
             let mut touched: Vec<usize> = Vec::new();
             let mut est = 0usize;
             for &j in &flips {
@@ -4683,7 +4737,8 @@ impl<'a, R: Real> Dual<'a, R> {
                 (0..m).filter(|&i| rhs[i] != R::ZERO).collect()
             } else {
                 touched
-                    .into_iter()
+                    .iter()
+                    .copied()
                     .filter(|&i| rhs[i].abs() > R::c(DROP_TOL))
                     .collect()
             };
@@ -4693,6 +4748,10 @@ impl<'a, R: Real> Dual<'a, R> {
             } else {
                 None
             };
+            for &i in &touched {
+                rhs[i] = R::ZERO;
+            }
+            self.glue.rhs = rhs;
             let sol = self.mirror.ftran_keep(&rows, &vals, dense_in);
             self.work.add_from(
                 0x1219d6,
@@ -5732,7 +5791,9 @@ impl<'a, R: Real> Dual<'a, R> {
     fn update_primal_and_weights(&mut self, pv: &Pivot<R>) {
         self.update_weights(pv, true);
         let (r, alpha) = (pv.r, pv.alpha);
-        let mut changed: Vec<usize> = Vec::new();
+        let mut changed = std::mem::take(&mut self.glue.changed);
+        changed.clear();
+        changed.reserve(pv.col.len() + 1);
         let v = pv.leave;
         let b = if self.st[v] == LB || self.st[v] == FIXED {
             self.p.lo[v]
@@ -5777,6 +5838,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 self.merge_walk_list();
             }
         }
+        self.glue.changed = changed;
     }
 }
 
@@ -6561,6 +6623,8 @@ fn solve_pass_callback<R: Real>(
         infs: Vec::new(),
         slack_nb: vec![false; m],
         prow_ws: Default::default(),
+        glue: Default::default(),
+        fw_ws: Default::default(),
         rbuf: Default::default(),
         flip_mark: Vec::new(),
         pend: cap,
@@ -8103,6 +8167,8 @@ mod captured_bh305_ratio {
             infs: Vec::new(),
             slack_nb: vec![false; m],
             prow_ws: Default::default(),
+            glue: Default::default(),
+            fw_ws: Default::default(),
             rbuf: Default::default(),
             flip_mark: Vec::new(),
             pend: cap,
