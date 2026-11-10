@@ -893,6 +893,18 @@ fn pivot_row_ws<R: Real>(
     (out, nst, est, distinct)
 }
 
+/// Primal infeasibility of a basic variable with value `x` and bounds `lo`, `up`.
+#[inline(always)]
+fn infeas_of<R: Real>(x: R, lo: f64, up: f64) -> R {
+    if lo > -BIG && x < R::c(lo) {
+        R::c(lo) - x
+    } else if up < BIG && x > R::c(up) {
+        x - R::c(up)
+    } else {
+        R::ZERO
+    }
+}
+
 struct Dual<'a, R: Real = f64> {
     p: &'a Internal,
     n: usize,
@@ -996,6 +1008,8 @@ struct Dual<'a, R: Real = f64> {
     value_mode: bool,
     cursor: usize,
     walk_len: usize,
+    /// Scratch of the pricing passes: the infeasibility of every row.
+    infs: Vec<R>,
     /// Slacks the row product offers, by row: those nonbasic at the last factorization and those that have left the basis since. A slack that enters the
     /// basis stays on offer until the next factorization.
     slack_nb: Vec<bool>,
@@ -1475,21 +1489,21 @@ impl<'a, R: Real> Dual<'a, R> {
         }
     }
 
+    #[inline(always)]
     fn infeas(&self, r: usize) -> f64 {
         self.infeas_real(r).to_f64()
     }
 
+    #[inline(always)]
     fn infeas_real(&self, r: usize) -> R {
-        let v = self.head[r];
-        let x = self.xb[r];
-        let (lo, up) = (self.p.lo[v], self.p.up[v]);
-        if lo > -BIG && x < R::c(lo) {
-            R::c(lo) - x
-        } else if up < BIG && x > R::c(up) {
-            x - R::c(up)
-        } else {
-            R::ZERO
-        }
+        infeas_of::<R>(self.xb[r], self.p.lo[self.head[r]], self.p.up[self.head[r]])
+    }
+
+    /// The infeasibility of every row (`infeas_real` of rows `0..m`) into the retained scratch `infs`; the caller takes it with `mem::take` and puts it back.
+    fn fill_infeas(&self, out: &mut Vec<R>) {
+        out.clear();
+        let (lo, up) = (&self.p.lo[..], &self.p.up[..]);
+        out.extend(self.head[..self.m].iter().zip(&self.xb[..self.m]).map(|(&v, &x)| infeas_of::<R>(x, lo[v], up[v])));
     }
 
     // ------------------------------------------------------------------ factorization
@@ -2378,15 +2392,23 @@ impl<'a, R: Real> Dual<'a, R> {
 
     /// `0xbdc10`: flags of all rows and the list of the infeasible ones sorted by priority (descending).
     fn build_walk_list(&mut self) {
+        let mut infs = std::mem::take(&mut self.infs);
+        self.fill_infeas(&mut infs);
+        self.build_walk_list_from(&infs);
+        self.infs = infs;
+    }
+
+    /// `build_walk_list` with the infeasibilities of the rows already in `infs` (nothing they depend on changes inside).
+    fn build_walk_list_from(&mut self, infs: &[R]) {
         let ptol = self.ptol();
         let mut rows = Vec::new();
         let mut keys = Vec::new();
         for r in 0..self.m {
-            let f = self.infeas(r);
-            if f > ptol {
+            let fr = infs[r];
+            if fr.to_f64() > ptol {
                 self.flags[r] = 0;
                 rows.push(r);
-                keys.push((-self.pri(r, self.infeas_real(r))).to_f64());
+                keys.push((-self.pri(r, fr)).to_f64());
             } else {
                 self.flags[r] = 2;
             }
@@ -2595,14 +2617,18 @@ impl<'a, R: Real> Dual<'a, R> {
                 // Work of the pricing-side walk rebuild (`0xbdc10`): classify
                 // all rows, retain waiting entries, and merge the newly infeasible rows.
                 let ptol = self.ptol();
-                let infeas = (0..self.m).filter(|&i| self.infeas(i) > ptol).count();
+                let mut infs = std::mem::take(&mut self.infs);
+                self.fill_infeas(&mut infs);
+                let infeas = infs.iter().filter(|f| f.to_f64() > ptol).count();
                 let old_len = self.walk_len.min(self.list.len());
                 let old = self.list[..old_len]
                     .iter()
-                    .filter(|&&i| self.flags[i] == 0 && self.infeas(i) > ptol)
+                    .filter(|&&i| self.flags[i] == 0 && infs[i].to_f64() > ptol)
                     .count();
-                let fresh = (0..self.m)
-                    .filter(|&i| self.flags[i] != 0 && self.infeas(i) > ptol)
+                let fresh = self.flags[..self.m]
+                    .iter()
+                    .zip(&infs)
+                    .filter(|&(&fl, f)| fl != 0 && f.to_f64() > ptol)
                     .count();
                 let m = self.m as f64;
                 let scan = if self.level == 0 {
@@ -2617,7 +2643,9 @@ impl<'a, R: Real> Dual<'a, R> {
                 self.work.add(0xbe17e, (2 * fresh) as f64, crate::work::CTX);
                 self.work
                     .add(0xbe34d, (old + fresh) as f64, crate::work::CTX);
-                self.build_walk_list();
+                debug_assert_eq!(infs.len(), self.m);
+                self.build_walk_list_from(&infs);
+                self.infs = infs;
                 if self.walk_len == 0 {
                     return None;
                 }
@@ -2701,7 +2729,8 @@ impl<'a, R: Real> Dual<'a, R> {
     fn touch_rows(&mut self, rows: &[usize]) {
         let ptol = self.ptol();
         for &r in rows {
-            let f = self.infeas(r);
+            let fr = self.infeas_real(r);
+            let f = fr.to_f64();
             if !self.value_mode {
                 if f > ptol {
                     self.flags[r] = 1;
@@ -2712,7 +2741,7 @@ impl<'a, R: Real> Dual<'a, R> {
             } else if f <= ptol {
                 self.flags[r] |= 2;
             } else {
-                self.prio[r] = self.pri(r, self.infeas_real(r));
+                self.prio[r] = self.pri(r, fr);
                 match self.flags[r] {
                     3 => self.flags[r] = 1,
                     1 | 5 | 7 => {}
@@ -6213,6 +6242,7 @@ fn solve_pass_callback<R: Real>(
         value_mode: false,
         cursor: 0,
         walk_len: 0,
+        infs: Vec::new(),
         slack_nb: vec![false; m],
         prow_ws: Default::default(),
         pend: cap,
@@ -7751,6 +7781,7 @@ mod captured_bh305_ratio {
             value_mode: false,
             cursor: 0,
             walk_len: 0,
+            infs: Vec::new(),
             slack_nb: vec![false; m],
             prow_ws: Default::default(),
             pend: cap,
@@ -8461,5 +8492,68 @@ mod reset_pricing_flat {
         assert_eq!(cap_pricing_weights(1, 10, &mut w), 2);
         let mut w = vec![1.0; 10];
         assert_eq!(cap_pricing_weights(1, 10, &mut w), 1);
+    }
+}
+
+#[cfg(test)]
+mod infeas_tests {
+    use super::*;
+
+    /// The former `infeas_real` body, as reference.
+    fn old_infeas_real<R: Real>(x: R, lo: f64, up: f64) -> R {
+        if lo > -BIG && x < R::c(lo) {
+            R::c(lo) - x
+        } else if up < BIG && x > R::c(up) {
+            x - R::c(up)
+        } else {
+            R::ZERO
+        }
+    }
+
+    fn same<R: Real>(a: R, b: R) -> bool {
+        let (a, b) = (a.to_f64(), b.to_f64());
+        a.to_bits() == b.to_bits() || (a.is_nan() && b.is_nan())
+    }
+
+    fn check<R: Real>() {
+        let vals = [
+            0.0, -0.0, 1.0, -1.0, 1e-9, -1e-9, 0.5, 2.0, 1e29, -1e29, 1e30, -1e30, 1e31, -1e31, f64::INFINITY, f64::NEG_INFINITY, f64::NAN,
+        ];
+        let mut s = 0x9e3779b97f4a7c15u64;
+        let mut next = || {
+            s ^= s << 13;
+            s ^= s >> 7;
+            s ^= s << 17;
+            s
+        };
+        let mut rnd = |next: &mut dyn FnMut() -> u64| {
+            let u = next();
+            if u & 1 == 0 {
+                vals[(u >> 8) as usize % vals.len()]
+            } else {
+                ((next() >> 11) as f64 / (1u64 << 53) as f64 - 0.5) * 4.0
+            }
+        };
+        for _ in 0..200_000 {
+            let (x, lo, up) = (rnd(&mut next), rnd(&mut next), rnd(&mut next));
+            // ties: x equal to a bound
+            let x = match next() % 5 {
+                0 => lo,
+                1 => up,
+                _ => x,
+            };
+            let (a, b) = (infeas_of::<R>(R::c(x), lo, up), old_infeas_real::<R>(R::c(x), lo, up));
+            assert!(same(a, b), "x {x} lo {lo} up {up}");
+        }
+    }
+
+    #[test]
+    fn infeas_of_matches_reference_f64() {
+        check::<f64>();
+    }
+
+    #[test]
+    fn infeas_of_matches_reference_quad() {
+        check::<crate::f80::F80>();
     }
 }
