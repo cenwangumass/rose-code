@@ -51,6 +51,20 @@ impl<R: Real> Shadow<R> {
         self.calls.set(call);
         check(method, call, "return", new, old);
         check(method, call, "observable", &self.new.observables(), &muted(|| self.old.observables()));
+        // Every solver transition, not just updates, can leave state consumed
+        // by a later call. Accessors only change already-compared observables.
+        if canonical || matches!(method, "ftran" | "ftran_needed" | "ftran_basic" | "ftran_keep" | "btran") {
+            self.new.check_retained(method, call);
+            muted(|| self.old.check_retained(method, call));
+            let a = self.new.f2_projection();
+            let b = self.old.f2_projection();
+            check(method, call, "f2.col_n", &a.column_count, &b.column_count);
+            if a.column_input != b.column_input { check(method, call, "f2.col_in", &a.column_input, &b.column_input); }
+            super::projection::check_numbers(method, call, "f2.x_col", &a.column, &b.column);
+            check(method, call, "f2.tau_n", &a.tau_count, &b.tau_count);
+            super::projection::check_numbers(method, call, "f2.x_tau", &a.tau, &b.tau);
+            if a.tau_raw != b.tau_raw { check(method, call, "f2.tau_raw", &a.tau_raw, &b.tau_raw); }
+        }
         if canonical {
             check(method, call, "canonical", &self.new.canonical(), &muted(|| self.old.canonical()));
         }
