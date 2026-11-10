@@ -423,12 +423,19 @@ struct Ratio {
 }
 
 /// The independent LU is only read by the stall check and deferred-free setup.
-/// Keep its fallible base build eager: its pivot order and dropping differ from
-/// the mirror, so mirror success does not prove this build will succeed. Updates
-/// cannot fail and are replayed, with their original representation, on demand.
+/// Its base build is lazy: `Dual::refactor` stores only the head (the columns the
+/// eager code factored) and the first reading call builds `Factor::with_floor`.
+/// Its pivot order and dropping differ from the mirror, so mirror success does
+/// not prove the build succeeds; a failed build is reported by the reading call
+/// as `SingularBasis`. Updates cannot fail and are replayed, with their original
+/// representation, on demand.
 struct AuxiliaryFactor {
-    base: Factor,
+    base: Option<Factor>,
+    head: Vec<usize>,
     pending: Vec<AuxiliaryUpdate>,
+    /// Shadow build: `base` is the eager build of `Dual::refactor`; the first read builds the lazy one and compares.
+    #[cfg(feature = "factor-shadow")]
+    verify: bool,
 }
 
 enum AuxiliaryUpdate {
@@ -438,7 +445,28 @@ enum AuxiliaryUpdate {
 
 impl AuxiliaryFactor {
     fn new(base: Factor) -> Self {
-        Self { base, pending: Vec::new() }
+        Self {
+            base: Some(base),
+            head: Vec::new(),
+            pending: Vec::new(),
+            #[cfg(feature = "factor-shadow")]
+            verify: false,
+        }
+    }
+
+    fn lazy(head: Vec<usize>) -> Self {
+        Self {
+            base: None,
+            head,
+            pending: Vec::new(),
+            #[cfg(feature = "factor-shadow")]
+            verify: false,
+        }
+    }
+
+    fn build(m: usize, head: &[usize], p: &Internal) -> Result<Factor, usize> {
+        let cols: Vec<&Column> = head.iter().map(|&j| &p.cols[j]).collect();
+        Factor::with_floor(m, &cols, 0.0)
     }
 
     fn update_column<R: Real>(&mut self, r: usize, column: Vec<(usize, R)>) {
@@ -451,22 +479,48 @@ impl AuxiliaryFactor {
         self.pending.push(AuxiliaryUpdate::Dense(r, alpha));
     }
 
-    fn materialize(&mut self) -> &Factor {
+    fn materialize(&mut self, p: &Internal) -> Result<&Factor, SolveError> {
+        self.materialize_with(|head| Self::build(p.m, head, p))
+    }
+
+    fn materialize_with(&mut self, build: impl Fn(&[usize]) -> Result<Factor, usize>) -> Result<&Factor, SolveError> {
+        if self.base.is_none() {
+            self.base = Some(build(&self.head).map_err(|_| SolveError::SingularBasis)?);
+        }
+        #[cfg(feature = "factor-shadow")]
+        if std::mem::take(&mut self.verify) {
+            let lazy = build(&self.head).expect("shadow: lazy auxiliary build failed where the eager one succeeded");
+            let eager = self.base.as_ref().unwrap();
+            let m = self.head.len();
+            let probe: Vec<f64> = (0..m).map(|i| 1.0 + 0.37 * i as f64).collect();
+            let bits = |v: &[f64]| v.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
+            let (mut a, mut b) = (probe.clone(), probe.clone());
+            eager.ftran(&mut a);
+            lazy.ftran(&mut b);
+            assert_eq!(bits(&a), bits(&b), "shadow: lazy auxiliary ftran differs from the eager build");
+            let (mut a, mut b) = (probe.clone(), probe);
+            eager.btran(&mut a);
+            lazy.btran(&mut b);
+            assert_eq!(bits(&a), bits(&b), "shadow: lazy auxiliary btran differs from the eager build");
+        }
+        let base = self.base.as_mut().unwrap();
         for update in self.pending.drain(..) {
             match update {
-                AuxiliaryUpdate::Column(r, column) => self.base.update_column(r, column),
-                AuxiliaryUpdate::Dense(r, alpha) => self.base.update(r, alpha),
+                AuxiliaryUpdate::Column(r, column) => base.update_column(r, column),
+                AuxiliaryUpdate::Dense(r, alpha) => base.update(r, alpha),
             }
         }
-        &self.base
+        Ok(self.base.as_ref().unwrap())
     }
 
-    fn ftran(&mut self, rhs: &mut Vec<f64>) {
-        self.materialize().ftran(rhs);
+    fn ftran(&mut self, p: &Internal, rhs: &mut Vec<f64>) -> Result<(), SolveError> {
+        self.materialize(p)?.ftran(rhs);
+        Ok(())
     }
 
-    fn btran(&mut self, rhs: &mut Vec<f64>) {
-        self.materialize().btran(rhs);
+    fn btran(&mut self, p: &Internal, rhs: &mut Vec<f64>) -> Result<(), SolveError> {
+        self.materialize(p)?.btran(rhs);
+        Ok(())
     }
 }
 
@@ -490,27 +544,27 @@ fn auxiliary_updates_are_lazy_and_bit_identical() {
             alpha[r] = 1.25;
             eager.update(r, alpha.clone());
             lazy.update(r, alpha);
-            assert_eq!(lazy.base.num_updates(), (round / 3 * 3) * 2);
+            assert_eq!(lazy.base.as_ref().unwrap().num_updates(), (round / 3 * 3) * 2);
             if round % 3 == 2 || round == 31 {
                 let bits = |v: Vec<f64>| v.into_iter().map(f64::to_bits).collect::<Vec<_>>();
                 let rhs: Vec<_> = (0..m).map(|i| values[(round + i) % values.len()]).collect();
                 let (mut a, mut b) = (rhs.clone(), rhs.clone());
                 eager.ftran(&mut a);
-                lazy.ftran(&mut b);
+                lazy.materialize_with(|_| unreachable!()).unwrap().ftran(&mut b);
                 assert_eq!(bits(a), bits(b));
                 let (mut a, mut b) = (rhs.clone(), rhs);
                 eager.btran(&mut a);
-                lazy.btran(&mut b);
+                lazy.materialize_with(|_| unreachable!()).unwrap().btran(&mut b);
                 assert_eq!(bits(a), bits(b));
                 assert!(lazy.pending.is_empty());
-                assert_eq!(lazy.base.nnz_eta, eager.nnz_eta);
+                assert_eq!(lazy.base.as_ref().unwrap().nnz_eta, eager.nnz_eta);
             }
         }
         lazy.update(0, vec![1.0; m]);
         // Installing a fresh base discards all updates, including unread ones.
         lazy = AuxiliaryFactor::new(Factor::new(m, &cols).unwrap());
         assert!(lazy.pending.is_empty());
-        assert_eq!(lazy.base.num_updates(), 0);
+        assert_eq!(lazy.base.as_ref().unwrap().num_updates(), 0);
     }
     let values = [0.0, -0.0, 1.25, -0.75, f64::from_bits(1), f64::INFINITY,
         f64::from_bits(0x7ff8000000000123), f64::from_bits(0xfff8000000000456)];
@@ -518,6 +572,52 @@ fn auxiliary_updates_are_lazy_and_bit_identical() {
         check::<f64>(values);
         check::<crate::f80::F80>(values);
     }
+}
+
+#[cfg(test)]
+#[test]
+fn auxiliary_lazy_build_matches_eager_build() {
+    fn check<R: Real>(values: &[f64]) {
+        let m = 7;
+        let all: Vec<Column> = (0..2 * m).map(|j| vec![(j % m, 2.0), ((j + 3) % m, 0.25), ((j + 1) % m, -0.5)]).collect();
+        let head: Vec<usize> = (0..m).map(|i| (i * 2 + 1) % (2 * m)).collect();
+        let build = |h: &[usize]| {
+            let cols: Vec<&Column> = h.iter().map(|&j| &all[j]).collect();
+            Factor::with_floor(m, &cols, 0.0)
+        };
+        let mut eager = build(&head).unwrap();
+        let mut lazy = AuxiliaryFactor::lazy(head.clone());
+        assert!(lazy.base.is_none());
+        let bits = |v: Vec<f64>| v.into_iter().map(f64::to_bits).collect::<Vec<_>>();
+        for round in 0..32 {
+            let r = round % m;
+            let mut column: Vec<_> = (0..round % (m + 2))
+                .map(|i| ((m - i % m - 1), R::c(values[(round + i) % values.len()])))
+                .collect();
+            column.push((r, R::c(1.25)));
+            eager.update_column(r, column.clone().into_iter().map(|(i, v)| (i, v.to_f64())).collect());
+            lazy.update_column(r, column);
+            let mut alpha: Vec<_> = (0..m).map(|i| values[(round + i + 2) % values.len()]).collect();
+            alpha[r] = 1.25;
+            eager.update(r, alpha.clone());
+            lazy.update(r, alpha);
+        }
+        let rhs: Vec<_> = (0..m).map(|i| values[i % values.len()] + 1.0).collect();
+        let (mut a, mut b) = (rhs.clone(), rhs.clone());
+        eager.ftran(&mut a);
+        lazy.materialize_with(&build).unwrap().ftran(&mut b);
+        assert_eq!(bits(a), bits(b));
+        let (mut a, mut b) = (rhs.clone(), rhs);
+        eager.btran(&mut a);
+        lazy.materialize_with(&build).unwrap().btran(&mut b);
+        assert_eq!(bits(a), bits(b));
+        // A failed lazy build is reported by the reading call as `SingularBasis`.
+        let mut bad = AuxiliaryFactor::lazy(head);
+        assert!(matches!(bad.materialize_with(|_| Err(0)), Err(SolveError::SingularBasis)));
+    }
+    let values = [0.0, -0.0, 1.25, -0.75, 3.5, f64::from_bits(1)];
+    check::<f64>(&values);
+    check::<crate::f80::F80>(&values);
 }
 
 /// The retained workspace of the row product: `acc` is +0.0 and `touched` false everywhere between calls.
@@ -1412,10 +1512,22 @@ impl<'a, R: Real> Dual<'a, R> {
         self.mirror = mi;
         self.mirror.set_upd_limit(self.upd_limit);
         self.factor_work(&st, &rows, discard);
-        let cols: Vec<&Column> = self.head.iter().map(|&j| &self.p.cols[j]).collect();
-        self.factor = AuxiliaryFactor::new(
-            Factor::with_floor(self.m, &cols, 0.0).map_err(|_| SolveError::SingularBasis)?,
-        );
+        self.factor = AuxiliaryFactor::lazy(self.head.clone());
+        // Shadow build: keep the eager build and its error return; the lazy build must agree on success and failure.
+        #[cfg(feature = "factor-shadow")]
+        match AuxiliaryFactor::build(self.m, &self.head, self.p) {
+            Ok(eager) => {
+                self.factor.base = Some(eager);
+                self.factor.verify = true;
+            }
+            Err(_) => {
+                assert!(
+                    AuxiliaryFactor::build(self.m, &self.head, self.p).is_err(),
+                    "shadow: lazy auxiliary build succeeded where the eager one failed"
+                );
+                return Err(SolveError::SingularBasis);
+            }
+        }
         self.refactorizations += 1;
         self.updates = 0;
         self.bad_rows.clear();
@@ -1453,7 +1565,7 @@ impl<'a, R: Real> Dual<'a, R> {
         let mut k = 0;
         while k < deferred.len() {
             let mut y: Vec<f64> = self.head.iter().map(|&v| self.cost[v]).collect();
-            self.factor.btran(&mut y);
+            self.factor.btran(self.p, &mut y)?;
             while k < deferred.len() {
                 let j = deferred[k];
                 k += 1;
@@ -4525,7 +4637,7 @@ impl<'a, R: Real> Dual<'a, R> {
     }
 
     /// Level of the tolerance (`0xe45c0`, after a refactorization): with request 4 the nonbasic variables are first put on the dual-feasible bound.
-    fn set_level(&mut self, old_level: usize) {
+    fn set_level(&mut self, old_level: usize) -> Result<(), SolveError> {
         let p = self.p;
         if self.request == 4 {
             for j in 0..self.n + self.m {
@@ -4559,15 +4671,16 @@ impl<'a, R: Real> Dual<'a, R> {
         self.level = (0..self.n + self.m)
             .filter(|&j| self.at_artificial(j))
             .count();
-        self.stall_check(old_level);
+        self.stall_check(old_level)?;
         if !self.flip_select && (self.pert >= 3 || 3.0 * self.iters as f64 > self.m as f64) {
             self.flip_select = true;
         }
+        Ok(())
     }
 
     /// The dual objective as the reference keeps it (`ctx+0x118`): the working costs times the basic solution and the nonbasic values, plus the shift
     /// offset, divided by the objective scale.
-    fn fresh_objective(&mut self) -> f64 {
+    fn fresh_objective(&mut self) -> Result<f64, SolveError> {
         let p = self.p;
         let mut r = p.rhs.clone();
         for j in 0..p.n + p.m {
@@ -4580,7 +4693,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 }
             }
         }
-        self.factor.ftran(&mut r);
+        self.factor.ftran(p, &mut r)?;
         let mut s = 0.0;
         for (pos, &j) in self.head.iter().enumerate() {
             s += self.cost[j] * r[pos];
@@ -4590,7 +4703,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 s += self.cost[j] * self.nonbasic_value(j);
             }
         }
-        (s + self.obj_off) / self.obj_scale
+        Ok((s + self.obj_off) / self.obj_scale)
     }
 
     /// The pricing switch after a factorization (`0xf770d..0xf82c5`, release profile only): at every third factorization, with the steepest-edge pricing
@@ -4677,9 +4790,9 @@ impl<'a, R: Real> Dual<'a, R> {
     }
 
     /// The stall test of the refactorization post pass (`0xe60cc..0xe6237`) and the cost perturbation it triggers (`0xe6af8..0xe6cd7`, `0xe74b1`).
-    fn stall_check(&mut self, old_level: usize) {
+    fn stall_check(&mut self, old_level: usize) -> Result<(), SolveError> {
         if self.pstep <= 0.0 && self.pert_param <= 0.0 {
-            return;
+            return Ok(());
         }
         // Quad 0x23904b..0x239085: the period is 2, 5, or 10000 according to
         // whether neither, one, or both of the handoff counter and perturbation flag exceed 2.
@@ -4690,7 +4803,7 @@ impl<'a, R: Real> Dual<'a, R> {
             (false, false) => 2,
         };
         if self.nref() % period != 1 {
-            return;
+            return Ok(());
         }
         let mut trig = false;
         if self.pstep > 0.0 && old_level <= self.level {
@@ -4699,14 +4812,14 @@ impl<'a, R: Real> Dual<'a, R> {
                 (self.stall - self.stall_snap) as f64 > 0.9 * (self.iters as f64 - self.stall_it);
             if !trig && self.prog_on {
                 // No objective progress since the last check.
-                let obj = self.fresh_objective();
+                let obj = self.fresh_objective()?;
                 trig = 1e-13 * (obj.abs().min(1e10) + 1.0) + self.best_obj > obj;
                 if !trig {
                     self.best_obj = maxsd(obj, self.best_obj);
                 }
             }
         } else if self.prog_on {
-            let obj = self.fresh_objective();
+            let obj = self.fresh_objective()?;
             self.best_obj = maxsd(obj, self.best_obj);
         }
         if trig && self.pert >= 2 && !(self.pert == 3 && self.pstep >= 0.01) {
@@ -4719,6 +4832,7 @@ impl<'a, R: Real> Dual<'a, R> {
         }
         self.stall_snap = self.stall;
         self.stall_it = self.iters as f64;
+        Ok(())
     }
 
     /// The objective rescale of the stall trigger with the perturbation flag below 2 and `ctx+0xd8 >= 1` (`0xe6266..0xe6a88`, then the perturbation): the
@@ -4935,7 +5049,7 @@ impl<'a, R: Real> Dual<'a, R> {
             let level_before = self.level;
             let level_work = self.set_level_work(level_before != 0);
             self.perturbed = false;
-            self.set_level(level_before);
+            self.set_level(level_before)?;
             // A cost perturbation made by the stall check inside the same pass adds `2 m + 4 n` to the `0xe6fdd` total (kb2 release, iteration 15:
             // 522.5 = 272.5 + 250 in extended units of 1.3; sctap1, grow7 the same).
             let perturb_work = if self.perturbed && !R::QUAD {
@@ -6259,7 +6373,7 @@ fn solve_pass_callback<R: Real>(
             s.pert = pert;
         }
     }
-    s.stall_check(0);
+    s.stall_check(0)?;
     // The setup's post-refactor pass (`0xe6dcc`) sees the iterations of the free-column pivots.
     if !s.flip_select && 3.0 * s.iters as f64 > s.m as f64 {
         s.flip_select = true;
@@ -6312,7 +6426,7 @@ fn solve_pass_callback<R: Real>(
         for &(i, a) in &p.fcols[j] {
             col[i] = a * dir;
         }
-        s.factor.ftran(&mut col);
+        s.factor.ftran(s.p, &mut col)?;
         let mut ray = vec![0.0; n + m];
         ray[j] = dir;
         for (i, &v) in col.iter().enumerate() {
