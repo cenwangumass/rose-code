@@ -816,6 +816,11 @@ fn pair_gate_end(steps: usize) {
 
 thread_local! { pub static DENSE_N: std::cell::Cell<usize> = std::cell::Cell::new(0); }
 
+fn gate_log() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("ROSE_GATE_LOG").is_some())
+}
+
 fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -> NucleusOut<R> {
     DENSE_N.with(|c| c.set(0));
     let npos = cols.iter().map(|c| c.0 + 1).max().unwrap_or(0);
@@ -907,7 +912,7 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
         }
         if sing.is_none() {
             let n = remaining as f64;
-            if std::env::var_os("ROSE_GATE_LOG").is_some() {
+            if gate_log() {
                 eprintln!("RGATE n={} z={}", remaining, z);
             }
             if remaining > 50
@@ -921,7 +926,7 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
                     .map(|&c| s.ccnt[c])
                     .sum();
                 z = exact as f64;
-                if std::env::var_os("ROSE_GATE_LOG").is_some() {
+                if gate_log() {
                     eprintln!(
                         "RGATE2 n={} exact={} thr={}",
                         remaining,
@@ -1027,7 +1032,7 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, cols: &[(usize, Vec<(usize, R)>)]) -
             },
         };
         let (pr, pc, pv) = (s.nodes[best].r, s.nodes[best].c, s.nodes[best].v);
-        if std::env::var_os("ROSE_GATE_LOG").is_some() {
+        if gate_log() {
             eprintln!(
                 "RPIV n={} r={} c={} sing={:?} row={} col={}",
                 remaining, s.rcnt[pr], s.ccnt[pc], sing_kind, pr, pc

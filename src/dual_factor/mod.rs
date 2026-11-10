@@ -2134,6 +2134,11 @@ impl<R: Real> DualFactor<R> {
         out
     }
 
+    /// The diagonal of the fresh factor (the first part of `numerics`, without building L).
+    pub fn diag(&self) -> &[R] {
+        &self.diag
+    }
+
     /// The fresh factor's numerics for the `luout` dump: the diagonal and each position's L column `(position, value)`.
     pub fn numerics(&self) -> (&[R], Vec<Vec<(usize, R)>>) {
         let l = self.lcolumns();
@@ -2987,21 +2992,28 @@ impl<R: Real> DualFactor<R> {
 
     /// Swap `r` (sitting in slot `hole`) up the dependency walk starting at slot `cur` (the loop at module offset 0xf2f7d of the
     /// reference update); when a column's list is as long as the distance to the hole the rest of the range shifts down instead.
-    fn walk(&mut self, r: usize, hole: usize, mut cur: usize) {
-        // Column lengths leave out row r, which the reference has already removed from U.
+    fn walk(&mut self, r: usize, hole: usize, mut cur: usize, refcols: &[(usize, usize)]) {
+        // Column lengths leave out row r, which the reference has already removed from U. `r` occurs only in the lists of the tail
+        // columns of `rowl[r]` (`refcols`, sorted by column), so any other tail column has its full length; the rest is counted.
         let len = |s: &Self, pos: usize| {
-            s.a[pos]
-                .iter()
-                .chain(&s.b[pos])
-                .filter(|&&x| x != r)
-                .count()
+            let count = || s.a[pos].iter().chain(&s.b[pos]).filter(|&&x| x != r).count();
+            let fast = if s.kind[pos] == -2 && refcols.binary_search_by_key(&pos, |o| o.0).is_err() {
+                s.a[pos].len() + s.b[pos].len()
+            } else {
+                count()
+            };
+            debug_assert_eq!(fast, count());
+            #[cfg(feature = "factor-shadow")]
+            assert_eq!(fast, count(), "walk column length");
+            fast
         };
         // The reference's work: each jump scans the column (2 per entry and 5) on the factor's scale; the final shift
         // moves the slots in between.
         let mut jumps = 0.0;
         while cur != hole {
             let pos = self.at[cur];
-            if len(self, pos) >= cur - hole {
+            let plen = len(self, pos);
+            if plen >= cur - hole {
                 self.upd_work
                     .push((0xf3d83, 2.0 * (cur - hole) as f64, crate::work::CTX));
                 let occ = self.at[hole];
@@ -3014,7 +3026,7 @@ impl<R: Real> DualFactor<R> {
                 self.slot[occ] = cur;
                 break;
             }
-            jumps += 2.0 * len(self, pos) as f64 + 5.0;
+            jumps += 2.0 * plen as f64 + 5.0;
             let mut nxt = hole;
             for &x in &self.a[pos] {
                 let sx = self.slot[x];
@@ -3366,7 +3378,7 @@ impl<R: Real> DualFactor<R> {
         let mut tail_rebuild = false;
         if old == -2 {
             if top >= oldslot as i64 {
-                self.walk(r, oldslot, top as usize);
+                self.walk(r, oldslot, top as usize, &refcols[..]);
             } else {
                 moved = false;
             }
@@ -3378,7 +3390,7 @@ impl<R: Real> DualFactor<R> {
             self.slot[r] = cs;
             self.at[cs] = r;
             if top > cs as i64 {
-                self.walk(r, cs, top as usize);
+                self.walk(r, cs, top as usize, &refcols[..]);
             }
         } else {
             // the tail grows by one slot: the occupant of the last non-tail slot fills r's old slot, r takes the new bottom slot
@@ -3394,7 +3406,7 @@ impl<R: Real> DualFactor<R> {
                 self.i21 = bt;
             }
             if !av.is_empty() {
-                self.walk(r, bt, top as usize);
+                self.walk(r, bt, top as usize, &refcols[..]);
             }
         }
         let _ = &mut tail_rebuild;
@@ -3537,10 +3549,12 @@ impl<R: Real> DualFactor<R> {
             // The rows are visited in the spike's order with the leaving column replaced by the last entry (`sp`).
             for &row in sp.iter().filter(|&&y| y != r && !scratch.old_rows.contains(&y)) {
                 // The transpose includes duplicates in the same multiplicity as the column scan.
-                let count = self.ut[row]
-                    .iter()
-                    .filter(|&&(c, _)| c != r && self.kind[c] == -2)
-                    .count();
+                // Every entry of `ut` belongs to a tail column (audited) and `r`'s own entries sit only in `old_rows`, skipped above.
+                let count = self.ut[row].len();
+                let counted = || self.ut[row].iter().filter(|&&(c, _)| c != r && self.kind[c] == -2).count();
+                debug_assert_eq!(count, counted());
+                #[cfg(feature = "factor-shadow")]
+                assert_eq!(count, counted(), "update count scan");
                 if count >= self.row_cap[row] {
                     // The growth is capped by the updates left before the refactorization (`0xf2cd1`: `F+0x188 - F+0x18c`).
                     let left = (self

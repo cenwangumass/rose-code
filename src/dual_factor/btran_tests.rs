@@ -124,3 +124,57 @@ fn captured_transpose_retained_tail_matches_dense_scratch() {
         }
     }
 }
+
+/// The walk's column lengths and the count scan of `update` (O(1) forms) against the retained original on many mixed replacements.
+#[test]
+fn update_walk_lengths_and_count_scan_match_original() {
+    let mut seed = 0x9e3779b97f4a7c15u64;
+    let mut next = || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed as usize
+    };
+    let mut walks = 0;
+    for m in [24, 70, 200] {
+        let mut cols: Vec<_> = (0..m).map(|i| {
+            let mut rows = vec![i];
+            let mut vals = vec![4.0];
+            for _ in 0..4 {
+                let r = next() % m;
+                if !rows.contains(&r) {
+                    rows.push(r);
+                    vals.push(if next() % 2 == 0 { 0.5 } else { -0.75 });
+                }
+            }
+            (true, rows, vals)
+        }).collect();
+        let st = crate::lu_order::factor_structure(m, &cols);
+        let mut new = DualFactor::fresh(m, m, &st, &cols);
+        let mut old = RefStruct::fresh(m, m, &st, &cols);
+        for step in 0..(m.min(60)) {
+            let r = next() % m;
+            let mut rows = vec![r];
+            let mut vals = vec![5.0 + step as f64];
+            for _ in 0..(1 + next() % 8) {
+                let q = next() % m;
+                if !rows.contains(&q) {
+                    rows.push(q);
+                    vals.push([0.25, -0.5, 1.5][next() % 3]);
+                }
+            }
+            assert_eq!(bits(new.ftran(&rows, &vals)), bits(old.ftran(&rows, &vals)));
+            new.update(r);
+            old.update(r);
+            assert_eq!(new.upd_work.len(), old.upd_work.len());
+            for (a, b) in new.upd_work.iter().zip(&old.upd_work) {
+                assert_eq!((a.0, a.1.to_bits()), (b.0, b.1.to_bits()), "m {m} step {step}");
+            }
+            assert_eq!(bits(new.diag.iter().copied().enumerate().collect()),
+                bits(old.numerics().0.iter().copied().enumerate().collect()));
+            walks += new.upd_work.iter().filter(|w| w.0 == 0xf3ca4).count();
+            cols[r] = (true, rows, vals);
+        }
+    }
+    assert!(walks > 0, "the walk's jumps were never exercised");
+}

@@ -91,6 +91,13 @@ impl<R: Real> Shadow<R> {
     forward!(last_dense() -> bool, |v: &bool| *v);
     forward!(last_ordered() -> bool, |v: &bool| *v);
 
+    pub fn diag(&self) -> &[R] {
+        let new = self.new.diag();
+        let old = muted(|| self.old.numerics().0);
+        self.finish("diag", &numbers(new), &numbers(old), false);
+        new
+    }
+
     pub fn numerics(&self) -> (&[R], Vec<Vec<(usize, R)>>) {
         let new = self.new.numerics();
         let old = muted(|| self.old.numerics());

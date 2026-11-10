@@ -1631,8 +1631,7 @@ impl<'a, R: Real> Dual<'a, R> {
             let (mx, mn) = mi
                 .as_ref()
                 .unwrap()
-                .numerics()
-                .0
+                .diag()
                 .iter()
                 .fold((0.0f64, f64::INFINITY), |(a, b), v| {
                     (a.max(v.abs().to_f64()), b.min(v.abs().to_f64()))
@@ -6118,8 +6117,7 @@ fn solve_pass_callback<R: Real>(
     if order.len() == m {
         while carry_thr < 0.9 {
             let (mx, mn) = mirror
-                .numerics()
-                .0
+                .diag()
                 .iter()
                 .fold((0.0f64, f64::INFINITY), |(a, b), v| {
                     (a.max(v.abs().to_f64()), b.min(v.abs().to_f64()))
