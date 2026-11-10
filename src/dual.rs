@@ -784,12 +784,206 @@ fn auxiliary_lazy_build_matches_eager_build() {
     check::<crate::f80::F80>(&values);
 }
 
-/// The retained workspace of the row product: `acc` is +0.0 and `touched` false everywhere between calls.
+/// The row-wise copy of the nonbasic structurals as flat pools: row `i` is `idx/val[start[i]..start[i] + len[i]]` with `cap[i] - len[i]` spare slots.
+/// The per-pivot edits keep the in-row order of a `Vec<(usize, f64)>` (`swap_remove` moves the last entry into the hole; `push` appends): the order of
+/// the scatter is the order of the floating-point sums. A full row moves to the end of the pool; the pool is compacted when most of it is dead.
+struct FlatRows {
+    start: Vec<u32>,
+    len: Vec<u32>,
+    cap: Vec<u32>,
+    idx: Vec<u32>,
+    val: Vec<f64>,
+    /// Slots of the pool owned by no row (left behind by moved rows).
+    dead: usize,
+    /// Exclusive bound of every stored index (`n + m`).
+    nv: usize,
+    /// Some stored index is not below `n` (a slack in a row).
+    wide: bool,
+    n: usize,
+    /// Debug check: the same rows as `Vec<Vec>`, edited with the same operations.
+    #[cfg(debug_assertions)]
+    mirror: Vec<Vec<(usize, f64)>>,
+}
+
+impl FlatRows {
+    fn new(m: usize, n: usize) -> Self {
+        FlatRows {
+            start: vec![0; m],
+            len: vec![0; m],
+            cap: vec![0; m],
+            idx: Vec::new(),
+            val: Vec::new(),
+            dead: 0,
+            nv: n + m,
+            wide: false,
+            n,
+            #[cfg(debug_assertions)]
+            mirror: vec![Vec::new(); m],
+        }
+    }
+
+    /// The rows of `rows` (indices below `n + m`) with spare capacity.
+    fn from_rows(rows: &[Vec<(usize, f64)>], n: usize) -> Self {
+        let m = rows.len();
+        let mut f = FlatRows::new(m, n);
+        assert!(n + m < u32::MAX as usize / 2);
+        let total: usize = rows.iter().map(|r| r.len() + (r.len() / 2).max(4)).sum();
+        assert!(total < u32::MAX as usize / 2);
+        f.idx.reserve(total);
+        f.val.reserve(total);
+        for (i, r) in rows.iter().enumerate() {
+            let cap = r.len() + (r.len() / 2).max(4);
+            f.start[i] = f.idx.len() as u32;
+            f.len[i] = r.len() as u32;
+            f.cap[i] = cap as u32;
+            for &(j, a) in r {
+                assert!(j < f.nv);
+                f.wide |= j >= n;
+                f.idx.push(j as u32);
+                f.val.push(a);
+            }
+            f.idx.resize(f.idx.len() + cap - r.len(), 0);
+            f.val.resize(f.val.len() + cap - r.len(), 0.0);
+        }
+        #[cfg(debug_assertions)]
+        {
+            f.mirror = rows.to_vec();
+        }
+        f.check();
+        f
+    }
+
+    #[inline(always)]
+    fn row_len(&self, i: usize) -> usize {
+        self.len[i] as usize
+    }
+
+    #[inline(always)]
+    fn row(&self, i: usize) -> (&[u32], &[f64]) {
+        let (s, l) = (self.start[i] as usize, self.len[i] as usize);
+        (&self.idx[s..s + l], &self.val[s..s + l])
+    }
+
+    /// The total number of entries.
+    #[allow(dead_code)]
+    fn total_len(&self) -> usize {
+        self.len.iter().map(|&l| l as usize).sum()
+    }
+
+    /// The first position of variable `j` in row `i`.
+    fn position(&self, i: usize, j: usize) -> Option<usize> {
+        self.row(i).0.iter().position(|&x| x as usize == j)
+    }
+
+    /// Replace entry `k` of row `i`.
+    fn set(&mut self, i: usize, k: usize, j: usize, a: f64) {
+        assert!(k < self.row_len(i) && j < self.nv);
+        let s = self.start[i] as usize + k;
+        self.idx[s] = j as u32;
+        self.val[s] = a;
+        self.wide |= j >= self.n;
+        #[cfg(debug_assertions)]
+        {
+            self.mirror[i][k] = (j, a);
+        }
+        self.check();
+    }
+
+    /// Remove entry `k` of row `i`; the last entry takes its place.
+    fn swap_remove(&mut self, i: usize, k: usize) {
+        let l = self.row_len(i);
+        assert!(k < l);
+        let s = self.start[i] as usize;
+        self.idx[s + k] = self.idx[s + l - 1];
+        self.val[s + k] = self.val[s + l - 1];
+        self.len[i] -= 1;
+        #[cfg(debug_assertions)]
+        {
+            self.mirror[i].swap_remove(k);
+        }
+        self.check();
+    }
+
+    /// Append `(j, a)` to row `i`.
+    fn push(&mut self, i: usize, j: usize, a: f64) {
+        assert!(j < self.nv);
+        let l = self.row_len(i);
+        if l == self.cap[i] as usize {
+            self.grow(i);
+        }
+        let s = self.start[i] as usize + l;
+        self.idx[s] = j as u32;
+        self.val[s] = a;
+        self.len[i] += 1;
+        self.wide |= j >= self.n;
+        #[cfg(debug_assertions)]
+        {
+            self.mirror[i].push((j, a));
+        }
+        self.check();
+    }
+
+    /// Move the full row `i` to the end of the pool with doubled capacity (the pool is compacted first when most of it is dead).
+    fn grow(&mut self, i: usize) {
+        if self.dead > 4096 && self.dead * 2 > self.idx.len() {
+            self.compact();
+        }
+        let l = self.row_len(i);
+        let cap = (2 * l).max(l + 4);
+        let (s, new_s) = (self.start[i] as usize, self.idx.len());
+        assert!(new_s + cap < u32::MAX as usize / 2);
+        self.idx.extend_from_within(s..s + l);
+        self.val.extend_from_within(s..s + l);
+        self.idx.resize(new_s + cap, 0);
+        self.val.resize(new_s + cap, 0.0);
+        self.dead += self.cap[i] as usize;
+        self.start[i] = new_s as u32;
+        self.cap[i] = cap as u32;
+    }
+
+    /// Rewrite the pool with the live rows only (same order, same capacities).
+    fn compact(&mut self) {
+        let m = self.start.len();
+        let live: usize = self.cap.iter().map(|&c| c as usize).sum();
+        let (mut idx, mut val) = (Vec::with_capacity(live * 2), Vec::with_capacity(live * 2));
+        for i in 0..m {
+            let (s, l, c) = (self.start[i] as usize, self.len[i] as usize, self.cap[i] as usize);
+            self.start[i] = idx.len() as u32;
+            idx.extend_from_slice(&self.idx[s..s + l]);
+            val.extend_from_slice(&self.val[s..s + l]);
+            idx.resize(idx.len() + c - l, 0);
+            val.resize(val.len() + c - l, 0.0);
+        }
+        self.idx = idx;
+        self.val = val;
+        self.dead = 0;
+    }
+
+    /// Debug builds: the flat rows equal the `Vec<Vec>` mirror, entry by entry and bit by bit.
+    #[inline(always)]
+    fn check(&self) {
+        #[cfg(debug_assertions)]
+        {
+            assert_eq!(self.mirror.len(), self.start.len());
+            for (i, r) in self.mirror.iter().enumerate() {
+                let (ix, vl) = self.row(i);
+                assert!(self.len[i] <= self.cap[i]);
+                assert_eq!(ix.len(), r.len(), "flat row {i} length");
+                for (k, &(j, a)) in r.iter().enumerate() {
+                    assert!(ix[k] as usize == j && vl[k].to_bits() == a.to_bits(), "flat row {i} entry {k}");
+                }
+            }
+        }
+    }
+}
+
+/// The retained workspace of the row product: `acc` is +0.0 and `bits` zero everywhere between calls.
 struct PivotWs<R: Real> {
     acc: Vec<R>,
-    touched: Vec<bool>,
-    /// Every index touched by the scatter, in first-touch order (the cleanup list).
-    all: Vec<usize>,
+    /// The touched flags, one bit per variable.
+    bits: Vec<u64>,
+    /// Every index touched by the scatter, in first-touch order (capacity `n + m`).
+    all: Vec<u32>,
     /// The coefficient of the first entry of each slack column.
     slack_coef: Vec<f64>,
     /// Result of the last call: the position in the returned row of the first entry of the leaving variable (it is only ever a slack entry).
@@ -800,7 +994,7 @@ struct PivotWs<R: Real> {
 
 impl<R: Real> Default for PivotWs<R> {
     fn default() -> Self {
-        PivotWs { acc: Vec::new(), touched: Vec::new(), all: Vec::new(), slack_coef: Vec::new(), leave_pos: None, slack_dup: false }
+        PivotWs { acc: Vec::new(), bits: Vec::new(), all: Vec::new(), slack_coef: Vec::new(), leave_pos: None, slack_dup: false }
     }
 }
 
@@ -808,7 +1002,7 @@ impl<R: Real> Default for PivotWs<R> {
 #[allow(clippy::too_many_arguments)]
 fn pivot_row_ws<R: Real>(
     ws: &mut PivotWs<R>,
-    rrows: &[Vec<(usize, f64)>],
+    rrows: &FlatRows,
     slack_nb: &[bool],
     st: &[i32],
     cols: &[Vec<(usize, f64)>],
@@ -820,90 +1014,138 @@ fn pivot_row_ws<R: Real>(
 ) -> (Vec<(usize, R)>, usize, usize, usize) {
     if ws.acc.len() != n + m {
         ws.acc = vec![R::ZERO; n + m];
-        ws.touched = vec![false; n + m];
-        ws.all = Vec::new();
+        ws.bits = vec![0; (n + m).div_ceil(64)];
+        ws.all = Vec::with_capacity(n + m);
         ws.slack_coef = (0..m).map(|i| cols[n + i][0].1).collect();
     }
+    assert!(rrows.nv == n + m && rrows.start.len() == m && st.len() >= n + m && slack_nb.len() >= m);
     // Local owners keep the pointers and lengths in registers across the scatter (stores through `ws` could alias them).
     let mut acc_v = std::mem::take(&mut ws.acc);
-    let mut touched_v = std::mem::take(&mut ws.touched);
+    let mut bits_v = std::mem::take(&mut ws.bits);
     let mut all_v = std::mem::take(&mut ws.all);
     let acc = &mut acc_v[..];
-    let touched = &mut touched_v[..acc.len()];
-    let all = &mut all_v;
+    let bits = &mut bits_v[..];
     let slack_coef = &ws.slack_coef[..];
     // The row product runs over the rows of `rho` unless their entries (`0x134aa0` counts them) outnumber the structurals n by 1.8 (`0xc5355`, `ctx+0x68`);
     // then it is columnwise, in index order.
-    let est: usize = rho.iter().map(|e| rrows[e.0].len()).sum();
+    let est: usize = rho.iter().map(|e| rrows.row_len(e.0)).sum();
     let sparse = rho.len() == 1 || !((n as f64) < 1.8 * est as f64);
-    all.clear();
-    for &(i, rv) in rho {
-        for &(j, a) in &rrows[i] {
-            acc[j] = acc[j] + rv * R::c(a);
-            if !touched[j] {
-                touched[j] = true;
-                all.push(j);
+    all_v.clear();
+    all_v.reserve(n + m);
+    let all_p = all_v.as_mut_ptr();
+    let mut cnt = 0usize;
+    // `acc`, `bits` and `all` hold `n + m`, `ceil((n + m) / 64)` and at least `n + m` slots; every stored index is below `n + m` (checked when stored),
+    // and the first-touch bit makes the entries of `all` distinct.
+    macro_rules! step {
+        ($rv:expr, $j:expr, $a:expr) => {{
+            let j = $j as usize;
+            debug_assert!(j < acc.len());
+            // SAFETY: j < n + m, see above.
+            unsafe {
+                let p = acc.get_unchecked_mut(j);
+                *p = *p + $rv * R::c($a);
+                let w = bits.get_unchecked_mut(j >> 6);
+                let b = 1u64 << (j & 63);
+                if *w & b == 0 {
+                    *w |= b;
+                    *all_p.add(cnt) = j as u32;
+                    cnt += 1;
+                }
             }
+        }};
+    }
+    for &(i, rv) in rho {
+        let (ix, vl) = rrows.row(i);
+        let k = ix.len();
+        let mut t = 0;
+        while t + 4 <= k {
+            // The loads of four entries; the updates follow in order.
+            let (j0, j1, j2, j3) = (ix[t], ix[t + 1], ix[t + 2], ix[t + 3]);
+            let (a0, a1, a2, a3) = (vl[t], vl[t + 1], vl[t + 2], vl[t + 3]);
+            step!(rv, j0, a0);
+            step!(rv, j1, a1);
+            step!(rv, j2, a2);
+            step!(rv, j3, a3);
+            t += 4;
+        }
+        while t < k {
+            step!(rv, ix[t], vl[t]);
+            t += 1;
         }
     }
+    // SAFETY: `cnt` slots were written, and cnt <= n + m (distinct indices).
+    unsafe { all_v.set_len(cnt) };
+    let all = &all_v[..];
     // Entries that cancelled to (nearly) nothing are dropped (the smallest captured entry is 1.04e-13).
     // A single entry in rho takes the scaled-copy path of `0x134d90` (`0x1360ac`), which has no tolerance test for a scale of 1 or more (fx_e2_r25 call 1: entries of 6e-14 stay);
     // below 1 the same tolerance filter as the general path follows (`0x136629`: `|scale| < 1.0`; seed 50165 call 5: rho -5e-5, a product of 1.25e-17 is dropped).
     let filter = rho.len() != 1 || rho[0].1.abs() < R::ONE;
     let sdir = if above { -1.0 } else { 1.0 };
+    // `s * sdir` for s = +-1 is exactly +-sdir.
+    let (c_pos, c_neg) = (R::c(sdir), R::c(-sdir));
+    let tol = R::c(DROP_TOL);
     let mut out: Vec<(usize, R)> = Vec::with_capacity(all.len() + rho.len());
-    let keep = |acc: &[R], j: usize| !filter || acc[j].abs() > R::c(DROP_TOL);
     let mut distinct = all.len();
+    // One pass per touched slot: the kept entry is appended and the accumulator is restored to +0.0 (the slack entries below do not read it).
     if sparse {
-        for &j in all.iter() {
-            if keep(acc, j) {
-                let s = if st[j] == UB { -1.0 } else { 1.0 };
-                out.push((j, acc[j] * R::c(s * sdir)));
+        for &j in all {
+            let j = j as usize;
+            let v = acc[j];
+            acc[j] = R::ZERO;
+            if !filter || v.abs() > tol {
+                out.push((j, v * if st[j] == UB { c_neg } else { c_pos }));
             }
         }
     } else {
         // Ascending index order over the structurals (the touched slots are only structurals, so the scan sees all of them).
         distinct = 0;
-        for j in 0..n {
-            if touched[j] {
+        for (w, &word) in bits.iter().enumerate().take(n.div_ceil(64)) {
+            let mut word = word;
+            if (w + 1) * 64 > n {
+                word &= (1u64 << (n - w * 64)) - 1;
+            }
+            while word != 0 {
+                let j = w * 64 + word.trailing_zeros() as usize;
+                word &= word - 1;
                 distinct += 1;
-                if keep(acc, j) {
-                    let s = if st[j] == UB { -1.0 } else { 1.0 };
-                    out.push((j, acc[j] * R::c(s * sdir)));
+                let v = acc[j];
+                acc[j] = R::ZERO;
+                if !filter || v.abs() > tol {
+                    out.push((j, v * if st[j] == UB { c_neg } else { c_pos }));
                 }
+            }
+        }
+        if rrows.wide {
+            // A slack in a row: its accumulator is outside the scan.
+            for &j in all {
+                acc[j as usize] = R::ZERO;
             }
         }
     }
     let nst = out.len();
-    // Slack entries; their accumulators are overwritten, so they are restored below with the rest.
+    // Slack entries (their accumulators are not read: a slack touched by the scatter has been restored above).
     // The scatter touches structurals only unless a slack is in `rrows`; a slack seen twice (or already touched) is a repeated variable of the row.
     let (mut leave_pos, mut slack_dup) = (None, false);
     for &(i, rv) in rho {
         let j = n + i;
         if slack_nb[i] || j == leave {
-            acc[j] = rv * R::c(slack_coef[i]);
-            let s = if st[j] == UB { -1.0 } else { 1.0 };
-            if touched[j] {
+            let v = rv * R::c(slack_coef[i]);
+            let s = if st[j] == UB { c_neg } else { c_pos };
+            let (w, b) = (j >> 6, 1u64 << (j & 63));
+            if bits[w] & b != 0 {
                 slack_dup = true;
             } else {
-                touched[j] = true;
+                bits[w] |= b;
             }
             if j == leave && leave_pos.is_none() {
                 leave_pos = Some(out.len());
             }
-            out.push((j, acc[j] * R::c(s * sdir)));
+            out.push((j, v * s));
         }
     }
-    for &(i, _) in rho {
-        acc[n + i] = R::ZERO;
-        touched[n + i] = false;
-    }
-    for &j in all.iter() {
-        acc[j] = R::ZERO;
-        touched[j] = false;
-    }
+    bits.fill(0);
     ws.acc = acc_v;
-    ws.touched = touched_v;
+    ws.bits = bits_v;
     ws.all = all_v;
     ws.leave_pos = leave_pos;
     ws.slack_dup = slack_dup;
@@ -975,7 +1217,7 @@ struct Dual<'a, R: Real = f64> {
     mirror: Mirror<R>,
     factor: AuxiliaryFactor,
     /// Row-wise copy of the nonbasic, non-fixed structurals in the reference's storage order, with their immutable first-match coefficients.
-    rrows: Vec<Vec<(usize, f64)>>,
+    rrows: FlatRows,
     /// The ratio test asked for a refactorization (request 5) instead of ending the dual: the iteration returns without a pivot.
     absorb_request: bool,
     /// The candidates of a row on a fresh factor at a nonzero level cannot absorb the infeasibility (`0xcc1ca`: `ctx+0x290` = 1, no entering variable): the pass ends with status -1004 at the post-iteration pass.
@@ -1902,17 +2144,16 @@ impl<'a, R: Real> Dual<'a, R> {
     /// The row-wise copy of the nonbasic, non-fixed structurals (`ctx+0x1d0`), built once at the start, column by column in index order; the pivots update
     /// it in place and no factorization rebuilds it.
     fn build_rrows(&mut self) {
-        for r in self.rrows.iter_mut() {
-            r.clear();
-        }
+        let mut rows: Vec<Vec<(usize, f64)>> = vec![Vec::new(); self.m];
         for j in 0..self.n {
             if self.st[j] < 0 && self.st[j] != FIXED && self.p.lo[j] != self.p.up[j] {
                 for &(i, _) in &self.p.cols[j] {
                     let a = self.p.cols[j].iter().find(|e| e.0 == i).unwrap().1;
-                    self.rrows[i].push((j, a));
+                    rows[i].push((j, a));
                 }
             }
         }
+        self.rrows = FlatRows::from_rows(&rows, self.n);
     }
 
     // ------------------------------------------------------------------ basic solution
@@ -3979,11 +4220,13 @@ impl<'a, R: Real> Dual<'a, R> {
         };
         // Pivot-row BTRAN, drop of the small entries.
         let rho_full = self.mirror.btran(&[(r, R::ONE)], true, false);
-        let rho: Vec<(usize, R)> = rho_full
-            .iter()
-            .copied()
-            .filter(|e| e.1.abs() > R::c(DROP_TOL))
-            .collect();
+        let drop_tol = R::c(DROP_TOL);
+        let mut rho: Vec<(usize, R)> = Vec::with_capacity(rho_full.len());
+        for &e in &rho_full {
+            if e.1.abs() > drop_tol {
+                rho.push(e);
+            }
+        }
         self.p60 = rho.len() as f64;
         self.work
             .add_from(0x13174d, 0xc51dd, self.mirror.work(), crate::work::FAC);
@@ -4498,24 +4741,24 @@ impl<'a, R: Real> Dual<'a, R> {
         let leave_in = leave < n && p.lo[leave] != p.up[leave];
         if q < n {
             for &(i, _) in &p.cols[q] {
-                if let Some(kk) = self.rrows[i].iter().position(|&(j, _)| j == q) {
+                if let Some(kk) = self.rrows.position(i, q) {
                     if let Some(a) = leave_in
                         .then(|| p.cols[leave].iter().find(|e| e.0 == i))
                         .flatten()
                         .map(|e| e.1)
                     {
-                        self.rrows[i][kk] = (leave, a);
+                        self.rrows.set(i, kk, leave, a);
                     } else {
-                        self.rrows[i].swap_remove(kk);
+                        self.rrows.swap_remove(i, kk);
                     }
                 }
             }
         }
         if leave_in {
             for &(i, _) in &p.cols[leave] {
-                if !self.rrows[i].iter().any(|&(j, _)| j == leave) {
+                if self.rrows.position(i, leave).is_none() {
                     let a = p.cols[leave].iter().find(|e| e.0 == i).unwrap().1;
-                    self.rrows[i].push((leave, a));
+                    self.rrows.push(i, leave, a);
                 }
             }
         }
@@ -6261,7 +6504,7 @@ fn solve_pass_callback<R: Real>(
         w: vec![R::ONE; m],
         mirror,
         factor: AuxiliaryFactor::new(factor),
-        rrows: vec![Vec::new(); m],
+        rrows: FlatRows::new(m, n),
         absorb_request: false,
         fresh_absorb: false,
         refactorizations: carry.fac + 1,
@@ -6445,7 +6688,7 @@ fn solve_pass_callback<R: Real>(
     }
     s.build_rrows();
     if let Some(rows) = crate::simplex::HANDOFF_ROWS.with(|c| c.borrow_mut().take()) {
-        s.rrows = rows
+        let rows: Vec<Vec<(usize, f64)>> = rows
             .into_iter()
             .enumerate()
             .map(|(i, row)| {
@@ -6457,6 +6700,7 @@ fn solve_pass_callback<R: Real>(
                     .collect()
             })
             .collect();
+        s.rrows = FlatRows::from_rows(&rows, n);
     }
     if let Some(dy) = &dstart_d {
         // Basic variables keep their d (the forced rows read it); the recompute below takes y from c_B minus the d of the stack entries.
@@ -7806,7 +8050,7 @@ mod captured_bh305_ratio {
             w: vec![1.0; m],
             mirror,
             factor: AuxiliaryFactor::new(factor),
-            rrows: vec![Vec::new(); m],
+            rrows: FlatRows::new(m, n),
             absorb_request: false,
             fresh_absorb: false,
             refactorizations: 1,
@@ -8369,8 +8613,46 @@ mod pivot_row_diff {
             let cols: Vec<Vec<(usize, f64)>> = (0..n + m)
                 .map(|j| if j < n { Vec::new() } else { vec![(j - n, if r.below(2) == 0 { 1.0 } else { -1.0 })] })
                 .collect();
+            let mut flat = FlatRows::from_rows(&rrows, n);
             let mut ws = PivotWs::<R>::default();
             for call in 0..8 {
+                // Pivot-like edits of both copies (position, in-place replace, swap_remove, push, also duplicates and emptied rows): same in-row order.
+                for _ in 0..r.below(6) * (call.min(1)) {
+                    let i = r.below(m);
+                    let nj = r.below(n);
+                    match r.below(3) {
+                        0 if !rrows[i].is_empty() => {
+                            let k = r.below(rrows[i].len());
+                            let j = rrows[i][k].0;
+                            assert_eq!(flat.position(i, j), rrows[i].iter().position(|e| e.0 == j));
+                            let kk = flat.position(i, j).unwrap();
+                            let a = value(&mut r);
+                            rrows[i][kk] = (nj, a);
+                            flat.set(i, kk, nj, a);
+                        }
+                        1 if !rrows[i].is_empty() => {
+                            let k = r.below(rrows[i].len());
+                            rrows[i].swap_remove(k);
+                            flat.swap_remove(i, k);
+                        }
+                        _ => {
+                            let a = value(&mut r);
+                            rrows[i].push((nj, a));
+                            flat.push(i, nj, a);
+                        }
+                    }
+                }
+                if r.below(8) == 0 {
+                    flat.compact();
+                }
+                for i in 0..m {
+                    let (ix, vl) = flat.row(i);
+                    assert!(
+                        ix.len() == rrows[i].len()
+                            && rrows[i].iter().enumerate().all(|(k, e)| e.0 == ix[k] as usize && e.1.to_bits() == vl[k].to_bits()),
+                        "case {case} call {call} row {i}"
+                    );
+                }
                 let k = if r.below(4) == 0 { 1 } else { 1 + r.below(m) };
                 let mut rows: Vec<usize> = (0..m).collect();
                 for t in 0..m {
@@ -8389,7 +8671,7 @@ mod pivot_row_diff {
                 let leave = n + r.below(m);
                 let above = r.below(2) == 0;
                 let want = pivot_row_ref(&rrows, &slack_nb, &st, &cols, n, m, &rho, leave, above);
-                let got = pivot_row_ws(&mut ws, &rrows, &slack_nb, &st, &cols, n, m, &rho, leave, above);
+                let got = pivot_row_ws(&mut ws, &flat, &slack_nb, &st, &cols, n, m, &rho, leave, above);
                 // A repeated rho index is not a valid input of the row product (the reference keeps the last value at both entries): positions only.
                 let rho_dup = rho.len() > k.min(m);
                 assert!(rho_dup || same(&want, &got), "case {case} call {call}");
@@ -8398,7 +8680,7 @@ mod pivot_row_diff {
                 let dup = (0..got.0.len()).any(|x| got.0[..x].iter().any(|e| e.0 == got.0[x].0));
                 assert_eq!(ws.slack_dup, dup, "case {case} call {call}");
                 assert!(ws.acc.iter().all(|x| x.to_f64().to_bits() == 0), "acc not restored");
-                assert!(ws.touched.iter().all(|&t| !t));
+                assert!(ws.bits.iter().all(|&w| w == 0));
             }
         }
     }
