@@ -797,8 +797,6 @@ struct FlatRows {
     dead: usize,
     /// Exclusive bound of every stored index (`n + m`).
     nv: usize,
-    /// Some stored index is not below `n` (a slack in a row).
-    wide: bool,
     n: usize,
     /// Debug check: the same rows as `Vec<Vec>`, edited with the same operations.
     #[cfg(debug_assertions)]
@@ -815,7 +813,6 @@ impl FlatRows {
             val: Vec::new(),
             dead: 0,
             nv: n + m,
-            wide: false,
             n,
             #[cfg(debug_assertions)]
             mirror: vec![Vec::new(); m],
@@ -837,8 +834,7 @@ impl FlatRows {
             f.len[i] = r.len() as u32;
             f.cap[i] = cap as u32;
             for &(j, a) in r {
-                assert!(j < f.nv);
-                f.wide |= j >= n;
+                assert!(j < n, "slack index {j} in a pivot row (n = {n})");
                 f.idx.push(j as u32);
                 f.val.push(a);
             }
@@ -864,12 +860,6 @@ impl FlatRows {
         (&self.idx[s..s + l], &self.val[s..s + l])
     }
 
-    /// The total number of entries.
-    #[allow(dead_code)]
-    fn total_len(&self) -> usize {
-        self.len.iter().map(|&l| l as usize).sum()
-    }
-
     /// The first position of variable `j` in row `i`.
     fn position(&self, i: usize, j: usize) -> Option<usize> {
         self.row(i).0.iter().position(|&x| x as usize == j)
@@ -877,11 +867,10 @@ impl FlatRows {
 
     /// Replace entry `k` of row `i`.
     fn set(&mut self, i: usize, k: usize, j: usize, a: f64) {
-        assert!(k < self.row_len(i) && j < self.nv);
+        assert!(k < self.row_len(i) && j < self.n, "slack index {j} in a pivot row (n = {})", self.n);
         let s = self.start[i] as usize + k;
         self.idx[s] = j as u32;
         self.val[s] = a;
-        self.wide |= j >= self.n;
         #[cfg(debug_assertions)]
         {
             self.mirror[i][k] = (j, a);
@@ -906,7 +895,7 @@ impl FlatRows {
 
     /// Append `(j, a)` to row `i`.
     fn push(&mut self, i: usize, j: usize, a: f64) {
-        assert!(j < self.nv);
+        assert!(j < self.n, "slack index {j} in a pivot row (n = {})", self.n);
         let l = self.row_len(i);
         if l == self.cap[i] as usize {
             self.grow(i);
@@ -915,7 +904,6 @@ impl FlatRows {
         self.idx[s] = j as u32;
         self.val[s] = a;
         self.len[i] += 1;
-        self.wide |= j >= self.n;
         #[cfg(debug_assertions)]
         {
             self.mirror[i].push((j, a));
@@ -945,7 +933,7 @@ impl FlatRows {
     fn compact(&mut self) {
         let m = self.start.len();
         let live: usize = self.cap.iter().map(|&c| c as usize).sum();
-        let (mut idx, mut val) = (Vec::with_capacity(live * 2), Vec::with_capacity(live * 2));
+        let (mut idx, mut val) = (Vec::with_capacity(live), Vec::with_capacity(live));
         for i in 0..m {
             let (s, l, c) = (self.start[i] as usize, self.len[i] as usize, self.cap[i] as usize);
             self.start[i] = idx.len() as u32;
@@ -1113,12 +1101,6 @@ fn pivot_row_ws<R: Real>(
                 if !filter || v.abs() > tol {
                     out.push((j, v * if st[j] == UB { c_neg } else { c_pos }));
                 }
-            }
-        }
-        if rrows.wide {
-            // A slack in a row: its accumulator is outside the scan.
-            for &j in all {
-                acc[j as usize] = R::ZERO;
             }
         }
     }

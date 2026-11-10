@@ -1803,6 +1803,8 @@ impl<R: Real> DualFactor<R> {
         // is final): every term below is an integer-valued count (`len`, `2 len + 4`), hence the sums are exact and order free.
         let tdense = self.tau_u_dense(&spike);
         let (mut nz, mut abs_a, mut tp_a2, mut tp_only_a) = (0usize, 0usize, 0usize, 0usize);
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        let mut surv_nz = 0usize;
         {
             let f2 = self.f2.borrow();
             let x_col = &f2.x_col;
@@ -1828,6 +1830,10 @@ impl<R: Real> DualFactor<R> {
                 };
                 x[c] = fin;
                 if fin != R::ZERO {
+                    #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+                    {
+                        surv_nz += 1;
+                    }
                     if tdense {
                         if fin.abs() > R::c(TOL) {
                             abs_a += self.a[c].len();
@@ -1853,6 +1859,14 @@ impl<R: Real> DualFactor<R> {
                 }
             }
         }
+        // Invariant (P4-2): every nonzero tail slot was reached through the a-lists and processed, so the nonzero tail values left are exactly the
+        // survivors counted in the loop.
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        assert_eq!(
+            (self.i21..m).filter(|&s| x[self.at[s]] != R::ZERO).count(),
+            surv_nz,
+            "ftran_needed: nonzero tail slots differ from the processed survivors"
+        );
         let (u_est, fin) = self.tau_u_finish(&spike, needed.len(), nz, abs_a);
         self.tau_u.set(u_est);
         self.tau_fin.set(fin);
@@ -2388,6 +2402,13 @@ impl<R: Real> DualFactor<R> {
                 touched.insert(j);
             }
         }
+        // Invariant (P4-2): the nonzero tail slots are exactly the processed survivors (`col_surv`).
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        assert_eq!(
+            (self.i21..m).filter(|&s| x[self.at[s]] != R::ZERO).count(),
+            col_surv.len(),
+            "ftran_with: nonzero tail slots differ from the processed survivors"
+        );
         let x_t = if bs { x.clone() } else { Vec::new() };
         touched.finish();
         touched.for_each(|p| {
@@ -3325,7 +3346,9 @@ impl<R: Real> DualFactor<R> {
             }
             return;
         }
-        bits.resize(nkeys.div_ceil(64), 0);
+        if bits.len() < nkeys.div_ceil(64) {
+            bits.resize(nkeys.div_ceil(64), 0);
+        }
         let (mut lo, mut hi) = (usize::MAX, 0);
         for &p in v.iter() {
             let k = key(p);
@@ -3388,7 +3411,17 @@ impl<R: Real> DualFactor<R> {
         let d2 = self.dens;
         // The nucleus positions are in nucleus-list order (`kind` is the index into `self.nuc`, so the keys are distinct).
         let nuc_sorted = |bits: &mut Vec<u64>, v: &mut Vec<usize>| {
-            Self::sort_distinct_keys(bits, v, i3, false, |x| self.kind[x] as usize, |k| self.nuc[k]);
+            Self::sort_distinct_keys(
+                bits,
+                v,
+                i3,
+                false,
+                |x| {
+                    debug_assert!(self.kind[x] >= 0, "nucleus key of a non-nucleus position");
+                    self.kind[x] as usize
+                },
+                |k| self.nuc[k],
+            );
         };
         let dense = (m as f64) <= (n as f64) * d2
             || d2 * ((nuc.len() + tri.len()) as f64) > (i3 + (m - self.i21)) as f64;
