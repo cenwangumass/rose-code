@@ -432,8 +432,8 @@ pub(super) fn assert_same<R: Real>(n: &DualFactor<R>, o: &DualFactor<R>) {
     assert_eq!((n.kind.clone(), n.nuc.clone()), (o.kind.clone(), o.nuc.clone()));
     assert_eq!((&n.a, &n.b, &n.rowl, &n.row_cap, &n.row_par), (&o.a, &o.b, &o.rowl, &o.row_cap, &o.row_par));
     assert_eq!((&n.perm, &n.first_eta, &n.slot, &n.at), (&o.perm, &o.first_eta, &o.slot, &o.at));
-    assert_eq!((&n.empty_tail, n.l_forward, n.dthr, n.lev_dense, n.lev_dense_ft, n.lev_built), (
-        &o.empty_tail,
+    assert_eq!((n.empty_tail.iter().copied().collect::<Vec<usize>>(), n.l_forward, n.dthr, n.lev_dense, n.lev_dense_ft, n.lev_built), (
+        o.empty_tail.iter().copied().collect::<Vec<usize>>(),
         o.l_forward,
         o.dthr,
         o.lev_dense,

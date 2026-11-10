@@ -23,6 +23,8 @@ mod adapter;
 mod btran_tests;
 #[cfg(test)]
 mod fresh_tests;
+#[cfg(test)]
+mod update_old;
 
 #[cfg(feature = "factor-shadow")]
 pub(crate) mod projection;
@@ -518,6 +520,56 @@ impl<R: Real> TauRow<R> {
     }
 }
 
+/// The set of tail columns without nucleus entries. Membership flags plus an unordered list: the only order-dependent query is the
+/// demotion's maximum by slot, whose key `(slot, column)` is unique, and `iter` (dumps) yields ascending columns as the former `BTreeSet`.
+#[derive(Clone, Default)]
+struct EmptyTail {
+    list: Vec<usize>,
+    has: Vec<bool>,
+}
+
+impl EmptyTail {
+    fn insert(&mut self, x: usize) {
+        if x >= self.has.len() {
+            self.has.resize(x + 1, false);
+        }
+        if !self.has[x] {
+            self.has[x] = true;
+            self.list.push(x);
+        }
+    }
+
+    fn remove(&mut self, x: &usize) {
+        if self.has.get(*x).copied().unwrap_or(false) {
+            self.has[*x] = false;
+            let p = self.list.iter().position(|y| y == x).unwrap();
+            self.list.swap_remove(p);
+        }
+    }
+
+    /// The member with the highest slot (ties, impossible for a slot permutation, broken by the larger column).
+    fn max_by_slot(&self, slot: &[usize]) -> Option<usize> {
+        self.list.iter().copied().max_by_key(|&x| (slot[x], x))
+    }
+
+    #[cfg(any(test, feature = "factor-shadow"))]
+    fn iter(&self) -> std::vec::IntoIter<&usize> {
+        let mut v: Vec<&usize> = self.list.iter().collect();
+        v.sort_unstable();
+        v.into_iter()
+    }
+}
+
+impl FromIterator<usize> for EmptyTail {
+    fn from_iter<I: IntoIterator<Item = usize>>(it: I) -> Self {
+        let mut s = EmptyTail::default();
+        for x in it {
+            s.insert(x);
+        }
+        s
+    }
+}
+
 #[derive(Clone)]
 
 pub struct DualFactor<R: Real = f64> {
@@ -544,7 +596,7 @@ pub struct DualFactor<R: Real = f64> {
     /// Density threshold fixed at factorization time (`f104` in the notes): 2, or `5 (nnzL/m + 1)^2` capped at `m`.
     dthr: usize,
     /// Columns eligible for demotion, keyed by identity so slot walks need no index repairs.
-    empty_tail: std::collections::BTreeSet<usize>,
+    empty_tail: EmptyTail,
     slot: Vec<usize>,
     at: Vec<usize>,
     /// Reused counts for ordering dense lists of permutation slots.
@@ -1091,10 +1143,11 @@ impl<R: Real> DualFactor<R> {
         let nnz_l_tot: usize = lpool.len();
         let perm = step;
         let znz = (nnz + sa + sb + 2 * m) as f64;
-        let empty_tail: std::collections::BTreeSet<usize> =
+        let empty_list: Vec<usize> =
             (0..m).filter(|&x| kind[x] == -2 && a[x].is_empty() && b[x].is_empty()).collect();
         // Only tail positions (`kind == -2`) are in the set: its largest element is the last one the downward scan from the end finds.
-        let mark0 = empty_tail.iter().next_back().copied().unwrap_or(i21.min(m - 1));
+        let mark0 = empty_list.last().copied().unwrap_or(i21.min(m - 1));
+        let empty_tail: EmptyTail = empty_list.into_iter().collect();
         // Entries per row of U: the capacity of each row of the row-wise copy, of `ut` and the layout of the rows.
         let mut row_cap = vec![0usize; m];
         for col in &uc {
@@ -3164,7 +3217,8 @@ impl<R: Real> DualFactor<R> {
     }
 
     /// Replace a numeric U column and update its ordered row copy without doing any arithmetic.
-    fn replace_u_column(&mut self, c: usize, col: Vec<(usize, R)>) {
+    /// Returns the replaced column so its buffer can be recycled.
+    fn replace_u_column(&mut self, c: usize, col: Vec<(usize, R)>) -> Vec<(usize, R)> {
         let old = std::mem::replace(&mut self.uc[c], col);
         for &(row, _) in &old {
             let entries = &mut self.ut[row];
@@ -3176,6 +3230,7 @@ impl<R: Real> DualFactor<R> {
             let pos = self.ut[row].partition_point(|e| e.0 <= c);
             self.ut[row].insert(pos, (c, v));
         }
+        old
     }
 
     /// Replace the column at position `r` by the entering column of the last `ftran`.
@@ -3192,6 +3247,10 @@ impl<R: Real> DualFactor<R> {
         self.before_last = (self.upd, self.sum_alpha);
         self.upd += 1;
         self.upd_work.clear();
+        if self.upd_work.capacity() == 0 {
+            // The caller takes the list each call; one allocation instead of the doubling from empty.
+            self.upd_work.reserve(32);
+        }
         // The eta is stored first, at the current pool fill; its value array sits on a 16-byte boundary when the fill is even.
         let peel = self.fill % 2;
         // The old column's entries leave the row-wise copy after the new column's entries have been added.
@@ -3291,13 +3350,14 @@ impl<R: Real> DualFactor<R> {
             && self.slot[r] + 1 != self.i21
             && sp.iter().any(|&y| y != r && self.kind[y] == -2)
         {
-            conv = self
-                .empty_tail
-                .iter()
-                .copied()
-                .max_by_key(|&x| self.slot[x]);
+            conv = self.empty_tail.max_by_slot(&self.slot);
             if let Some(x) = conv {
                 self.empty_tail.remove(&x);
+                // Invariant behind the count scan's `ut[row].len()`: every entry of `ut` belongs to a tail column (`kind == -2`). Only
+                // columns of `empty_tail` leave the tail (here), so they must already have left the row-wise copy.
+                debug_assert!(self.uc[x].is_empty(), "demoted empty_tail column {x} still has U entries");
+                #[cfg(feature = "factor-shadow")]
+                assert!(self.uc[x].is_empty(), "demoted empty_tail column {x} still has U entries");
                 convslot = Some(self.slot[x]);
                 // Only a column some tail column refers to joins the nucleus list; the others become singletons.
                 let refs = &mut scratch.conversion_refs;
@@ -3386,9 +3446,12 @@ impl<R: Real> DualFactor<R> {
         } else if old == -2 {
             let old_b = std::mem::take(&mut self.b[r]);
             self.a[r].clear();
-            self.replace_u_column(r, Vec::new());
+            let old_col = self.replace_u_column(r, Vec::new());
+            if old_col.capacity() > scratch.spare_col.capacity() {
+                scratch.spare_col = old_col;
+            }
             self.kind[r] = -1;
-            for x in old_b {
+            for &x in &old_b {
                 if self.kind[x] >= 0
                     && !self.rowl[x]
                         .iter()
@@ -3398,6 +3461,9 @@ impl<R: Real> DualFactor<R> {
                     self.kind[x] = -1;
                 }
             }
+            if old_b.capacity() > scratch.spare_b.capacity() {
+                scratch.spare_b = old_b;
+            }
         }
         for &x in &sp {
             if self.kind[x] == -1 {
@@ -3405,8 +3471,15 @@ impl<R: Real> DualFactor<R> {
                 self.nuc.push(x);
             }
         }
-        let av: Vec<usize> = sp.iter().copied().filter(|&x| self.kind[x] == -2).collect();
-        let bv: Vec<usize> = sp.iter().copied().filter(|&x| self.kind[x] >= 0).collect();
+        // Built in recycled buffers (the lists replaced at the end of this call), with the same content and order as a fresh collect.
+        let mut av = std::mem::take(&mut scratch.spare_a);
+        av.clear();
+        av.reserve(sp.len());
+        av.extend(sp.iter().copied().filter(|&x| self.kind[x] == -2));
+        let mut bv = std::mem::take(&mut scratch.spare_b);
+        bv.clear();
+        bv.reserve(sp.len());
+        bv.extend(sp.iter().copied().filter(|&x| self.kind[x] >= 0));
         let refcols = &mut scratch.refcols;
         refcols.clear();
         refcols.extend(self.rowl[r].iter().copied().map(|k| (k, self.slot[k])));
@@ -3538,8 +3611,10 @@ impl<R: Real> DualFactor<R> {
         }
         let mut newdiag = values[r];
         if eliminated {
-            let mut ind = vec![r];
-            let mut val = vec![R::ONE / d0];
+            let mut ind = Vec::with_capacity(1 + scratch.eta.len());
+            ind.push(r);
+            let mut val = Vec::with_capacity(1 + scratch.eta.len());
+            val.push(R::ONE / d0);
             for &(k, c) in &scratch.eta {
                 ind.push(k);
                 val.push(c);
@@ -3625,14 +3700,24 @@ impl<R: Real> DualFactor<R> {
             self.bt_occupied = false;
         }
         self.diag[r] = newdiag;
-        self.replace_u_column(r, self.spike.iter().copied().filter(|e| e.0 != r).collect());
-        self.a[r] = av;
+        let mut col = std::mem::take(&mut scratch.spare_col);
+        col.clear();
+        col.reserve(self.spike.len());
+        col.extend(self.spike.iter().copied().filter(|e| e.0 != r));
+        let old_col = self.replace_u_column(r, col);
+        if old_col.capacity() > scratch.spare_col.capacity() {
+            scratch.spare_col = old_col;
+        }
+        scratch.spare_a = std::mem::replace(&mut self.a[r], av);
         let mut bb = bv;
         bb.reverse();
         for &y in self.a[r].iter().chain(bb.iter()) {
             self.rowl[y].push(r);
         }
-        self.b[r] = bb;
+        let old_b = std::mem::replace(&mut self.b[r], bb);
+        if old_b.capacity() > scratch.spare_b.capacity() {
+            scratch.spare_b = old_b;
+        }
         if self.kind[r] == -2 && self.a[r].is_empty() && self.b[r].is_empty() {
             self.empty_tail.insert(r);
         } else {

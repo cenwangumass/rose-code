@@ -178,3 +178,85 @@ fn update_walk_lengths_and_count_scan_match_original() {
     }
     assert!(walks > 0, "the walk's jumps were never exercised");
 }
+
+/// Every field `update` writes, bitwise (floats as bits, the unordered `empty_tail` as its sorted members).
+fn update_state(f: &DualFactor<f64>) -> String {
+    let ub = |v: &Vec<Vec<(usize, f64)>>| v.iter().map(|c| c.iter().map(|e| (e.0, e.1.to_bits())).collect::<Vec<_>>()).collect::<Vec<_>>();
+    let etas = f.etas.iter().map(|e| (e.idx, e.ind.clone(), e.val.iter().map(|x| x.to_bits()).collect::<Vec<_>>(), e.peel)).collect::<Vec<_>>();
+    let work = f.upd_work.iter().map(|w| (w.0, w.1.to_bits(), w.2.to_bits())).collect::<Vec<_>>();
+    let diag = f.diag.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
+    let et = f.empty_tail.iter().copied().collect::<Vec<_>>();
+    format!(
+        "{:?}",
+        (
+            (&f.kind, &f.nuc, f.i21, f.mark, &f.a, &f.b, &f.slot, &f.at, &f.rowl),
+            (ub(&f.uc), ub(&f.ut), diag, etas, &f.first_eta, f.fill, &f.row_cap, &f.row_par, et),
+            (work, f.sum_eta.to_bits(), f.sum_alpha.to_bits(), f.upd, (f.before_last.0, f.before_last.1.to_bits())),
+            (f.bt_occupied, f.dense_est.get().to_bits(), f.spike_used, f.row_cached),
+        )
+    )
+}
+
+/// `update` without per-call temporaries against the retained original (`update_old`) over random replacement sequences, including bare
+/// replacements (the entering column is a multiple of the current one), demotions of empty tail columns and nucleus replacements.
+#[test]
+fn update_without_temporaries_matches_original() {
+    let mut seed = 0x1f83d9abfb41bd6bu64;
+    let mut next = || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed as usize
+    };
+    let (mut bare, mut demoted, mut tail_repl, mut et_seen) = (0, 0, 0, 0);
+    for m in [24, 70, 200] {
+        for round in 0..16 {
+            let mut cols: Vec<_> = (0..m).map(|i| {
+                let mut rows = vec![i];
+                let mut vals = vec![4.0];
+                for _ in 0..(1 + round % 5) {
+                    let r = next() % m;
+                    if !rows.contains(&r) {
+                        rows.push(r);
+                        vals.push(if next() % 2 == 0 { 0.5 } else { -0.75 });
+                    }
+                }
+                (true, rows, vals)
+            }).collect();
+            let st = crate::lu_order::factor_structure(m, &cols);
+            let mut new = DualFactor::fresh(m, m, &st, &cols);
+            let mut old = new.clone();
+            assert_eq!(update_state(&new), update_state(&old));
+            for step in 0..(m.min(100)) {
+                let r = next() % m;
+                let (rows, vals) = if next() % 6 == 0 {
+                    (cols[r].1.clone(), cols[r].2.iter().map(|v| 2.0 * v).collect())
+                } else {
+                    let mut rows = vec![r];
+                    let mut vals = vec![5.0 + step as f64];
+                    for _ in 0..(1 + next() % 8) {
+                        let q = next() % m;
+                        if !rows.contains(&q) {
+                            rows.push(q);
+                            vals.push([0.25, -0.5, 1.5][next() % 3]);
+                        }
+                    }
+                    (rows, vals)
+                };
+                let a = new.ftran(&rows, &vals);
+                let b = old.ftran(&rows, &vals);
+                assert_eq!(bits(a), bits(b));
+                bare += usize::from(new.spike.iter().all(|e| e.0 == r));
+                tail_repl += usize::from(new.kind[r] == -2);
+                et_seen += usize::from(!new.empty_tail.list.is_empty() && new.kind[r] != -2);
+                let kinds = new.kind.clone();
+                new.update(r);
+                old.update_old(r);
+                demoted += (0..m).filter(|&x| x != r && kinds[x] == -2 && new.kind[x] != -2).count();
+                assert_eq!(update_state(&new), update_state(&old), "m {m} round {round} step {step}");
+                cols[r] = (true, rows, vals);
+            }
+        }
+    }
+    assert!(bare > 0 && demoted > 0 && tail_repl > 0, "bare {bare} demoted {demoted} tail {tail_repl} et {et_seen}");
+}
