@@ -5,6 +5,26 @@
 use crate::real::Real;
 use std::collections::HashMap;
 
+/// Multiplicative hasher for the pending-pair map (small integer keys, never iterated, so the hash cannot reach a decision).
+#[derive(Default, Clone, Copy)]
+struct KeyHasher(u64);
+
+impl std::hash::Hasher for KeyHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+    fn write(&mut self, bytes: &[u8]) {
+        for &b in bytes {
+            self.0 = (self.0.rotate_left(5) ^ u64::from(b)).wrapping_mul(0x517c_c1b7_2722_0a95);
+        }
+    }
+    fn write_usize(&mut self, n: usize) {
+        self.0 = (self.0.rotate_left(5) ^ n as u64).wrapping_mul(0x517c_c1b7_2722_0a95);
+    }
+}
+
+type KeyMap = HashMap<usize, usize, std::hash::BuildHasherDefault<KeyHasher>>;
+
 const SING_TOL: f64 = 1e-10;
 const DROP_TOL: f64 = 1e-13;
 const UNZ_TOL: f64 = 1e-13;
@@ -39,7 +59,7 @@ struct Pass<'a, R: Real> {
     /// Hash entries: owner id and key; the key's pending entry waits for a partner.
     ids: Vec<usize>,
     keys: Vec<usize>,
-    pending: HashMap<usize, usize>,
+    pending: KeyMap,
     pairs: Vec<(usize, usize)>,
     seq: Vec<(usize, usize)>,
     phase: Vec<u8>,
@@ -51,10 +71,13 @@ impl<R: Real> Pass<'_, R> {
         let e = self.ids.len();
         self.ids.push(id);
         self.keys.push(key);
-        if let Some(prev) = self.pending.remove(&key) {
-            self.pairs.push((prev, e));
-        } else {
-            self.pending.insert(key, e);
+        match self.pending.entry(key) {
+            std::collections::hash_map::Entry::Occupied(o) => {
+                self.pairs.push((o.remove(), e));
+            }
+            std::collections::hash_map::Entry::Vacant(v) => {
+                v.insert(e);
+            }
         }
     }
 
@@ -416,7 +439,7 @@ pub fn run<R: Real>(
         temp: vec![R::ZERO; m.max(n)],
         ids: Vec::new(),
         keys: Vec::new(),
-        pending: HashMap::new(),
+        pending: KeyMap::default(),
         pairs: Vec::new(),
         seq: std::mem::take(seq),
         phase: std::mem::take(phase),

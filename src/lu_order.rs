@@ -203,7 +203,8 @@ pub fn factor_structure_r<'a, R: Real>(m: usize, cols: impl Into<Cols<'a>>) -> S
         let (_, idx, val) = &cols[c];
         let pv = R::c(val[idx.iter().position(|&i| i == prow).unwrap()]);
         // A pair override replaces the column (its multipliers are all that is known: no raw entries).
-        if let Some((r, v)) = ov.l.remove(&s) {
+        // The override map is almost always empty: skip the hash lookup then.
+        if let Some((r, v)) = if ov.l.is_empty() { None } else { ov.l.remove(&s) } {
             l_idx.extend_from_slice(&r);
             l_raw.extend(std::iter::repeat_n(R::c(f64::NAN), v.len()));
             l_val.extend(v);

@@ -1226,7 +1226,7 @@ impl<R: Real> DualFactor<R> {
                     continue;
                 }
                 tmp.clear();
-                if let Some(u) = st.pair_urow.get(&y) {
+                if let Some(u) = if st.pair_urow.is_empty() { None } else { st.pair_urow.get(&y) } {
                     for &t in mem {
                         stamp[t] = y;
                     }
