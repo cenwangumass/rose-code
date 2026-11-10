@@ -21,6 +21,8 @@ mod pool;
 mod adapter;
 #[cfg(test)]
 mod btran_tests;
+#[cfg(test)]
+mod fresh_tests;
 
 #[cfg(feature = "factor-shadow")]
 pub(crate) mod projection;
@@ -830,8 +832,25 @@ fn dot<R: Real>(x: &[R], c: &[R], peel: usize) -> R {
     tot
 }
 
+/// Temporaries of `DualFactor::fresh` that survive from one factorization to the next. Between two columns `reached` and `changed` are all
+/// false and `epos` is all `usize::MAX`.
+#[derive(Default)]
+struct FreshScratch {
+    reached: Vec<bool>,
+    changed: Vec<bool>,
+    epos: Vec<usize>,
+    lst: Vec<usize>,
+}
+
+thread_local! {
+    static FRESH_SCRATCH: std::cell::Cell<FreshScratch> = std::cell::Cell::new(FreshScratch::default());
+}
+
 impl<R: Real> DualFactor<R> {
     /// Fresh factor from the pivot sequence; `cols[pos]` is the basis column at incoming position `pos` as `(is_slack, rows, values)`.
+    ///
+    /// Every structure is built to its final size from counting passes (the nested lists with their exact capacities), and the
+    /// per-column temporaries live in a scratch that survives from one factorization to the next.
     pub fn fresh<'a>(
         m: usize,
         ncols: usize,
@@ -843,13 +862,17 @@ impl<R: Real> DualFactor<R> {
         for (s, &(r, _)) in st.pivots.iter().enumerate() {
             step[r] = s;
         }
-        let n1 = st.phase.iter().filter(|&&p| p == 1 || p == 2).count();
-        let n3 = st.phase.iter().filter(|&&p| p == 3).count();
+        let (mut n1, mut n12, mut n3) = (0usize, 0usize, 0usize);
+        for &p in &st.phase {
+            n1 += usize::from(p == 1);
+            n12 += usize::from(p == 1 || p == 2);
+            n3 += usize::from(p == 3);
+        }
         let nseq = st.loff;
-        let i21 = n1 + n3;
+        let i21 = n12 + n3;
         let mut kind = vec![-1i64; m];
-        let mut nuc = Vec::new();
-        for s in n1..i21 {
+        let mut nuc = Vec::with_capacity(n3.min(m));
+        for s in n12..i21 {
             kind[s] = nuc.len() as i64;
             nuc.push(s);
         }
@@ -863,40 +886,54 @@ impl<R: Real> DualFactor<R> {
         let lcolumn = |v: usize| lpool.iter(v);
         let lt = lpool.transpose(m);
         let l_forward = (0..lpool.lines()).all(|v| lpool.col(v).0.iter().all(|&y| y as usize > v));
-        // pivot-row values of the Markowitz steps, by column
-        let mut mk: Vec<Vec<(usize, R)>> = vec![Vec::new(); m];
+        // Pivot-row values of the Markowitz steps by column, `(step, value)` in ascending step order: counting sort.
+        let mut mk_start = vec![0usize; m + 1];
         for s in nseq..m {
-            for &(c, v) in st.u_row(s) {
-                mk[c].push((s, v));
+            for &(c, _) in st.u_row(s) {
+                mk_start[c + 1] += 1;
             }
         }
-        let mut a = vec![Vec::new(); m];
-        let mut b = vec![Vec::new(); m];
+        for c in 0..m {
+            mk_start[c + 1] += mk_start[c];
+        }
+        let mut mk: Vec<(usize, R)> = Vec::new();
+        if let Some(&(_, first)) = (nseq..m).find_map(|s| st.u_row(s).first()) {
+            mk.resize(mk_start[m], (0, first));
+            let mut next: Vec<usize> = mk_start[..m].to_vec();
+            for s in nseq..m {
+                for &(c, v) in st.u_row(s) {
+                    mk[next[c]] = (s, v);
+                    next[c] += 1;
+                }
+            }
+        }
+        let mut a: Vec<Vec<usize>> = vec![Vec::new(); m];
+        let mut b: Vec<Vec<usize>> = vec![Vec::new(); m];
         let mut uc: Vec<Vec<(usize, R)>> = vec![Vec::new(); m];
         let (mut sa, mut sb) = (0usize, 0usize);
         let mut xv = vec![R::ZERO; m];
-        let mut reached = vec![false; m];
-        let mut epos = vec![usize::MAX; m];
-        let mut changed = vec![false; m];
+        let mut ents: Vec<(usize, R)> = Vec::new();
+        let mut sc = FRESH_SCRATCH.with(|s| s.take());
+        // Invariants between columns (restored below): `reached` and `changed` all false, `epos` all MAX.
+        sc.reached.resize(m, false);
+        sc.changed.resize(m, false);
+        sc.epos.resize(m, usize::MAX);
+        let FreshScratch { reached, changed, epos, lst } = &mut sc;
         for t in i21..m {
             let c = st.pivots[t].1;
             let (_, idx, val) = &cols[c];
-            let mut start: Vec<usize> = Vec::new();
+            lst.clear();
             for (&i, &v) in idx.iter().zip(val) {
                 let s = step[i];
                 if s <= t {
                     xv[s] += R::c(v);
-                    start.push(s);
+                    if !reached[s] {
+                        reached[s] = true;
+                        lst.push(s);
+                    }
                 }
             }
             // Only the reached set is needed: the numeric solve below visits it in ascending order.
-            let mut lst = Vec::new();
-            for &v in &start {
-                if !reached[v] {
-                    reached[v] = true;
-                    lst.push(v);
-                }
-            }
             let mut k = 0;
             while k < lst.len() {
                 let v = lst[k];
@@ -910,9 +947,8 @@ impl<R: Real> DualFactor<R> {
             }
             // The numeric solve visits the steps in ascending order, not graph-discovery order: sums that cancel to rounding
             // noise then fall on the reference's side of the tolerance (PILOT.JA factor 45, column 925).
-            let mut q = lst.clone();
-            q.sort_unstable();
-            for &v in &q {
+            lst.sort_unstable();
+            for &v in lst.iter() {
                 if v >= t {
                     continue;
                 }
@@ -948,9 +984,8 @@ impl<R: Real> DualFactor<R> {
                     }
                 }
             }
-            let mut ents: Vec<(usize, R)> = Vec::new();
-            let touched = q;
-            for &v in &touched {
+            ents.clear();
+            for &v in lst.iter() {
                 if v < t
                     && (xv[v].abs() > R::c(TOL)
                         || (!changed[v] && xv[v] != R::ZERO && (kind[v] >= 0 || st.phase[v] == 4)))
@@ -961,7 +996,7 @@ impl<R: Real> DualFactor<R> {
             for (i, e) in ents.iter().enumerate() {
                 epos[e.0] = i;
             }
-            for &(sidx, vv) in &mk[c] {
+            for &(sidx, vv) in &mk[mk_start[c]..mk_start[c + 1]] {
                 if sidx < t {
                     if epos[sidx] != usize::MAX {
                         ents[epos[sidx]].1 = vv;
@@ -979,31 +1014,27 @@ impl<R: Real> DualFactor<R> {
             ents.retain(|e| {
                 e.1.abs() > R::c(TOL) || (!changed[e.0] && (kind[e.0] >= 0 || st.phase[e.0] == 4))
             });
-            for &v in &lst {
+            for &v in lst.iter() {
                 xv[v] = R::ZERO;
                 reached[v] = false;
-            }
-            for &v in &touched {
                 changed[v] = false;
             }
-            for &v in &touched {
-                xv[v] = R::ZERO;
-            }
             ents.sort_unstable_by_key(|e| e.0);
-            let av: Vec<usize> = ents
-                .iter()
-                .map(|e| e.0)
-                .filter(|&x| kind[x] == -2)
-                .collect();
-            let mut bv: Vec<usize> = ents.iter().map(|e| e.0).filter(|&x| kind[x] >= 0).collect();
-            bv.sort_unstable_by_key(|&x| std::cmp::Reverse(kind[x]));
-            sa += av.len();
-            sb += bv.len();
+            let na = ents.iter().filter(|e| kind[e.0] == -2).count();
+            let nb = ents.iter().filter(|e| kind[e.0] >= 0).count();
+            sa += na;
+            sb += nb;
             // The reference lists the fresh tail column's A entries in descending order.
-            a[t] = av.into_iter().rev().collect();
+            let mut av = Vec::with_capacity(na);
+            av.extend(ents.iter().rev().map(|e| e.0).filter(|&x| kind[x] == -2));
+            let mut bv = Vec::with_capacity(nb);
+            bv.extend(ents.iter().map(|e| e.0).filter(|&x| kind[x] >= 0));
+            bv.sort_unstable_by_key(|&x| std::cmp::Reverse(kind[x]));
+            a[t] = av;
             b[t] = bv;
-            uc[t] = ents;
+            uc[t] = ents.to_vec();
         }
+        FRESH_SCRATCH.with(|s| s.set(sc));
         let nt = m - i21;
         let nn = nuc.len();
         let h33 = if nt > 0 {
@@ -1060,24 +1091,106 @@ impl<R: Real> DualFactor<R> {
         let nnz_l_tot: usize = lpool.len();
         let perm = step;
         let znz = (nnz + sa + sb + 2 * m) as f64;
-        let mark0 = (i21..m)
-            .rev()
-            .find(|&t| kind[t] == -2 && a[t].is_empty() && b[t].is_empty())
-            .unwrap_or(i21.min(m - 1));
-        let mut ut = vec![Vec::new(); m];
+        let empty_tail: std::collections::BTreeSet<usize> =
+            (0..m).filter(|&x| kind[x] == -2 && a[x].is_empty() && b[x].is_empty()).collect();
+        // Only tail positions (`kind == -2`) are in the set: its largest element is the last one the downward scan from the end finds.
+        let mark0 = empty_tail.iter().next_back().copied().unwrap_or(i21.min(m - 1));
+        // Entries per row of U: the capacity of each row of the row-wise copy, of `ut` and the layout of the rows.
+        let mut row_cap = vec![0usize; m];
+        for col in &uc {
+            for &(row, _) in col {
+                row_cap[row] += 1;
+            }
+        }
+        let u_total: usize = row_cap.iter().sum();
+        // `update` appends to the rows of `ut` and `rowl`: nonempty rows get room for a few entries (capacity only, never visible).
+        let spare = |n: usize| if n == 0 { 0 } else { n + (n >> 2) + 2 };
+        let mut ut: Vec<Vec<(usize, R)>> = row_cap.iter().map(|&n| Vec::with_capacity(spare(n))).collect();
         for (c, col) in uc.iter().enumerate() {
             for &(row, v) in col {
                 ut[row].push((c, v));
             }
         }
-        DualFactor {
+        // A row lists its tail columns in the order of the factorization's U row (Markowitz steps), or in the order of the
+        // basis columns for a row of the singleton phases.
+        let rowl: Vec<Vec<usize>> = {
+            // member lists (the tail columns whose A or B list holds the row, ascending) as one counting-sorted array
+            let mut mem_start = vec![0usize; m + 1];
+            for t in i21..m {
+                for &y in a[t].iter().chain(b[t].iter()) {
+                    mem_start[y + 1] += 1;
+                }
+            }
+            for y in 0..m {
+                mem_start[y + 1] += mem_start[y];
+            }
+            let mut member = vec![0usize; mem_start[m]];
+            let mut next: Vec<usize> = mem_start[..m].to_vec();
+            for t in i21..m {
+                for &y in a[t].iter().chain(b[t].iter()) {
+                    member[next[y]] = t;
+                    next[y] += 1;
+                }
+            }
+            let mut pos_of_col = vec![usize::MAX; m];
+            for (t, &(_, c)) in st.pivots.iter().enumerate() {
+                pos_of_col[c] = t;
+            }
+            let mut rl = vec![Vec::new(); m];
+            let mut stamp = vec![usize::MAX; m];
+            let mut tmp: Vec<usize> = Vec::new();
+            for y in 0..m {
+                let mem = &member[mem_start[y]..mem_start[y + 1]];
+                if mem.is_empty() {
+                    continue;
+                }
+                tmp.clear();
+                if let Some(u) = st.pair_urow.get(&y) {
+                    for &t in mem {
+                        stamp[t] = y;
+                    }
+                    tmp.extend(u.iter().map(|&c| pos_of_col[c]).filter(|&t| stamp[t] == y));
+                } else if st.u_row(y).is_empty() {
+                    // Filtering all basis columns in index order is equivalent to sorting just this row's members by
+                    // column. Keep only the positions represented by pos_of_col, and emit each position once.
+                    tmp.extend(mem.iter().copied().filter(|&t| pos_of_col[st.pivots[t].1] == t));
+                    tmp.sort_unstable_by_key(|&t| st.pivots[t].1);
+                    tmp.dedup();
+                } else {
+                    for &t in mem {
+                        stamp[t] = y;
+                    }
+                    tmp.extend(st.u_row(y).iter().map(|&(c, _)| pos_of_col[c]).filter(|&t| stamp[t] == y));
+                }
+                let mut row = Vec::with_capacity(spare(tmp.len()));
+                row.extend_from_slice(&tmp);
+                rl[y] = row;
+            }
+            rl
+        };
+        // A fresh factor lays the rows of the row-wise copy out contiguously: the nonempty rows of the nucleus in the order of their list index
+        // (`kind`), then the others by position, each row as long as its U entries (`ucol_len`); the parity of the start decides the alignment of the row's
+        // value array in the dot product of the second FTRAN vector.
+        let row_par = {
+            let mut par = vec![0u8; m];
+            let mut acc = 0usize;
+            // `nuc` lists the steps with `kind >= 0` in `kind` order.
+            for p in nuc.iter().copied().chain((0..m).filter(|&p| kind[p] < 0)) {
+                if row_cap[p] > 0 {
+                    par[p] = (acc % 2) as u8;
+                    acc += row_cap[p];
+                }
+            }
+            par
+        };
+        let fresh = DualFactor {
             upd: 0,
             sum_alpha: 0.0,
             before_last: (0, 0.0),
             sum_eta: 0.0,
             last_alpha: 0,
             znz,
-            n1: st.phase.iter().filter(|&&p| p == 1).count(),
+            n1,
             loff: nseq,
             nnz_l: nnz_l_tot,
             nnz_l_tail: nnz_tail,
@@ -1096,83 +1209,10 @@ impl<R: Real> DualFactor<R> {
                 .max(20)
                 .wrapping_add(ncols + 1)
                 % 2,
-            fill: 2 * (uc.iter().map(Vec::len).sum::<usize>() + nnz_l_tot),
-            // A row lists its tail columns in the order of the factorization's U row (Markowitz steps), or in the order of the
-            // basis columns for a row of the singleton phases.
-            rowl: {
-                let mut member = vec![Vec::new(); m];
-                for t in i21..m {
-                    if kind[t] == -2 {
-                        for &y in a[t].iter().chain(b[t].iter()) {
-                            member[y].push(t);
-                        }
-                    }
-                }
-                let mut pos_of_col = vec![usize::MAX; m];
-                for (t, &(_, c)) in st.pivots.iter().enumerate() {
-                    pos_of_col[c] = t;
-                }
-                let mut rl = vec![Vec::new(); m];
-                let mut stamp = vec![usize::MAX; m];
-                for y in 0..m {
-                    if member[y].is_empty() {
-                        continue;
-                    }
-                    let order: Vec<usize> = if let Some(u) = st.pair_urow.get(&y) {
-                        u.iter().map(|&c| pos_of_col[c]).collect()
-                    } else if st.u_row(y).is_empty() {
-                        // Filtering all basis columns in index order is equivalent to sorting just this row's members by
-                        // column. Keep only the positions represented by pos_of_col, and emit each position once.
-                        let mut row: Vec<usize> = member[y]
-                            .iter()
-                            .copied()
-                            .filter(|&t| pos_of_col[st.pivots[t].1] == t)
-                            .collect();
-                        row.sort_unstable_by_key(|&t| st.pivots[t].1);
-                        row.dedup();
-                        rl[y] = row;
-                        continue;
-                    } else {
-                        st.u_row(y).iter().map(|&(c, _)| pos_of_col[c]).collect()
-                    };
-                    for &t in &member[y] {
-                        stamp[t] = y;
-                    }
-                    rl[y] = order.into_iter().filter(|&t| stamp[t] == y).collect();
-                }
-                rl
-            },
-            row_cap: {
-                let mut c = vec![0usize; m];
-                for col in &uc {
-                    for &(row, _) in col {
-                        c[row] += 1;
-                    }
-                }
-                c
-            },
-            // A fresh factor lays the rows of the row-wise copy out contiguously: the nonempty rows of the nucleus in the order of their list index
-            // (`kind`), then the others by position, each row as long as its U entries (`ucol_len`); the parity of the start decides the alignment of the row's
-            // value array in the dot product of the second FTRAN vector.
-            row_par: {
-                let mut len = vec![0usize; m];
-                for col in &uc {
-                    for &(row, _) in col {
-                        len[row] += 1;
-                    }
-                }
-                let mut order: Vec<usize> =
-                    (0..m).filter(|&p| kind[p] >= 0 && len[p] > 0).collect();
-                order.sort_by_key(|&p| kind[p]);
-                order.extend((0..m).filter(|&p| kind[p] < 0 && len[p] > 0));
-                let mut par = vec![0u8; m];
-                let mut acc = 0usize;
-                for p in order {
-                    par[p] = (acc % 2) as u8;
-                    acc += len[p];
-                }
-                par
-            },
+            fill: 2 * (u_total + nnz_l_tot),
+            rowl,
+            row_cap,
+            row_par,
             upd_work: Vec::new(),
             h33,
             h34,
@@ -1184,9 +1224,7 @@ impl<R: Real> DualFactor<R> {
             bt_dense: false,
             row_cached: None,
             m,
-            empty_tail: (0..m)
-                .filter(|&x| kind[x] == -2 && a[x].is_empty() && b[x].is_empty())
-                .collect(),
+            empty_tail,
             kind,
             nuc,
             i21,
@@ -1221,7 +1259,11 @@ impl<R: Real> DualFactor<R> {
             update_seen: Vec::new(),
             spike_used: false,
             lsnap: Default::default(),
-        }
+        };
+        // Every factor any test builds is also compared with the construction it replaced.
+        #[cfg(test)]
+        fresh_tests::assert_same(&fresh, &Self::fresh_old(m, ncols, st, cols));
+        fresh
     }
 
     /// Destinations and multipliers of L column `v`.
