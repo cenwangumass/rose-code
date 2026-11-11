@@ -13,12 +13,16 @@
 
 use crate::lu_order::Structure;
 use crate::real::Real;
+use ab::AbLists;
 use pool::{Csr, LPool};
 use std::collections::BinaryHeap;
+mod ab;
 mod btran_ws;
 mod pool;
 #[cfg(feature = "factor-shadow")]
 mod adapter;
+#[cfg(test)]
+mod ab_tests;
 #[cfg(test)]
 mod btran_tests;
 #[cfg(test)]
@@ -587,8 +591,8 @@ pub struct DualFactor<R: Real = f64> {
     i21: usize,
     /// The reference's upper bound `[L+0xe8]` on the position of a tail column without entries, scanned downward at updates.
     mark: usize,
-    a: Vec<Vec<usize>>,
-    b: Vec<Vec<usize>>,
+    /// The A and B lists of the tail columns with their coefficients (the bits of the matching `uc` entries).
+    ab: AbLists<R>,
     /// Immutable forward L columns, preserving coefficient and destination order.
     lpool: LPool<R>,
     /// Every L destination is above its source step (`y > v`), so a dense forward scan sees final values.
@@ -927,11 +931,10 @@ struct FreshScratch {
     lst: Vec<usize>,
 }
 
-/// The nested lists of a retired factor (`a`, `b`, `uc`, `ut`, `rowl`), kept with their allocations for the next `fresh`
+/// The nested lists of a retired factor (`ab`, `uc`, `ut`, `rowl`), kept with their allocations for the next `fresh`
 /// (`DualFactor::recycle`): the refactorization then neither frees the old rows nor allocates the new ones.
 struct Recycled<R> {
-    a: Vec<Vec<usize>>,
-    b: Vec<Vec<usize>>,
+    ab: AbLists<R>,
     uc: Vec<Vec<(usize, R)>>,
     ut: Vec<Vec<(usize, R)>>,
     rowl: Vec<Vec<usize>>,
@@ -945,9 +948,8 @@ impl<R: Real> Recycled<R> {
             v.iter_mut().for_each(Vec::clear);
         }
         let kept = RECYCLED.with(|r| r.take()).and_then(|b| b.downcast::<Self>().ok());
-        let mut r = kept.map_or_else(|| Self { a: Vec::new(), b: Vec::new(), uc: Vec::new(), ut: Vec::new(), rowl: Vec::new() }, |b| *b);
-        rows(&mut r.a, m);
-        rows(&mut r.b, m);
+        let mut r = kept.map_or_else(|| Self { ab: AbLists::new(), uc: Vec::new(), ut: Vec::new(), rowl: Vec::new() }, |b| *b);
+        r.ab.reset(m);
         rows(&mut r.uc, m);
         rows(&mut r.ut, m);
         rows(&mut r.rowl, m);
@@ -961,11 +963,11 @@ thread_local! {
 }
 
 impl<R: Real> DualFactor<R> {
-    /// Retire the factor: its nested lists (`a`, `b`, `uc`, `ut`, `rowl`) are kept, allocations included, for the next `fresh` of this
+    /// Retire the factor: its nested lists (`ab`, `uc`, `ut`, `rowl`) are kept, allocations included, for the next `fresh` of this
     /// scalar type on this thread (the rest is dropped). Only capacities carry over; `fresh` clears every row.
     pub fn recycle(self) {
-        let Self { a, b, uc, ut, rowl, .. } = self;
-        RECYCLED.with(|r| r.set(Some(Box::new(Recycled { a, b, uc, ut, rowl }))));
+        let Self { ab, uc, ut, rowl, .. } = self;
+        RECYCLED.with(|r| r.set(Some(Box::new(Recycled { ab, uc, ut, rowl }))));
     }
 
     /// Fresh factor from the pivot sequence; `cols[pos]` is the basis column at incoming position `pos` as `(is_slack, rows, values)`.
@@ -1028,10 +1030,11 @@ impl<R: Real> DualFactor<R> {
                 }
             }
         }
-        let Recycled { mut a, mut b, mut uc, mut ut, rowl: mut rl } = Recycled::<R>::take(m);
+        let Recycled { mut ab, mut uc, mut ut, rowl: mut rl } = Recycled::<R>::take(m);
         let (mut sa, mut sb) = (0usize, 0usize);
         let mut xv = vec![R::ZERO; m];
         let mut ents: Vec<(usize, R)> = Vec::new();
+        let (mut av, mut bv): (Vec<(u32, R)>, Vec<(u32, R)>) = (Vec::new(), Vec::new());
         let mut sc = FRESH_SCRATCH.with(|s| s.take());
         // Invariants between columns (restored below): `reached` and `changed` all false, `epos` all MAX.
         sc.reached.resize(m, false);
@@ -1144,13 +1147,14 @@ impl<R: Real> DualFactor<R> {
             sa += na;
             sb += nb;
             // The reference lists the fresh tail column's A entries in descending order.
-            let av = &mut a[t];
+            av.clear();
             av.reserve(na);
-            av.extend(ents.iter().rev().map(|e| e.0).filter(|&x| kind[x] == -2));
-            let bv = &mut b[t];
+            av.extend(ents.iter().rev().filter(|e| kind[e.0] == -2).map(|e| (e.0 as u32, e.1)));
+            bv.clear();
             bv.reserve(nb);
-            bv.extend(ents.iter().map(|e| e.0).filter(|&x| kind[x] >= 0));
-            bv.sort_unstable_by_key(|&x| std::cmp::Reverse(kind[x]));
+            bv.extend(ents.iter().filter(|e| kind[e.0] >= 0).map(|e| (e.0 as u32, e.1)));
+            bv.sort_unstable_by_key(|e| std::cmp::Reverse(kind[e.0 as usize]));
+            ab.set(t, &av, &bv);
             uc[t].extend_from_slice(&ents);
         }
         FRESH_SCRATCH.with(|s| s.set(sc));
@@ -1211,7 +1215,7 @@ impl<R: Real> DualFactor<R> {
         let perm = step;
         let znz = (nnz + sa + sb + 2 * m) as f64;
         let empty_list: Vec<usize> =
-            (0..m).filter(|&x| kind[x] == -2 && a[x].is_empty() && b[x].is_empty()).collect();
+            (0..m).filter(|&x| kind[x] == -2 && ab.is_empty(x)).collect();
         // Only tail positions (`kind == -2`) are in the set: its largest element is the last one the downward scan from the end finds.
         let mark0 = empty_list.last().copied().unwrap_or(i21.min(m - 1));
         let empty_tail: EmptyTail = empty_list.into_iter().collect();
@@ -1241,8 +1245,8 @@ impl<R: Real> DualFactor<R> {
             // member lists (the tail columns whose A or B list holds the row, ascending) as one counting-sorted array
             let mut mem_start = vec![0usize; m + 1];
             for t in i21..m {
-                for &y in a[t].iter().chain(b[t].iter()) {
-                    mem_start[y + 1] += 1;
+                for &y in ab.both(t) {
+                    mem_start[y as usize + 1] += 1;
                 }
             }
             for y in 0..m {
@@ -1251,9 +1255,9 @@ impl<R: Real> DualFactor<R> {
             let mut member = vec![0usize; mem_start[m]];
             let mut next: Vec<usize> = mem_start[..m].to_vec();
             for t in i21..m {
-                for &y in a[t].iter().chain(b[t].iter()) {
-                    member[next[y]] = t;
-                    next[y] += 1;
+                for &y in ab.both(t) {
+                    member[next[y as usize]] = t;
+                    next[y as usize] += 1;
                 }
             }
             let mut pos_of_col = vec![usize::MAX; m];
@@ -1358,8 +1362,7 @@ impl<R: Real> DualFactor<R> {
             nuc,
             i21,
             mark: mark0,
-            a,
-            b,
+            ab,
             lpool,
             l_forward,
             perm,
@@ -1392,6 +1395,8 @@ impl<R: Real> DualFactor<R> {
         // Every factor any test builds is also compared with the construction it replaced.
         #[cfg(test)]
         fresh_tests::assert_same(&fresh, &Self::fresh_old(m, ncols, st, cols));
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        fresh.ab.check(&fresh.uc, &fresh.kind);
         fresh
     }
 
@@ -1863,7 +1868,8 @@ impl<R: Real> DualFactor<R> {
             while k < tail.len() {
                 let c = tail[k];
                 k += 1;
-                for &j in &self.a[c] {
+                for &j in self.ab.a(c) {
+                    let j = j as usize;
                     if !touched[j] {
                         touched[j] = true;
                         tail.push(j);
@@ -1916,13 +1922,13 @@ impl<R: Real> DualFactor<R> {
                     }
                     if tdense {
                         if fin.abs() > R::c(TOL) {
-                            abs_a += self.a[c].len();
+                            abs_a += self.ab.na(c);
                         }
                     } else {
                         nz += 1;
                     }
                     if joint_dense && raw {
-                        let len = self.a[c].len();
+                        let len = self.ab.na(c);
                         tp_a2 += 2 * len + 4;
                         if x_col.get(c).map_or(true, |v| *v == R::ZERO) {
                             tp_only_a += len;
@@ -1932,10 +1938,9 @@ impl<R: Real> DualFactor<R> {
                 if zeroed || tiny {
                     continue;
                 }
-                for &(j, v) in &self.uc[c] {
-                    if self.kind[j] == -2 {
-                        x[j] -= v * xc;
-                    }
+                // The tail targets of the column are its A list (distinct rows, so the order of the scatter is free).
+                for (&j, &v) in self.ab.a(c).iter().zip(self.ab.a_val(c)) {
+                    x[j as usize] -= v * xc;
                 }
             }
         }
@@ -2095,7 +2100,8 @@ impl<R: Real> DualFactor<R> {
                 let mut touched = nuc_cnt;
                 x0 += surv_b;
                 for &c in surv {
-                    for &j in &self.b[c] {
+                    for &j in self.ab.b(c) {
+                        let j = j as usize;
                         if !seen[j] {
                             seen[j] = true;
                             touched += 1;
@@ -2215,10 +2221,10 @@ impl<R: Real> DualFactor<R> {
             for t in (i21..m).rev() {
                 let c = self.at[t];
                 if tau_pass(c) {
-                    x5 += (self.a[c].len() as f64 + 2.0) * 2.0;
+                    x5 += (self.ab.na(c) as f64 + 2.0) * 2.0;
                 }
                 if col_pass(c) {
-                    x3 += 2.0 * (self.a[c].len() + self.b[c].len()) as f64;
+                    x3 += 2.0 * (self.ab.na(c) + self.ab.nb(c)) as f64;
                 }
             }
             let x0 = 2.0 * nuc_len as f64 + x3;
@@ -2230,13 +2236,13 @@ impl<R: Real> DualFactor<R> {
                 let c = self.at[t];
                 let (tp, cp) = (tau_pass(c), col_pass(c));
                 if tp || cp {
-                    r9 += self.a[c].len();
+                    r9 += self.ab.na(c);
                 }
                 if tp {
-                    x5 += (self.a[c].len() as f64 + 2.0) * 2.0;
+                    x5 += (self.ab.na(c) as f64 + 2.0) * 2.0;
                 }
                 if cp {
-                    r15 += self.b[c].len();
+                    r15 += self.ab.nb(c);
                     surv.push(c);
                 }
             }
@@ -2246,7 +2252,7 @@ impl<R: Real> DualFactor<R> {
             if r15 as f64 * 2.5 > nuc_len as f64 {
                 x0 += nuc_cnt as f64;
                 for &c in &surv {
-                    x0 += self.b[c].len() as f64 * 2.0 + 4.0;
+                    x0 += self.ab.nb(c) as f64 * 2.0 + 4.0;
                 }
                 x0 += nuc_len as f64 * 2.4;
             } else {
@@ -2256,8 +2262,9 @@ impl<R: Real> DualFactor<R> {
                 }
                 let mut touched = nuc_cnt;
                 for &c in &surv {
-                    x0 += self.b[c].len() as f64 * 2.0 + 4.0;
-                    for &j in &self.b[c] {
+                    x0 += self.ab.nb(c) as f64 * 2.0 + 4.0;
+                    for &j in self.ab.b(c) {
+                        let j = j as usize;
                         if !seen[j] {
                             seen[j] = true;
                             touched += 1;
@@ -2288,10 +2295,10 @@ impl<R: Real> DualFactor<R> {
         for t in (i21..m).rev() {
             let c = self.at[t];
             if f.x_col[c] != R::ZERO {
-                x5 += ((self.a[c].len() + self.b[c].len()) as f64 + 2.0) * 2.0;
+                x5 += ((self.ab.na(c) + self.ab.nb(c)) as f64 + 2.0) * 2.0;
             }
             if f.x_tau[c] != R::ZERO && f.tau_raw[c] {
-                x4 += (self.a[c].len() as f64 + 2.0) * 2.0;
+                x4 += (self.ab.na(c) as f64 + 2.0) * 2.0;
             }
         }
         let last = if i21 == m {
@@ -2347,7 +2354,7 @@ impl<R: Real> DualFactor<R> {
             for t in (self.i21..self.m).rev() {
                 let c = self.at[t];
                 if x[c].abs() > R::c(TOL) {
-                    e += self.a[c].len() as f64 * 2.0;
+                    e += self.ab.na(c) as f64 * 2.0;
                 }
             }
             fin = tail_rows;
@@ -2449,7 +2456,8 @@ impl<R: Real> DualFactor<R> {
             while k < tail.len() {
                 let c = tail[k];
                 k += 1;
-                for &j in &self.a[c] {
+                for &j in self.ab.a(c) {
+                    let j = j as usize;
                     if touched.insert(j) {
                         tail.push(j);
                     }
@@ -2474,8 +2482,8 @@ impl<R: Real> DualFactor<R> {
             }
             x[c] = xc;
             col_surv.push(c);
-            sa += self.a[c].len();
-            sb += self.b[c].len();
+            sa += self.ab.na(c);
+            sb += self.ab.nb(c);
             su += self.uc[c].len();
             for &(j, v) in &self.uc[c] {
                 x[j] -= v * xc;
@@ -3215,7 +3223,8 @@ impl<R: Real> DualFactor<R> {
             heap.pop();
             let c = self.at[top];
             if x[c] != R::ZERO {
-                for &j in &self.a[c] {
+                for &j in self.ab.a(c) {
+                    let j = j as usize;
                     if mark.insert(j) {
                         heap.push(self.slot[j]);
                     }
@@ -3235,7 +3244,8 @@ impl<R: Real> DualFactor<R> {
             }
             e = e + (2 * s.sb + 4 * s.list.len()) as f64;
             for &c in s.list {
-                for &y in &self.b[c] {
+                for &y in self.ab.b(c) {
+                    let y = y as usize;
                     if nm.insert(y) {
                         cntn += 1;
                     }
@@ -3313,8 +3323,8 @@ impl<R: Real> DualFactor<R> {
         surv.clear();
         let visit = |c: usize, lb: &mut usize, ld: &mut usize, surv: &mut Vec<usize>| -> bool {
             if x[c] != R::ZERO {
-                *lb += self.b[c].len();
-                *ld += self.a[c].len();
+                *lb += self.ab.nb(c);
+                *ld += self.ab.na(c);
                 surv.push(c);
                 true
             } else {
@@ -3334,7 +3344,8 @@ impl<R: Real> DualFactor<R> {
             heap.pop();
             let c = self.at[top];
             if visit(c, &mut lb, &mut ld, surv) {
-                for &j in &self.a[c] {
+                for &j in self.ab.a(c) {
+                    let j = j as usize;
                     if mark.insert(j) {
                         heap.push(self.slot[j]);
                     }
@@ -3352,8 +3363,9 @@ impl<R: Real> DualFactor<R> {
                 }
             }
             for &c in surv.iter() {
-                e = e + self.b[c].len() as f64 * 2.0 + 4.0;
-                for &y in &self.b[c] {
+                e = e + self.ab.nb(c) as f64 * 2.0 + 4.0;
+                for &y in self.ab.b(c) {
+                    let y = y as usize;
                     if nm.insert(y) {
                         cntn += 1;
                     }
@@ -3363,7 +3375,7 @@ impl<R: Real> DualFactor<R> {
         } else {
             e += nuc_in as f64;
             for &c in surv.iter() {
-                e = e + self.b[c].len() as f64 * 2.0 + 4.0;
+                e = e + self.ab.nb(c) as f64 * 2.0 + 4.0;
             }
             e + 3.0 * i3 as f64
         };
@@ -3517,14 +3529,15 @@ impl<R: Real> DualFactor<R> {
             while k < t.len() {
                 let c = t[k];
                 k += 1;
-                for &j in &self.a[c] {
+                for &j in self.ab.a(c) {
+                    let j = j as usize;
                     if have.insert(j) {
                         t.push(j);
                     }
                 }
             }
             ns.clear();
-            for &x in nuc.iter().chain(t.iter().flat_map(|&c| self.b[c].iter())) {
+            for x in nuc.iter().copied().chain(t.iter().flat_map(|&c| self.ab.b(c).iter().map(|&y| y as usize))) {
                 if nm.insert(x) {
                     ns.push(x);
                 }
@@ -3548,20 +3561,21 @@ impl<R: Real> DualFactor<R> {
                 order.push(k);
                 // The reference's counter and nucleus-list discovery only see tail columns that survive the tolerance test.
                 if x[k] != R::ZERO {
-                    lb += self.b[k].len();
+                    lb += self.ab.nb(k);
                 }
-                for &j in &self.a[k] {
+                for &j in self.ab.a(k) {
+                    let j = j as usize;
                     if have.insert(j) {
                         heap.push(self.slot[j]);
                     }
                 }
             }
             ns.clear();
-            for &y in nuc.iter().chain(
+            for y in nuc.iter().copied().chain(
                 order
                     .iter()
                     .filter(|&&k| x[k] != R::ZERO)
-                    .flat_map(|&k| self.b[k].iter()),
+                    .flat_map(|&k| self.ab.b(k).iter().map(|&y| y as usize)),
             ) {
                 if nm.insert(y) {
                     ns.push(y);
@@ -3633,14 +3647,15 @@ impl<R: Real> DualFactor<R> {
             while k < t.len() {
                 let c = t[k];
                 k += 1;
-                for &j in &self.a[c] {
+                for &j in self.ab.a(c) {
+                    let j = j as usize;
                     if have.insert(j) {
                         t.push(j);
                     }
                 }
             }
             let mut ns: Vec<usize> = Vec::new();
-            for &x in nuc.iter().chain(t.iter().flat_map(|&c| self.b[c].iter())) {
+            for x in nuc.iter().copied().chain(t.iter().flat_map(|&c| self.ab.b(c).iter().map(|&y| y as usize))) {
                 if nm.insert(x) {
                     ns.push(x);
                 }
@@ -3663,20 +3678,21 @@ impl<R: Real> DualFactor<R> {
             order.push(k);
             // The reference's counter and nucleus-list discovery only see tail columns that survive the tolerance test.
             if x[k] != R::ZERO {
-                lb += self.b[k].len();
+                lb += self.ab.nb(k);
             }
-            for &j in &self.a[k] {
+            for &j in self.ab.a(k) {
+                let j = j as usize;
                 if have.insert(j) {
                     heap.push((self.slot[j], j));
                 }
             }
         }
         let mut lst: Vec<usize> = Vec::new();
-        for &y in nuc.iter().chain(
+        for y in nuc.iter().copied().chain(
             order
                 .iter()
                 .filter(|&&k| x[k] != R::ZERO)
-                .flat_map(|&k| self.b[k].iter()),
+                .flat_map(|&k| self.ab.b(k).iter().map(|&y| y as usize)),
         ) {
             if nm.insert(y) {
                 lst.push(y);
@@ -3708,9 +3724,9 @@ impl<R: Real> DualFactor<R> {
         // Column lengths leave out row r, which the reference has already removed from U. `r` occurs only in the lists of the tail
         // columns of `rowl[r]` (`refcols`, sorted by column), so any other tail column has its full length; the rest is counted.
         let len = |s: &Self, pos: usize| {
-            let count = || s.a[pos].iter().chain(&s.b[pos]).filter(|&&x| x != r).count();
+            let count = || s.ab.both(pos).iter().filter(|&&x| x as usize != r).count();
             let fast = if s.kind[pos] == -2 && refcols.binary_search_by_key(&pos, |o| o.0).is_err() {
-                s.a[pos].len() + s.b[pos].len()
+                s.ab.na(pos) + s.ab.nb(pos)
             } else {
                 count()
             };
@@ -3740,7 +3756,8 @@ impl<R: Real> DualFactor<R> {
             }
             jumps += 2.0 * plen as f64 + 5.0;
             let mut nxt = hole;
-            for &x in &self.a[pos] {
+            for &x in self.ab.a(pos) {
+                let x = x as usize;
                 let sx = self.slot[x];
                 if sx > hole && sx < cur && sx > nxt {
                     nxt = sx;
@@ -3858,7 +3875,7 @@ impl<R: Real> DualFactor<R> {
             let n = crate::dump::FACTOR_STRUCT_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             crate::dump::emit(
                 "fstruct",
-                serde_json::json!({"r": r, "rowl": (0..m).filter(|&y| !self.rowl[y].is_empty()).map(|y| (y.to_string(), self.rowl[y].clone())).collect::<std::collections::BTreeMap<_, _>>(), "mark": self.mark, "n": n, "m": m, "i3": self.nuc.len(), "i21": self.i21, "kind": self.kind, "nuc": self.nuc, "seqA": self.slot, "fill": self.fill, "diag": jv(&self.diag), "uvals": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), (self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.0).collect::<Vec<_>>(), self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.1.to_f64()).collect::<Vec<_>>()))).collect::<std::collections::BTreeMap<_, _>>(), "cols": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), [&self.a[k], &self.b[k]])).collect::<std::collections::BTreeMap<_, _>>()}),
+                serde_json::json!({"r": r, "rowl": (0..m).filter(|&y| !self.rowl[y].is_empty()).map(|y| (y.to_string(), self.rowl[y].clone())).collect::<std::collections::BTreeMap<_, _>>(), "mark": self.mark, "n": n, "m": m, "i3": self.nuc.len(), "i21": self.i21, "kind": self.kind, "nuc": self.nuc, "seqA": self.slot, "fill": self.fill, "diag": jv(&self.diag), "uvals": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), (self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.0).collect::<Vec<_>>(), self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.1.to_f64()).collect::<Vec<_>>()))).collect::<std::collections::BTreeMap<_, _>>(), "cols": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), [self.ab.a(k), self.ab.b(k)])).collect::<std::collections::BTreeMap<_, _>>()}),
             );
         }
         self.before_last = (self.upd, self.sum_alpha);
@@ -3942,7 +3959,8 @@ impl<R: Real> DualFactor<R> {
         single_rows.clear();
         if old == -2 {
             // The old column leaves the rows it appears in (`0xf1e7a`): the entries before it in each row list are passed.
-            for &y in self.a[r].iter().chain(self.b[r].iter()) {
+            for &y in self.ab.both(r) {
+                let y = y as usize;
                 if let Some(p) = self.rowl[y].iter().position(|&t| t == r) {
                     if self.rowl[y].len() > 1 && p > 0 {
                         self.upd_work.push((0xf1f82, p as f64, crate::work::CTX));
@@ -3979,7 +3997,7 @@ impl<R: Real> DualFactor<R> {
                 // Only a column some tail column refers to joins the nucleus list; the others become singletons.
                 let refs = &mut scratch.conversion_refs;
                 refs.clear();
-                refs.extend(self.rowl[x].iter().copied().filter(|&k| self.kind[k] == -2 && self.a[k].contains(&x)));
+                refs.extend(self.rowl[x].iter().copied().filter(|&k| self.kind[k] == -2 && self.ab.a_pos(k, x).is_some()));
                 refs.sort_unstable();
                 refs.dedup();
                 let held = !refs.is_empty();
@@ -3990,14 +4008,13 @@ impl<R: Real> DualFactor<R> {
                     self.kind[x] = -1;
                 }
                 for &k in refs.iter() {
-                    if self.kind[k] == -2 && self.a[k].contains(&x) {
+                    let pa = if self.kind[k] == -2 { self.ab.a_pos(k, x) } else { None };
+                    if let Some(p) = pa {
                         // The last entry of A fills the hole, and the demoted column takes the slot A gives up (the front of B).
-                        let p = self.a[k].iter().position(|&y| y == x).unwrap();
-                        self.a[k].swap_remove(p);
+                        self.ab.demote(k, p);
                         if p > 0 {
                             self.upd_work.push((0xf3eac, p as f64, crate::work::CTX));
                         }
-                        self.b[k].insert(0, x);
                         demoted_front.push(k);
                     }
                 }
@@ -4043,7 +4060,7 @@ impl<R: Real> DualFactor<R> {
         if old >= 0 {
             let held = self.rowl[r]
                 .iter()
-                .any(|&x| x != r && self.kind[x] == -2 && self.b[x].contains(&r));
+                .any(|&x| x != r && self.kind[x] == -2 && self.ab.b_pos(x, r).is_some());
             if bare && crate::dump::on("bare") {
                 let tail = (0..m).filter(|&x| self.kind[x] == -2).count();
                 crate::dump::emit(
@@ -4061,26 +4078,27 @@ impl<R: Real> DualFactor<R> {
                 }
             }
         } else if old == -2 {
-            let old_b = std::mem::take(&mut self.b[r]);
-            self.a[r].clear();
+            let mut old_b = std::mem::take(&mut scratch.old_b);
+            old_b.clear();
+            old_b.extend_from_slice(self.ab.b(r));
+            self.ab.clear(r);
             let old_col = self.replace_u_column(r, Vec::new());
             if old_col.capacity() > scratch.spare_col.capacity() {
                 scratch.spare_col = old_col;
             }
             self.kind[r] = -1;
             for &x in &old_b {
+                let x = x as usize;
                 if self.kind[x] >= 0
                     && !self.rowl[x]
                         .iter()
-                        .any(|&k| self.kind[k] == -2 && self.b[k].contains(&x))
+                        .any(|&k| self.kind[k] == -2 && self.ab.b_pos(k, x).is_some())
                 {
                     self.drop_nuc(x);
                     self.kind[x] = -1;
                 }
             }
-            if old_b.capacity() > scratch.spare_b.capacity() {
-                scratch.spare_b = old_b;
-            }
+            scratch.old_b = old_b;
         }
         for &x in &sp {
             if self.kind[x] == -1 {
@@ -4089,23 +4107,24 @@ impl<R: Real> DualFactor<R> {
             }
         }
         // Built in recycled buffers (the lists replaced at the end of this call), with the same content and order as a fresh collect.
+        // The lists carry the coefficients of the new U column's entries (`values` holds the spike at the positions of `sp`).
         let mut av = std::mem::take(&mut scratch.spare_a);
         av.clear();
         av.reserve(sp.len());
-        av.extend(sp.iter().copied().filter(|&x| self.kind[x] == -2));
+        av.extend(sp.iter().copied().filter(|&x| self.kind[x] == -2).map(|x| (x as u32, values[x])));
         let mut bv = std::mem::take(&mut scratch.spare_b);
         bv.clear();
         bv.reserve(sp.len());
-        bv.extend(sp.iter().copied().filter(|&x| self.kind[x] >= 0));
+        bv.extend(sp.iter().copied().filter(|&x| self.kind[x] >= 0).map(|x| (x as u32, values[x])));
         let refcols = &mut scratch.refcols;
         refcols.clear();
         refcols.extend(self.rowl[r].iter().copied().map(|k| (k, self.slot[k])));
         refcols.sort_unstable();
         refcols.dedup();
-        refcols.retain(|&(x, _)| x != r && self.kind[x] == -2 && (self.a[x].contains(&r) || self.b[x].contains(&r)));
+        refcols.retain(|&(x, _)| x != r && self.kind[x] == -2 && (self.ab.a_pos(x, r).is_some() || self.ab.b_pos(x, r).is_some()));
         // Only a surviving row-r reference can raise the mark after the slot walk.
         let oldslot = self.slot[r];
-        let top: i64 = av.iter().map(|&x| self.slot[x] as i64).max().unwrap_or(-1);
+        let top: i64 = av.iter().map(|&(x, _)| self.slot[x as usize] as i64).max().unwrap_or(-1);
         let mut moved = true;
         let mut tail_rebuild = false;
         if old == -2 {
@@ -4168,17 +4187,16 @@ impl<R: Real> DualFactor<R> {
             if k == r || self.kind[k] != -2 {
                 continue;
             }
-            let in_a = self.a[k].contains(&r);
-            let in_b = self.b[k].contains(&r);
+            let (pos_a, pos_b) = (self.ab.a_pos(k, r), self.ab.b_pos(k, r));
+            let (in_a, in_b) = (pos_a.is_some(), pos_b.is_some());
+            debug_assert!(!(in_a && in_b), "row {r} in both lists of column {k}");
             if bare {
                 continue;
             }
             if in_a || in_b {
                 // The reference scans the lists from their start for `r`; the booking is the number of entries passed.
-                let pa = self.a[k].iter().position(|&y| y == r).unwrap_or(0);
-                let pb = self.b[k]
-                    .iter()
-                    .position(|&y| y == r)
+                let pa = pos_a.unwrap_or(0);
+                let pb = pos_b
                     .unwrap_or(0)
                     .saturating_sub(usize::from(demoted_front.binary_search(&k).is_ok()));
                 let (site, units) = if keep {
@@ -4192,22 +4210,18 @@ impl<R: Real> DualFactor<R> {
                     self.upd_work.push((site, units as f64, crate::work::CTX));
                 }
                 if keep {
-                    if !in_a {
-                        self.a[k].push(r);
+                    // `r` moves from B to the end of A (the front slot of B, which A takes), B's front entry filling its hole.
+                    if let Some(p) = pos_b {
+                        self.ab.b_to_a(k, p);
                     }
-                    remove_front_fill(&mut self.b[k], r);
                 } else {
-                    if in_a {
+                    if let Some(p) = pos_a {
                         // A and B share one array in the reference (A first): A's last entry fills the hole and B's last entry
                         // takes the slot A gives up, which is the front of B.
-                        let p = self.a[k].iter().position(|&y| y == r).unwrap();
-                        self.a[k].swap_remove(p);
-                        if let Some(last) = self.b[k].pop() {
-                            self.b[k].insert(0, last);
-                        }
+                        self.ab.drop_a(k, p);
                     }
-                    if in_b {
-                        remove_last_fill(&mut self.b[k], r);
+                    if let Some(p) = pos_b {
+                        self.ab.drop_b(k, p);
                     }
                     self.uc[k].retain(|e| e.0 != r);
                     let row = &mut self.ut[r];
@@ -4216,7 +4230,7 @@ impl<R: Real> DualFactor<R> {
                     row.drain(first..end);
                     eliminated = true;
                     // A column left without entries raises the mark to its slot (`0xf29d5`).
-                    if self.a[k].is_empty() && self.b[k].is_empty() {
+                    if self.ab.is_empty(k) {
                         self.empty_tail.insert(k);
                         self.mark = self.mark.max(old_ref_slot);
                     }
@@ -4325,28 +4339,28 @@ impl<R: Real> DualFactor<R> {
         if old_col.capacity() > scratch.spare_col.capacity() {
             scratch.spare_col = old_col;
         }
-        scratch.spare_a = std::mem::replace(&mut self.a[r], av);
-        let mut bb = bv;
-        bb.reverse();
-        for &y in self.a[r].iter().chain(bb.iter()) {
-            self.rowl[y].push(r);
+        bv.reverse();
+        self.ab.set(r, &av, &bv);
+        for &y in self.ab.both(r) {
+            self.rowl[y as usize].push(r);
         }
-        let old_b = std::mem::replace(&mut self.b[r], bb);
-        if old_b.capacity() > scratch.spare_b.capacity() {
-            scratch.spare_b = old_b;
-        }
-        if self.kind[r] == -2 && self.a[r].is_empty() && self.b[r].is_empty() {
+        scratch.spare_a = av;
+        scratch.spare_b = bv;
+        if self.kind[r] == -2 && self.ab.is_empty(r) {
             self.empty_tail.insert(r);
         } else {
             self.empty_tail.remove(&r);
         }
         self.spike_used = true;
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        self.ab.check(&self.uc, &self.kind);
         scratch.sp = sp;
         scratch.clear();
         self.btran_ws.update.replace(scratch);
     }
 }
 
+#[cfg(test)]
 /// Delete `r` from a column's nucleus list the way the reference does: the entry at the front of this (reversed) list fills the hole.
 fn remove_front_fill(v: &mut Vec<usize>, r: usize) {
     if let Some(p) = v.iter().position(|&y| y == r) {
@@ -4357,6 +4371,7 @@ fn remove_front_fill(v: &mut Vec<usize>, r: usize) {
     }
 }
 
+#[cfg(test)]
 fn remove_last_fill(v: &mut Vec<usize>, r: usize) {
     if let Some(p) = v.iter().position(|&y| y == r) {
         v.swap_remove(p);

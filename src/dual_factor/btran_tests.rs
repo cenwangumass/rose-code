@@ -179,6 +179,11 @@ fn update_walk_lengths_and_count_scan_match_original() {
     assert!(walks > 0, "the walk's jumps were never exercised");
 }
 
+/// The coefficients of the A and B lists, as bits.
+fn ab_values(f: &DualFactor<f64>) -> Vec<(Vec<u64>, Vec<u64>)> {
+    (0..f.m).map(|c| (f.ab.a_val(c).iter().map(|x| x.to_bits()).collect(), f.ab.b_val(c).iter().map(|x| x.to_bits()).collect())).collect()
+}
+
 /// Every field `update` writes, bitwise (floats as bits, the unordered `empty_tail` as its sorted members).
 fn update_state(f: &DualFactor<f64>) -> String {
     let ub = |v: &Vec<Vec<(usize, f64)>>| v.iter().map(|c| c.iter().map(|e| (e.0, e.1.to_bits())).collect::<Vec<_>>()).collect::<Vec<_>>();
@@ -189,7 +194,7 @@ fn update_state(f: &DualFactor<f64>) -> String {
     format!(
         "{:?}",
         (
-            (&f.kind, &f.nuc, f.i21, f.mark, &f.a, &f.b, &f.slot, &f.at, &f.rowl),
+            (&f.kind, &f.nuc, f.i21, f.mark, f.ab.to_vecs(), ab_values(f), &f.slot, &f.at, &f.rowl),
             (ub(&f.uc), ub(&f.ut), diag, etas, &f.first_eta, f.fill, &f.row_cap, &f.row_par, et),
             (work, f.sum_eta.to_bits(), f.sum_alpha.to_bits(), f.upd, (f.before_last.0, f.before_last.1.to_bits())),
             (f.bt_occupied, f.dense_est.get().to_bits(), f.spike_used, f.row_cached),

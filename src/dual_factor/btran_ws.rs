@@ -96,8 +96,9 @@ pub(super) struct Update<R> {
     pub conversion_refs: Vec<usize>,
     pub xs: Vec<R>,
     /// Buffers recycled between updates: the replaced column lists and U column of the previous call (contents irrelevant, capacity kept).
-    pub spare_a: Vec<usize>,
-    pub spare_b: Vec<usize>,
+    pub spare_a: Vec<(u32, R)>,
+    pub spare_b: Vec<(u32, R)>,
+    pub old_b: Vec<u32>,
     pub spare_col: Vec<(usize, R)>,
 }
 
@@ -115,6 +116,7 @@ impl<R> Update<R> {
         self.xs.clear();
         self.spare_a.clear();
         self.spare_b.clear();
+        self.old_b.clear();
         self.spare_col.clear();
     }
 }

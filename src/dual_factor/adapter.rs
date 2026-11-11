@@ -18,6 +18,8 @@ impl<R: Real> DualFactor<R> {
         let require = |ok: bool, field: &str| {
             assert!(ok, "factor-shadow {method} call {call}: {}.{field} invariant", "DualFactor");
         };
+        // A/B lists: the audited sets, no duplicates, coefficients carrying the bits of the matching `uc` entries.
+        self.ab.check(&self.uc, &self.kind);
         if let Some(inverse) = self.row_of.get() {
             require(inverse.len() == self.m, "row_of.len");
             for (r, &p) in self.perm.iter().enumerate() {
@@ -130,13 +132,14 @@ impl<R: Real> DualFactor<R> {
 
     pub(crate) fn canonical(&self) -> crate::dual_factor::projection::Canonical {
         use crate::dual_factor::projection::{bits, columns, numbers, sparse, Canonical, EtaState};
+        let (tail_destinations, nucleus_destinations) = self.ab.to_vecs();
         Canonical {
             m: self.m, i21: self.i21, mark: self.mark,
             kind: self.kind.clone(), nucleus: self.nuc.clone(),
             slot: self.slot.clone(), at: self.at.clone(), diagonal: numbers(&self.diag),
             lower_columns: columns(&self.lcolumns()),
             upper_columns: columns(&self.uc), upper_rows: columns(&self.ut),
-            tail_destinations: self.a.clone(), nucleus_destinations: self.b.clone(),
+            tail_destinations, nucleus_destinations,
             row_columns: self.rowl.clone(), row_capacity: self.row_cap.clone(), row_alignment: self.row_par.clone(),
             pool_fill: self.fill,
             etas: self.etas.iter().map(|e| EtaState {

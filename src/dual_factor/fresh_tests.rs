@@ -231,6 +231,15 @@ impl<R: Real> DualFactor<R> {
         let nnz_l_tot: usize = lpool.len();
         let perm = step;
         let znz = (nnz + sa + sb + 2 * m) as f64;
+        // The lists as the old construction built them, with the coefficients looked up in `uc` (an independent derivation).
+        let mut old_ab = AbLists::new();
+        old_ab.reset(m);
+        for t in 0..m {
+            let with_coeff = |l: &[usize]| -> Vec<(u32, R)> {
+                l.iter().map(|&x| (x as u32, uc[t].iter().find(|e| e.0 == x).map_or(R::ZERO, |e| e.1))).collect()
+            };
+            old_ab.set(t, &with_coeff(&a[t]), &with_coeff(&b[t]));
+        }
         let mark0 = (i21..m)
             .rev()
             .find(|&t| kind[t] == -2 && a[t].is_empty() && b[t].is_empty())
@@ -362,8 +371,7 @@ impl<R: Real> DualFactor<R> {
             nuc,
             i21,
             mark: mark0,
-            a,
-            b,
+            ab: old_ab,
             lpool,
             l_forward,
             perm,
@@ -426,11 +434,21 @@ fn same_csr<R: Real>(x: &Csr<R>, y: &Csr<R>, what: &str) {
     same_vals(&x.val, &y.val, what);
 }
 
+/// Lists, order and coefficient bits of every column.
+pub(super) fn assert_same_ab<R: Real>(n: &AbLists<R>, o: &AbLists<R>) {
+    assert_eq!(n.to_vecs(), o.to_vecs(), "A/B lists");
+    for c in 0..n.to_vecs().0.len() {
+        same_vals(n.a_val(c), o.a_val(c), "A coefficients");
+        same_vals(n.b_val(c), o.b_val(c), "B coefficients");
+    }
+}
+
 /// Every field a fresh factor sets, bitwise (the rest is the default state, equal by construction).
 pub(super) fn assert_same<R: Real>(n: &DualFactor<R>, o: &DualFactor<R>) {
     assert_eq!((n.m, n.i21, n.mark, n.loff, n.n1), (o.m, o.i21, o.mark, o.loff, o.n1));
     assert_eq!((n.kind.clone(), n.nuc.clone()), (o.kind.clone(), o.nuc.clone()));
-    assert_eq!((&n.a, &n.b, &n.rowl, &n.row_cap, &n.row_par), (&o.a, &o.b, &o.rowl, &o.row_cap, &o.row_par));
+    assert_eq!((&n.rowl, &n.row_cap, &n.row_par), (&o.rowl, &o.row_cap, &o.row_par));
+    assert_same_ab(&n.ab, &o.ab);
     assert_eq!((&n.perm, &n.first_eta, &n.slot, &n.at), (&o.perm, &o.first_eta, &o.slot, &o.at));
     assert_eq!((n.empty_tail.iter().copied().collect::<Vec<usize>>(), n.l_forward, n.dthr, n.lev_dense, n.lev_dense_ft, n.lev_built), (
         o.empty_tail.iter().copied().collect::<Vec<usize>>(),
@@ -457,8 +475,7 @@ pub(super) fn assert_same<R: Real>(n: &DualFactor<R>, o: &DualFactor<R>) {
 /// Leave junk in every row, as the edits of a long update sequence would.
 fn dirty(f: &mut DualFactor<f64>) {
     for i in 0..f.m {
-        f.a[i].extend([7, 9, 11]);
-        f.b[i].insert(0, 5);
+        f.ab.set(i, &[(7, -1.0), (9, 2.0), (11, 0.5)], &[(5, 3.0)]);
         f.uc[i].push((3, -1.5));
         f.ut[i].extend([(1, 2.5); 40]);
         f.rowl[i].push(8);
