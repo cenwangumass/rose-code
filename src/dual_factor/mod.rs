@@ -922,11 +922,47 @@ struct FreshScratch {
     lst: Vec<usize>,
 }
 
+/// The nested lists of a retired factor (`a`, `b`, `uc`, `ut`, `rowl`), kept with their allocations for the next `fresh`
+/// (`DualFactor::recycle`): the refactorization then neither frees the old rows nor allocates the new ones.
+struct Recycled<R> {
+    a: Vec<Vec<usize>>,
+    b: Vec<Vec<usize>>,
+    uc: Vec<Vec<(usize, R)>>,
+    ut: Vec<Vec<(usize, R)>>,
+    rowl: Vec<Vec<usize>>,
+}
+
+impl<R: Real> Recycled<R> {
+    /// The retained lists, or new empty ones, as `m` empty rows each.
+    fn take(m: usize) -> Self {
+        fn rows<T>(v: &mut Vec<Vec<T>>, m: usize) {
+            v.resize_with(m, Vec::new);
+            v.iter_mut().for_each(Vec::clear);
+        }
+        let kept = RECYCLED.with(|r| r.take()).and_then(|b| b.downcast::<Self>().ok());
+        let mut r = kept.map_or_else(|| Self { a: Vec::new(), b: Vec::new(), uc: Vec::new(), ut: Vec::new(), rowl: Vec::new() }, |b| *b);
+        rows(&mut r.a, m);
+        rows(&mut r.b, m);
+        rows(&mut r.uc, m);
+        rows(&mut r.ut, m);
+        rows(&mut r.rowl, m);
+        r
+    }
+}
+
 thread_local! {
     static FRESH_SCRATCH: std::cell::Cell<FreshScratch> = std::cell::Cell::new(FreshScratch::default());
+    static RECYCLED: std::cell::Cell<Option<Box<dyn std::any::Any>>> = const { std::cell::Cell::new(None) };
 }
 
 impl<R: Real> DualFactor<R> {
+    /// Retire the factor: its nested lists (`a`, `b`, `uc`, `ut`, `rowl`) are kept, allocations included, for the next `fresh` of this
+    /// scalar type on this thread (the rest is dropped). Only capacities carry over; `fresh` clears every row.
+    pub fn recycle(self) {
+        let Self { a, b, uc, ut, rowl, .. } = self;
+        RECYCLED.with(|r| r.set(Some(Box::new(Recycled { a, b, uc, ut, rowl }))));
+    }
+
     /// Fresh factor from the pivot sequence; `cols[pos]` is the basis column at incoming position `pos` as `(is_slack, rows, values)`.
     ///
     /// Every structure is built to its final size from counting passes (the nested lists with their exact capacities), and the
@@ -987,9 +1023,7 @@ impl<R: Real> DualFactor<R> {
                 }
             }
         }
-        let mut a: Vec<Vec<usize>> = vec![Vec::new(); m];
-        let mut b: Vec<Vec<usize>> = vec![Vec::new(); m];
-        let mut uc: Vec<Vec<(usize, R)>> = vec![Vec::new(); m];
+        let Recycled { mut a, mut b, mut uc, mut ut, rowl: mut rl } = Recycled::<R>::take(m);
         let (mut sa, mut sb) = (0usize, 0usize);
         let mut xv = vec![R::ZERO; m];
         let mut ents: Vec<(usize, R)> = Vec::new();
@@ -1105,14 +1139,14 @@ impl<R: Real> DualFactor<R> {
             sa += na;
             sb += nb;
             // The reference lists the fresh tail column's A entries in descending order.
-            let mut av = Vec::with_capacity(na);
+            let av = &mut a[t];
+            av.reserve(na);
             av.extend(ents.iter().rev().map(|e| e.0).filter(|&x| kind[x] == -2));
-            let mut bv = Vec::with_capacity(nb);
+            let bv = &mut b[t];
+            bv.reserve(nb);
             bv.extend(ents.iter().map(|e| e.0).filter(|&x| kind[x] >= 0));
             bv.sort_unstable_by_key(|&x| std::cmp::Reverse(kind[x]));
-            a[t] = av;
-            b[t] = bv;
-            uc[t] = ents.to_vec();
+            uc[t].extend_from_slice(&ents);
         }
         FRESH_SCRATCH.with(|s| s.set(sc));
         let nt = m - i21;
@@ -1186,7 +1220,11 @@ impl<R: Real> DualFactor<R> {
         let u_total: usize = row_cap.iter().sum();
         // `update` appends to the rows of `ut` and `rowl`: nonempty rows get room for a few entries (capacity only, never visible).
         let spare = |n: usize| if n == 0 { 0 } else { n + (n >> 2) + 2 };
-        let mut ut: Vec<Vec<(usize, R)>> = row_cap.iter().map(|&n| Vec::with_capacity(spare(n))).collect();
+        for (row, &n) in row_cap.iter().enumerate() {
+            if n > 0 {
+                ut[row].reserve(spare(n));
+            }
+        }
         for (c, col) in uc.iter().enumerate() {
             for &(row, v) in col {
                 ut[row].push((c, v));
@@ -1217,7 +1255,13 @@ impl<R: Real> DualFactor<R> {
             for (t, &(_, c)) in st.pivots.iter().enumerate() {
                 pos_of_col[c] = t;
             }
-            let mut rl = vec![Vec::new(); m];
+            // Marker words of the rows with a pair order: the hash is read only for those.
+            let mut has_urow = vec![0u64; m.div_ceil(64)];
+            for &y in st.pair_urow.keys() {
+                if y < m {
+                    has_urow[y / 64] |= 1 << (y % 64);
+                }
+            }
             let mut stamp = vec![usize::MAX; m];
             let mut tmp: Vec<usize> = Vec::new();
             for y in 0..m {
@@ -1226,7 +1270,7 @@ impl<R: Real> DualFactor<R> {
                     continue;
                 }
                 tmp.clear();
-                if let Some(u) = if st.pair_urow.is_empty() { None } else { st.pair_urow.get(&y) } {
+                if let Some(u) = if has_urow[y / 64] >> (y % 64) & 1 == 0 { None } else { st.pair_urow.get(&y) } {
                     for &t in mem {
                         stamp[t] = y;
                     }
@@ -1243,9 +1287,8 @@ impl<R: Real> DualFactor<R> {
                     }
                     tmp.extend(st.u_row(y).iter().map(|&(c, _)| pos_of_col[c]).filter(|&t| stamp[t] == y));
                 }
-                let mut row = Vec::with_capacity(spare(tmp.len()));
-                row.extend_from_slice(&tmp);
-                rl[y] = row;
+                rl[y].reserve(spare(tmp.len()));
+                rl[y].extend_from_slice(&tmp);
             }
             rl
         };

@@ -199,12 +199,18 @@ pub fn factor_structure_r<'a, R: Real>(m: usize, cols: impl Into<Cols<'a>>) -> S
     let mut l_raw: Vec<R> = Vec::with_capacity(nnz_cols);
     let mut diag: Vec<R> = Vec::with_capacity(nsteps);
     l_start.push(0);
+    // Marker words of the singleton steps with an override: the hash is read only for those.
+    let mut has_ov = vec![0u64; nsing.div_ceil(64)];
+    for &s in ov.l.keys() {
+        if s < nsing {
+            has_ov[s / 64] |= 1 << (s % 64);
+        }
+    }
     for (s, &(prow, c)) in seq.iter().enumerate().take(nsing) {
         let (_, idx, val) = &cols[c];
         let pv = R::c(val[idx.iter().position(|&i| i == prow).unwrap()]);
         // A pair override replaces the column (its multipliers are all that is known: no raw entries).
-        // The override map is almost always empty: skip the hash lookup then.
-        if let Some((r, v)) = if ov.l.is_empty() { None } else { ov.l.remove(&s) } {
+        if let Some((r, v)) = if has_ov[s / 64] >> (s % 64) & 1 == 0 { None } else { ov.l.remove(&s) } {
             l_idx.extend_from_slice(&r);
             l_raw.extend(std::iter::repeat_n(R::c(f64::NAN), v.len()));
             l_val.extend(v);

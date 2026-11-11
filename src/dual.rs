@@ -1995,6 +1995,9 @@ impl<'a, R: Real> Dual<'a, R> {
             }
             self.factor_work(&st, rows.view(), discard);
             self.lu_thr = if self.lu_thr < 0.5 { 0.5 } else { 0.9 };
+            if let Some(retired) = mi.take() {
+                retired.recycle();
+            }
             (order, st, rows, mi) = self.lu_attempt();
             if order.len() < self.m {
                 self.singular_payload();
@@ -2012,7 +2015,7 @@ impl<'a, R: Real> Dual<'a, R> {
         }
         self.head = order;
         self.reset_pricing(&st, rows.view());
-        self.mirror = mi;
+        std::mem::replace(&mut self.mirror, mi).recycle();
         self.mirror.set_upd_limit(self.upd_limit);
         self.factor_work(&st, rows.view(), discard);
         self.factor = AuxiliaryFactor::lazy(self.head.clone());
@@ -2207,10 +2210,15 @@ impl<'a, R: Real> Dual<'a, R> {
         let mut tol_abort = false;
         let p = self.p;
         let mut r: Vec<R> = p.rhs.iter().map(|&v| R::c(v)).collect();
+        // Entries of the structural nonbasic columns at a nonzero value (the read-out below, `0xc142b`), counted in the same pass.
+        let mut cols = 0usize;
         for j in 0..p.n + p.m {
             if self.st[j] < 0 {
                 let v = self.nonbasic_value(j);
                 if v != 0.0 {
+                    if j < p.n {
+                        cols += p.cols[j].len();
+                    }
                     for &(i, a) in &p.cols[j] {
                         r[i] -= R::c(a) * R::c(v);
                     }
@@ -2221,10 +2229,6 @@ impl<'a, R: Real> Dual<'a, R> {
         self.work
             .add_from(0x1219d6, 0x120673, est, crate::work::FAC);
         // `0xc142b`: the solution read-out sums the columns of the nonbasic variables at a nonzero value.
-        let cols: usize = (0..p.n)
-            .filter(|&j| self.st[j] < 0 && self.nonbasic_value(j) != 0.0)
-            .map(|j| p.cols[j].len())
-            .sum();
         self.work.add(
             0xc142b,
             4.0 * p.m as f64 + 2.0 * cols as f64,

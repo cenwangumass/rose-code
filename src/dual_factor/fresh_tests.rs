@@ -450,23 +450,39 @@ pub(super) fn assert_same<R: Real>(n: &DualFactor<R>, o: &DualFactor<R>) {
     same_vals(&n.diag, &o.diag, "diag");
     same_pairs(&n.uc, &o.uc, "uc");
     same_pairs(&n.ut, &o.ut, "ut");
-    // uc, a, b are exact; ut and rowl rows keep spare room for `update`
-    assert!(n.uc.iter().all(|c| c.capacity() == c.len()) && n.a.iter().all(|c| c.capacity() == c.len()));
+    // ut rows keep spare room for `update` (capacities are otherwise whatever a recycled row had)
     assert!(n.ut.iter().zip(&n.row_cap).all(|(c, &k)| c.capacity() >= k));
+}
+
+/// Leave junk in every row, as the edits of a long update sequence would.
+fn dirty(f: &mut DualFactor<f64>) {
+    for i in 0..f.m {
+        f.a[i].extend([7, 9, 11]);
+        f.b[i].insert(0, 5);
+        f.uc[i].push((3, -1.5));
+        f.ut[i].extend([(1, 2.5); 40]);
+        f.rowl[i].push(8);
+    }
 }
 
 fn check(m: usize, cols: &[(bool, Vec<usize>, Vec<f64>)]) {
     let st = crate::lu_order::factor_structure(m, cols);
-    // twice: the second build runs on the retained scratch
-    for _ in 0..2 {
-        let n = DualFactor::<f64>::fresh(m, m, &st, cols);
+    // The builds after the first run on the retained scratch and on the lists of the previous factor, which has a different size
+    // and content (`recycle`); the last one runs on lists that a column replacement has edited.
+    for round in 0..3 {
+        let mut n = DualFactor::<f64>::fresh(m, m, &st, cols);
         let o = DualFactor::<f64>::fresh_old(m, m, &st, cols);
         assert_same(&n, &o);
+        if round == 1 {
+            dirty(&mut n);
+        }
+        n.recycle();
     }
     let st = crate::lu_order::factor_structure_r::<crate::f80::F80>(m, cols);
     let n = DualFactor::<crate::f80::F80>::fresh(m, m, &st, cols);
     let o = DualFactor::<crate::f80::F80>::fresh_old(m, m, &st, cols);
     assert_same(&n, &o);
+    n.recycle();
 }
 
 #[test]

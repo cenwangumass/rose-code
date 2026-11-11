@@ -38,6 +38,11 @@ macro_rules! forward {
 }
 
 impl<R: Real> Shadow<R> {
+    /// See `DualFactor::recycle`; the oracle is dropped.
+    pub fn recycle(self) {
+        self.new.recycle();
+    }
+
     pub fn fresh<'a>(m: usize, ncols: usize, st: &Structure<R>, cols: impl Into<crate::lu_order::Cols<'a>>) -> Self {
         let cols: crate::lu_order::Cols<'a> = cols.into();
         let new = DualFactor::fresh(m, ncols, st, cols);
