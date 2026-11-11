@@ -36,47 +36,58 @@ from this unaccepted candidate.
 
 ## Current host: AMD EPYC virtual CPU, family 23
 
-Source `zxtxvvvn` (`18061fe9`), pinned Rust 1.98.1, ordinary ThinLTO release,
-glibc, CPU 2. Accepted CLI SHA256
-`8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410`.
-The ordinary baseline remains intact. The separately qualified fixed39
-PGO/system-TCMalloc configuration below has its own ELF and table. Historical
-EPYC 9V74/TCMalloc tables remain separate configurations.
+Source Rose `main` = `789467e2` (dual factor capture-gaps C1X+C2X+C3X on `a416b9c8`), pinned Rust 1.98.1,
+ordinary ThinLTO release (no `factor-shadow`), glibc, CPU 2. CLI SHA256
+`7aa21f98f0c817f7e96ac27013201460f33c9fd921ca60f0405c2d1150a8224c` (previous table: `18061fe9`, CLI SHA256
+`8483049968e1aa8be28e7003ec5a0acdeb80a77a07fea05b50c6142a54d38410`). Host line printed by the runner:
+AMD EPYC Processor (with IBPB), kernel 7.0.0-38-generic (remote timing machine via `rtime`). The ordinary
+baseline remains intact. The separately qualified fixed39 PGO/system-TCMalloc configuration below has its own
+ELF and table. Historical EPYC 9V74/TCMalloc tables remain separate configurations.
 
-The current fixed 23-row reference comparison is complete: Rose is faster on
+The current fixed 23-row reference comparison (re-run 2026-11-11 on `789467e2`) is complete: Rose is faster on
 **0/23**. Each solver has one warmup and three measured fresh-process runs per
 row, rotating order on the same CPU. Timers are Rose `diagnostics.seconds` and
-Gurobi `Runtime`; all 184 complete results/exits are retained and stable within
-each solver. Valid nonoptimal statuses and Rose exit 3 are preserved. Barrier
+Gurobi `Runtime`; all 23 rows' complete results/exits are stable within each solver. Valid nonoptimal statuses
+and Rose exit 3 are preserved (primal_5959 rows, greenbea.barrier-r, greenbea.pdhg). Barrier
 uses its normal 1000 iteration limit; GREENBEA PDHG uses the specified 20000.
 Reference logging is explicitly off. Three-sample medians are descriptive,
 not an optimization acceptance screen or cross-solver numerical-alignment proof.
 
-| Row | Rose ms | Gurobi ms | Rose / Gurobi |
-|---|---:|---:|---:|
-| degen2.primal-c | 71.128 | 21.668 | 3.283 |
-| degen2.dual-r | 58.745 | 16.805 | 3.496 |
-| degen3.primal-c | 883.168 | 311.364 | 2.836 |
-| degen3.primal-r | 1216.082 | 333.747 | 3.644 |
-| perold.primal-c | 1024.754 | 309.258 | 3.314 |
-| pilot4.primal-r | 93.306 | 28.592 | 3.263 |
-| 80bau3b.primal-c | 922.550 | 189.233 | 4.875 |
-| primal_5959.primal-r | 99.369 | 73.598 | 1.350 |
-| degen3.dual-c | 489.323 | 155.954 | 3.138 |
-| degen3.dual-r | 462.506 | 151.071 | 3.062 |
-| perold.dual-r | 259.579 | 70.153 | 3.700 |
-| 80bau3b.dual-r | 565.991 | 137.443 | 4.118 |
-| greenbea.dual-c | 1331.731 | 361.102 | 3.688 |
-| greenbea.dual-r | 1394.194 | 350.943 | 3.973 |
-| mode_switch.dual-r | 1343.815 | 163.622 | 8.213 |
-| primal_5959.dual-r | 127.878 | 97.885 | 1.306 |
-| quad_2717.dual-r | 153.781 | 105.567 | 1.457 |
-| fx_quad_obj_5371.dual-r | 47.779 | 39.065 | 1.223 |
-| degen3.barrier-r | 271.010 | 128.775 | 2.105 |
-| 80bau3b.barrier-r | 405.132 | 169.034 | 2.397 |
-| greenbea.barrier-r | 1651.639 | 704.060 | 2.346 |
-| 80bau3b.pdhg | 3744.162 | 3239.033 | 1.156 |
-| greenbea.pdhg | 1898.783 | 1516.258 | 1.252 |
+The dual rows are what the dual factor work since `18061fe9` changed (the whole dual factor backend effort, not only
+the capture-gaps stack; the stack alone is -5.6% to -6.5% instructions): Rose ms fell on all dual rows with a dual-heavy
+workload (for example degen2.dual-r 58.7 -> 47.4, degen3.dual 462-489 -> 388-414, 80bau3b.dual-r 566 -> 446,
+greenbea.dual-c 1332 -> 1068, mode_switch.dual-r 1344 -> 1062). Primal/barrier/PDHG rows are unchanged code;
+their Rose ms moved by -8% to +34% and the Gurobi column also rose 0-25% (for example 80bau3b.primal-c Rose
++34%, Gurobi +20%; mode_switch.dual-r Gurobi 164 -> 283), so this run's host was slower or noisier than the
+previous one. Compare the ratio column, and treat single-row ms deltas as noise-limited.
+"Rose ms before" is the previous table; the ratio is from this run only (previous ratios in the JSON).
+
+| Row | Rose ms | Rose ms before | Gurobi ms | Rose / Gurobi |
+|---|---:|---:|---:|---:|
+| degen2.primal-c | 70.017 | 71.128 | 22.629 | 3.094 |
+| degen2.dual-r | 47.361 | 58.745 | 19.122 | 2.477 |
+| degen3.primal-c | 964.372 | 883.168 | 313.855 | 3.073 |
+| degen3.primal-r | 1118.214 | 1216.082 | 398.545 | 2.806 |
+| perold.primal-c | 1040.952 | 1024.754 | 308.519 | 3.374 |
+| pilot4.primal-r | 111.932 | 93.306 | 35.008 | 3.197 |
+| 80bau3b.primal-c | 1233.757 | 922.550 | 226.345 | 5.451 |
+| primal_5959.primal-r | 108.012 | 99.369 | 74.215 | 1.455 |
+| degen3.dual-c | 414.245 | 489.323 | 173.096 | 2.393 |
+| degen3.dual-r | 387.979 | 462.506 | 162.951 | 2.381 |
+| perold.dual-r | 220.981 | 259.579 | 76.904 | 2.873 |
+| 80bau3b.dual-r | 446.100 | 565.991 | 153.476 | 2.907 |
+| greenbea.dual-c | 1068.384 | 1331.731 | 411.515 | 2.596 |
+| greenbea.dual-r | 1333.392 | 1394.194 | 458.471 | 2.908 |
+| mode_switch.dual-r | 1062.425 | 1343.815 | 283.299 | 3.750 |
+| primal_5959.dual-r | 160.409 | 127.878 | 114.422 | 1.402 |
+| quad_2717.dual-r | 159.920 | 153.781 | 125.055 | 1.279 |
+| fx_quad_obj_5371.dual-r | 65.010 | 47.779 | 47.433 | 1.371 |
+| degen3.barrier-r | 317.058 | 271.010 | 150.438 | 2.108 |
+| 80bau3b.barrier-r | 443.008 | 405.132 | 200.357 | 2.211 |
+| greenbea.barrier-r | 1860.167 | 1651.639 | 787.428 | 2.362 |
+| 80bau3b.pdhg | 4685.953 | 3744.162 | 4118.993 | 1.138 |
+| greenbea.pdhg | 2261.199 | 1898.783 | 1809.566 | 1.250 |
+
 
 The reference was reconstructed from the supplied archive and hash-checked
 patches at `target/perf-reference/reconstructed/libgurobi130.so`, exact SHA256
@@ -86,7 +97,8 @@ now checks Runtime/status/iteration reads, honours parameter precedence, records
 effective overrides and preserves failures/timeouts. Parent harness commits:
 `7e089564`, `a86024e2`. The first sweep prefix stopped on an incorrect harness
 exit check and is excluded; the corrected complete panel is used exclusively.
-Evidence: [current-reference-comparison.json](evidence/current-reference-comparison.json),
+Evidence: [current-reference-comparison-789467e2.json](evidence/current-reference-comparison-789467e2.json) (this table, with all samples, previous ms and previous Gurobi ms),
+[current-reference-comparison.json](evidence/current-reference-comparison.json) (previous table),
 all manifests, raw output, source/runner/library/model hashes and qualified
 small/error witnesses in `target/perf-reference/`.
 [reference-availability.json](evidence/reference-availability.json) records reconstruction.

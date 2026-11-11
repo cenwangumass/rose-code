@@ -1,0 +1,617 @@
+{
+ "source": "rose main 789467e2",
+ "rose_sha256": "7aa21f98f0c817f7e96ac27013201460f33c9fd921ca60f0405c2d1150a8224c",
+ "library_sha256": "26a505171314b3300b754b4eff5f5719366b47ccf6f3d59770df99e3f256ee30",
+ "host": {
+  "cpu": "AMD EPYC Processor (with IBPB)",
+  "kernel": "7.0.0-38-generic"
+ },
+ "cpu": 2,
+ "warmups": 1,
+ "samples": 3,
+ "completion": {
+  "completed_rows": 23,
+  "rose_faster_rows": 0,
+  "all_results_stable": true
+ },
+ "rows": [
+  {
+   "id": "degen2.primal-c",
+   "rose_ms": 70.016531,
+   "ref_ms": 22.6290225982666,
+   "ratio": 3.094103189651829,
+   "rose_status": "optimal",
+   "ref_status": 2,
+   "rose_exits": [
+    0
+   ],
+   "ref_exits": [
+    0
+   ],
+   "rose_samples_ms": [
+    64.78576199999999,
+    70.016531,
+    73.030107
+   ],
+   "ref_samples_ms": [
+    23.962974548339844,
+    21.842002868652344,
+    22.6290225982666
+   ],
+   "prev_rose_ms": 71.128285,
+   "prev_ref_ms": 21.667957305908203
+  },
+  {
+   "id": "degen2.dual-r",
+   "rose_ms": 47.360824,
+   "ref_ms": 19.121885299682617,
+   "ratio": 2.476786324033964,
+   "rose_status": "optimal",
+   "ref_status": 2,
+   "rose_exits": [
+    0
+   ],
+   "ref_exits": [
+    0
+   ],
+   "rose_samples_ms": [
+    47.360824,
+    46.188698,
+    49.79452
+   ],
+   "ref_samples_ms": [
+    18.36109161376953,
+    21.63386344909668,
+    19.121885299682617
+   ],
+   "prev_rose_ms": 58.744535,
+   "prev_ref_ms": 16.804933547973633
+  },
+  {
+   "id": "degen3.primal-c",
+   "rose_ms": 964.37186,
+   "ref_ms": 313.8551712036133,
+   "ratio": 3.0726651923614936,
+   "rose_status": "optimal",
+   "ref_status": 2,
+   "rose_exits": [
+    0
+   ],
+   "ref_exits": [
+    0
+   ],
+   "rose_samples_ms": [
+    911.4147059999999,
+    964.37186,
+    1170.56655
+   ],
+   "ref_samples_ms": [
+    452.38494873046875,
+    313.8551712036133,
+    300.34494400024414
+   ],
+   "prev_rose_ms": 883.168303,
+   "prev_ref_ms": 311.36393547058105
+  },
+  {
+   "id": "degen3.primal-r",
+   "rose_ms": 1118.2139200000001,
+   "ref_ms": 398.5450267791748,
+   "ratio": 2.8057404932054975,
+   "rose_status": "optimal",
+   "ref_status": 2,
+   "rose_exits": [
+    0
+   ],
+   "ref_exits": [
+    0
+   ],
+   "rose_samples_ms": [
+    1079.551438,
+    1212.3511170000002,
+    1118.2139200000001
+   ],
+   "ref_samples_ms": [
+    430.0820827484131,
+    398.5450267791748,
+    379.6870708465576
+   ],
+   "prev_rose_ms": 1216.0822979999998,
+   "prev_ref_ms": 333.74714851379395
+  },
+  {
+   "id": "perold.primal-c",
+   "rose_ms": 1040.952466,
+   "ref_ms": 308.5191249847412,
+   "ratio": 3.374028971628529,
+   "rose_status": "optimal",
+   "ref_status": 2,
+   "rose_exits": [
+    0
+   ],
+   "ref_exits": [
+    0
+   ],
+   "rose_samples_ms": [
+    1008.664154,
+    1043.186881,
+    1040.952466
+   ],
+   "ref_samples_ms": [
+    308.5191249847412,
+    366.8789863586426,
+    303.6949634552002
+   ],
+   "prev_rose_ms": 1024.754101,
+   "prev_ref_ms": 309.25822257995605
+  },
+  {
+   "id": "pilot4.primal-r",
+   "rose_ms": 111.93160400000001,
+   "ref_ms": 35.00795364379883,
+   "ratio": 3.197319247474127,
+   "rose_status": "optimal",
+   "ref_status": 2,
+   "rose_exits": [
+    0
+   ],
+   "ref_exits": [
+    0
+   ],
+   "rose_samples_ms": [
+    112.42579599999999,
+    111.93160400000001,
+    105.210908
+   ],
+   "ref_samples_ms": [
+    30.943870544433594,
+    35.00795364379883,
+    38.91420364379883
+   ],
+   "prev_rose_ms": 93.30596800000001,
+   "prev_ref_ms": 28.59210968017578
+  },
+  {
+   "id": "80bau3b.primal-c",
+   "rose_ms": 1233.756796,
+   "ref_ms": 226.34506225585938,
+   "ratio": 5.450778487075486,
+   "rose_status": "optimal",
+   "ref_status": 2,
+   "rose_exits": [
+    0
+   ],
+   "ref_exits": [
+    0
+   ],
+   "rose_samples_ms": [
+    1332.545944,
+    1217.3095389999999,
+    1233.756796
+   ],
+   "ref_samples_ms": [
+    211.47608757019043,
+    226.34506225585938,
+    230.12781143188477
+   ],
+   "prev_rose_ms": 922.54998,
+   "prev_ref_ms": 189.23282623291016
+  },
+  {
+   "id": "primal_5959.primal-r",
+   "rose_ms": 108.01231,
+   "ref_ms": 74.21493530273438,
+   "ratio": 1.4553985604029813,
+   "rose_status": "numerical_failure",
+   "ref_status": 12,
+   "rose_exits": [
+    3
+   ],
+   "ref_exits": [
+    0
+   ],
+   "rose_samples_ms": [
+    122.26861099999999,
+    108.01231,
+    103.501893
+   ],
+   "ref_samples_ms": [
+    81.4979076385498,
+    74.21493530273438,
+    71.84600830078125
+   ],
+   "prev_rose_ms": 99.368627,
+   "prev_ref_ms": 73.59790802001953
+  },
+  {
+   "id": "degen3.dual-c",
+   "rose_ms": 414.245214,
+   "ref_ms": 173.0961799621582,
+   "ratio": 2.393150525277687,
+   "rose_status": "optimal",
+   "ref_status": 2,
+   "rose_exits": [
+    0
+   ],
+   "ref_exits": [
+    0
+   ],
+   "rose_samples_ms": [
+    414.245214,
+    439.777322,
+    407.006792
+   ],
+   "ref_samples_ms": [
+    152.13513374328613,
+    185.5490207672119,
+    173.0961799621582
+   ],
+   "prev_rose_ms": 489.323259,
+   "prev_ref_ms": 155.95388412475586
+  },
+  {
+   "id": "degen3.dual-r",
+   "rose_ms": 387.979066,
+   "ref_ms": 162.95099258422852,
+   "ratio": 2.380955524400722,
+   "rose_status": "optimal",
+   "ref_status": 2,
+   "rose_exits": [
+    0
+   ],
+   "ref_exits": [
+    0
+   ],
+   "rose_samples_ms": [
+    393.58471499999996,
+    387.979066,
+    386.898062
+   ],
+   "ref_samples_ms": [
+    156.8930149078369,
+    171.69618606567383,
+    162.95099258422852
+   ],
+   "prev_rose_ms": 462.50636000000003,
+   "prev_ref_ms": 151.07083320617676
+  },
+  {
+   "id": "perold.dual-r",
+   "rose_ms": 220.981498,
+   "ref_ms": 76.9040584564209,
+   "ratio": 2.873469910891936,
+   "rose_status": "optimal",
+   "ref_status": 2,
+   "rose_exits": [
+    0
+   ],
+   "ref_exits": [
+    0
+   ],
+   "rose_samples_ms": [
+    304.69350499999996,
+    220.981498,
+    220.431873
+   ],
+   "ref_samples_ms": [
+    94.09689903259277,
+    71.07877731323242,
+    76.9040584564209
+   ],
+   "prev_rose_ms": 259.579307,
+   "prev_ref_ms": 70.15299797058105
+  },
+  {
+   "id": "80bau3b.dual-r",
+   "rose_ms": 446.100416,
+   "ref_ms": 153.47599983215332,
+   "ratio": 2.906646097682184,
+   "rose_status": "optimal",
+   "ref_status": 2,
+   "rose_exits": [
+    0
+   ],
+   "ref_exits": [
+    0
+   ],
+   "rose_samples_ms": [
+    446.100416,
+    425.961211,
+    453.56924799999996
+   ],
+   "ref_samples_ms": [
+    152.3449420928955,
+    162.13297843933105,
+    153.47599983215332
+   ],
+   "prev_rose_ms": 565.990818,
+   "prev_ref_ms": 137.44282722473145
+  },
+  {
+   "id": "greenbea.dual-c",
+   "rose_ms": 1068.384034,
+   "ref_ms": 411.5149974822998,
+   "ratio": 2.5962213784102817,
+   "rose_status": "optimal",
+   "ref_status": 2,
+   "rose_exits": [
+    0
+   ],
+   "ref_exits": [
+    0
+   ],
+   "rose_samples_ms": [
+    1062.3149919999998,
+    1068.384034,
+    1178.990038
+   ],
+   "ref_samples_ms": [
+    427.2499084472656,
+    381.4270496368408,
+    411.5149974822998
+   ],
+   "prev_rose_ms": 1331.7306959999999,
+   "prev_ref_ms": 361.1021041870117
+  },
+  {
+   "id": "greenbea.dual-r",
+   "rose_ms": 1333.392362,
+   "ref_ms": 458.47082138061523,
+   "ratio": 2.908347270573712,
+   "rose_status": "optimal",
+   "ref_status": 2,
+   "rose_exits": [
+    0
+   ],
+   "ref_exits": [
+    0
+   ],
+   "rose_samples_ms": [
+    1133.505441,
+    1469.9172549999998,
+    1333.392362
+   ],
+   "ref_samples_ms": [
+    458.47082138061523,
+    434.2689514160156,
+    479.144811630249
+   ],
+   "prev_rose_ms": 1394.194422,
+   "prev_ref_ms": 350.94308853149414
+  },
+  {
+   "id": "mode_switch.dual-r",
+   "rose_ms": 1062.425027,
+   "ref_ms": 283.2989692687988,
+   "ratio": 3.750190230985109,
+   "rose_status": "optimal",
+   "ref_status": 2,
+   "rose_exits": [
+    0
+   ],
+   "ref_exits": [
+    0
+   ],
+   "rose_samples_ms": [
+    1062.425027,
+    1131.848002,
+    1030.635156
+   ],
+   "ref_samples_ms": [
+    321.8061923980713,
+    283.2989692687988,
+    225.01420974731445
+   ],
+   "prev_rose_ms": 1343.8148270000002,
+   "prev_ref_ms": 163.6219024658203
+  },
+  {
+   "id": "primal_5959.dual-r",
+   "rose_ms": 160.408869,
+   "ref_ms": 114.42208290100098,
+   "ratio": 1.4019048153387246,
+   "rose_status": "numerical_failure",
+   "ref_status": 12,
+   "rose_exits": [
+    3
+   ],
+   "ref_exits": [
+    0
+   ],
+   "rose_samples_ms": [
+    203.123623,
+    160.408869,
+    149.870247
+   ],
+   "ref_samples_ms": [
+    114.42208290100098,
+    123.28314781188965,
+    111.9990348815918
+   ],
+   "prev_rose_ms": 127.87837199999998,
+   "prev_ref_ms": 97.8851318359375
+  },
+  {
+   "id": "quad_2717.dual-r",
+   "rose_ms": 159.919638,
+   "ref_ms": 125.05507469177246,
+   "ratio": 1.2787936706619818,
+   "rose_status": "optimal",
+   "ref_status": 2,
+   "rose_exits": [
+    0
+   ],
+   "ref_exits": [
+    0
+   ],
+   "rose_samples_ms": [
+    177.769056,
+    157.52588500000002,
+    159.919638
+   ],
+   "ref_samples_ms": [
+    118.13497543334961,
+    126.32417678833008,
+    125.05507469177246
+   ],
+   "prev_rose_ms": 153.78145800000001,
+   "prev_ref_ms": 105.56697845458984
+  },
+  {
+   "id": "fx_quad_obj_5371.dual-r",
+   "rose_ms": 65.009558,
+   "ref_ms": 47.43313789367676,
+   "ratio": 1.3705514938885441,
+   "rose_status": "infeasible",
+   "ref_status": 3,
+   "rose_exits": [
+    0
+   ],
+   "ref_exits": [
+    0
+   ],
+   "rose_samples_ms": [
+    59.686356,
+    66.783955,
+    65.009558
+   ],
+   "ref_samples_ms": [
+    43.00689697265625,
+    47.43313789367676,
+    50.132036209106445
+   ],
+   "prev_rose_ms": 47.778586999999995,
+   "prev_ref_ms": 39.064884185791016
+  },
+  {
+   "id": "degen3.barrier-r",
+   "rose_ms": 317.058371,
+   "ref_ms": 150.4380702972412,
+   "ratio": 2.1075673888500703,
+   "rose_status": "optimal",
+   "ref_status": 2,
+   "rose_exits": [
+    0
+   ],
+   "ref_exits": [
+    0
+   ],
+   "rose_samples_ms": [
+    317.058371,
+    346.934666,
+    297.81727800000004
+   ],
+   "ref_samples_ms": [
+    145.98512649536133,
+    154.13999557495117,
+    150.4380702972412
+   ],
+   "prev_rose_ms": 271.010352,
+   "prev_ref_ms": 128.77511978149414
+  },
+  {
+   "id": "80bau3b.barrier-r",
+   "rose_ms": 443.00807399999997,
+   "ref_ms": 200.35696029663086,
+   "ratio": 2.2110940061384503,
+   "rose_status": "optimal",
+   "ref_status": 2,
+   "rose_exits": [
+    0
+   ],
+   "ref_exits": [
+    0
+   ],
+   "rose_samples_ms": [
+    441.322272,
+    443.00807399999997,
+    454.924664
+   ],
+   "ref_samples_ms": [
+    200.35696029663086,
+    184.94582176208496,
+    217.13900566101074
+   ],
+   "prev_rose_ms": 405.13176899999996,
+   "prev_ref_ms": 169.03400421142578
+  },
+  {
+   "id": "greenbea.barrier-r",
+   "rose_ms": 1860.167084,
+   "ref_ms": 787.4279022216797,
+   "ratio": 2.362333210128384,
+   "rose_status": "suboptimal",
+   "ref_status": 13,
+   "rose_exits": [
+    3
+   ],
+   "ref_exits": [
+    0
+   ],
+   "rose_samples_ms": [
+    1860.167084,
+    1806.112814,
+    1868.6620380000002
+   ],
+   "ref_samples_ms": [
+    784.2471599578857,
+    787.4279022216797,
+    826.9901275634766
+   ],
+   "prev_rose_ms": 1651.639261,
+   "prev_ref_ms": 704.0600776672363
+  },
+  {
+   "id": "80bau3b.pdhg",
+   "rose_ms": 4685.953207,
+   "ref_ms": 4118.993043899536,
+   "ratio": 1.1376453315307644,
+   "rose_status": "optimal",
+   "ref_status": 2,
+   "rose_exits": [
+    0
+   ],
+   "ref_exits": [
+    0
+   ],
+   "rose_samples_ms": [
+    4531.758867,
+    4685.953207,
+    5069.55808
+   ],
+   "ref_samples_ms": [
+    4064.532995223999,
+    4185.127973556519,
+    4118.993043899536
+   ],
+   "prev_rose_ms": 3744.1617699999997,
+   "prev_ref_ms": 3239.032983779907
+  },
+  {
+   "id": "greenbea.pdhg",
+   "rose_ms": 2261.198709,
+   "ref_ms": 1809.5660209655762,
+   "ratio": 1.2495806634308013,
+   "rose_status": "iteration_limit",
+   "ref_status": 7,
+   "rose_exits": [
+    3
+   ],
+   "ref_exits": [
+    0
+   ],
+   "rose_samples_ms": [
+    2359.52172,
+    2029.824631,
+    2261.198709
+   ],
+   "ref_samples_ms": [
+    1814.7189617156982,
+    1809.5660209655762,
+    1769.657850265503
+   ],
+   "prev_rose_ms": 1898.7827309999998,
+   "prev_ref_ms": 1516.2580013275146
+  }
+ ]
+}
