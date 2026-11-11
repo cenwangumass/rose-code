@@ -26,6 +26,8 @@ mod ab_tests;
 #[cfg(test)]
 mod btran_tests;
 #[cfg(test)]
+mod handoff_tests;
+#[cfg(test)]
 thread_local! {
     /// Dense L solves of this test thread that carried a count (the `force_dense` readers' case).
     static LIVE_COUNTS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
@@ -395,6 +397,21 @@ impl<R> BtranWork<R> {
             self.pending.push(e);
         }
     }
+}
+
+/// What the L stage hands to the U stage: the sparse list `(position, value)`, or the dense work vector itself. The consumer's
+/// first pass over `x` turns every `v == 0` slot (+0.0 or -0.0) into +0.0, the bits the old list round trip produced.
+enum LOut<R> {
+    List(Vec<(usize, R)>),
+    Dense(Vec<R>),
+}
+
+// Test hook: hand the dense L-stage vector on through the old list round trip (the `dense_spike` list), to compare the two paths.
+#[cfg(test)]
+thread_local! {
+    static FORCE_LIST_HANDOFF: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// Dense L-stage vectors this test thread handed on as the array itself.
+    static DENSE_HANDOFFS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 /// Working values are indexed by permutation slot. A clear occupancy bit represents +0,
@@ -1434,6 +1451,50 @@ impl<R: Real> DualFactor<R> {
         out
     }
 
+    /// Counts the entries with `v != 0` and stores +0.0 into every other slot (a -0.0 would read as +0.0 through the old list round trip).
+    #[inline(never)]
+    fn normalize_count(x: &mut [R]) -> usize {
+        let mut nz = 0usize;
+        for v in x.iter_mut() {
+            let keep = *v != R::ZERO;
+            nz += usize::from(keep);
+            *v = if keep { *v } else { R::ZERO };
+        }
+        nz
+    }
+
+    /// One pass over a dense L-stage vector: every slot with `v == 0` (+0.0 or -0.0) is stored as +0.0, `inp` receives the positions of
+    /// the entries with `v != 0` and `sp` the `(position, value)` entries above the tolerance, both in ascending position, without a
+    /// conditional push per entry. Returns the number of entries with `v != 0`.
+    #[inline(never)]
+    fn dense_lists(x: &mut [R], inp: &mut Vec<usize>, sp: &mut Vec<(usize, R)>) -> usize {
+        inp.clear();
+        sp.clear();
+        inp.reserve(x.len() + 1);
+        sp.reserve(x.len() + 1);
+        let (pi, ps) = (inp.as_mut_ptr(), sp.as_mut_ptr());
+        let (mut ci, mut cs) = (0usize, 0usize);
+        for (i, slot) in x.iter_mut().enumerate() {
+            let v = *slot;
+            let kept = v != R::ZERO;
+            let v = if kept { v } else { R::ZERO };
+            *slot = v;
+            // Both counts are at most `i < x.len()` before the writes and both buffers hold `x.len() + 1` entries; a rejected entry is
+            // overwritten by the next one. The types are Copy, so entries beyond the length need no drop.
+            unsafe {
+                pi.add(ci).write(i);
+                ps.add(cs).write((i, v));
+            }
+            ci += usize::from(kept);
+            cs += usize::from(kept & (v.abs() > R::c(TOL)));
+        }
+        unsafe {
+            inp.set_len(ci);
+            sp.set_len(cs);
+        }
+        ci
+    }
+
     /// Pack a dense BTRAN result in row order without conditional vector growth.
     #[inline(never)]
     fn dense_btran_output(x: &[R], perm: &[usize]) -> Vec<(usize, R)> {
@@ -1528,7 +1589,7 @@ impl<R: Real> DualFactor<R> {
         rows: &[usize],
         vals: &[R],
         force_dense: bool,
-    ) -> (Vec<(usize, R)>, Option<usize>, f64) {
+    ) -> (LOut<R>, Option<usize>, f64) {
         let m = self.m;
         let mut e = 0.0f64;
         let dense_l = rows.len() * self.dthr > self.m || force_dense || self.lev_dense_ft;
@@ -1539,7 +1600,7 @@ impl<R: Real> DualFactor<R> {
                     .get_or_insert_with(Box::default)
                     .solve(self, levels, *maxlev, rows, vals)
                 {
-                    return (result.0, Some(result.1), result.2);
+                    return (LOut::List(result.0), Some(result.1), result.2);
                 }
             }
         }
@@ -1786,25 +1847,26 @@ impl<R: Real> DualFactor<R> {
         }
         // A dense vector goes on as the raw array: the reference keeps the sub-tolerance residues of the L and eta stages.
         if output_dense {
-            return (
-                if R::LANES {
-                    Self::dense_spike(&x)
-                } else {
-                    (0..m)
-                        .filter(|&v| x[v] != R::ZERO)
-                        .map(|v| (v, x[v]))
-                        .collect()
-                },
-                count_l,
-                e,
-            );
+            if !R::LANES {
+                return (LOut::List((0..m).filter(|&v| x[v] != R::ZERO).map(|v| (v, x[v])).collect()), count_l, e);
+            }
+            // The U stage reads the array itself (the reference keeps a dense result dense).
+            #[cfg(test)]
+            if FORCE_LIST_HANDOFF.with(std::cell::Cell::get) {
+                return (LOut::List(Self::dense_spike(&x)), count_l, e);
+            }
+            #[cfg(test)]
+            DENSE_HANDOFFS.with(|k| k.set(k.get() + 1));
+            return (LOut::Dense(x), count_l, e);
         }
         (
-            order
-                .into_iter()
-                .filter(|&v| x[v].abs() > R::c(TOL))
-                .map(|v| (v, x[v]))
-                .collect(),
+            LOut::List(
+                order
+                    .into_iter()
+                    .filter(|&v| x[v].abs() > R::c(TOL))
+                    .map(|v| (v, x[v]))
+                    .collect(),
+            ),
             count_l,
             e,
         )
@@ -1830,12 +1892,21 @@ impl<R: Real> DualFactor<R> {
         dense_in: bool,
     ) -> Vec<(usize, R)> {
         let m = self.m;
-        let (spike, count_l, e_l) = self.lstage_num(rows, vals, dense_in);
+        let (lout, count_l, e_l) = self.lstage_num(rows, vals, dense_in);
+        // A dense L-stage vector is the U stage's work vector itself (it implies `tau_dense`); only its counts are needed.
+        let (spike, dense_x) = match lout {
+            LOut::List(list) => (list, None),
+            LOut::Dense(mut x) => {
+                let nz = Self::normalize_count(&mut x);
+                (Vec::new(), Some((x, nz)))
+            }
+        };
         self.tau_l.set(e_l);
         let tau_dense = rows.len() * self.dthr > self.m
             || dense_in
             || self.lev_dense_ft
             || (!self.etas.is_empty() && Self::count_dense(count_l, self.dthr, self.m));
+        debug_assert!(dense_x.is_none() || tau_dense);
         let tau_n = if tau_dense { None } else { Some(spike.len()) };
         // The inline dense joint loop of two dense vectors (`0x128c56..0x129152`) tests the raw value before the quotient: a tail column whose
         // raw value is at most the tolerance is zeroed even when the quotient exceeds it.
@@ -1844,17 +1915,34 @@ impl<R: Real> DualFactor<R> {
         let joint_dense = !tau_n.is_some_and(|n| {
             self.nuc.len() + n < self.i21 || self.dens * (n as f64) < 2.0 * m as f64
         });
-        let mut x = vec![R::ZERO; m];
-        let mut touched = vec![false; m];
+        // The spike's entry count and its tail-entry count (read only where `m > h33^2 n`), before the tail loop changes `x`.
+        let (spike_n, spike_t) = match &dense_x {
+            Some((x, nz)) => (
+                *nz,
+                if self.tail_count_needed(*nz) { (0..m).filter(|&p| self.kind[p] == -2 && x[p] != R::ZERO).count() } else { 0 },
+            ),
+            None => (
+                spike.len(),
+                if self.tail_count_needed(spike.len()) { spike.iter().filter(|e| self.kind[e.0] == -2).count() } else { 0 },
+            ),
+        };
         let mut tail: Vec<usize> = Vec::new();
-        for &(p, v) in &spike {
-            x[p] = v;
-            touched[p] = true;
-            if !joint_dense && self.kind[p] == -2 {
-                tail.push(p);
+        let (mut x, mut touched) = match dense_x {
+            Some((x, _)) => (x, Vec::new()),
+            None => {
+                let mut x = vec![R::ZERO; m];
+                let mut touched = vec![false; m];
+                for &(p, v) in &spike {
+                    x[p] = v;
+                    touched[p] = true;
+                    if !joint_dense && self.kind[p] == -2 {
+                        tail.push(p);
+                    }
+                }
+                (x, touched)
             }
-        }
-        let keep_tiny = !tau_dense && !joint_dense && self.tau_u_dense(&spike);
+        };
+        let keep_tiny = !tau_dense && !joint_dense && self.tau_u_dense_nt(spike_n, spike_t);
         if joint_dense || (!R::QUAD && keep_tiny) {
             // The ordinary dense tail loop (12403b..12405f) divides and stores
             // every slot before testing the quotient, including unreachable zero
@@ -1887,7 +1975,7 @@ impl<R: Real> DualFactor<R> {
         //
         // The work estimates of the U stage are booked here, where a tail column is finished (a scatter only hits lower slots, so its value
         // is final): every term below is an integer-valued count (`len`, `2 len + 4`), hence the sums are exact and order free.
-        let tdense = self.tau_u_dense(&spike);
+        let tdense = self.tau_u_dense_nt(spike_n, spike_t);
         let (mut nz, mut abs_a, mut tp_a2, mut tp_only_a) = (0usize, 0usize, 0usize, 0usize);
         #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
         let mut surv_nz = 0usize;
@@ -1952,12 +2040,12 @@ impl<R: Real> DualFactor<R> {
             surv_nz,
             "ftran_needed: nonzero tail slots differ from the processed survivors"
         );
-        let (u_est, fin) = self.tau_u_finish(&spike, needed.len(), nz, abs_a);
+        let (u_est, fin) = self.tau_u_finish(spike_n, spike_t, needed.len(), nz, abs_a);
         self.tau_u.set(u_est);
         self.tau_fin.set(fin);
         #[cfg(test)]
         {
-            let (v, f) = self.tau_u_work_ref(&spike, &x, needed.len());
+            let (v, f) = self.tau_u_work_ref(spike_n, spike_t, &x, needed.len());
             assert_eq!(v.to_bits(), u_est.to_bits(), "tau_u");
             assert_eq!(f, fin, "tau_fin");
         }
@@ -2148,21 +2236,21 @@ impl<R: Real> DualFactor<R> {
     /// Work of the tau solve's U stage from the counts of the tail loop (see `tau_u_work_ref`): `abs_a` is the sum of `len(a)` over the tail
     /// columns whose solved value exceeds the tolerance (dense loop), `nz` the number of nonzero tail columns (heap walk). Returns the
     /// estimate and the finished count.
-    fn tau_u_finish(&self, spike: &[(usize, R)], n: usize, nz: usize, abs_a: usize) -> (f64, usize) {
+    fn tau_u_finish(&self, spike_n: usize, t: usize, n: usize, nz: usize, abs_a: usize) -> (f64, usize) {
         let m = self.m as f64;
-        let (cnt, nf) = (spike.len() as f64, n as f64);
+        let (cnt, nf) = (spike_n as f64, n as f64);
         let d = self.h33;
         let tail_rows = (self.m - self.i21) as f64;
         let mut e = ((10.0 + nf) + nf) + 6.0 * cnt;
         let mut dense = m <= (d * d) * cnt;
         if !dense {
-            let t = spike.iter().filter(|e| self.kind[e.0] == -2).count() as f64;
+            let t = t as f64;
             if ((5.0 * d) * d) * t > tail_rows {
                 dense = true;
                 e = 2.0 * t + e;
             }
         }
-        debug_assert_eq!(dense, self.tau_u_dense(spike));
+        debug_assert_eq!(dense, self.tau_u_dense_nt(spike_n, t));
         let fin;
         if dense {
             e = 3.0 * tail_rows + e;
@@ -2318,14 +2406,20 @@ impl<R: Real> DualFactor<R> {
         x1
     }
 
-    /// Whether the U stage of the second vector runs its dense slot loop (`0x123690`: `m <= h33^2 c` for a spike of `c` entries, or `5 h33^2 t > m - i21` for `t` tail entries).
-    fn tau_u_dense(&self, spike: &[(usize, R)]) -> bool {
+    /// Whether the U stage of the second vector runs its dense slot loop (`0x123690`: `m <= h33^2 c` for a spike of `c` entries, or `5 h33^2 t > m - i21` for `t` tail entries),
+    /// from the spike's entry count `n` and tail-entry count `t` (`t` is read only where `tail_count_needed(n)`).
+    fn tau_u_dense_nt(&self, n: usize, t: usize) -> bool {
         let (m, d) = (self.m as f64, self.h33);
-        if m <= (d * d) * spike.len() as f64 {
+        if m <= (d * d) * n as f64 {
             return true;
         }
-        let t = spike.iter().filter(|e| self.kind[e.0] == -2).count() as f64;
-        ((5.0 * d) * d) * t > (self.m - self.i21) as f64
+        ((5.0 * d) * d) * t as f64 > (self.m - self.i21) as f64
+    }
+
+    /// Whether the tail-entry count of a spike of `n` entries decides the dense slot loop (`m > h33^2 n`).
+    fn tail_count_needed(&self, n: usize) -> bool {
+        let d = self.h33;
+        self.m as f64 > (d * d) * n as f64
     }
 
     /// Work of the tau solve's U stage (`0x123690`, which adds to `F+0x200`): `10 + 2 n + 6 c` for `n` needed positions and a spike of
@@ -2333,21 +2427,21 @@ impl<R: Real> DualFactor<R> {
     /// tail column with quotient above the tolerance (plus `2 t` in the second case) and `4 (m - i21)` at the end; otherwise the heap walk books `4 h33` per nonzero
     /// tail column and `4` per such column at the end. `(2 n) h34` is added last. `x` holds the solved tail values.
     #[cfg(test)]
-    fn tau_u_work_ref(&self, spike: &[(usize, R)], x: &[R], n: usize) -> (f64, usize) {
+    fn tau_u_work_ref(&self, spike_n: usize, t: usize, x: &[R], n: usize) -> (f64, usize) {
         let m = self.m as f64;
-        let (cnt, nf) = (spike.len() as f64, n as f64);
+        let (cnt, nf) = (spike_n as f64, n as f64);
         let d = self.h33;
         let tail_rows = (self.m - self.i21) as f64;
         let mut e = ((10.0 + nf) + nf) + 6.0 * cnt;
         let mut dense = m <= (d * d) * cnt;
         if !dense {
-            let t = spike.iter().filter(|e| self.kind[e.0] == -2).count() as f64;
+            let t = t as f64;
             if ((5.0 * d) * d) * t > tail_rows {
                 dense = true;
                 e = 2.0 * t + e;
             }
         }
-        debug_assert_eq!(dense, self.tau_u_dense(spike));
+        debug_assert_eq!(dense, self.tau_u_dense_nt(spike_n, t));
         let fin;
         if dense {
             e = 3.0 * tail_rows + e;
@@ -2407,7 +2501,24 @@ impl<R: Real> DualFactor<R> {
 
     fn ftran_with(&mut self, rows: &[usize], vals: &[R], force_dense: bool) -> Vec<(usize, R)> {
         let m = self.m;
-        let (spike, count_l, e_l) = self.lstage_num(rows, vals, force_dense);
+        let (lout, count_l, e_l) = self.lstage_num(rows, vals, force_dense);
+        let spike = match lout {
+            LOut::List(list) => list,
+            LOut::Dense(mut x) => {
+                let mut inp = std::mem::take(&mut self.f2.get_mut().col_in);
+                let mut sp = std::mem::take(&mut self.spike);
+                let nz = Self::dense_lists(&mut x, &mut inp, &mut sp);
+                let u_dense = rows.len() * self.dthr > m
+                    || self.lev_dense_ft
+                    || (!self.etas.is_empty() && Self::count_dense(count_l, self.dthr, m))
+                    || !(self.nuc.len() + nz < self.i21 || self.dens * (nz as f64) < 2.0 * m as f64);
+                if u_dense && !(force_dense && crate::dump::on("bsolve")) {
+                    return self.ftran_with_dense(rows, x, inp, sp, nz, count_l, e_l);
+                }
+                // The sparse U routine and the bsolve dump take the list.
+                Self::dense_spike(&x)
+            }
+        };
         // The previous column snapshot has served every consumer. Reuse it as
         // numeric work and reset only blocks that could contain a prior write.
         let old = self.f2.get_mut();
@@ -2573,6 +2684,95 @@ impl<R: Real> DualFactor<R> {
         }
         // The column replacement does not receive the residues.
         spike.retain(|e| e.1.abs() > R::c(TOL));
+        self.spike = spike;
+        self.spike_used = false;
+        self.last_alpha = out.len();
+        out
+    }
+
+    /// `ftran_with` for a dense L-stage vector `x` (`nz` entries with `v != 0`, every other slot +0.0) that takes the dense U routine
+    /// (`0x121ef0`): `x` is the U work vector and then the column snapshot, with no spike list, re-scatter or second zero-filled vector.
+    /// The tail loop and the final pass are those of `ftran_with` for `u_dense`; a position the old marker set did not contain holds
+    /// +0.0 and comes out as +0.0 from the final pass.
+    #[allow(clippy::too_many_arguments)]
+    fn ftran_with_dense(
+        &mut self,
+        rows: &[usize],
+        mut x: Vec<R>,
+        inp: Vec<usize>,
+        spike: Vec<(usize, R)>,
+        nz: usize,
+        count_l: Option<usize>,
+        e_l: f64,
+    ) -> Vec<(usize, R)> {
+        let m = self.m;
+        // `inp` (the L-stage entries' positions) and `spike` (those above the tolerance, in ascending position as the column replacement
+        // receives them after a dense solve) come from `dense_lists`.
+        let mut col_surv = std::mem::take(&mut self.f2.get_mut().col_surv);
+        col_surv.clear();
+        let (mut sa, mut sb, mut su) = (0usize, 0usize, 0usize);
+        for s in (self.i21..m).rev() {
+            let c = self.at[s];
+            let mut xc = x[c];
+            if xc.abs() <= R::c(TOL) {
+                x[c] = R::ZERO;
+                continue;
+            }
+            xc /= self.diag[c];
+            if xc.abs() <= R::c(TOL) {
+                x[c] = R::ZERO;
+                continue;
+            }
+            x[c] = xc;
+            col_surv.push(c);
+            sa += self.ab.na(c);
+            sb += self.ab.nb(c);
+            su += self.uc[c].len();
+            for &(j, v) in &self.uc[c] {
+                x[j] -= v * xc;
+            }
+        }
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        assert_eq!(
+            (self.i21..m).filter(|&s| x[self.at[s]] != R::ZERO).count(),
+            col_surv.len(),
+            "ftran_with: nonzero tail slots differ from the processed survivors"
+        );
+        // The tail slots are final; every other slot is zeroed at or below the tolerance and divided otherwise (the old marker set held
+        // the L entries and the scatter targets; every other slot is +0.0 and stays so).
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        assert!((0..m).all(|p| (self.kind[p] == -2) == (self.slot[p] >= self.i21)), "tail kind and slot differ");
+        for (p, xp) in x.iter_mut().enumerate() {
+            let v = *xp;
+            if v.abs() <= R::c(TOL) {
+                *xp = R::ZERO;
+            } else if self.kind[p] != -2 {
+                let q = v / self.diag[p];
+                *xp = if q.abs() <= R::c(TOL) { R::ZERO } else { q };
+            }
+        }
+        let vec_dense = rows.len() * self.dthr > m
+            || self.lev_dense_ft
+            || (!self.etas.is_empty() && Self::count_dense(count_l, self.dthr, m));
+        let u_cnt = if vec_dense { None } else { Some(nz) };
+        let u_est = self.u_work(&inp, &x, false, u_cnt, &Surv { list: &col_surv, n: col_surv.len(), sa, sb, su });
+        #[cfg(test)]
+        assert_eq!(u_est.to_bits(), self.u_work_ref(&inp, &x, false, u_cnt).to_bits(), "u_work");
+        self.work = u_est + e_l;
+        self.work_parts = (e_l, u_est);
+        self.last_dense = true;
+        self.last_ordered = true;
+        let out: Vec<(usize, R)> = x.iter().copied().enumerate().filter(|&(_, v)| v != R::ZERO).collect();
+        *self.f2.get_mut() = F2 {
+            col_n: u_cnt,
+            col_in: inp,
+            x_col: x,
+            dirty_blocks: None,
+            col_surv,
+            col_sa: sa,
+            col_sb: sb,
+            ..F2::<R>::default()
+        };
         self.spike = spike;
         self.spike_used = false;
         self.last_alpha = out.len();
