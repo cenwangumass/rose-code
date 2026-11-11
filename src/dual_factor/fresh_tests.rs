@@ -381,7 +381,6 @@ impl<R: Real> DualFactor<R> {
             dthr,
             slot: (0..m).collect(),
             at: (0..m).collect(),
-            slot_counts: Default::default(),
             btran_ws: Default::default(),
             etas: Vec::new(),
             lt,

@@ -625,8 +625,6 @@ pub struct DualFactor<R: Real = f64> {
     empty_tail: EmptyTail,
     slot: Vec<usize>,
     at: Vec<usize>,
-    /// Reused counts for ordering dense lists of permutation slots.
-    slot_counts: std::cell::RefCell<Vec<usize>>,
     etas: Vec<Eta<R>>,
     bt_occupied: bool,
     bt_work: Option<Box<BtranWork<R>>>,
@@ -1389,7 +1387,6 @@ impl<R: Real> DualFactor<R> {
             dthr,
             slot: (0..m).collect(),
             at: (0..m).collect(),
-            slot_counts: Default::default(),
             btran_ws: Default::default(),
             etas: Vec::new(),
             lt,
@@ -1964,7 +1961,7 @@ impl<R: Real> DualFactor<R> {
                     }
                 }
             }
-            self.sort_slot_desc(&mut tail);
+            self.sort_tail_desc(&mut tail);
         }
         #[cfg(any(test, feature = "factor-shadow"))]
         let mut tau_raw = vec![false; m];
@@ -2549,33 +2546,24 @@ impl<R: Real> DualFactor<R> {
                 || self.dens * (spike.len() as f64) < 2.0 * m as f64);
         let bs = force_dense && crate::dump::on("bsolve");
         let mut touched = FtranTouched::new(m, u_dense, dirty.unwrap_or_default());
-        let mut tail: Vec<usize> = Vec::new();
-        for &(p, _) in &spike {
+        let inp: Vec<usize> = spike.iter().map(|e| e.0).collect();
+        for &p in &inp {
             touched.insert(p);
         }
-        if u_dense && !bs {
+        // The sparse solve runs the closure of the list's tail positions under the `a` lists in descending slot order, which is also the
+        // tail part of the output order: `uorder_open` produces it once and `uorder_close` finishes the order after the tail loop.
+        let opened = !(u_dense && !bs);
+        let tail: Vec<usize> = if opened {
+            let tail = self.uorder_open(&inp);
+            for &c in &tail {
+                touched.insert(c);
+            }
+            tail
+        } else {
             // Unreached columns contain zero and the dense kernel skips them before division.
             // Slot order preserves the arithmetic order of every reached column.
-            tail.extend((self.i21..m).rev().map(|s| self.at[s]));
-        } else {
-            for &(p, _) in &spike {
-                if self.kind[p] == -2 {
-                    tail.push(p);
-                }
-            }
-            let mut k = 0;
-            while k < tail.len() {
-                let c = tail[k];
-                k += 1;
-                for &j in self.ab.a(c) {
-                    let j = j as usize;
-                    if touched.insert(j) {
-                        tail.push(j);
-                    }
-                }
-            }
-            self.sort_slot_desc(&mut tail);
-        }
+            (self.i21..m).rev().map(|s| self.at[s]).collect()
+        };
         let x_l = if bs { x.clone() } else { Vec::new() };
         // The U-stage work estimate sums integer-valued lengths over the tail columns that keep a nonzero value; they are collected where
         // the column is finished (a scatter only hits lower slots) instead of by a later scan of the tail (`u_work_ref`).
@@ -2632,7 +2620,6 @@ impl<R: Real> DualFactor<R> {
             || (!self.etas.is_empty() && Self::count_dense(count_l, self.dthr, m))
             || !(self.nuc.len() + spike.len() < self.i21
                 || self.dens * (spike.len() as f64) < 2.0 * m as f64);
-        let inp: Vec<usize> = spike.iter().map(|e| e.0).collect();
         let vec_dense = rows.len() * self.dthr > m
             || self.lev_dense_ft
             || (!self.etas.is_empty() && Self::count_dense(count_l, self.dthr, m));
@@ -2645,10 +2632,14 @@ impl<R: Real> DualFactor<R> {
         self.last_dense = dense;
         self.last_ordered = dense || u_dense;
         let mut out = Vec::new();
+        let ordered = if opened { Some(self.uorder_close(tail, &x)) } else { None };
         if dense || u_dense {
             out.extend(x.iter().copied().enumerate().filter(|&(_, v)| v != R::ZERO));
+            if let Some(o) = ordered {
+                self.uorder_done(o);
+            }
         } else {
-            let ordered = self.uorder(&inp, &x);
+            let ordered = ordered.unwrap();
             for &p in &ordered {
                 if touched.take_sparse(p) && x[p] != R::ZERO {
                     out.push((p, x[p]));
@@ -3583,27 +3574,17 @@ impl<R: Real> DualFactor<R> {
         result
     }
 
-    /// Descending slot order without repeatedly reading indirect keys during comparisons. `slot` and `at` are inverse
-    /// permutations, so sorting slots and mapping back also preserves repeated positions exactly.
+    /// Sorts distinct positions into descending slot order (a tail list built with a visited marker has no repeats), by one bit per slot
+    /// for a long list and by the sorted slots for a short one: no counting pass over all `m` slots.
+    fn sort_tail_desc(&self, positions: &mut [usize]) {
+        let mut scratch = self.btran_ws.order.borrow_mut();
+        Self::sort_distinct_keys(&mut scratch.bits, positions, self.m, true, |p| self.slot[p], |s| self.at[s]);
+    }
+
+    /// The previous tail sort (oracle of the tests; its counting-sort branch for long lists gave the same order): descending slot order.
+    /// `slot` and `at` are inverse permutations, so sorting slots and mapping back also preserves repeated positions exactly.
+    #[cfg(test)]
     fn sort_slot_desc(&self, positions: &mut [usize]) {
-        if positions.len() >= 64 && positions.len() > self.m / 8 {
-            let mut counts = self.slot_counts.borrow_mut();
-            counts.resize(self.m, 0);
-            for &p in positions.iter() {
-                counts[self.slot[p]] += 1;
-            }
-            let mut i = 0;
-            for slot in (0..self.m).rev() {
-                for _ in 0..counts[slot] {
-                    positions[i] = self.at[slot];
-                    i += 1;
-                }
-            }
-            // This branch already scans every slot, with m < 8 * output length.
-            // A bulk clear here is cheaper than an extra scalar store per slot.
-            counts.fill(0);
-            return;
-        }
         for p in positions.iter_mut() {
             *p = self.slot[*p];
         }
@@ -3645,7 +3626,8 @@ impl<R: Real> DualFactor<R> {
         for &p in v.iter() {
             let k = key(p);
             let w = k >> 6;
-            debug_assert!(bits[w] >> (k & 63) & 1 == 0, "duplicate key");
+            #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+            assert!(bits[w] >> (k & 63) & 1 == 0, "duplicate key");
             bits[w] |= 1 << (k & 63);
             lo = lo.min(w);
             hi = hi.max(w);
@@ -3676,11 +3658,22 @@ impl<R: Real> DualFactor<R> {
     }
 
     /// Order of the nonzero positions of the solution, given the L-stage list. The result is the retained `Order::out`, taken from the
-    /// scratch; hand it back with `uorder_done`.
+    /// scratch; hand it back with `uorder_done`. Kept as the composition of `uorder_open` and `uorder_close` (the solve itself calls the
+    /// two halves around its tail loop).
+    #[cfg(test)]
     fn uorder(&self, inp: &[usize], x: &[R]) -> Vec<usize> {
+        let tail = self.uorder_open(inp);
+        self.uorder_close(tail, x)
+    }
+
+    /// First half of `uorder`, which needs no solution values: classifies the L-stage list and returns the tail columns the U solve
+    /// processes, the closure of the list's tail positions under the `a` lists, in descending slot order. This is the order the solve's
+    /// tail loop runs in and also the tail part of the output order (slots are distinct, so the heap and the key sort agree). Hand the
+    /// vector back to `uorder_close`.
+    fn uorder_open(&self, inp: &[usize]) -> Vec<usize> {
         let m = self.m;
         let mut scratch = self.btran_ws.order.borrow_mut();
-        let btran_ws::Order { seen, have, nm, heap, bits, inp_d, sing, tri, nuc, t, ns, order, out } = &mut *scratch;
+        let btran_ws::Order { seen, have, nm, heap, bits, inp_d, sing, tri, nuc, order, dense, .. } = &mut *scratch;
         seen.prepare(m);
         have.prepare(m);
         nm.prepare(m);
@@ -3701,25 +3694,10 @@ impl<R: Real> DualFactor<R> {
         let n = inp_d.len();
         let i3 = self.nuc.len();
         let d2 = self.dens;
-        // The nucleus positions are in nucleus-list order (`kind` is the index into `self.nuc`, so the keys are distinct).
-        let nuc_sorted = |bits: &mut Vec<u64>, v: &mut Vec<usize>| {
-            Self::sort_distinct_keys(
-                bits,
-                v,
-                i3,
-                false,
-                |x| {
-                    debug_assert!(self.kind[x] >= 0, "nucleus key of a non-nucleus position");
-                    self.kind[x] as usize
-                },
-                |k| self.nuc[k],
-            );
-        };
-        let dense = (m as f64) <= (n as f64) * d2
+        *dense = (m as f64) <= (n as f64) * d2
             || d2 * ((nuc.len() + tri.len()) as f64) > (i3 + (m - self.i21)) as f64;
-        out.clear();
-        out.extend_from_slice(sing);
-        if dense {
+        if *dense {
+            let mut t = std::mem::take(order);
             t.clear();
             t.extend_from_slice(tri);
             for &x in tri.iter() {
@@ -3736,17 +3714,9 @@ impl<R: Real> DualFactor<R> {
                     }
                 }
             }
-            ns.clear();
-            for x in nuc.iter().copied().chain(t.iter().flat_map(|&c| self.ab.b(c).iter().map(|&y| y as usize))) {
-                if nm.insert(x) {
-                    ns.push(x);
-                }
-            }
             // The positions of `t` are distinct, hence so are their slots (`slot` and `at` are inverse permutations).
-            Self::sort_distinct_keys(bits, t, m, true, |p| self.slot[p], |s| self.at[s]);
-            out.extend_from_slice(t);
-            nuc_sorted(bits, ns);
-            out.extend_from_slice(ns);
+            Self::sort_distinct_keys(bits, &mut t, m, true, |p| self.slot[p], |s| self.at[s]);
+            t
         } else {
             // Slots are distinct, so the heap of slots pops in the same order as the (slot, position) pairs.
             heap.clear();
@@ -3754,15 +3724,11 @@ impl<R: Real> DualFactor<R> {
                 have.insert(x);
                 heap.push(self.slot[x]);
             }
+            let mut order = std::mem::take(order);
             order.clear();
-            let mut lb = nuc.len();
             while let Some(s) = heap.pop() {
                 let k = self.at[s];
                 order.push(k);
-                // The reference's counter and nucleus-list discovery only see tail columns that survive the tolerance test.
-                if x[k] != R::ZERO {
-                    lb += self.ab.nb(k);
-                }
                 for &j in self.ab.a(k) {
                     let j = j as usize;
                     if have.insert(j) {
@@ -3770,10 +3736,52 @@ impl<R: Real> DualFactor<R> {
                     }
                 }
             }
-            ns.clear();
+            order
+        }
+    }
+
+    /// Second half of `uorder`: the singletons, the tail columns (`tail`, from `uorder_open`) and the nucleus positions they reach. `x`
+    /// holds the solution after the tail loop (the reference's counter and nucleus-list discovery only see the tail columns that
+    /// survive the tolerance test).
+    fn uorder_close(&self, tail: Vec<usize>, x: &[R]) -> Vec<usize> {
+        let mut scratch = self.btran_ws.order.borrow_mut();
+        let btran_ws::Order { nm, bits, sing, nuc, ns, out, dense, order, .. } = &mut *scratch;
+        let i3 = self.nuc.len();
+        // The nucleus positions are in nucleus-list order (`kind` is the index into `self.nuc`, so the keys are distinct).
+        let nuc_sorted = |bits: &mut Vec<u64>, v: &mut Vec<usize>| {
+            Self::sort_distinct_keys(
+                bits,
+                v,
+                i3,
+                false,
+                |x| {
+                    debug_assert!(self.kind[x] >= 0, "nucleus key of a non-nucleus position");
+                    self.kind[x] as usize
+                },
+                |k| self.nuc[k],
+            );
+        };
+        out.clear();
+        out.extend_from_slice(sing);
+        ns.clear();
+        if *dense {
+            // Every tail column counts, and the sorted nucleus list does not depend on the discovery order.
+            for y in nuc.iter().copied().chain(tail.iter().flat_map(|&c| self.ab.b(c).iter().map(|&y| y as usize))) {
+                if nm.insert(y) {
+                    ns.push(y);
+                }
+            }
+            out.extend_from_slice(&tail);
+            nuc_sorted(bits, ns);
+            out.extend_from_slice(ns);
+            *order = tail;
+        } else {
+            let mut lb = nuc.len();
+            for &k in tail.iter().filter(|&&k| x[k] != R::ZERO) {
+                lb += self.ab.nb(k);
+            }
             for y in nuc.iter().copied().chain(
-                order
-                    .iter()
+                tail.iter()
                     .filter(|&&k| x[k] != R::ZERO)
                     .flat_map(|&k| self.ab.b(k).iter().map(|&y| y as usize)),
             ) {
@@ -3781,11 +3789,12 @@ impl<R: Real> DualFactor<R> {
                     ns.push(y);
                 }
             }
-            out.extend_from_slice(order);
+            out.extend_from_slice(&tail);
             if (lb as f64) * 2.5 > i3 as f64 {
                 nuc_sorted(bits, ns);
             }
             out.extend_from_slice(ns);
+            *order = tail;
         }
         scratch.clear();
         std::mem::take(&mut scratch.out)

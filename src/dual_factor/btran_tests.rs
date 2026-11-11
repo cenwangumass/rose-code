@@ -7,7 +7,7 @@ fn bits(v: Vec<(usize, f64)>) -> Vec<(usize, u64)> {
 }
 
 #[test]
-fn retained_slot_counts_keep_duplicates_and_clear_between_calls() {
+fn tail_sort_by_slot_bits_matches_slot_sort_and_clears_between_calls() {
     let m = 321;
     let cols: Vec<_> = (0..m).map(|i| (true, vec![i], vec![1.0])).collect();
     let st = crate::lu_order::factor_structure(m, &cols);
@@ -15,13 +15,14 @@ fn retained_slot_counts_keep_duplicates_and_clear_between_calls() {
     f.at.rotate_left(71);
     for (s, &p) in f.at.iter().enumerate() { f.slot[p] = s; }
     for pass in 0..16 {
-        for n in [0, 1, 63, 64, 65, 200, 500] {
-            let mut v: Vec<_> = (0..n).map(|i| (i * 47 + pass * 13) % m).collect();
+        for n in [0, 1, 23, 24, 25, 63, 64, 65, 200, 321] {
+            // distinct positions: 50 is coprime to 321, so the walk is a permutation
+            let mut v: Vec<_> = (0..m).map(|i| (i * 50 + pass * 13) % m).take(n).collect();
             let mut expected = v.clone();
-            expected.sort_unstable_by_key(|&p| std::cmp::Reverse(f.slot[p]));
-            f.sort_slot_desc(&mut v);
+            f.sort_slot_desc(&mut expected);
+            f.sort_tail_desc(&mut v);
             assert_eq!(v, expected);
-            assert!(f.slot_counts.borrow().iter().all(|&n| n == 0));
+            assert!(f.btran_ws.order.borrow().bits.iter().all(|&w| w == 0));
         }
     }
 }
@@ -322,7 +323,39 @@ fn uorder_matches_original_after_updates() {
                         continue;
                     }
                     let want = f.uorder_ref(&inp, &x);
-                    let got = f.uorder(&inp, &x);
+                    // The solve's tail order: the closure of the list's tail positions under the `a` lists with a visited marker, sorted by
+                    // descending slot (the previous tail construction of `ftran_with`).
+                    let old_tail = {
+                        let mut seen = vec![false; m];
+                        let mut tail = Vec::new();
+                        for &p in &inp {
+                            if !seen[p] {
+                                seen[p] = true;
+                                if f.kind[p] == -2 {
+                                    tail.push(p);
+                                }
+                            }
+                        }
+                        let mut k = 0;
+                        while k < tail.len() {
+                            let c = tail[k];
+                            k += 1;
+                            for &j in f.ab.a(c) {
+                                let j = j as usize;
+                                if !std::mem::replace(&mut seen[j], true) {
+                                    tail.push(j);
+                                }
+                            }
+                        }
+                        let mut sorted = tail.clone();
+                        f.sort_tail_desc(&mut sorted);
+                        f.sort_slot_desc(&mut tail);
+                        assert_eq!(sorted, tail, "sort_tail_desc m {m} round {round} step {step}");
+                        tail
+                    };
+                    let open = f.uorder_open(&inp);
+                    assert_eq!(open, old_tail, "tail m {m} round {round} step {step}");
+                    let got = f.uorder_close(open, &x);
                     assert_eq!(got, want, "m {m} round {round} step {step}");
                     f.uorder_done(got);
                     {

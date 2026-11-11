@@ -63,9 +63,10 @@ pub(super) struct Order {
     pub sing: Vec<usize>,
     pub tri: Vec<usize>,
     pub nuc: Vec<usize>,
-    pub t: Vec<usize>,
     pub ns: Vec<usize>,
     pub order: Vec<usize>,
+    /// Whether the open `uorder` took the dense branch.
+    pub dense: bool,
     pub out: Vec<usize>,
 }
 
