@@ -106,7 +106,7 @@ fn captured_transpose_retained_tail_matches_dense_scratch() {
         for (p, &s) in f.slot.iter().enumerate() { f.at[s] = p; }
         let uc: Vec<Vec<(usize, f64)>> = serde_json::from_value(rec["uc"].clone()).unwrap();
         for (c, col) in uc.iter().enumerate() {
-            for &(p, v) in col { f.ut[p].push((c, v)); }
+            for &(p, v) in col { f.urows.push(p, c, v); }
         }
         let mut tail = SparseBtranTail::default();
         for h in [2.0, 7.0] {
@@ -195,8 +195,8 @@ fn update_state(f: &DualFactor<f64>) -> String {
     format!(
         "{:?}",
         (
-            (&f.kind, &f.nuc, f.i21, f.mark, f.ab.to_vecs(), ab_values(f), &f.slot, &f.at, &f.rowl),
-            (ub(&f.uc), ub(&f.ut), diag, etas, &f.first_eta, f.fill, &f.row_cap, &f.row_par, et),
+            (&f.kind, &f.nuc, f.i21, f.mark, f.ab.to_vecs(), ab_values(f), &f.slot, &f.at, f.urows.to_rowl()),
+            (ub(&f.uc), ub(&f.urows.to_ut()), diag, etas, &f.first_eta, f.fill, &f.row_cap, &f.row_par, et),
             (work, f.sum_eta.to_bits(), f.sum_alpha.to_bits(), f.upd, (f.before_last.0, f.before_last.1.to_bits())),
             (f.bt_occupied, f.dense_est.get().to_bits(), f.spike_used, f.row_cached),
         )

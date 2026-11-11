@@ -14,18 +14,84 @@ impl<R: Real> DualFactor<R> {
         }
     }
 
+    /// Row elimination of a column replacement at `r` on the transpose `ut` (sorted by column), as it was before the row pool: the eta
+    /// multipliers `(position, multiplier)` in elimination order.
+    pub(super) fn eliminate_old(&self, ut: &[Vec<(usize, R)>], r: usize, w: &mut [R], seen: &mut [bool], scratch: &mut btran_ws::Update<R>) -> usize {
+        let m = self.m;
+        let d0 = self.diag[r];
+        // Tail entries of the maintained transpose, in the same ascending column order as the CSR rebuild.
+        let rows = |i: usize| ut[i].iter().filter(|&&(k, _)| self.kind[k] == -2);
+        let btran_ws::Update { touched, heap, eta, .. } = scratch;
+        touched.clear();
+        heap.clear();
+        eta.clear();
+        for &(k, v) in rows(r) {
+            w[k] = v * (R::ONE / d0);
+            touched.push(k);
+            seen[k] = true;
+            heap.push(std::cmp::Reverse((self.slot[k], k)));
+        }
+        // The reference's solve (`0x131760`) books 2 per entry of the row-wise copy of every accepted position, `r` first.
+        // Count only the rows reached by the solve. The transpose is sorted by column,
+        // so adjacent duplicates count once, just as in the full column/stamp rebuild.
+        let rlen = |y: usize| {
+            let mut prev = usize::MAX;
+            let mut count = 0;
+            for &(c, _) in &ut[y] {
+                if c != prev && self.kind[c] == -2 {
+                    count += 1;
+                }
+                prev = c;
+            }
+            count
+        };
+        let mut visited = if self.slot[r] >= self.i21 { rlen(r) } else { 0 };
+        let mut dense = 3.0 + 2.0 * rlen(r) as f64;
+        let mut minslot = if self.kind[r] == -2 { self.slot[r] } else { m };
+        for &(k, _) in rows(r) {
+            minslot = minslot.min(self.slot[k]);
+        }
+        while let Some(std::cmp::Reverse((_, k))) = heap.pop() {
+            let c = -w[k] / self.diag[k];
+            if c.abs() <= R::c(TOL) {
+                continue;
+            }
+            eta.push((k, c));
+            let len = rlen(k);
+            dense += 2.0 * len as f64;
+            if self.slot[k] >= self.i21 {
+                visited += len;
+            }
+            for &(l, v) in rows(k) {
+                w[l] += c * v;
+                if !seen[l] {
+                    touched.push(l);
+                    seen[l] = true;
+                    heap.push(std::cmp::Reverse((self.slot[l], l)));
+                }
+            }
+        }
+        dense += 2.0 * (m - minslot) as f64;
+        self.dense_est.set(if rows(r).next().is_none() { 0.0 } else { dense });
+        for &i in touched.iter() {
+            w[i] = R::ZERO;
+            seen[i] = false;
+        }
+        visited
+    }
+
     /// Replace a numeric U column and update its ordered row copy without doing any arithmetic.
-    fn replace_u_column_old(&mut self, c: usize, col: Vec<(usize, R)>) {
+    fn replace_u_column_old(&mut self, ut: &mut [Vec<(usize, R)>], c: usize, col: Vec<(usize, R)>) {
         let old = std::mem::replace(&mut self.uc[c], col);
         for &(row, _) in &old {
-            let entries = &mut self.ut[row];
+            let entries = &mut ut[row];
             let first = entries.partition_point(|e| e.0 < c);
             let end = first + entries[first..].partition_point(|e| e.0 == c);
             entries.drain(first..end);
         }
         for &(row, v) in &self.uc[c] {
-            let pos = self.ut[row].partition_point(|e| e.0 <= c);
-            self.ut[row].insert(pos, (c, v));
+            let pos = ut[row].partition_point(|e| e.0 <= c);
+            ut[row].insert(pos, (c, v));
         }
     }
 
@@ -34,12 +100,15 @@ impl<R: Real> DualFactor<R> {
         let m = self.m;
         // The A and B lists as nested vectors, edited as before; the shared `walk` reads them from `ab`, so they are written back first.
         let (mut oa, mut ob) = self.ab.to_vecs();
+        // The row-wise copy as the nested lists it was before the pool (`ut` sorted by column, `rowl` in physical order), edited as before
+        // and put back into the pool at the end.
+        let (mut ut, mut rowl) = (self.urows.to_ut(), self.urows.to_rowl());
         let mut scratch = self.btran_ws.update.take();
         if crate::dump::on("fstruct") {
             let n = crate::dump::FACTOR_STRUCT_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             crate::dump::emit(
                 "fstruct",
-                serde_json::json!({"r": r, "rowl": (0..m).filter(|&y| !self.rowl[y].is_empty()).map(|y| (y.to_string(), self.rowl[y].clone())).collect::<std::collections::BTreeMap<_, _>>(), "mark": self.mark, "n": n, "m": m, "i3": self.nuc.len(), "i21": self.i21, "kind": self.kind, "nuc": self.nuc, "seqA": self.slot, "fill": self.fill, "diag": jv(&self.diag), "uvals": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), (self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.0).collect::<Vec<_>>(), self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.1.to_f64()).collect::<Vec<_>>()))).collect::<std::collections::BTreeMap<_, _>>(), "cols": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), [&oa[k], &ob[k]])).collect::<std::collections::BTreeMap<_, _>>()}),
+                serde_json::json!({"r": r, "rowl": (0..m).filter(|&y| !rowl[y].is_empty()).map(|y| (y.to_string(), rowl[y].clone())).collect::<std::collections::BTreeMap<_, _>>(), "mark": self.mark, "n": n, "m": m, "i3": self.nuc.len(), "i21": self.i21, "kind": self.kind, "nuc": self.nuc, "seqA": self.slot, "fill": self.fill, "diag": jv(&self.diag), "uvals": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), (self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.0).collect::<Vec<_>>(), self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.1.to_f64()).collect::<Vec<_>>()))).collect::<std::collections::BTreeMap<_, _>>(), "cols": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), [&oa[k], &ob[k]])).collect::<std::collections::BTreeMap<_, _>>()}),
             );
         }
         self.before_last = (self.upd, self.sum_alpha);
@@ -78,7 +147,7 @@ impl<R: Real> DualFactor<R> {
         let mut seen = std::mem::take(&mut self.update_seen);
         values.resize(m, R::ZERO);
         seen.resize(m, false);
-        let solve_len = self.eliminate(r, &mut values, &mut seen, &mut scratch);
+        let solve_len = self.eliminate_old(&ut, r, &mut values, &mut seen, &mut scratch);
         // The solve runs only when a spike entry lies below `max(slot[r], i21 - 1)` (`0xf1859..0xf191f`).
         let solve_floor = self.slot[r].max(self.i21.saturating_sub(1));
         let cached = self.row_cached.take() == Some(r);
@@ -120,14 +189,14 @@ impl<R: Real> DualFactor<R> {
         if old == -2 {
             // The old column leaves the rows it appears in (`0xf1e7a`): the entries before it in each row list are passed.
             for &y in oa[r].iter().chain(ob[r].iter()) {
-                if let Some(p) = self.rowl[y].iter().position(|&t| t == r) {
-                    if self.rowl[y].len() > 1 && p > 0 {
+                if let Some(p) = rowl[y].iter().position(|&t| t == r) {
+                    if rowl[y].len() > 1 && p > 0 {
                         self.upd_work.push((0xf1f82, p as f64, crate::work::CTX));
                     }
-                    if self.rowl[y].len() == 1 {
+                    if rowl[y].len() == 1 {
                         single_rows.push(y);
                     }
-                    self.rowl[y].swap_remove(p);
+                    rowl[y].swap_remove(p);
                 }
             }
         }
@@ -155,7 +224,7 @@ impl<R: Real> DualFactor<R> {
                 // Only a column some tail column refers to joins the nucleus list; the others become singletons.
                 let refs = &mut scratch.conversion_refs;
                 refs.clear();
-                refs.extend(self.rowl[x].iter().copied().filter(|&k| self.kind[k] == -2 && oa[k].contains(&x)));
+                refs.extend(rowl[x].iter().copied().filter(|&k| self.kind[k] == -2 && oa[k].contains(&x)));
                 refs.sort_unstable();
                 refs.dedup();
                 let held = !refs.is_empty();
@@ -217,7 +286,7 @@ impl<R: Real> DualFactor<R> {
             }
         }
         if old >= 0 {
-            let held = self.rowl[r]
+            let held = rowl[r]
                 .iter()
                 .any(|&x| x != r && self.kind[x] == -2 && ob[x].contains(&r));
             if bare && crate::dump::on("bare") {
@@ -239,11 +308,11 @@ impl<R: Real> DualFactor<R> {
         } else if old == -2 {
             let old_b = std::mem::take(&mut ob[r]);
             oa[r].clear();
-            self.replace_u_column_old(r, Vec::new());
+            self.replace_u_column_old(&mut ut, r, Vec::new());
             self.kind[r] = -1;
             for x in old_b {
                 if self.kind[x] >= 0
-                    && !self.rowl[x]
+                    && !rowl[x]
                         .iter()
                         .any(|&k| self.kind[k] == -2 && ob[k].contains(&x))
                 {
@@ -262,7 +331,7 @@ impl<R: Real> DualFactor<R> {
         let bv: Vec<usize> = sp.iter().copied().filter(|&x| self.kind[x] >= 0).collect();
         let refcols = &mut scratch.refcols;
         refcols.clear();
-        refcols.extend(self.rowl[r].iter().copied().map(|k| (k, self.slot[k])));
+        refcols.extend(rowl[r].iter().copied().map(|k| (k, self.slot[k])));
         refcols.sort_unstable();
         refcols.dedup();
         refcols.retain(|&(x, _)| x != r && self.kind[x] == -2 && (oa[x].contains(&r) || ob[x].contains(&r)));
@@ -376,7 +445,7 @@ impl<R: Real> DualFactor<R> {
                         remove_last_fill(&mut ob[k], r);
                     }
                     self.uc[k].retain(|e| e.0 != r);
-                    let row = &mut self.ut[r];
+                    let row = &mut ut[r];
                     let first = row.partition_point(|e| e.0 < k);
                     let end = first + row[first..].partition_point(|e| e.0 == k);
                     row.drain(first..end);
@@ -390,7 +459,7 @@ impl<R: Real> DualFactor<R> {
             }
         }
         if !keep {
-            self.rowl[r].clear();
+            rowl[r].clear();
         }
         let mut newdiag = values[r];
         if eliminated {
@@ -448,8 +517,8 @@ impl<R: Real> DualFactor<R> {
             for &row in sp.iter().filter(|&&y| y != r && !scratch.old_rows.contains(&y)) {
                 // The transpose includes duplicates in the same multiplicity as the column scan.
                 // Every entry of `ut` belongs to a tail column (audited) and `r`'s own entries sit only in `old_rows`, skipped above.
-                let count = self.ut[row].len();
-                let counted = || self.ut[row].iter().filter(|&&(c, _)| c != r && self.kind[c] == -2).count();
+                let count = ut[row].len();
+                let counted = || ut[row].iter().filter(|&&(c, _)| c != r && self.kind[c] == -2).count();
                 debug_assert_eq!(count, counted());
                 #[cfg(feature = "factor-shadow")]
                 assert_eq!(count, counted(), "update count scan");
@@ -481,12 +550,12 @@ impl<R: Real> DualFactor<R> {
             self.bt_occupied = false;
         }
         self.diag[r] = newdiag;
-        self.replace_u_column_old(r, self.spike.iter().copied().filter(|e| e.0 != r).collect());
+        self.replace_u_column_old(&mut ut, r, self.spike.iter().copied().filter(|e| e.0 != r).collect());
         oa[r] = av;
         let mut bb = bv;
         bb.reverse();
         for &y in oa[r].iter().chain(bb.iter()) {
-            self.rowl[y].push(r);
+            rowl[y].push(r);
         }
         ob[r] = bb;
         self.sync_ab_old(&oa, &ob);
@@ -496,6 +565,7 @@ impl<R: Real> DualFactor<R> {
             self.empty_tail.remove(&r);
         }
         self.spike_used = true;
+        self.urows = URows::from_nested(&rowl, &ut);
         scratch.sp = sp;
         scratch.clear();
         self.btran_ws.update.replace(scratch);

@@ -80,6 +80,13 @@ impl<R: Real> AbLists<R> {
         &self.val[(s.start + s.na) as usize..(s.start + s.na + s.nb) as usize]
     }
 
+    /// The coefficients of A then B, entry for entry with `both`.
+    #[inline(always)]
+    pub fn both_val(&self, c: usize) -> &[R] {
+        let s = &self.span[c];
+        &self.val[s.start as usize..(s.start + s.na + s.nb) as usize]
+    }
+
     /// A then B.
     #[inline(always)]
     pub fn both(&self, c: usize) -> &[u32] {

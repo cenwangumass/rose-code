@@ -270,8 +270,6 @@ impl<R: Real> DualFactor<R> {
             tau_u: std::cell::Cell::new(0.0),
             tau_fin: std::cell::Cell::new(0),
             f2: std::cell::RefCell::new(F2::default()),
-            tau_terms: Default::default(),
-            tau_row: Default::default(),
             scratch_peel: ((m as f64).powf(0.7) as usize)
                 .max(20)
                 .wrapping_add(ncols + 1)
@@ -279,7 +277,7 @@ impl<R: Real> DualFactor<R> {
             fill: 2 * (uc.iter().map(Vec::len).sum::<usize>() + nnz_l_tot),
             // A row lists its tail columns in the order of the factorization's U row (Markowitz steps), or in the order of the
             // basis columns for a row of the singleton phases.
-            rowl: {
+            urows: URows::from_nested(&{
                 let mut member = vec![Vec::new(); m];
                 for t in i21..m {
                     if kind[t] == -2 {
@@ -321,7 +319,7 @@ impl<R: Real> DualFactor<R> {
                     rl[y] = order.into_iter().filter(|&t| stamp[t] == y).collect();
                 }
                 rl
-            },
+            }, &ut),
             row_cap: {
                 let mut c = vec![0usize; m];
                 for col in &uc {
@@ -393,7 +391,6 @@ impl<R: Real> DualFactor<R> {
             lev_built,
             diag: st.diag.clone(),
             uc,
-            ut,
             spike: Vec::new(),
             update_values: Vec::new(),
             update_seen: Vec::new(),
@@ -446,7 +443,7 @@ pub(super) fn assert_same_ab<R: Real>(n: &AbLists<R>, o: &AbLists<R>) {
 pub(super) fn assert_same<R: Real>(n: &DualFactor<R>, o: &DualFactor<R>) {
     assert_eq!((n.m, n.i21, n.mark, n.loff, n.n1), (o.m, o.i21, o.mark, o.loff, o.n1));
     assert_eq!((n.kind.clone(), n.nuc.clone()), (o.kind.clone(), o.nuc.clone()));
-    assert_eq!((&n.rowl, &n.row_cap, &n.row_par), (&o.rowl, &o.row_cap, &o.row_par));
+    assert_eq!((n.urows.to_rowl(), &n.row_cap, &n.row_par), (o.urows.to_rowl(), &o.row_cap, &o.row_par));
     assert_same_ab(&n.ab, &o.ab);
     assert_eq!((&n.perm, &n.first_eta, &n.slot, &n.at), (&o.perm, &o.first_eta, &o.slot, &o.at));
     assert_eq!((n.empty_tail.iter().copied().collect::<Vec<usize>>(), n.l_forward, n.dthr, n.lev_dense, n.lev_dense_ft, n.lev_built), (
@@ -466,9 +463,12 @@ pub(super) fn assert_same<R: Real>(n: &DualFactor<R>, o: &DualFactor<R>) {
     same_csr(&n.lt, &o.lt, "lt");
     same_vals(&n.diag, &o.diag, "diag");
     same_pairs(&n.uc, &o.uc, "uc");
-    same_pairs(&n.ut, &o.ut, "ut");
-    // ut rows keep spare room for `update` (capacities are otherwise whatever a recycled row had)
-    assert!(n.ut.iter().zip(&n.row_cap).all(|(c, &k)| c.capacity() >= k));
+    same_pairs(&n.urows.to_ut(), &o.urows.to_ut(), "ut");
+    // the physical order carries the same values entry for entry
+    for y in 0..n.m {
+        same_vals(n.urows.row(y).1, o.urows.row(y).1, "urows values");
+    }
+    n.urows.check(&n.uc, &n.kind);
 }
 
 /// Leave junk in every row, as the edits of a long update sequence would.
@@ -476,8 +476,9 @@ fn dirty(f: &mut DualFactor<f64>) {
     for i in 0..f.m {
         f.ab.set(i, &[(7, -1.0), (9, 2.0), (11, 0.5)], &[(5, 3.0)]);
         f.uc[i].push((3, -1.5));
-        f.ut[i].extend([(1, 2.5); 40]);
-        f.rowl[i].push(8);
+        for c in 0..40 {
+            f.urows.push(i, c, 2.5);
+        }
     }
 }
 

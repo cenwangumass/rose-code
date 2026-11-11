@@ -113,13 +113,7 @@ impl<R: Real> DualFactor<R> {
                 }
             }
         }
-        let row = self.tau_row.borrow();
-        // prepare bumps the epoch (clearing stamps on wrap), and terms
-        // are cleared before append_terms. Neither retained numeric
-        // buffer is logically live between calls.
-        require(row.values.len() == row.stamps.len(), "tau_row.stamps.len");
-        require(row.stamps.iter().all(|&v| v <= row.epoch), "tau_row.stamps.epoch");
-        require(row.epoch != 0 || row.stamps.iter().all(|&v| v == 0), "tau_row.epoch.zero");
+        self.urows.check(&self.uc, &self.kind);
     }
 
     pub(crate) fn f2_projection(&self) -> crate::dual_factor::projection::F2State<R> {
@@ -138,9 +132,9 @@ impl<R: Real> DualFactor<R> {
             kind: self.kind.clone(), nucleus: self.nuc.clone(),
             slot: self.slot.clone(), at: self.at.clone(), diagonal: numbers(&self.diag),
             lower_columns: columns(&self.lcolumns()),
-            upper_columns: columns(&self.uc), upper_rows: columns(&self.ut),
+            upper_columns: columns(&self.uc), upper_rows: columns(&self.urows.to_ut()),
             tail_destinations, nucleus_destinations,
-            row_columns: self.rowl.clone(), row_capacity: self.row_cap.clone(), row_alignment: self.row_par.clone(),
+            row_columns: self.urows.to_rowl(), row_capacity: self.row_cap.clone(), row_alignment: self.row_par.clone(),
             pool_fill: self.fill,
             etas: self.etas.iter().map(|e| EtaState {
                 target: e.idx, indices: e.ind.clone(), values: numbers(&e.val),

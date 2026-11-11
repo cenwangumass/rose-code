@@ -15,10 +15,14 @@ use crate::lu_order::Structure;
 use crate::real::Real;
 use ab::AbLists;
 use pool::{Csr, LPool};
+use urows::URows;
 use std::collections::BinaryHeap;
 mod ab;
 mod btran_ws;
 mod pool;
+mod urows;
+#[cfg(test)]
+mod urows_tests;
 #[cfg(feature = "factor-shadow")]
 mod adapter;
 #[cfg(test)]
@@ -491,61 +495,6 @@ impl<R: Real> SparseBtranTail<R> {
     }
 }
 
-/// Direct numeric row lookup for tau dots. Stamps retain the first duplicate without clearing per row.
-#[derive(Clone, Default)]
-
-struct TauRow<R> {
-    values: Vec<R>,
-    stamps: Vec<usize>,
-    epoch: usize,
-}
-
-impl<R: Real> TauRow<R> {
-    fn prepare(&mut self, m: usize, row: &[(usize, R)]) {
-        if self.values.len() != m {
-            self.values.resize(m, R::ZERO);
-            self.stamps.resize(m, 0);
-        }
-        self.epoch = self.epoch.wrapping_add(1);
-        if self.epoch == 0 {
-            self.stamps.fill(0);
-            self.epoch = 1;
-        }
-        for &(c, v) in row {
-            if self.stamps[c] != self.epoch {
-                self.stamps[c] = self.epoch;
-                self.values[c] = v;
-            }
-        }
-    }
-
-    fn get(&self, c: usize) -> Option<R> {
-        (self.stamps[c] == self.epoch).then(|| self.values[c])
-    }
-
-    /// Append the row's surviving terms in virtual rowl order, including its duplicates.
-    #[inline(never)]
-    fn append_terms(&self, cols: &[usize], x: &[R], out: &mut Vec<(R, R)>) {
-        let mut count = out.len();
-        out.reserve(cols.len());
-        let dst = out.as_mut_ptr();
-        for &c in cols {
-            if let Some(v) = self.get(c) {
-                // Before each write, count <= original_len + visited < original_len + cols.len() <= capacity.
-                // Reads stay checked, and each write initializes the next appended entry.
-                unsafe {
-                    dst.add(count).write((v, x[c]));
-                }
-                count += 1;
-            }
-        }
-        // Appended entries are initialized in the same filtered order as the old extend.
-        unsafe {
-            out.set_len(count);
-        }
-    }
-}
-
 /// The set of tail columns without nucleus entries. Membership flags plus an unordered list: the only order-dependent query is the
 /// demotion's maximum by slot, whose key `(slot, column)` is unique, and `iter` (dumps) yields ascending columns as the former `BTreeSet`.
 #[derive(Clone, Default)]
@@ -640,8 +589,8 @@ pub struct DualFactor<R: Real = f64> {
     diag: Vec<R>,
     /// Numeric U entries of each tail column `(position, value)`.
     uc: Vec<Vec<(usize, R)>>,
-    /// Numeric U transpose, ordered by column, including duplicate entries in column order.
-    ut: Vec<Vec<(usize, R)>>,
+    /// The row-wise copy of the numeric U entries of the tail columns, rows in the reference's physical order (one pool).
+    urows: URows<R>,
     /// Spike of the most recent solve: the L stage and eta result `(position, value)` in list order.
     spike: Vec<(usize, R)>,
     /// Whether the column replacement has used the spike since the last FTRAN.
@@ -685,10 +634,6 @@ pub struct DualFactor<R: Real = f64> {
     tau_fin: std::cell::Cell<usize>,
     /// What the last `ftran` and `ftran_needed` leave for the joint U stages of the two-vector FTRAN (`joint_u`).
     f2: std::cell::RefCell<F2<R>>,
-    /// Scratch terms of the second-vector nucleus row dot; keep capacity across rows and solves.
-    tau_terms: std::cell::RefCell<Vec<(R, R)>>,
-    /// Reusable direct view of one numeric U row; its values are read in virtual rowl order.
-    tau_row: std::cell::RefCell<TauRow<R>>,
     /// Fill of the reference's pool for etas and the row-wise copy of U (`F+0x160`), and the capacity of each row of that copy.
     /// Only the parity of `fill` matters: it decides the alignment of the next eta's value array.
     fill: usize,
@@ -696,8 +641,6 @@ pub struct DualFactor<R: Real = f64> {
     /// Parity of the start of each row in the row-wise copy (the value array of a row starts on a 16-byte boundary when it is 0): the rows of a
     /// fresh factor start on multiples of 4, a row moved to the end of the pool starts at the fill of that moment.
     row_par: Vec<u8>,
-    /// The reference's row-wise copy: for each row, the tail columns whose A or B list holds it, in insertion order.
-    rowl: Vec<Vec<usize>>,
     /// Alignment of the scratch eta behind each new diagonal (`ctx+0x1d0`): its value array sits `4 m` bytes after the index array in
     /// an arena whose offsets add `24 maxupd + 8 (m + ncols) + 8`, so the parity is `(maxupd + ncols + 1) % 2` whatever `m` is.
     scratch_peel: usize,
@@ -808,9 +751,14 @@ fn ju<R: Real>(v: &[Vec<(usize, R)>]) -> Vec<Vec<(usize, f64)>> {
 /// when fewer than `peel + 8` are left, it is sequential; otherwise `peel` (0 or 1: the elements before the first 16-byte boundary of the
 /// value array) terms are subtracted one by one, then blocks of eight go to four two-lane accumulators (the first one starts with `s` in lane
 /// 0), combined as `(a0 + a1) + (a2 + a3)` lane-wise and then lane 0 + lane 1, and the last `(n - peel) % 8` terms are subtracted one by one.
+#[cfg(test)]
 fn row_dot<R: Real>(s: R, t: &[(R, R)], peel: usize) -> R {
-    let n = t.len();
-    let prod = |i: usize| t[i].0 * t[i].1;
+    row_dot_by(s, t.len(), peel, |i| t[i].0 * t[i].1)
+}
+
+/// `row_dot` over `n` terms given by their products `prod(i)`.
+#[inline(always)]
+fn row_dot_by<R: Real>(s: R, n: usize, peel: usize, prod: impl Fn(usize) -> R) -> R {
     if !R::LANES || n < 8 || n < peel + 8 {
         return (0..n).fold(s, |a, i| a - prod(i));
     }
@@ -845,10 +793,15 @@ fn row_dot<R: Real>(s: R, t: &[(R, R)], peel: usize) -> R {
 /// The row dot of the extended-precision two-vector FTRAN output stage (`0x2642b0`, loop `0x2678c4`): for `n >= 8` terms, eight accumulators by term
 /// position mod 8 (the first starting with `s`, the others at zero, each subtracting its terms), added in order `((((((a0 + a1) + a2) + ...) + a7`; the
 /// remaining `n % 8` terms (all of them for `n < 8`) are then subtracted from the last to the first (the Duff cascade at `0x267b0d..0x267bbd`).
+#[cfg(test)]
 fn row_dot_q<R: Real>(s: R, t: &[(R, R)]) -> R {
-    let n = t.len();
+    row_dot_q_by(s, t.len(), |i| t[i].0 * t[i].1)
+}
+
+/// `row_dot_q` over `n` terms given by their products `prod(i)`.
+#[inline(always)]
+fn row_dot_q_by<R: Real>(s: R, n: usize, prod: impl Fn(usize) -> R) -> R {
     let nb = n / 8 * 8;
-    let prod = |i: usize| t[i].0 * t[i].1;
     let mut r = s;
     if nb > 0 {
         let mut a = [R::ZERO; 8];
@@ -946,13 +899,12 @@ struct FreshScratch {
     lst: Vec<usize>,
 }
 
-/// The nested lists of a retired factor (`ab`, `uc`, `ut`, `rowl`), kept with their allocations for the next `fresh`
+/// The lists of a retired factor (`ab`, `uc`, `urows`), kept with their allocations for the next `fresh`
 /// (`DualFactor::recycle`): the refactorization then neither frees the old rows nor allocates the new ones.
 struct Recycled<R> {
     ab: AbLists<R>,
     uc: Vec<Vec<(usize, R)>>,
-    ut: Vec<Vec<(usize, R)>>,
-    rowl: Vec<Vec<usize>>,
+    urows: URows<R>,
 }
 
 impl<R: Real> Recycled<R> {
@@ -963,11 +915,10 @@ impl<R: Real> Recycled<R> {
             v.iter_mut().for_each(Vec::clear);
         }
         let kept = RECYCLED.with(|r| r.take()).and_then(|b| b.downcast::<Self>().ok());
-        let mut r = kept.map_or_else(|| Self { ab: AbLists::new(), uc: Vec::new(), ut: Vec::new(), rowl: Vec::new() }, |b| *b);
+        let mut r = kept.map_or_else(|| Self { ab: AbLists::new(), uc: Vec::new(), urows: URows::new() }, |b| *b);
         r.ab.reset(m);
         rows(&mut r.uc, m);
-        rows(&mut r.ut, m);
-        rows(&mut r.rowl, m);
+        r.urows.reset(m);
         r
     }
 }
@@ -978,11 +929,11 @@ thread_local! {
 }
 
 impl<R: Real> DualFactor<R> {
-    /// Retire the factor: its nested lists (`ab`, `uc`, `ut`, `rowl`) are kept, allocations included, for the next `fresh` of this
+    /// Retire the factor: its lists (`ab`, `uc`, `urows`) are kept, allocations included, for the next `fresh` of this
     /// scalar type on this thread (the rest is dropped). Only capacities carry over; `fresh` clears every row.
     pub fn recycle(self) {
-        let Self { ab, uc, ut, rowl, .. } = self;
-        RECYCLED.with(|r| r.set(Some(Box::new(Recycled { ab, uc, ut, rowl }))));
+        let Self { ab, uc, urows, .. } = self;
+        RECYCLED.with(|r| r.set(Some(Box::new(Recycled { ab, uc, urows }))));
     }
 
     /// Fresh factor from the pivot sequence; `cols[pos]` is the basis column at incoming position `pos` as `(is_slack, rows, values)`.
@@ -1045,7 +996,7 @@ impl<R: Real> DualFactor<R> {
                 }
             }
         }
-        let Recycled { mut ab, mut uc, mut ut, rowl: mut rl } = Recycled::<R>::take(m);
+        let Recycled { mut ab, mut uc, mut urows } = Recycled::<R>::take(m);
         let (mut sa, mut sb) = (0usize, 0usize);
         let mut xv = vec![R::ZERO; m];
         let mut ents: Vec<(usize, R)> = Vec::new();
@@ -1234,7 +1185,7 @@ impl<R: Real> DualFactor<R> {
         // Only tail positions (`kind == -2`) are in the set: its largest element is the last one the downward scan from the end finds.
         let mark0 = empty_list.last().copied().unwrap_or(i21.min(m - 1));
         let empty_tail: EmptyTail = empty_list.into_iter().collect();
-        // Entries per row of U: the capacity of each row of the row-wise copy, of `ut` and the layout of the rows.
+        // Entries per row of U: the capacity of each row of the row-wise copy, of `urows` and the layout of the rows.
         let mut row_cap = vec![0usize; m];
         for col in &uc {
             for &(row, _) in col {
@@ -1242,21 +1193,22 @@ impl<R: Real> DualFactor<R> {
             }
         }
         let u_total: usize = row_cap.iter().sum();
-        // `update` appends to the rows of `ut` and `rowl`: nonempty rows get room for a few entries (capacity only, never visible).
+        // `update` appends to the rows of `urows`: nonempty rows get room for a few entries (capacity only, never visible).
         let spare = |n: usize| if n == 0 { 0 } else { n + (n >> 2) + 2 };
         for (row, &n) in row_cap.iter().enumerate() {
             if n > 0 {
-                ut[row].reserve(spare(n));
+                urows.reserve_row(row, spare(n));
             }
         }
+        // Filled in ascending column order; the rows are put in the reference's physical order below.
         for (c, col) in uc.iter().enumerate() {
             for &(row, v) in col {
-                ut[row].push((c, v));
+                urows.push(row, c, v);
             }
         }
         // A row lists its tail columns in the order of the factorization's U row (Markowitz steps), or in the order of the
         // basis columns for a row of the singleton phases.
-        let rowl: Vec<Vec<usize>> = {
+        {
             // member lists (the tail columns whose A or B list holds the row, ascending) as one counting-sorted array
             let mut mem_start = vec![0usize; m + 1];
             for t in i21..m {
@@ -1311,11 +1263,18 @@ impl<R: Real> DualFactor<R> {
                     }
                     tmp.extend(st.u_row(y).iter().map(|&(c, _)| pos_of_col[c]).filter(|&t| stamp[t] == y));
                 }
-                rl[y].reserve(spare(tmp.len()));
-                rl[y].extend_from_slice(&tmp);
+                // The row holds the same columns (audited): `xv` carries the values over to the new order.
+                let (cs, vs) = urows.row_mut(y);
+                assert_eq!(cs.len(), tmp.len(), "fresh: rowl members differ from the row");
+                for (&c, &v) in cs.iter().zip(vs.iter()) {
+                    xv[c as usize] = v;
+                }
+                for ((c, v), &t) in cs.iter_mut().zip(vs.iter_mut()).zip(&tmp) {
+                    *c = t as u32;
+                    *v = xv[t];
+                }
             }
-            rl
-        };
+        }
         // A fresh factor lays the rows of the row-wise copy out contiguously: the nonempty rows of the nucleus in the order of their list index
         // (`kind`), then the others by position, each row as long as its U entries (`ucol_len`); the parity of the start decides the alignment of the row's
         // value array in the dot product of the second FTRAN vector.
@@ -1351,14 +1310,12 @@ impl<R: Real> DualFactor<R> {
             tau_u: std::cell::Cell::new(0.0),
             tau_fin: std::cell::Cell::new(0),
             f2: std::cell::RefCell::new(F2::default()),
-            tau_terms: Default::default(),
-            tau_row: Default::default(),
             scratch_peel: ((m as f64).powf(0.7) as usize)
                 .max(20)
                 .wrapping_add(ncols + 1)
                 % 2,
             fill: 2 * (u_total + nnz_l_tot),
-            rowl,
+            urows,
             row_cap,
             row_par,
             upd_work: Vec::new(),
@@ -1399,7 +1356,6 @@ impl<R: Real> DualFactor<R> {
             lev_built,
             diag: st.diag.clone(),
             uc,
-            ut,
             spike: Vec::new(),
             update_values: Vec::new(),
             update_seen: Vec::new(),
@@ -1410,7 +1366,10 @@ impl<R: Real> DualFactor<R> {
         #[cfg(test)]
         fresh_tests::assert_same(&fresh, &Self::fresh_old(m, ncols, st, cols));
         #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
-        fresh.ab.check(&fresh.uc, &fresh.kind);
+        {
+            fresh.ab.check(&fresh.uc, &fresh.kind);
+            fresh.urows.check(&fresh.uc, &fresh.kind);
+        }
         fresh
     }
 
@@ -1879,7 +1838,7 @@ impl<R: Real> DualFactor<R> {
     /// The second vector of the reference's two-vector FTRAN (`0x125f50`, its U stage `0x123690`): `B^-1 a` at the positions of
     /// the first vector's result only (`needed`), in that order. The L stage and the tail columns are solved as in `ftran`, the
     /// tail columns scattering into tail rows only. A needed singleton position is `x / diag`, a needed tail position its solved
-    /// value, a needed nucleus position the row-wise dot product over the row copy (`rowl`), subtracted term by term from the L
+    /// value, a needed nucleus position the row-wise dot product over the row pool (`urows`), subtracted term by term from the L
     /// stage value and divided by the diagonal, without a tolerance test. Does not touch the spike of the last `ftran`.
     pub fn ftran_needed(
         &self,
@@ -2057,29 +2016,30 @@ impl<R: Real> DualFactor<R> {
             f.tp_a2 = tp_a2;
             f.tp_only_a = tp_only_a;
         }
-        let mut terms = self.tau_terms.borrow_mut();
-        let mut row = self.tau_row.borrow_mut();
         needed
             .iter()
             .map(|&p| {
                 let v = match self.kind[p] {
                     -2 => x[p],
                     -1 => x[p] / self.diag[p],
-                    _ => {
-                        terms.clear();
-                        row.prepare(m, &self.ut[p]);
-                        row.append_terms(&self.rowl[p], &x, &mut terms);
-                        let dot = if R::QUAD {
-                            row_dot_q(x[p], &terms)
-                        } else {
-                            row_dot(x[p], &terms, self.row_par[p] as usize)
-                        };
-                        dot / self.diag[p]
-                    }
+                    _ => self.nucleus_dot(p, &x) / self.diag[p],
                 };
                 (p, v)
             })
             .collect()
+    }
+
+    /// The row-wise dot product of nucleus position `p` (`0x1241ed`): `x[p]` minus the products of the row's values with `x` at its columns,
+    /// in the row's physical order.
+    #[inline(always)]
+    fn nucleus_dot(&self, p: usize, x: &[R]) -> R {
+        let (cols, vals) = self.urows.row(p);
+        let prod = |i: usize| vals[i] * x[cols[i] as usize];
+        if R::QUAD {
+            row_dot_q_by(x[p], cols.len(), prod)
+        } else {
+            row_dot_by(x[p], cols.len(), self.row_par[p] as usize, prod)
+        }
     }
 
     /// The U-stage work of the two-vector FTRAN when the reference does not run the two single-vector U stages: the joint routine `0x12c300` (the
@@ -2116,7 +2076,7 @@ impl<R: Real> DualFactor<R> {
         let mut e = 0.0f64;
         for &p in out {
             if self.kind[p] >= 0 {
-                e += (self.rowl[p].len() as f64 + 2.0) * 2.0;
+                e += (self.urows.len(p) as f64 + 2.0) * 2.0;
             }
         }
         e
@@ -2816,12 +2776,13 @@ impl<R: Real> DualFactor<R> {
     ) -> (Vec<usize>, f64) {
         let m = self.m;
         let cnt = inp.len();
-        let ut = &self.ut;
+        let urows = &self.urows;
         out.clear();
         let mut eu = 0.0f64;
-        let push = |w: &mut W, row: &[(usize, R)], d: R| {
-            for &(c, v) in row {
-                let value = w.entry(c, &self.slot);
+        let push = |w: &mut W, p: usize, d: R| {
+            let (cols, vals) = urows.row(p);
+            for (&c, &v) in cols.iter().zip(vals) {
+                let value = w.entry(c as usize, &self.slot);
                 *value = -(v * d) + *value;
             }
         };
@@ -2845,11 +2806,11 @@ impl<R: Real> DualFactor<R> {
                 out.push(p);
                 x[p] = d;
                 if self.h33 > 5.0 && self.kind[p] >= 0 {
-                    eu = ut[p].len() as f64 * 2.0 + eu;
+                    eu = urows.len(p) as f64 * 2.0 + eu;
                 }
-                push(w, &ut[p], d);
-                for &(c, _) in &ut[p] {
-                    lowest = lowest.min(self.slot[c]);
+                push(w, p, d);
+                for &c in urows.cols(p) {
+                    lowest = lowest.min(self.slot[c as usize]);
                 }
             }
         }
@@ -2864,13 +2825,33 @@ impl<R: Real> DualFactor<R> {
             let p = self.at[t];
             let d = w.take(p, t) / self.diag[p];
             if d.abs() > R::c(TOL) {
-                eu = ut[p].len() as f64 * 2.0 + eu;
+                eu = urows.len(p) as f64 * 2.0 + eu;
                 out.push(p);
                 x[p] = d;
-                push(w, &ut[p], d);
+                push(w, p, d);
             }
         }
         (out, eu)
+    }
+
+    /// The dense U^T loop of the BTRAN over the slots in order; `e` is the work estimate so far, returned with the rows' share added.
+    fn dense_btran_u(&self, x: &mut [R], mut e: f64) -> f64 {
+        for t in 0..self.m {
+            let p = self.at[t];
+            let xv = x[p];
+            let d = xv / self.diag[p];
+            if xv.abs() <= R::c(TOL) || d.abs() <= R::c(TOL) {
+                x[p] = R::ZERO;
+                continue;
+            }
+            x[p] = d;
+            e = self.urows.len(p) as f64 * 2.0 + e;
+            let (cols, vals) = self.urows.row(p);
+            for (&c, &v) in cols.iter().zip(vals) {
+                x[c as usize] -= v * d;
+            }
+        }
+        e
     }
 
     /// The reference BTRAN (`0x12de60`) of a sparse input given by basis position: U^T solve (`0x130b70` or the dense loop), the row
@@ -2892,7 +2873,7 @@ impl<R: Real> DualFactor<R> {
         ws: &mut BtranWork<R>,
     ) -> Vec<(usize, R)> {
         let m = self.m;
-        let ut = &self.ut;
+        let urows = &self.urows;
         let mut x = std::mem::take(&mut ws.x);
         x.resize(m, R::ZERO);
         let mut e = 0.0f64;
@@ -2902,7 +2883,7 @@ impl<R: Real> DualFactor<R> {
             self.row_cached = Some(inp[0].0);
         }
         let hsum = (self.h33 + self.h34) as usize;
-        let direct = direct && !inp.is_empty() && !ut[inp[0].0].is_empty();
+        let direct = direct && !inp.is_empty() && !urows.is_empty(inp[0].0);
         // The current vector: a list (`Some`) or dense (`None`).
         let mut list: Option<Vec<usize>>;
         if !dense_in && (direct || hsum * cnt <= m) {
@@ -2930,20 +2911,7 @@ impl<R: Real> DualFactor<R> {
                 e = cnt as f64 * 2.0 + m as f64 + e;
             }
             e = m as f64 + m as f64 + e;
-            for t in 0..m {
-                let p = self.at[t];
-                let xv = x[p];
-                let d = xv / self.diag[p];
-                if xv.abs() <= R::c(TOL) || d.abs() <= R::c(TOL) {
-                    x[p] = R::ZERO;
-                    continue;
-                }
-                x[p] = d;
-                e = ut[p].len() as f64 * 2.0 + e;
-                for &(c, v) in &ut[p] {
-                    x[c] -= v * d;
-                }
-            }
+            e = self.dense_btran_u(&mut x, e);
             list = None;
         }
         // Row etas, last first.
@@ -3991,32 +3959,25 @@ impl<R: Real> DualFactor<R> {
     fn eliminate(&self, r: usize, w: &mut [R], seen: &mut [bool], scratch: &mut btran_ws::Update<R>) -> usize {
         let m = self.m;
         let d0 = self.diag[r];
-        // Tail entries of the maintained transpose, in the same ascending column order as the CSR rebuild.
-        let rows = |i: usize| self.ut[i].iter().filter(|&&(k, _)| self.kind[k] == -2);
+        // Every entry of a row belongs to a tail column (audited), so the rows need no `kind` filter. The order inside a row is irrelevant here:
+        // the entries of a row are distinct columns, and the heap is keyed by the unique `(slot, column)`.
+        let urows = &self.urows;
         let btran_ws::Update { touched, heap, eta, .. } = scratch;
         touched.clear();
         heap.clear();
         eta.clear();
-        for &(k, v) in rows(r) {
-            w[k] = v * (R::ONE / d0);
+        let inv = R::ONE / d0;
+        let (cols, vals) = urows.row(r);
+        for (&k, &v) in cols.iter().zip(vals) {
+            let k = k as usize;
+            w[k] = v * inv;
             touched.push(k);
             seen[k] = true;
             heap.push(std::cmp::Reverse((self.slot[k], k)));
         }
         // The reference's solve (`0x131760`) books 2 per entry of the row-wise copy of every accepted position, `r` first.
-        // Count only the rows reached by the solve. The transpose is sorted by column,
-        // so adjacent duplicates count once, just as in the full column/stamp rebuild.
-        let rlen = |y: usize| {
-            let mut prev = usize::MAX;
-            let mut count = 0;
-            for &(c, _) in &self.ut[y] {
-                if c != prev && self.kind[c] == -2 {
-                    count += 1;
-                }
-                prev = c;
-            }
-            count
-        };
+        // Count only the rows reached by the solve.
+        let rlen = |y: usize| urows.len(y);
         // Only positions in the tail (slot >= i21) are visited in the heap phase of the solve that books; the earlier ones are
         // handled in the list phase.
         let mut visited = if self.slot[r] >= self.i21 { rlen(r) } else { 0 };
@@ -4025,8 +3986,8 @@ impl<R: Real> DualFactor<R> {
         // every accepted position of the walk.
         let mut dense = 3.0 + 2.0 * rlen(r) as f64;
         let mut minslot = if self.kind[r] == -2 { self.slot[r] } else { m };
-        for &(k, _) in rows(r) {
-            minslot = minslot.min(self.slot[k]);
+        for &k in cols {
+            minslot = minslot.min(self.slot[k as usize]);
         }
         while let Some(std::cmp::Reverse((_, k))) = heap.pop() {
             let c = -w[k] / self.diag[k];
@@ -4039,7 +4000,9 @@ impl<R: Real> DualFactor<R> {
             if self.slot[k] >= self.i21 {
                 visited += len;
             }
-            for &(l, v) in rows(k) {
+            let (lcols, lvals) = urows.row(k);
+            for (&l, &v) in lcols.iter().zip(lvals) {
+                let l = l as usize;
                 w[l] += c * v;
                 if !seen[l] {
                     touched.push(l);
@@ -4051,7 +4014,7 @@ impl<R: Real> DualFactor<R> {
         dense += 2.0 * (m - minslot) as f64;
         // The solve returns at once, booking nothing, when row `r` of the row-wise copy is empty.
         self.dense_est
-            .set(if rows(r).next().is_none() { 0.0 } else { dense });
+            .set(if urows.is_empty(r) { 0.0 } else { dense });
         for &i in touched.iter() {
             w[i] = R::ZERO;
             seen[i] = false;
@@ -4059,21 +4022,10 @@ impl<R: Real> DualFactor<R> {
         visited
     }
 
-    /// Replace a numeric U column and update its ordered row copy without doing any arithmetic.
-    /// Returns the replaced column so its buffer can be recycled.
+    /// Replace a numeric U column. Its entries left the row-wise copy and the new ones join it at the places `update` handles them (the
+    /// rows of the old column at `0xf1e7a`, those of the new one at the end). Returns the replaced column so its buffer can be recycled.
     fn replace_u_column(&mut self, c: usize, col: Vec<(usize, R)>) -> Vec<(usize, R)> {
-        let old = std::mem::replace(&mut self.uc[c], col);
-        for &(row, _) in &old {
-            let entries = &mut self.ut[row];
-            let first = entries.partition_point(|e| e.0 < c);
-            let end = first + entries[first..].partition_point(|e| e.0 == c);
-            entries.drain(first..end);
-        }
-        for &(row, v) in &self.uc[c] {
-            let pos = self.ut[row].partition_point(|e| e.0 <= c);
-            self.ut[row].insert(pos, (c, v));
-        }
-        old
+        std::mem::replace(&mut self.uc[c], col)
     }
 
     /// Replace the column at position `r` by the entering column of the last `ftran`.
@@ -4084,7 +4036,7 @@ impl<R: Real> DualFactor<R> {
             let n = crate::dump::FACTOR_STRUCT_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             crate::dump::emit(
                 "fstruct",
-                serde_json::json!({"r": r, "rowl": (0..m).filter(|&y| !self.rowl[y].is_empty()).map(|y| (y.to_string(), self.rowl[y].clone())).collect::<std::collections::BTreeMap<_, _>>(), "mark": self.mark, "n": n, "m": m, "i3": self.nuc.len(), "i21": self.i21, "kind": self.kind, "nuc": self.nuc, "seqA": self.slot, "fill": self.fill, "diag": jv(&self.diag), "uvals": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), (self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.0).collect::<Vec<_>>(), self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.1.to_f64()).collect::<Vec<_>>()))).collect::<std::collections::BTreeMap<_, _>>(), "cols": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), [self.ab.a(k), self.ab.b(k)])).collect::<std::collections::BTreeMap<_, _>>()}),
+                serde_json::json!({"r": r, "rowl": (0..m).filter(|&y| !self.urows.is_empty(y)).map(|y| (y.to_string(), self.urows.cols(y).to_vec())).collect::<std::collections::BTreeMap<_, _>>(), "mark": self.mark, "n": n, "m": m, "i3": self.nuc.len(), "i21": self.i21, "kind": self.kind, "nuc": self.nuc, "seqA": self.slot, "fill": self.fill, "diag": jv(&self.diag), "uvals": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), (self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.0).collect::<Vec<_>>(), self.uc[k].iter().filter(|e| self.kind[e.0] == -2).map(|e| e.1.to_f64()).collect::<Vec<_>>()))).collect::<std::collections::BTreeMap<_, _>>(), "cols": (0..m).filter(|&k| self.kind[k] == -2).map(|k| (k.to_string(), [self.ab.a(k), self.ab.b(k)])).collect::<std::collections::BTreeMap<_, _>>()}),
             );
         }
         self.before_last = (self.upd, self.sum_alpha);
@@ -4170,14 +4122,15 @@ impl<R: Real> DualFactor<R> {
             // The old column leaves the rows it appears in (`0xf1e7a`): the entries before it in each row list are passed.
             for &y in self.ab.both(r) {
                 let y = y as usize;
-                if let Some(p) = self.rowl[y].iter().position(|&t| t == r) {
-                    if self.rowl[y].len() > 1 && p > 0 {
+                if let Some(p) = self.urows.position(y, r) {
+                    let len = self.urows.len(y);
+                    if len > 1 && p > 0 {
                         self.upd_work.push((0xf1f82, p as f64, crate::work::CTX));
                     }
-                    if self.rowl[y].len() == 1 {
+                    if len == 1 {
                         single_rows.push(y);
                     }
-                    self.rowl[y].swap_remove(p);
+                    self.urows.swap_remove(y, p);
                 }
             }
         }
@@ -4197,7 +4150,7 @@ impl<R: Real> DualFactor<R> {
             conv = self.empty_tail.max_by_slot(&self.slot);
             if let Some(x) = conv {
                 self.empty_tail.remove(&x);
-                // Invariant behind the count scan's `ut[row].len()`: every entry of `ut` belongs to a tail column (`kind == -2`). Only
+                // Invariant behind the row lengths: every entry of `urows` belongs to a tail column (`kind == -2`). Only
                 // columns of `empty_tail` leave the tail (here), so they must already have left the row-wise copy.
                 debug_assert!(self.uc[x].is_empty(), "demoted empty_tail column {x} still has U entries");
                 #[cfg(feature = "factor-shadow")]
@@ -4206,7 +4159,7 @@ impl<R: Real> DualFactor<R> {
                 // Only a column some tail column refers to joins the nucleus list; the others become singletons.
                 let refs = &mut scratch.conversion_refs;
                 refs.clear();
-                refs.extend(self.rowl[x].iter().copied().filter(|&k| self.kind[k] == -2 && self.ab.a_pos(k, x).is_some()));
+                refs.extend(self.urows.cols(x).iter().map(|&k| k as usize).filter(|&k| self.kind[k] == -2 && self.ab.a_pos(k, x).is_some()));
                 refs.sort_unstable();
                 refs.dedup();
                 let held = !refs.is_empty();
@@ -4267,9 +4220,11 @@ impl<R: Real> DualFactor<R> {
             }
         }
         if old >= 0 {
-            let held = self.rowl[r]
+            let held = self
+                .urows
+                .cols(r)
                 .iter()
-                .any(|&x| x != r && self.kind[x] == -2 && self.ab.b_pos(x, r).is_some());
+                .any(|&x| x as usize != r && self.kind[x as usize] == -2 && self.ab.b_pos(x as usize, r).is_some());
             if bare && crate::dump::on("bare") {
                 let tail = (0..m).filter(|&x| self.kind[x] == -2).count();
                 crate::dump::emit(
@@ -4299,9 +4254,11 @@ impl<R: Real> DualFactor<R> {
             for &x in &old_b {
                 let x = x as usize;
                 if self.kind[x] >= 0
-                    && !self.rowl[x]
+                    && !self
+                        .urows
+                        .cols(x)
                         .iter()
-                        .any(|&k| self.kind[k] == -2 && self.ab.b_pos(k, x).is_some())
+                        .any(|&k| self.kind[k as usize] == -2 && self.ab.b_pos(k as usize, x).is_some())
                 {
                     self.drop_nuc(x);
                     self.kind[x] = -1;
@@ -4327,7 +4284,7 @@ impl<R: Real> DualFactor<R> {
         bv.extend(sp.iter().copied().filter(|&x| self.kind[x] >= 0).map(|x| (x as u32, values[x])));
         let refcols = &mut scratch.refcols;
         refcols.clear();
-        refcols.extend(self.rowl[r].iter().copied().map(|k| (k, self.slot[k])));
+        refcols.extend(self.urows.cols(r).iter().map(|&k| (k as usize, self.slot[k as usize])));
         refcols.sort_unstable();
         refcols.dedup();
         refcols.retain(|&(x, _)| x != r && self.kind[x] == -2 && (self.ab.a_pos(x, r).is_some() || self.ab.b_pos(x, r).is_some()));
@@ -4432,11 +4389,8 @@ impl<R: Real> DualFactor<R> {
                     if let Some(p) = pos_b {
                         self.ab.drop_b(k, p);
                     }
+                    // Row `r` of the row-wise copy is emptied below (`!keep`), which takes `k`'s entry with it.
                     self.uc[k].retain(|e| e.0 != r);
-                    let row = &mut self.ut[r];
-                    let first = row.partition_point(|e| e.0 < k);
-                    let end = first + row[first..].partition_point(|e| e.0 == k);
-                    row.drain(first..end);
                     eliminated = true;
                     // A column left without entries raises the mark to its slot (`0xf29d5`).
                     if self.ab.is_empty(k) {
@@ -4447,7 +4401,7 @@ impl<R: Real> DualFactor<R> {
             }
         }
         if !keep {
-            self.rowl[r].clear();
+            self.urows.clear_row(r);
         }
         let mut newdiag = values[r];
         if eliminated {
@@ -4505,10 +4459,9 @@ impl<R: Real> DualFactor<R> {
             // A row that already holds an entry of the old column takes the new entry in place.
             // The rows are visited in the spike's order with the leaving column replaced by the last entry (`sp`).
             for &row in sp.iter().filter(|&&y| y != r && !scratch.old_rows.contains(&y)) {
-                // The transpose includes duplicates in the same multiplicity as the column scan.
-                // Every entry of `ut` belongs to a tail column (audited) and `r`'s own entries sit only in `old_rows`, skipped above.
-                let count = self.ut[row].len();
-                let counted = || self.ut[row].iter().filter(|&&(c, _)| c != r && self.kind[c] == -2).count();
+                // Every entry of `urows` belongs to a tail column (audited) and `r`'s own entries sit only in `old_rows`, skipped above.
+                let count = self.urows.len(row);
+                let counted = || self.urows.cols(row).iter().filter(|&&c| c as usize != r && self.kind[c as usize] == -2).count();
                 debug_assert_eq!(count, counted());
                 #[cfg(feature = "factor-shadow")]
                 assert_eq!(count, counted(), "update count scan");
@@ -4550,8 +4503,9 @@ impl<R: Real> DualFactor<R> {
         }
         bv.reverse();
         self.ab.set(r, &av, &bv);
-        for &y in self.ab.both(r) {
-            self.rowl[y as usize].push(r);
+        // The new column joins the end of each of its rows, with the coefficient bits of its A and B entries.
+        for (&y, &v) in self.ab.both(r).iter().zip(self.ab.both_val(r)) {
+            self.urows.push(y as usize, r, v);
         }
         scratch.spare_a = av;
         scratch.spare_b = bv;
@@ -4562,7 +4516,10 @@ impl<R: Real> DualFactor<R> {
         }
         self.spike_used = true;
         #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
-        self.ab.check(&self.uc, &self.kind);
+        {
+            self.ab.check(&self.uc, &self.kind);
+            self.urows.check(&self.uc, &self.kind);
+        }
         scratch.sp = sp;
         scratch.clear();
         self.btran_ws.update.replace(scratch);
