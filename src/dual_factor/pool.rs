@@ -18,6 +18,11 @@ pub(super) struct Csr<R> {
 pub(super) type LPool<R> = Csr<R>;
 
 impl<R: Copy> Csr<R> {
+    /// No entries in the lines `[n1, loff)`.
+    pub(super) fn gap_is_empty(&self, n1: usize, loff: usize) -> bool {
+        self.start[n1] == self.start[loff]
+    }
+
     pub fn with_capacity(lines: usize, entries: usize) -> Self {
         let mut start = Vec::with_capacity(lines + 1);
         start.push(0);
@@ -140,31 +145,56 @@ impl<R: Copy> Csr<R> {
     }
 }
 
-/// Dense forward L sweep over all steps, in ascending order, for a pool whose destinations all exceed their source (`y > v`):
-/// `x[v]` is final when visited, so the `count_l` filter (`abs > TOL`) runs in the same pass. Steps with `!(abs <= TOL)` (NaN
-/// included) are processed. Returns `(count, sum of the processed column lengths)`.
+/// Dense forward L sweep in ascending order over the steps `[0,n1)` and `[loff,lines)`, for a pool whose destinations all exceed
+/// their source (`y > v`): `x[v]` is final when visited, so the `count_l` filter (`abs > TOL`) runs in the same pass. The steps
+/// `[n1,loff)` are the singleton pivots of the factor, whose L columns are empty (`start[n1] == start[loff]`): they process nothing,
+/// so skipping them leaves `x` and the length sum as the full sweep leaves them. Steps with `!(abs <= TOL)` (NaN included) are
+/// processed. Returns `(count, sum of the processed column lengths)`; `count` is the number of `abs > TOL` entries of `x[..lines]`
+/// when `count_gap` (the gap's entries are final after the sweep and are scanned), and `None` otherwise (the caller does not read it).
+/// A pool whose gap holds entries (a structure that breaks the factor's phase invariants, e.g. a multi-entry column flagged as a slack
+/// in a synthetic test) takes the full sweep, so the result is the full sweep's for every pool; a real factor has an empty gap.
 #[inline(never)]
-pub(super) fn fused_forward<R: Real>(l: &LPool<R>, x: &mut [R]) -> (usize, usize) {
+pub(super) fn fused_forward<R: Real>(
+    l: &LPool<R>,
+    x: &mut [R],
+    n1: usize,
+    loff: usize,
+    count_gap: bool,
+) -> (Option<usize>, usize) {
     l.check_vector(x.len());
+    assert!(n1 <= loff && loff <= l.lines());
+    let (n1, loff) = if l.gap_is_empty(n1, loff) { (n1, loff) } else { (l.lines(), l.lines()) };
     let (idx, val) = (&l.idx[..], &l.val[..]);
     let tol = R::c(TOL);
     let (mut count, mut len_sum) = (0usize, 0usize);
     let start = &l.start[..];
-    for v in 0..l.lines() {
+    let mut visit = |v: usize| {
         // SAFETY: `v < lines <= x.len()` (checked above).
         let xv = unsafe { *x.get_unchecked(v) };
         let a = xv.abs();
         count += usize::from(a > tol);
         if a <= tol {
-            continue;
+            return;
         }
         // SAFETY: `v + 1 <= lines < start.len()`.
         let (s, e) = unsafe { (*start.get_unchecked(v) as usize, *start.get_unchecked(v + 1) as usize) };
         len_sum += e - s;
         // SAFETY: `s <= e <= idx.len() == val.len()` (monotone `start` ending at the entry count); destinations `< idx_bound <= x.len()`.
         unsafe { sub_column(x, idx.get_unchecked(s..e), val.get_unchecked(s..e), xv) };
+    };
+    for v in 0..n1 {
+        visit(v);
     }
-    (count, len_sum)
+    for v in loff..l.lines() {
+        visit(v);
+    }
+    if count_gap {
+        // No step writes into the gap after its own turn (destinations exceed sources), and the steps after it have sources `>= loff`.
+        count += x[n1..loff].iter().filter(|v| v.abs() > tol).count();
+        (Some(count), len_sum)
+    } else {
+        (None, len_sum)
+    }
 }
 
 /// Dense forward L sweep without a count (`!(abs <= TOL)` steps); returns the sum of the processed column lengths.
@@ -218,8 +248,20 @@ pub(super) fn reverse_sweep<R: Real>(lt: &Csr<R>, x: &mut [R]) -> usize {
 
 /// The plain checked kernels, kept as references for the differential tests.
 #[cfg(test)]
-mod plain {
+pub(super) mod plain {
     use super::*;
+
+    /// Bitwise equality (F80 by its representation).
+    pub fn same_bits<R: Real>(a: R, b: R) -> bool {
+        use std::any::Any;
+        let (a, b) = (&a as &dyn Any, &b as &dyn Any);
+        if let Some(a) = a.downcast_ref::<f64>() {
+            a.to_bits() == b.downcast_ref::<f64>().unwrap().to_bits()
+        } else {
+            let (a, b) = (a.downcast_ref::<crate::f80::F80>().unwrap(), b.downcast_ref::<crate::f80::F80>().unwrap());
+            a.repr() == b.repr()
+        }
+    }
 
     pub fn fused_forward<R: Real>(l: &LPool<R>, x: &mut [R]) -> (usize, usize) {
         let (mut count, mut len_sum) = (0usize, 0usize);
@@ -428,8 +470,8 @@ mod tests {
                     let (mut xr, mut er) = (x0.clone(), e0);
                     let count = reference_dense(&cols, &mut xr, &mut er);
                     let mut xn = x0.clone();
-                    let (c, sum) = fused_forward(&pool, &mut xn);
-                    assert_eq!(c, count);
+                    let (c, sum) = fused_forward(&pool, &mut xn, 0, 0, true);
+                    assert_eq!(c, Some(count));
                     assert!(same(&xr, &xn));
                     assert_eq!((sum as f64 * 2.0 + e0).to_bits(), er.to_bits());
                 }
@@ -440,7 +482,8 @@ mod tests {
                     assert!(same(&xp, &xn));
                     if is_forward {
                         let (mut xp, mut xn) = (x0.clone(), x0.clone());
-                        assert_eq!(plain::fused_forward(&pool, &mut xp), fused_forward(&pool, &mut xn));
+                        let (cp, sp) = plain::fused_forward(&pool, &mut xp);
+                        assert_eq!((Some(cp), sp), fused_forward(&pool, &mut xn, 0, 0, true));
                         assert!(same(&xp, &xn));
                     }
                     let (mut xp, mut xn) = (x0.clone(), x0.clone());
@@ -498,8 +541,48 @@ mod tests {
         let cols: Cols<f64> = vec![vec![(1, 2.0)], vec![]];
         let pool = pool_of(&cols);
         let mut x = vec![f64::NAN, 0.0];
-        let (count, sum) = fused_forward(&pool, &mut x);
-        assert_eq!((count, sum), (0, 1));
+        let (count, sum) = fused_forward(&pool, &mut x, 0, 0, true);
+        assert_eq!((count, sum), (Some(0), 1));
         assert!(x[1].is_nan());
+    }
+
+    /// The restricted sweep (`[0,n1)` and `[loff,lines)`) against the full one on forward pools whose columns in `[n1,loff)` are
+    /// emptied: vector bits, count (when asked for) and length sum agree; NaN and sub-tolerance values sit in the gap as well.
+    fn gap_check<R: Real>(seed: u64) {
+        let mut rng = Rng(seed);
+        let (mut gaps, mut counted) = (0, 0);
+        for round in 0..400 {
+            let m = 1 + rng.below(40);
+            let mut cols = random_cols::<R>(&mut rng, m, true);
+            let n1 = rng.below(m + 1);
+            let loff = n1 + rng.below(m - n1 + 1);
+            for c in &mut cols[n1..loff] {
+                c.clear();
+            }
+            gaps += usize::from(loff > n1);
+            let pool = pool_of(&cols);
+            assert!(pool.gap_is_empty(n1, loff));
+            for count_gap in [false, true] {
+                let x0: Vec<R> = (0..m).map(|_| value::<R>(&mut rng)).collect();
+                let (mut xp, mut xn) = (x0.clone(), x0.clone());
+                let (cp, sp) = plain::fused_forward(&pool, &mut xp);
+                let (cn, sn) = fused_forward(&pool, &mut xn, n1, loff, count_gap);
+                assert!(same(&xp, &xn), "round {round}");
+                assert_eq!(sp, sn);
+                assert_eq!(cn, count_gap.then_some(cp));
+                counted += usize::from(count_gap && loff > n1);
+            }
+        }
+        assert!(gaps > 100 && counted > 100);
+    }
+
+    #[test]
+    fn restricted_sweep_matches_full_sweep_f64() {
+        gap_check::<f64>(0x2545f4914f6cdd1d);
+    }
+
+    #[test]
+    fn restricted_sweep_matches_full_sweep_f80() {
+        gap_check::<F80>(0x9e3779b97f4a7c15);
     }
 }

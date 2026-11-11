@@ -474,3 +474,85 @@ fn ftran_work_booked_in_u_loops_matches_scans() {
     assert!(third > 0 && pair > 0 && usual > 0, "third {third} pair {pair} usual {usual}");
     assert!(tau_dense_seen > 0 && col_dense_seen > 0 && tiny_seen > 0, "tau dense {tau_dense_seen} col dense {col_dense_seen} tiny {tiny_seen} checks {checks}");
 }
+
+/// The dense L sweep that skips the empty gap `[n1, loff)` against the full sweep (`assert_full_sweep`, asserted inline under cfg(test)),
+/// on genuine bases (slack columns have one entry, so phases 2-4 leave the gap empty), with updates, `force_dense` solves with etas (the
+/// case that reads `count_l`), sparse and dense inputs; the results and booked work agree with the original backend.
+#[test]
+fn dense_l_sweep_skipping_the_gap_matches_the_full_sweep() {
+    let mut seed = 0x9e3779b97f4a7c15u64;
+    let mut next = || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed as usize
+    };
+    let (mut gaps, mut live, mut checks) = (0, 0, 0);
+    for m in [12, 30, 80, 260] {
+        for round in 0..12 {
+            // slack columns on a pseudo-random subset, structural columns (with some singletons) elsewhere
+            let cols: Vec<_> = (0..m).map(|i| match next() % 4 {
+                0 | 1 => (true, vec![i], vec![1.0]),
+                2 => (false, vec![i], vec![2.0]),
+                _ => {
+                    let mut rows = vec![i];
+                    let mut vals = vec![4.0];
+                    for _ in 0..(1 + round % 4) {
+                        let r = next() % m;
+                        if !rows.contains(&r) {
+                            rows.push(r);
+                            vals.push(if next() % 2 == 0 { 0.5 } else { -0.75 });
+                        }
+                    }
+                    (false, rows, vals)
+                }
+            }).collect();
+            let st = crate::lu_order::factor_structure(m, &cols);
+            let mut new = DualFactor::fresh(m, m, &st, &cols);
+            let mut old = RefStruct::fresh(m, m, &st, &cols);
+            gaps += usize::from(new.n1 < new.loff && new.lpool.gap_is_empty(new.n1, new.loff));
+            for step in 0..m.min(30) {
+                let mut rows: Vec<usize> = Vec::new();
+                for _ in 0..[1, 2, 5, m / 8 + 1][next() % 4].min(m) {
+                    let r = next() % m;
+                    if !rows.contains(&r) {
+                        rows.push(r);
+                    }
+                }
+                let vals: Vec<f64> = rows.iter().map(|_| [0.25, -1.5, 1e-15, 3.0, -0.0][next() % 5]).collect();
+                let dense = next() % 2 == 0;
+                let (a, b) = if dense {
+                    (new.ftran_basic(&rows, &vals), old.ftran_basic(&rows, &vals))
+                } else {
+                    (new.ftran(&rows, &vals), old.ftran(&rows, &vals))
+                };
+                assert_eq!(bits(a), bits(b));
+                assert_eq!(new.work.to_bits(), old.work.to_bits());
+                let needed: Vec<usize> = rows.clone();
+                let dense_in = next() % 3 == 0;
+                assert_eq!(bits(new.ftran_needed(&rows, &vals, &needed, dense_in)), bits(old.ftran_needed(&rows, &vals, &needed, dense_in)));
+                assert_eq!(new.tau_l.get().to_bits(), old.tau_l.get().to_bits());
+                let b: Vec<_> = (0..m).map(|_| [0.0, 0.5, -2.0][next() % 3]).collect();
+                assert_eq!(new.ftran_dense_work(&b).to_bits(), old.ftran_dense_work(&b).to_bits());
+                checks += 1;
+                if step % 2 == 1 {
+                    let r = next() % m;
+                    let mut rows = vec![r];
+                    let mut vals = vec![5.0 + step as f64];
+                    for _ in 0..(1 + next() % 6) {
+                        let q = next() % m;
+                        if !rows.contains(&q) {
+                            rows.push(q);
+                            vals.push([0.25, -0.5, 1.5][next() % 3]);
+                        }
+                    }
+                    assert_eq!(bits(new.ftran(&rows, &vals)), bits(old.ftran(&rows, &vals)));
+                    new.update(r);
+                    old.update(r);
+                }
+            }
+            live = super::LIVE_COUNTS.with(|k| k.get());
+        }
+    }
+    assert!(gaps > 10 && live > 20, "gaps {gaps} live {live} checks {checks}");
+}

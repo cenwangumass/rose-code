@@ -22,6 +22,11 @@ mod adapter;
 #[cfg(test)]
 mod btran_tests;
 #[cfg(test)]
+thread_local! {
+    /// Dense L solves of this test thread that carried a count (the `force_dense` readers' case).
+    static LIVE_COUNTS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+#[cfg(test)]
 mod fresh_tests;
 #[cfg(test)]
 mod update_old;
@@ -1488,6 +1493,29 @@ impl<R: Real> DualFactor<R> {
         q
     }
 
+    /// `count_l * dthr > m` for a count the caller reads: `lstage_num` returns `None` only when `rows_dense`, `lev_dense_ft` or (for
+    /// the `force_dense` readers) the dense request already decides the test, or there are no etas, and the readers test those first.
+    #[inline(always)]
+    fn count_dense(count_l: Option<usize>, dthr: usize, m: usize) -> bool {
+        count_l.expect("count_l is read only where lstage_num counted it") * dthr > m
+    }
+
+    /// Test oracle for the dense L sweep: the full sweep over every step on a copy of the input (`before`) against the restricted
+    /// one (`after`), bit for bit, with the count where it was asked for and the length sum.
+    #[cfg(test)]
+    fn assert_full_sweep(&self, before: &[R], after: &[R], count: Option<usize>, len_sum: usize) {
+        let mut full = before.to_vec();
+        let (c, s) = pool::plain::fused_forward(&self.lpool, &mut full);
+        assert!(full.iter().zip(after).all(|(&a, &b)| pool::plain::same_bits(a, b)), "x");
+        assert_eq!(s, len_sum);
+        if let Some(n) = count {
+            assert_eq!(n, c);
+        }
+        if count.is_some() && self.lpool.gap_is_empty(self.n1, self.loff) && self.n1 < self.loff {
+            LIVE_COUNTS.with(|k| k.set(k.get() + 1));
+        }
+    }
+
     /// L solve (Kahn order) and row etas on the entering column; returns the nonzero list the U solve receives, with values.
     /// Also returns the work estimate of the L stage and the row etas (`0x12bd30` / `0x12a990` and the eta loop of `0x120740`).
     fn lstage_num(
@@ -1495,7 +1523,7 @@ impl<R: Real> DualFactor<R> {
         rows: &[usize],
         vals: &[R],
         force_dense: bool,
-    ) -> (Vec<(usize, R)>, usize, f64) {
+    ) -> (Vec<(usize, R)>, Option<usize>, f64) {
         let m = self.m;
         let mut e = 0.0f64;
         let dense_l = rows.len() * self.dthr > self.m || force_dense || self.lev_dense_ft;
@@ -1506,7 +1534,7 @@ impl<R: Real> DualFactor<R> {
                     .get_or_insert_with(Box::default)
                     .solve(self, levels, *maxlev, rows, vals)
                 {
-                    return result;
+                    return (result.0, Some(result.1), result.2);
                 }
             }
         }
@@ -1523,19 +1551,28 @@ impl<R: Real> DualFactor<R> {
                 start.push(s);
             }
         }
+        // `count_l` is `None` where no reader can see it: the readers (here and in `ftran_needed` / `ftran_with`) test it only with
+        // etas present and after `rows_dense`, `lev_dense_ft` (and, in `ftran_needed`, `force_dense`) have been ruled out.
         let (mut order, count_l) = if dense_l {
             // Dense L solve (`0x12bd30`): every node in ascending order; the list handed on is the ascending scan.
+            let need_count = force_dense && rows.len() * self.dthr <= self.m && !self.lev_dense_ft && !self.etas.is_empty();
             e = m as f64 + rows.len() as f64 * 2.0 + e;
             e = (m - self.loff) as f64 * 2.0 + self.n1 as f64 + self.n1 as f64 + e;
             let count_l = if self.l_forward {
                 // Every destination is above its source, so `x[v]` is final when visited and `count_l` is counted in the same pass.
                 // `e` is integer-valued here (sums of `m`, counts and doubled counts), so the doubled column lengths are added at once.
                 debug_assert!(e.fract() == 0.0);
-                let (count_l, len_sum) = pool::fused_forward(&self.lpool, &mut x);
+                // The singleton steps `[n1, loff)` have no L entries and are not visited; their nonzeros are scanned only if read.
+                #[cfg(test)]
+                let before = x.clone();
+                let (count_l, len_sum) = pool::fused_forward(&self.lpool, &mut x, self.n1, self.loff, need_count);
+                #[cfg(test)]
+                self.assert_full_sweep(&before, &x, count_l, len_sum);
                 e = len_sum as f64 * 2.0 + e;
                 count_l
             } else {
-                for v in 0..self.m {
+                let (n1, loff) = if self.lpool.gap_is_empty(self.n1, self.loff) { (self.n1, self.loff) } else { (self.m, self.m) };
+                for v in (0..n1).chain(loff..self.m) {
                     let xv = x[v];
                     if xv.abs() <= R::c(TOL) {
                         continue;
@@ -1546,7 +1583,7 @@ impl<R: Real> DualFactor<R> {
                         x[y as usize] -= a * xv;
                     }
                 }
-                (0..self.m).filter(|&v| x[v].abs() > R::c(TOL)).count()
+                need_count.then(|| (0..self.m).filter(|&v| x[v].abs() > R::c(TOL)).count())
             };
             (Vec::new(), count_l)
         } else if let Some((lev, maxlev)) = &self.levels {
@@ -1592,7 +1629,7 @@ impl<R: Real> DualFactor<R> {
             }
             let n = out.len();
             e = ((self.nnz_l + m + 2 * m) as f64 * 5.0 * n as f64) / (m + 1) as f64 + e;
-            (out, n)
+            (out, Some(n))
         } else {
             let q = self.kahn(&start);
             let x0 = x.clone();
@@ -1669,10 +1706,10 @@ impl<R: Real> DualFactor<R> {
                     } else {
                         Vec::new()
                     },
-                    count_l,
+                    Some(count_l),
                 )
             } else {
-                (q, count_l)
+                (q, Some(count_l))
             }
         };
         if crate::dump::on("lstage") {
@@ -1680,7 +1717,7 @@ impl<R: Real> DualFactor<R> {
         }
         // The sparse L stage drops a node whose value is at or below the tolerance from its list; an eta that makes it nonzero again appends it
         // at the end (SCAGR7 iteration 173: `0x129aa0` start `[82, 125, 83]` leaves `[82, 49, 125]`).
-        let output_dense = dense_l || (!self.etas.is_empty() && count_l * self.dthr > m);
+        let output_dense = dense_l || (!self.etas.is_empty() && Self::count_dense(count_l, self.dthr, m));
         let mut have = Vec::new();
         if !output_dense {
             order.retain(|&v| x[v].abs() > R::c(TOL));
@@ -1693,7 +1730,7 @@ impl<R: Real> DualFactor<R> {
         let mut eta_x: Vec<R> = Vec::new();
         if !self.etas.is_empty() {
             let netas = self.etas.len();
-            if dense_l || count_l * self.dthr > m {
+            if dense_l || Self::count_dense(count_l, self.dthr, m) {
                 e = self.sum_eta * 2.0 + e;
             } else {
                 // Sparse eta pass: from the first eta that lists an input position; the list grows by the eta positions that
@@ -1793,7 +1830,7 @@ impl<R: Real> DualFactor<R> {
         let tau_dense = rows.len() * self.dthr > self.m
             || dense_in
             || self.lev_dense_ft
-            || (!self.etas.is_empty() && count_l * self.dthr > self.m);
+            || (!self.etas.is_empty() && Self::count_dense(count_l, self.dthr, self.m));
         let tau_n = if tau_dense { None } else { Some(spike.len()) };
         // The inline dense joint loop of two dense vectors (`0x128c56..0x129152`) tests the raw value before the quotient: a tail column whose
         // raw value is at most the tolerance is zeroed even when the quotient exceeds it.
@@ -2388,10 +2425,10 @@ impl<R: Real> DualFactor<R> {
         // The dense U routine (`0x121ef0`) tests the raw value first; the sparse one (`0x1223e0`, at `0x12297b`) only the quotient.
         let u_dense = !R::LANES
             || rows.len() * self.dthr > m
-            || (!self.etas.is_empty() && count_l * self.dthr > m)
+            || self.lev_dense_ft
+            || (!self.etas.is_empty() && Self::count_dense(count_l, self.dthr, m))
             || !(self.nuc.len() + spike.len() < self.i21
-                || self.dens * (spike.len() as f64) < 2.0 * m as f64)
-            || self.lev_dense_ft;
+                || self.dens * (spike.len() as f64) < 2.0 * m as f64);
         let bs = force_dense && crate::dump::on("bsolve");
         let mut touched = FtranTouched::new(m, u_dense, dirty.unwrap_or_default());
         let mut tail: Vec<usize> = Vec::new();
@@ -2473,13 +2510,13 @@ impl<R: Real> DualFactor<R> {
         // A dense result (the reference's `-1` count) is scanned by position index; a sparse one comes in the U solve's order.
         let dense = rows.len() * self.dthr > m
             || self.lev_dense_ft
-            || (!self.etas.is_empty() && count_l * self.dthr > m)
+            || (!self.etas.is_empty() && Self::count_dense(count_l, self.dthr, m))
             || !(self.nuc.len() + spike.len() < self.i21
                 || self.dens * (spike.len() as f64) < 2.0 * m as f64);
         let inp: Vec<usize> = spike.iter().map(|e| e.0).collect();
         let vec_dense = rows.len() * self.dthr > m
             || self.lev_dense_ft
-            || (!self.etas.is_empty() && count_l * self.dthr > m);
+            || (!self.etas.is_empty() && Self::count_dense(count_l, self.dthr, m));
         let u_cnt = if vec_dense { None } else { Some(spike.len()) };
         let u_est = self.u_work(&inp, &x, !dense, u_cnt, &Surv { list: &col_surv, n: col_surv.len(), sa, sb, su });
         #[cfg(test)]
