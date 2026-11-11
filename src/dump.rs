@@ -89,6 +89,7 @@ pub const KINDS: &[(&str, &str, &str)] = &[
     ("barrier_front", "ASM", "single-precision factor, supernode `FRONT_COL`: the lower triangle (6 x 6) of the front as float bits after the assembly (ASM) and after each child update (UPD, child column), like `replay/gdb_barrier_chol32_watch.py`"),
     ("fillparts", "FILLP", "per factor update: pool fill on entry, eta size, new column entries added, and the row growths (row, cnt, cap, extra)"),
     ("qobj", "QOBJ", "quad dual working objective recomputes and accepted pivot updates"),
+    ("stallobj", "STALLOBJ", "double dual maintained objective (`ctx+0x118`): at each x_B recompute the structurals' sum S and the new objective (ev recompute), at each accepted pivot the step and the new objective (ev pivot), at each stall-check read the objective, best objective and progress flag (ev check), all as f64 bit patterns; `compare.py stallobj`"),
     ("qtau", "QTAU", "quad dual, per two-vector FTRAN: r, pricing mode, dense_in, the second vector (in), the pivot column result (col) and tau at its positions (tau), as long-double values"),
 ];
 
@@ -106,14 +107,14 @@ fn kinds() -> &'static [String] {
     })
 }
 
-/// Whether the dump `kind` is selected.
+/// Whether the dump `kind` is selected (`all` leaves out `stallobj`, which only a comparison asks for by name, so the parity records stay unchanged).
 pub fn on(kind: &str) -> bool {
     if is_muted() { return false; }
     debug_assert!(
         KINDS.iter().any(|k| k.0 == kind),
         "unknown dump kind {kind}"
     );
-    kinds().iter().any(|k| k == kind || k == "all")
+    kinds().iter().any(|k| k == kind || (k == "all" && kind != "stallobj"))
 }
 
 /// Whether any dump is selected.

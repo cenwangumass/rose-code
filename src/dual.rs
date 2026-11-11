@@ -596,6 +596,8 @@ struct Ratio {
 struct AuxiliaryFactor {
     base: Option<Factor>,
     head: Vec<usize>,
+    /// Absolute pivot floor of the lazy build (`Factor::with_floor`).
+    floor: f64,
     pending: Vec<AuxiliaryUpdate>,
     /// Shadow build: `base` is the eager build of `Dual::refactor`; the first read builds the lazy one and compares.
     #[cfg(feature = "factor-shadow")]
@@ -608,10 +610,12 @@ enum AuxiliaryUpdate {
 }
 
 impl AuxiliaryFactor {
+    #[cfg(test)]
     fn new(base: Factor) -> Self {
         Self {
             base: Some(base),
             head: Vec::new(),
+            floor: 0.0,
             pending: Vec::new(),
             #[cfg(feature = "factor-shadow")]
             verify: false,
@@ -619,18 +623,23 @@ impl AuxiliaryFactor {
     }
 
     fn lazy(head: Vec<usize>) -> Self {
+        Self::lazy_floor(head, 0.0)
+    }
+
+    fn lazy_floor(head: Vec<usize>, floor: f64) -> Self {
         Self {
             base: None,
             head,
+            floor,
             pending: Vec::new(),
             #[cfg(feature = "factor-shadow")]
             verify: false,
         }
     }
 
-    fn build(m: usize, head: &[usize], p: &Internal) -> Result<Factor, usize> {
+    fn build(m: usize, head: &[usize], p: &Internal, floor: f64) -> Result<Factor, usize> {
         let cols: Vec<&Column> = head.iter().map(|&j| &p.cols[j]).collect();
-        Factor::with_floor(m, &cols, 0.0)
+        Factor::with_floor(m, &cols, floor)
     }
 
     fn update_column<R: Real>(&mut self, r: usize, column: Vec<(usize, R)>) {
@@ -644,7 +653,8 @@ impl AuxiliaryFactor {
     }
 
     fn materialize(&mut self, p: &Internal) -> Result<&Factor, SolveError> {
-        self.materialize_with(|head| Self::build(p.m, head, p))
+        let floor = self.floor;
+        self.materialize_with(|head| Self::build(p.m, head, p, floor))
     }
 
     fn materialize_with(&mut self, build: impl Fn(&[usize]) -> Result<Factor, usize>) -> Result<&Factor, SolveError> {
@@ -1411,6 +1421,10 @@ struct Dual<'a, R: Real = f64> {
     obj_off: f64,
     /// Quad working objective, absent after a writer whose arithmetic is not yet modelled.
     working_obj: Option<f64>,
+    /// The double dual's maintained objective (`ctx+0x118`): reset at every x_B recompute, advanced by each accepted pivot, read by the stall check.
+    obj: f64,
+    /// The model's objective constant (`ctx+0x128`, raw, not divided by the objective scale; -0.0 when the model has none).
+    obj_const: f64,
     /// `ctx+0x3fc` (-1 once set): the second selection among the bound flips of the ratio test. Set at a refactorization (`0xe6dcc`) when the
     /// perturbation flag is 3 or more or 3 iterations exceed the row count (`ctx+0x178`, which also sets it, is 0 in every capture).
     flip_select: bool,
@@ -2021,14 +2035,14 @@ impl<'a, R: Real> Dual<'a, R> {
         self.factor = AuxiliaryFactor::lazy(self.head.clone());
         // Shadow build: keep the eager build and its error return; the lazy build must agree on success and failure.
         #[cfg(feature = "factor-shadow")]
-        match AuxiliaryFactor::build(self.m, &self.head, self.p) {
+        match AuxiliaryFactor::build(self.m, &self.head, self.p, 0.0) {
             Ok(eager) => {
                 self.factor.base = Some(eager);
                 self.factor.verify = true;
             }
             Err(_) => {
                 assert!(
-                    AuxiliaryFactor::build(self.m, &self.head, self.p).is_err(),
+                    AuxiliaryFactor::build(self.m, &self.head, self.p, 0.0).is_err(),
                     "shadow: lazy auxiliary build succeeded where the eager one failed"
                 );
                 return Err(SolveError::SingularBasis);
@@ -2367,6 +2381,26 @@ impl<'a, R: Real> Dual<'a, R> {
                 crate::dump::emit(
                     "qobj",
                     serde_json::json!({"kind":"recompute", "it":self.iters, "value":self.working_obj}),
+                );
+            }
+        }
+        if !R::QUAD {
+            // `0xbfc80..0xbfd96`: the maintained objective restarts from the structurals' sum (index order) over the x_B just computed.
+            let mut sum = 0.0f64;
+            for j in 0..p.n {
+                let x = if self.st[j] >= 0 {
+                    self.xb[self.st[j] as usize].to_f64()
+                } else {
+                    self.nonbasic_value(j)
+                };
+                sum += x * self.cost[j];
+            }
+            self.obj = ((sum + self.obj_off) / self.obj_scale) + self.obj_const;
+            if crate::dump::on("stallobj") {
+                crate::dump::emit(
+                    "stallobj",
+                    serde_json::json!({"ev":"recompute", "it":self.iters, "nref":self.nref(), "sum":format!("{:016x}", sum.to_bits()),
+                        "obj":format!("{:016x}", self.obj.to_bits())}),
                 );
             }
         }
@@ -4660,6 +4694,17 @@ impl<'a, R: Real> Dual<'a, R> {
             // A mismatch the ladder accepted (agreeing signs past the sixth retry) is an iteration: no mismatch mark in the record.
             o.remove("mismatch");
         }
+        if !R::QUAD {
+            // `0xc5d46`: the accepted pivot adds its objective step to the maintained objective.
+            self.obj += obj_increment.to_f64();
+            if crate::dump::on("stallobj") {
+                crate::dump::emit(
+                    "stallobj",
+                    serde_json::json!({"ev":"pivot", "it":self.iters, "step":format!("{:016x}", obj_increment.to_f64().to_bits()),
+                        "obj":format!("{:016x}", self.obj.to_bits())}),
+                );
+            }
+        }
         if R::QUAD {
             if let Some(old) = self.working_obj {
                 let new = (R::c(old) + obj_increment).to_f64();
@@ -5180,8 +5225,17 @@ impl<'a, R: Real> Dual<'a, R> {
         Ok(())
     }
 
-    /// The dual objective as the reference keeps it (`ctx+0x118`): the working costs times the basic solution and the nonbasic values, plus the shift
-    /// offset, divided by the objective scale.
+    /// The objective the stall check reads (`ctx+0x118`, read without a solve): the maintained `obj` in the double dual. The quad dual still solves it
+    /// afresh through the auxiliary factor: the working costs times the basic solution and the nonbasic values, plus the shift offset, divided by the
+    /// objective scale.
+    fn stall_objective(&mut self) -> Result<f64, SolveError> {
+        if R::QUAD {
+            self.fresh_objective()
+        } else {
+            Ok(self.obj)
+        }
+    }
+
     fn fresh_objective(&mut self) -> Result<f64, SolveError> {
         let p = self.p;
         let mut r = p.rhs.clone();
@@ -5291,6 +5345,16 @@ impl<'a, R: Real> Dual<'a, R> {
         }
     }
 
+    fn dump_stall_check(&self, obj: f64) {
+        if crate::dump::on("stallobj") {
+            crate::dump::emit(
+                "stallobj",
+                serde_json::json!({"ev":"check", "it":self.iters, "nref":self.nref(), "obj":format!("{:016x}", obj.to_bits()),
+                    "best":format!("{:016x}", self.best_obj.to_bits()), "prog_on":self.prog_on}),
+            );
+        }
+    }
+
     /// The stall test of the refactorization post pass (`0xe60cc..0xe6237`) and the cost perturbation it triggers (`0xe6af8..0xe6cd7`, `0xe74b1`).
     fn stall_check(&mut self, old_level: usize) -> Result<(), SolveError> {
         if self.pstep <= 0.0 && self.pert_param <= 0.0 {
@@ -5314,14 +5378,16 @@ impl<'a, R: Real> Dual<'a, R> {
                 (self.stall - self.stall_snap) as f64 > 0.9 * (self.iters as f64 - self.stall_it);
             if !trig && self.prog_on {
                 // No objective progress since the last check.
-                let obj = self.fresh_objective()?;
+                let obj = self.stall_objective()?;
+                self.dump_stall_check(obj);
                 trig = 1e-13 * (obj.abs().min(1e10) + 1.0) + self.best_obj > obj;
                 if !trig {
                     self.best_obj = maxsd(obj, self.best_obj);
                 }
             }
         } else if self.prog_on {
-            let obj = self.fresh_objective()?;
+            let obj = self.stall_objective()?;
+            self.dump_stall_check(obj);
             self.best_obj = maxsd(obj, self.best_obj);
         }
         if trig && self.pert >= 2 && !(self.pert == 3 && self.pstep >= 0.01) {
@@ -6533,14 +6599,9 @@ fn solve_pass_callback<R: Real>(
             mirror = Mirror::fresh(m, n, &stc, rows.view());
         }
     }
-    let cols: Vec<&Column> = order.iter().map(|&j| &p.cols[j]).collect();
-    let factor = if R::QUAD {
-        // The quad pass starts from an ill-conditioned basis the double factor may find singular; the quad LU decides (the double factor is only for read-out).
-        Factor::with_floor(m, &cols, 0.0)
-    } else {
-        Factor::new(m, &cols)
-    }
-    .map_err(|_| SolveError::SingularBasis)?;
+    // The auxiliary LU is built on its first read (the deferred-free pass). The quad pass starts from an ill-conditioned basis the double factor may find
+    // singular; the quad LU decides (the double factor is only for read-out).
+    let factor = AuxiliaryFactor::lazy_floor(order.clone(), if R::QUAD { 0.0 } else { 1e-11 });
     let mut st = vec![LB; n + m];
     for (pos, &j) in order.iter().enumerate() {
         st[j] = pos as i32;
@@ -6556,7 +6617,7 @@ fn solve_pass_callback<R: Real>(
         d: vec![R::ZERO; n + m],
         w: vec![R::ONE; m],
         mirror,
-        factor: AuxiliaryFactor::new(factor),
+        factor,
         rrows: FlatRows::new(m, n),
         absorb_request: false,
         fresh_absorb: false,
@@ -6647,6 +6708,10 @@ fn solve_pass_callback<R: Real>(
         pert: 0,
         obj_off: 0.0,
         working_obj: None,
+        obj: 0.0,
+        // GUROBI: `ctx+0x128` holds -0.0 when the model has no objective constant; the term `[ctx+0x490]+0x10` of the recompute is null in every run seen
+        // and taken as 0.
+        obj_const: if model.offset == 0.0 { -0.0 } else { model.offset },
         flip_select: start.is_some(),
         work: if R::QUAD {
             crate::work::Work::dual_quad()
@@ -8191,6 +8256,8 @@ mod captured_bh305_ratio {
             pert: 0,
             obj_off: 0.0,
             working_obj: None,
+            obj: 0.0,
+            obj_const: -0.0,
             flip_select: false,
             work: crate::work::Work::dual(),
             pivot_cols: None,
