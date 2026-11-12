@@ -3882,6 +3882,20 @@ impl<R: Real> DualFactor<R> {
         2.0 * self.spike.len() as f64
     }
 
+    /// The sources of step `v` in the forward reset list of the pricing weights (the reference's `F+0x70/0x80`): the steps whose L column holds
+    /// the row of step `v`, ascending (the reference walks the list descending).
+    #[inline(always)]
+    pub fn reset_forward(&self, v: usize) -> &[u32] {
+        self.lt.col(v).0
+    }
+
+    /// The tail columns of row `y` of the numeric U rows, in physical order (the reference's backward reset list `F+0xb0/0xd0`). Valid for the
+    /// pricing reset only on a factor without updates.
+    #[inline(always)]
+    pub fn reset_backward(&self, y: usize) -> &[u32] {
+        self.urows.cols(y)
+    }
+
     /// `nnz(U)` of the fresh factor (the reference's `F+0xb0` pointer array total): the factor size less `nnz(L)` and the two diagonals.
     pub fn u_nnz(&self) -> usize {
         self.znz as usize - self.nnz_l - 2 * self.m

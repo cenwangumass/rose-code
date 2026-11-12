@@ -101,6 +101,14 @@ impl<R: Real> Shadow<R> {
     forward!(last_dense() -> bool, |v: &bool| *v);
     forward!(last_ordered() -> bool, |v: &bool| *v);
 
+    pub fn reset_forward(&self, v: usize) -> &[u32] {
+        self.new.reset_forward(v)
+    }
+
+    pub fn reset_backward(&self, y: usize) -> &[u32] {
+        self.new.reset_backward(y)
+    }
+
     pub fn diag(&self) -> &[R] {
         let new = self.new.diag();
         let old = muted(|| self.old.numerics().0);

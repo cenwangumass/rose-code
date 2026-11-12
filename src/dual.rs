@@ -376,89 +376,53 @@ fn maxr<R: Real>(a: R, b: R) -> R {
     }
 }
 
-/// The row weights of `Dual::reset_pricing` before the cap, without materialized lists: the forward lists are CSR filled by ascending
-/// step `e`, so each is ascending with equal entries adjacent (the dumped lists are sorted descending and deduplicated, which is this
-/// list read backwards skipping an entry equal to the previous one); the backward lists are walked in place in their stored order.
+/// The row weights of `Dual::reset_pricing` before the cap, without materialized lists: the forward lists are the factor's L transpose read
+/// backwards (the reference's descending order), the backward lists the factor's numeric U rows in their stored order. Both are those of the
+/// fresh factor `f` (no update since `fresh`); the lists of the previous implementation (CSRs built from the structure and the basis columns)
+/// are rebuilt and compared in debug and shadow builds.
 fn pricing_weights<R: Real>(
     m: usize,
     st: &crate::lu_order::Structure<R>,
     cols: crate::lu_order::Cols<'_>,
+    f: &Mirror<R>,
 ) -> Vec<f64> {
-    let mut step_of_row = vec![usize::MAX; m];
-    let mut step_of_pos = vec![usize::MAX; m];
-    for (s, &(r, c)) in st.pivots.iter().enumerate() {
-        step_of_row[r] = s;
-        step_of_pos[c] = s;
-    }
-    // Forward lists as CSR, filled by ascending e: each list is ascending with equal entries adjacent.
-    let mut fstart = vec![0u32; m + 1];
-    for e in 0..m {
-        for &r in st.l_rows(e) {
-            fstart[step_of_row[r] + 1] += 1;
-        }
-    }
-    for k in 0..m {
-        fstart[k + 1] += fstart[k];
-    }
-    let mut next: Vec<u32> = fstart[..m].to_vec();
-    let mut fidx = vec![0u32; fstart[m] as usize];
-    for e in 0..m {
-        for &r in st.l_rows(e) {
-            let k = step_of_row[r];
-            fidx[next[k] as usize] = e as u32;
-            next[k] += 1;
-        }
-    }
-    // Row-wise basis positions (ascending position) as CSR.
-    let mut rstart = vec![0u32; m + 1];
-    for col in cols.iter() {
-        for &i in &col.1 {
-            rstart[i + 1] += 1;
-        }
-    }
-    for i in 0..m {
-        rstart[i + 1] += rstart[i];
-    }
-    let mut rnext: Vec<u32> = rstart[..m].to_vec();
-    let mut ridx = vec![0u32; rstart[m] as usize];
-    for (c, col) in cols.iter().enumerate() {
-        for &i in &col.1 {
-            ridx[rnext[i] as usize] = c as u32;
-            rnext[i] += 1;
-        }
-    }
+    #[cfg(any(debug_assertions, feature = "factor-shadow"))]
+    check_reset_lists(m, st, cols, f);
+    #[cfg(not(any(debug_assertions, feature = "factor-shadow")))]
+    let _ = (st, cols);
     let n = m as f64;
     let mut w = vec![1.0f64; m];
     for k in 0..m {
-        let mut prev = usize::MAX;
-        for &j in fidx[fstart[k] as usize..fstart[k + 1] as usize].iter().rev() {
+        for &j in f.reset_forward(k).iter().rev() {
             let j = j as usize;
-            if j == prev {
-                continue;
-            }
-            prev = j;
             w[k] = (w[k] + w[j]) - (w[j] * w[k]) / n;
         }
     }
     for k in (0..m).rev() {
-        if st.phase[k] != 0 {
-            let i = st.pivots[k].0;
-            for &c in &ridx[rstart[i] as usize..rstart[i + 1] as usize] {
-                let j = step_of_pos[c as usize];
-                if j > k {
-                    w[k] = (w[k] + w[j]) - (w[j] * w[k]) / n;
-                }
-            }
-        } else {
-            for &(c, _) in st.u_row(k) {
-                let j = step_of_pos[c];
-                if j > k {
-                    w[k] = (w[k] + w[j]) - (w[j] * w[k]) / n;
-                }
-            }
+        for &j in f.reset_backward(k) {
+            let j = j as usize;
+            w[k] = (w[k] + w[j]) - (w[j] * w[k]) / n;
         }
     }
     w
+}
+
+/// The lists the reset used to build (forward CSR deduplicated, backward filtered to later steps) against the factor's: same entries in the
+/// same order, so the sequential sums of `pricing_weights` see identical terms.
+#[cfg(any(debug_assertions, feature = "factor-shadow"))]
+fn check_reset_lists<R: Real>(
+    m: usize,
+    st: &crate::lu_order::Structure<R>,
+    cols: crate::lu_order::Cols<'_>,
+    f: &Mirror<R>,
+) {
+    let (fwd, bwd, _) = pricing_weights_lists(m, st, cols);
+    for k in 0..m {
+        let got: Vec<usize> = f.reset_forward(k).iter().rev().map(|&j| j as usize).collect();
+        assert_eq!(got, fwd[k], "reset forward list of step {k}");
+        let got: Vec<usize> = f.reset_backward(k).iter().map(|&j| j as usize).collect();
+        assert_eq!(got, bwd[k], "reset backward list of step {k}");
+    }
 }
 
 /// The lists and weights of the reference form of `Dual::reset_pricing` (the `p68` dump carries the lists).
@@ -1487,6 +1451,8 @@ struct Dual<'a, R: Real = f64> {
     /// `rrows` is the set of the nonbasic, non-fixed structurals as the pivots keep it (false after a handoff list or an in-place repair, which change the
     /// set without the row copy).
     rrows_exact: bool,
+    /// A structural column repeats a row (MPS input is not merged): the reset then keeps the deduplicating list path.
+    dup_entries: bool,
     /// The factorization count the pass started from (`ctx+0x2c0` counts from there).
     fac0: usize,
     /// `ctx+0x2c0` at the start of the pass (`Carry::nref0`), and the factorizations that `refactorizations` counts but `ctx+0x2c0` does not (the failed one of the in-place repair:
@@ -2145,7 +2111,7 @@ impl<'a, R: Real> Dual<'a, R> {
         }
         self.scr_wv = wv;
         self.head = order;
-        self.reset_pricing(&st, rows.view());
+        self.reset_pricing(&st, rows.view(), &mi);
         std::mem::replace(&mut self.mirror, mi).recycle();
         self.mirror.set_upd_limit(self.upd_limit);
         self.factor_work(&st, rows.view(), discard);
@@ -2336,6 +2302,7 @@ impl<'a, R: Real> Dual<'a, R> {
             for &(i, _) in &self.p.cols[j] {
                 if seen[i] == j {
                     self.rrows_exact = false;
+                    self.dup_entries = true;
                     break 'cols;
                 }
                 seen[i] = j;
@@ -2947,14 +2914,22 @@ impl<'a, R: Real> Dual<'a, R> {
         &mut self,
         st: &crate::lu_order::Structure<R>,
         cols: crate::lu_order::Cols<'_>,
+        f: &Mirror<R>,
     ) {
         if self.ptype == 0 {
             return;
         }
-        if crate::dump::on("p68") {
+        // A repeated (row, column) entry can repeat a row in a singleton L column; the old lists deduplicate it, the factor's do not.
+        if crate::dump::on("p68") || self.dup_entries {
             return self.reset_pricing_ref(st, cols);
         }
-        let mut w = pricing_weights(self.m, st, cols);
+        // `f` is the factor just built by `lu_attempt`, before it replaces `self.mirror`: no update since `fresh`.
+        let w = pricing_weights(self.m, st, cols, f);
+        self.set_pricing_weights(w);
+    }
+
+    /// The cap and store of a reset's weights.
+    fn set_pricing_weights(&mut self, mut w: Vec<f64>) {
         self.ptype = cap_pricing_weights(self.ptype, self.m, &mut w);
         self.p68 = w;
     }
@@ -6980,6 +6955,7 @@ fn solve_pass_callback<R: Real>(
         scr_ydbl: Vec::new(),
         scr_nbv: Vec::new(),
         rrows_exact: true,
+        dup_entries: false,
         fac0: carry.fac,
         nref0: carry.nref0,
         nref_skip: 0,
@@ -7200,8 +7176,14 @@ fn solve_pass_callback<R: Real>(
             }
         }
     }
-    if !free_phase {
-        s.reset_pricing(&stc, rows.view());
+    // Not in the free phase, `s.mirror` is the setup factor with no update yet (only read by `true_d` and the residual check above).
+    if !free_phase && s.ptype > 0 {
+        if crate::dump::on("p68") || s.dup_entries {
+            s.reset_pricing_ref(&stc, rows.view());
+        } else {
+            let w = pricing_weights(m, &stc, rows.view(), &s.mirror);
+            s.set_pricing_weights(w);
+        }
     }
     s.slack_nb = (0..m).map(|i| s.st[n + i] < 0).collect();
     s.level = (0..n + m).filter(|&j| s.at_artificial(j)).count();
@@ -8538,6 +8520,7 @@ mod captured_bh305_ratio {
             scr_ydbl: Vec::new(),
             scr_nbv: Vec::new(),
             rrows_exact: true,
+            dup_entries: false,
             fac0: 0,
             nref0: 0,
             nref_skip: 0,
@@ -9397,13 +9380,13 @@ mod true_d_differential {
 
 #[cfg(test)]
 mod reset_pricing_flat {
-    use super::{cap_pricing_weights, pricing_weights, pricing_weights_lists};
+    use super::{cap_pricing_weights, pricing_weights, pricing_weights_lists, Mirror};
 
     fn bits(v: &[f64]) -> Vec<u64> {
         v.iter().map(|x| x.to_bits()).collect()
     }
 
-    /// The flat weights equal the list form bit for bit on random factor structures, with duplicate and out-of-order L rows injected.
+    /// The weights from the factor's lists equal the list form bit for bit on random factor structures.
     #[test]
     fn flat_weights_match_the_list_form() {
         let mut seed = 0x2545f4914f6cdd1du64;
@@ -9434,29 +9417,12 @@ mod reset_pricing_flat {
             for i in (1..m).rev() {
                 cols.swap(i, rnd(i + 1));
             }
-            let mut st = crate::lu_order::factor_structure(m, &cols);
+            let st = crate::lu_order::factor_structure(m, &cols);
             if st.pivots.len() != m {
                 continue;
             }
-            if case % 2 == 1 {
-                for e in 0..m {
-                    let adds = rnd(4);
-                    for _ in 0..adds {
-                        let r = if !st.l_rows(e).is_empty() && rnd(2) == 0 {
-                            st.l_rows(e)[rnd(st.l_rows(e).len())]
-                        } else {
-                            rnd(m)
-                        };
-                        let mut rows = st.l_rows(e).to_vec();
-                        rows.push(r);
-                        st.set_l_rows_for_test(e, rows);
-                    }
-                    if rnd(5) == 0 {
-                        st.set_l_rows_for_test(e, Vec::new());
-                    }
-                }
-            }
-            let flat = pricing_weights(m, &st, (&cols).into());
+            let f = Mirror::fresh(m, m, &st, &cols);
+            let flat = pricing_weights(m, &st, (&cols).into(), &f);
             let (_, _, lists) = pricing_weights_lists(m, &st, (&cols).into());
             assert_eq!(bits(&flat), bits(&lists), "case {case}, m {m}");
             checked += 1;
