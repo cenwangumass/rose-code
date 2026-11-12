@@ -1062,12 +1062,22 @@ fn pivot_row_ws<R: Real>(
     // The size pass also checks every index of `rho` against `m` (the unchecked reads below rely on it) and keeps the row spans for the scatter.
     let mut spans_v = std::mem::take(&mut ws.spans);
     spans_v.clear();
+    spans_v.reserve(rho.len());
+    assert!(rrows.len.len() == m && rrows.idx.len() == rrows.val.len());
     let mut est = 0usize;
-    for e in rho {
-        let (s, l) = (rrows.start[e.0], rrows.len[e.0]);
-        debug_assert!(s as usize + l as usize <= rrows.idx.len() && rrows.idx.len() == rrows.val.len());
-        est += l as usize;
-        spans_v.push((s, l));
+    {
+        let spans_p = spans_v.as_mut_ptr();
+        for (k, e) in rho.iter().enumerate() {
+            // One check per entry; the reads of `start`/`len` (both of length m) need no more.
+            assert!(e.0 < m, "pivot_row_ws: row index {} out of range (m = {m})", e.0);
+            let (s, l) = (rrows.start[e.0], rrows.len[e.0]);
+            debug_assert!(s as usize + l as usize <= rrows.idx.len());
+            est += l as usize;
+            // SAFETY: `k < rho.len()`, the reserved capacity.
+            unsafe { spans_p.add(k).write((s, l)) };
+        }
+        // SAFETY: `rho.len()` spans were written.
+        unsafe { spans_v.set_len(rho.len()) };
     }
     let sparse = rho.len() == 1 || !((n as f64) < 1.8 * est as f64);
     all_v.clear();
@@ -1097,24 +1107,33 @@ fn pivot_row_ws<R: Real>(
     // SAFETY (the spans): `start + len <= idx.len() = val.len()` is an invariant of `FlatRows` (`check`).
     let (idx_p, val_p) = (rrows.idx.as_ptr(), rrows.val.as_ptr());
     for (&(_, rv), &(s, l)) in rho.iter().zip(spans_v.iter()) {
-        let (ix, vl) = unsafe {
-            (std::slice::from_raw_parts(idx_p.add(s as usize), l as usize), std::slice::from_raw_parts(val_p.add(s as usize), l as usize))
-        };
-        let k = ix.len();
+        // SAFETY: the span is inside the pools (invariant above), so every read below is.
+        let (ix, vl) = unsafe { (idx_p.add(s as usize), val_p.add(s as usize)) };
+        let k = l as usize;
         let mut t = 0;
         while t + 4 <= k {
             // The loads of four entries; the updates follow in order.
-            let (j0, j1, j2, j3) = (ix[t], ix[t + 1], ix[t + 2], ix[t + 3]);
-            let (a0, a1, a2, a3) = (vl[t], vl[t + 1], vl[t + 2], vl[t + 3]);
+            let (j0, j1, j2, j3) = unsafe { (*ix.add(t), *ix.add(t + 1), *ix.add(t + 2), *ix.add(t + 3)) };
+            let (a0, a1, a2, a3) = unsafe { (*vl.add(t), *vl.add(t + 1), *vl.add(t + 2), *vl.add(t + 3)) };
             step!(rv, j0, a0);
             step!(rv, j1, a1);
             step!(rv, j2, a2);
             step!(rv, j3, a3);
             t += 4;
         }
-        while t < k {
-            step!(rv, ix[t], vl[t]);
-            t += 1;
+        // The last 0-3 entries, in order.
+        let r = k - t;
+        if r >= 1 {
+            let (j0, a0) = unsafe { (*ix.add(t), *vl.add(t)) };
+            step!(rv, j0, a0);
+            if r >= 2 {
+                let (j1, a1) = unsafe { (*ix.add(t + 1), *vl.add(t + 1)) };
+                step!(rv, j1, a1);
+                if r == 3 {
+                    let (j2, a2) = unsafe { (*ix.add(t + 2), *vl.add(t + 2)) };
+                    step!(rv, j2, a2);
+                }
+            }
         }
     }
     // SAFETY: `cnt` slots were written, and cnt <= n + m (distinct indices).
@@ -1181,11 +1200,12 @@ fn pivot_row_ws<R: Real>(
     // at most `rho.len()` slack entries follow the `all.len()` structurals.
     for &(i, rv) in rho {
         unsafe {
-            if *slack_nb.get_unchecked(i) || i == leave_i {
+            let is_leave = i == leave_i;
+            if *slack_nb.get_unchecked(i) | is_leave {
                 let j = n + i;
                 let v = rv * R::c(*slack_coef.get_unchecked(i));
                 let s = if *st.get_unchecked(j) == UB { c_neg } else { c_pos };
-                if i == leave_i && leave_pos.is_none() {
+                if is_leave && leave_pos.is_none() {
                     leave_pos = Some(no);
                 }
                 out_p.add(no).write((j, v * s));
@@ -8929,6 +8949,66 @@ mod pivot_row_diff {
                 assert!(ws.bits.iter().all(|&w| w == 0));
             }
         }
+    }
+
+    /// Rows of exactly the lengths 0..=5, 7, 8 (and 6, 9, 12), columns shared between rows, `rho` over all or some rows in a random order,
+    /// the leaving slack inside and outside `rho`, on the columnwise (small n) and the row-wise (large n) route.
+    fn run_lengths<R: Real>() {
+        let mut r = Rng(0x2545f4914f6cdd1d);
+        let lens = [0usize, 1, 2, 3, 4, 5, 7, 8, 6, 9, 12, 4, 0, 8];
+        let m = lens.len();
+        for n in [12usize, 16, 200] {
+            for case in 0..60 {
+                let mut rrows: Vec<Vec<(usize, f64)>> = vec![Vec::new(); m];
+                for (i, &l) in lens.iter().enumerate() {
+                    let mut cs: Vec<usize> = (0..n).collect();
+                    for t in 0..l.min(n) {
+                        let u = t + r.below(n - t);
+                        cs.swap(t, u);
+                        rrows[i].push((cs[t], value(&mut r)));
+                    }
+                }
+                let slack_nb: Vec<bool> = (0..m).map(|_| r.below(2) == 0).collect();
+                let st: Vec<i32> = (0..n + m).map(|_| if r.below(2) == 0 { UB } else { LB }).collect();
+                let cols: Vec<Vec<(usize, f64)>> = (0..n + m)
+                    .map(|j| if j < n { Vec::new() } else { vec![(j - n, if r.below(2) == 0 { 1.0 } else { -1.0 })] })
+                    .collect();
+                let flat = FlatRows::from_rows(&rrows, n);
+                let mut ws = PivotWs::<R>::default();
+                for call in 0..12 {
+                    let mut rows: Vec<usize> = (0..m).collect();
+                    for t in 0..m {
+                        let u = r.below(m);
+                        rows.swap(t, u);
+                    }
+                    let k = match call % 4 {
+                        0 => m,
+                        1 => 1,
+                        _ => 1 + r.below(m),
+                    };
+                    let rho: Vec<(usize, R)> = rows[..k].iter().map(|&i| (i, R::c(value(&mut r)))).collect();
+                    // Inside `rho` on the even calls, outside it (when some row is left out) on the odd ones.
+                    let leave = if call % 2 == 0 { n + rows[r.below(k)] } else { n + rows[(k + r.below(m - k + 1)).min(m - 1)] };
+                    let above = r.below(2) == 0;
+                    let want = pivot_row_ref(&rrows, &slack_nb, &st, &cols, n, m, &rho, leave, above);
+                    let got = pivot_row_ws(&mut ws, &flat, &slack_nb, &st, &cols, n, m, &rho, leave, above);
+                    assert!(same(&want, &got), "n {n} case {case} call {call}");
+                    assert_eq!(ws.leave_pos, got.0.iter().position(|e| e.0 == leave), "n {n} case {case} call {call}");
+                    assert!(!ws.slack_dup);
+                    assert!(ws.acc.iter().all(|x| x.to_f64().to_bits() == 0) && ws.bits.iter().all(|&w| w == 0));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn matches_reference_lengths_f64() {
+        run_lengths::<f64>();
+    }
+
+    #[test]
+    fn matches_reference_lengths_f80() {
+        run_lengths::<crate::f80::F80>();
     }
 
     #[test]
