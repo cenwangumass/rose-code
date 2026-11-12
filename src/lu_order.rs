@@ -621,6 +621,12 @@ impl<R: Real> Structure<R> {
         self.l_idx.len()
     }
 
+    /// The flat L arrays `(l_start, l_idx, l_val)`: step `s` owns `l_idx[l_start[s]..l_start[s + 1]]` and the matching values.
+    #[inline]
+    pub fn l_flat(&self) -> (&[usize], &[usize], &[R]) {
+        (&self.l_start, &self.l_idx, &self.l_val)
+    }
+
     /// Replace the row indices of the L column of step `s` (tests of consumers that only read `l_rows`; the values keep their
     /// old length where they are not rewritten, so only the indices are meaningful afterwards).
     #[cfg(test)]

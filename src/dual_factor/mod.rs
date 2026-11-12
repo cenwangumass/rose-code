@@ -1159,7 +1159,8 @@ impl<R: Real> DualFactor<R> {
         for s in i21..m {
             kind[s] = -2;
         }
-        let (lpool, lt, l_forward) = LPool::build_with_transpose(m, st.steps(), st.l_nnz(), &step, |s| (st.l_rows(s), st.l_vals(s)));
+        let (l_start, l_idx, l_val) = st.l_flat();
+        let (lpool, lt, l_forward) = LPool::from_flat(m, l_start, l_idx, l_val, &step);
         let lcolumn = |v: usize| lpool.iter(v);
         // Pivot-row values of the Markowitz steps by column, `(step, value)` in ascending step order: counting sort.
         let mut mk_start = vec![0usize; m + 1];

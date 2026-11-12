@@ -23,6 +23,7 @@ impl<R: Copy> Csr<R> {
         self.start[n1] == self.start[loff]
     }
 
+    #[cfg(test)]
     pub fn with_capacity(lines: usize, entries: usize) -> Self {
         let mut start = Vec::with_capacity(lines + 1);
         start.push(0);
@@ -42,6 +43,71 @@ impl<R: Copy> Csr<R> {
         self.start.push(self.idx.len() as u32);
     }
 
+    /// L and its transpose from the structure's flat arrays (`l_start`: steps + 1 offsets, `l_idx`: row indices, `l_val`: multipliers),
+    /// destinations relabelled through `step`. Same result as the reference `build_with_transpose` over the per-step slices: one pass
+    /// relabels and counts, one `extend_from_slice` copies the values, the scatter fills the transpose in ascending source step
+    /// (`start` is the prefix of the counts). Only the non-empty steps are walked. `forward` is true when every destination exceeds
+    /// its source step.
+    pub fn from_flat(lines: usize, l_start: &[usize], l_idx: &[usize], l_val: &[R], step: &[usize]) -> (Csr<R>, Csr<R>, bool) {
+        let n = l_idx.len();
+        let steps = l_start.len() - 1;
+        assert!(l_start[0] == 0 && l_start[steps] == n && l_val.len() == n);
+        assert!(n <= u32::MAX as usize && lines < u32::MAX as usize);
+        let mut idx = vec![0u32; n];
+        let mut tstart = vec![0u32; lines + 1];
+        let (mut forward, mut top) = (true, 0usize);
+        for s in 0..steps {
+            let (a, b) = (l_start[s], l_start[s + 1]);
+            if a == b {
+                continue;
+            }
+            for (o, &r) in idx[a..b].iter_mut().zip(&l_idx[a..b]) {
+                let y = step[r];
+                top = top.max(y);
+                forward &= y > s;
+                tstart[y.wrapping_add(1)] += 1;
+                *o = y as u32;
+            }
+        }
+        // every destination below `lines` (a wrapped `usize::MAX` or an out-of-range label fails here)
+        assert!(n == 0 || top < lines);
+        let idx_bound = if n == 0 { 0 } else { top as u32 + 1 };
+        let mut l = Csr { start: l_start.iter().map(|&e| e as u32).collect(), idx, val: Vec::with_capacity(n), idx_bound };
+        l.val.extend_from_slice(l_val);
+        for y in 0..lines {
+            tstart[y + 1] += tstart[y];
+        }
+        let mut next: Vec<u32> = tstart[..lines].to_vec();
+        let mut tidx = vec![0u32; n];
+        let mut tval: Vec<R> = Vec::with_capacity(n);
+        {
+            let spare = tval.spare_capacity_mut();
+            assert!(spare.len() >= n && tidx.len() == n && l.idx.len() == n && l.val.len() == n);
+            for v in 0..steps {
+                let (a, b) = (l_start[v], l_start[v + 1]);
+                for k in a..b {
+                    // SAFETY: `k < n` (offsets checked against `n` above and non-decreasing); `y < lines` (checked on `top`);
+                    // `next[y]` runs through the `tstart[y]..tstart[y + 1]` slots counted for `y`, all below `n`, each used once.
+                    unsafe {
+                        let y = *l.idx.get_unchecked(k) as usize;
+                        let slot = next.get_unchecked_mut(y);
+                        let p = *slot as usize;
+                        *slot += 1;
+                        debug_assert!(p < n);
+                        *tidx.get_unchecked_mut(p) = v as u32;
+                        spare.get_unchecked_mut(p).write(*l.val.get_unchecked(k));
+                    }
+                }
+            }
+        }
+        // SAFETY: the counts sum to `n` and every slot `0..n` was written exactly once above.
+        unsafe { tval.set_len(n) };
+        let idx_bound = if n == 0 { 0 } else { steps as u32 };
+        let lt = Csr { start: tstart, idx: tidx, val: tval, idx_bound };
+        (l, lt, forward)
+    }
+
+    #[cfg(test)]
     /// L and its transpose from the structure's steps in one counted pass each: the copy writes the pool directly (lines of known
     /// length, destinations relabelled through `step`) and counts the destinations on the way, the scatter then fills the transpose
     /// (`start` is the prefix of the counts). Returns `(l, lt, forward)`; `forward` is true when every destination exceeds its source.
@@ -536,6 +602,61 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// `from_flat` against the per-step reference over random flat structures: empty steps, fewer steps than lines, repeated
+    /// destinations (`step` is any map into the lines, a permutation in a third of the rounds), NaN and signed-zero values.
+    fn check_flat<R: Real>(seed: u64) {
+        let mut rng = Rng(seed);
+        for round in 0..600 {
+            let lines = 1 + rng.below(40);
+            let steps = if round % 4 == 0 { rng.below(lines + 1) } else { lines };
+            let mut step: Vec<usize> = (0..lines).collect();
+            if round % 3 != 0 {
+                for r in 0..lines {
+                    step[r] = rng.below(lines);
+                }
+            } else {
+                for i in (1..lines).rev() {
+                    step.swap(i, rng.below(i + 1));
+                }
+            }
+            let forward_only = round % 5 == 0;
+            let (mut l_start, mut l_idx, mut l_val) = (vec![0usize], Vec::new(), Vec::new());
+            for s in 0..steps {
+                let n = if rng.below(3) == 0 { 0 } else { rng.below(7) };
+                for _ in 0..n {
+                    let r = if forward_only {
+                        // a row whose step is above `s` when one exists
+                        match (0..lines).find(|&r| step[r] > s && rng.below(2) == 0) {
+                            Some(r) => r,
+                            None => continue,
+                        }
+                    } else {
+                        rng.below(lines)
+                    };
+                    l_idx.push(r);
+                    l_val.push(value::<R>(&mut rng));
+                }
+                l_start.push(l_idx.len());
+            }
+            let (l, lt, fw) = LPool::from_flat(lines, &l_start, &l_idx, &l_val, &step);
+            let (l0, lt0, fw0) =
+                LPool::build_with_transpose(lines, steps, l_idx.len(), &step, |s| (&l_idx[l_start[s]..l_start[s + 1]], &l_val[l_start[s]..l_start[s + 1]]));
+            assert_eq!(fw, fw0);
+            for (a, b) in [(&l, &l0), (&lt, &lt0)] {
+                assert_eq!(a.start, b.start);
+                assert_eq!(a.idx, b.idx);
+                assert_eq!(a.idx_bound, b.idx_bound);
+                assert!(same(&a.val, &b.val));
+            }
+        }
+    }
+
+    #[test]
+    fn from_flat_matches_reference() {
+        check_flat::<f64>(0x9e3779b97f4a7c15);
+        check_flat::<F80>(0x1234_5678_9abc_def1);
     }
 
     fn check<R: Real>(seed: u64) {
