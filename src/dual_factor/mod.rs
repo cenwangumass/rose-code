@@ -1195,6 +1195,7 @@ impl<R: Real> DualFactor<R> {
         sc.epos.resize(m, usize::MAX);
         let FreshScratch { reached, changed, epos, lst } = &mut sc;
         let mut dir: Vec<(usize, R)> = Vec::new();
+        let mut dmk: Vec<(usize, R)> = Vec::new();
         for t in i21..m {
             let c = st.pivots[t].1;
             let (_, idx, val) = &cols[c];
@@ -1220,14 +1221,25 @@ impl<R: Real> DualFactor<R> {
                 }
             }
             if direct {
+                // The raw part is in column order: sort it, and merge the `mk` part, which is already ascending in the step (counting
+                // sort above). A repeated step, or an `mk` part that is not strictly ascending, shows as a non-increasing pair.
+                dir.sort_unstable_by_key(|e| e.0);
+                dmk.clear();
+                let mut i = 0;
                 for &(sidx, vv) in &mk[mk_start[c]..mk_start[c + 1]] {
                     if sidx < t && vv.abs() > R::c(TOL) {
-                        dir.push((sidx, vv));
+                        while i < dir.len() && dir[i].0 < sidx {
+                            dmk.push(dir[i]);
+                            i += 1;
+                        }
+                        dmk.push((sidx, vv));
                     }
                 }
-                dir.sort_unstable_by_key(|e| e.0);
-                if dir.windows(2).any(|w| w[0].0 == w[1].0) {
+                dmk.extend_from_slice(&dir[i..]);
+                if dmk.windows(2).any(|w| w[0].0 >= w[1].0) {
                     direct = false;
+                } else {
+                    std::mem::swap(&mut dir, &mut dmk);
                 }
             }
             if !direct || cfg!(any(debug_assertions, feature = "factor-shadow")) {
@@ -1339,15 +1351,27 @@ impl<R: Real> DualFactor<R> {
                 ents.clear();
                 ents.extend_from_slice(&dir);
             }
-            let na = ents.iter().filter(|e| kind[e.0] == -2).count();
-            let nb = ents.iter().filter(|e| kind[e.0] >= 0).count();
-            sa += na;
-            sb += nb;
-            // The reference lists the fresh tail column's A entries in descending order.
+            // One pass: the B entries in extraction order and the A count. `ents` is ascending in the step and `kind` is strictly
+            // increasing with the step over the nucleus (`kind[s] = nuc.len()` at insertion), so the reference's order of the B list
+            // (descending `kind`) is the reverse of the extraction order.
             bv.clear();
-            bv.reserve(nb);
-            bv.extend(ents.iter().filter(|e| kind[e.0] >= 0).map(|e| (e.0 as u32, e.1)));
-            bv.sort_unstable_by_key(|e| std::cmp::Reverse(kind[e.0 as usize]));
+            let mut na = 0usize;
+            for e in &ents {
+                let k = kind[e.0];
+                na += usize::from(k == -2);
+                if k >= 0 {
+                    bv.push((e.0 as u32, e.1));
+                }
+            }
+            bv.reverse();
+            #[cfg(any(debug_assertions, feature = "factor-shadow"))]
+            {
+                let mut chk: Vec<(u32, R)> = ents.iter().filter(|e| kind[e.0] >= 0).map(|e| (e.0 as u32, e.1)).collect();
+                chk.sort_unstable_by_key(|e| std::cmp::Reverse(kind[e.0 as usize]));
+                assert!(chk.len() == bv.len() && chk.iter().zip(&bv).all(|(a, b)| a.0 == b.0 && a.1.to_f64().to_bits() == b.1.to_f64().to_bits()));
+            }
+            sa += na;
+            sb += bv.len();
             ab.append_fresh(t, ents.iter().rev().filter(|e| kind[e.0] == -2).map(|e| (e.0 as u32, e.1)), &bv);
             uc[t].extend_from_slice(&ents);
         }
@@ -1408,8 +1432,9 @@ impl<R: Real> DualFactor<R> {
         let nnz_l_tot: usize = lpool.len();
         let perm = step;
         let znz = (nnz + sa + sb + 2 * m) as f64;
-        let empty_list: Vec<usize> =
-            (0..m).filter(|&x| kind[x] == -2 && ab.is_empty(x)).collect();
+        // Only the tail slots `i21..m` have `kind == -2`, and all of them do.
+        debug_assert!((0..m).all(|x| (kind[x] == -2) == (x >= i21)));
+        let empty_list: Vec<usize> = (i21..m).filter(|&x| ab.is_empty(x)).collect();
         // Only tail positions (`kind == -2`) are in the set: its largest element is the last one the downward scan from the end finds.
         let mark0 = empty_list.last().copied().unwrap_or(i21.min(m - 1));
         let empty_tail: EmptyTail = empty_list.into_iter().collect();
@@ -1427,22 +1452,29 @@ impl<R: Real> DualFactor<R> {
         // `update` appends to the rows of `urows`: nonempty rows get room for a few entries (capacity only, never visible).
         let spare = |n: usize| if n == 0 { 0 } else { n + (n >> 2) + 2 };
         urows.reserve_all(row_cap.iter().map(|&n| spare(n)));
-        // Filled in ascending column order; the rows are put in the reference's physical order below.
-        for (c, col) in uc.iter().enumerate() {
-            for &(row, v) in col {
-                urows.push(row, c, v);
+        let mut pos_of_col = vec![usize::MAX; m];
+        for (t, &(_, c)) in st.pivots.iter().enumerate() {
+            pos_of_col[c] = t;
+        }
+        // Filled in ascending order of the basis column of the tail positions: a row of the singleton phases lists its members in that
+        // order (final, no reorder below); the other rows are reordered below from their values, whatever the fill order.
+        let mut visited = 0usize;
+        for &t in &pos_of_col {
+            if t >= i21 && t < m {
+                visited += 1;
+                for &(row, v) in &uc[t] {
+                    urows.push(row, t, v);
+                }
             }
         }
+        // Every tail position is the position of exactly one basis column (a repeated column would leave one out).
+        assert_eq!(visited, m - i21, "fresh: tail columns not visited exactly once");
         // A row lists its tail columns in the order of the factorization's U row (Markowitz steps), or in the order of the
         // basis columns for a row of the singleton phases.
         {
-            // The members of a row (the tail columns whose A or B list holds it, ascending) are the columns the row holds at this
-            // point: it was filled in ascending column order from the same entries (audited by `urows.check`).
+            // The members of a row (the tail columns whose A or B list holds it) are the columns the row holds at this point: it was
+            // filled from the same entries (audited by `urows.check`).
             let mut mem: Vec<usize> = Vec::new();
-            let mut pos_of_col = vec![usize::MAX; m];
-            for (t, &(_, c)) in st.pivots.iter().enumerate() {
-                pos_of_col[c] = t;
-            }
             // Marker words of the rows with a pair order: the hash is read only for those.
             let mut has_urow = vec![0u64; m.div_ceil(64)];
             for &y in st.pair_urow.keys() {
@@ -1456,20 +1488,24 @@ impl<R: Real> DualFactor<R> {
                 if urows.is_empty(y) {
                     continue;
                 }
+                let pair = if has_urow[y / 64] >> (y % 64) & 1 == 0 { None } else { st.pair_urow.get(&y) };
+                if pair.is_none() && st.u_row(y).is_empty() {
+                    // Singleton-phase row: filled in the final order (ascending basis column).
+                    #[cfg(any(debug_assertions, feature = "factor-shadow"))]
+                    {
+                        let cs = urows.cols(y);
+                        assert!(cs.windows(2).all(|w| st.pivots[w[0] as usize].1 < st.pivots[w[1] as usize].1), "fresh: row {y} not in column order");
+                    }
+                    continue;
+                }
                 mem.clear();
                 mem.extend(urows.cols(y).iter().map(|&c| c as usize));
                 tmp.clear();
-                if let Some(u) = if has_urow[y / 64] >> (y % 64) & 1 == 0 { None } else { st.pair_urow.get(&y) } {
+                if let Some(u) = pair {
                     for &t in &mem {
                         stamp[t] = y;
                     }
                     tmp.extend(u.iter().map(|&c| pos_of_col[c]).filter(|&t| stamp[t] == y));
-                } else if st.u_row(y).is_empty() {
-                    // Filtering all basis columns in index order is equivalent to sorting just this row's members by
-                    // column. Keep only the positions represented by pos_of_col, and emit each position once.
-                    tmp.extend(mem.iter().copied().filter(|&t| pos_of_col[st.pivots[t].1] == t));
-                    tmp.sort_unstable_by_key(|&t| st.pivots[t].1);
-                    tmp.dedup();
                 } else {
                     for &t in &mem {
                         stamp[t] = y;

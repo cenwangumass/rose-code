@@ -541,3 +541,38 @@ fn flat_fresh_matches_the_construction_it_replaced() {
         }
     }
 }
+
+/// Columns in a scrambled order (the basis column of a tail position is neither ascending in the position nor in the row): the
+/// singleton-phase rows list their members in ascending basis column, which the fill order must give.
+#[test]
+fn scrambled_basis_columns_match_the_construction_it_replaced() {
+    let mut seed = 0x2545f4914f6cdd1du64;
+    let mut next = || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed as usize
+    };
+    for &m in &[5usize, 23, 64, 150, 301] {
+        for dens in [1usize, 2, 3, 6] {
+            let mut cols: Vec<(bool, Vec<usize>, Vec<f64>)> = (0..m)
+                .map(|i| {
+                    let mut rows = vec![i];
+                    let mut vals = vec![2.0 + (next() % 3) as f64];
+                    for _ in 0..dens {
+                        let r = next() % m;
+                        if !rows.contains(&r) {
+                            rows.push(r);
+                            vals.push([0.125, -0.25, 1.0, -3.0, 1e-14][next() % 5]);
+                        }
+                    }
+                    (vals.len() == 1, rows, vals)
+                })
+                .collect();
+            for i in (1..m).rev() {
+                cols.swap(i, next() % (i + 1));
+            }
+            check(m, &cols);
+        }
+    }
+}
