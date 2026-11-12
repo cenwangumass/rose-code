@@ -128,6 +128,11 @@ pub struct Structure<R = f64> {
     pub dense_n: usize,
     /// Rows of the factored matrix (the pivot count is smaller for a singular basis).
     pub m: usize,
+    /// Inputs of the work estimate that the construction collects on its passes over the basis: the singleton steps, the basis
+    /// nonzeros (a slack counts 1) and the entries of the singleton steps' columns and rows that go to U (`work`).
+    nsing: usize,
+    nnz_b: usize,
+    u_sing: usize,
     /// The structural pass emits at most one gate record; retain it when a fresh factor is copied.
     pair_gate_record: Option<PairGateRecord>,
 }
@@ -139,98 +144,411 @@ pub fn factor_structure<'a>(m: usize, cols: impl Into<Cols<'a>>) -> Structure {
 /// `factor_structure` with the numbers of the factor in the number type `R` (the quad mode runs the same LU in extended precision).
 pub fn factor_structure_r<'a, R: Real>(m: usize, cols: impl Into<Cols<'a>>) -> Structure<R> {
     let cols: Cols<'a> = cols.into();
-    let (mut seq, mut phase, mut ov, loff, pair_gate_record) = phases(m, cols);
-    let nsing = seq.len();
-    let mut done_r = vec![false; m];
-    let mut done_c = vec![false; cols.len()];
-    for &(r, c) in &seq {
-        done_r[r] = true;
-        done_c[c] = true;
-    }
-    // The nucleus columns, flat: each column's kept entries in reverse input order.
-    let mut nuc_pos: Vec<usize> = Vec::new();
-    let mut nuc_start: Vec<usize> = vec![0];
-    let mut nuc_ent: Vec<(usize, R)> = Vec::new();
-    for (pos, (_, idx, val)) in cols.iter().enumerate() {
-        if done_c[pos] {
-            continue;
-        }
-        let first = nuc_ent.len();
-        nuc_ent.extend(
-            idx.iter()
-                .copied()
-                .zip(val.iter().copied())
-                // The reference's matrix leaves out entries below the absolute tolerance (fx_e2_r25: a scaled entry 2^-44 in a row of the nucleus changed its count).
-                .filter(|(i, v)| !done_r[*i] && v.abs() >= ABS_TOL)
-                .map(|(i, v)| (i, R::c(v))),
-        );
-        nuc_ent[first..].reverse();
-        nuc_pos.push(pos);
-        nuc_start.push(nuc_ent.len());
-    }
-    // The work estimate counts every input entry in active rows and columns
-    // before the numeric nucleus applies its magnitude filter (0xd4e4b,
-    // 0xdf521..0xdf5ed); scaled entries below ABS_TOL still contribute.
-    let nuc_nnz = cols
-        .iter()
-        .enumerate()
-        .filter(|(pos, _)| !done_c[*pos])
-        .map(|(_, (slack, rows, _))| {
-            if *slack {
-                1
-            } else {
-                rows.iter().filter(|r| !done_r[**r]).count()
+    #[cfg(feature = "factor-shadow")]
+    let gate_before = gate_get();
+    let mut ws = WS.with(|c| c.take());
+    let st = build::<R>(m, cols, &mut ws);
+    WS.with(|c| c.set(ws));
+    #[cfg(feature = "factor-shadow")]
+    old::check(&st, m, cols, gate_before);
+    st
+}
+
+/// Buffers of the front end kept across factorizations (one set per thread).
+#[derive(Default)]
+struct Ws {
+    /// Row counts (a basic slack counts `m + 1`); the pivot walks decrement them.
+    rc: Vec<usize>,
+    /// The row has a basic slack.
+    slack_row: Vec<bool>,
+    /// Row-wise copy of the structural basis columns (positions, ascending), rows with a basic slack left out: row `r` is
+    /// `roff[r]..roff[r + 1]`.
+    roff: Vec<usize>,
+    rcol: Vec<usize>,
+    fill: Vec<usize>,
+    row_done: Vec<bool>,
+    col_done: Vec<bool>,
+    stack: Vec<usize>,
+    /// Entries of each column in the rows not yet assigned.
+    cnt: Vec<i64>,
+    /// Copy of the entries of the columns left after phase 3 in the rows left then (positions and values), for the pair pass.
+    noff: Vec<usize>,
+    nidx: Vec<usize>,
+    nval: Vec<f64>,
+    /// Steps of the rows and columns of the pair pass (0 for those assigned before it).
+    pair_row: Vec<usize>,
+    pair_col: Vec<usize>,
+    nuc_pos: Vec<usize>,
+    nuc_start: Vec<usize>,
+    /// The nucleus entries (a `Vec<(usize, R)>` of the factorization's number type).
+    nuc_ent: Option<Box<dyn std::any::Any>>,
+    pairs: crate::lu_pairs::Buffers,
+}
+
+thread_local! {
+    static WS: std::cell::Cell<Ws> = std::cell::Cell::new(Ws::default());
+}
+
+/// Whether the doubleton pass can run when `remaining` rows are left (`pair_gate` without its effects).
+fn pair_gate_possible(remaining: usize) -> bool {
+    let (_, gate) = PAIR_GATE.with(|c| c.get());
+    remaining >= 4 && gate >= 0 && (gate >= GATE_ALWAYS || remaining >= 50)
+}
+
+/// One count pass and one row-wise copy of the basis (rows with a basic slack left out), the singleton phases with the L columns of
+/// phase 1 written at the pivot, one pass over the entries of the columns left after phase 3 (counts, pair-pass row copy), the
+/// doubleton pass, and one pass over the entries of the columns left for the nucleus (work estimate input, U entries of the
+/// singleton rows, node entries).
+fn build<R: Real>(m: usize, cols: Cols<'_>, ws: &mut Ws) -> Structure<R> {
+    let n = cols.len();
+    let Ws {
+        rc,
+        slack_row,
+        roff,
+        rcol,
+        fill,
+        row_done,
+        col_done,
+        stack,
+        cnt,
+        noff,
+        nidx,
+        nval,
+        pair_row,
+        pair_col,
+        nuc_pos,
+        nuc_start,
+        nuc_ent,
+        pairs,
+    } = ws;
+    // Row counts, with a basic slack counting `m + 1`.
+    rc.clear();
+    rc.resize(m, 0);
+    slack_row.clear();
+    slack_row.resize(m, false);
+    let (mut nnz_b, mut nnz_cols) = (0usize, 0usize);
+    for (is_slack, idx, _) in cols.iter() {
+        nnz_cols += idx.len();
+        if *is_slack {
+            rc[idx[0]] += 1 + m;
+            slack_row[idx[0]] = true;
+            nnz_b += 1;
+        } else {
+            nnz_b += idx.len();
+            for &i in idx {
+                rc[i] += 1;
             }
-        })
-        .sum();
-    let nnz_cols: usize = cols.iter().map(|c| c.1.len()).sum();
-    let nuc = nucleus(m, nnz_cols, &nuc_pos, &nuc_start, &nuc_ent);
-    let nuc_work = nuc.work;
-    seq.extend(nuc.pivots.iter().copied());
-    phase.resize(seq.len(), 0);
-    let mut step = vec![usize::MAX; m];
-    for (s, &(r, _)) in seq.iter().enumerate() {
-        step[r] = s;
+        }
     }
-    let nsteps = seq.len();
-    let mut l_start: Vec<usize> = Vec::with_capacity(nsteps + 1);
+    // The row-wise copy.
+    roff.clear();
+    roff.push(0);
+    let mut total = 0;
+    for r in 0..m {
+        if !slack_row[r] {
+            total += rc[r];
+        }
+        roff.push(total);
+    }
+    rcol.clear();
+    rcol.resize(total, 0);
+    fill.clear();
+    fill.extend_from_slice(&roff[..m]);
+    for (pos, (is_slack, idx, _)) in cols.iter().enumerate() {
+        if !*is_slack {
+            for &i in idx {
+                if !slack_row[i] {
+                    rcol[fill[i]] = pos;
+                    fill[i] += 1;
+                }
+            }
+        }
+    }
+    row_done.clear();
+    row_done.resize(m, false);
+    col_done.clear();
+    col_done.resize(n, false);
+    let mut seq: Vec<(usize, usize)> = Vec::with_capacity(m);
+    let mut phase: Vec<u8> = Vec::with_capacity(m);
+    // The L columns of the singleton steps (the entries in rows pivoted later), written at the pivot.
+    let mut l_start: Vec<usize> = Vec::with_capacity(m + 1);
     let mut l_idx: Vec<usize> = Vec::with_capacity(nnz_cols);
     let mut l_val: Vec<R> = Vec::with_capacity(nnz_cols);
     let mut l_raw: Vec<R> = Vec::with_capacity(nnz_cols);
-    let mut diag: Vec<R> = Vec::with_capacity(nsteps);
+    let mut diag: Vec<R> = Vec::with_capacity(m);
     l_start.push(0);
-    // Marker words of the singleton steps with an override: the hash is read only for those.
-    let mut has_ov = vec![0u64; nsing.div_ceil(64)];
-    for &s in ov.l.keys() {
-        if s < nsing {
-            has_ov[s / 64] |= 1 << (s % 64);
-        }
+    // Entries of the singleton steps' columns in rows pivoted before them, and of the singleton steps' rows in columns pivoted
+    // after them (`Structure::work`).
+    let mut u_sing = 0usize;
+    let mut ph = 1u8;
+    macro_rules! pivot {
+        ($i:expr, $p:expr) => {{
+            row_done[$i] = true;
+            col_done[$p] = true;
+            seq.push(($i, $p));
+            phase.push(ph);
+        }};
     }
-    for (s, &(prow, c)) in seq.iter().enumerate().take(nsing) {
-        let (_, idx, val) = &cols[c];
-        let pv = R::c(val[idx.iter().position(|&i| i == prow).unwrap()]);
-        // A pair override replaces the column (its multipliers are all that is known: no raw entries).
-        if let Some((r, v)) = if has_ov[s / 64] >> (s % 64) & 1 == 0 { None } else { ov.l.remove(&s) } {
-            l_idx.extend_from_slice(&r);
-            l_raw.extend(std::iter::repeat_n(R::c(f64::NAN), v.len()));
-            l_val.extend(v);
-        } else {
-            for (&i, &x) in idx.iter().zip(val) {
-                if step[i] > s {
-                    l_idx.push(i);
-                    l_val.push(R::c(x) / pv);
-                    l_raw.push(R::c(x));
+    // Phase 1: rows with one structural column and no slack, LIFO stack.
+    stack.clear();
+    stack.extend((0..m).filter(|&i| rc[i] == 1));
+    while let Some(i) = stack.pop() {
+        if rc[i] == 0 || row_done[i] {
+            continue;
+        }
+        rc[i] = 0;
+        let Some(pos) = rcol[roff[i]..roff[i + 1]].iter().copied().find(|&p| !col_done[p]) else {
+            continue;
+        };
+        pivot!(i, pos);
+        let (_, idx, val) = cols.get(pos);
+        let pv = R::c(val[idx.iter().position(|&x| x == i).unwrap()]);
+        for (&r2, &x) in idx.iter().zip(val) {
+            if !row_done[r2] {
+                rc[r2] -= 1;
+                if rc[r2] == 1 {
+                    stack.push(r2);
                 }
+                l_idx.push(r2);
+                l_val.push(R::c(x) / pv);
+                l_raw.push(R::c(x));
+            } else if r2 != i {
+                u_sing += 1;
             }
         }
         l_start.push(l_idx.len());
         diag.push(pv);
     }
-    let pair_unz = ov.unz.clone();
-    let pair_urow = ov.urow.clone();
+    // Phase 2: slack columns whose row has only the slack left. The L columns of phases 2-4 are empty.
+    ph = 2;
+    for pos in 0..n {
+        if col_done[pos] {
+            continue;
+        }
+        let (is_slack, idx, val) = cols.get(pos);
+        if !*is_slack {
+            continue;
+        }
+        let i = idx[0];
+        if rc[i] == m + 1 {
+            rc[i] = 1;
+            pivot!(i, pos);
+            l_start.push(l_idx.len());
+            diag.push(R::c(val[0]));
+        }
+    }
+    // Phase 3: one ascending pass.
+    ph = 3;
+    for pos in 0..n {
+        if col_done[pos] {
+            continue;
+        }
+        let (is_slack, idx, val) = cols.get(pos);
+        if !*is_slack {
+            if idx.len() == 1 && rc[idx[0]] <= m && !row_done[idx[0]] {
+                let i = idx[0];
+                rc[i] = 1;
+                pivot!(i, pos);
+                l_start.push(l_idx.len());
+                diag.push(R::c(val[0]));
+            }
+        } else {
+            let i = idx[0];
+            if !row_done[i] {
+                rc[i] = rc[i].wrapping_sub(m);
+                pivot!(i, pos);
+                l_start.push(l_idx.len());
+                diag.push(R::c(val[0]));
+            }
+        }
+    }
+    // The entries of the columns left, in the rows left: their count per column (phase 4), and the pair pass's row copy. Every
+    // row left has no basic slack, and `rc` counts exactly its entries in the columns left (the other columns have their entries in
+    // rows assigned).
+    let want_pairs = pair_gate_possible(m - seq.len());
+    cnt.clear();
+    cnt.resize(n, 0);
+    if want_pairs {
+        noff.clear();
+        noff.push(0);
+        let mut total = 0;
+        for r in 0..m {
+            if !row_done[r] {
+                total += rc[r];
+            }
+            noff.push(total);
+        }
+        nidx.clear();
+        nidx.resize(total, 0);
+        nval.clear();
+        nval.resize(total, 0.0);
+        fill.clear();
+        fill.extend_from_slice(&noff[..m]);
+        for pos in 0..n {
+            if col_done[pos] {
+                continue;
+            }
+            let (_, idx, val) = cols.get(pos);
+            let mut c = 0;
+            for (&r, &v) in idx.iter().zip(val) {
+                if !row_done[r] {
+                    c += 1;
+                    nidx[fill[r]] = pos;
+                    nval[fill[r]] = v;
+                    fill[r] += 1;
+                }
+            }
+            cnt[pos] = c;
+        }
+        debug_assert!((0..m).all(|r| row_done[r] || fill[r] == noff[r + 1]));
+    } else {
+        for pos in 0..n {
+            if !col_done[pos] {
+                cnt[pos] = cols.get(pos).1.iter().filter(|&&r| !row_done[r]).count() as i64;
+            }
+        }
+    }
+    // Phase 4: column singletons over the unassigned rows.
+    ph = 4;
+    stack.clear();
+    stack.extend((0..n).filter(|&p| !col_done[p] && cnt[p] == 1));
+    while let Some(pos) = stack.pop() {
+        if cnt[pos] <= 0 || col_done[pos] {
+            continue;
+        }
+        let (_, idx, val) = cols.get(pos);
+        let k = idx.iter().position(|&i| !row_done[i]).unwrap();
+        let i = idx[k];
+        pivot!(i, pos);
+        l_start.push(l_idx.len());
+        diag.push(R::c(val[k]));
+        u_sing += idx.len() - cnt[pos] as usize;
+        cnt[pos] = 0;
+        for &c2 in &rcol[roff[i]..roff[i + 1]] {
+            if !col_done[c2] && c2 != pos {
+                cnt[c2] -= 1;
+                if cnt[c2] == 1 {
+                    stack.push(c2);
+                }
+            }
+        }
+    }
+    let mut ov = crate::lu_pairs::Overrides::<R>::default();
+    let loff = seq.len();
+    let pair_gate_record = pair_gate(m - seq.len());
+    if pair_gate_record.is_some() && std::env::var_os("ROSE_NO_PAIRS").is_none() {
+        debug_assert!(want_pairs);
+        let before = seq.len();
+        ov = crate::lu_pairs::run::<R>(
+            m,
+            cols,
+            &mut seq,
+            &mut phase,
+            crate::lu_pairs::NucRows { roff: noff, ridx: nidx, rval: nval },
+            rc,
+            cnt,
+            row_done,
+            pairs,
+        );
+        pair_gate_end(seq.len() - before);
+    }
+    let nsing = seq.len();
+    for &(r, c) in &seq[loff..] {
+        row_done[r] = true;
+        col_done[c] = true;
+    }
+    // The L columns and U entries of the pair pass's steps, with the steps' order for the rows and columns it assigned.
+    if nsing > loff {
+        if pair_row.len() < m {
+            pair_row.resize(m, 0);
+        }
+        if pair_col.len() < n {
+            pair_col.resize(n, 0);
+        }
+        for (k, &(r, c)) in seq.iter().enumerate().skip(loff) {
+            pair_row[r] = k;
+            pair_col[c] = k;
+        }
+        for (k, &(prow, c)) in seq.iter().enumerate().skip(loff) {
+            let (_, idx, val) = cols.get(c);
+            let pv = R::c(val[idx.iter().position(|&i| i == prow).unwrap()]);
+            // A pair override replaces the column (its multipliers are all that is known: no raw entries).
+            if let Some((r, v)) = ov.l.remove(&k) {
+                l_idx.extend_from_slice(&r);
+                l_raw.extend(std::iter::repeat_n(R::c(f64::NAN), v.len()));
+                l_val.extend(v);
+            } else {
+                for (&i, &x) in idx.iter().zip(val) {
+                    if !row_done[i] || pair_row[i] > k {
+                        l_idx.push(i);
+                        l_val.push(R::c(x) / pv);
+                        l_raw.push(R::c(x));
+                    }
+                }
+            }
+            for &i in idx {
+                if row_done[i] && pair_row[i] < k {
+                    u_sing += 1;
+                }
+            }
+            l_start.push(l_idx.len());
+            diag.push(pv);
+        }
+        // A column pair's second pivot row is updated by the first pivot's row: the reference counts the entries that result
+        // (fill included, cancelled ones left out) instead of the row's entries in the columns pivoted after it.
+        for (&s, &count) in &ov.unz {
+            let hi = seq[s].0;
+            let own = rcol[roff[hi]..roff[hi + 1]].iter().filter(|&&c| !col_done[c] || pair_col[c] > s).count();
+            // `own` includes nucleus-column entries that the fused pass below adds to `u_sing` later, so the running value can
+            // dip below zero here; modular arithmetic gives the same final count without an overflow panic in checked builds.
+            u_sing = u_sing.wrapping_add(count).wrapping_sub(own);
+        }
+        for &(r, c) in &seq[loff..] {
+            pair_row[r] = 0;
+            pair_col[c] = 0;
+        }
+    }
     for (&s, &d) in &ov.diag {
         diag[s] = d;
     }
+    let pair_unz = ov.unz;
+    let pair_urow = ov.urow;
+    // The nucleus columns, flat: each column's kept entries in reverse input order. The work estimate counts every input entry
+    // in active rows and columns before the numeric nucleus applies its magnitude filter (0xd4e4b, 0xdf521..0xdf5ed); scaled
+    // entries below ABS_TOL still contribute. The entries in assigned rows are the U entries of the singleton steps' rows.
+    let mut ent: Vec<(usize, R)> = nuc_ent.take().and_then(|b| b.downcast::<Vec<(usize, R)>>().ok()).map(|b| *b).unwrap_or_default();
+    ent.clear();
+    nuc_pos.clear();
+    nuc_start.clear();
+    nuc_start.push(0);
+    let mut nuc_nnz = 0usize;
+    for pos in 0..n {
+        if col_done[pos] {
+            continue;
+        }
+        let (is_slack, idx, val) = cols.get(pos);
+        let mut active = 0usize;
+        for (&i, &v) in idx.iter().zip(val).rev() {
+            if row_done[i] {
+                u_sing += 1;
+            } else {
+                active += 1;
+                // The reference's matrix leaves out entries below the absolute tolerance (fx_e2_r25: a scaled entry 2^-44 in a row of the nucleus changed its count).
+                if v.abs() >= ABS_TOL {
+                    ent.push((i, R::c(v)));
+                }
+            }
+        }
+        nuc_nnz += if *is_slack { 1 } else { active };
+        nuc_pos.push(pos);
+        nuc_start.push(ent.len());
+    }
+    let nuc = nucleus(m, nnz_cols, nuc_pos, nuc_start, &ent);
+    *nuc_ent = Some(Box::new(ent));
+    let nuc_work = nuc.work;
+    seq.extend(nuc.pivots.iter().copied());
+    phase.resize(seq.len(), 0);
+    let nsteps = seq.len();
     let l_base = l_idx.len();
     l_idx.extend_from_slice(&nuc.l_idx);
     l_raw.extend(std::iter::repeat_n(R::c(f64::NAN), nuc.l_val.len()));
@@ -260,6 +578,9 @@ pub fn factor_structure_r<'a, R: Real>(m: usize, cols: impl Into<Cols<'a>>) -> S
         dense_n: DENSE_N.with(|c| c.get()),
         m,
         pair_gate_record,
+        nsing,
+        nnz_b,
+        u_sing,
     }
 }
 
@@ -323,40 +644,13 @@ impl<R: Real> Structure<R> {
 
     /// The factorization's increments of the reference's work counter (`0xd4190`, `crate::work`) as `(site, estimate)`, given
     /// the factored columns and whether the L solve levels are built (`crate::ftran_order`).
-    pub fn work<'a>(&self, cols: impl Into<Cols<'a>>, levels: bool) -> Vec<(u32, f64)> {
-        let cols: Cols<'a> = cols.into();
+    pub fn work<'a>(&self, _cols: impl Into<Cols<'a>>, levels: bool) -> Vec<(u32, f64)> {
         let m = self.m as f64;
-        let nnz_b: usize = cols.iter().map(|c| if c.0 { 1 } else { c.1.len() }).sum();
-        let nsing = self.phase.iter().filter(|&&p| p != 0).count();
+        let (nnz_b, nsing, u_sing) = (self.nnz_b, self.nsing, self.u_sing);
         let nnz_l: usize = self.l_idx.len();
         // The entries of the singleton steps' columns that go to U (rows pivoted before them), and with the Markowitz pivot
         // rows the off-diagonal U.
         let nnz_l_sing: usize = self.l_start[nsing];
-        // The U entries of the singleton steps' rows: basis entries in a row pivoted in a singleton step, in a column pivoted
-        // later (the reference counts them directly; `nnz(B) - nsing - nnz_l_sing - nuc` differs when a pair step drops or
-        // creates L entries).
-        let u_sing = {
-            let mut step_r = vec![usize::MAX; self.m];
-            let mut step_c = vec![usize::MAX; cols.len()];
-            for (k, &(r, c)) in self.pivots.iter().enumerate() {
-                step_r[r] = k;
-                step_c[c] = k;
-            }
-            let mut per = vec![0usize; nsing];
-            for (pos, c) in cols.iter().enumerate() {
-                for &i in &c.1 {
-                    if step_r[i] < nsing && step_c[pos] > step_r[i] {
-                        per[step_r[i]] += 1;
-                    }
-                }
-            }
-            // A column pair's second pivot row is updated by the first pivot's row: the reference counts the entries that
-            // result (fill included, cancelled ones left out).
-            for (&s, &n) in &self.pair_unz {
-                per[s] = n;
-            }
-            per.iter().sum::<usize>()
-        };
         let mut out = vec![
             (
                 0xd4ded,
@@ -392,165 +686,6 @@ impl<R: Real> Structure<R> {
         }
         out
     }
-}
-
-/// Row incidence in ascending column order, retaining every occurrence of a duplicate row.
-fn row_columns(m: usize, cols: Cols<'_>) -> (Vec<usize>, Vec<usize>) {
-    let mut offsets = vec![0; m + 1];
-    for (_, rows, _) in cols.iter() {
-        for &r in rows {
-            offsets[r + 1] += 1;
-        }
-    }
-    for r in 0..m {
-        offsets[r + 1] += offsets[r];
-    }
-    let mut next = offsets[..m].to_vec();
-    let mut columns = vec![0; offsets[m]];
-    for (c, (_, rows, _)) in cols.iter().enumerate() {
-        for &r in rows {
-            columns[next[r]] = c;
-            next[r] += 1;
-        }
-    }
-    (offsets, columns)
-}
-
-fn phases<R: Real>(
-    m: usize,
-    cols: Cols<'_>,
-) -> (
-    Vec<(usize, usize)>,
-    Vec<u8>,
-    crate::lu_pairs::Overrides<R>,
-    usize,
-    Option<PairGateRecord>,
-) {
-    let n = cols.len();
-    let mut rc = vec![0usize; m];
-    for (is_slack, idx, _) in cols.iter() {
-        if *is_slack {
-            rc[idx[0]] += 1 + m;
-        } else {
-            for &i in idx {
-                rc[i] += 1;
-            }
-        }
-    }
-    let (row_offsets, rowcols) = row_columns(m, cols);
-    let mut row_done = vec![false; m];
-    let mut col_done = vec![false; n];
-    let mut seq = Vec::with_capacity(m);
-    let mut phase: Vec<u8> = Vec::with_capacity(m);
-    let mut ph = 1u8;
-    macro_rules! pivot {
-        ($i:expr, $p:expr) => {{
-            row_done[$i] = true;
-            col_done[$p] = true;
-            seq.push(($i, $p));
-            phase.push(ph);
-        }};
-    }
-    // Phase 1: rows with one structural column and no slack, LIFO stack.
-    let mut st: Vec<usize> = (0..m).filter(|&i| rc[i] == 1).collect();
-    while let Some(i) = st.pop() {
-        if rc[i] == 0 || row_done[i] {
-            continue;
-        }
-        rc[i] = 0;
-        let Some(pos) = rowcols[row_offsets[i]..row_offsets[i + 1]]
-            .iter()
-            .copied()
-            .find(|&p| !col_done[p] && !cols[p].0)
-        else {
-            continue;
-        };
-        pivot!(i, pos);
-        for &r2 in &cols[pos].1 {
-            if !row_done[r2] {
-                rc[r2] -= 1;
-                if rc[r2] == 1 {
-                    st.push(r2);
-                }
-            }
-        }
-    }
-    // Phase 2: slack columns whose row has only the slack left.
-    ph = 2;
-    for pos in 0..n {
-        if col_done[pos] || !cols[pos].0 {
-            continue;
-        }
-        let i = cols[pos].1[0];
-        if rc[i] == m + 1 {
-            rc[i] = 1;
-            pivot!(i, pos);
-        }
-    }
-    // Phase 3: one ascending pass.
-    ph = 3;
-    for pos in 0..n {
-        if col_done[pos] {
-            continue;
-        }
-        let (is_slack, idx, _) = &cols[pos];
-        if !*is_slack {
-            if idx.len() == 1 && rc[idx[0]] <= m && !row_done[idx[0]] {
-                let i = idx[0];
-                rc[i] = 1;
-                pivot!(i, pos);
-            }
-        } else {
-            let i = idx[0];
-            if !row_done[i] {
-                rc[i] = rc[i].wrapping_sub(m);
-                pivot!(i, pos);
-            }
-        }
-    }
-    let (row_done3, col_done3) = (row_done.clone(), col_done.clone());
-    // Phase 4: column singletons over the unassigned rows.
-    ph = 4;
-    let mut cnt = vec![0i64; n];
-    for (pos, (_, idx, _)) in cols.iter().enumerate() {
-        if !col_done[pos] {
-            cnt[pos] = idx.iter().filter(|&&i| !row_done[i]).count() as i64;
-        }
-    }
-    let mut st: Vec<usize> = (0..n).filter(|&p| !col_done[p] && cnt[p] == 1).collect();
-    while let Some(pos) = st.pop() {
-        if cnt[pos] <= 0 || col_done[pos] {
-            continue;
-        }
-        let i = *cols[pos].1.iter().find(|&&i| !row_done[i]).unwrap();
-        pivot!(i, pos);
-        cnt[pos] = 0;
-        for &c2 in &rowcols[row_offsets[i]..row_offsets[i + 1]] {
-            if !col_done[c2] && c2 != pos {
-                cnt[c2] -= 1;
-                if cnt[c2] == 1 {
-                    st.push(c2);
-                }
-            }
-        }
-    }
-    let mut ov = crate::lu_pairs::Overrides::<R>::default();
-    let loff = seq.len();
-    let pair_gate_record = pair_gate(m - seq.len());
-    if pair_gate_record.is_some() && std::env::var_os("ROSE_NO_PAIRS").is_none() {
-        let before = seq.len();
-        #[cfg(test)]
-        let run = if crate::lu_pairs::USE_REF.with(|c| c.get()) {
-            crate::lu_pairs::reference::run::<R>
-        } else {
-            crate::lu_pairs::run::<R>
-        };
-        #[cfg(not(test))]
-        let run = crate::lu_pairs::run::<R>;
-        ov = run(m, cols, &mut seq, &mut phase, &row_done3, &col_done3, &row_done, &col_done);
-        pair_gate_end(seq.len() - before);
-    }
-    (seq, phase, ov, loff, pair_gate_record)
 }
 
 const NIL: usize = usize::MAX;
@@ -1657,6 +1792,10 @@ fn dense_lu_uncached<R: Real>(a: &mut [Vec<R>], base: usize) -> Vec<usize> {
 #[path = "lu_order_ref.rs"]
 mod reference;
 
+#[cfg(any(test, feature = "factor-shadow"))]
+#[path = "lu_order_old.rs"]
+mod old;
+
 #[cfg(test)]
 mod row_column_tests {
     #[test]
@@ -1668,11 +1807,11 @@ mod row_column_tests {
             (false, vec![], vec![]),
             (false, vec![2, 2], vec![]),
         ];
-        let (offsets, columns) = super::row_columns(4, (&cols).into());
+        let (offsets, columns) = super::old::row_columns(4, (&cols).into());
         assert_eq!(offsets, [0, 3, 4, 8, 8]);
         assert_eq!(columns, [0, 0, 2, 1, 0, 2, 4, 4]);
-        assert_eq!(super::row_columns(0, (&[] as &[super::Col]).into()), (vec![0], vec![]));
-        assert_eq!(super::row_columns(3, (&[] as &[super::Col]).into()), (vec![0; 4], vec![]));
+        assert_eq!(super::old::row_columns(0, (&[] as &[super::Col]).into()), (vec![0], vec![]));
+        assert_eq!(super::old::row_columns(3, (&[] as &[super::Col]).into()), (vec![0; 4], vec![]));
     }
 }
 
@@ -1987,7 +2126,7 @@ mod flat_structure_tests {
     }
 
     fn old_structure_ref<R: Real>(m: usize, cols: Cols<'_>) -> Old<R> {
-    let (mut seq, mut phase, ov, loff, pair_gate_record) = phases(m, cols);
+    let (mut seq, mut phase, ov, loff, pair_gate_record) = old::phases(m, cols);
     let nsing = seq.len();
     let mut done_r = vec![false; m];
     let mut done_c = vec![false; cols.len()];
@@ -2202,6 +2341,10 @@ mod flat_structure_tests {
             set_factorization_number(1 + case);
             let old = old_structure::<R>(m, (&cols).into());
             gate_set(gate);
+            set_factorization_number(1 + case);
+            let whole = super::old::factor_structure_r::<R>(m, Cols::from(&cols));
+            gate_set(gate);
+            super::old::assert_same(&new, &whole, (&cols).into());
             assert_eq!(new.pivots, old.pivots, "case {case}");
             assert_eq!(new.phase, old.phase, "case {case}");
             assert_eq!(new.nuc_nnz, old.nuc_nnz, "case {case}");

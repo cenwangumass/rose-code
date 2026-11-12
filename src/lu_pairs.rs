@@ -44,17 +44,33 @@ pub struct Overrides<R = f64> {
     pub urow: HashMap<usize, Vec<usize>>,
 }
 
+/// Buffers of the pass kept across factorizations.
+#[derive(Default)]
+pub struct Buffers {
+    rowc: Vec<i64>,
+    ids: Vec<usize>,
+    keys: Vec<usize>,
+    pending: KeyMap,
+    pairs: Vec<(usize, usize)>,
+}
+
+/// Row-wise copy (column positions and values) of the entries of the columns left after phase 3 in the rows left then, in the
+/// reference's array order, flat: row `r` is `roff[r]..roff[r + 1]` (the length of a row never changes, only the order inside it).
+pub struct NucRows<'a> {
+    pub roff: &'a [usize],
+    pub ridx: &'a mut [usize],
+    pub rval: &'a mut [f64],
+}
+
 struct Pass<'a, R: Real> {
     m: usize,
     cols: crate::lu_order::Cols<'a>,
     /// Active counts (> 0 while active, -1 or 0 once assigned).
     rowc: Vec<i64>,
-    colc: Vec<i64>,
-    /// Row-wise copies (column positions and values) of the rows left after phase 3, in the reference's array order, flat:
-    /// row `r` is `roff[r]..roff[r + 1]` (the length of a row never changes, only the order inside it).
-    roff: Vec<usize>,
-    ridx: Vec<usize>,
-    rval: Vec<R>,
+    colc: &'a mut [i64],
+    roff: &'a [usize],
+    ridx: &'a mut [usize],
+    rval: &'a mut [f64],
     temp: Vec<R>,
     /// Hash entries: owner id and key; the key's pending entry waits for a partner.
     ids: Vec<usize>,
@@ -187,8 +203,8 @@ impl<R: Real> Pass<'_, R> {
     fn row_pair(&mut self, r1: usize, r2: usize) {
         let (b1, b2) = (self.roff[r1], self.roff[r2]);
         let (c0, c1) = (self.ridx[b1], self.ridx[b1 + 1]);
-        let (v0, v1) = (self.rval[b1], self.rval[b1 + 1]);
-        let (w0, w1) = (self.rval[b2], self.rval[b2 + 1]);
+        let (v0, v1) = (R::c(self.rval[b1]), R::c(self.rval[b1 + 1]));
+        let (w0, w1) = (R::c(self.rval[b2]), R::c(self.rval[b2 + 1]));
         let (prow, p, u12, orow, o0, o1) = if v0.abs() < w0.abs() {
             (r2, w0, w1, r1, v0, v1)
         } else {
@@ -266,11 +282,11 @@ impl<R: Real> Pass<'_, R> {
             let c = self.ridx[j];
             if self.colc[c] > 0 {
                 if c == d1 {
-                    v[0] = self.rval[j];
+                    v[0] = R::c(self.rval[j]);
                 } else if c == d2 {
-                    v[1] = self.rval[j];
+                    v[1] = R::c(self.rval[j]);
                 } else {
-                    others_lo.push((c, self.rval[j]));
+                    others_lo.push((c, R::c(self.rval[j])));
                 }
             }
         }
@@ -285,11 +301,11 @@ impl<R: Real> Pass<'_, R> {
             let c = self.ridx[j];
             if self.colc[c] > 0 {
                 if c == pc {
-                    hv[0] = self.rval[j];
+                    hv[0] = R::c(self.rval[j]);
                 } else if c == nc {
-                    hv[1] = self.rval[j];
+                    hv[1] = R::c(self.rval[j]);
                 } else {
-                    others_hi.push((c, self.rval[j]));
+                    others_hi.push((c, R::c(self.rval[j])));
                 }
             }
         }
@@ -371,80 +387,46 @@ impl<R: Real> Pass<'_, R> {
     }
 }
 
-/// Runs the pass after phase 4. `done3` are the rows and columns assigned by phases 1-3 (the row lists are built from what was
-/// left then), `row_done`/`col_done` the state after phase 4. Appends the pass's pivots to `seq` and `phase`.
-pub fn run<R: Real>(
+/// Runs the pass after phase 4. `nuc` is the row copy of what was left after phase 3, `rc` the row counts (exact for the rows
+/// still unassigned), `colc` the active entries of each column (0 or less for the assigned ones), `row_done` the state
+/// after phase 4. Appends the pass's pivots to `seq` and `phase`.
+#[allow(clippy::too_many_arguments)]
+pub fn run<'a, R: Real>(
     m: usize,
-    cols: crate::lu_order::Cols<'_>,
+    cols: crate::lu_order::Cols<'a>,
     seq: &mut Vec<(usize, usize)>,
     phase: &mut Vec<u8>,
-    row_done3: &[bool],
-    col_done3: &[bool],
+    nuc: NucRows<'a>,
+    rc: &[usize],
+    colc: &'a mut [i64],
     row_done: &[bool],
-    col_done: &[bool],
+    bufs: &mut Buffers,
 ) -> Overrides<R> {
     let n = cols.len();
-    // Counting pass, then the same column-ascending fill as the former per-row pushes.
-    let mut roff = vec![0usize; m + 1];
-    for pos in 0..n {
-        if !col_done3[pos] {
-            for &r in &cols[pos].1 {
-                if !row_done3[r] {
-                    roff[r + 1] += 1;
-                }
-            }
-        }
-    }
-    for r in 0..m {
-        roff[r + 1] += roff[r];
-    }
-    let mut next = roff[..m].to_vec();
-    let mut ridx = vec![0usize; roff[m]];
-    let mut rval = vec![R::ZERO; roff[m]];
-    for pos in 0..n {
-        if col_done3[pos] {
-            continue;
-        }
-        for (&r, &v) in cols[pos].1.iter().zip(&cols[pos].2) {
-            if !row_done3[r] {
-                ridx[next[r]] = pos;
-                rval[next[r]] = R::c(v);
-                next[r] += 1;
-            }
-        }
-    }
-    let mut rowc = vec![-1i64; m];
-    let mut colc = vec![-1i64; n];
-    for pos in 0..n {
-        if !col_done[pos] {
-            colc[pos] = cols[pos].1.iter().filter(|&&r| !row_done[r]).count() as i64;
-            for &r in &cols[pos].1 {
-                if !row_done[r] {
-                    if rowc[r] < 0 {
-                        rowc[r] = 0;
-                    }
-                    rowc[r] += 1;
-                }
-            }
-        }
-    }
+    let mut rowc = std::mem::take(&mut bufs.rowc);
+    rowc.clear();
+    rowc.extend((0..m).map(|r| if row_done[r] { -1 } else { rc[r] as i64 }));
     let mut st = Pass {
         m,
         cols,
         rowc,
         colc,
-        roff,
-        ridx,
-        rval,
+        roff: nuc.roff,
+        ridx: nuc.ridx,
+        rval: nuc.rval,
         temp: vec![R::ZERO; m.max(n)],
-        ids: Vec::new(),
-        keys: Vec::new(),
-        pending: KeyMap::default(),
-        pairs: Vec::new(),
+        ids: std::mem::take(&mut bufs.ids),
+        keys: std::mem::take(&mut bufs.keys),
+        pending: std::mem::take(&mut bufs.pending),
+        pairs: std::mem::take(&mut bufs.pairs),
         seq: std::mem::take(seq),
         phase: std::mem::take(phase),
         ov: Overrides::<R>::default(),
     };
+    st.ids.clear();
+    st.keys.clear();
+    st.pending.clear();
+    st.pairs.clear();
     // Row pairs.
     for r in 0..m {
         if !row_done[r] && st.rowc[r] == 2 {
@@ -473,10 +455,15 @@ pub fn run<R: Real>(
     }
     *seq = st.seq;
     *phase = st.phase;
+    bufs.rowc = st.rowc;
+    bufs.ids = st.ids;
+    bufs.keys = st.keys;
+    bufs.pending = st.pending;
+    bufs.pairs = st.pairs;
     st.ov
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "factor-shadow"))]
 #[path = "lu_pairs_ref.rs"]
 pub mod reference;
 
