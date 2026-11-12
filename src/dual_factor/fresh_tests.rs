@@ -384,6 +384,9 @@ impl<R: Real> DualFactor<R> {
             lt,
             levels,
             level_cache: LevelCache::default(),
+            level_spare: LevelCache::default(),
+            lists: Default::default(),
+            lscr: Default::default(),
             lt_levels: Default::default(),
             // Four or more occupancy words, and skipped zero divisions must always be exact.
             bt_occupied: !R::QUAD && m >= 256 && st.diag.iter().all(|d| d.to_f64().is_normal()),

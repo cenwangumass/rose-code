@@ -106,6 +106,13 @@ impl<R: Real> DualFactor<R> {
     pub fn set_upd_limit(&mut self, limit: Option<usize>) { self.upd_limit = limit; }
     pub fn clear_update_work(&mut self) { self.upd_work.clear(); }
     pub fn take_update_work(&mut self) -> Vec<(u32, f64, f64)> { std::mem::take(&mut self.upd_work) }
+    /// Hands the list taken by `take_update_work` back (emptied) so the next `update` does not allocate one.
+    pub fn give_update_work(&mut self, mut list: Vec<(u32, f64, f64)>) {
+        list.clear();
+        if self.upd_work.capacity() == 0 {
+            self.upd_work = list;
+        }
+    }
 }
 
 /// Sparse U solves visit only reached rows, in ascending basis position. Dense
@@ -212,6 +219,60 @@ impl FtranTouched {
     }
 }
 
+/// Retained result lists `(position, value)`: a solve takes one (empty, capacity kept) instead of allocating, and the consumer hands
+/// it back with `DualFactor::give_list`. Only capacities circulate; every list is cleared when taken.
+#[derive(Default)]
+struct ListPool<R>(std::cell::RefCell<Vec<Vec<(usize, R)>>>);
+
+impl<R> Clone for ListPool<R> {
+    fn clone(&self) -> Self {
+        Self(Default::default())
+    }
+}
+
+impl<R> ListPool<R> {
+    /// Lists kept at most (a few solves are alive at once).
+    const KEEP: usize = 8;
+
+    fn take(&self) -> Vec<(usize, R)> {
+        let mut v = self.0.borrow_mut().pop().unwrap_or_default();
+        v.clear();
+        v
+    }
+
+    fn give(&self, mut v: Vec<(usize, R)>) {
+        if v.capacity() == 0 {
+            return;
+        }
+        v.clear();
+        let mut pool = self.0.borrow_mut();
+        if pool.len() < Self::KEEP {
+            pool.push(v);
+        }
+    }
+}
+
+/// Retained work buffers of the L stage (`lstage_num`) and of its row etas. Between calls `active` is all false and the buckets are
+/// empty; `order` and `eta_x` are cleared where they are taken.
+struct LScratch<R> {
+    buckets: Vec<Vec<usize>>,
+    active: Vec<bool>,
+    order: Vec<usize>,
+    eta_x: Vec<R>,
+}
+
+impl<R> Default for LScratch<R> {
+    fn default() -> Self {
+        Self { buckets: Vec::new(), active: Vec::new(), order: Vec::new(), eta_x: Vec::new() }
+    }
+}
+
+impl<R> Clone for LScratch<R> {
+    fn clone(&self) -> Self {
+        Self::default()
+    }
+}
+
 /// Per-factor scratch and an index of the append-only row etas. A cloned
 /// factor builds its own scratch on demand; no caller can observe the cache.
 #[derive(Default)]
@@ -242,6 +303,20 @@ struct LevelWorkspace<R> {
 }
 
 impl<R: Real> LevelWorkspace<R> {
+    /// Forget the state of a retired factor (its etas, rows and scratch values), keeping every allocation.
+    fn reset(&mut self) {
+        self.values.clear();
+        self.state.clear();
+        self.touched.clear();
+        self.buckets.iter_mut().for_each(Vec::clear);
+        self.order.clear();
+        self.uses.iter_mut().for_each(Vec::clear);
+        self.term_ends.clear();
+        self.pending.clear();
+        self.gather.clear();
+        self.incompatible = false;
+    }
+
     fn prepare(&mut self, f: &DualFactor<R>, nlevels: usize) -> bool {
         if self.incompatible {
             return false;
@@ -316,6 +391,7 @@ impl<R: Real> LevelWorkspace<R> {
         maxlev: usize,
         rows: &[usize],
         vals: &[R],
+        pooled: bool,
     ) -> Option<(Vec<(usize, R)>, usize, f64)> {
         if !self.prepare(f, maxlev + 1) {
             return None;
@@ -406,13 +482,14 @@ impl<R: Real> LevelWorkspace<R> {
         if crate::dump::on("lstage") {
             f.lsnap.borrow_mut().1.clone_from(&self.values);
         }
-        let out = self
-            .order
-            .iter()
-            .copied()
-            .filter(|&i| self.values[i].abs() > R::c(TOL))
-            .map(|i| (i, self.values[i]))
-            .collect();
+        let mut out = if pooled { f.lists.take() } else { Vec::new() };
+        out.extend(
+            self.order
+                .iter()
+                .copied()
+                .filter(|&i| self.values[i].abs() > R::c(TOL))
+                .map(|i| (i, self.values[i])),
+        );
         Some((out, count, work))
     }
 }
@@ -651,6 +728,11 @@ pub struct DualFactor<R: Real = f64> {
     /// for `m >= 250`, a small level count (`< m/10`) and a short Markowitz L part.
     levels: Option<(Vec<usize>, usize)>,
     level_cache: LevelCache<R>,
+    /// A reset workspace of a retired factor, adopted by `level_cache` on its first use (kept apart so the cache holds only live state).
+    level_spare: LevelCache<R>,
+    /// Retained result lists and L-stage buffers (see `ListPool`, `LScratch`); they survive `recycle`.
+    lists: ListPool<R>,
+    lscr: std::cell::RefCell<LScratch<R>>,
     /// Immutable transpose-graph levels and maximum, initialized when a BTRAN first uses level buckets.
     lt_levels: std::cell::OnceCell<(Vec<usize>, usize)>,
     lev_built: bool,
@@ -976,6 +1058,12 @@ struct Recycled<R> {
     ab: AbLists<R>,
     uc: Vec<Vec<(usize, R)>>,
     urows: URows<R>,
+    /// Scratch that carries only capacities: the level workspace (reset), the result lists and the L-stage buffers.
+    level: Option<Box<LevelWorkspace<R>>>,
+    lists: ListPool<R>,
+    lscr: LScratch<R>,
+    /// The level buckets of the BTRAN workspace (empty rows).
+    bt_buckets: Vec<Vec<usize>>,
 }
 
 impl<R: Real> Recycled<R> {
@@ -986,7 +1074,18 @@ impl<R: Real> Recycled<R> {
             v.iter_mut().for_each(Vec::clear);
         }
         let kept = RECYCLED.with(|r| r.take()).and_then(|b| b.downcast::<Self>().ok());
-        let mut r = kept.map_or_else(|| Self { ab: AbLists::new(), uc: Vec::new(), urows: URows::new() }, |b| *b);
+        let mut r = kept.map_or_else(
+            || Self {
+                ab: AbLists::new(),
+                uc: Vec::new(),
+                urows: URows::new(),
+                level: None,
+                lists: ListPool::default(),
+                lscr: LScratch::default(),
+                bt_buckets: Vec::new(),
+            },
+            |b| *b,
+        );
         r.ab.reset(m);
         rows(&mut r.uc, m);
         r.urows.reset(m);
@@ -1003,8 +1102,15 @@ impl<R: Real> DualFactor<R> {
     /// Retire the factor: its lists (`ab`, `uc`, `urows`) are kept, allocations included, for the next `fresh` of this
     /// scalar type on this thread (the rest is dropped). Only capacities carry over; `fresh` clears every row.
     pub fn recycle(self) {
-        let Self { ab, uc, urows, .. } = self;
-        RECYCLED.with(|r| r.set(Some(Box::new(Recycled { ab, uc, urows }))));
+        let Self { ab, uc, urows, level_cache, lists, lscr, bt_work, .. } = self;
+        let mut bt_buckets = bt_work.map(|w| w.buckets).unwrap_or_default();
+        bt_buckets.iter_mut().for_each(Vec::clear);
+        let mut level = level_cache.0.into_inner();
+        if let Some(l) = level.as_mut() {
+            l.reset();
+        }
+        let lscr = lscr.into_inner();
+        RECYCLED.with(|r| r.set(Some(Box::new(Recycled { ab, uc, urows, level, lists, lscr, bt_buckets }))));
     }
 
     /// Fresh factor from the pivot sequence; `cols[pos]` is the basis column at incoming position `pos` as `(is_slack, rows, values)`.
@@ -1067,7 +1173,7 @@ impl<R: Real> DualFactor<R> {
                 }
             }
         }
-        let Recycled { mut ab, mut uc, mut urows } = Recycled::<R>::take(m);
+        let Recycled { mut ab, mut uc, mut urows, level, lists, lscr, bt_buckets } = Recycled::<R>::take(m);
         let (mut sa, mut sb) = (0usize, 0usize);
         let mut xv = vec![R::ZERO; m];
         let mut ents: Vec<(usize, R)> = Vec::new();
@@ -1420,10 +1526,13 @@ impl<R: Real> DualFactor<R> {
             lt,
             levels,
             level_cache: LevelCache::default(),
+            level_spare: LevelCache(std::cell::RefCell::new(level)),
+            lists,
+            lscr: std::cell::RefCell::new(lscr),
             lt_levels: Default::default(),
             // Four or more occupancy words, and skipped zero divisions must always be exact.
             bt_occupied: !R::QUAD && m >= 256 && st.diag.iter().all(|d| d.to_f64().is_normal()),
-            bt_work: None,
+            bt_work: Some(Box::new(BtranWork { buckets: bt_buckets, ..Default::default() })),
             lev_built,
             diag: st.diag.clone(),
             uc,
@@ -1523,8 +1632,9 @@ impl<R: Real> DualFactor<R> {
 
     /// Pack a dense BTRAN result in row order without conditional vector growth.
     #[inline(never)]
-    fn dense_btran_output(x: &[R], perm: &[usize]) -> Vec<(usize, R)> {
-        let mut out = Vec::with_capacity(perm.len());
+    fn dense_btran_output(x: &[R], perm: &[usize], mut out: Vec<(usize, R)>) -> Vec<(usize, R)> {
+        out.clear();
+        out.reserve(perm.len());
         let dst: *mut (usize, R) = out.as_mut_ptr();
         let mut count = 0;
         for (r, &i) in perm.iter().enumerate() {
@@ -1610,12 +1720,13 @@ impl<R: Real> DualFactor<R> {
 
     /// L solve (Kahn order) and row etas on the entering column; returns the nonzero list the U solve receives, with values.
     /// Also returns the work estimate of the L stage and the row etas (`0x12bd30` / `0x12a990` and the eta loop of `0x120740`).
-    fn lstage_num(
-        &self,
-        rows: &[usize],
-        vals: &[R],
-        force_dense: bool,
-    ) -> (LOut<R>, Option<usize>, f64) {
+    fn lstage_num(&self, rows: &[usize], vals: &[R], force_dense: bool) -> (LOut<R>, Option<usize>, f64) {
+        self.lstage_list(rows, vals, force_dense, false)
+    }
+
+    /// `lstage_num`; with `pooled` a list result is taken from the retained pool, which only a caller that gives it back
+    /// (`ftran_needed`) may ask for.
+    fn lstage_list(&self, rows: &[usize], vals: &[R], force_dense: bool, pooled: bool) -> (LOut<R>, Option<usize>, f64) {
         let m = self.m;
         let mut e = 0.0f64;
         let dense_l = rows.len() * self.dthr > self.m || force_dense || self.lev_dense_ft;
@@ -1623,8 +1734,8 @@ impl<R: Real> DualFactor<R> {
             if let Some((levels, maxlev)) = &self.levels {
                 let mut cache = self.level_cache.0.borrow_mut();
                 if let Some(result) = cache
-                    .get_or_insert_with(Box::default)
-                    .solve(self, levels, *maxlev, rows, vals)
+                    .get_or_insert_with(|| self.level_spare.0.take().unwrap_or_default())
+                    .solve(self, levels, *maxlev, rows, vals, pooled)
                 {
                     return (LOut::List(result.0), Some(result.1), result.2);
                 }
@@ -1682,8 +1793,16 @@ impl<R: Real> DualFactor<R> {
             // Level-bucket L solve: nodes are taken level by level, each level in insertion order (inputs first, then the
             // nodes reached from lower levels); values below the tolerance are dropped without propagating.
             let maxlev = *maxlev;
-            let mut buckets: Vec<Vec<usize>> = vec![Vec::new(); maxlev + 1];
-            let mut active = vec![false; self.m];
+            let (mut buckets, mut active, mut out) = {
+                let mut scr = self.lscr.borrow_mut();
+                (std::mem::take(&mut scr.buckets), std::mem::take(&mut scr.active), std::mem::take(&mut scr.order))
+            };
+            // Retained buffers: `active` all false and the buckets empty between calls (restored below), `out` cleared here.
+            #[cfg(test)]
+            assert!(active.iter().all(|&a| !a) && buckets.iter().all(Vec::is_empty), "stale L-stage scratch");
+            buckets.resize_with(maxlev + 1, Vec::new);
+            active.resize(self.m, false);
+            out.clear();
             let mut l = usize::MAX;
             for &v in &start {
                 if !active[v] {
@@ -1693,7 +1812,6 @@ impl<R: Real> DualFactor<R> {
                 }
             }
             let mut remaining: usize = buckets.iter().map(Vec::len).sum();
-            let mut out: Vec<usize> = Vec::new();
             while remaining > 0 && l <= maxlev {
                 let mut i = 0;
                 while i < buckets[l].len() {
@@ -1718,6 +1836,18 @@ impl<R: Real> DualFactor<R> {
                     }
                 }
                 l += 1;
+            }
+            // Every queued node sits in its bucket: clear the markers through them, then the buckets.
+            for b in buckets.iter_mut() {
+                for &v in b.iter() {
+                    active[v] = false;
+                }
+                b.clear();
+            }
+            {
+                let mut scr = self.lscr.borrow_mut();
+                scr.buckets = buckets;
+                scr.active = active;
             }
             let n = out.len();
             e = ((self.nnz_l + m + 2 * m) as f64 * 5.0 * n as f64) / (m + 1) as f64 + e;
@@ -1819,7 +1949,7 @@ impl<R: Real> DualFactor<R> {
             }
         }
         // Gather each eta into one buffer; its logical peel is stored in eta.peel.
-        let mut eta_x: Vec<R> = Vec::new();
+        let mut eta_x: Vec<R> = std::mem::take(&mut self.lscr.borrow_mut().eta_x);
         if !self.etas.is_empty() {
             let netas = self.etas.len();
             if dense_l || Self::count_dense(count_l, self.dthr, m) {
@@ -1868,11 +1998,14 @@ impl<R: Real> DualFactor<R> {
             }
             x[eta.idx] = s;
         }
+        self.lscr.borrow_mut().eta_x = eta_x;
         if crate::dump::on("lstage") {
             self.lsnap.borrow_mut().1 = x.clone();
         }
         // A dense vector goes on as the raw array: the reference keeps the sub-tolerance residues of the L and eta stages.
         if output_dense {
+            order.clear();
+            self.lscr.borrow_mut().order = order;
             if !R::LANES {
                 return (LOut::List((0..m).filter(|&v| x[v] != R::ZERO).map(|v| (v, x[v])).collect()), count_l, e);
             }
@@ -1885,17 +2018,11 @@ impl<R: Real> DualFactor<R> {
             DENSE_HANDOFFS.with(|k| k.set(k.get() + 1));
             return (LOut::Dense(x), count_l, e);
         }
-        (
-            LOut::List(
-                order
-                    .into_iter()
-                    .filter(|&v| x[v].abs() > R::c(TOL))
-                    .map(|v| (v, x[v]))
-                    .collect(),
-            ),
-            count_l,
-            e,
-        )
+        let mut list = if pooled { self.lists.take() } else { Vec::new() };
+        list.extend(order.iter().copied().filter(|&v| x[v].abs() > R::c(TOL)).map(|v| (v, x[v])));
+        order.clear();
+        self.lscr.borrow_mut().order = order;
+        (LOut::List(list), count_l, e)
     }
 
     /// FTRAN of a sparse column: the nonzeros `(position, value)` of `B^-1 a` in the reference's output order. The spike is kept
@@ -1918,7 +2045,7 @@ impl<R: Real> DualFactor<R> {
         dense_in: bool,
     ) -> Vec<(usize, R)> {
         let (m, i21) = (self.m, self.i21);
-        let (lout, count_l, e_l) = self.lstage_num(rows, vals, dense_in);
+        let (lout, count_l, e_l) = self.lstage_list(rows, vals, dense_in, true);
         // A dense L-stage vector is the U stage's work vector itself (it implies `tau_dense`); only its counts are needed.
         let (spike, dense_x) = match lout {
             LOut::List(list) => (list, None),
@@ -2047,17 +2174,22 @@ impl<R: Real> DualFactor<R> {
             f.tp_a2 = counts.tp_a2;
             f.tp_only_a = counts.tp_only_a;
         }
-        needed
-            .iter()
-            .map(|&p| {
-                let v = match self.kind[p] {
-                    -2 => x[p],
-                    -1 => x[p] / self.diag[p],
-                    _ => self.nucleus_dot(p, &x) / self.diag[p],
-                };
-                (p, v)
-            })
-            .collect()
+        let mut result = self.lists.take();
+        result.extend(needed.iter().map(|&p| {
+            let v = match self.kind[p] {
+                -2 => x[p],
+                -1 => x[p] / self.diag[p],
+                _ => self.nucleus_dot(p, &x) / self.diag[p],
+            };
+            (p, v)
+        }));
+        self.lists.give(spike);
+        result
+    }
+
+    /// Hands a result list of `btran` or `ftran_needed` back for reuse once its contents are no longer read.
+    pub fn give_list(&self, list: Vec<(usize, R)>) {
+        self.lists.give(list);
     }
 
     /// Number of tail slots whose position holds a nonzero value in the dense vector `x` (the tail positions are `at[i21..m]`).
@@ -3355,21 +3487,19 @@ impl<R: Real> DualFactor<R> {
         }
         let result = if self.bt_dense {
             if R::LANES {
-                Self::dense_btran_output(&x, &self.perm[..m])
+                Self::dense_btran_output(&x, &self.perm[..m], self.lists.take())
             } else {
-                (0..m)
-                    .filter_map(|r| {
-                        let v = x[self.perm[r]];
-                        (v != R::ZERO).then_some((r, v))
-                    })
-                    .collect()
+                let mut out = self.lists.take();
+                out.extend((0..m).filter_map(|r| {
+                    let v = x[self.perm[r]];
+                    (v != R::ZERO).then_some((r, v))
+                }));
+                out
             }
         } else {
-            res.iter()
-                .copied()
-                .filter(|&i| x[i] != R::ZERO)
-                .map(|i| (row_of[i], x[i]))
-                .collect()
+            let mut out = self.lists.take();
+            out.extend(res.iter().copied().filter(|&i| x[i] != R::ZERO).map(|i| (row_of[i], x[i])));
+            out
         };
         if self.bt_dense || partial {
             x.fill(R::ZERO);

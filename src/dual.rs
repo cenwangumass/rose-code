@@ -1269,11 +1269,42 @@ struct GlueBufs<R: Real> {
     tau: Vec<R>,
     rhs: Vec<R>,
     changed: Vec<usize>,
+    /// Per-iteration lists of `Dual::iteration`, taken (cleared) at the start and put back when the pivot is built; capacities only.
+    rho: Vec<(usize, R)>,
+    rows_q: Vec<usize>,
+    vals_q: Vec<R>,
+    rho_rows: Vec<usize>,
+    rho_vals: Vec<R>,
+    needed: Vec<usize>,
+    sq: Vec<R>,
+    /// The `col`/`tau` of the last `Pivot` and its box, recovered by `Dual::reclaim` after the post-iteration pass.
+    col: Vec<(usize, R)>,
+    tau_col: Vec<R>,
+    pivot: Option<Box<Pivot<R>>>,
+    /// The walk list before its last rebuild (swapped with `Dual::list`), and the sort keys of the rebuild.
+    spare_list: Vec<usize>,
+    keys: Vec<f64>,
 }
 
 impl<R: Real> Default for GlueBufs<R> {
     fn default() -> Self {
-        GlueBufs { tau: Vec::new(), rhs: Vec::new(), changed: Vec::new() }
+        GlueBufs {
+            tau: Vec::new(),
+            rhs: Vec::new(),
+            changed: Vec::new(),
+            rho: Vec::new(),
+            rows_q: Vec::new(),
+            vals_q: Vec::new(),
+            rho_rows: Vec::new(),
+            rho_vals: Vec::new(),
+            needed: Vec::new(),
+            sq: Vec::new(),
+            col: Vec::new(),
+            tau_col: Vec::new(),
+            pivot: None,
+            spare_list: Vec::new(),
+            keys: Vec::new(),
+        }
     }
 }
 
@@ -1283,11 +1314,13 @@ struct FwWs<R: Real> {
     seen: Vec<bool>,
     order: Vec<usize>,
     list: Vec<(usize, R)>,
+    /// Squares of `list` for its norm.
+    sq: Vec<R>,
 }
 
 impl<R: Real> Default for FwWs<R> {
     fn default() -> Self {
-        FwWs { dense: Vec::new(), seen: Vec::new(), order: Vec::new(), list: Vec::new() }
+        FwWs { dense: Vec::new(), seen: Vec::new(), order: Vec::new(), list: Vec::new(), sq: Vec::new() }
     }
 }
 
@@ -2807,8 +2840,10 @@ impl<'a, R: Real> Dual<'a, R> {
     /// `build_walk_list` with the infeasibilities of the rows already in `infs` (nothing they depend on changes inside).
     fn build_walk_list_from(&mut self, infs: &[R]) {
         let ptol = self.ptol();
-        let mut rows = Vec::new();
-        let mut keys = Vec::new();
+        let mut rows = std::mem::take(&mut self.glue.spare_list);
+        let mut keys = std::mem::take(&mut self.glue.keys);
+        rows.clear();
+        keys.clear();
         for r in 0..self.m {
             let fr = infs[r];
             if fr.to_f64() > ptol {
@@ -2821,7 +2856,8 @@ impl<'a, R: Real> Dual<'a, R> {
         }
         ref_sort(&mut keys, &mut rows);
         self.walk_len = rows.len();
-        self.list = rows;
+        self.glue.spare_list = std::mem::replace(&mut self.list, rows);
+        self.glue.keys = keys;
         self.cursor = 0;
         self.pend = self.cap;
     }
@@ -3064,7 +3100,8 @@ impl<'a, R: Real> Dual<'a, R> {
         // flag 0; the leaving row is the first maximum of the priority among the rest.
         let mut best = R::c(0.5) * self.thr;
         let mut row = None;
-        let mut kept = Vec::with_capacity(self.list.len());
+        let mut kept = std::mem::take(&mut self.glue.spare_list);
+        kept.clear();
         let (walked, mut removed) = (self.list.len(), 0usize);
         for &e in &self.list {
             if self.flags[e] >= 2 {
@@ -3089,7 +3126,7 @@ impl<'a, R: Real> Dual<'a, R> {
             let est = 0.5 * kept.len() as f64 + removed as f64 + 2.0 * (walked - removed) as f64;
             self.work.add(0xcce72, est, crate::work::CTX);
         }
-        self.list = kept;
+        self.glue.spare_list = std::mem::replace(&mut self.list, kept);
         if row.is_none() {
             // Refresh (`0xcd031`): argmax over the rows with flag 0, threshold divided by 10, those at or above it join the list.
             self.thr /= R::c(10.0);
@@ -3188,11 +3225,13 @@ impl<'a, R: Real> Dual<'a, R> {
         row: &[(usize, R)],
         leave: usize,
         above: bool,
+        mut rows: Vec<usize>,
+        mut vals: Vec<R>,
     ) -> (Vec<usize>, Vec<R>, R, f64, bool) {
         let p = self.p;
         let sdir = if above { -1.0 } else { 1.0 };
         let mut guard = self.fw_ws.borrow_mut();
-        let FwWs { dense, seen, order, list } = &mut *guard;
+        let FwWs { dense, seen, order, list, sq } = &mut *guard;
         if dense.len() != self.m {
             *dense = vec![R::ZERO; self.m];
             *seen = vec![false; self.m];
@@ -3214,7 +3253,7 @@ impl<'a, R: Real> Dual<'a, R> {
         if leave < self.n && !self.dflag[leave] {
             list.push((leave, R::ONE));
         }
-        let w = rho_norm(list);
+        let w = rho_norm_with(list, sq);
         order.clear();
         let mut work = 4.0 * list.len() as f64;
         for &(j, v) in list.iter() {
@@ -3241,8 +3280,11 @@ impl<'a, R: Real> Dual<'a, R> {
         // is a dense vector (count -1) whose entries are all kept, however small (`0x25d7ac`; seed 2772 call 93: a row of 1.9e-14).
         let dense_route = R::QUAD
             && ((self.n + 1) * self.m) as f64 <= list.len() as f64 * 3.0 * self.nnz_a as f64;
-        let mut rows = Vec::with_capacity(order.len());
-        let mut vals = Vec::with_capacity(order.len());
+        // The result lists are the caller's retained buffers (capacities only).
+        rows.clear();
+        vals.clear();
+        rows.reserve(order.len());
+        vals.reserve(order.len());
         let order_len = order.len();
         // The scratch goes back to all zero / all false through the touched list.
         for &i in order.iter() {
@@ -3971,7 +4013,7 @@ impl<'a, R: Real> Dual<'a, R> {
     fn shift_entering(
         &mut self,
         row: &[(usize, R)],
-        kept: &[usize],
+        kept0: &[usize],
         chosen: usize,
         xm5: R,
         mut xm15: R,
@@ -3981,8 +4023,10 @@ impl<'a, R: Real> Dual<'a, R> {
         let mut xm5 = xm5;
         let delta = R::c(dual_tol());
         let mut chosen = chosen;
-        let mut kept: Vec<usize> = kept.to_vec();
+        // The list is copied only when a pass replaces it.
+        let mut kept_own: Option<Vec<usize>> = None;
         for _ in 0..8 {
+            let kept: &[usize] = kept_own.as_deref().unwrap_or(kept0);
             let j = row[chosen].0;
             let dj = self.d[j];
             if self.st[j] == LB || self.st[j] == UB {
@@ -4012,7 +4056,7 @@ impl<'a, R: Real> Dual<'a, R> {
             }
             xm3 = xm15;
             let mut next: Vec<usize> = Vec::new();
-            for &e in &kept {
+            for &e in kept {
                 let (jj, av) = row[e];
                 if self.d[jj] < R::ZERO {
                     if self.st[jj] == LB || self.st[jj] == UB {
@@ -4068,7 +4112,7 @@ impl<'a, R: Real> Dual<'a, R> {
                     crate::work::CTX,
                 );
                 (chosen, xm5) = self.select_entering(row, &next, xm3);
-                kept = next;
+                kept_own = Some(next);
             }
         }
         (chosen, xm5)
@@ -4255,6 +4299,13 @@ struct Pivot<R> {
 }
 
 impl<'a, R: Real> Dual<'a, R> {
+    /// Keeps the pivot's `col` and `tau` buffers and its box for the next iteration (contents are cleared when taken).
+    fn reclaim(&mut self, mut pv: Box<Pivot<R>>) {
+        self.glue.col = std::mem::take(&mut pv.col);
+        self.glue.tau_col = std::mem::take(&mut pv.tau);
+        self.glue.pivot = Some(pv);
+    }
+
     /// One call of the iteration function `0xc4fe0`.
     fn iteration(&mut self, k: usize, dump: &mut Option<serde_json::Value>) -> Step<R> {
         let p = self.p;
@@ -4337,7 +4388,9 @@ impl<'a, R: Real> Dual<'a, R> {
         // Pivot-row BTRAN, drop of the small entries.
         let rho_full = self.mirror.btran(&[(r, R::ONE)], true, false);
         let drop_tol = R::c(DROP_TOL);
-        let mut rho: Vec<(usize, R)> = Vec::with_capacity(rho_full.len());
+        let mut rho: Vec<(usize, R)> = std::mem::take(&mut self.glue.rho);
+        rho.clear();
+        rho.reserve(rho_full.len());
         for &e in &rho_full {
             if e.1.abs() > drop_tol {
                 rho.push(e);
@@ -4569,23 +4622,37 @@ impl<'a, R: Real> Dual<'a, R> {
             self.forced.pop();
         }
         // The reference's two-vector FTRAN: the pivot column first, then tau = B^-1 rho at the column's positions only.
-        let rows_q: Vec<usize> = p.fcols[q].iter().map(|&(i, _)| i).collect();
-        let vals_q: Vec<R> = p.fcols[q].iter().map(|&(_, a)| R::c(a)).collect();
+        let mut rows_q = std::mem::take(&mut self.glue.rows_q);
+        let mut vals_q = std::mem::take(&mut self.glue.vals_q);
+        rows_q.clear();
+        rows_q.extend(p.fcols[q].iter().map(|&(i, _)| i));
+        vals_q.clear();
+        vals_q.extend(p.fcols[q].iter().map(|&(_, a)| R::c(a)));
         let col_out = self.mirror.ftran(&rows_q, &vals_q);
         // Mode 3: the second vector is not rho but the combination of the columns of the row's entries that were basic when the weights restarted
         // (`0xc57d8`, `0x11f620`), and its squared norm is the weight of the pivot row.
         let (rho_rows, rho_vals, w_row, vec_work, dense_route) = if self.pmode >= 2 {
-            self.framework_rhs(&row, leave, above)
+            let rr = std::mem::take(&mut self.glue.rho_rows);
+            let rv = std::mem::take(&mut self.glue.rho_vals);
+            self.framework_rhs(&row, leave, above, rr, rv)
         } else {
+            let mut rr = std::mem::take(&mut self.glue.rho_rows);
+            let mut rv = std::mem::take(&mut self.glue.rho_vals);
+            rr.clear();
+            rr.extend(rho.iter().map(|e| e.0));
+            rv.clear();
+            rv.extend(rho.iter().map(|e| e.1));
             (
-                rho.iter().map(|e| e.0).collect::<Vec<usize>>(),
-                rho.iter().map(|e| e.1).collect::<Vec<R>>(),
-                rho_norm(&rho),
+                rr,
+                rv,
+                rho_norm_with(&rho, &mut self.glue.sq),
                 rho.len() as f64,
                 false,
             )
         };
-        let needed: Vec<usize> = col_out.iter().map(|e| e.0).collect();
+        let mut needed = std::mem::take(&mut self.glue.needed);
+        needed.clear();
+        needed.extend(col_out.iter().map(|e| e.0));
         // Mode 3: the framework vector is a dense vector (count -1) once it has more than m/8 entries (SC50A calls 11, 14..; AFIRO call 12: 4 of m = 27;
         // 6 of 50 stay sparse); its L stage then runs dense.
         let dense_in = self.pmode == 3 && (dense_route || rho_rows.len() * 8 > m);
@@ -4768,16 +4835,21 @@ impl<'a, R: Real> Dual<'a, R> {
         }
         // Column without the pivot entry: the last entry moves into the pivot's slot.
         // A dense FTRAN result (count -1) is compacted by an ascending scan that skips the pivot and the entries up to the drop tolerance (`0x12013c`).
-        let mut col: Vec<(usize, R)> = col_out.clone();
+        let mut col: Vec<(usize, R)> = std::mem::take(&mut self.glue.col);
+        col.clear();
+        col.extend_from_slice(&col_out);
         if self.mirror.last_dense() {
             col.retain(|e| e.0 != r && e.1.abs() > R::c(DROP_TOL));
         } else if let Some(k) = col.iter().position(|e| e.0 == r) {
             col.swap_remove(k);
         }
-        let tau: Vec<R> = col.iter().map(|e| tau_dense[e.0]).collect();
+        let mut tau: Vec<R> = std::mem::take(&mut self.glue.tau_col);
+        tau.clear();
+        tau.extend(col.iter().map(|e| tau_dense[e.0]));
         for &(i, _) in &tau_out {
             tau_dense[i] = R::ZERO;
         }
+        self.mirror.give_list(tau_out);
         self.glue.tau = tau_dense;
         // Each accepted pivot and each bound flip advances the shared clock.
         crate::simplex::TOTAL_ITERS.with(|c| c.set(c.get() + 1.0 + flips.len() as f64));
@@ -4929,21 +5001,22 @@ impl<'a, R: Real> Dual<'a, R> {
                 (qe, ws.leave_pos)
             }
         };
-        Step::Pivot(Box::new(Pivot {
-            r,
-            leave,
-            q,
-            row,
-            q_pos,
-            leave_pos,
-            flips,
-            col,
-            tau,
-            alpha,
-            w: w_row,
-            t0,
-            above,
-        }))
+        // The lists of this iteration go back to the glue (capacities only), the pivot reuses its box.
+        self.mirror.give_list(rho_full);
+        self.glue.rho = rho;
+        self.glue.rows_q = rows_q;
+        self.glue.vals_q = vals_q;
+        self.glue.rho_rows = rho_rows;
+        self.glue.rho_vals = rho_vals;
+        self.glue.needed = needed;
+        let pivot = Pivot { r, leave, q, row, q_pos, leave_pos, flips, col, tau, alpha, w: w_row, t0, above };
+        Step::Pivot(match self.glue.pivot.take() {
+            Some(mut b) => {
+                *b = pivot;
+                b
+            }
+            None => Box::new(pivot),
+        })
     }
 }
 
@@ -5602,9 +5675,11 @@ impl<'a, R: Real> Dual<'a, R> {
             } else {
                 self.factor.update_column(pv.r, alpha);
                 self.mirror.update(pv.r);
-                for (site, est, scale) in self.mirror.take_update_work() {
+                let uw = self.mirror.take_update_work();
+                for &(site, est, scale) in &uw {
                     self.work.add(site, est, scale);
                 }
+                self.mirror.give_update_work(uw);
                 self.touch_pricing(pv.r, &pv.col);
                 self.updates += 1;
             }
@@ -5950,15 +6025,17 @@ impl<'a, R: Real> Dual<'a, R> {
 /// of eight entries per pass (four accumulators of two lanes, combined pairwise, then lane 0 + lane 1, then the tail).
 /// The initial weight of a dense BTRAN result (`0xc392b..0xc3b08`): the squares are summed over all `m` slots of the dense vector (zeros included), so
 /// each nonzero falls in the lane of its row index; the alignment peel was never needed in the captures (16-byte aligned buffers).
-fn rho_norm_dense<R: Real>(rho: &[(usize, R)], m: usize) -> R {
-    let mut sq = vec![R::ZERO; m];
+fn rho_norm_dense_with<R: Real>(rho: &[(usize, R)], m: usize, sq: &mut Vec<R>) -> R {
+    sq.clear();
+    sq.resize(m, R::ZERO);
     for &(i, v) in rho {
         sq[i] = v * v;
     }
-    sum_squares(&sq)
+    sum_squares(sq)
 }
 
-fn rho_norm<R: Real>(rho: &[(usize, R)]) -> R {
+/// `rho_norm` with the squares built in the caller's buffer.
+fn rho_norm_with<R: Real>(rho: &[(usize, R)], sq: &mut Vec<R>) -> R {
     if R::QUAD {
         // The quad kernel (`0x25d3ff..0x25d49a`) squares in extended precision and keeps the running sum in a double: each step is
         // rounded to extended by the add and then to double by the store.
@@ -5966,8 +6043,9 @@ fn rho_norm<R: Real>(rho: &[(usize, R)]) -> R {
             .iter()
             .fold(R::ZERO, |a, e| R::c((a + e.1 * e.1).to_f64()));
     }
-    let sq: Vec<R> = rho.iter().map(|e| e.1 * e.1).collect();
-    sum_squares(&sq)
+    sq.clear();
+    sq.extend(rho.iter().map(|e| e.1 * e.1));
+    sum_squares(sq)
 }
 
 fn sum_squares<R: Real>(sq: &[R]) -> R {
@@ -6972,15 +7050,17 @@ fn solve_pass_callback<R: Real>(
         s.dflag = s.st.iter().map(|&t| t < 0).collect();
     }
     // Initial weights: the squared norms of the rows of B^-1 (a supplied basis starts with unit weights).
+    let mut sq_buf: Vec<R> = Vec::new();
     for r in 0..if s.warm { 0 } else { m } {
         let out = s.mirror.btran(&[(r, R::ONE)], false, false);
         s.work
             .add_from(0x12de50, 0xc36f1, s.mirror.work(), crate::work::FAC);
         s.w[r] = if s.mirror.bt_dense() {
-            rho_norm_dense(&out, m)
+            rho_norm_dense_with(&out, m, &mut sq_buf)
         } else {
-            rho_norm(&out)
+            rho_norm_with(&out, &mut sq_buf)
         };
+        s.mirror.give_list(out);
     }
     if R::QUAD {
         // The quad pass keeps the perturbation flag and the stall counters of the double pass (same context), so its setup stall test can perturb (`0x239085`, c6007 quad pass 1).
@@ -7109,6 +7189,7 @@ fn solve_pass_callback<R: Real>(
                     }
                 };
                 s.post(Some(&pv), due)?;
+                s.reclaim(pv);
                 // The driver around the pricing (`0xf6745..0xf6768`, `0xf8b51..0xf8b77`) clears the worst rejected row (`ctx+0x430` = -1, `ctx+0x438` = 0)
                 // each time it returns, so the "first rejection" is per iteration; the rejected count `ctx+0x420` stays (fx_midsing_1106 call 20).
                 s.driver_return();

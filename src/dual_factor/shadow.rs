@@ -38,6 +38,11 @@ macro_rules! forward {
 }
 
 impl<R: Real> Shadow<R> {
+    /// See `DualFactor::give_list`.
+    pub fn give_list(&self, list: Vec<(usize, R)>) {
+        self.new.give_list(list);
+    }
+
     /// See `DualFactor::recycle`; the oracle is dropped.
     pub fn recycle(self) {
         self.new.recycle();
@@ -186,6 +191,10 @@ impl<R: Real> Shadow<R> {
         self.new.clear_update_work();
         muted(|| self.old.upd_work.clear());
         self.finish("clear_update_work", &(), &(), false);
+    }
+    /// See `DualFactor::give_update_work`.
+    pub fn give_update_work(&mut self, list: Vec<(u32, f64, f64)>) {
+        self.new.give_update_work(list);
     }
     pub fn take_update_work(&mut self) -> Vec<(u32, f64, f64)> {
         let new = self.new.take_update_work();
