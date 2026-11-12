@@ -19,6 +19,11 @@ fn list_handoff<T>(on: bool, f: impl FnOnce() -> T) -> T {
 
 /// Everything either path leaves behind that a later consumer reads.
 pub(super) fn assert_same<R: Real>(a: &mut DualFactor<R>, b: &mut DualFactor<R>, what: &str) {
+    assert_same_with(a, b, what, true);
+}
+
+/// `exact_dirty`: the lists of dirty blocks are equal; otherwise `a`'s are a subset of `b`'s that still covers every nonzero of `a`'s column.
+pub(super) fn assert_same_with<R: Real>(a: &mut DualFactor<R>, b: &mut DualFactor<R>, what: &str, exact_dirty: bool) {
     assert_eq!(a.work.to_bits(), b.work.to_bits(), "{what}: work");
     assert_eq!((a.work_parts.0.to_bits(), a.work_parts.1.to_bits()), (b.work_parts.0.to_bits(), b.work_parts.1.to_bits()), "{what}: parts");
     assert_eq!((a.last_dense, a.last_ordered, a.last_alpha), (b.last_dense, b.last_ordered, b.last_alpha), "{what}: flags");
@@ -28,7 +33,20 @@ pub(super) fn assert_same<R: Real>(a: &mut DualFactor<R>, b: &mut DualFactor<R>,
     let (fa, fb) = (a.f2.get_mut(), b.f2.get_mut());
     assert_eq!((fa.col_n, &fa.col_in, &fa.col_surv, fa.col_sa, fa.col_sb), (fb.col_n, &fb.col_in, &fb.col_surv, fb.col_sa, fb.col_sb), "{what}: f2 column");
     assert_eq!(all_bits(&fa.x_col), all_bits(&fb.x_col), "{what}: x_col");
-    assert_eq!(fa.dirty_blocks, fb.dirty_blocks, "{what}: dirty");
+    if exact_dirty {
+        assert_eq!(fa.dirty_blocks, fb.dirty_blocks, "{what}: dirty");
+    } else {
+        let (da, db) = (fa.dirty_blocks.as_deref(), fb.dirty_blocks.as_deref());
+        if let (Some(da), Some(db)) = (da, db) {
+            assert!(da.iter().all(|k| db.contains(k)), "{what}: dirty blocks of the new route are not a subset");
+            assert!(da.windows(2).all(|w| w[0] < w[1]), "{what}: dirty blocks not ascending");
+        }
+        if let Some(da) = da {
+            for (i, &v) in fa.x_col.iter().enumerate() {
+                assert!(v == R::ZERO || da.contains(&(i / 64)), "{what}: nonzero outside the dirty blocks at {i}");
+            }
+        }
+    }
     assert_eq!((fa.tau_n, fa.tp_a2, fa.tp_only_a), (fb.tau_n, fb.tp_a2, fb.tp_only_a), "{what}: f2 tau");
     assert_eq!(all_bits(&fa.x_tau), all_bits(&fb.x_tau), "{what}: x_tau");
     assert_eq!(fa.tau_raw, fb.tau_raw, "{what}: tau_raw");

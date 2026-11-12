@@ -39,6 +39,9 @@ mod needed_tests;
 thread_local! {
     /// Dense L solves of this test thread that carried a count (the `force_dense` readers' case).
     static LIVE_COUNTS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// Routes of `ftran_with_sparse` on this test thread: calls, full sweeps, heap walks that stayed a heap, heap walks that fell back to a
+    /// sweep, nucleus lists sorted, nucleus lists in discovery order.
+    static SPARSE_ROUTES: std::cell::Cell<[usize; 6]> = const { std::cell::Cell::new([0; 6]) };
 }
 #[cfg(test)]
 mod fresh_tests;
@@ -48,6 +51,10 @@ mod update_old;
 mod full_old;
 #[cfg(test)]
 mod full_tests;
+#[cfg(test)]
+mod ordering_old;
+#[cfg(test)]
+mod ordering_tests;
 
 #[cfg(feature = "factor-shadow")]
 pub(crate) mod projection;
@@ -114,6 +121,9 @@ impl<R: Real> DualFactor<R> {
         }
     }
 }
+
+/// The sparse U heap hands over to a sweep of the remaining slots once `top - loff < SWEEP_RATIO * heap size` (the reference's constant is 6.0).
+const SWEEP_RATIO: usize = 6;
 
 /// Sparse U solves visit only reached rows, in ascending basis position. Dense
 /// solves retain their contiguous marker scan. Duplicate touches are idempotent.
@@ -737,6 +747,9 @@ pub struct DualFactor<R: Real = f64> {
     lt_levels: std::cell::OnceCell<(Vec<usize>, usize)>,
     lev_built: bool,
     diag: Vec<R>,
+    /// Whether some diagonal entry is zero or NaN: a zero slot of the tail then divides to NaN instead of vanishing, so the sparse U stage
+    /// must visit it (`ftran_with` keeps the closure walk for such a factor, which only a singular basis gives).
+    bad_diag: bool,
     /// Numeric U entries of each tail column `(position, value)`.
     uc: Vec<Vec<(usize, R)>>,
     /// The row-wise copy of the numeric U entries of the tail columns, rows in the reference's physical order (one pool).
@@ -1535,6 +1548,7 @@ impl<R: Real> DualFactor<R> {
             bt_work: Some(Box::new(BtranWork { buckets: bt_buckets, ..Default::default() })),
             lev_built,
             diag: st.diag.clone(),
+            bad_diag: st.diag.iter().any(|d| !(d.abs() > R::ZERO)),
             uc,
             spike: Vec::new(),
             update_values: Vec::new(),
@@ -2724,6 +2738,9 @@ impl<R: Real> DualFactor<R> {
             || !(self.nuc.len() + spike.len() < self.i21
                 || self.dens * (spike.len() as f64) < 2.0 * m as f64);
         let bs = force_dense && crate::dump::on("bsolve");
+        if !u_dense && !bs && !self.bad_diag {
+            return self.ftran_with_sparse(rows, spike, x, dirty, col_surv, count_l, e_l);
+        }
         let mut touched = FtranTouched::new(m, u_dense, dirty.unwrap_or_default());
         let mut inp = std::mem::take(&mut old.col_in);
         inp.clear();
@@ -2893,6 +2910,273 @@ impl<R: Real> DualFactor<R> {
             spike.sort_unstable_by_key(|e| e.0);
         }
         // The column replacement does not receive the residues.
+        spike.retain(|e| e.1.abs() > R::c(TOL));
+        self.spike = spike;
+        self.spike_used = false;
+        self.last_alpha = out.len();
+        out
+    }
+
+    /// The sparse-list U stage of `ftran_with` (`u_dense` false, no `bsolve` dump): the reference's `0x1223e0` and the tail of its joint routine.
+    /// `x` holds the L-stage list `spike` scattered over a cleared vector (`dirty` lists the blocks the previous column left nonzero).
+    ///
+    /// The tail columns are visited in descending slot order, the order of the output and of every update. Where the dense gate of
+    /// `uorder_open` holds (the reference sweeps, `12c6fa`/`12c804`/`1225df`) all tail slots are swept, a slot holding zero costing a test;
+    /// otherwise the reached slots come from a max-heap of slots filled by the scatters themselves, which abandons itself for a sweep of the
+    /// remaining slots once the heap is dense in its range (the reference's `6.0 * size > top - loff` at `1228c1`). A column holding zero
+    /// scatters nothing, so which of the two walks visits it is not observable: same updates in the same order as the closure walk of
+    /// `uorder_open` (`ftran_with_prev` in `ordering_old`), and no closure, key sort or tail list.
+    ///
+    /// The output is the singletons in input order, the surviving tail columns, the nucleus positions (in nucleus-list order when the
+    /// reference lists the whole nucleus, in discovery order otherwise) and the other touched positions in ascending position.
+    #[allow(clippy::too_many_arguments)]
+    fn ftran_with_sparse(
+        &mut self,
+        rows: &[usize],
+        spike: Vec<(usize, R)>,
+        mut x: Vec<R>,
+        dirty: Option<Vec<usize>>,
+        mut col_surv: Vec<usize>,
+        count_l: Option<usize>,
+        e_l: f64,
+    ) -> Vec<(usize, R)> {
+        let (m, i21, i3) = (self.m, self.i21, self.nuc.len());
+        let tol = R::c(TOL);
+        let mut inp = std::mem::take(&mut self.f2.get_mut().col_in);
+        inp.clear();
+        inp.extend(spike.iter().map(|e| e.0));
+        let mut touched = FtranTouched::new(m, false, dirty.unwrap_or_default());
+        let mut order_scratch = self.btran_ws.order.borrow_mut();
+        let btran_ws::Order { heap, bits, tri, ns, .. } = &mut *order_scratch;
+        let (mut sa, mut sb, mut su) = (0usize, 0usize, 0usize);
+        let sweep_all;
+        let nuc_in;
+        {
+            let FtranTouched::Sparse { words, occupied } = &mut touched else { unreachable!() };
+            let (diag, uc, kind, slot, at, ab) = (&self.diag[..], &self.uc[..], &self.kind[..], &self.slot[..], &self.at[..], &self.ab);
+            // Mark the L-stage positions (a repeated position counts once) and count them by class; the tail ones seed the heap.
+            let (mut n, mut nuc_n) = (0usize, 0usize);
+            tri.clear();
+            for &p in &inp {
+                let word = &mut words[p / 64];
+                if *word == 0 {
+                    occupied.push(p / 64);
+                }
+                let bit = 1u64 << (p % 64);
+                if *word & bit != 0 {
+                    continue;
+                }
+                *word |= bit;
+                n += 1;
+                match kind[p] {
+                    -1 => {}
+                    -2 => tri.push(slot[p]),
+                    _ => nuc_n += 1,
+                }
+            }
+            nuc_in = nuc_n;
+            let d2 = self.dens;
+            sweep_all = (m as f64) <= (n as f64) * d2 || d2 * ((nuc_n + tri.len()) as f64) > (i3 + (m - i21)) as f64;
+            // One tail column: the quotient alone is tested (the sparse routine), a zero slot is stored as +0.0; `$mark` records a scatter target.
+            macro_rules! solve_column {
+                ($c:expr, |$j:ident| $mark:block) => {{
+                    let c = $c;
+                    let xr = x[c];
+                    if xr == R::ZERO {
+                        x[c] = R::ZERO;
+                    } else {
+                        let xc = xr / diag[c];
+                        if xc.abs() <= tol {
+                            x[c] = R::ZERO;
+                        } else {
+                            x[c] = xc;
+                            col_surv.push(c);
+                            let (na, nb) = ab.counts(c);
+                            sa += na;
+                            sb += nb;
+                            let col = &uc[c];
+                            su += col.len();
+                            for &($j, v) in col {
+                                x[$j] -= v * xc;
+                                $mark
+                            }
+                        }
+                    }
+                }};
+            }
+            macro_rules! mark {
+                ($j:ident) => {{
+                    let word = &mut words[$j / 64];
+                    if *word == 0 {
+                        occupied.push($j / 64);
+                    }
+                    *word |= 1u64 << ($j % 64);
+                }};
+            }
+            col_surv.clear();
+            #[cfg(test)]
+            SPARSE_ROUTES.with(|r| {
+                let mut v = r.get();
+                v[0] += 1;
+                v[1] += usize::from(sweep_all);
+                r.set(v);
+            });
+            let mut top = i21;
+            if sweep_all {
+                for t in (i21..m).rev() {
+                    solve_column!(at[t], |j| { mark!(j) });
+                }
+            } else {
+                heap.clear();
+                heap.extend(tri.iter().copied());
+                while let Some(&t) = heap.peek() {
+                    if heap.len() > 1 && t - i21 < SWEEP_RATIO * heap.len() {
+                        top = t + 1;
+                        #[cfg(test)]
+                        SPARSE_ROUTES.with(|r| {
+                            let mut v = r.get();
+                            v[3] += 1;
+                            r.set(v);
+                        });
+                        break;
+                    }
+                    heap.pop();
+                    solve_column!(at[t], |j| {
+                        let word = &mut words[j / 64];
+                        if *word == 0 {
+                            occupied.push(j / 64);
+                        }
+                        let bit = 1u64 << (j % 64);
+                        if *word & bit == 0 {
+                            *word |= bit;
+                            if kind[j] == -2 {
+                                heap.push(slot[j]);
+                            }
+                        }
+                    });
+                }
+                #[cfg(test)]
+                if top == i21 {
+                    SPARSE_ROUTES.with(|r| {
+                        let mut v = r.get();
+                        v[2] += 1;
+                        r.set(v);
+                    });
+                }
+                heap.clear();
+                for t in (i21..top).rev() {
+                    solve_column!(at[t], |j| { mark!(j) });
+                }
+            }
+        }
+        // Invariant (P4-2): the nonzero tail slots are exactly the processed survivors (`col_surv`).
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        assert_eq!(
+            (self.i21..m).filter(|&s| x[self.at[s]] != R::ZERO).count(),
+            col_surv.len(),
+            "ftran_with: nonzero tail slots differ from the processed survivors"
+        );
+        touched.finish();
+        // The nucleus positions come out in nucleus-list order when the reference lists the whole nucleus (the dense gate, or the survivors'
+        // B lists reach more than 0.4 of it), otherwise in discovery order.
+        let sorted_nuc = sweep_all || (nuc_in + sb) as f64 * 2.5 > i3 as f64;
+        #[cfg(test)]
+        SPARSE_ROUTES.with(|r| {
+            let mut v = r.get();
+            v[if sorted_nuc { 4 } else { 5 }] += 1;
+            r.set(v);
+        });
+        ns.clear();
+        {
+            let (kind, diag) = (&self.kind[..], &self.diag[..]);
+            touched.for_each(|p| {
+                if kind[p] != -2 {
+                    let v = x[p] / diag[p];
+                    let w = if v.abs() <= tol { R::ZERO } else { v };
+                    x[p] = w;
+                    if sorted_nuc && kind[p] >= 0 && w != R::ZERO {
+                        ns.push(p);
+                    }
+                }
+            });
+        }
+        let vec_dense = rows.len() * self.dthr > m
+            || self.lev_dense_ft
+            || (!self.etas.is_empty() && Self::count_dense(count_l, self.dthr, m));
+        debug_assert!(
+            !(vec_dense || !(self.nuc.len() + spike.len() < self.i21 || self.dens * (spike.len() as f64) < 2.0 * m as f64)),
+            "the sparse U route has a sparse result"
+        );
+        let u_cnt = if vec_dense { None } else { Some(spike.len()) };
+        let u_est = self.u_work(&inp, &x, true, u_cnt, &Surv { list: &col_surv, n: col_surv.len(), sa, sb, su });
+        #[cfg(test)]
+        assert_eq!(u_est.to_bits(), self.u_work_ref(&inp, &x, true, u_cnt).to_bits(), "u_work");
+        self.work = u_est + e_l;
+        self.work_parts = (e_l, u_est);
+        self.last_dense = false;
+        self.last_ordered = false;
+        let mut scratch = std::mem::take(&mut self.f2.get_mut().out_scr);
+        scratch.clear();
+        {
+            let kind = &self.kind[..];
+            for &p in &inp {
+                if kind[p] == -1 && touched.take_sparse(p) && x[p] != R::ZERO {
+                    scratch.push((p, x[p]));
+                }
+            }
+            for &c in &col_surv {
+                let marked = touched.take_sparse(c);
+                debug_assert!(marked, "a surviving tail column was never marked");
+                scratch.push((c, x[c]));
+            }
+            if sorted_nuc {
+                Self::sort_distinct_keys(bits, ns, i3, false, |p| kind[p] as usize, |k| self.nuc[k]);
+                for &p in ns.iter() {
+                    touched.take_sparse(p);
+                    scratch.push((p, x[p]));
+                }
+            } else {
+                for &p in &inp {
+                    if kind[p] >= 0 && touched.take_sparse(p) && x[p] != R::ZERO {
+                        scratch.push((p, x[p]));
+                    }
+                }
+                for &c in &col_surv {
+                    for &y in self.ab.b(c) {
+                        let y = y as usize;
+                        if touched.take_sparse(y) && x[y] != R::ZERO {
+                            scratch.push((y, x[y]));
+                        }
+                    }
+                }
+            }
+            touched.for_each(|p| {
+                if x[p] != R::ZERO {
+                    scratch.push((p, x[p]));
+                }
+            });
+        }
+        drop(order_scratch);
+        // The result is handed out with its exact length; the scratch keeps its capacity for the next call.
+        let out = scratch.clone();
+        scratch.clear();
+        let FtranTouched::Sparse { occupied, .. } = touched else { unreachable!() };
+        *self.f2.get_mut() = F2 {
+            col_n: u_cnt,
+            col_in: inp,
+            x_col: x,
+            dirty_blocks: Some(occupied),
+            col_surv,
+            col_sa: sa,
+            col_sb: sb,
+            out_scr: scratch,
+            ..F2::<R>::default()
+        };
+        // The column replacement receives the spike in L-stage order after a sparse solve (ascending after a dense L-stage vector).
+        let mut spike = spike;
+        if vec_dense {
+            spike.sort_unstable_by_key(|e| e.0);
+        }
         spike.retain(|e| e.1.abs() > R::c(TOL));
         self.spike = spike;
         self.spike_used = false;
@@ -4786,6 +5070,7 @@ impl<R: Real> DualFactor<R> {
         if self.bt_occupied && !newdiag.to_f64().is_normal() {
             self.bt_occupied = false;
         }
+        self.bad_diag |= !(newdiag.abs() > R::ZERO);
         self.diag[r] = newdiag;
         let mut col = std::mem::take(&mut scratch.spare_col);
         col.clear();

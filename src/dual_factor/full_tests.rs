@@ -2,7 +2,12 @@
 //! scratch, no normalizing pass over the dense L-stage vector) against the frozen ones of the stack before it (`ftran_with_old`): output
 //! order and bits, WORK, the spike, the F2 state (column snapshot, dirty blocks, survivors) and the second vector of the pair, over random
 //! factors and update sequences. Repeated calls on the same factors catch stale scratch.
-use super::handoff_tests::{all_bits, assert_same, bits};
+use super::handoff_tests::{all_bits, assert_same_with, bits};
+
+/// The dirty blocks of the sparse U stage are a subset of the older ones (P6-4), so they are compared by coverage.
+fn assert_same<R: Real>(a: &mut DualFactor<R>, b: &mut DualFactor<R>, what: &str) {
+    assert_same_with(a, b, what, false);
+}
 use super::*;
 
 fn run<R: Real>(seeds: &[u64], vals_pool: &[f64]) -> (usize, usize) {

@@ -393,6 +393,7 @@ impl<R: Real> DualFactor<R> {
             bt_work: None,
             lev_built,
             diag: st.diag.clone(),
+            bad_diag: st.diag.iter().any(|d| !(d.abs() > R::ZERO)),
             uc,
             spike: Vec::new(),
             update_values: Vec::new(),
