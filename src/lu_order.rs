@@ -2302,8 +2302,11 @@ mod flat_structure_tests {
                 }
                 let mut rows = if a == b { vec![a] } else { vec![a, b] };
                 if kind == 3 {
-                    rows.push(rng.below(m));
-                    rows.dedup();
+                    // A column holds each row at most once (`dedup` would keep a non-adjacent repeat).
+                    let r = rng.below(m);
+                    if !rows.contains(&r) {
+                        rows.push(r);
+                    }
                 }
                 let vals = rows.iter().map(|_| (1 + rng.below(3)) as f64 * if rng.below(2) == 0 { 0.5 } else { -2.0 }).collect();
                 cols.push((false, rows, vals));
