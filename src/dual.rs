@@ -1477,6 +1477,16 @@ struct Dual<'a, R: Real = f64> {
     last_cap: usize,
     /// The duals `y = B^-T c_B` of the last recompute.
     last_y: Vec<R>,
+    /// Retained scratch of the refactor-time passes (no per-refactor allocation): the weights by variable (all zero between uses), the nonzero rows and values of
+    /// the x_B right-hand side, the double copy of `last_y`, the nonbasic structural values of the last x_B recompute.
+    scr_wv: Vec<R>,
+    scr_rows: Vec<usize>,
+    scr_vals: Vec<R>,
+    scr_ydbl: Vec<f64>,
+    scr_nbv: Vec<f64>,
+    /// `rrows` is the set of the nonbasic, non-fixed structurals as the pivots keep it (false after a handoff list or an in-place repair, which change the
+    /// set without the row copy).
+    rrows_exact: bool,
     /// The factorization count the pass started from (`ctx+0x2c0` counts from there).
     fac0: usize,
     /// `ctx+0x2c0` at the start of the pass (`Carry::nref0`), and the factorizations that `refactorizations` counts but `ctx+0x2c0` does not (the failed one of the in-place repair:
@@ -2071,6 +2081,7 @@ impl<'a, R: Real> Dual<'a, R> {
             }
             // The repair retains the pending request: in particular, a request-4
             // confirmation still runs its residual-scale feasibility test.
+            self.rrows_exact = false;
             self.refactorizations += 1;
             self.nref_skip += 1;
             // The failure counts as one more retry (`ctx+0x184` 5 -> 6 at `0xf5921`, fx_midsing_1390): later pivot mismatches on a fresh factor end the run.
@@ -2119,7 +2130,9 @@ impl<'a, R: Real> Dual<'a, R> {
             }
         }
         let mi = mi.unwrap();
-        let mut wv = vec![R::ZERO; self.n + self.m];
+        // The weights by variable on a retained buffer (all zero between uses).
+        let mut wv = std::mem::take(&mut self.scr_wv);
+        wv.resize(self.n + self.m, R::ZERO);
         for (pos, &v) in self.head.iter().enumerate() {
             wv[v] = self.w[pos];
         }
@@ -2127,6 +2140,10 @@ impl<'a, R: Real> Dual<'a, R> {
             self.st[v] = pos as i32;
             self.w[pos] = wv[v];
         }
+        for &v in &self.head {
+            wv[v] = R::ZERO;
+        }
+        self.scr_wv = wv;
         self.head = order;
         self.reset_pricing(&st, rows.view());
         std::mem::replace(&mut self.mirror, mi).recycle();
@@ -2312,6 +2329,18 @@ impl<'a, R: Real> Dual<'a, R> {
             }
         }
         self.rrows = FlatRows::from_rows(&rows, self.n);
+        // `rrows` takes the first entry of a repeated (row, column) pair for every copy, `p.rwise` keeps each entry's own
+        // value: with a repeated row in any structural column the single-pass d could differ, so keep the full path.
+        let mut seen = vec![usize::MAX; self.m];
+        'cols: for j in 0..self.n {
+            for &(i, _) in &self.p.cols[j] {
+                if seen[i] == j {
+                    self.rrows_exact = false;
+                    break 'cols;
+                }
+                seen[i] = j;
+            }
+        }
     }
 
     // ------------------------------------------------------------------ basic solution
@@ -2326,9 +2355,16 @@ impl<'a, R: Real> Dual<'a, R> {
         let mut r: Vec<R> = p.rhs.iter().map(|&v| R::c(v)).collect();
         // Entries of the structural nonbasic columns at a nonzero value (the read-out below, `0xc142b`), counted in the same pass.
         let mut cols = 0usize;
+        // The nonbasic structural values, computed once here and read again by the objective sum below.
+        let mut nbv = std::mem::take(&mut self.scr_nbv);
+        nbv.clear();
+        nbv.resize(p.n, 0.0);
         for j in 0..p.n + p.m {
             if self.st[j] < 0 {
                 let v = self.nonbasic_value(j);
+                if j < p.n {
+                    nbv[j] = v;
+                }
                 if v != 0.0 {
                     if j < p.n {
                         cols += p.cols[j].len();
@@ -2348,27 +2384,39 @@ impl<'a, R: Real> Dual<'a, R> {
             4.0 * p.m as f64 + 2.0 * cols as f64,
             crate::work::CTX,
         );
-        let rows: Vec<usize> = (0..p.m).filter(|&i| r[i] != R::ZERO).collect();
-        let vals: Vec<R> = rows.iter().map(|&i| r[i]).collect();
+        let mut rows = std::mem::take(&mut self.scr_rows);
+        let mut vals = std::mem::take(&mut self.scr_vals);
+        rows.clear();
+        vals.clear();
+        for i in 0..p.m {
+            if r[i] != R::ZERO {
+                rows.push(i);
+                vals.push(r[i]);
+            }
+        }
         let out = self.mirror.ftran_basic(&rows, &vals);
-        let mut xb = vec![R::ZERO; p.m];
+        self.scr_rows = rows;
+        self.scr_vals = vals;
+        let mut xb = std::mem::take(&mut self.xb);
+        xb.clear();
+        xb.resize(p.m, R::ZERO);
         for (i, v) in out {
             xb[i] = v;
-        }
-        // The reference forms B*x_B from zero first, then subtracts it from the
-        // right-hand side (`0x115d60`, `0xc1480`); subtracting each term from
-        // the right-hand side directly can change the residual and its gate.
-        let mut product = vec![R::ZERO; p.m];
-        for (pos, &j) in self.head.iter().enumerate() {
-            for &(i, a) in &p.cols[j] {
-                product[i] += R::c(a) * xb[pos];
-            }
         }
         // `0xc10ab..0xc1129`, `0xc1480..0xc1517`: R = max(1e-9, max|rhs|), the largest |x_B| and the residual of B x_B against the rhs, both relative to R;
         // the residual is read only when the factorization count is 4 mod 5 or the request is 4, 6 or 8 (`0xc1137..0xc11ce`, `0xc165b..0xc1699`).
         let rmax = r.iter().fold(R::c(1e-9), |a, v| a.max(v.abs()));
         let xmax = xb.iter().fold(R::ZERO, |a, v| a.max(v.abs()));
         let e2 = if self.nref() % 5 == 4 || matches!(req, 4 | 6 | 8) {
+            // The reference forms B*x_B from zero first, then subtracts it from the
+            // right-hand side (`0x115d60`, `0xc1480`); subtracting each term from
+            // the right-hand side directly can change the residual and its gate.
+            let mut product = vec![R::ZERO; p.m];
+            for (pos, &j) in self.head.iter().enumerate() {
+                for &(i, a) in &p.cols[j] {
+                    product[i] += R::c(a) * xb[pos];
+                }
+            }
             let residual = r
                 .iter()
                 .zip(&product)
@@ -2470,7 +2518,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 let x = if self.st[j] >= 0 {
                     self.xb[self.st[j] as usize]
                 } else {
-                    R::c(self.nonbasic_value(j))
+                    R::c(nbv[j])
                 };
                 sum += x * (R::c(self.cost[j]) + R::c(self.cost_lo[j]));
             }
@@ -2491,7 +2539,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 let x = if self.st[j] >= 0 {
                     self.xb[self.st[j] as usize].to_f64()
                 } else {
-                    self.nonbasic_value(j)
+                    nbv[j]
                 };
                 sum += x * self.cost[j];
             }
@@ -2504,6 +2552,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 );
             }
         }
+        self.scr_nbv = nbv;
         self.drift_status |= tol_abort;
         Ok(())
     }
@@ -2546,10 +2595,34 @@ impl<'a, R: Real> Dual<'a, R> {
     fn recompute_d(&mut self) {
         // The d of the forced-row stack entries survive the recompute (`0xe53a7..0xe5400` save, `0xe57a8..` restore).
         let saved: Vec<(usize, R)> = self.forced.iter().map(|&v| (v, self.d[v])).collect();
-        let dt = self.true_d();
+        self.btran_y();
         self.dual_residual_check();
         self.work
             .add_from(0x12de50, 0xe53a7, self.mirror.work(), crate::work::FAC);
+        if self.rrows_exact {
+            self.assign_d_single_pass();
+            #[cfg(any(debug_assertions, feature = "factor-shadow"))]
+            {
+                let want = self.d_from_full_product(&saved);
+                for (v, dv) in saved {
+                    self.d[v] = dv;
+                }
+                for j in 0..self.n + self.m {
+                    assert!(
+                        want[j].json().to_string() == self.d[j].json().to_string(),
+                        "single-pass d differs at {j}: {:?} against {:?}",
+                        self.d[j],
+                        want[j]
+                    );
+                }
+            }
+            #[cfg(not(any(debug_assertions, feature = "factor-shadow")))]
+            for (v, dv) in saved {
+                self.d[v] = dv;
+            }
+            return;
+        }
+        let dt = true_d_rowwise(self.p, &self.st, &self.cost, &self.cost_lo, &self.last_y);
         for j in 0..self.n + self.m {
             if self.st[j] == FIXED {
                 if j < self.n {
@@ -2568,6 +2641,68 @@ impl<'a, R: Real> Dual<'a, R> {
         for (v, dv) in saved {
             self.d[v] = dv;
         }
+    }
+
+    /// The final d of `recompute_d` in one pass over the nonbasic non-fixed structurals' row copy `rrows` (the reference's list `ctx+0x1d0`): every d_j starts
+    /// from its cost (nonbasic) or zero (basic), receives `- y_i a_ij` row by row in ascending row order as `true_d_rowwise` does, and a variable at its upper
+    /// bound ends as `-(c - y a)`. The entries the full product visits and `recompute_d` then discards (the basic and fixed structurals) are not visited: the
+    /// fixed ones end at their cost, the basic ones at zero. The slack of row `i` is its single entry, subtracted in its row.
+    fn assign_d_single_pass(&mut self) {
+        let (n, m) = (self.n, self.m);
+        for j in 0..n + m {
+            self.d[j] = if self.st[j] < 0 {
+                R::c(self.cost[j]) + R::c(self.cost_lo[j])
+            } else {
+                R::ZERO
+            };
+        }
+        let drop = R::c(DROP_TOL);
+        for i in 0..m {
+            let yi = self.last_y[i];
+            if yi.abs() > drop {
+                let (idx, val) = self.rrows.row(i);
+                for (&j, &a) in idx.iter().zip(val) {
+                    let j = j as usize;
+                    if self.st[j] < 0 && self.st[j] != FIXED {
+                        self.d[j] -= yi * R::c(a);
+                    }
+                }
+                if self.st[n + i] < 0 {
+                    let a = self.p.cols[n + i][0].1;
+                    self.d[n + i] -= yi * R::c(a);
+                }
+            }
+        }
+        for j in 0..n + m {
+            if self.st[j] == UB {
+                self.d[j] = -self.d[j];
+            }
+        }
+    }
+
+    /// The full product and the assignment loop of `recompute_d` as they were before the single pass (reference for the debug and shadow check); the d of the forced rows
+    /// is not restored.
+    #[cfg(any(debug_assertions, feature = "factor-shadow"))]
+    fn d_from_full_product(&self, saved: &[(usize, R)]) -> Vec<R> {
+        let dt = true_d_rowwise(self.p, &self.st, &self.cost, &self.cost_lo, &self.last_y);
+        let mut d = vec![R::ZERO; self.n + self.m];
+        for j in 0..self.n + self.m {
+            d[j] = if self.st[j] == FIXED {
+                if j < self.n {
+                    R::c(self.cost[j]) + R::c(self.cost_lo[j])
+                } else {
+                    dt[j]
+                }
+            } else if self.st[j] < 0 {
+                if self.st[j] == UB { -dt[j] } else { dt[j] }
+            } else {
+                R::ZERO
+            };
+        }
+        for &(v, dv) in saved {
+            d[v] = dv;
+        }
+        d
     }
 
     /// The log timer of the wrapper (`0xf9306..0xf6e13`): on a fresh factor with no request pending, the first time the total iteration count is 100 past the last
@@ -2621,8 +2756,15 @@ impl<'a, R: Real> Dual<'a, R> {
         }
         let mut primal_sum = 0.0;
         let ptol = R::c(primal_tol());
+        // The second sum (artificial upper bounds with a positive d, level != 0) shares the pass: the two conditions are disjoint (basic against nonbasic), the
+        // accumulators independent, each in ascending j order.
+        let tol = R::c(dual_tol());
+        let mut sum = R::ZERO;
         for j in 0..self.n + self.m {
             if self.st[j] < 0 {
+                if self.level != 0 && self.st[j] == UB && self.p.up[j] >= BIG && self.d[j] > tol {
+                    sum = sum + self.d[j];
+                }
                 continue;
             }
             let x = self.xb[self.st[j] as usize];
@@ -2649,15 +2791,6 @@ impl<'a, R: Real> Dual<'a, R> {
                 records.push((R::QUAD, self.iters, self.it0, primal_sum));
             }
         });
-        let tol = R::c(dual_tol());
-        let mut sum = R::ZERO;
-        if self.level != 0 {
-            for j in 0..self.n + self.m {
-                if self.st[j] == UB && self.p.up[j] >= BIG && self.d[j] > tol {
-                    sum = sum + self.d[j];
-                }
-            }
-        }
         set_dual_infeas_sum(sum.to_f64());
     }
 
@@ -2669,11 +2802,11 @@ impl<'a, R: Real> Dual<'a, R> {
             return;
         }
         let mut meas = R::ZERO;
-        let y_double: Vec<f64> = if R::QUAD {
-            Vec::new()
-        } else {
-            self.last_y.iter().map(|v| v.to_f64()).collect()
-        };
+        let mut y_double = std::mem::take(&mut self.scr_ydbl);
+        y_double.clear();
+        if !R::QUAD {
+            y_double.extend(self.last_y.iter().map(|v| v.to_f64()));
+        }
         for &j in &self.head {
             // The kernel of `0xe59a1..0xe5bd9`: the cost (with the shift), minus the column products, sequentially below 8 entries past the alignment peel, else the eight-lane
             // body of the read-out kernel (fx_midsing_1127: 165.177734375 against 142.407).
@@ -2706,6 +2839,7 @@ impl<'a, R: Real> Dual<'a, R> {
             };
             meas = maxr(meas, acc.abs());
         }
+        self.scr_ydbl = y_double;
         let tol = dual_tol();
         if crate::dump::on("dualtol") {
             crate::dump::emit(
@@ -2727,6 +2861,12 @@ impl<'a, R: Real> Dual<'a, R> {
     /// d from the costs (`d_j = c_j - y a_j`, in the true frame) with y = B^-T c_B from the reference BTRAN; the terms are subtracted row by row in
     /// ascending row order, as the reference's row-wise product `0x136b00` does (rows with |y| <= 1e-13 are skipped).
     fn true_d(&mut self) -> Vec<R> {
+        self.btran_y();
+        true_d_rowwise(self.p, &self.st, &self.cost, &self.cost_lo, &self.last_y)
+    }
+
+    /// `y = B^-T c_B` of the reference BTRAN into `last_y` (the right-hand side takes the forced-row stack into account).
+    fn btran_y(&mut self) {
         let p = self.p;
         let mut inp: Vec<(usize, R)> = self
             .head
@@ -2759,12 +2899,13 @@ impl<'a, R: Real> Dual<'a, R> {
                 serde_json::json!({"refactor": self.refactorizations, "iter": self.iters, "out": crate::dump::sparse_r(&out)}),
             );
         }
-        let mut y = vec![R::ZERO; p.m];
+        let mut y = std::mem::take(&mut self.last_y);
+        y.clear();
+        y.resize(p.m, R::ZERO);
         for &(i, v) in out.iter() {
             y[i] = v;
         }
-        self.last_y = y.clone();
-        true_d_rowwise(p, &self.st, &self.cost, &self.cost_lo, &y)
+        self.last_y = y;
     }
 
     // ------------------------------------------------------------------ pricing object
@@ -5296,9 +5437,10 @@ impl<'a, R: Real> Dual<'a, R> {
         if self.request == 1 || (self.request == 4 && !R::QUAD && self.level != 0) {
             return;
         }
+        // `add_shift_q` and `raise_pert` leave the dual tolerance alone.
+        let tol = R::c(dual_tol());
         for j in 0..self.n + self.m {
             let d = self.d[j];
-            let tol = R::c(dual_tol());
             let shift = if self.st[j] == LB {
                 (d < -tol).then_some(-d)
             } else if self.st[j] == UB {
@@ -6832,6 +6974,12 @@ fn solve_pass_callback<R: Real>(
         avg_touch: carry.avg_touch,
         last_cap: carry.last_cap,
         last_y: Vec::new(),
+        scr_wv: Vec::new(),
+        scr_rows: Vec::new(),
+        scr_vals: Vec::new(),
+        scr_ydbl: Vec::new(),
+        scr_nbv: Vec::new(),
+        rrows_exact: true,
         fac0: carry.fac,
         nref0: carry.nref0,
         nref_skip: 0,
@@ -6966,6 +7114,7 @@ fn solve_pass_callback<R: Real>(
             })
             .collect();
         s.rrows = FlatRows::from_rows(&rows, n);
+        s.rrows_exact = false;
     }
     if let Some(dy) = &dstart_d {
         // Basic variables keep their d (the forced rows read it); the recompute below takes y from c_B minus the d of the stack entries.
@@ -8383,6 +8532,12 @@ mod captured_bh305_ratio {
             avg_touch: 0.0,
             last_cap: 0,
             last_y: Vec::new(),
+            scr_wv: Vec::new(),
+            scr_rows: Vec::new(),
+            scr_vals: Vec::new(),
+            scr_ydbl: Vec::new(),
+            scr_nbv: Vec::new(),
+            rrows_exact: true,
             fac0: 0,
             nref0: 0,
             nref_skip: 0,
