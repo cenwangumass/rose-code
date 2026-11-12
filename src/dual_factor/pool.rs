@@ -107,29 +107,37 @@ impl<R: Copy> Csr<R> {
     }
 }
 
-/// `x[y] -= a * xv` for the entries `(idx[k], val[k])` in order, four per iteration (the updates stay sequential, so repeated
-/// destinations and the rounding are those of the plain loop).
+/// `x[y] -= a * xv` for the entries `(idx[k], val[k])` in order, four per iteration and a 0-3 entry tail (the updates stay
+/// sequential, so repeated destinations and the rounding are those of the plain loop).
 ///
 /// # Safety
 /// Every `idx[k] as usize` is `< x.len()`.
 #[inline(always)]
 unsafe fn sub_column<R: Real>(x: &mut [R], idx: &[u32], val: &[R], xv: R) {
     let n = idx.len().min(val.len());
-    let (idx, val) = (&idx[..n], &val[..n]);
-    let (di, ri) = (idx.chunks_exact(4), idx.chunks_exact(4).remainder());
-    let (dv, rv) = (val.chunks_exact(4), val.chunks_exact(4).remainder());
-    for (y, a) in di.zip(dv) {
-        // SAFETY: the caller guarantees every destination is in range.
-        unsafe {
-            *x.get_unchecked_mut(y[0] as usize) -= a[0] * xv;
-            *x.get_unchecked_mut(y[1] as usize) -= a[1] * xv;
-            *x.get_unchecked_mut(y[2] as usize) -= a[2] * xv;
-            *x.get_unchecked_mut(y[3] as usize) -= a[3] * xv;
+    let mut k = 0;
+    // SAFETY: `k + 4 <= n <= idx.len(), val.len()` in the loop, `k + r < n` in the tail; destinations are in range (caller).
+    unsafe {
+        while k + 4 <= n {
+            *x.get_unchecked_mut(*idx.get_unchecked(k) as usize) -= *val.get_unchecked(k) * xv;
+            *x.get_unchecked_mut(*idx.get_unchecked(k + 1) as usize) -= *val.get_unchecked(k + 1) * xv;
+            *x.get_unchecked_mut(*idx.get_unchecked(k + 2) as usize) -= *val.get_unchecked(k + 2) * xv;
+            *x.get_unchecked_mut(*idx.get_unchecked(k + 3) as usize) -= *val.get_unchecked(k + 3) * xv;
+            k += 4;
         }
-    }
-    for (&y, &a) in ri.iter().zip(rv) {
-        // SAFETY: as above.
-        unsafe { *x.get_unchecked_mut(y as usize) -= a * xv };
+        match n - k {
+            3 => {
+                *x.get_unchecked_mut(*idx.get_unchecked(k) as usize) -= *val.get_unchecked(k) * xv;
+                *x.get_unchecked_mut(*idx.get_unchecked(k + 1) as usize) -= *val.get_unchecked(k + 1) * xv;
+                *x.get_unchecked_mut(*idx.get_unchecked(k + 2) as usize) -= *val.get_unchecked(k + 2) * xv;
+            }
+            2 => {
+                *x.get_unchecked_mut(*idx.get_unchecked(k) as usize) -= *val.get_unchecked(k) * xv;
+                *x.get_unchecked_mut(*idx.get_unchecked(k + 1) as usize) -= *val.get_unchecked(k + 1) * xv;
+            }
+            1 => *x.get_unchecked_mut(*idx.get_unchecked(k) as usize) -= *val.get_unchecked(k) * xv,
+            _ => {}
+        }
     }
 }
 
@@ -161,6 +169,17 @@ pub(super) fn fused_forward<R: Real>(
     loff: usize,
     count_gap: bool,
 ) -> (Option<usize>, usize) {
+    // The per-slot count is read only with `count_gap`: the other calls run the variant without it.
+    if count_gap {
+        let (c, s) = fused_forward_impl::<R, true>(l, x, n1, loff);
+        (Some(c), s)
+    } else {
+        (None, fused_forward_impl::<R, false>(l, x, n1, loff).1)
+    }
+}
+
+#[inline(always)]
+fn fused_forward_impl<R: Real, const COUNT: bool>(l: &LPool<R>, x: &mut [R], n1: usize, loff: usize) -> (usize, usize) {
     l.check_vector(x.len());
     assert!(n1 <= loff && loff <= l.lines());
     let (n1, loff) = if l.gap_is_empty(n1, loff) { (n1, loff) } else { (l.lines(), l.lines()) };
@@ -168,33 +187,64 @@ pub(super) fn fused_forward<R: Real>(
     let tol = R::c(TOL);
     let (mut count, mut len_sum) = (0usize, 0usize);
     let start = &l.start[..];
-    let mut visit = |v: usize| {
-        // SAFETY: `v < lines <= x.len()` (checked above).
-        let xv = unsafe { *x.get_unchecked(v) };
-        let a = xv.abs();
-        count += usize::from(a > tol);
-        if a <= tol {
-            return;
-        }
-        // SAFETY: `v + 1 <= lines < start.len()`.
-        let (s, e) = unsafe { (*start.get_unchecked(v) as usize, *start.get_unchecked(v + 1) as usize) };
-        len_sum += e - s;
-        // SAFETY: `s <= e <= idx.len() == val.len()` (monotone `start` ending at the entry count); destinations `< idx_bound <= x.len()`.
-        unsafe { sub_column(x, idx.get_unchecked(s..e), val.get_unchecked(s..e), xv) };
-    };
-    for v in 0..n1 {
-        visit(v);
+    // One step: `x[v]` is final when visited (destinations exceed sources); `!(abs <= tol)` (NaN included) processes the column.
+    macro_rules! visit {
+        ($v:expr) => {{
+            let v: usize = $v;
+            // SAFETY: `v < lines <= x.len()` (checked above).
+            let xv = unsafe { *x.get_unchecked(v) };
+            let a = xv.abs();
+            if COUNT {
+                count += usize::from(a > tol);
+            }
+            if !(a <= tol) {
+                // SAFETY: `v + 1 <= lines < start.len()`.
+                let (s, e) = unsafe { (*start.get_unchecked(v) as usize, *start.get_unchecked(v + 1) as usize) };
+                len_sum += e - s;
+                // SAFETY: `s <= e <= idx.len() == val.len()` (monotone `start` ending at the entry count); destinations
+                // `< idx_bound <= x.len()`.
+                unsafe { sub_column(x, idx.get_unchecked(s..e), val.get_unchecked(s..e), xv) };
+            }
+        }};
     }
-    for v in loff..l.lines() {
-        visit(v);
+    // Four slots per guard: when all four are `abs <= tol` at the read, none of them processes a column, so none of the four
+    // values changes before its turn (only a processed column writes) and the group is skipped (it adds nothing to the count);
+    // otherwise the four are visited one by one in ascending order.
+    macro_rules! range {
+        ($lo:expr, $hi:expr) => {{
+            let (mut v, hi): (usize, usize) = ($lo, $hi);
+            while v + 4 <= hi {
+                // SAFETY: `v + 3 < hi <= lines <= x.len()`.
+                let (b0, b1, b2, b3) = unsafe {
+                    (
+                        x.get_unchecked(v).abs() <= tol,
+                        x.get_unchecked(v + 1).abs() <= tol,
+                        x.get_unchecked(v + 2).abs() <= tol,
+                        x.get_unchecked(v + 3).abs() <= tol,
+                    )
+                };
+                // All four `abs <= tol`: each contributes 0 to the count too.
+                if !(b0 & b1 & b2 & b3) {
+                    visit!(v);
+                    visit!(v + 1);
+                    visit!(v + 2);
+                    visit!(v + 3);
+                }
+                v += 4;
+            }
+            while v < hi {
+                visit!(v);
+                v += 1;
+            }
+        }};
     }
-    if count_gap {
+    range!(0, n1);
+    range!(loff, l.lines());
+    if COUNT {
         // No step writes into the gap after its own turn (destinations exceed sources), and the steps after it have sources `>= loff`.
         count += x[n1..loff].iter().filter(|v| v.abs() > tol).count();
-        (Some(count), len_sum)
-    } else {
-        (None, len_sum)
     }
+    (count, len_sum)
 }
 
 /// Dense forward L sweep without a count (`!(abs <= TOL)` steps); returns the sum of the processed column lengths.
@@ -584,5 +634,50 @@ mod tests {
     #[test]
     fn restricted_sweep_matches_full_sweep_f80() {
         gap_check::<F80>(0x9e3779b97f4a7c15);
+    }
+
+    /// Columns of length 0-9 with few distinct destinations (repeats inside a column), values with NaN, -0.0 and sub-tolerance
+    /// entries, runs of small slots of every length and phase: the sweeps agree with the plain kernels bit for bit.
+    fn short_column_check<R: Real>(seed: u64) {
+        let mut rng = Rng(seed);
+        for round in 0..600 {
+            let m = 1 + rng.below(30);
+            let cols: Cols<R> = (0..m)
+                .map(|v| {
+                    let n = rng.below(10);
+                    let span = (m - v - 1).min(1 + rng.below(3));
+                    (0..n).filter_map(|_| (span > 0).then(|| (v + 1 + rng.below(span), value::<R>(&mut rng)))).collect()
+                })
+                .collect();
+            let pool = pool_of(&cols);
+            // mostly small slots, so that groups of four are skipped and partly processed
+            let x0: Vec<R> = (0..m).map(|_| if rng.below(4) == 0 { value::<R>(&mut rng) } else { R::c(if rng.below(2) == 0 { 0.0 } else { -1e-15 }) }).collect();
+            let (mut xp, mut xn) = (x0.clone(), x0.clone());
+            let (cp, sp) = plain::fused_forward(&pool, &mut xp);
+            for count_gap in [false, true] {
+                xn.copy_from_slice(&x0);
+                let (cn, sn) = fused_forward(&pool, &mut xn, 0, 0, count_gap);
+                assert!(same(&xp, &xn), "round {round}");
+                assert_eq!((cn, sn), (count_gap.then_some(cp), sp));
+            }
+            let mut xs = x0.clone();
+            assert_eq!(forward_sweep(&pool, &mut xs), sp);
+            assert!(same(&xp, &xs));
+            // the reverse sweep (any destinations) on the transpose, whose columns are the same short lengths
+            let lt = pool.transpose(m);
+            let (mut xp, mut xn) = (x0.clone(), x0.clone());
+            assert_eq!(plain::reverse_sweep(&lt, &mut xp), reverse_sweep(&lt, &mut xn));
+            assert!(same(&xp, &xn));
+        }
+    }
+
+    #[test]
+    fn short_columns_and_small_slot_runs_match_plain_f64() {
+        short_column_check::<f64>(0x1234_5678_9abc_def1);
+    }
+
+    #[test]
+    fn short_columns_and_small_slot_runs_match_plain_f80() {
+        short_column_check::<F80>(0x0fed_cba9_8765_4321);
     }
 }
