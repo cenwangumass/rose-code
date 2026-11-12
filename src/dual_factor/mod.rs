@@ -1148,6 +1148,7 @@ impl<R: Real> DualFactor<R> {
             n3 += usize::from(p == 3);
         }
         let nseq = st.loff;
+        let nsing = st.phase.iter().filter(|&&p| p != 0).count();
         let i21 = n12 + n3;
         let mut kind = vec![-1i64; m];
         let mut nuc = Vec::with_capacity(n3.min(m));
@@ -1197,107 +1198,151 @@ impl<R: Real> DualFactor<R> {
         sc.changed.resize(m, false);
         sc.epos.resize(m, usize::MAX);
         let FreshScratch { reached, changed, epos, lst } = &mut sc;
+        let mut dir: Vec<(usize, R)> = Vec::new();
         for t in i21..m {
             let c = st.pivots[t].1;
             let (_, idx, val) = &cols[c];
-            lst.clear();
-            for (&i, &v) in idx.iter().zip(val) {
-                let s = step[i];
-                if s <= t {
-                    xv[s] += R::c(v);
-                    if !reached[s] {
-                        reached[s] = true;
-                        lst.push(s);
+            // A tail column without a raw entry in a pair row (`nseq <= s < nsing`) is built directly: the raw copies of the
+            // singleton rows, the elimination's own values (`mk`) above the tolerance. The L-solve replay is needed only for
+            // the pair rows' values (and for the x87 scalar, where the rule is not established).
+            // Justification and corpus check: plans/dual-factor/K0c-result.md section 1. The release guards below fall back to the
+            // replay wherever its argument does not hold structurally: a raw entry of a singleton row whose L column reaches a
+            // step <= t (it would propagate), a raw entry in a row the replay keeps but the direct rule drops (not kind >= 0 or
+            // phase 4), and a repeated row in the column (unmerged MPS input; the replay sums the copies).
+            let mut direct = !R::QUAD && !idx.iter().any(|&i| step[i] < t && step[i] >= nseq && step[i] < nsing);
+            dir.clear();
+            if direct {
+                for (&i, &v) in idx.iter().zip(val) {
+                    let s = step[i];
+                    if s < t && s < nseq && R::c(v) != R::ZERO {
+                        if !(kind[s] >= 0 || st.phase[s] == 4) || lcolumn(s).any(|(y, _)| y <= t) {
+                            direct = false;
+                            break;
+                        }
+                        dir.push((s, R::c(v)));
                     }
                 }
             }
-            // Only the reached set is needed: the numeric solve below visits it in ascending order.
-            let mut k = 0;
-            while k < lst.len() {
-                let v = lst[k];
-                k += 1;
-                for (y, _) in lcolumn(v) {
-                    if y <= t && !reached[y] {
-                        reached[y] = true;
-                        lst.push(y);
+            if direct {
+                for &(sidx, vv) in &mk[mk_start[c]..mk_start[c + 1]] {
+                    if sidx < t && vv.abs() > R::c(TOL) {
+                        dir.push((sidx, vv));
                     }
                 }
+                dir.sort_unstable_by_key(|e| e.0);
+                if dir.windows(2).any(|w| w[0].0 == w[1].0) {
+                    direct = false;
+                }
             }
-            // The numeric solve visits the steps in ascending order, not graph-discovery order: sums that cancel to rounding
-            // noise then fall on the reference's side of the tolerance (PILOT.JA factor 45, column 925).
-            lst.sort_unstable();
-            for &v in lst.iter() {
-                if v >= t {
-                    continue;
+            if !direct || cfg!(any(debug_assertions, feature = "factor-shadow")) {
+                lst.clear();
+                for (&i, &v) in idx.iter().zip(val) {
+                    let s = step[i];
+                    if s <= t {
+                        xv[s] += R::c(v);
+                        if !reached[s] {
+                            reached[s] = true;
+                            lst.push(s);
+                        }
+                    }
                 }
-                let x = xv[v];
-                // Noise at or below the tolerance does not propagate (a cancellation residue of 1.2e-13 made PEROLD's tail
-                // column 600 carry a spurious entry).
-                if x == R::ZERO || x.abs() <= R::c(TOL) {
-                    continue;
+                // Only the reached set is needed: the numeric solve below visits it in ascending order.
+                let mut k = 0;
+                while k < lst.len() {
+                    let v = lst[k];
+                    k += 1;
+                    for (y, _) in lcolumn(v) {
+                        if y <= t && !reached[y] {
+                            reached[y] = true;
+                            lst.push(y);
+                        }
+                    }
                 }
-                for (e, (y, multiplier)) in lcolumn(v).enumerate() {
-                    if y > t {
+                // The numeric solve visits the steps in ascending order, not graph-discovery order: sums that cancel to rounding
+                // noise then fall on the reference's side of the tolerance (PILOT.JA factor 45, column 925).
+                lst.sort_unstable();
+                for &v in lst.iter() {
+                    if v >= t {
                         continue;
                     }
-                    // A singleton-phase column subtracts `(x * a) / d` with the raw entry `a`, not `x * (a / d)`; the
-                    // multiplier is the only form known for pair overrides and nucleus columns.
-                    let a = st.l_raw(v)[e];
-                    let upd = if a.is_nan() {
-                        multiplier * x
-                    } else {
-                        (x * a) / st.diag[v]
-                    };
-                    // A product at or below the tolerance does not create an entry (as in the Markowitz elimination's fill): PILOT.JA
-                    // factor 48, column 922: 9.06e-14 + 5.95e-14 would make a spurious entry of -1.5e-13 at 901.
-                    if xv[y] == R::ZERO && upd.abs() <= R::c(TOL) {
+                    let x = xv[v];
+                    // Noise at or below the tolerance does not propagate (a cancellation residue of 1.2e-13 made PEROLD's tail
+                    // column 600 carry a spurious entry).
+                    if x == R::ZERO || x.abs() <= R::c(TOL) {
                         continue;
                     }
-                    xv[y] -= upd;
-                    changed[y] = true;
-                    // A sum that cancels to the tolerance leaves the pattern, as an eliminated entry does (PILOT.JA factor 52,
-                    // column 931: -3.2e-14 left by a cancellation plus a later 8.4e-14 must not become an entry of -1.2e-13).
-                    if xv[y].abs() <= R::c(TOL) {
-                        xv[y] = R::ZERO;
+                    for (e, (y, multiplier)) in lcolumn(v).enumerate() {
+                        if y > t {
+                            continue;
+                        }
+                        // A singleton-phase column subtracts `(x * a) / d` with the raw entry `a`, not `x * (a / d)`; the
+                        // multiplier is the only form known for pair overrides and nucleus columns.
+                        let a = st.l_raw(v)[e];
+                        let upd = if a.is_nan() {
+                            multiplier * x
+                        } else {
+                            (x * a) / st.diag[v]
+                        };
+                        // A product at or below the tolerance does not create an entry (as in the Markowitz elimination's fill): PILOT.JA
+                        // factor 48, column 922: 9.06e-14 + 5.95e-14 would make a spurious entry of -1.5e-13 at 901.
+                        if xv[y] == R::ZERO && upd.abs() <= R::c(TOL) {
+                            continue;
+                        }
+                        xv[y] -= upd;
+                        changed[y] = true;
+                        // A sum that cancels to the tolerance leaves the pattern, as an eliminated entry does (PILOT.JA factor 52,
+                        // column 931: -3.2e-14 left by a cancellation plus a later 8.4e-14 must not become an entry of -1.2e-13).
+                        if xv[y].abs() <= R::c(TOL) {
+                            xv[y] = R::ZERO;
+                        }
                     }
                 }
-            }
-            ents.clear();
-            for &v in lst.iter() {
-                if v < t
-                    && (xv[v].abs() > R::c(TOL)
-                        || (!changed[v] && xv[v] != R::ZERO && (kind[v] >= 0 || st.phase[v] == 4)))
-                {
-                    ents.push((v, xv[v]));
-                }
-            }
-            for (i, e) in ents.iter().enumerate() {
-                epos[e.0] = i;
-            }
-            for &(sidx, vv) in &mk[mk_start[c]..mk_start[c + 1]] {
-                if sidx < t {
-                    if epos[sidx] != usize::MAX {
-                        ents[epos[sidx]].1 = vv;
-                    } else {
-                        epos[sidx] = ents.len();
-                        ents.push((sidx, vv));
+                ents.clear();
+                for &v in lst.iter() {
+                    if v < t
+                        && (xv[v].abs() > R::c(TOL)
+                            || (!changed[v] && xv[v] != R::ZERO && (kind[v] >= 0 || st.phase[v] == 4)))
+                    {
+                        ents.push((v, xv[v]));
                     }
                 }
+                for (i, e) in ents.iter().enumerate() {
+                    epos[e.0] = i;
+                }
+                for &(sidx, vv) in &mk[mk_start[c]..mk_start[c + 1]] {
+                    if sidx < t {
+                        if epos[sidx] != usize::MAX {
+                            ents[epos[sidx]].1 = vv;
+                        } else {
+                            epos[sidx] = ents.len();
+                            ents.push((sidx, vv));
+                        }
+                    }
+                }
+                for e in &ents {
+                    epos[e.0] = usize::MAX;
+                }
+                // A singleton-row pivot copies active entries without a magnitude test (`0xe0872`, `0xe2a14`, `0xdc546`), including tail positions.
+                // Unchanged nucleus entries are also retained (fx_e2_r25).
+                ents.retain(|e| {
+                    e.1.abs() > R::c(TOL) || (!changed[e.0] && (kind[e.0] >= 0 || st.phase[e.0] == 4))
+                });
+                for &v in lst.iter() {
+                    xv[v] = R::ZERO;
+                    reached[v] = false;
+                    changed[v] = false;
+                }
+                ents.sort_unstable_by_key(|e| e.0);
             }
-            for e in &ents {
-                epos[e.0] = usize::MAX;
+            if direct {
+                #[cfg(any(debug_assertions, feature = "factor-shadow"))]
+                assert!(
+                    dir.len() == ents.len() && dir.iter().zip(&ents).all(|(d, e)| d.0 == e.0 && d.1.to_f64().to_bits() == e.1.to_f64().to_bits()),
+                    "direct tail column {t} differs from the replay"
+                );
+                ents.clear();
+                ents.extend_from_slice(&dir);
             }
-            // A singleton-row pivot copies active entries without a magnitude test (`0xe0872`, `0xe2a14`, `0xdc546`), including tail positions.
-            // Unchanged nucleus entries are also retained (fx_e2_r25).
-            ents.retain(|e| {
-                e.1.abs() > R::c(TOL) || (!changed[e.0] && (kind[e.0] >= 0 || st.phase[e.0] == 4))
-            });
-            for &v in lst.iter() {
-                xv[v] = R::ZERO;
-                reached[v] = false;
-                changed[v] = false;
-            }
-            ents.sort_unstable_by_key(|e| e.0);
             let na = ents.iter().filter(|e| kind[e.0] == -2).count();
             let nb = ents.iter().filter(|e| kind[e.0] >= 0).count();
             sa += na;
