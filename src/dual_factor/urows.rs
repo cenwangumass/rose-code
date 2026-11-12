@@ -69,6 +69,7 @@ impl<R: Real> URows<R> {
     }
 
     /// Make room for `n` entries in total in the empty row `y` (the row must be empty).
+    #[cfg(test)]
     pub fn reserve_row(&mut self, y: usize, n: usize) {
         debug_assert!(self.span[y].len == 0);
         if n > self.span[y].cap as usize {
@@ -77,6 +78,21 @@ impl<R: Real> URows<R> {
             self.val.resize(start + n, R::ZERO);
             self.span[y] = Span { start: start as u32, len: 0, cap: n as u32 };
         }
+    }
+
+    /// Room for `caps[y]` entries in every (empty) row `y`, laid out in row order in one go: the layout `reserve_row` per row gives,
+    /// with one growth of the arrays instead of one per row. Rows with room 0 get none.
+    pub fn reserve_all(&mut self, caps: impl Iterator<Item = usize>) {
+        debug_assert!(self.col.is_empty() && self.span.iter().all(|s| s.len == 0 && s.cap == 0));
+        let mut at = 0usize;
+        for (s, n) in self.span.iter_mut().zip(caps) {
+            if n > 0 {
+                *s = Span { start: at as u32, len: 0, cap: n as u32 };
+                at += n;
+            }
+        }
+        self.col.resize(at, 0);
+        self.val.resize(at, R::ZERO);
     }
 
     /// Append `(c, v)` to row `y`; a full row moves to the end of the arrays with room to grow.
@@ -175,6 +191,42 @@ impl<R: Real> URows<R> {
                 assert!(seen.insert(c), "column {c} twice in U row {y}");
                 let u = w.iter().find(|e| e.0 == c as usize).unwrap_or_else(|| panic!("column {c} not in U row {y}")).1;
                 assert!(super::ab::same_bits(u, v), "value of column {c} in U row {y}");
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod reserve_tests {
+    use super::*;
+
+    /// `reserve_all` gives every row the span (start, cap) and the arrays the length that `reserve_row` row by row gives.
+    #[test]
+    fn reserve_all_matches_reserve_row() {
+        let mut seed = 0x2b_5e_17u64;
+        for round in 0..200 {
+            let m = 1 + round % 37;
+            let caps: Vec<usize> = (0..m)
+                .map(|_| {
+                    seed ^= seed << 13;
+                    seed ^= seed >> 7;
+                    seed ^= seed << 17;
+                    if seed % 3 == 0 { 0 } else { (seed % 9) as usize }
+                })
+                .collect();
+            let mut a = URows::<f64>::new();
+            a.reset(m);
+            for (y, &n) in caps.iter().enumerate() {
+                a.reserve_row(y, n);
+            }
+            let mut b = URows::<f64>::new();
+            b.reset(m);
+            b.reserve_all(caps.iter().copied());
+            assert_eq!(a.col.len(), b.col.len());
+            assert_eq!(a.val.len(), b.val.len());
+            for y in 0..m {
+                let (s, t) = (a.span[y], b.span[y]);
+                assert_eq!((s.start, s.len, s.cap), (t.start, t.len, t.cap), "row {y} of {caps:?}");
             }
         }
     }

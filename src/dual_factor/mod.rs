@@ -1159,13 +1159,8 @@ impl<R: Real> DualFactor<R> {
         for s in i21..m {
             kind[s] = -2;
         }
-        let mut lpool = LPool::with_capacity(m, st.l_nnz());
-        for s in 0..st.steps() {
-            lpool.push_line(st.l_rows(s).iter().zip(st.l_vals(s)).map(|(&r, &v)| (step[r], v)));
-        }
+        let (lpool, lt, l_forward) = LPool::build_with_transpose(m, st.steps(), st.l_nnz(), &step, |s| (st.l_rows(s), st.l_vals(s)));
         let lcolumn = |v: usize| lpool.iter(v);
-        let lt = lpool.transpose(m);
-        let l_forward = (0..lpool.lines()).all(|v| lpool.col(v).0.iter().all(|&y| y as usize > v));
         // Pivot-row values of the Markowitz steps by column, `(step, value)` in ascending step order: counting sort.
         let mut mk_start = vec![0usize; m + 1];
         for s in nseq..m {
@@ -1191,7 +1186,7 @@ impl<R: Real> DualFactor<R> {
         let (mut sa, mut sb) = (0usize, 0usize);
         let mut xv = vec![R::ZERO; m];
         let mut ents: Vec<(usize, R)> = Vec::new();
-        let (mut av, mut bv): (Vec<(u32, R)>, Vec<(u32, R)>) = (Vec::new(), Vec::new());
+        let mut bv: Vec<(u32, R)> = Vec::new();
         let mut sc = FRESH_SCRATCH.with(|s| s.take());
         // Invariants between columns (restored below): `reached` and `changed` all false, `epos` all MAX.
         sc.reached.resize(m, false);
@@ -1348,14 +1343,11 @@ impl<R: Real> DualFactor<R> {
             sa += na;
             sb += nb;
             // The reference lists the fresh tail column's A entries in descending order.
-            av.clear();
-            av.reserve(na);
-            av.extend(ents.iter().rev().filter(|e| kind[e.0] == -2).map(|e| (e.0 as u32, e.1)));
             bv.clear();
             bv.reserve(nb);
             bv.extend(ents.iter().filter(|e| kind[e.0] >= 0).map(|e| (e.0 as u32, e.1)));
             bv.sort_unstable_by_key(|e| std::cmp::Reverse(kind[e.0 as usize]));
-            ab.set(t, &av, &bv);
+            ab.append_fresh(t, ents.iter().rev().filter(|e| kind[e.0] == -2).map(|e| (e.0 as u32, e.1)), &bv);
             uc[t].extend_from_slice(&ents);
         }
         FRESH_SCRATCH.with(|s| s.set(sc));
@@ -1428,13 +1420,12 @@ impl<R: Real> DualFactor<R> {
             }
         }
         let u_total: usize = row_cap.iter().sum();
+        // Every U entry of a tail column is in its A or B list (kind -2 or >= 0): the member lists below are read from the rows, so an
+        // entry at a singleton-phase row (kind -1) would pass silently there. Release check, O(1).
+        assert_eq!(u_total, sa + sb, "fresh: U entry outside the A/B rows");
         // `update` appends to the rows of `urows`: nonempty rows get room for a few entries (capacity only, never visible).
         let spare = |n: usize| if n == 0 { 0 } else { n + (n >> 2) + 2 };
-        for (row, &n) in row_cap.iter().enumerate() {
-            if n > 0 {
-                urows.reserve_row(row, spare(n));
-            }
-        }
+        urows.reserve_all(row_cap.iter().map(|&n| spare(n)));
         // Filled in ascending column order; the rows are put in the reference's physical order below.
         for (c, col) in uc.iter().enumerate() {
             for &(row, v) in col {
@@ -1444,24 +1435,9 @@ impl<R: Real> DualFactor<R> {
         // A row lists its tail columns in the order of the factorization's U row (Markowitz steps), or in the order of the
         // basis columns for a row of the singleton phases.
         {
-            // member lists (the tail columns whose A or B list holds the row, ascending) as one counting-sorted array
-            let mut mem_start = vec![0usize; m + 1];
-            for t in i21..m {
-                for &y in ab.both(t) {
-                    mem_start[y as usize + 1] += 1;
-                }
-            }
-            for y in 0..m {
-                mem_start[y + 1] += mem_start[y];
-            }
-            let mut member = vec![0usize; mem_start[m]];
-            let mut next: Vec<usize> = mem_start[..m].to_vec();
-            for t in i21..m {
-                for &y in ab.both(t) {
-                    member[next[y as usize]] = t;
-                    next[y as usize] += 1;
-                }
-            }
+            // The members of a row (the tail columns whose A or B list holds it, ascending) are the columns the row holds at this
+            // point: it was filled in ascending column order from the same entries (audited by `urows.check`).
+            let mut mem: Vec<usize> = Vec::new();
             let mut pos_of_col = vec![usize::MAX; m];
             for (t, &(_, c)) in st.pivots.iter().enumerate() {
                 pos_of_col[c] = t;
@@ -1476,13 +1452,14 @@ impl<R: Real> DualFactor<R> {
             let mut stamp = vec![usize::MAX; m];
             let mut tmp: Vec<usize> = Vec::new();
             for y in 0..m {
-                let mem = &member[mem_start[y]..mem_start[y + 1]];
-                if mem.is_empty() {
+                if urows.is_empty(y) {
                     continue;
                 }
+                mem.clear();
+                mem.extend(urows.cols(y).iter().map(|&c| c as usize));
                 tmp.clear();
                 if let Some(u) = if has_urow[y / 64] >> (y % 64) & 1 == 0 { None } else { st.pair_urow.get(&y) } {
-                    for &t in mem {
+                    for &t in &mem {
                         stamp[t] = y;
                     }
                     tmp.extend(u.iter().map(|&c| pos_of_col[c]).filter(|&t| stamp[t] == y));
@@ -1493,7 +1470,7 @@ impl<R: Real> DualFactor<R> {
                     tmp.sort_unstable_by_key(|&t| st.pivots[t].1);
                     tmp.dedup();
                 } else {
-                    for &t in mem {
+                    for &t in &mem {
                         stamp[t] = y;
                     }
                     tmp.extend(st.u_row(y).iter().map(|&(c, _)| pos_of_col[c]).filter(|&t| stamp[t] == y));

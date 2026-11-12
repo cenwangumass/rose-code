@@ -118,6 +118,26 @@ impl<R: Real> AbLists<R> {
         self.b(c).iter().position(|&y| y as usize == x)
     }
 
+    /// The lists of column `c`, which is empty and has no room yet (a column `fresh` has not touched), appended at the end of the
+    /// arrays with exactly their length as room: the layout `set` gives such a column, without zero-filling the new room first.
+    pub fn append_fresh(&mut self, c: usize, a: impl Iterator<Item = (u32, R)>, b: &[(u32, R)]) {
+        debug_assert!(self.span[c].cap == 0 && self.span[c].na == 0 && self.span[c].nb == 0);
+        let start = self.idx.len();
+        for (x, v) in a {
+            self.idx.push(x);
+            self.val.push(v);
+        }
+        let na = self.idx.len() - start;
+        for &(x, v) in b {
+            self.idx.push(x);
+            self.val.push(v);
+        }
+        let n = self.idx.len() - start;
+        if n > 0 {
+            self.span[c] = Span { start: start as u32, na: na as u32, nb: (n - na) as u32, cap: n as u32 };
+        }
+    }
+
     /// Replace both lists of column `c`: in place when they fit its room, else at the end of the arrays (Rose-internal; not projected).
     pub fn set(&mut self, c: usize, a: &[(u32, R)], b: &[(u32, R)]) {
         let n = a.len() + b.len();

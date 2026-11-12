@@ -30,6 +30,7 @@ impl<R: Copy> Csr<R> {
     }
 
     /// Append the next line.
+    #[cfg(test)]
     pub fn push_line(&mut self, entries: impl Iterator<Item = (usize, R)>) {
         for (y, a) in entries {
             assert!(y < u32::MAX as usize);
@@ -39,6 +40,63 @@ impl<R: Copy> Csr<R> {
         }
         assert!(self.idx.len() <= u32::MAX as usize);
         self.start.push(self.idx.len() as u32);
+    }
+
+    /// L and its transpose from the structure's steps in one counted pass each: the copy writes the pool directly (lines of known
+    /// length, destinations relabelled through `step`) and counts the destinations on the way, the scatter then fills the transpose
+    /// (`start` is the prefix of the counts). Returns `(l, lt, forward)`; `forward` is true when every destination exceeds its source.
+    /// Same result as `push_line` per step, then `transpose(lines)`, then the `y > v` check.
+    pub fn build_with_transpose<'s>(
+        lines: usize,
+        steps: usize,
+        entries: usize,
+        step: &[usize],
+        line: impl Fn(usize) -> (&'s [usize], &'s [R]),
+    ) -> (Csr<R>, Csr<R>, bool)
+    where
+        R: 's,
+    {
+        let mut l = Csr::with_capacity(lines, entries);
+        let mut tstart = vec![0u32; lines + 1];
+        let (mut forward, mut bound) = (true, 0u32);
+        for s in 0..steps {
+            let (rows, vals) = line(s);
+            debug_assert_eq!(rows.len(), vals.len());
+            for &r in rows {
+                let y = step[r];
+                assert!(y < u32::MAX as usize);
+                bound = bound.max(y as u32 + 1);
+                forward &= y > s;
+                tstart[y + 1] += 1;
+                l.idx.push(y as u32);
+            }
+            l.val.extend_from_slice(&vals[..rows.len()]);
+            assert!(l.idx.len() <= u32::MAX as usize);
+            l.start.push(l.idx.len() as u32);
+        }
+        l.idx_bound = bound;
+        for y in 0..lines {
+            tstart[y + 1] += tstart[y];
+        }
+        let mut next: Vec<u32> = tstart[..lines].to_vec();
+        let mut idx = vec![0u32; l.idx.len()];
+        let mut val: Vec<R> = Vec::with_capacity(l.idx.len());
+        if let Some(&first) = l.val.first() {
+            val.resize(l.idx.len(), first);
+        }
+        for v in 0..l.lines() {
+            let (s, e) = (l.start[v] as usize, l.start[v + 1] as usize);
+            for k in s..e {
+                let y = l.idx[k] as usize;
+                let p = next[y] as usize;
+                next[y] += 1;
+                idx[p] = v as u32;
+                val[p] = l.val[k];
+            }
+        }
+        let idx_bound = if idx.is_empty() { 0 } else { l.lines() as u32 };
+        let lt = Csr { start: tstart, idx, val, idx_bound };
+        (l, lt, forward)
     }
 
     #[inline(always)]
@@ -77,6 +135,7 @@ impl<R: Copy> Csr<R> {
 
     /// Transpose with `lines` target lines by counting sort over the source lines in ascending order: each target line lists its
     /// sources `v` ascending (a repeated destination of one source keeps its entry order).
+    #[cfg(test)]
     pub fn transpose(&self, lines: usize) -> Csr<R> {
         let mut start = vec![0u32; lines + 1];
         for &y in &self.idx {
