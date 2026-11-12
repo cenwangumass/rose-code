@@ -106,6 +106,33 @@ The earlier single-binary host baseline in evidence/current-host.json remains
 separate from this paired solver comparison. Full frozen parity 987/987 and
 all 292 runnable release tests pass; numerical source and accepted CLI unchanged.
 
+### Dual factor FTRAN redesign stack (`4a5e881a`), two runs
+
+Same method and host as the table above (`compare_reference.py`, reconstructed libgurobi130.so sha 26a50517, medians of
+3 after 1 warmup). Commits since `93540e37`: A/B coefficient lists, dense L-to-U handoff, sparse U order without touched
+sets, numeric U row pool, needed and full U kernels, U ordering by tail sweep/heap as the reference does, pivot row
+residual and scatter, retained per-iteration scratch, L kernels. Numbers unchanged (parity 987/987 normal and shadow,
+corpus diff 0). GREENBEA dual instructions 3560.9 M -> 2747.3 M (reference 1436 M).
+
+| Row | Rose ms run 1 / run 2 | Gurobi ms run 1 / run 2 | Rose / Gurobi run 1 / run 2 | Ratio in the table above |
+|---|---:|---:|---:|---:|
+| degen2.dual-r | 36.9 / 35.7 | 18.5 / 17.2 | 1.995 / 2.079 | 2.477 |
+| degen3.dual-c | 269.5 / 254.4 | 165.0 / 151.8 | 1.634 / 1.676 | 2.393 |
+| degen3.dual-r | 266.7 / 255.6 | 163.3 / 144.2 | 1.633 / 1.773 | 2.381 |
+| perold.dual-r | 149.4 / 164.1 | 72.5 / 71.0 | 2.062 / 2.312 | 2.873 |
+| 80bau3b.dual-r | 317.9 / 319.4 | 145.8 / 140.2 | 2.181 / 2.278 | 2.907 |
+| greenbea.dual-c | 715.8 / 701.4 | 413.6 / 374.6 | 1.731 / 1.872 | 2.596 |
+| greenbea.dual-r | 696.6 / 687.3 | 358.9 / 370.2 | 1.941 / 1.857 | 2.908 |
+| mode_switch.dual-r | 739.3 / 716.2 | 223.7 / 178.3 | 3.305 / 4.017 | 3.750 |
+| primal_5959.dual-r | 148.5 / 131.9 | 105.0 / 105.5 | 1.414 / 1.251 | 1.402 |
+| quad_2717.dual-r | 146.3 / 138.6 | 120.9 / 107.4 | 1.209 / 1.291 | 1.279 |
+| fx_quad_obj_5371.dual-r | 61.3 / 55.5 | 43.6 / 45.9 | 1.406 / 1.211 | 1.371 |
+
+Family mean ratios (run 1 / run 2 vs the table above): dual 1.865 / 1.965 vs 2.394; primal 3.220 / 3.197 vs 3.207;
+barrier 2.420 / 2.264 vs 2.227; PDHG 1.202 / 1.144 vs 1.194. Primal, barrier and PDHG do not use the dual factor and are
+unchanged within run-to-run noise (up to 28% on the smallest row). Rose is slower on 23/23 rows. Evidence:
+[f4-stack7-run1.json](evidence/f4-stack7-run1.json), [f4-stack7-run2.json](evidence/f4-stack7-run2.json) (all 23 rows).
+
 ### Current optimized DEGEN2 dual stage accounting
 
 Qualified fixed39 PGO/system-TCMalloc ELF55af6617 and reconstructed reference
