@@ -1011,11 +1011,21 @@ struct PivotWs<R: Real> {
     leave_pos: Option<usize>,
     /// Result of the last call: some variable occurs twice in the returned row (a repeated slack index in `rho`), so positions are not unique.
     slack_dup: bool,
+    /// The `(start, len)` of each row of `rho` in the pool of `rrows`, found by the size pass and read again by the scatter.
+    spans: Vec<(u32, u32)>,
 }
 
 impl<R: Real> Default for PivotWs<R> {
     fn default() -> Self {
-        PivotWs { acc: Vec::new(), bits: Vec::new(), all: Vec::new(), slack_coef: Vec::new(), leave_pos: None, slack_dup: false }
+        PivotWs {
+            acc: Vec::new(),
+            bits: Vec::new(),
+            all: Vec::new(),
+            slack_coef: Vec::new(),
+            leave_pos: None,
+            slack_dup: false,
+            spans: Vec::new(),
+        }
     }
 }
 
@@ -1039,7 +1049,7 @@ fn pivot_row_ws<R: Real>(
         ws.all = Vec::with_capacity(n + m);
         ws.slack_coef = (0..m).map(|i| cols[n + i][0].1).collect();
     }
-    assert!(rrows.nv == n + m && rrows.start.len() == m && st.len() >= n + m && slack_nb.len() >= m);
+    assert!(rrows.nv == n + m && rrows.start.len() == m && st.len() >= n + m && slack_nb.len() >= m && ws.slack_coef.len() == m);
     // Local owners keep the pointers and lengths in registers across the scatter (stores through `ws` could alias them).
     let mut acc_v = std::mem::take(&mut ws.acc);
     let mut bits_v = std::mem::take(&mut ws.bits);
@@ -1049,7 +1059,16 @@ fn pivot_row_ws<R: Real>(
     let slack_coef = &ws.slack_coef[..];
     // The row product runs over the rows of `rho` unless their entries (`0x134aa0` counts them) outnumber the structurals n by 1.8 (`0xc5355`, `ctx+0x68`);
     // then it is columnwise, in index order.
-    let est: usize = rho.iter().map(|e| rrows.row_len(e.0)).sum();
+    // The size pass also checks every index of `rho` against `m` (the unchecked reads below rely on it) and keeps the row spans for the scatter.
+    let mut spans_v = std::mem::take(&mut ws.spans);
+    spans_v.clear();
+    let mut est = 0usize;
+    for e in rho {
+        let (s, l) = (rrows.start[e.0], rrows.len[e.0]);
+        debug_assert!(s as usize + l as usize <= rrows.idx.len() && rrows.idx.len() == rrows.val.len());
+        est += l as usize;
+        spans_v.push((s, l));
+    }
     let sparse = rho.len() == 1 || !((n as f64) < 1.8 * est as f64);
     all_v.clear();
     all_v.reserve(n + m);
@@ -1075,8 +1094,12 @@ fn pivot_row_ws<R: Real>(
             }
         }};
     }
-    for &(i, rv) in rho {
-        let (ix, vl) = rrows.row(i);
+    // SAFETY (the spans): `start + len <= idx.len() = val.len()` is an invariant of `FlatRows` (`check`).
+    let (idx_p, val_p) = (rrows.idx.as_ptr(), rrows.val.as_ptr());
+    for (&(_, rv), &(s, l)) in rho.iter().zip(spans_v.iter()) {
+        let (ix, vl) = unsafe {
+            (std::slice::from_raw_parts(idx_p.add(s as usize), l as usize), std::slice::from_raw_parts(val_p.add(s as usize), l as usize))
+        };
         let k = ix.len();
         let mut t = 0;
         while t + 4 <= k {
@@ -1105,16 +1128,23 @@ fn pivot_row_ws<R: Real>(
     // `s * sdir` for s = +-1 is exactly +-sdir.
     let (c_pos, c_neg) = (R::c(sdir), R::c(-sdir));
     let tol = R::c(DROP_TOL);
+    // Every entry is written through `out_p`: at most one per touched slot plus one per slack entry of `rho`, which is the reserved capacity.
     let mut out: Vec<(usize, R)> = Vec::with_capacity(all.len() + rho.len());
+    let out_p = out.as_mut_ptr();
+    let mut no = 0usize;
     let mut distinct = all.len();
     // One pass per touched slot: the kept entry is appended and the accumulator is restored to +0.0 (the slack entries below do not read it).
+    // SAFETY: every `j` is below `n + m` (see above), `acc` has `n + m` slots and `st` at least that many (asserted); `no <= all.len()` here.
     if sparse {
         for &j in all {
             let j = j as usize;
-            let v = acc[j];
-            acc[j] = R::ZERO;
-            if !filter || v.abs() > tol {
-                out.push((j, v * if st[j] == UB { c_neg } else { c_pos }));
+            unsafe {
+                let v = *acc.get_unchecked(j);
+                *acc.get_unchecked_mut(j) = R::ZERO;
+                if !filter || v.abs() > tol {
+                    out_p.add(no).write((j, v * if *st.get_unchecked(j) == UB { c_neg } else { c_pos }));
+                    no += 1;
+                }
             }
         }
     } else {
@@ -1129,41 +1159,58 @@ fn pivot_row_ws<R: Real>(
                 let j = w * 64 + word.trailing_zeros() as usize;
                 word &= word - 1;
                 distinct += 1;
-                let v = acc[j];
-                acc[j] = R::ZERO;
-                if !filter || v.abs() > tol {
-                    out.push((j, v * if st[j] == UB { c_neg } else { c_pos }));
+                // SAFETY: j < n (masked), each set bit is one entry of `all`, so `no <= all.len()`.
+                unsafe {
+                    let v = *acc.get_unchecked(j);
+                    *acc.get_unchecked_mut(j) = R::ZERO;
+                    if !filter || v.abs() > tol {
+                        out_p.add(no).write((j, v * if *st.get_unchecked(j) == UB { c_neg } else { c_pos }));
+                        no += 1;
+                    }
                 }
             }
         }
     }
-    let nst = out.len();
+    let nst = no;
     // Slack entries (their accumulators are not read: a slack touched by the scatter has been restored above).
-    // The scatter touches structurals only unless a slack is in `rrows`; a slack seen twice (or already touched) is a repeated variable of the row.
-    let (mut leave_pos, mut slack_dup) = (None, false);
+    // The scatter touches structurals only (`FlatRows` stores indices below `n`), and the rows of `rho` are distinct (a BTRAN result has one entry per row),
+    // so a slack occurs at most once in the row: `slack_dup` stays false and the leaving variable's position is that of its single entry.
+    let leave_i = leave.wrapping_sub(n);
+    let mut leave_pos = None;
+    // SAFETY: every `i` of `rho` is below `m` (size pass), `slack_nb.len() >= m`, `slack_coef.len() == m`, `st.len() >= n + m`;
+    // at most `rho.len()` slack entries follow the `all.len()` structurals.
     for &(i, rv) in rho {
-        let j = n + i;
-        if slack_nb[i] || j == leave {
-            let v = rv * R::c(slack_coef[i]);
-            let s = if st[j] == UB { c_neg } else { c_pos };
-            let (w, b) = (j >> 6, 1u64 << (j & 63));
-            if bits[w] & b != 0 {
-                slack_dup = true;
-            } else {
-                bits[w] |= b;
+        unsafe {
+            if *slack_nb.get_unchecked(i) || i == leave_i {
+                let j = n + i;
+                let v = rv * R::c(*slack_coef.get_unchecked(i));
+                let s = if *st.get_unchecked(j) == UB { c_neg } else { c_pos };
+                if i == leave_i && leave_pos.is_none() {
+                    leave_pos = Some(no);
+                }
+                out_p.add(no).write((j, v * s));
+                no += 1;
             }
-            if j == leave && leave_pos.is_none() {
-                leave_pos = Some(out.len());
-            }
-            out.push((j, v * s));
         }
     }
+    // `slack_dup` is never set: BTRAN's result holds each row once. Checked in debug and shadow builds (shadow parity runs it).
+    #[cfg(any(debug_assertions, feature = "factor-shadow"))]
+    assert!(
+        {
+            let mut seen = std::collections::HashSet::new();
+            rho.iter().all(|e| seen.insert(e.0))
+        },
+        "pivot_row_ws: repeated row index in rho"
+    );
+    // SAFETY: `no` entries were written, no <= capacity.
+    unsafe { out.set_len(no) };
     bits.fill(0);
     ws.acc = acc_v;
     ws.bits = bits_v;
     ws.all = all_v;
+    ws.spans = spans_v;
     ws.leave_pos = leave_pos;
-    ws.slack_dup = slack_dup;
+    ws.slack_dup = false;
     (out, nst, est, distinct)
 }
 
@@ -8787,18 +8834,12 @@ mod pivot_row_diff {
                     .iter()
                     .map(|&i| (i, R::c(if r.below(3) == 0 { value(&mut r) * 4.0 } else { value(&mut r) })))
                     .collect();
-                let mut rho = rho;
-                if r.below(3) == 0 {
-                    let first = rho[0];
-                    rho.push((first.0, R::c(value(&mut r))));
-                }
+                // The rows of `rho` are distinct (a BTRAN result has one entry per row), see `pivot_row_ws`.
                 let leave = n + r.below(m);
                 let above = r.below(2) == 0;
                 let want = pivot_row_ref(&rrows, &slack_nb, &st, &cols, n, m, &rho, leave, above);
                 let got = pivot_row_ws(&mut ws, &flat, &slack_nb, &st, &cols, n, m, &rho, leave, above);
-                // A repeated rho index is not a valid input of the row product (the reference keeps the last value at both entries): positions only.
-                let rho_dup = rho.len() > k.min(m);
-                assert!(rho_dup || same(&want, &got), "case {case} call {call}");
+                assert!(same(&want, &got), "case {case} call {call}");
                 // The first-match position of the leaving variable and the duplicate flag.
                 assert_eq!(ws.leave_pos, got.0.iter().position(|e| e.0 == leave), "case {case} call {call}");
                 let dup = (0..got.0.len()).any(|x| got.0[..x].iter().any(|e| e.0 == got.0[x].0));
