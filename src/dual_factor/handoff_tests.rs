@@ -2,11 +2,11 @@
 //! vector) is kept behind the `FORCE_LIST_HANDOFF` test hook and must give identical bits, orders and WORK.
 use super::*;
 
-fn bits<R: Real>(v: &[(usize, R)]) -> Vec<(usize, u64)> {
+pub(super) fn bits<R: Real>(v: &[(usize, R)]) -> Vec<(usize, u64)> {
     v.iter().map(|&(i, x)| (i, x.to_f64().to_bits())).collect()
 }
 
-fn all_bits<R: Real>(v: &[R]) -> Vec<u64> {
+pub(super) fn all_bits<R: Real>(v: &[R]) -> Vec<u64> {
     v.iter().map(|x| x.to_f64().to_bits()).collect()
 }
 
@@ -18,7 +18,7 @@ fn list_handoff<T>(on: bool, f: impl FnOnce() -> T) -> T {
 }
 
 /// Everything either path leaves behind that a later consumer reads.
-fn assert_same<R: Real>(a: &mut DualFactor<R>, b: &mut DualFactor<R>, what: &str) {
+pub(super) fn assert_same<R: Real>(a: &mut DualFactor<R>, b: &mut DualFactor<R>, what: &str) {
     assert_eq!(a.work.to_bits(), b.work.to_bits(), "{what}: work");
     assert_eq!((a.work_parts.0.to_bits(), a.work_parts.1.to_bits()), (b.work_parts.0.to_bits(), b.work_parts.1.to_bits()), "{what}: parts");
     assert_eq!((a.last_dense, a.last_ordered, a.last_alpha), (b.last_dense, b.last_ordered, b.last_alpha), "{what}: flags");

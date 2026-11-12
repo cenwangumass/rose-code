@@ -60,7 +60,16 @@ impl<R: Real> AbLists<R> {
         &self.idx[s.start as usize..(s.start + s.na) as usize]
     }
 
+    /// The A list and its coefficients, from one lookup of the column's span.
+    #[inline(always)]
+    pub fn a_pair(&self, c: usize) -> (&[u32], &[R]) {
+        let s = &self.span[c];
+        let r = s.start as usize..(s.start + s.na) as usize;
+        (&self.idx[r.clone()], &self.val[r])
+    }
+
     /// Coefficients of the A list, entry for entry.
+    #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
     #[inline(always)]
     pub fn a_val(&self, c: usize) -> &[R] {
         let s = &self.span[c];

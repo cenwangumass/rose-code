@@ -32,6 +32,10 @@ mod btran_tests;
 #[cfg(test)]
 mod handoff_tests;
 #[cfg(test)]
+mod needed_old;
+#[cfg(test)]
+mod needed_tests;
+#[cfg(test)]
 thread_local! {
     /// Dense L solves of this test thread that carried a count (the `force_dense` readers' case).
     static LIVE_COUNTS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
@@ -45,6 +49,45 @@ mod update_old;
 pub(crate) mod projection;
 #[cfg(feature = "factor-shadow")]
 pub mod shadow;
+
+/// The sums `ftran_needed` books while it finishes the tail columns (all integer-valued).
+#[derive(Default)]
+struct TailCounts {
+    /// Survivors (heap-walk booking).
+    nz: usize,
+    /// Tail-row entries of the survivors above the tolerance (dense booking).
+    abs_a: usize,
+    /// `2 len + 4` over the raw survivors of the joint dense loops, and the `len` of those whose snapshot entry is zero.
+    tp_a2: usize,
+    tp_only_a: usize,
+    /// Columns with a nonzero final value (checked against the vector in debug builds).
+    #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+    surv_nz: usize,
+}
+
+impl TailCounts {
+    /// One finished column with the nonzero final value `fin`, `na` entries in its A list and, for the joint loops, its snapshot entry.
+    #[inline(always)]
+    fn book<const JD: bool, const TD: bool, R: Real>(&mut self, na: usize, fin: R, raw: bool, col: Option<&R>) {
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        {
+            self.surv_nz += 1;
+        }
+        if TD {
+            if fin.abs() > R::c(TOL) {
+                self.abs_a += na;
+            }
+        } else {
+            self.nz += 1;
+        }
+        if JD && raw {
+            self.tp_a2 += 2 * na + 4;
+            if col.map_or(true, |v| *v == R::ZERO) {
+                self.tp_only_a += na;
+            }
+        }
+    }
+}
 
 impl<R: Real> DualFactor<R> {
     pub fn work(&self) -> f64 { self.work }
@@ -1847,7 +1890,7 @@ impl<R: Real> DualFactor<R> {
         needed: &[usize],
         dense_in: bool,
     ) -> Vec<(usize, R)> {
-        let m = self.m;
+        let (m, i21) = (self.m, self.i21);
         let (lout, count_l, e_l) = self.lstage_num(rows, vals, dense_in);
         // A dense L-stage vector is the U stage's work vector itself (it implies `tau_dense`); only its counts are needed.
         let (spike, dense_x) = match lout {
@@ -1873,41 +1916,37 @@ impl<R: Real> DualFactor<R> {
         });
         // The spike's entry count and its tail-entry count (read only where `m > h33^2 n`), before the tail loop changes `x`.
         let (spike_n, spike_t) = match &dense_x {
-            Some((x, nz)) => (
-                *nz,
-                if self.tail_count_needed(*nz) { (0..m).filter(|&p| self.kind[p] == -2 && x[p] != R::ZERO).count() } else { 0 },
-            ),
+            Some((x, nz)) => (*nz, if self.tail_count_needed(*nz) { self.tail_nonzero(x) } else { 0 }),
             None => (
                 spike.len(),
                 if self.tail_count_needed(spike.len()) { spike.iter().filter(|e| self.kind[e.0] == -2).count() } else { 0 },
             ),
         };
+        let tdense = self.tau_u_dense_nt(spike_n, spike_t);
+        let keep_tiny = !tau_dense && !joint_dense && tdense;
+        // The dense slot loop (`12403b..12405f`, and the joint loops) divides and stores every tail slot, descending, before testing the
+        // quotient, including unreachable zero slots: their signed zeros are consumed by requested rows and F2. Otherwise the reached
+        // columns are the closure of the spike's tail positions under the `a` lists, in the same descending slot order.
+        let dense_order = joint_dense || (!R::QUAD && keep_tiny);
         let mut tail: Vec<usize> = Vec::new();
-        let (mut x, mut touched) = match dense_x {
-            Some((x, _)) => (x, Vec::new()),
+        let mut x = match dense_x {
+            Some((x, _)) => x,
             None => {
                 let mut x = vec![R::ZERO; m];
-                let mut touched = vec![false; m];
                 for &(p, v) in &spike {
                     x[p] = v;
-                    touched[p] = true;
-                    if !joint_dense && self.kind[p] == -2 {
+                    if !dense_order && self.kind[p] == -2 {
                         tail.push(p);
                     }
                 }
-                (x, touched)
+                x
             }
         };
-        let keep_tiny = !tau_dense && !joint_dense && self.tau_u_dense_nt(spike_n, spike_t);
-        if joint_dense || (!R::QUAD && keep_tiny) {
-            // The ordinary dense tail loop (12403b..12405f) divides and stores
-            // every slot before testing the quotient, including unreachable zero
-            // slots. Their signed zeros are consumed by requested rows and F2.
-            tail.clear();
-            // Extra zero columns are zeroed by the joint dense kernel. Reached
-            // columns keep the same descending slot order as the symbolic walk.
-            tail.extend((self.i21..m).rev().map(|s| self.at[s]));
-        } else {
+        if !dense_order {
+            let mut touched = vec![false; m];
+            for &(p, _) in &spike {
+                touched[p] = true;
+            }
             let mut k = 0;
             while k < tail.len() {
                 let c = tail[k];
@@ -1924,79 +1963,44 @@ impl<R: Real> DualFactor<R> {
         }
         #[cfg(any(test, feature = "factor-shadow"))]
         let mut tau_raw = vec![false; m];
+        #[cfg(not(any(test, feature = "factor-shadow")))]
+        let mut tau_raw: [bool; 0] = [];
         // The U stage `0x123690` solves the tail in one of three loops: the heap walk and the sparse-row loop zero a quotient of at most the tolerance, the dense
         // slot loop (`0x12403b`: `m <= h33^2 c` or `5 h33^2 t > m - i21`, see `tau_u_work`) stores the quotient and only skips its scatter (FIT2P call 14
         // keeps a tail value of 4e-16 that enters the row dots of the nucleus positions). A dense input (`tau_dense`) zeroes it (FIT2P call 49), and so does the
         // joint dense loop (`joint_dense`, fx_e2_r25 call 6: a tail quotient of -1.8e-14 is 0 in the reference).
         //
-        // The work estimates of the U stage are booked here, where a tail column is finished (a scatter only hits lower slots, so its value
-        // is final): every term below is an integer-valued count (`len`, `2 len + 4`), hence the sums are exact and order free.
-        let tdense = self.tau_u_dense_nt(spike_n, spike_t);
-        let (mut nz, mut abs_a, mut tp_a2, mut tp_only_a) = (0usize, 0usize, 0usize, 0usize);
-        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
-        let mut surv_nz = 0usize;
-        {
+        // The work estimates of the U stage are booked in the loop, where a tail column is finished (a scatter only hits lower slots, so its value
+        // is final): every term is an integer-valued count (`len`, `2 len + 4`), hence the sums are exact and order free.
+        let counts = {
             let f2 = self.f2.borrow();
-            let x_col = &f2.x_col;
-            for &c in &tail {
-                let raw = x[c].abs() > R::c(TOL);
-                #[cfg(any(test, feature = "factor-shadow"))]
-                {
-                    tau_raw[c] = raw;
-                }
-                let xc = x[c] / self.diag[c];
-                let zeroed = joint_dense && !raw;
-                let tiny = !zeroed && xc.abs() <= R::c(TOL);
-                let fin = if zeroed {
-                    R::ZERO
-                } else if tiny {
-                    if keep_tiny {
-                        xc
-                    } else {
-                        R::ZERO
-                    }
-                } else {
-                    xc
+            let x_col = &f2.x_col[..];
+            let dense_slots = || self.at[i21..m].iter().rev().copied();
+            macro_rules! pass {
+                ($jd:literal, $kt:literal, $td:literal, $order:expr) => {
+                    self.needed_tail::<$jd, $kt, $td>(&mut x, $order, x_col, &mut tau_raw)
                 };
-                x[c] = fin;
-                if fin != R::ZERO {
-                    #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
-                    {
-                        surv_nz += 1;
-                    }
-                    if tdense {
-                        if fin.abs() > R::c(TOL) {
-                            abs_a += self.ab.na(c);
-                        }
-                    } else {
-                        nz += 1;
-                    }
-                    if joint_dense && raw {
-                        let len = self.ab.na(c);
-                        tp_a2 += 2 * len + 4;
-                        if x_col.get(c).map_or(true, |v| *v == R::ZERO) {
-                            tp_only_a += len;
-                        }
-                    }
-                }
-                if zeroed || tiny {
-                    continue;
-                }
-                // The tail targets of the column are its A list (distinct rows, so the order of the scatter is free).
-                for (&j, &v) in self.ab.a(c).iter().zip(self.ab.a_val(c)) {
-                    x[j as usize] -= v * xc;
-                }
             }
-        }
+            match (joint_dense, keep_tiny, tdense, dense_order) {
+                (true, _, false, _) => pass!(true, false, false, dense_slots()),
+                (true, _, true, _) => pass!(true, false, true, dense_slots()),
+                (false, true, false, true) => pass!(false, true, false, dense_slots()),
+                (false, true, true, true) => pass!(false, true, true, dense_slots()),
+                (false, true, false, false) => pass!(false, true, false, tail.iter().copied()),
+                (false, true, true, false) => pass!(false, true, true, tail.iter().copied()),
+                (false, false, false, _) => pass!(false, false, false, tail.iter().copied()),
+                (false, false, true, _) => pass!(false, false, true, tail.iter().copied()),
+            }
+        };
         // Invariant (P4-2): every nonzero tail slot was reached through the a-lists and processed, so the nonzero tail values left are exactly the
         // survivors counted in the loop.
         #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
         assert_eq!(
             (self.i21..m).filter(|&s| x[self.at[s]] != R::ZERO).count(),
-            surv_nz,
+            counts.surv_nz,
             "ftran_needed: nonzero tail slots differ from the processed survivors"
         );
-        let (u_est, fin) = self.tau_u_finish(spike_n, spike_t, needed.len(), nz, abs_a);
+        let (u_est, fin) = self.tau_u_finish(spike_n, spike_t, needed.len(), counts.nz, counts.abs_a);
         self.tau_u.set(u_est);
         self.tau_fin.set(fin);
         #[cfg(test)]
@@ -2013,8 +2017,8 @@ impl<R: Real> DualFactor<R> {
                 f.x_tau = x.clone();
                 f.tau_raw = tau_raw;
             }
-            f.tp_a2 = tp_a2;
-            f.tp_only_a = tp_only_a;
+            f.tp_a2 = counts.tp_a2;
+            f.tp_only_a = counts.tp_only_a;
         }
         needed
             .iter()
@@ -2029,11 +2033,67 @@ impl<R: Real> DualFactor<R> {
             .collect()
     }
 
+    /// Number of tail slots whose position holds a nonzero value in the dense vector `x` (the tail positions are `at[i21..m]`).
+    fn tail_nonzero(&self, x: &[R]) -> usize {
+        debug_assert!((self.i21..self.m).all(|s| self.kind[self.at[s]] == -2));
+        self.at[self.i21..self.m].iter().filter(|&&p| x[p] != R::ZERO).count()
+    }
+
+    /// The tail loop of `ftran_needed` over the columns `order` (descending slots): divide, store, test, scatter over the column's A list,
+    /// with the work-estimate counts of the U stage booked as each column is finished. `JD`: the joint dense loops (raw test first, a
+    /// zeroed column is neither divided nor scattered); `KT`: a quotient of at most the tolerance is kept (and not scattered); `TD`: the
+    /// dense booking (`abs_a`) instead of the heap-walk booking (`nz`).
+    #[inline(always)]
+    fn needed_tail<const JD: bool, const KT: bool, const TD: bool>(
+        &self,
+        x: &mut [R],
+        order: impl Iterator<Item = usize>,
+        x_col: &[R],
+        tau_raw: &mut [bool],
+    ) -> TailCounts {
+        let mut t = TailCounts::default();
+        let diag = &self.diag[..];
+        let ab = &self.ab;
+        let tol = R::c(TOL);
+        for c in order {
+            let xr = x[c];
+            let raw = xr.abs() > tol;
+            #[cfg(any(test, feature = "factor-shadow"))]
+            {
+                tau_raw[c] = raw;
+            }
+            #[cfg(not(any(test, feature = "factor-shadow")))]
+            let _ = &tau_raw;
+            if JD && !raw {
+                x[c] = R::ZERO;
+                continue;
+            }
+            let xc = xr / diag[c];
+            let tiny = xc.abs() <= tol;
+            let fin = if tiny && !KT { R::ZERO } else { xc };
+            x[c] = fin;
+            if tiny {
+                // A kept tiny quotient is a survivor of the dense slot loop (never scattered); a dropped one books nothing.
+                if KT && fin != R::ZERO {
+                    t.book::<JD, TD, R>(ab.na(c), fin, raw, x_col.get(c));
+                }
+                continue;
+            }
+            let (ai, av) = ab.a_pair(c);
+            t.book::<JD, TD, R>(ai.len(), fin, raw, x_col.get(c));
+            for (&j, &v) in ai.iter().zip(av) {
+                x[j as usize] -= v * xc;
+            }
+        }
+        t
+    }
+
     /// The row-wise dot product of nucleus position `p` (`0x1241ed`): `x[p]` minus the products of the row's values with `x` at its columns,
     /// in the row's physical order.
     #[inline(always)]
     fn nucleus_dot(&self, p: usize, x: &[R]) -> R {
         let (cols, vals) = self.urows.row(p);
+        let vals = &vals[..cols.len()];
         let prod = |i: usize| vals[i] * x[cols[i] as usize];
         if R::QUAD {
             row_dot_q_by(x[p], cols.len(), prod)
@@ -2592,7 +2652,15 @@ impl<R: Real> DualFactor<R> {
         self.last_dense = dense;
         self.last_ordered = dense || u_dense;
         let mut out = Vec::new();
-        let ordered = if opened { Some(self.uorder_close(tail, &x)) } else { None };
+        // A dense result is scanned by position, so only the sparse output reads the order `uorder_close` completes.
+        let ordered = if opened && !(dense || u_dense) {
+            Some(self.uorder_close(tail, &x))
+        } else {
+            if opened {
+                self.uorder_discard(tail);
+            }
+            None
+        };
         if dense || u_dense {
             out.extend(x.iter().copied().enumerate().filter(|&(_, v)| v != R::ZERO));
             if let Some(o) = ordered {
@@ -3766,6 +3834,14 @@ impl<R: Real> DualFactor<R> {
         }
         scratch.clear();
         std::mem::take(&mut scratch.out)
+    }
+
+    /// Hands the tail buffer of `uorder_open` back to the scratch when the output order is not read (the `uorder_close` bookkeeping
+    /// without the singleton, tail and nucleus lists).
+    fn uorder_discard(&self, tail: Vec<usize>) {
+        let mut scratch = self.btran_ws.order.borrow_mut();
+        scratch.order = tail;
+        scratch.clear();
     }
 
     /// Returns the buffer of `uorder` to the scratch.
