@@ -47,6 +47,13 @@ impl<R: Real> AbLists<R> {
         self.span[c].nb as usize
     }
 
+    /// `(na, nb)` from one lookup of the column's span.
+    #[inline(always)]
+    pub fn counts(&self, c: usize) -> (usize, usize) {
+        let s = &self.span[c];
+        (s.na as usize, s.nb as usize)
+    }
+
     #[inline(always)]
     pub fn is_empty(&self, c: usize) -> bool {
         let s = &self.span[c];

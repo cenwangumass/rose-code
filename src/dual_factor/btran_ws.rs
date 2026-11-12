@@ -26,8 +26,9 @@ impl Marks {
 
     /// Returns true only on the first visit in this epoch.
     pub fn insert(&mut self, i: usize) -> bool {
-        let first = self.values[i] != self.generation;
-        self.values[i] = self.generation;
+        let v = &mut self.values[i];
+        let first = *v != self.generation;
+        *v = self.generation;
         first
     }
 }

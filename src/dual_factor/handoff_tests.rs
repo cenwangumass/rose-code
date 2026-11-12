@@ -139,35 +139,38 @@ fn dense_handoff_matches_the_list_round_trip_f80() {
 }
 
 #[test]
-fn normalize_count_keeps_nonzero_bits_and_clears_signed_zero() {
+fn normalize_count_counts_nonzero_entries() {
     let nan = f64::from_bits(0x7ff8_0000_dead_beef);
     let sub = f64::from_bits(1);
-    let mut x = vec![0.0, -0.0, 1e-300, -sub, nan, -1.5, f64::INFINITY, -0.0, 0.0, 1e-15];
-    let want: Vec<u64> = x.iter().map(|&v| if v != 0.0 { v.to_bits() } else { 0 }).collect();
+    let mut x = vec![0.0, 0.0, 1e-300, -sub, nan, -1.5, f64::INFINITY, 0.0, 0.0, 1e-15];
+    let want = all_bits(&x);
     let nz = DualFactor::<f64>::normalize_count(&mut x);
     assert_eq!(nz, 6);
     assert_eq!(all_bits(&x), want);
 }
 
+/// The no -0.0 contract of the dense L-stage vector is checked in the test, debug and shadow builds.
 #[test]
-fn dense_lists_match_the_filters_and_clear_signed_zeros() {
+#[should_panic(expected = "-0.0")]
+fn normalize_count_rejects_a_negative_zero() {
+    DualFactor::<f64>::normalize_count(&mut [1.0, -0.0]);
+}
+
+#[test]
+fn dense_lists_match_the_filters() {
     let mut inp = vec![99usize; 3];
     let mut sp = vec![(7usize, 1.0f64); 2];
     for x in [
         vec![],
         vec![0.0; 5],
-        vec![-0.0, 0.0, -0.0],
-        vec![1.0, 0.0, 1e-15, -2.0, TOL, -TOL, f64::NAN, 5e-14, -0.0, 0.0],
-        (0..70).map(|i| if i % 3 == 0 { -0.0 } else { i as f64 * 1e-14 }).collect(),
+        vec![1.0, 0.0, 1e-15, -2.0, TOL, -TOL, f64::NAN, 5e-14, 0.0, 0.0],
+        (0..70).map(|i| if i % 3 == 0 { 0.0 } else { i as f64 * 1e-14 }).collect(),
     ] {
-        let mut y = x.clone();
-        let nz = DualFactor::<f64>::dense_lists(&mut y, &mut inp, &mut sp);
+        let nz = DualFactor::<f64>::dense_lists(&x, &mut inp, &mut sp);
         let want_i: Vec<usize> = (0..x.len()).filter(|&i| x[i] != 0.0).collect();
         let want_s: Vec<(usize, f64)> = want_i.iter().map(|&i| (i, x[i])).filter(|e| e.1.abs() > TOL).collect();
         assert_eq!(nz, want_i.len());
         assert_eq!(inp, want_i);
         assert_eq!(bits(&sp), bits(&want_s));
-        let want_x: Vec<u64> = x.iter().map(|&v| if v != 0.0 { v.to_bits() } else { 0 }).collect();
-        assert_eq!(all_bits(&y), want_x);
     }
 }

@@ -44,6 +44,10 @@ thread_local! {
 mod fresh_tests;
 #[cfg(test)]
 mod update_old;
+#[cfg(test)]
+mod full_old;
+#[cfg(test)]
+mod full_tests;
 
 #[cfg(feature = "factor-shadow")]
 pub(crate) mod projection;
@@ -141,6 +145,27 @@ impl FtranTouched {
                 let fresh = *word & bit == 0;
                 *word |= bit;
                 fresh
+            }
+        }
+    }
+
+    /// Marks every row of the list (the result of each `insert` is not needed), the variant tested once.
+    fn insert_all(&mut self, rows: &[usize]) {
+        match self {
+            Self::Dense(flags) => {
+                for &row in rows {
+                    flags[row] = true;
+                }
+            }
+            Self::Sparse { words, occupied } => {
+                for &row in rows {
+                    let block = row / 64;
+                    let word = &mut words[block];
+                    if *word == 0 {
+                        occupied.push(block);
+                    }
+                    *word |= 1u64 << (row % 64);
+                }
             }
         }
     }
@@ -743,6 +768,8 @@ struct F2<R> {
     /// the sum of `len(a)` over those whose column value is zero. Only kept when the joint routines run.
     tp_a2: usize,
     tp_only_a: usize,
+    /// Retained buffer of the full U solves' output list (empty between calls; only its capacity travels).
+    out_scr: Vec<(usize, R)>,
 }
 
 impl<R> Default for F2<R> {
@@ -762,6 +789,7 @@ impl<R> Default for F2<R> {
             col_sb: 0,
             tp_a2: 0,
             tp_only_a: 0,
+            out_scr: Vec::new(),
         }
     }
 }
@@ -1450,47 +1478,46 @@ impl<R: Real> DualFactor<R> {
         out
     }
 
-    /// Counts the entries with `v != 0` and stores +0.0 into every other slot (a -0.0 would read as +0.0 through the old list round trip).
+    /// Counts the entries with `v != 0`. The dense L-stage vector holds no -0.0: it starts as +0.0, the L stage and the first-touch
+    /// scatter only add or subtract (a sum is -0.0 only when both addends are), and an eta result at or below the tolerance is stored as +0.0.
+    /// The old pass stored +0.0 into every zero slot (a -0.0 would have read as +0.0 through the list round trip); the claim is checked
+    /// in the test, debug and shadow builds.
     #[inline(never)]
     fn normalize_count(x: &mut [R]) -> usize {
-        let mut nz = 0usize;
-        for v in x.iter_mut() {
-            let keep = *v != R::ZERO;
-            nz += usize::from(keep);
-            *v = if keep { *v } else { R::ZERO };
-        }
-        nz
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        assert!(x.iter().all(|&v| v != R::ZERO || ab::same_bits(v, R::ZERO)), "dense L-stage vector holds a -0.0");
+        x.iter().map(|&v| usize::from(v != R::ZERO)).sum()
     }
 
-    /// One pass over a dense L-stage vector: every slot with `v == 0` (+0.0 or -0.0) is stored as +0.0, `inp` receives the positions of
+    /// One pass over a dense L-stage vector (no -0.0, see `normalize_count`): `inp` receives the positions of
     /// the entries with `v != 0` and `sp` the `(position, value)` entries above the tolerance, both in ascending position, without a
     /// conditional push per entry. Returns the number of entries with `v != 0`.
     #[inline(never)]
-    fn dense_lists(x: &mut [R], inp: &mut Vec<usize>, sp: &mut Vec<(usize, R)>) -> usize {
+    fn dense_lists(x: &[R], inp: &mut Vec<usize>, sp: &mut Vec<(usize, R)>) -> usize {
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        assert!(x.iter().all(|&v| v != R::ZERO || ab::same_bits(v, R::ZERO)), "dense L-stage vector holds a -0.0");
         inp.clear();
         sp.clear();
         inp.reserve(x.len() + 1);
-        sp.reserve(x.len() + 1);
-        let (pi, ps) = (inp.as_mut_ptr(), sp.as_mut_ptr());
-        let (mut ci, mut cs) = (0usize, 0usize);
-        for (i, slot) in x.iter_mut().enumerate() {
-            let v = *slot;
-            let kept = v != R::ZERO;
-            let v = if kept { v } else { R::ZERO };
-            *slot = v;
-            // Both counts are at most `i < x.len()` before the writes and both buffers hold `x.len() + 1` entries; a rejected entry is
-            // overwritten by the next one. The types are Copy, so entries beyond the length need no drop.
-            unsafe {
-                pi.add(ci).write(i);
-                ps.add(cs).write((i, v));
-            }
-            ci += usize::from(kept);
-            cs += usize::from(kept & (v.abs() > R::c(TOL)));
+        let pi = inp.as_mut_ptr();
+        let mut ci = 0usize;
+        for (i, &v) in x.iter().enumerate() {
+            // `ci <= i < x.len()` before the write and `inp` holds `x.len() + 1` entries; a rejected position is overwritten by the next
+            // one. The type is Copy, so entries beyond the length need no drop.
+            unsafe { pi.add(ci).write(i) };
+            ci += usize::from(v != R::ZERO);
         }
-        unsafe {
-            inp.set_len(ci);
-            sp.set_len(cs);
+        unsafe { inp.set_len(ci) };
+        // The spike is the part of the list above the tolerance, with the values (`cs < ci + 1 <= capacity` at every write).
+        sp.reserve(ci + 1);
+        let ps = sp.as_mut_ptr();
+        let mut cs = 0usize;
+        for &i in inp.iter() {
+            let v = x[i];
+            unsafe { ps.add(cs).write((i, v)) };
+            cs += usize::from(v.abs() > R::c(TOL));
         }
+        unsafe { sp.set_len(cs) };
         ci
     }
 
@@ -2521,10 +2548,10 @@ impl<R: Real> DualFactor<R> {
         let (lout, count_l, e_l) = self.lstage_num(rows, vals, force_dense);
         let spike = match lout {
             LOut::List(list) => list,
-            LOut::Dense(mut x) => {
+            LOut::Dense(x) => {
                 let mut inp = std::mem::take(&mut self.f2.get_mut().col_in);
                 let mut sp = std::mem::take(&mut self.spike);
-                let nz = Self::dense_lists(&mut x, &mut inp, &mut sp);
+                let nz = Self::dense_lists(&x, &mut inp, &mut sp);
                 let u_dense = rows.len() * self.dthr > m
                     || self.lev_dense_ft
                     || (!self.etas.is_empty() && Self::count_dense(count_l, self.dthr, m))
@@ -2566,18 +2593,16 @@ impl<R: Real> DualFactor<R> {
                 || self.dens * (spike.len() as f64) < 2.0 * m as f64);
         let bs = force_dense && crate::dump::on("bsolve");
         let mut touched = FtranTouched::new(m, u_dense, dirty.unwrap_or_default());
-        let inp: Vec<usize> = spike.iter().map(|e| e.0).collect();
-        for &p in &inp {
-            touched.insert(p);
-        }
+        let mut inp = std::mem::take(&mut old.col_in);
+        inp.clear();
+        inp.extend(spike.iter().map(|e| e.0));
+        touched.insert_all(&inp);
         // The sparse solve runs the closure of the list's tail positions under the `a` lists in descending slot order, which is also the
         // tail part of the output order: `uorder_open` produces it once and `uorder_close` finishes the order after the tail loop.
         let opened = !(u_dense && !bs);
         let tail: Vec<usize> = if opened {
             let tail = self.uorder_open(&inp);
-            for &c in &tail {
-                touched.insert(c);
-            }
+            touched.insert_all(&tail);
             tail
         } else {
             // Unreached columns contain zero and the dense kernel skips them before division.
@@ -2588,25 +2613,55 @@ impl<R: Real> DualFactor<R> {
         // The U-stage work estimate sums integer-valued lengths over the tail columns that keep a nonzero value; they are collected where
         // the column is finished (a scatter only hits lower slots) instead of by a later scan of the tail (`u_work_ref`).
         let (mut sa, mut sb, mut su) = (0usize, 0usize, 0usize);
-        for &c in &tail {
-            let mut xc = x[c];
-            if u_dense && xc.abs() <= R::c(TOL) {
-                x[c] = R::ZERO;
-                continue;
+        let tol = R::c(TOL);
+        if let FtranTouched::Sparse { words, occupied } = &mut touched {
+            // The sparse solve (not `u_dense`): the quotient alone is tested, and a scatter marks its target block without the first-visit test
+            // (the tail dependency walk is done; the set of marks is what the readers see).
+            let (diag, uc) = (&self.diag[..], &self.uc[..]);
+            for &c in &tail {
+                let xc = x[c] / diag[c];
+                if xc.abs() <= tol {
+                    x[c] = R::ZERO;
+                    continue;
+                }
+                x[c] = xc;
+                col_surv.push(c);
+                let (na, nb) = self.ab.counts(c);
+                sa += na;
+                sb += nb;
+                let col = &uc[c];
+                su += col.len();
+                for &(j, v) in col {
+                    x[j] -= v * xc;
+                    let block = j / 64;
+                    let word = &mut words[block];
+                    if *word == 0 {
+                        occupied.push(block);
+                    }
+                    *word |= 1u64 << (j % 64);
+                }
             }
-            xc /= self.diag[c];
-            if xc.abs() <= R::c(TOL) {
-                x[c] = R::ZERO;
-                continue;
-            }
-            x[c] = xc;
-            col_surv.push(c);
-            sa += self.ab.na(c);
-            sb += self.ab.nb(c);
-            su += self.uc[c].len();
-            for &(j, v) in &self.uc[c] {
-                x[j] -= v * xc;
-                touched.insert(j);
+        } else {
+            for &c in &tail {
+                let mut xc = x[c];
+                if xc.abs() <= tol {
+                    x[c] = R::ZERO;
+                    continue;
+                }
+                xc /= self.diag[c];
+                if xc.abs() <= tol {
+                    x[c] = R::ZERO;
+                    continue;
+                }
+                x[c] = xc;
+                col_surv.push(c);
+                sa += self.ab.na(c);
+                sb += self.ab.nb(c);
+                su += self.uc[c].len();
+                for &(j, v) in &self.uc[c] {
+                    x[j] -= v * xc;
+                    touched.insert(j);
+                }
             }
         }
         // Invariant (P4-2): the nonzero tail slots are exactly the processed survivors (`col_surv`).
@@ -2618,16 +2673,15 @@ impl<R: Real> DualFactor<R> {
         );
         let x_t = if bs { x.clone() } else { Vec::new() };
         touched.finish();
-        touched.for_each(|p| {
-            if self.kind[p] != -2 {
-                let v = x[p] / self.diag[p];
-                x[p] = if (u_dense && x[p].abs() <= R::c(TOL)) || v.abs() <= R::c(TOL) {
-                    R::ZERO
-                } else {
-                    v
-                };
-            }
-        });
+        {
+            let (kind, diag) = (&self.kind[..], &self.diag[..]);
+            touched.for_each(|p| {
+                if kind[p] != -2 {
+                    let v = x[p] / diag[p];
+                    x[p] = if (u_dense && x[p].abs() <= tol) || v.abs() <= tol { R::ZERO } else { v };
+                }
+            });
+        }
         if bs {
             crate::dump::emit(
                 "bsolve",
@@ -2651,7 +2705,8 @@ impl<R: Real> DualFactor<R> {
         self.work_parts = (e_l, u_est);
         self.last_dense = dense;
         self.last_ordered = dense || u_dense;
-        let mut out = Vec::new();
+        let mut scratch = std::mem::take(&mut self.f2.get_mut().out_scr);
+        scratch.clear();
         // A dense result is scanned by position, so only the sparse output reads the order `uorder_close` completes.
         let ordered = if opened && !(dense || u_dense) {
             Some(self.uorder_close(tail, &x))
@@ -2662,7 +2717,7 @@ impl<R: Real> DualFactor<R> {
             None
         };
         if dense || u_dense {
-            out.extend(x.iter().copied().enumerate().filter(|&(_, v)| v != R::ZERO));
+            scratch.extend(x.iter().copied().enumerate().filter(|&(_, v)| v != R::ZERO));
             if let Some(o) = ordered {
                 self.uorder_done(o);
             }
@@ -2670,16 +2725,19 @@ impl<R: Real> DualFactor<R> {
             let ordered = ordered.unwrap();
             for &p in &ordered {
                 if touched.take_sparse(p) && x[p] != R::ZERO {
-                    out.push((p, x[p]));
+                    scratch.push((p, x[p]));
                 }
             }
             self.uorder_done(ordered);
             touched.for_each(|p| {
                 if x[p] != R::ZERO {
-                    out.push((p, x[p]));
+                    scratch.push((p, x[p]));
                 }
             });
         }
+        // The result is handed out with its exact length; the scratch keeps its capacity for the next call.
+        let out = scratch.clone();
+        scratch.clear();
         let dirty_blocks = match touched {
             FtranTouched::Sparse { occupied, .. } => Some(occupied),
             FtranTouched::Dense(_) => None,
@@ -2692,6 +2750,7 @@ impl<R: Real> DualFactor<R> {
             col_surv,
             col_sa: sa,
             col_sb: sb,
+            out_scr: scratch,
             ..F2::<R>::default()
         };
         // The column replacement receives the spike in ascending order after a dense solve (the reference scans the dense vector),
@@ -2727,28 +2786,38 @@ impl<R: Real> DualFactor<R> {
         let m = self.m;
         // `inp` (the L-stage entries' positions) and `spike` (those above the tolerance, in ascending position as the column replacement
         // receives them after a dense solve) come from `dense_lists`.
-        let mut col_surv = std::mem::take(&mut self.f2.get_mut().col_surv);
+        let old = self.f2.get_mut();
+        let mut col_surv = std::mem::take(&mut old.col_surv);
+        let mut scratch = std::mem::take(&mut old.out_scr);
         col_surv.clear();
         let (mut sa, mut sb, mut su) = (0usize, 0usize, 0usize);
-        for s in (self.i21..m).rev() {
-            let c = self.at[s];
-            let mut xc = x[c];
-            if xc.abs() <= R::c(TOL) {
-                x[c] = R::ZERO;
-                continue;
-            }
-            xc /= self.diag[c];
-            if xc.abs() <= R::c(TOL) {
-                x[c] = R::ZERO;
-                continue;
-            }
-            x[c] = xc;
-            col_surv.push(c);
-            sa += self.ab.na(c);
-            sb += self.ab.nb(c);
-            su += self.uc[c].len();
-            for &(j, v) in &self.uc[c] {
-                x[j] -= v * xc;
+        let (i21, tol) = (self.i21, R::c(TOL));
+        // The tail columns, one lookup of each column's lists, walked in descending slot order: test the raw value, divide, test the
+        // quotient, store, count, scatter over the whole U column.
+        {
+            let (diag, uc) = (&self.diag[..], &self.uc[..]);
+            col_surv.reserve(m - i21);
+            for &c in self.at[i21..m].iter().rev() {
+                let mut xc = x[c];
+                if xc.abs() <= tol {
+                    x[c] = R::ZERO;
+                    continue;
+                }
+                xc /= diag[c];
+                if xc.abs() <= tol {
+                    x[c] = R::ZERO;
+                    continue;
+                }
+                x[c] = xc;
+                col_surv.push(c);
+                let (na, nb) = self.ab.counts(c);
+                sa += na;
+                sb += nb;
+                let col = &uc[c];
+                su += col.len();
+                for &(j, v) in col {
+                    x[j] -= v * xc;
+                }
             }
         }
         #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
@@ -2758,18 +2827,35 @@ impl<R: Real> DualFactor<R> {
             "ftran_with: nonzero tail slots differ from the processed survivors"
         );
         // The tail slots are final; every other slot is zeroed at or below the tolerance and divided otherwise (the old marker set held
-        // the L entries and the scatter targets; every other slot is +0.0 and stays so).
+        // the L entries and the scatter targets; every other slot is +0.0 and stays so). The pass also publishes the nonzero slots in
+        // ascending position into the retained list, which is then copied out at its exact length.
         #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
         assert!((0..m).all(|p| (self.kind[p] == -2) == (self.slot[p] >= self.i21)), "tail kind and slot differ");
-        for (p, xp) in x.iter_mut().enumerate() {
-            let v = *xp;
-            if v.abs() <= R::c(TOL) {
-                *xp = R::ZERO;
-            } else if self.kind[p] != -2 {
-                let q = v / self.diag[p];
-                *xp = if q.abs() <= R::c(TOL) { R::ZERO } else { q };
+        scratch.clear();
+        scratch.reserve(m);
+        let mut count = 0usize;
+        {
+            let dst = scratch.as_mut_ptr();
+            let (kind, diag) = (&self.kind[..], &self.diag[..]);
+            for (p, xp) in x.iter_mut().enumerate() {
+                let v = *xp;
+                let w = if v.abs() <= tol {
+                    R::ZERO
+                } else if kind[p] != -2 {
+                    let q = v / diag[p];
+                    if q.abs() <= tol { R::ZERO } else { q }
+                } else {
+                    v
+                };
+                *xp = w;
+                if w != R::ZERO {
+                    // `count <= p < m <= capacity`; the entry type is Copy.
+                    unsafe { dst.add(count).write((p, w)) };
+                    count += 1;
+                }
             }
         }
+        unsafe { scratch.set_len(count) };
         let vec_dense = rows.len() * self.dthr > m
             || self.lev_dense_ft
             || (!self.etas.is_empty() && Self::count_dense(count_l, self.dthr, m));
@@ -2781,7 +2867,8 @@ impl<R: Real> DualFactor<R> {
         self.work_parts = (e_l, u_est);
         self.last_dense = true;
         self.last_ordered = true;
-        let out: Vec<(usize, R)> = x.iter().copied().enumerate().filter(|&(_, v)| v != R::ZERO).collect();
+        let out = scratch.clone();
+        scratch.clear();
         *self.f2.get_mut() = F2 {
             col_n: u_cnt,
             col_in: inp,
@@ -2790,6 +2877,7 @@ impl<R: Real> DualFactor<R> {
             col_surv,
             col_sa: sa,
             col_sb: sb,
+            out_scr: scratch,
             ..F2::<R>::default()
         };
         self.spike = spike;
