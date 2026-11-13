@@ -1758,6 +1758,12 @@ struct Dual<'a, R: Real = f64> {
     scr_vals: Vec<R>,
     scr_ydbl: Vec<f64>,
     scr_nbv: Vec<f64>,
+    /// Maintained nonbasic values (`nb_value` with `zero_artificial` false, a copy of the bound or 0; 0 for a basic variable) of every variable, the list of the
+    /// variables with a nonzero value (`nz`, ascending when `nz_sorted`), and each one's slot in it (`NZ_NONE` when absent). Updated at every status change.
+    nbv: Vec<f64>,
+    nz: Vec<u32>,
+    nz_pos: Vec<u32>,
+    nz_sorted: bool,
     /// The variables at their upper bound found by `assign_d_single_pass`'s initialisation (negated at its end), and the right-hand side of `btran_y`.
     scr_ub: Vec<u32>,
     scr_binp: Vec<(usize, R)>,
@@ -2226,7 +2232,91 @@ fn nb_value(zero_art: bool, s: i32, lo: f64, up: f64) -> f64 {
     }
 }
 
+const NZ_NONE: u32 = u32::MAX;
+
 impl<'a, R: Real> Dual<'a, R> {
+    /// Status change of `j` to a nonbasic status `s` (the maintained nonbasic values and their list follow).
+    #[inline]
+    fn set_st(&mut self, j: usize, s: i32) {
+        self.st[j] = s;
+        let v = nb_value(false, s, self.p.lo[j], self.p.up[j]);
+        self.nbv[j] = v;
+        self.nz_set(j, v != 0.0);
+    }
+
+    /// Status change of `j` to the basis position `pos`.
+    #[inline]
+    fn set_basic(&mut self, j: usize, pos: i32) {
+        if self.st[j] < 0 {
+            self.nbv[j] = 0.0;
+            self.nz_set(j, false);
+        }
+        self.st[j] = pos;
+    }
+
+    #[inline]
+    fn nz_set(&mut self, j: usize, present: bool) {
+        let at = self.nz_pos[j];
+        if present {
+            if at == NZ_NONE {
+                self.nz_pos[j] = self.nz.len() as u32;
+                self.nz.push(j as u32);
+                self.nz_sorted = false;
+            }
+        } else if at != NZ_NONE {
+            let last = *self.nz.last().unwrap();
+            self.nz.swap_remove(at as usize);
+            if last as usize != j {
+                self.nz_pos[last as usize] = at;
+            }
+            self.nz_pos[j] = NZ_NONE;
+            self.nz_sorted = false;
+        }
+    }
+
+    /// The nonbasic values and the ascending list of the nonzero ones, computed afresh from the statuses and bounds.
+    fn fresh_nb(&self, zero_art: bool) -> (Vec<f64>, Vec<u32>) {
+        let p = self.p;
+        let nv = p.n + p.m;
+        let mut nbv = vec![0.0; nv];
+        let mut nz = Vec::new();
+        for (j, ((&s, &lo), &up)) in self.st[..nv].iter().zip(&p.lo[..nv]).zip(&p.up[..nv]).enumerate() {
+            if s < 0 {
+                let v = nb_value(zero_art, s, lo, up);
+                nbv[j] = v;
+                if v != 0.0 {
+                    nz.push(j as u32);
+                }
+            }
+        }
+        (nbv, nz)
+    }
+
+    /// Rebuilds the maintained nonbasic state from the statuses.
+    fn rebuild_nb(&mut self) {
+        let nv = self.p.n + self.p.m;
+        let (nbv, nz) = self.fresh_nb(false);
+        self.nbv = nbv;
+        self.nz_pos.clear();
+        self.nz_pos.resize(nv, NZ_NONE);
+        for (k, &j) in nz.iter().enumerate() {
+            self.nz_pos[j as usize] = k as u32;
+        }
+        self.nz = nz;
+        self.nz_sorted = true;
+    }
+
+    /// Sorts the list into ascending order (the scatter order of the reference).
+    fn nz_sort(&mut self) {
+        if !self.nz_sorted {
+            self.nz.sort_unstable();
+            for (k, &j) in self.nz.iter().enumerate() {
+                self.nz_pos[j as usize] = k as u32;
+            }
+            self.nz_sorted = true;
+        }
+    }
+
     fn nonbasic_value(&self, j: usize) -> f64 {
         nb_value(self.zero_artificial, self.st[j], self.p.lo[j], self.p.up[j])
     }
@@ -2380,12 +2470,12 @@ impl<'a, R: Real> Dual<'a, R> {
             let mut last = None;
             for (pos, r) in gone.zip(free_rows) {
                 let out = self.head[pos];
-                self.st[out] = LB;
+                self.set_st(out, LB);
                 self.set_head(pos, n + r);
                 last = Some(out);
             }
             if let Some(j) = last {
-                self.st[j] = FIXED;
+                self.set_st(j, FIXED);
                 self.d[j] = R::c(if j < n { self.cost[j] } else { 0.0 });
                 self.repaired = Some(j);
             }
@@ -2448,9 +2538,9 @@ impl<'a, R: Real> Dual<'a, R> {
         }
         // `order` holds each basic variable once (one pivot per position), so zeroing `wv[v]` as it is read leaves the buffer all zero, as the separate
         // pass over `head` did.
-        for (pos, (&v, w)) in order.iter().zip(&mut self.w[..self.m]).enumerate() {
-            self.st[v] = pos as i32;
-            *w = std::mem::replace(&mut wv[v], R::ZERO);
+        for (pos, &v) in order.iter().enumerate().take(self.m) {
+            self.set_basic(v, pos as i32);
+            self.w[pos] = std::mem::replace(&mut wv[v], R::ZERO);
         }
         self.scr_wv = wv;
         self.head = order;
@@ -2572,12 +2662,13 @@ impl<'a, R: Real> Dual<'a, R> {
             );
         }
         let leave = self.head[r];
-        self.st[leave] = if self.p.lo[leave] == self.p.up[leave] {
+        let leave_st = if self.p.lo[leave] == self.p.up[leave] {
             FIXED
         } else {
             LB
         };
-        self.st[j] = r as i32;
+        self.set_st(leave, leave_st);
+        self.set_basic(j, r as i32);
         self.set_head(r, j);
         self.iters += 1;
         crate::simplex::TOTAL_ITERS.with(|c| c.set(c.get() + 1.0));
@@ -2669,26 +2760,34 @@ impl<'a, R: Real> Dual<'a, R> {
         let mut r: Vec<R> = p.rhs.iter().map(|&v| R::c(v)).collect();
         // Entries of the structural nonbasic columns at a nonzero value (the read-out below, `0xc142b`), counted in the same pass.
         let mut cols = 0usize;
-        // The nonbasic structural values, computed once here and read again by the objective sum below.
-        let mut nbv = std::mem::take(&mut self.scr_nbv);
-        nbv.clear();
-        nbv.resize(p.n, 0.0);
-        let zero_art = self.zero_artificial;
-        let nv = p.n + p.m;
-        for (j, ((&s, &lo), &up)) in self.st[..nv].iter().zip(&p.lo[..nv]).zip(&p.up[..nv]).enumerate() {
-            if s < 0 {
-                let v = nb_value(zero_art, s, lo, up);
-                if j < p.n {
-                    nbv[j] = v;
-                }
-                if v != 0.0 {
-                    if j < p.n {
-                        cols += p.cols[j].len();
-                    }
-                    for &(i, a) in &p.cols[j] {
-                        r[i] -= R::c(a) * R::c(v);
-                    }
-                }
+        // The nonbasic values and the ascending list of the nonzero ones: the maintained state (a copy of the bounds), read again by the objective sum
+        // below; with the artificial bounds read as zero (the final recompute) they are computed afresh.
+        let fresh = if self.zero_artificial {
+            Some(self.fresh_nb(true))
+        } else {
+            self.nz_sort();
+            #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+            {
+                let (want, want_nz) = self.fresh_nb(false);
+                assert!(
+                    self.nz == want_nz && self.nbv.iter().zip(&want).all(|(a, b)| a.to_bits() == b.to_bits()),
+                    "maintained nonbasic values differ from a recount"
+                );
+            }
+            None
+        };
+        let (nbv, nz): (&[f64], &[u32]) = match &fresh {
+            Some((v, l)) => (v, l),
+            None => (&self.nbv, &self.nz),
+        };
+        for &j in nz {
+            let j = j as usize;
+            let v = nbv[j];
+            if j < p.n {
+                cols += p.cols[j].len();
+            }
+            for &(i, a) in &p.cols[j] {
+                r[i] -= R::c(a) * R::c(v);
             }
         }
         let mut rows = std::mem::take(&mut self.scr_rows);
@@ -2887,7 +2986,6 @@ impl<'a, R: Real> Dual<'a, R> {
                 );
             }
         }
-        self.scr_nbv = nbv;
         self.drift_status |= tol_abort;
         Ok(())
     }
@@ -5380,7 +5478,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 }
             }
             for &j in &flips {
-                self.st[j] = if self.st[j] == LB { UB } else { LB };
+                self.set_st(j, if self.st[j] == LB { UB } else { LB });
                 self.d[j] = -self.d[j];
             }
             self.touch_rows(&changed);
@@ -5394,11 +5492,11 @@ impl<'a, R: Real> Dual<'a, R> {
         } else {
             LB
         };
-        self.st[leave] = new_st_leave;
+        self.set_st(leave, new_st_leave);
         if leave >= self.n {
             self.slack_nb[leave - self.n] = true;
         }
-        self.st[q] = r as i32;
+        self.set_basic(q, r as i32);
         self.set_head(r, q);
         // Row-wise copy: in a row holding both columns the leaving one takes the entering one's place; elsewhere the entering one is deleted (the last
         // entry moves into its slot) and the leaving one is appended.
@@ -5781,22 +5879,22 @@ impl<'a, R: Real> Dual<'a, R> {
                     && self.d[j].abs() <= R::c(dual_tol())
                 {
                     // A free variable no longer tied to an artificial bound by its d goes back to the free status (value 0).
-                    self.st[j] = FREE;
+                    self.set_st(j, FREE);
                     self.d[j] = R::ZERO;
                 } else if self.st[j] == LB && self.d[j] < R::c(-dual_tol()) {
-                    self.st[j] = UB;
+                    self.set_st(j, UB);
                     self.d[j] = -self.d[j];
                 } else if self.st[j] == UB && up_inf && self.d[j] <= R::c(dual_tol()) {
-                    self.st[j] = LB;
+                    self.set_st(j, LB);
                     self.d[j] = -self.d[j];
                 } else if self.st[j] == UB && !up_inf && self.d[j] < R::c(-dual_tol()) {
                     // At a finite upper bound with the wrong-signed d (`0xe7820`, status -2: d' < -tol): the variable goes to its lower bound (fx_badscale
                     // release, x with a scaled cost of -2e-9 that the pivot turns into +2e-6).
-                    self.st[j] = LB;
+                    self.set_st(j, LB);
                     self.d[j] = -self.d[j];
                 } else if self.st[j] == LB && lo_inf && !up_inf && self.d[j] <= R::c(dual_tol()) {
                     // The mirror of the previous rule for a variable without a lower bound.
-                    self.st[j] = UB;
+                    self.set_st(j, UB);
                     self.d[j] = -self.d[j];
                 }
                 level += self.at_artificial(j) as usize;
@@ -6093,7 +6191,7 @@ impl<'a, R: Real> Dual<'a, R> {
                     bump(self, true);
                     acc -= R::c(p.lo[j]) * xi;
                     self.d[j] += xi;
-                    self.st[j] = LB;
+                    self.set_st(j, LB);
                 }
             }
         }
@@ -7300,6 +7398,10 @@ fn solve_pass_callback<R: Real>(
         scr_vals: Vec::new(),
         scr_ydbl: Vec::new(),
         scr_nbv: Vec::new(),
+        nbv: Vec::new(),
+        nz: Vec::new(),
+        nz_pos: Vec::new(),
+        nz_sorted: true,
         scr_ub: Vec::new(),
         scr_binp: Vec::new(),
         rrows_exact: true,
@@ -7375,6 +7477,7 @@ fn solve_pass_callback<R: Real>(
         // pass after the dual optimum brings it back (`0x155139`).
         s.st[j] = FIXED;
     }
+    s.rebuild_nb();
     s.init_pricing_type();
     // The public DStart (`reverse-engineer/PLAN.md`): d = c - A^T y for every variable, basic ones included; the basic variables of the start basis with |d| > 1e-7
     // form the forced-row stack (`0xeef09`, ascending), taken before the setup pivots of the free variables.
@@ -7464,7 +7567,7 @@ fn solve_pass_callback<R: Real>(
         if s.st[j] == FREE && dt[j].abs() > R::c(dual_tol()) {
             // A free variable the setup pivots could not bring into the basis (no basic variable with a finite lower bound in its column) and that is dual
             // infeasible: it takes the artificial bound its d asks for, like any other variable without the bound it would need.
-            s.st[j] = if dt[j] > R::ZERO { LB } else { UB };
+            s.set_st(j, if dt[j] > R::ZERO { LB } else { UB });
             s.d[j] = dt[j].abs();
             continue;
         }
@@ -7481,13 +7584,13 @@ fn solve_pass_callback<R: Real>(
             continue;
         }
         if dt[j] < R::c(-dual_tol()) {
-            s.st[j] = UB;
+            s.set_st(j, UB);
         } else if dt[j] > R::c(dual_tol()) {
-            s.st[j] = LB;
+            s.set_st(j, LB);
         } else if crash_upper.as_ref().is_some_and(|u| u[j]) {
             // A d within the tolerance keeps the status the crash gave (`0xead36`: at the upper bound for a negative cost, else at the lower bound, then
             // the sign of the cost after the crash's third pass; f94 release: x120 with cost -1 and d = 0 starts at the artificial upper bound).
-            s.st[j] = UB;
+            s.set_st(j, UB);
         }
         s.d[j] = if s.st[j] == UB { -dt[j] } else { dt[j] };
     }
@@ -7840,7 +7943,7 @@ fn solve_pass_callback<R: Real>(
                 s.sync_bounds();
                 for pos in 0..s.m {
                     let v = s.head[pos];
-                    s.st[v] = pos as i32;
+                    s.set_basic(v, pos as i32);
                     s.w[pos] = wv[v];
                 }
                 if let Err(e) = s.refactor("optimal_cleanup") {
@@ -8870,6 +8973,10 @@ mod captured_bh305_ratio {
             scr_vals: Vec::new(),
             scr_ydbl: Vec::new(),
             scr_nbv: Vec::new(),
+            nbv: Vec::new(),
+            nz: Vec::new(),
+            nz_pos: Vec::new(),
+            nz_sorted: true,
             scr_ub: Vec::new(),
             scr_binp: Vec::new(),
             rrows_exact: true,
@@ -8919,6 +9026,7 @@ mod captured_bh305_ratio {
             forced_stale: false,
         };
         s.d = d;
+        s.rebuild_nb();
         s.level = input["lvl"].as_u64().unwrap() as usize;
         s.iters = input["it"].as_f64().unwrap() as usize;
         let rc = &case["candidate_collection"];
