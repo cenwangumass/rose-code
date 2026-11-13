@@ -2628,15 +2628,6 @@ impl<'a, R: Real> Dual<'a, R> {
                 }
             }
         }
-        let est = self.mirror.ftran_dense_work(&r);
-        self.work
-            .add_from(0x1219d6, 0x120673, est, crate::work::FAC);
-        // `0xc142b`: the solution read-out sums the columns of the nonbasic variables at a nonzero value.
-        self.work.add(
-            0xc142b,
-            4.0 * p.m as f64 + 2.0 * cols as f64,
-            crate::work::CTX,
-        );
         let mut rows = std::mem::take(&mut self.scr_rows);
         let mut vals = std::mem::take(&mut self.scr_vals);
         rows.clear();
@@ -2647,7 +2638,35 @@ impl<'a, R: Real> Dual<'a, R> {
                 vals.push(r[i]);
             }
         }
+        // The estimate of the dense FTRAN is booked before the read-out term. On the dense route it is the work of the real solve below
+        // (booked right after it, the solve books nothing here); on the others it is the replay, booked first.
+        let from_solve = self.mirror.dense_route(rows.len());
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        let replay = self.mirror.ftran_dense_work(&r);
+        if !from_solve {
+            let est = self.mirror.ftran_dense_work(&r);
+            self.work
+                .add_from(0x1219d6, 0x120673, est, crate::work::FAC);
+            // `0xc142b`: the solution read-out sums the columns of the nonbasic variables at a nonzero value.
+            self.work.add(
+                0xc142b,
+                4.0 * p.m as f64 + 2.0 * cols as f64,
+                crate::work::CTX,
+            );
+        }
         let out = self.mirror.ftran_basic(&rows, &vals);
+        if from_solve {
+            let est = self.mirror.dense_work_of_solve(self.mirror.work(), rows.len());
+            #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+            assert_eq!(est.to_bits(), replay.to_bits(), "recompute_xb: dense work of the solve differs from the replay");
+            self.work
+                .add_from(0x1219d6, 0x120673, est, crate::work::FAC);
+            self.work.add(
+                0xc142b,
+                4.0 * p.m as f64 + 2.0 * cols as f64,
+                crate::work::CTX,
+            );
+        }
         self.scr_rows = rows;
         self.scr_vals = vals;
         let mut xb = std::mem::take(&mut self.xb);
@@ -5253,7 +5272,11 @@ impl<'a, R: Real> Dual<'a, R> {
                     .collect()
             };
             let vals: Vec<R> = rows.iter().map(|&i| rhs[i]).collect();
-            let dense_est = if dense_in {
+            // On the dense route the estimate is the work of the real solve below; otherwise the replay of the dense FTRAN.
+            let from_solve = dense_in && self.mirror.dense_route(rows.len());
+            #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+            let replay = dense_in.then(|| self.mirror.ftran_dense_work(&rhs));
+            let dense_est = if dense_in && !from_solve {
                 Some(self.mirror.ftran_dense_work(&rhs))
             } else {
                 None
@@ -5263,6 +5286,15 @@ impl<'a, R: Real> Dual<'a, R> {
             }
             self.glue.rhs = rhs;
             let sol = self.mirror.ftran_keep(&rows, &vals, dense_in);
+            let dense_est = if from_solve {
+                Some(self.mirror.dense_work_of_solve(self.mirror.keep_work(), rows.len()))
+            } else {
+                dense_est
+            };
+            #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+            if from_solve {
+                assert_eq!(dense_est.map(f64::to_bits), replay.map(f64::to_bits), "dense work of the solve differs from the replay");
+            }
             self.work.add_from(
                 0x1219d6,
                 0x120673,

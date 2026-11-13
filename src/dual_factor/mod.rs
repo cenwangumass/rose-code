@@ -4164,6 +4164,20 @@ impl<R: Real> DualFactor<R> {
         self.last_ordered
     }
 
+    /// Whether the real FTRAN of a dense input with `nrows` nonzero entries (`ftran_basic`, `ftran_keep(.., true)`) takes the dense L route
+    /// (`nrows * dthr > m`) into `ftran_with_dense` (the `bsolve` dump forces the list route). Then `ftran_dense_work` is
+    /// `dense_work_of_solve`; on the other routes the real solve books a different estimate and the replay is needed.
+    pub fn dense_route(&self, nrows: usize) -> bool {
+        nrows * self.dthr > self.m && !crate::dump::on("bsolve")
+    }
+
+    /// `ftran_dense_work(b)` from the work `solved` of the real dense-route FTRAN of the same vector (`nrows` nonzero entries): the L stage
+    /// books the input term `m + 2 nrows` that the replay does not, every other term (L sweep, row etas, U tail with `cnt = None`) is
+    /// the same integer sum.
+    pub fn dense_work_of_solve(&self, solved: f64, nrows: usize) -> f64 {
+        solved - (self.m + 2 * nrows) as f64
+    }
+
     /// Work estimate of an FTRAN with a dense input (the reference's count `-1`, e.g. the basic solution after a refactorization):
     /// dense L solve, all row etas, dense U solve. `b` is indexed by row.
     pub fn ftran_dense_work(&self, b: &[R]) -> f64 {

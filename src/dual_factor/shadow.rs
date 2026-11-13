@@ -148,6 +148,13 @@ impl<R: Real> Shadow<R> {
         self.finish("work_parts", &(bits(new.0), bits(new.1)), &(bits(old.0), bits(old.1)), false);
         new
     }
+    /// Pure functions of the new backend's route and work; the old backend has no counterpart.
+    pub fn dense_route(&self, nrows: usize) -> bool {
+        self.new.dense_route(nrows)
+    }
+    pub fn dense_work_of_solve(&self, solved: f64, nrows: usize) -> f64 {
+        self.new.dense_work_of_solve(solved, nrows)
+    }
     pub fn keep_work(&self) -> f64 {
         let new = self.new.keep_work();
         let old = muted(|| self.old.keep_work);
