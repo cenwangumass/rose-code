@@ -270,7 +270,7 @@ impl<R: Copy> Csr<R> {
     /// Per-call O(1) check that `x` can be indexed by every line and every entry index of the pool; `start` is monotone and ends at
     /// `idx.len() == val.len()` by construction (`push_line` / `transpose` are the only writers).
     #[inline(always)]
-    fn check_vector(&self, n: usize) {
+    pub(super) fn check_vector(&self, n: usize) {
         assert!(n >= self.lines() && n >= self.idx_bound as usize);
         debug_assert!(self.start.windows(2).all(|w| w[0] <= w[1]));
         debug_assert!(self.start.last().map(|&e| e as usize) == Some(self.idx.len()) && self.idx.len() == self.val.len());

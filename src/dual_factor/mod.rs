@@ -28,6 +28,8 @@ mod adapter;
 #[cfg(test)]
 mod ab_tests;
 #[cfg(test)]
+mod btran_level_tests;
+#[cfg(test)]
 mod btran_out_tests;
 #[cfg(test)]
 mod btran_tests;
@@ -503,6 +505,63 @@ impl<R: Real> LevelWorkspace<R> {
                 .map(|i| (i, self.values[i])),
         );
         Some((out, count, work))
+    }
+}
+
+/// The level-bucket sweep of the sparse `L^T` BTRAN: nodes are taken level by level (insertion order within a level), a node with
+/// `|x| >= TOL` is kept in `res` and subtracted along its `lt` column, and the not yet marked entries of that column are marked and
+/// appended to the bucket of their level; a smaller node is zeroed. The seeds (all marked, in their buckets) are set up by the caller.
+///
+/// One loop per column: the new nodes must enter the buckets in the order of the reference (the column walked from its last entry), so
+/// the loop runs from the last entry to the first and subtracts as it goes. The destinations of one column are distinct (a column of
+/// `L^T` is a row of `L`, whose entries have distinct columns), so the order of the subtractions cannot change a result.
+#[allow(clippy::too_many_arguments)]
+fn level_sweep<R: Real>(
+    lt: &Csr<R>,
+    lev: &[usize],
+    maxlev: usize,
+    lo: usize,
+    x: &mut [R],
+    marks: &mut [u32],
+    stamp: u32,
+    buckets: &mut [Vec<usize>],
+    res: &mut Vec<usize>,
+) {
+    // O(1) proof for the unchecked accesses below: every node and column entry is `< lt.lines()` or `< idx_bound`, both at most the
+    // length of `x`, `marks` and `lev`; every level is `<= maxlev < buckets.len()`.
+    lt.check_vector(x.len());
+    assert!(marks.len() == x.len() && lev.len() == x.len() && maxlev < buckets.len());
+    let tol = R::c(TOL);
+    let mut lv_i = lo;
+    while lv_i <= maxlev {
+        let mut k = 0;
+        while k < buckets[lv_i].len() {
+            let i = buckets[lv_i][k];
+            k += 1;
+            // SAFETY: nodes in the buckets are `< x.len()` (seeds are indices of `x`, pushed entries are column entries).
+            let v = unsafe { *x.get_unchecked(i) };
+            if v.abs() >= tol {
+                res.push(i);
+                let (src, mult) = lt.col(i);
+                let n = src.len().min(mult.len());
+                for q in (0..n).rev() {
+                    // SAFETY: `q < n`; `j < idx_bound <= x.len() == marks.len() == lev.len()`; `lev[j] <= maxlev < buckets.len()`.
+                    unsafe {
+                        let j = *src.get_unchecked(q) as usize;
+                        *x.get_unchecked_mut(j) -= *mult.get_unchecked(q) * v;
+                        let mk = marks.get_unchecked_mut(j);
+                        if *mk != stamp {
+                            *mk = stamp;
+                            buckets.get_unchecked_mut(*lev.get_unchecked(j)).push(j);
+                        }
+                    }
+                }
+            } else {
+                x[i] = R::ZERO;
+            }
+        }
+        buckets[lv_i].clear();
+        lv_i += 1;
     }
 }
 
@@ -3756,41 +3815,13 @@ impl<R: Real> DualFactor<R> {
                     });
                     let maxlev = *maxlev;
                     ws.buckets.resize_with(maxlev + 1, Vec::new);
-                    let buckets = &mut ws.buckets;
                     let mut lo = usize::MAX;
                     for &i in l {
                         ws.marks[i] = stamp;
-                        buckets[lev[i]].push(i);
+                        ws.buckets[lev[i]].push(i);
                         lo = lo.min(lev[i]);
                     }
-                    let mut lv_i = lo;
-                    while lv_i <= maxlev {
-                        let mut k = 0;
-                        while k < buckets[lv_i].len() {
-                            let i = buckets[lv_i][k];
-                            k += 1;
-                            let v = x[i];
-                            if v.abs() >= R::c(TOL) {
-                                res.push(i);
-                                let (src, mult) = lt.col(i);
-                                for (&j, &lv) in src.iter().zip(mult) {
-                                    x[j as usize] -= lv * v;
-                                }
-                                // The reference walks the row from its last entry.
-                                for &j in src.iter().rev() {
-                                    let j = j as usize;
-                                    if ws.marks[j] != stamp {
-                                        ws.marks[j] = stamp;
-                                        buckets[lev[j]].push(j);
-                                    }
-                                }
-                            } else {
-                                x[i] = R::ZERO;
-                            }
-                        }
-                        buckets[lv_i].clear();
-                        lv_i += 1;
-                    }
+                    level_sweep(lt, lev, maxlev, lo, &mut x, &mut ws.marks, stamp, &mut ws.buckets, &mut res);
                 } else {
                     let heap = &mut ws.pending;
                     for &i in l {
