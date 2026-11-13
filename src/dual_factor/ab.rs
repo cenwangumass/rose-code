@@ -85,6 +85,38 @@ impl<R: Real> AbLists<R> {
         }
     }
 
+    /// A then B and their coefficients, from one lookup of the column's span: the whole numeric U column, entry for entry.
+    #[inline(always)]
+    pub fn both_pair(&self, c: usize) -> (&[u32], &[R]) {
+        let s = &self.span[c];
+        let (lo, hi) = (s.start as usize, (s.start + s.na + s.nb) as usize);
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        {
+            (&self.idx[lo..hi], &self.val[lo..hi])
+        }
+        #[cfg(not(any(test, debug_assertions, feature = "factor-shadow")))]
+        {
+            // SAFETY: as `a_pair` (`start + na + nb <= start + cap <= len` of both arrays).
+            unsafe { (self.idx.get_unchecked(lo..hi), self.val.get_unchecked(lo..hi)) }
+        }
+    }
+
+    /// `(na, nb)` and the whole numeric U column (A then B with the coefficients) from one lookup of the column's span.
+    #[inline(always)]
+    pub fn counts_both_pair(&self, c: usize) -> (usize, usize, &[u32], &[R]) {
+        let s = &self.span[c];
+        let (lo, hi) = (s.start as usize, (s.start + s.na + s.nb) as usize);
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        {
+            (s.na as usize, s.nb as usize, &self.idx[lo..hi], &self.val[lo..hi])
+        }
+        #[cfg(not(any(test, debug_assertions, feature = "factor-shadow")))]
+        {
+            // SAFETY: as `both_pair`.
+            unsafe { (s.na as usize, s.nb as usize, self.idx.get_unchecked(lo..hi), self.val.get_unchecked(lo..hi)) }
+        }
+    }
+
     /// `x[j] -= v * xv` over the A list of column `c`, entry by entry in list order (4-way unrolled, same operations and order as the
     /// plain loop even if an index repeats). Every A entry is a position below `x.len()` (asserted by the caller once per call;
     /// checked per entry in the test, debug and shadow builds).
@@ -293,6 +325,18 @@ pub(super) fn same_bits<R: Real>(a: R, b: R) -> bool {
     } else {
         let (a, b) = (a.downcast_ref::<crate::f80::F80>().unwrap(), b.downcast_ref::<crate::f80::F80>().unwrap());
         a.repr() == b.repr()
+    }
+}
+
+/// The representation of a value (signed zeros, NaN payloads and the x87 format included), for multiset comparisons.
+#[cfg(feature = "factor-shadow")]
+pub(super) fn bits_of<R: Real>(a: R) -> Vec<u8> {
+    use std::any::Any;
+    let a = &a as &dyn Any;
+    if let Some(a) = a.downcast_ref::<f64>() {
+        a.to_bits().to_le_bytes().to_vec()
+    } else {
+        format!("{:?}", a.downcast_ref::<crate::f80::F80>().unwrap().repr()).into_bytes()
     }
 }
 

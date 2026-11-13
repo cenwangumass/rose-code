@@ -18,16 +18,18 @@ use pool::{Csr, LPool};
 use urows::URows;
 use std::collections::BinaryHeap;
 
-/// Scatter of one U column `x[j] -= v * xc` over its `(j, v)` entries in textual order, four per iteration (the updates stay
+/// Scatter of one U column `x[j] -= v * xc` over its entries (`$idx[k]`, `$val[k]`) in list order, four per iteration (the updates stay
 /// sequential, so the rounding and repeated destinations are those of the plain loop); `$step` runs after each update with `j`.
 /// Caller contract: `x.len() >= m` and every `j < m` (the U columns hold factor positions); checked per entry in test/debug/shadow builds.
 macro_rules! scatter_u_col {
-    ($x:expr, $col:expr, $xc:expr, $n:expr, |$j:ident| $step:block) => {{
-        let (col, xc, n): (&[(usize, R)], R, usize) = ($col, $xc, $n);
+    ($x:expr, $idx:expr, $val:expr, $xc:expr, $n:expr, |$j:ident| $step:block) => {{
+        let (idx, val, xc, n): (&[u32], &[R], R, usize) = ($idx, $val, $xc, $n);
         let mut k = 0usize;
         macro_rules! one {
-            ($e:expr) => {{
-                let ($j, v) = $e;
+            ($i:expr) => {{
+                let i = $i;
+                // SAFETY of the callers' indices: `i < len`.
+                let ($j, v) = (unsafe { *idx.get_unchecked(i) } as usize, unsafe { *val.get_unchecked(i) });
                 #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
                 assert!($j < n && $j < $x.len(), "U column entry out of range");
                 // SAFETY: `$j < m <= $x.len()` (caller contract, checked above in test/debug/shadow builds).
@@ -35,17 +37,17 @@ macro_rules! scatter_u_col {
                 $step
             }};
         }
-        let len = col.len();
-        // SAFETY of the `get_unchecked` below: `k + 3 < len` in the loop and `k + r < len` in the tail.
+        let len = idx.len().min(val.len());
+        // SAFETY of the indices above: `k + 3 < len` in the loop and `k < len` in the tail.
         while k + 4 <= len {
-            one!(unsafe { *col.get_unchecked(k) });
-            one!(unsafe { *col.get_unchecked(k + 1) });
-            one!(unsafe { *col.get_unchecked(k + 2) });
-            one!(unsafe { *col.get_unchecked(k + 3) });
+            one!(k);
+            one!(k + 1);
+            one!(k + 2);
+            one!(k + 3);
             k += 4;
         }
         while k < len {
-            one!(unsafe { *col.get_unchecked(k) });
+            one!(k);
             k += 1;
         }
     }};
@@ -1751,10 +1753,17 @@ impl<R: Real> DualFactor<R> {
         let empty_tail: EmptyTail = empty_list.into_iter().collect();
         // Entries per row of U: the capacity of each row of the row-wise copy, of `urows` and the layout of the rows.
         let mut row_cap = vec![0usize; m];
-        for col in &uc {
-            for &(row, _) in col {
-                row_cap[row] += 1;
+        for t in i21..m {
+            for &row in ab.both(t) {
+                row_cap[row as usize] += 1;
             }
+        }
+        #[cfg(feature = "factor-shadow")]
+        {
+            let mut by_uc = vec![0usize; m];
+            uc.iter().flatten().for_each(|e| by_uc[e.0] += 1);
+            assert!(by_uc == row_cap, "fresh: row counts of ab and uc differ");
+            assert!((0..i21).all(|c| ab.is_empty(c) && uc[c].is_empty()), "fresh: a non-tail column holds U entries");
         }
         let u_total: usize = row_cap.iter().sum();
         // Every U entry of a tail column is in its A or B list (kind -2 or >= 0): the member lists below are read from the rows, so an
@@ -1773,8 +1782,8 @@ impl<R: Real> DualFactor<R> {
         for &t in &pos_of_col {
             if t >= i21 && t < m {
                 visited += 1;
-                for &(row, v) in &uc[t] {
-                    urows.push(row, t, v);
+                for (&row, &v) in ab.both(t).iter().zip(ab.both_val(t)) {
+                    urows.push(row as usize, t, v);
                 }
             }
         }
@@ -3195,7 +3204,7 @@ impl<R: Real> DualFactor<R> {
         if let FtranTouched::Sparse { words, occupied } = &mut touched {
             // The sparse solve (not `u_dense`): the quotient alone is tested, and a scatter marks its target block without the first-visit test
             // (the tail dependency walk is done; the set of marks is what the readers see).
-            let (diag, uc) = (&self.diag[..], &self.uc[..]);
+            let diag = &self.diag[..];
             for &c in &tail {
                 let xc = x[c] / diag[c];
                 if xc.abs() <= tol {
@@ -3204,20 +3213,20 @@ impl<R: Real> DualFactor<R> {
                 }
                 x[c] = xc;
                 col_surv.push(c);
-                let (na, nb) = self.ab.counts(c);
+                let (na, nb, idx, val) = self.ab.counts_both_pair(c);
                 sa += na;
                 sb += nb;
-                let col = &uc[c];
-                su += col.len();
-                for &(j, v) in col {
-                    x[j] -= v * xc;
+                #[cfg(feature = "factor-shadow")]
+                self.shadow_u_col(c);
+                su += idx.len();
+                scatter_u_col!(x, idx, val, xc, m, |j| {
                     let block = j / 64;
                     let word = &mut words[block];
                     if *word == 0 {
                         occupied.push(block);
                     }
                     *word |= 1u64 << (j % 64);
-                }
+                });
             }
         } else {
             for &c in &tail {
@@ -3233,13 +3242,15 @@ impl<R: Real> DualFactor<R> {
                 }
                 x[c] = xc;
                 col_surv.push(c);
-                sa += self.ab.na(c);
-                sb += self.ab.nb(c);
-                su += self.uc[c].len();
-                for &(j, v) in &self.uc[c] {
-                    x[j] -= v * xc;
+                let (na, nb, idx, val) = self.ab.counts_both_pair(c);
+                sa += na;
+                sb += nb;
+                #[cfg(feature = "factor-shadow")]
+                self.shadow_u_col(c);
+                su += idx.len();
+                scatter_u_col!(x, idx, val, xc, m, |j| {
                     touched.insert(j);
-                }
+                });
             }
         }
         // Invariant (P4-2): the nonzero tail slots are exactly the processed survivors (`col_surv`).
@@ -3385,7 +3396,7 @@ impl<R: Real> DualFactor<R> {
         let (mut pops, mut brk) = (0usize, None);
         {
             let FtranTouched::Sparse { words, occupied } = &mut touched else { unreachable!() };
-            let (diag, uc, kind, slot, at, ab) = (&self.diag[..], &self.uc[..], &self.kind[..], &self.slot[..], &self.at[..], &self.ab);
+            let (diag, kind, slot, at, ab) = (&self.diag[..], &self.kind[..], &self.slot[..], &self.at[..], &self.ab);
             // Mark the L-stage positions (a repeated position counts once) and count them by class; the tail ones seed the heap.
             let (mut n, mut nuc_n) = (0usize, 0usize);
             tri.clear();
@@ -3424,12 +3435,13 @@ impl<R: Real> DualFactor<R> {
                         } else {
                             x[c] = xc;
                             col_surv.push(c);
-                            let (na, nb) = ab.counts(c);
+                            let (na, nb, idx, val) = ab.counts_both_pair(c);
                             sa += na;
                             sb += nb;
-                            let col = &uc[c];
-                            su += col.len();
-                            scatter_u_col!(x, col, xc, m, |$j| $mark);
+                            #[cfg(feature = "factor-shadow")]
+                            self.shadow_u_col(c);
+                            su += idx.len();
+                            scatter_u_col!(x, idx, val, xc, m, |$j| $mark);
                         }
                     }
                 }};
@@ -3646,7 +3658,7 @@ impl<R: Real> DualFactor<R> {
         // The tail columns, one lookup of each column's lists, walked in descending slot order: test the raw value, divide, test the
         // quotient, store, count, scatter over the whole U column.
         {
-            let (diag, uc) = (&self.diag[..], &self.uc[..]);
+            let diag = &self.diag[..];
             assert!(x.len() >= m, "ftran_with: vector shorter than the factor");
             col_surv.reserve(m - i21);
             for &c in self.at[i21..m].iter().rev() {
@@ -3662,12 +3674,13 @@ impl<R: Real> DualFactor<R> {
                 }
                 x[c] = xc;
                 col_surv.push(c);
-                let (na, nb) = self.ab.counts(c);
+                let (na, nb, idx, val) = self.ab.counts_both_pair(c);
                 sa += na;
                 sb += nb;
-                let col = &uc[c];
-                su += col.len();
-                scatter_u_col!(x, col, xc, m, |j| {});
+                #[cfg(feature = "factor-shadow")]
+                self.shadow_u_col(c);
+                su += idx.len();
+                scatter_u_col!(x, idx, val, xc, m, |j| {});
             }
         }
         #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
@@ -4303,7 +4316,7 @@ impl<R: Real> DualFactor<R> {
         }
         // The highest tail slot whose U column is empty, scanning down to the tail start.
         let mut r13 = m - 1;
-        while r13 > x100 && !self.uc[self.at[r13]].is_empty() {
+        while r13 > x100 && !self.ab.is_empty(self.at[r13]) {
             r13 -= 1;
         }
         acc += (m - 1 - r13) as f64;
@@ -4397,9 +4410,12 @@ impl<R: Real> DualFactor<R> {
             }
             x[c] = xc;
             n_surv += 1;
-            su += self.uc[c].len();
-            for &(j, v) in &self.uc[c] {
-                x[j] -= v * xc;
+            #[cfg(feature = "factor-shadow")]
+            self.shadow_u_col(c);
+            let (idx, val) = self.ab.both_pair(c);
+            su += idx.len();
+            for (&j, &v) in idx.iter().zip(val) {
+                x[j as usize] -= v * xc;
             }
         }
         let result = self.u_work(&[], x, false, None, &Surv { list: &[], n: n_surv, sa: 0, sb: 0, su }, None) + e;
@@ -4535,7 +4551,7 @@ impl<R: Real> DualFactor<R> {
         let m = self.m;
         let i21 = self.i21;
         let i3 = self.nuc.len();
-        let len = |c: usize| self.uc[c].len();
+        let len = |c: usize| self.ab.na(c) + self.ab.nb(c);
         // Every tail slot from the top down, then the nucleus list (shared by the dense paths).
         let full_tail = |mut e: f64| {
             e = (m - i21) as f64 * 3.0 + e;
@@ -5135,6 +5151,19 @@ impl<R: Real> DualFactor<R> {
             seen[i] = false;
         }
         visited
+    }
+
+    /// Shadow audit of a reader of the numeric U column `c`: what `ab` hands out (A then B with the coefficients) is `uc[c]` as a multiset
+    /// with equal bits, and no row repeats (the scatters write distinct destinations, so the entry order reaches no output).
+    #[cfg(feature = "factor-shadow")]
+    fn shadow_u_col(&self, c: usize) {
+        let (idx, val) = self.ab.both_pair(c);
+        let mut got: Vec<(usize, Vec<u8>)> = idx.iter().zip(val).map(|(&j, &v)| (j as usize, ab::bits_of(v))).collect();
+        let mut want: Vec<(usize, Vec<u8>)> = self.uc[c].iter().map(|&(j, v)| (j, ab::bits_of(v))).collect();
+        got.sort();
+        want.sort();
+        assert!(got == want, "ab span of column {c} differs from uc as a multiset");
+        assert!(got.windows(2).all(|w| w[0].0 != w[1].0), "row repeated in column {c}");
     }
 
     /// Replace a numeric U column. Its entries left the row-wise copy and the new ones join it at the places `update` handles them (the

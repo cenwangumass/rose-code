@@ -149,7 +149,8 @@ fn scatter_u_col_case<R: Real>() {
                 a[j] -= v * xc;
                 la.push(j);
             }
-            scatter_u_col!(b, &col, xc, m, |j| { lb.push(j) });
+            let (idx, val): (Vec<u32>, Vec<R>) = col.iter().map(|&(j, v)| (j as u32, v)).unzip();
+            scatter_u_col!(b, &idx, &val, xc, m, |j| { lb.push(j) });
             assert_eq!(la, lb);
             assert_eq!(all_bits(&a), all_bits(&b));
         }
