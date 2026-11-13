@@ -5164,12 +5164,32 @@ impl<R: Real> DualFactor<R> {
         // The eta is stored first, at the current pool fill; its value array sits on a 16-byte boundary when the fill is even.
         let peel = self.fill % 2;
         // The old column's entries leave the row-wise copy after the new column's entries have been added.
-        scratch.old_rows.clear();
+        // The rows of a tail column are those of its A and B lists (the multiset of `uc[r]` rows, audited), stamped for the membership
+        // tests of the row loop below; a non-tail column has none.
+        let mut old_n = 0;
         if self.kind[r] == -2 {
-            scratch.old_rows.extend(self.uc[r].iter().map(|e| e.0));
+            let both = self.ab.both(r);
+            old_n = both.len();
+            scratch.old_mark.prepare(m);
+            for &y in both {
+                scratch.old_mark.insert(y as usize);
+            }
+        }
+        #[cfg(feature = "factor-shadow")]
+        let shadow_old: Vec<usize> = if self.kind[r] == -2 { self.uc[r].iter().map(|e| e.0).collect() } else { Vec::new() };
+        #[cfg(feature = "factor-shadow")]
+        {
+            assert_eq!(old_n, shadow_old.len(), "update old column length");
+            assert!(shadow_old.iter().all(|&y| scratch.old_mark.contains(y)), "update old rows");
+        }
+        // One pass over the spike for the count and the highest slot (below the floors everything is decided from these two).
+        let (k, maxslot) = self.spike.iter().filter(|e| e.0 != r).fold((0usize, -1i64), |(n, t), e| (n + 1, t.max(self.slot[e.0] as i64)));
+        #[cfg(feature = "factor-shadow")]
+        {
+            assert_eq!(k, self.spike.iter().filter(|e| e.0 != r).count(), "update spike count");
+            assert_eq!(maxslot, self.spike.iter().filter(|e| e.0 != r).map(|e| self.slot[e.0] as i64).max().unwrap_or(-1), "update spike top slot");
         }
         // The new U column's entries (`0xf15c0`, sites `0xf2521` and `0xf2e3c`).
-        let k = self.spike.iter().filter(|e| e.0 != r).count();
         if k > 0 {
             self.upd_work
                 .push((0xf2521, 3.0 * k as f64, crate::work::CTX));
@@ -5198,13 +5218,10 @@ impl<R: Real> DualFactor<R> {
         // The solve runs only when a spike entry lies below `max(slot[r], i21 - 1)` (`0xf1859..0xf191f`).
         let solve_floor = self.slot[r].max(self.i21.saturating_sub(1));
         let cached = self.row_cached.take() == Some(r);
-        if !cached
-            && (solve_len > 0 || (self.h33 > 5.0 && self.dense_est.get() > 0.0))
-            && self
-                .spike
-                .iter()
-                .any(|e| e.0 != r && self.slot[e.0] > solve_floor)
-        {
+        let above_floor = maxslot > solve_floor as i64;
+        #[cfg(feature = "factor-shadow")]
+        assert_eq!(above_floor, self.spike.iter().any(|e| e.0 != r && self.slot[e.0] > solve_floor), "update spike above floor");
+        if !cached && (solve_len > 0 || (self.h33 > 5.0 && self.dense_est.get() > 0.0)) && above_floor {
             let est = if self.h33 > 5.0 {
                 self.dense_est.get()
             } else {
@@ -5214,11 +5231,18 @@ impl<R: Real> DualFactor<R> {
         }
         let mut sp = std::mem::take(&mut scratch.sp);
         sp.clear();
+        // The U column of the new state (the spike without `r`) is collected in the same pass.
+        let mut col = std::mem::take(&mut scratch.spare_col);
+        col.clear();
+        col.reserve(self.spike.len());
         for &(p, v) in &self.spike {
             values[p] = v;
             if !seen[p] {
                 seen[p] = true;
                 sp.push(p);
+            }
+            if p != r {
+                col.push((p, v));
             }
         }
         let d0 = self.diag[r];
@@ -5304,14 +5328,9 @@ impl<R: Real> DualFactor<R> {
             let oldslot0 = self.slot[r] as i64;
             let bt = self.i21 as i64 - 1;
             let floor = bt.max(oldslot0);
-            let top = self
-                .spike
-                .iter()
-                .filter(|e| e.0 != r)
-                .map(|e| self.slot[e.0] as i64)
-                .max()
-                .unwrap_or(floor)
-                .max(floor);
+            let top = maxslot.max(floor);
+            #[cfg(feature = "factor-shadow")]
+            assert_eq!(top, self.spike.iter().filter(|e| e.0 != r).map(|e| self.slot[e.0] as i64).max().unwrap_or(floor).max(floor), "update top");
             xlim = bt;
             if top == floor {
                 if bt >= oldslot0 && k > 0 {
@@ -5392,20 +5411,43 @@ impl<R: Real> DualFactor<R> {
         let mut av = std::mem::take(&mut scratch.spare_a);
         av.clear();
         av.reserve(sp.len());
-        av.extend(sp.iter().copied().filter(|&x| self.kind[x] == -2).map(|x| (x as u32, values[x])));
         let mut bv = std::mem::take(&mut scratch.spare_b);
         bv.clear();
         bv.reserve(sp.len());
-        bv.extend(sp.iter().copied().filter(|&x| self.kind[x] >= 0).map(|x| (x as u32, values[x])));
+        // One pass over `sp` for both lists (each in `sp` order) and the highest slot of the A list.
+        let mut top: i64 = -1;
+        for &x in &sp {
+            let kx = self.kind[x];
+            if kx == -2 {
+                av.push((x as u32, values[x]));
+                top = top.max(self.slot[x] as i64);
+            } else if kx >= 0 {
+                bv.push((x as u32, values[x]));
+            }
+        }
         let refcols = &mut scratch.refcols;
         refcols.clear();
         refcols.extend(self.urows.cols(r).iter().map(|&k| (k as usize, self.slot[k as usize])));
         refcols.sort_unstable();
         refcols.dedup();
-        refcols.retain(|&(x, _)| x != r && self.kind[x] == -2 && (self.ab.a_pos(x, r).is_some() || self.ab.b_pos(x, r).is_some()));
+        // The columns of row `r` are tail columns other than `r` that hold `r` in A or B (every `urows` entry is a tail column's
+        // entry, audited; `r` is never in its own column; no pass between here and the main loop edits another column's lists), so
+        // the filter the reference-order code applied here removes nothing (0 removals in all models; `factor-shadow` asserts it).
+        // Each column's positions of `r` are found once and used by the main loop.
+        let refpos = &mut scratch.refpos;
+        refpos.clear();
+        for &(x, _) in refcols.iter() {
+            let pa = self.ab.a_pos(x, r);
+            let pb = if pa.is_some() { None } else { self.ab.b_pos(x, r) };
+            #[cfg(feature = "factor-shadow")]
+            {
+                assert!(x != r && self.kind[x] == -2 && (pa.is_some() || pb.is_some()), "update refcols retain would remove {x}");
+                assert_eq!(pb, self.ab.b_pos(x, r), "update row {r} in both lists of column {x}");
+            }
+            refpos.push((pa, pb));
+        }
         // Only a surviving row-r reference can raise the mark after the slot walk.
         let oldslot = self.slot[r];
-        let top: i64 = av.iter().map(|&(x, _)| self.slot[x as usize] as i64).max().unwrap_or(-1);
         let mut moved = true;
         let mut tail_rebuild = false;
         if old == -2 {
@@ -5464,11 +5506,12 @@ impl<R: Real> DualFactor<R> {
                 .push((0xf2a51, 3.0 * refs as f64, crate::work::CTX));
         }
         let mut eliminated = false;
-        for &(k, old_ref_slot) in refcols.iter() {
+        for (&(k, old_ref_slot), &(pos_a, pos_b)) in refcols.iter().zip(refpos.iter()) {
             if k == r || self.kind[k] != -2 {
                 continue;
             }
-            let (pos_a, pos_b) = (self.ab.a_pos(k, r), self.ab.b_pos(k, r));
+            #[cfg(feature = "factor-shadow")]
+            assert!(pos_a == self.ab.a_pos(k, r) && pos_b == self.ab.b_pos(k, r), "update cached positions");
             let (in_a, in_b) = (pos_a.is_some(), pos_b.is_some());
             debug_assert!(!(in_a && in_b), "row {r} in both lists of column {k}");
             if bare {
@@ -5567,13 +5610,15 @@ impl<R: Real> DualFactor<R> {
         // pool with room to grow when it is full.
         let fill_in = self.fill;
         let mut fp_rows: Vec<(usize, usize, usize, usize)> = Vec::new();
-        if k > scratch.old_rows.len() {
+        if k > old_n {
             self.fill += k;
         }
         if k > 0 {
             // A row that already holds an entry of the old column takes the new entry in place.
             // The rows are visited in the spike's order with the leaving column replaced by the last entry (`sp`).
-            for &row in sp.iter().filter(|&&y| y != r && !scratch.old_rows.contains(&y)) {
+            for &row in sp.iter().filter(|&&y| y != r && !(old_n > 0 && scratch.old_mark.contains(y))) {
+                #[cfg(feature = "factor-shadow")]
+                assert_eq!(old_n > 0 && scratch.old_mark.contains(row), shadow_old.contains(&row), "update old column membership");
                 // Every entry of `urows` belongs to a tail column (audited) and `r`'s own entries sit only in `old_rows`, skipped above.
                 let count = self.urows.len(row);
                 let counted = || self.urows.cols(row).iter().filter(|&&c| c as usize != r && self.kind[c as usize] == -2).count();
@@ -5601,7 +5646,7 @@ impl<R: Real> DualFactor<R> {
             let n = crate::dump::FACTOR_FILL_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             crate::dump::emit(
                 "fillparts",
-                serde_json::json!({"n": n, "k": k, "old": scratch.old_rows.len(), "col": if k > scratch.old_rows.len() { k } else { 0 }, "fill_after_eta": fill_in, "rows": fp_rows}),
+                serde_json::json!({"n": n, "k": k, "old": old_n, "col": if k > old_n { k } else { 0 }, "fill_after_eta": fill_in, "rows": fp_rows}),
             );
         }
         if self.bt_occupied && !newdiag.to_f64().is_normal() {
@@ -5609,10 +5654,6 @@ impl<R: Real> DualFactor<R> {
         }
         self.bad_diag |= !(newdiag.abs() > R::ZERO);
         self.diag[r] = newdiag;
-        let mut col = std::mem::take(&mut scratch.spare_col);
-        col.clear();
-        col.reserve(self.spike.len());
-        col.extend(self.spike.iter().copied().filter(|e| e.0 != r));
         let old_col = self.replace_u_column(r, col);
         if old_col.capacity() > scratch.spare_col.capacity() {
             scratch.spare_col = old_col;

@@ -31,6 +31,12 @@ impl Marks {
         *v = self.generation;
         first
     }
+
+    /// Whether `i` was inserted in this epoch.
+    #[inline(always)]
+    pub fn contains(&self, i: usize) -> bool {
+        self.values[i] == self.generation
+    }
 }
 
 #[derive(Default)]
@@ -91,10 +97,16 @@ pub(super) struct Update<R> {
     pub heap: BinaryHeap<std::cmp::Reverse<(usize, usize)>>,
     pub eta: Vec<(usize, R)>,
     pub sp: Vec<usize>,
+    /// The frozen `update_old` keeps its old column rows as a list.
+    #[cfg(test)]
     pub old_rows: Vec<usize>,
+    /// Rows of the old column (stamped per update, never cleared).
+    pub old_mark: Marks,
     pub single_rows: Vec<usize>,
     pub demoted_front: Vec<usize>,
     pub refcols: Vec<(usize, usize)>,
+    /// The A and B positions of `r` in the columns of `refcols`, entry for entry.
+    pub refpos: Vec<(Option<usize>, Option<usize>)>,
     pub conversion_refs: Vec<usize>,
     pub xs: Vec<R>,
     /// Buffers recycled between updates: the replaced column lists and U column of the previous call (contents irrelevant, capacity kept).
@@ -110,10 +122,12 @@ impl<R> Update<R> {
         self.heap.clear();
         self.eta.clear();
         self.sp.clear();
+        #[cfg(test)]
         self.old_rows.clear();
         self.single_rows.clear();
         self.demoted_front.clear();
         self.refcols.clear();
+        self.refpos.clear();
         self.conversion_refs.clear();
         self.xs.clear();
         self.spare_a.clear();
@@ -176,7 +190,7 @@ impl<R: Real> super::DualFactor<R> {
         }
         let update = self.btran_ws.update.borrow();
         assert!(update.touched.is_empty() && update.heap.is_empty() && update.eta.is_empty()
-            && update.sp.is_empty() && update.old_rows.is_empty() && update.single_rows.is_empty()
+            && update.sp.is_empty() && update.refpos.is_empty() && update.single_rows.is_empty()
             && update.demoted_front.is_empty() && update.refcols.is_empty() && update.conversion_refs.is_empty()
             && update.xs.is_empty(), "factor-shadow update scratch lists not clean");
     }
