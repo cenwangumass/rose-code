@@ -88,8 +88,9 @@ impl<R: Real> AbLists<R> {
         {
             // SAFETY: (1) the pool arrays only grow between resets (`set` and `append_fresh` extend them, no edit shrinks or moves a span
             // but `set`), and a stream record is only written from a span that lay inside both arrays when it was valid (`fresh`,
-            // `sync_slot`) or by shrinking or growing `a_len` in step with `na` (`update`), so even a stale header cannot reach outside
-            // the arrays; (2) every A entry is a tail position, below `m`, and the caller asserts `x.len() >= m` once per call, so the
+            // `sync_slot`) or by shrinking or growing `a_len` in step with `na` (`update`), so within one factor even a stale header cannot
+            // reach outside the arrays. Across a reset (`fresh`) this does not hold for records left from the previous factor: they are safe
+            // only because `fresh` rewrites every tail record i21..m and the non-tail records are never read; (2) every A entry is a tail position, below `m`, and the caller asserts `x.len() >= m` once per call, so the
             // destinations are in range.
             unsafe { scatter_unrolled(self.idx.get_unchecked(lo..hi), self.val.get_unchecked(lo..hi), x, xv) }
         }
