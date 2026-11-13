@@ -1,7 +1,7 @@
 //! Differential tests of the A/B lists with coefficients: the in-place edits against `Vec` semantics, random update sequences against the
 //! retained original `update_old` (lists, order and coefficient bits after every step, every branch of `update`), and the needed tail
 //! scatter over A against the scan of `uc` it replaced.
-use super::ab::{same_bits, AbLists};
+use super::ab::{bits_of, same_bits, AbLists};
 use super::*;
 
 fn rng(mut seed: u64) -> impl FnMut() -> usize {
@@ -281,4 +281,106 @@ fn unrolled<R: Real>() {
 fn unrolled_scatter_matches_the_plain_loop() {
     unrolled::<f64>();
     unrolled::<crate::f80::F80>();
+}
+
+/// Everything the solver can observe of a factor except the `uc` mirror, value bits included.
+fn solver_state<R: Real>(f: &DualFactor<R>) -> String {
+    let b = |v: &[R]| v.iter().map(|&x| bits_of(x)).collect::<Vec<_>>();
+    let ut = f.urows.to_ut().iter().map(|c| c.iter().map(|&(j, v)| (j, bits_of(v))).collect::<Vec<_>>()).collect::<Vec<_>>();
+    let ab = (0..f.m).map(|c| (b(f.ab.a_val(c)), b(f.ab.b_val(c)))).collect::<Vec<_>>();
+    let etas = f.etas.iter().map(|e| (e.idx, e.ind.clone(), b(&e.val), e.peel)).collect::<Vec<_>>();
+    let work = f.upd_work.iter().map(|w| (w.0, w.1.to_bits(), w.2.to_bits())).collect::<Vec<_>>();
+    let et = f.empty_tail.iter().copied().collect::<Vec<_>>();
+    format!(
+        "{:?}",
+        (
+            (&f.kind, &f.nuc, f.i21, f.mark, f.ab.to_vecs(), ab, &f.slot, &f.at, f.urows.to_rowl(), ut),
+            (b(&f.diag), etas, &f.first_eta, f.fill, &f.row_cap, &f.row_par, et),
+            (work, f.sum_eta.to_bits(), f.sum_alpha.to_bits(), f.upd, f.work.to_bits(), f.fresh_work().iter().map(|w| (w.0, w.1.to_bits())).collect::<Vec<_>>()),
+            (f.bt_occupied, f.dense_est.get().to_bits(), f.spike_used, f.row_cached, f.bad_diag),
+        )
+    )
+}
+
+/// A factor without the `uc` mirror (what a run without the `fstruct` and `bsolve` dumps builds) against one with it, through random
+/// replacement sequences with FTRANs and BTRANs between the updates: identical solver state, FTRAN and BTRAN results, work; the
+/// mirror stays the multiset of the `ab` spans (and its fresh order is what `u_numerics` derives from `ab`).
+fn mirror_off_case<R: Real>(seen: &mut usize) {
+    let mut next = rng(0x3c6ef372fe94f82b);
+    for m in [18, 60, 150] {
+        for round in 0..10 {
+            let mut cols: Vec<(bool, Vec<usize>, Vec<f64>)> = (0..m)
+                .map(|i| {
+                    let mut rows = vec![i];
+                    let mut vals = vec![4.0];
+                    for _ in 0..(1 + round % 5) {
+                        let r = if round % 2 == 1 {
+                            if i == 0 {
+                                continue;
+                            }
+                            next() % i
+                        } else {
+                            next() % m
+                        };
+                        if !rows.contains(&r) {
+                            rows.push(r);
+                            vals.push(coeffs()[2 + next() % 3] + 0.25);
+                        }
+                    }
+                    (true, rows, vals)
+                })
+                .collect();
+            let st = crate::lu_order::factor_structure_r::<R>(m, &cols);
+            let mut on = DualFactor::<R>::fresh(m, m, &st, &cols);
+            MIRROR_OFF.with(|f| f.set(true));
+            let mut off = DualFactor::<R>::fresh(m, m, &st, &cols);
+            MIRROR_OFF.with(|f| f.set(false));
+            assert!(on.mirror && !off.mirror && off.uc.iter().all(|c| c.is_empty()));
+            let fresh_u = |f: &DualFactor<R>| f.u_numerics().iter().map(|c| c.iter().map(|&(j, v)| (j, bits_of(v))).collect::<Vec<_>>()).collect::<Vec<_>>();
+            let from_mirror: Vec<Vec<(usize, Vec<u8>)>> = on.uc.iter().map(|c| c.iter().map(|&(j, v)| (j, bits_of(v))).collect()).collect();
+            assert_eq!(fresh_u(&on), from_mirror, "fresh U order derived from ab");
+            assert_eq!(fresh_u(&off), from_mirror);
+            assert_eq!(solver_state(&on), solver_state(&off), "m {m} round {round} fresh");
+            for step in 0..m.min(90) {
+                let r = next() % m;
+                let (rows, vals): (Vec<usize>, Vec<f64>) = if next() % 6 == 0 {
+                    (cols[r].1.clone(), cols[r].2.iter().map(|v| 2.0 * v).collect())
+                } else {
+                    let mut rows = vec![r];
+                    let mut vals = vec![5.0 + step as f64];
+                    for _ in 0..(1 + next() % 8) {
+                        let q = next() % m;
+                        if !rows.contains(&q) {
+                            rows.push(q);
+                            vals.push([0.25, -0.5, 1.5, -0.0][next() % 4]);
+                        }
+                    }
+                    (rows, vals)
+                };
+                let rv: Vec<R> = vals.iter().map(|&v| R::c(v)).collect();
+                let (a, b) = (on.ftran(&rows, &rv), off.ftran(&rows, &rv));
+                assert!(a.len() == b.len() && a.iter().zip(&b).all(|(x, y)| x.0 == y.0 && same_bits(x.1, y.1)), "ftran m {m} round {round} step {step}");
+                let inp = [(next() % m, R::ONE), (r, R::c(0.5))];
+                let (a, b) = (on.btran(&inp, false, false), off.btran(&inp, false, false));
+                assert!(a.len() == b.len() && a.iter().zip(&b).all(|(x, y)| x.0 == y.0 && same_bits(x.1, y.1)), "btran m {m} round {round} step {step}");
+                on.update(r);
+                off.update(r);
+                *seen += 1;
+                assert_eq!(solver_state(&on), solver_state(&off), "m {m} round {round} step {step}");
+                assert!(off.uc.iter().all(|c| c.is_empty()));
+                on.ab.check(&on.uc, &on.kind);
+                cols[r] = (true, rows, vals);
+            }
+            on.recycle();
+            off.recycle();
+        }
+    }
+}
+
+#[test]
+fn factor_without_the_uc_mirror_matches_the_mirrored_one() {
+    let mut seen = 0;
+    mirror_off_case::<f64>(&mut seen);
+    mirror_off_case::<crate::f80::F80>(&mut seen);
+    assert!(seen > 1000);
 }

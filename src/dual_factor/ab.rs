@@ -329,7 +329,7 @@ pub(super) fn same_bits<R: Real>(a: R, b: R) -> bool {
 }
 
 /// The representation of a value (signed zeros, NaN payloads and the x87 format included), for multiset comparisons.
-#[cfg(feature = "factor-shadow")]
+#[cfg(any(test, feature = "factor-shadow"))]
 pub(super) fn bits_of<R: Real>(a: R) -> Vec<u8> {
     use std::any::Any;
     let a = &a as &dyn Any;

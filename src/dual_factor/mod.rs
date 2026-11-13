@@ -992,8 +992,13 @@ pub struct DualFactor<R: Real = f64> {
     /// Whether some diagonal entry is zero or NaN: a zero slot of the tail then divides to NaN instead of vanishing, so the sparse U stage
     /// must visit it (`ftran_with` keeps the closure walk for such a factor, which only a singular basis gives).
     bad_diag: bool,
-    /// Numeric U entries of each tail column `(position, value)`.
+    /// Mirror of the numeric U entries of each tail column `(position, value)` in spike order: the only copy that keeps the order the
+    /// `fstruct` and `bsolve` dumps print and the shadow oracle's projection reads. `ab` holds every entry of the tail columns; no reader
+    /// of the solver reads this. Maintained (and nonempty) only when `mirror`; empty otherwise.
     uc: Vec<Vec<(usize, R)>>,
+    /// Whether `uc` is maintained: under the `factor-shadow` feature, in unit tests unless a test turns it off, and when a dump
+    /// that prints the spike order is selected (`fstruct`, `bsolve`).
+    mirror: bool,
     /// The row-wise copy of the numeric U entries of the tail columns, rows in the reference's physical order (one pool).
     urows: URows<R>,
     /// Spike of the most recent solve: the L stage and eta result `(position, value)` in list order.
@@ -1377,6 +1382,28 @@ struct FreshScratch {
     lst: Vec<usize>,
 }
 
+#[cfg(test)]
+thread_local! {
+    /// Unit tests that run a factor without the `uc` mirror (the build every normal run uses) set this.
+    static MIRROR_OFF: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Whether a new factor keeps the `uc` mirror (see `DualFactor::mirror`).
+fn mirror_wanted() -> bool {
+    #[cfg(feature = "factor-shadow")]
+    {
+        true
+    }
+    #[cfg(not(feature = "factor-shadow"))]
+    {
+        #[cfg(test)]
+        if MIRROR_OFF.with(|m| m.get()) {
+            return false;
+        }
+        cfg!(test) || crate::dump::on("fstruct") || crate::dump::on("bsolve")
+    }
+}
+
 /// The lists of a retired factor (`ab`, `uc`, `urows`), kept with their allocations for the next `fresh`
 /// (`DualFactor::recycle`): the refactorization then neither frees the old rows nor allocates the new ones.
 struct Recycled<R> {
@@ -1393,7 +1420,7 @@ struct Recycled<R> {
 
 impl<R: Real> Recycled<R> {
     /// The retained lists, or new empty ones, as `m` empty rows each.
-    fn take(m: usize) -> Self {
+    fn take(m: usize, mirror: bool) -> Self {
         fn rows<T>(v: &mut Vec<Vec<T>>, m: usize) {
             v.resize_with(m, Vec::new);
             v.iter_mut().for_each(Vec::clear);
@@ -1412,7 +1439,11 @@ impl<R: Real> Recycled<R> {
             |b| *b,
         );
         r.ab.reset(m);
-        rows(&mut r.uc, m);
+        if mirror {
+            rows(&mut r.uc, m);
+        } else {
+            r.uc.clear();
+        }
         r.urows.reset(m);
         r
     }
@@ -1449,6 +1480,7 @@ impl<R: Real> DualFactor<R> {
         cols: impl Into<crate::lu_order::Cols<'a>>,
     ) -> DualFactor<R> {
         let cols: crate::lu_order::Cols<'a> = cols.into();
+        let mirror = mirror_wanted();
         let mut step = vec![usize::MAX; m];
         for (s, &(r, _)) in st.pivots.iter().enumerate() {
             step[r] = s;
@@ -1495,7 +1527,7 @@ impl<R: Real> DualFactor<R> {
                 }
             }
         }
-        let Recycled { mut ab, mut uc, mut urows, level, lists, lscr, bt_buckets } = Recycled::<R>::take(m);
+        let Recycled { mut ab, mut uc, mut urows, level, lists, lscr, bt_buckets } = Recycled::<R>::take(m, mirror);
         let (mut sa, mut sb) = (0usize, 0usize);
         let mut xv = vec![R::ZERO; m];
         let mut ents: Vec<(usize, R)> = Vec::new();
@@ -1685,7 +1717,9 @@ impl<R: Real> DualFactor<R> {
             sa += na;
             sb += bv.len();
             ab.append_fresh(t, ents.iter().rev().filter(|e| kind[e.0] == -2).map(|e| (e.0 as u32, e.1)), &bv);
-            uc[t].extend_from_slice(&ents);
+            if mirror {
+                uc[t].extend_from_slice(&ents);
+            }
         }
         FRESH_SCRATCH.with(|s| s.set(sc));
         let nt = m - i21;
@@ -1759,7 +1793,7 @@ impl<R: Real> DualFactor<R> {
             }
         }
         #[cfg(feature = "factor-shadow")]
-        {
+        if mirror {
             let mut by_uc = vec![0usize; m];
             uc.iter().flatten().for_each(|e| by_uc[e.0] += 1);
             assert!(by_uc == row_cap, "fresh: row counts of ab and uc differ");
@@ -1931,6 +1965,7 @@ impl<R: Real> DualFactor<R> {
             diag: st.diag.clone(),
             bad_diag: st.diag.iter().any(|d| !(d.abs() > R::ZERO)),
             uc,
+            mirror,
             spike: Vec::new(),
             update_values: Vec::new(),
             update_seen: Vec::new(),
@@ -1941,7 +1976,7 @@ impl<R: Real> DualFactor<R> {
         #[cfg(test)]
         fresh_tests::assert_same(&fresh, &Self::fresh_old(m, ncols, st, cols));
         #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
-        {
+        if fresh.mirror {
             fresh.ab.check(&fresh.uc, &fresh.kind);
             fresh.urows.check(&fresh.uc, &fresh.kind);
         }
@@ -3197,6 +3232,8 @@ impl<R: Real> DualFactor<R> {
             (self.i21..m).rev().map(|s| self.at[s]).collect()
         };
         let x_l = if bs { x.clone() } else { Vec::new() };
+        // `scatter_u_col!` writes `x[j]` unchecked for U rows `j < m`.
+        assert!(x.len() >= m, "ftran_with: vector shorter than the factor");
         // The U-stage work estimate sums integer-valued lengths over the tail columns that keep a nonzero value; they are collected where
         // the column is finished (a scatter only hits lower slots) instead of by a later scan of the tail (`u_work_ref`).
         let (mut sa, mut sb, mut su) = (0usize, 0usize, 0usize);
@@ -3272,6 +3309,7 @@ impl<R: Real> DualFactor<R> {
             });
         }
         if bs {
+            assert!(self.mirror, "the bsolve dump needs the uc mirror");
             crate::dump::emit(
                 "bsolve",
                 serde_json::json!({"l": jv(&x_l), "tail_done": jv(&x_t), "x": jv(&x), "tail": tail, "kind": self.kind, "slot": self.slot, "diag": jv(&self.diag), "u_dense": u_dense, "uc": ju(&self.uc), "lcols": (0..self.m).map(|v| self.lcolumn(v).0.iter().map(|&y| y as usize).collect::<Vec<_>>()).collect::<Vec<_>>(), "lvals": (0..self.m).map(|v| self.lcolumn(v).1.iter().map(|e| e.to_f64()).collect::<Vec<_>>()).collect::<Vec<_>>(), "perm": self.perm, "rows": rows, "vals": jv(&vals)}),
@@ -3381,6 +3419,8 @@ impl<R: Real> DualFactor<R> {
         e_l: f64,
     ) -> Vec<(usize, R)> {
         let (m, i21, i3) = (self.m, self.i21, self.nuc.len());
+        // `scatter_u_col!` writes `x[j]` unchecked for U rows `j < m`.
+        assert!(x.len() >= m, "ftran_with_sparse: vector shorter than the factor");
         let tol = R::c(TOL);
         let mut inp = std::mem::take(&mut self.f2.get_mut().col_in);
         inp.clear();
@@ -3760,9 +3800,18 @@ impl<R: Real> DualFactor<R> {
         (&self.diag, l)
     }
 
-    /// Fresh U columns in the stored solve order, indexed by pivot position.
-    pub fn u_numerics(&self) -> &[Vec<(usize, R)>] {
-        &self.uc
+    /// Fresh U columns in the stored solve order, indexed by pivot position: each tail column's entries ascending by row (the order
+    /// `fresh` extracts them in), derived from the `ab` span. Valid only on a factor that has not been updated.
+    pub fn u_numerics(&self) -> Vec<Vec<(usize, R)>> {
+        debug_assert!(self.upd == 0, "u_numerics reads the order of a fresh factor");
+        (0..self.m)
+            .map(|c| {
+                let (idx, val) = self.ab.both_pair(c);
+                let mut col: Vec<(usize, R)> = idx.iter().zip(val).map(|(&j, &v)| (j as usize, v)).collect();
+                col.sort_unstable_by_key(|e| e.0);
+                col
+            })
+            .collect()
     }
 
     /// The reference's refactorization decision, evaluated before an iteration's own update: at the update limit
@@ -4426,7 +4475,7 @@ impl<R: Real> DualFactor<R> {
     }
 
     /// `u_work_ref` from the sums of the U loop: `s` describes the tail columns that kept a nonzero value (count, their `a`, `b` and
-    /// `uc` lengths, and for the sparse solve the columns in the solve's descending slot order). Every summed term is an integer, so
+    /// `ab` lengths, and for the sparse solve the columns in the solve's descending slot order). Every summed term is an integer, so
     /// the sums equal the reference's scans bit for bit; the heap walk still decides the walk's own terms from the solved values.
     fn u_work(&self, inp: &[usize], x: &[R], sparse: bool, cnt: Option<usize>, s: &Surv<'_>, walk: Option<&Walk>) -> f64 {
         let v = self.u_work_from(inp, x, sparse, cnt, s, walk);
@@ -5177,6 +5226,7 @@ impl<R: Real> DualFactor<R> {
         let m = self.m;
         let mut scratch = self.btran_ws.update.take();
         if crate::dump::on("fstruct") {
+            assert!(self.mirror, "the fstruct dump needs the uc mirror");
             let n = crate::dump::FACTOR_STRUCT_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             crate::dump::emit(
                 "fstruct",
@@ -5224,8 +5274,8 @@ impl<R: Real> DualFactor<R> {
                 .push((0xf2521, 3.0 * k as f64, crate::work::CTX));
         }
         // A tail column leaves the row-wise copy of U entry by entry.
-        if self.kind[r] == -2 && !self.uc[r].is_empty() {
-            let len = self.uc[r].len();
+        if old_n > 0 {
+            let len = old_n;
             self.upd_work.push((
                 if k == 0 {
                     0xf2521
@@ -5260,19 +5310,19 @@ impl<R: Real> DualFactor<R> {
         }
         let mut sp = std::mem::take(&mut scratch.sp);
         sp.clear();
-        // The U column of the new state (the spike without `r`) is collected in the same pass.
+        // The mirror's U column of the new state (the spike without `r`).
         let mut col = std::mem::take(&mut scratch.spare_col);
         col.clear();
-        col.reserve(self.spike.len());
         for &(p, v) in &self.spike {
             values[p] = v;
             if !seen[p] {
                 seen[p] = true;
                 sp.push(p);
             }
-            if p != r {
-                col.push((p, v));
-            }
+        }
+        if self.mirror {
+            col.reserve(self.spike.len());
+            col.extend(self.spike.iter().filter(|e| e.0 != r).copied());
         }
         let d0 = self.diag[r];
         if let Some(i) = sp.iter().position(|&x| x == r) {
@@ -5320,7 +5370,7 @@ impl<R: Real> DualFactor<R> {
                 self.empty_tail.remove(&x);
                 // Invariant behind the row lengths: every entry of `urows` belongs to a tail column (`kind == -2`). Only
                 // columns of `empty_tail` leave the tail (here), so they must already have left the row-wise copy.
-                debug_assert!(self.uc[x].is_empty(), "demoted empty_tail column {x} still has U entries");
+                debug_assert!(self.ab.is_empty(x), "demoted empty_tail column {x} still has U entries");
                 #[cfg(feature = "factor-shadow")]
                 assert!(self.uc[x].is_empty(), "demoted empty_tail column {x} still has U entries");
                 convslot = Some(self.slot[x]);
@@ -5409,9 +5459,11 @@ impl<R: Real> DualFactor<R> {
             old_b.clear();
             old_b.extend_from_slice(self.ab.b(r));
             self.ab.clear(r);
-            let old_col = self.replace_u_column(r, Vec::new());
-            if old_col.capacity() > scratch.spare_col.capacity() {
-                scratch.spare_col = old_col;
+            if self.mirror {
+                let old_col = self.replace_u_column(r, Vec::new());
+                if old_col.capacity() > scratch.spare_col.capacity() {
+                    scratch.spare_col = old_col;
+                }
             }
             self.kind[r] = -1;
             for &x in &old_b {
@@ -5577,7 +5629,9 @@ impl<R: Real> DualFactor<R> {
                         self.ab.drop_b(k, p);
                     }
                     // Row `r` of the row-wise copy is emptied below (`!keep`), which takes `k`'s entry with it.
-                    self.uc[k].retain(|e| e.0 != r);
+                    if self.mirror {
+                        self.uc[k].retain(|e| e.0 != r);
+                    }
                     eliminated = true;
                     // A column left without entries raises the mark to its slot (`0xf29d5`).
                     if self.ab.is_empty(k) {
@@ -5683,9 +5737,11 @@ impl<R: Real> DualFactor<R> {
         }
         self.bad_diag |= !(newdiag.abs() > R::ZERO);
         self.diag[r] = newdiag;
-        let old_col = self.replace_u_column(r, col);
-        if old_col.capacity() > scratch.spare_col.capacity() {
-            scratch.spare_col = old_col;
+        if self.mirror {
+            let old_col = self.replace_u_column(r, col);
+            if old_col.capacity() > scratch.spare_col.capacity() {
+                scratch.spare_col = old_col;
+            }
         }
         bv.reverse();
         self.ab.set(r, &av, &bv);
@@ -5702,7 +5758,7 @@ impl<R: Real> DualFactor<R> {
         }
         self.spike_used = true;
         #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
-        {
+        if self.mirror {
             self.ab.check(&self.uc, &self.kind);
             self.urows.check(&self.uc, &self.kind);
         }

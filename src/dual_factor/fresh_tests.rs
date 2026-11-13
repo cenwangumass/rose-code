@@ -397,6 +397,7 @@ impl<R: Real> DualFactor<R> {
             diag: st.diag.clone(),
             bad_diag: st.diag.iter().any(|d| !(d.abs() > R::ZERO)),
             uc,
+            mirror: true,
             spike: Vec::new(),
             update_values: Vec::new(),
             update_seen: Vec::new(),
@@ -468,13 +469,17 @@ pub(super) fn assert_same<R: Real>(n: &DualFactor<R>, o: &DualFactor<R>) {
     same_csr(&n.lpool, &o.lpool, "lpool");
     same_csr(&n.lt, &o.lt, "lt");
     same_vals(&n.diag, &o.diag, "diag");
-    same_pairs(&n.uc, &o.uc, "uc");
+    if n.mirror {
+        same_pairs(&n.uc, &o.uc, "uc");
+    }
     same_pairs(&n.urows.to_ut(), &o.urows.to_ut(), "ut");
     // the physical order carries the same values entry for entry
     for y in 0..n.m {
         same_vals(n.urows.row(y).1, o.urows.row(y).1, "urows values");
     }
-    n.urows.check(&n.uc, &n.kind);
+    if n.mirror {
+        n.urows.check(&n.uc, &n.kind);
+    }
 }
 
 /// Leave junk in every row, as the edits of a long update sequence would.

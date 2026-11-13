@@ -143,10 +143,10 @@ impl<R: Real> Shadow<R> {
         new
     }
 
-    pub fn u_numerics(&self) -> &[Vec<(usize, R)>] {
+    pub fn u_numerics(&self) -> Vec<Vec<(usize, R)>> {
         let new = self.new.u_numerics();
         let old = muted(|| self.old.u_numerics());
-        self.finish("u_numerics", &columns(new), &columns(old), false);
+        self.finish("u_numerics", &columns(&new), &columns(old), false);
         new
     }
 
