@@ -4013,18 +4013,7 @@ impl<'a, R: Real> Dual<'a, R> {
         }
         list.clear();
         list.reserve(row.len() + 1);
-        for &(j, a) in row {
-            if self.dflag[j] {
-                continue;
-            }
-            let a = if a.abs() < R::c(ALPHA_TOL) {
-                R::ZERO
-            } else {
-                a
-            };
-            let s = if self.st[j] == UB { -1.0 } else { 1.0 };
-            list.push((j, a * R::c(s * sdir)));
-        }
+        framework_list(row, &self.dflag, &self.st, self.n + self.m, sdir, list);
         if leave < self.n && !self.dflag[leave] {
             list.push((leave, R::ONE));
         }
@@ -6769,6 +6758,29 @@ fn rho_norm_vals<R: Real>(vals: &[R], sq: &mut Vec<R>) -> R {
 }
 
 /// `rho_norm_vals` on a list of pairs.
+/// The first loop of `Dual::framework_rhs`: the entries of `row` whose variable is not in `dflag`, below `ALPHA_TOL` in magnitude as +0.0, times the
+/// sign of the bound (`st == UB` flips) and of the direction `sdir` (+-1), appended to `list`. Every index of `row` must be below `nvar`
+/// (rows of `pivot_row_ws`): one length check replaces the per-entry bounds checks.
+#[inline]
+fn framework_list<R: Real>(row: &[(usize, R)], dflag: &[bool], st: &[i32], nvar: usize, sdir: f64, list: &mut Vec<(usize, R)>) {
+    assert!(dflag.len() >= nvar && st.len() >= nvar);
+    debug_assert!(row.iter().all(|e| e.0 < nvar));
+    let (tol, sg_lb, sg_ub) = (R::c(ALPHA_TOL), R::c(sdir), R::c(-1.0 * sdir));
+    for &(j, a) in row {
+        // SAFETY: `j < nvar <= dflag.len(), st.len()` (see above).
+        if unsafe { *dflag.get_unchecked(j) } {
+            continue;
+        }
+        let a = if a.abs() < tol {
+            R::ZERO
+        } else {
+            a
+        };
+        let sg = if unsafe { *st.get_unchecked(j) } == UB { sg_ub } else { sg_lb };
+        list.push((j, a * sg));
+    }
+}
+
 fn rho_norm_with<R: Real>(rho: &[(usize, R)], sq: &mut Vec<R>) -> R {
     if R::QUAD {
         // The quad kernel (`0x25d3ff..0x25d49a`) squares in extended precision and keeps the running sum in a double: each step is
@@ -10638,5 +10650,66 @@ mod rrows_backptr_diff {
             }
         }
         assert!(tracked_cases > 100 && untracked_cases > 0, "{tracked_cases} {untracked_cases}");
+    }
+}
+
+#[cfg(test)]
+mod framework_list_diff {
+    use super::*;
+
+    /// The first loop of `framework_rhs` as it was before `framework_list` (bounds-checked, `s * sdir` per entry).
+    fn old<R: Real>(row: &[(usize, R)], dflag: &[bool], st: &[i32], sdir: f64, list: &mut Vec<(usize, R)>) {
+        for &(j, a) in row {
+            if dflag[j] {
+                continue;
+            }
+            let a = if a.abs() < R::c(ALPHA_TOL) { R::ZERO } else { a };
+            let s = if st[j] == UB { -1.0 } else { 1.0 };
+            list.push((j, a * R::c(s * sdir)));
+        }
+    }
+
+    fn run<R: Real>() {
+        let mut seed = 0x2545_f491_4f6c_dd1du64;
+        let mut next = move || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        let tol = ALPHA_TOL;
+        let vals = [
+            0.0, -0.0, tol, -tol, tol * (1.0 - 1e-15), -tol * (1.0 + 1e-15), -tol * (1.0 - 1e-15), 1e-10 + 1e-25, 1.0, -2.5, 3e-9, 1e-300, -1e300,
+            f64::NAN, -f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 1e-5, -7.25,
+        ];
+        let sts = [LB, UB, FREE, FIXED, 0, 3];
+        for _ in 0..20000 {
+            let nvar = 1 + next() as usize % 20;
+            let st: Vec<i32> = (0..nvar).map(|_| sts[next() as usize % sts.len()]).collect();
+            let dflag: Vec<bool> = (0..nvar).map(|_| next() % 3 == 0).collect();
+            let row: Vec<(usize, R)> = (0..next() as usize % 25)
+                .map(|_| (next() as usize % nvar, R::c(vals[next() as usize % vals.len()])))
+                .collect();
+            for sdir in [1.0, -1.0] {
+                let (mut a, mut b) = (vec![], vec![]);
+                old(&row, &dflag, &st, sdir, &mut a);
+                framework_list(&row, &dflag, &st, nvar, sdir, &mut b);
+                assert_eq!(a.len(), b.len());
+                for (x, y) in a.iter().zip(&b) {
+                    // Same bits (the sign of zero and the NaN included), through the printed form of the value.
+                    assert!(x.0 == y.0 && format!("{:?}", x.1) == format!("{:?}", y.1) && x.1.to_f64().to_bits() == y.1.to_f64().to_bits());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn framework_list_matches_old_loop_f64() {
+        run::<f64>();
+    }
+
+    #[test]
+    fn framework_list_matches_old_loop_f80() {
+        run::<crate::f80::F80>();
     }
 }
