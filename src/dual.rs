@@ -1251,10 +1251,23 @@ fn pivot_row_ws<R: Real>(
 }
 
 /// The dual step over the pivot row: `d[j] -= theta * a` for every entry, with the entry negated when `j` is one of the flipped variables.
-fn d_row_step<R: Real>(d: &mut [R], row: &[(usize, R)], flips: &[usize], theta: R, mark: &mut Vec<bool>) {
+///
+/// # Safety
+/// Every index of `row` must be below `d.len()` (`flips` are checked). The rows come from `pivot_row_ws`, which stores only indices below `n + m` (checked when
+/// stored), and `d` has `n + m` entries (`Dual::iteration` asserts that before the call).
+#[inline]
+unsafe fn d_row_step<R: Real>(d: &mut [R], row: &[(usize, R)], flips: &[usize], theta: R, mark: &mut Vec<bool>) {
+    if cfg!(test) {
+        assert!(row.iter().all(|e| e.0 < d.len()), "d_row_step: index out of range");
+    }
+    let dp = d.as_mut_ptr();
     if flips.is_empty() {
         for &(j, a) in row {
-            d[j] = d[j] - theta * a;
+            // SAFETY: j < d.len(), see above. Repeated indices in a row update sequentially, as with a checked loop.
+            unsafe {
+                let p = dp.add(j);
+                *p = *p - theta * a;
+            }
         }
         return;
     }
@@ -1264,13 +1277,132 @@ fn d_row_step<R: Real>(d: &mut [R], row: &[(usize, R)], flips: &[usize], theta: 
     for &j in flips {
         mark[j] = true;
     }
+    let mp = mark.as_ptr();
     for &(j, a) in row {
-        let a = if mark[j] { -a } else { a };
-        d[j] = d[j] - theta * a;
+        // SAFETY: j < d.len() <= mark.len(), see above.
+        unsafe {
+            let a = if *mp.add(j) { -a } else { a };
+            let p = dp.add(j);
+            *p = *p - theta * a;
+        }
     }
     for &j in flips {
         mark[j] = false;
     }
+}
+
+/// What the candidate loops of the ratio test leave besides the lists: the running `bound`, the position and contribution of the best ratio and the
+/// largest negative entries of the kept (`xm13`) and rejected (`xm9`) candidates.
+struct Cand<R> {
+    bound: R,
+    best_i: i64,
+    bestc: R,
+    xm13: R,
+    xm9: R,
+}
+
+/// The two candidate loops of `ratio_test_with` (entries from `esi` on that sit at a bound, then the earlier ones), filling the retained lists.
+///
+/// # Safety
+/// `st` and `d` must be longer than every index of `row`.
+#[allow(clippy::too_many_arguments)]
+#[inline]
+unsafe fn ratio_candidates<R: Real>(
+    lo: &[f64],
+    up: &[f64],
+    st: &[i32],
+    d: &[R],
+    row: &[(usize, R)],
+    esi: usize,
+    delta: R,
+    xmm7: R,
+    xmm12: R,
+    variant: bool,
+    ratio_arr: &mut Vec<R>,
+    con: &mut Vec<R>,
+    lst: &mut Vec<usize>,
+) -> Cand<R> {
+    let cnt = row.len();
+    if cfg!(test) {
+        assert!(row.iter().all(|e| e.0 < st.len() && e.0 < d.len()), "ratio_candidates: index out of range");
+    }
+    let mut bound = R::c(-1e100);
+    let (mut best, mut best_i, mut bestc) = (R::c(-1e100), -1i64, R::ZERO);
+    let (mut xm13, mut xm9) = (R::ZERO, R::ZERO);
+    let (neg_tol, tol10) = (R::c(-ALPHA_TOL), R::c(1e-10));
+    ratio_arr.clear();
+    con.clear();
+    lst.clear();
+    macro_rules! track {
+        ($i:expr, $ratio:expr, $c:expr) => {{
+            let (ratio, c) = ($ratio, $c);
+            let k = lst.len() as i64;
+            if ratio > tol10 + best {
+                best_i = k;
+                best = ratio;
+                bestc = c;
+            } else if ratio >= best - tol10 {
+                let old = best;
+                bestc = minr(bestc, c);
+                if ratio > old {
+                    best_i = k;
+                }
+                best = maxr(ratio, old);
+            }
+            con.push(c);
+            lst.push($i);
+            ratio_arr.push(ratio);
+        }};
+    }
+    for i in esi..cnt {
+        let (j, v) = row[i];
+        // SAFETY: j < n + m <= st.len(), d.len() (see the contract).
+        if v < neg_tol && unsafe { *st.get_unchecked(j) == LB || *st.get_unchecked(j) == UB } {
+            let dj = unsafe { *d.get_unchecked(j) };
+            let ratio = dj / v;
+            if bound > ratio {
+                xm9 = minr(v, xm9);
+            } else {
+                xm13 = minr(v, xm13);
+                if dj >= R::ZERO {
+                    bound = maxr(PIVOT_DELTA(delta, v, ratio), bound);
+                }
+                track!(i, ratio, xmm12);
+            }
+        }
+    }
+    for i in 0..esi.min(cnt) {
+        let (j, v) = row[i];
+        if v < neg_tol {
+            // SAFETY: as above.
+            let dj = unsafe { *d.get_unchecked(j) };
+            let ratio = dj / v;
+            if bound > ratio {
+                xm9 = minr(v, xm9);
+                continue;
+            }
+            xm13 = minr(v, xm13);
+            let c;
+            if variant && unsafe { *st.get_unchecked(j) } == LB && up[j] >= BIG {
+                if dj >= R::ZERO {
+                    bound = maxr(PIVOT_DELTA(delta, v, ratio), bound);
+                }
+                c = xmm12;
+            } else {
+                let c0 = R::c(lo[j] - up[j]) * v;
+                if c0 > xmm7 {
+                    if dj >= R::ZERO {
+                        bound = maxr(PIVOT_DELTA(delta, v, ratio), bound);
+                    }
+                    c = minr(xmm12, c0);
+                } else {
+                    c = c0;
+                }
+            }
+            track!(i, ratio, c);
+        }
+    }
+    Cand { bound, best_i, bestc, xm13, xm9 }
 }
 
 /// The candidate list of the ratio test (ratios, contributions, row positions) and the kept list; retained across calls, cleared at the start of each.
@@ -3613,14 +3745,19 @@ impl<'a, R: Real> Dual<'a, R> {
 
     /// The bound-flipping Harris ratio test (`0xc74a0`, `ctx+0x468 != 0`), `specs/dual-simplex.md`.
     // GUROBI: with `ctx+0x468 == 0` the reference takes `0xc6900` instead; not modelled, no witness (never hit by `replay/gdb_dual_branchhits.py`).
-    fn ratio_test(&mut self, row: &[(usize, R)], esi: usize, leave: usize, above: bool, xbr: R) -> Ratio {
+    ///
+    /// # Safety
+    /// Every index of `row` must be below `n + m` (rows of `pivot_row_ws` are; the candidate loops read `st` and `d` unchecked).
+    unsafe fn ratio_test(&mut self, row: &[(usize, R)], esi: usize, leave: usize, above: bool, xbr: R) -> Ratio {
         let mut bufs = std::mem::take(&mut self.rbuf);
-        let result = self.ratio_test_with(&mut bufs, row, esi, leave, above, xbr);
+        let result = unsafe { self.ratio_test_with(&mut bufs, row, esi, leave, above, xbr) };
         self.rbuf = bufs;
         result
     }
 
-    fn ratio_test_with(
+    /// # Safety
+    /// As `ratio_test`.
+    unsafe fn ratio_test_with(
         &mut self,
         bufs: &mut RatioBufs<R>,
         row: &[(usize, R)],
@@ -3637,82 +3774,14 @@ impl<'a, R: Real> Dual<'a, R> {
         let xmm12 = R::c(-2.0) * xmm10;
         let xmm7 = ptol - xmm10;
         let cnt = row.len();
-        let mut bound = R::c(-1e100);
-        let (mut best, mut best_i, mut bestc) = (R::c(-1e100), -1i64, R::ZERO);
-        let (mut xm13, mut xm9) = (R::ZERO, R::ZERO);
         let RatioBufs { ratio_arr, con, lst, kept } = bufs;
-        ratio_arr.clear();
-        con.clear();
-        lst.clear();
-        kept.clear();
-        macro_rules! track {
-            ($i:expr, $ratio:expr, $c:expr) => {{
-                let (ratio, c) = ($ratio, $c);
-                let k = lst.len() as i64;
-                if ratio > R::c(1e-10) + best {
-                    best_i = k;
-                    best = ratio;
-                    bestc = c;
-                } else if ratio >= best - R::c(1e-10) {
-                    let old = best;
-                    bestc = minr(bestc, c);
-                    if ratio > old {
-                        best_i = k;
-                    }
-                    best = maxr(ratio, old);
-                }
-                con.push(c);
-                lst.push($i);
-                ratio_arr.push(ratio);
-            }};
-        }
-        for i in esi..cnt {
-            let (j, v) = row[i];
-            if v < R::c(-ALPHA_TOL) && (self.st[j] == LB || self.st[j] == UB) {
-                let dj = self.d[j];
-                let ratio = dj / v;
-                if bound > ratio {
-                    xm9 = minr(v, xm9);
-                } else {
-                    xm13 = minr(v, xm13);
-                    if dj >= R::ZERO {
-                        bound = maxr(PIVOT_DELTA(delta, v, ratio), bound);
-                    }
-                    track!(i, ratio, xmm12);
-                }
-            }
-        }
+        assert!(self.st.len() >= self.n + self.m && self.d.len() >= self.n + self.m, "st or d shorter than n + m");
         let variant = self.level != 0 && self.iters + self.it_base > self.m;
-        for i in 0..esi.min(cnt) {
-            let (j, v) = row[i];
-            if v < R::c(-ALPHA_TOL) {
-                let dj = self.d[j];
-                let ratio = dj / v;
-                if bound > ratio {
-                    xm9 = minr(v, xm9);
-                    continue;
-                }
-                xm13 = minr(v, xm13);
-                let c;
-                if variant && self.st[j] == LB && p.up[j] >= BIG {
-                    if dj >= R::ZERO {
-                        bound = maxr(PIVOT_DELTA(delta, v, ratio), bound);
-                    }
-                    c = xmm12;
-                } else {
-                    let c0 = R::c(p.lo[j] - p.up[j]) * v;
-                    if c0 > xmm7 {
-                        if dj >= R::ZERO {
-                            bound = maxr(PIVOT_DELTA(delta, v, ratio), bound);
-                        }
-                        c = minr(xmm12, c0);
-                    } else {
-                        c = c0;
-                    }
-                }
-                track!(i, ratio, c);
-            }
-        }
+        // SAFETY: the lengths were checked above (n + m); the row indices are below n + m (the contract of this function).
+        let Cand { bound, best_i, bestc, xm13, xm9 } = unsafe {
+            ratio_candidates(&p.lo, &p.up, &self.st, &self.d, row, esi, delta, xmm7, xmm12, variant, ratio_arr, con, lst)
+        };
+        kept.clear();
         let nn = lst.len();
         self.work.add(0xc7bcd, 3.0 * cnt as f64, crate::work::CTX);
         self.retry_end = 0;
@@ -4714,7 +4783,8 @@ impl<'a, R: Real> Dual<'a, R> {
                 }
             }
         } else {
-            self.ratio_test(&row, esi, leave, above, xbr)
+            // SAFETY: the row comes from `pivot_row_ws` (indices below n + m).
+            unsafe { self.ratio_test(&row, esi, leave, above, xbr) }
         };
         if std::mem::take(&mut self.fresh_absorb) && !self.no_art_exit {
             if let Some(mut sn) = snap {
@@ -6005,7 +6075,9 @@ impl<'a, R: Real> Dual<'a, R> {
                     e.1
                 }
             });
-            d_row_step(&mut self.d, &pv.row, &pv.flips, theta, &mut self.flip_mark);
+            assert!(self.d.len() >= self.n + self.m, "d shorter than n + m");
+            // SAFETY: the row's indices are below n + m (`pivot_row_ws`), d has n + m entries (the flips are checked).
+            unsafe { d_row_step(&mut self.d, &pv.row, &pv.flips, theta, &mut self.flip_mark) };
             // A leaving variable that becomes fixed keeps the true reduced cost, not the frame value.
             // The leaving variable is in the reference's row with the coefficient 1, so its stored d (0 up to the noise of the last recompute) takes the step too.
             // `0xe45c0` (`0xe47c7..0xe47ff`): the leaving variable is the row entry with coefficient +1 (leaving below) or -1 (above, the row is negated);
@@ -8759,13 +8831,13 @@ mod captured_bh305_ratio {
         s.rbuf.kept.extend([1, 2]);
         s.rbuf.con.extend([f64::NAN; 4]);
         s.rbuf.ratio_arr.extend([f64::NAN; 2]);
-        let result = s.ratio_test(
+        let result = unsafe { s.ratio_test(
             &row,
             input["esi"].as_u64().unwrap() as usize,
             leave,
             false,
             input["xB"].as_f64().unwrap(),
-        );
+        ) };
         let q = result.q.expect("reference selected a candidate");
         assert_eq!(row[q].0 as i64, case["expected"]["q"].as_i64().unwrap());
         assert_eq!(
@@ -9420,7 +9492,7 @@ mod d_step_diff {
             seed ^= seed << 17;
             seed
         };
-        let values = [0.0, -0.0, 1.0, -1.0, 0.1, 1e-14, -3.5, 1e300, -1e300, f64::MIN_POSITIVE, 0.3];
+        let values = [0.0, -0.0, 1.0, -1.0, 0.1, 1e-14, -3.5, 1e300, -1e300, f64::MIN_POSITIVE, 0.3, f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 1e-10, -1e-10];
         let mut mark = Vec::new();
         for _ in 0..2000 {
             let len = 1 + next() as usize % 12;
@@ -9434,7 +9506,7 @@ mod d_step_diff {
             let theta = R::c(values[next() as usize % values.len()]);
             let (mut want, mut got) = (d0.clone(), d0.clone());
             d_step_ref(&mut want, &row, &flips, theta);
-            d_row_step(&mut got, &row, &flips, theta, &mut mark);
+            unsafe { d_row_step(&mut got, &row, &flips, theta, &mut mark) };
             assert!(want.iter().zip(&got).all(|(x, y)| x.to_f64().to_bits() == y.to_f64().to_bits()));
             assert!(mark.iter().all(|&b| !b), "marks not cleared");
         }
@@ -9447,6 +9519,167 @@ mod d_step_diff {
 
     #[test]
     fn matches_reference_f80() {
+        run::<crate::f80::F80>();
+    }
+}
+
+#[cfg(test)]
+mod row_loops_diff {
+    use super::*;
+
+    /// The candidate loops before the unchecked rewrite.
+    #[allow(clippy::too_many_arguments)]
+    fn ratio_candidates_ref<R: Real>(
+        lo: &[f64],
+        up: &[f64],
+        st: &[i32],
+        d: &[R],
+        row: &[(usize, R)],
+        esi: usize,
+        delta: R,
+        xmm7: R,
+        xmm12: R,
+        variant: bool,
+        ratio_arr: &mut Vec<R>,
+        con: &mut Vec<R>,
+        lst: &mut Vec<usize>,
+    ) -> Cand<R> {
+        let cnt = row.len();
+        let mut bound = R::c(-1e100);
+        let (mut best, mut best_i, mut bestc) = (R::c(-1e100), -1i64, R::ZERO);
+        let (mut xm13, mut xm9) = (R::ZERO, R::ZERO);
+        ratio_arr.clear();
+        con.clear();
+        lst.clear();
+        macro_rules! track {
+            ($i:expr, $ratio:expr, $c:expr) => {{
+                let (ratio, c) = ($ratio, $c);
+                let k = lst.len() as i64;
+                if ratio > R::c(1e-10) + best {
+                    best_i = k;
+                    best = ratio;
+                    bestc = c;
+                } else if ratio >= best - R::c(1e-10) {
+                    let old = best;
+                    bestc = minr(bestc, c);
+                    if ratio > old {
+                        best_i = k;
+                    }
+                    best = maxr(ratio, old);
+                }
+                con.push(c);
+                lst.push($i);
+                ratio_arr.push(ratio);
+            }};
+        }
+        for i in esi..cnt {
+            let (j, v) = row[i];
+            if v < R::c(-ALPHA_TOL) && (st[j] == LB || st[j] == UB) {
+                let dj = d[j];
+                let ratio = dj / v;
+                if bound > ratio {
+                    xm9 = minr(v, xm9);
+                } else {
+                    xm13 = minr(v, xm13);
+                    if dj >= R::ZERO {
+                        bound = maxr(PIVOT_DELTA(delta, v, ratio), bound);
+                    }
+                    track!(i, ratio, xmm12);
+                }
+            }
+        }
+        for i in 0..esi.min(cnt) {
+            let (j, v) = row[i];
+            if v < R::c(-ALPHA_TOL) {
+                let dj = d[j];
+                let ratio = dj / v;
+                if bound > ratio {
+                    xm9 = minr(v, xm9);
+                    continue;
+                }
+                xm13 = minr(v, xm13);
+                let c;
+                if variant && st[j] == LB && up[j] >= BIG {
+                    if dj >= R::ZERO {
+                        bound = maxr(PIVOT_DELTA(delta, v, ratio), bound);
+                    }
+                    c = xmm12;
+                } else {
+                    let c0 = R::c(lo[j] - up[j]) * v;
+                    if c0 > xmm7 {
+                        if dj >= R::ZERO {
+                            bound = maxr(PIVOT_DELTA(delta, v, ratio), bound);
+                        }
+                        c = minr(xmm12, c0);
+                    } else {
+                        c = c0;
+                    }
+                }
+                track!(i, ratio, c);
+            }
+        }
+        Cand { bound, best_i, bestc, xm13, xm9 }
+    }
+
+    fn same<R: Real>(a: R, b: R) -> bool {
+        a.to_f64().to_bits() == b.to_f64().to_bits() && format!("{a:?}") == format!("{b:?}")
+    }
+
+    fn run<R: Real>() {
+        let mut seed = 0x9e37_79b9_7f4a_7c15u64;
+        let mut next = move || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        let tol = ALPHA_TOL;
+        // Values at and around the tolerances, signed zeros, infinities, NaN.
+        let vals = [
+            0.0, -0.0, tol, -tol, -tol * (1.0 + 1e-15), -tol * (1.0 - 1e-15), 1e-10 + 1e-25, -1.0, -2.5, -3e-9, 1.0, 0.5, -1e-300, -1e300, f64::NAN,
+            f64::INFINITY, f64::NEG_INFINITY, 1e-5, -7.25,
+        ];
+        let sts = [LB, UB, FREE, FIXED, 0, 3];
+        let (mut nc, mut nq) = (0usize, 0usize);
+        for it in 0..20000 {
+            let nv = 1 + next() as usize % 12;
+            let mut st: Vec<i32> = (0..nv).map(|_| sts[next() as usize % sts.len()]).collect();
+            if it % 7 == 0 {
+                st.iter_mut().for_each(|s| *s = LB);
+            }
+            let d: Vec<R> = (0..nv).map(|_| R::c(vals[next() as usize % vals.len()])).collect();
+            let lo: Vec<f64> = (0..nv).map(|_| [0.0, -1.0, -BIG, 2.0, -0.0][next() as usize % 5]).collect();
+            let up: Vec<f64> = (0..nv).map(|_| [1.0, BIG, 0.5, 1e30, 3.0][next() as usize % 5]).collect();
+            let cnt = next() as usize % 20;
+            // Repeated variables are allowed in a row.
+            let row: Vec<(usize, R)> = (0..cnt).map(|_| (next() as usize % nv, R::c(vals[next() as usize % vals.len()]))).collect();
+            let esi = (next() as usize % (cnt + 3)).min(cnt + 2);
+            let delta = R::c(1e-7);
+            let xmm12 = R::c([-2.0, -0.0, 0.0, -1e-3, f64::NAN][next() as usize % 5]);
+            let xmm7 = R::c([-1.0, 0.0, 1e-6, 5.0][next() as usize % 4]);
+            let variant = next() % 2 == 0;
+            let (mut a, mut b, mut c) = (vec![R::c(f64::NAN); 2], vec![R::ZERO; 3], vec![7usize]);
+            let (mut a2, mut b2, mut c2) = (vec![], vec![R::c(5.0)], vec![]);
+            let want = ratio_candidates_ref(&lo, &up, &st, &d, &row, esi, delta, xmm7, xmm12, variant, &mut a, &mut b, &mut c);
+            let got = unsafe { ratio_candidates(&lo, &up, &st, &d, &row, esi, delta, xmm7, xmm12, variant, &mut a2, &mut b2, &mut c2) };
+            assert!(same(want.bound, got.bound) && same(want.bestc, got.bestc) && same(want.xm13, got.xm13) && same(want.xm9, got.xm9));
+            assert_eq!(want.best_i, got.best_i);
+            assert_eq!(c, c2);
+            assert!(a.len() == a2.len() && a.iter().zip(&a2).all(|(x, y)| same(*x, *y)));
+            assert!(b.len() == b2.len() && b.iter().zip(&b2).all(|(x, y)| same(*x, *y)));
+            nc += c.len();
+            nq += usize::from(!c.is_empty());
+        }
+        assert!(nc > 5000 && nq > 3000, "the random rows should produce candidates ({nc}, {nq})");
+    }
+
+    #[test]
+    fn candidates_match_reference_f64() {
+        run::<f64>();
+    }
+
+    #[test]
+    fn candidates_match_reference_f80() {
         run::<crate::f80::F80>();
     }
 }
