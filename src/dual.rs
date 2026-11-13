@@ -4013,7 +4013,8 @@ impl<'a, R: Real> Dual<'a, R> {
         }
         list.clear();
         list.reserve(row.len() + 1);
-        framework_list(row, &self.dflag, &self.st, self.n + self.m, sdir, list);
+        // SAFETY: `row` is the output of `pivot_row_ws` (indices below n + m, see `framework_list`).
+        unsafe { framework_list(row, &self.dflag, &self.st, self.n + self.m, sdir, list) };
         if leave < self.n && !self.dflag[leave] {
             list.push((leave, R::ONE));
         }
@@ -6757,12 +6758,14 @@ fn rho_norm_vals<R: Real>(vals: &[R], sq: &mut Vec<R>) -> R {
     sum_squares(sq)
 }
 
-/// `rho_norm_vals` on a list of pairs.
 /// The first loop of `Dual::framework_rhs`: the entries of `row` whose variable is not in `dflag`, below `ALPHA_TOL` in magnitude as +0.0, times the
-/// sign of the bound (`st == UB` flips) and of the direction `sdir` (+-1), appended to `list`. Every index of `row` must be below `nvar`
-/// (rows of `pivot_row_ws`): one length check replaces the per-entry bounds checks.
+/// sign of the bound (`st == UB` flips) and of the direction `sdir` (+-1), appended to `list`.
+///
+/// # Safety
+/// Every index of `row` must be below `nvar` (rows of `pivot_row_ws`: structurals from `rrows` below n, slacks n + i with i < m asserted in release
+/// where rho is read); one length check replaces the per-entry bounds checks.
 #[inline]
-fn framework_list<R: Real>(row: &[(usize, R)], dflag: &[bool], st: &[i32], nvar: usize, sdir: f64, list: &mut Vec<(usize, R)>) {
+unsafe fn framework_list<R: Real>(row: &[(usize, R)], dflag: &[bool], st: &[i32], nvar: usize, sdir: f64, list: &mut Vec<(usize, R)>) {
     assert!(dflag.len() >= nvar && st.len() >= nvar);
     debug_assert!(row.iter().all(|e| e.0 < nvar));
     let (tol, sg_lb, sg_ub) = (R::c(ALPHA_TOL), R::c(sdir), R::c(-1.0 * sdir));
@@ -6781,6 +6784,7 @@ fn framework_list<R: Real>(row: &[(usize, R)], dflag: &[bool], st: &[i32], nvar:
     }
 }
 
+/// `rho_norm_vals` on a list of pairs.
 fn rho_norm_with<R: Real>(rho: &[(usize, R)], sq: &mut Vec<R>) -> R {
     if R::QUAD {
         // The quad kernel (`0x25d3ff..0x25d49a`) squares in extended precision and keeps the running sum in a double: each step is
@@ -10693,7 +10697,8 @@ mod framework_list_diff {
             for sdir in [1.0, -1.0] {
                 let (mut a, mut b) = (vec![], vec![]);
                 old(&row, &dflag, &st, sdir, &mut a);
-                framework_list(&row, &dflag, &st, nvar, sdir, &mut b);
+                // SAFETY: the random rows use indices below `nvar`.
+                unsafe { framework_list(&row, &dflag, &st, nvar, sdir, &mut b) };
                 assert_eq!(a.len(), b.len());
                 for (x, y) in a.iter().zip(&b) {
                     // Same bits (the sign of zero and the NaN included), through the printed form of the value.
