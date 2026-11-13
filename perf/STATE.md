@@ -2,6 +2,28 @@
 
 Current state of the work in [PLAN.md](PLAN.md). Rewrite in place; no log (history is `jj log`).
 
+## Dual simplex instruction stack (local, unpushed)
+
+Stack on `main` `a5050f4a` to `23039b0a` (14 commits: walk-list rebuild, BTRAN level sweep with its
+repeated-entry guard, BTRAN output packers, slim FTRAN WORK accounting, dense-route WORK from the real
+solve, pricing with cached basic bounds, MPS parse without per-line allocations, pivot-row scatter and
+word-block skip, L-stage level solve and eta dots, needed-U and full-U scatters). Every commit is bit-identical:
+release tests 372 passed with 22 ignored, full parity normal and `factor-shadow` 987/987, corpus diff 0 over
+564 runs. `perf stat -e instructions:u -r 3`, dual release, current remote host, against the reference:
+
+| Model | `main` | `23039b0a` | Change | Ratio |
+|---|--:|--:|--:|--:|
+| GREENBEA | 2573.4 M | 2237.9 M | -13.04% | 1.554 |
+| DEGEN3 | 985.2 M | 892.6 M | -9.41% | 1.549 |
+| DEGEN2 | 124.12 M | 112.39 M | -9.45% | 1.690 |
+| 80BAU3B | 1157.7 M | 1026.7 M | -11.32% | 1.664 |
+| PEROLD | 688.8 M | 613.5 M | -10.93% | 1.834 |
+
+Instruction-ratio geomean 1.655 (`main` 1.856). Fixed 23-row wall-time table on `23039b0a`: 0/23 Rose wins,
+dual rows geomean 1.614 (degen3.dual-r 1.307, greenbea.dual-r 1.545, degen2.dual-r 1.706). Remaining
+GREENBEA gap by family: FTRAN ~215 M, factor construction ~143 M, BTRAN ~70 M, update 59 M, pricing and
+glue up to 195 M; the exact micro-rewrites left are each below 0.5%.
+
 ## Replacement candidate
 
 The retained needed-U numeric-row component and ordinary dense-tail slot fix are
