@@ -513,8 +513,8 @@ impl<R: Real> LevelWorkspace<R> {
 /// appended to the bucket of their level; a smaller node is zeroed. The seeds (all marked, in their buckets) are set up by the caller.
 ///
 /// One loop per column: the new nodes must enter the buckets in the order of the reference (the column walked from its last entry), so
-/// the loop runs from the last entry to the first and subtracts as it goes. The destinations of one column are distinct (a column of
-/// `L^T` is a row of `L`, whose entries have distinct columns), so the order of the subtractions cannot change a result.
+/// the loop runs from the last entry to the first and subtracts as it goes. The caller guarantees the destinations of one column are
+/// distinct (`lt_lines_distinct`), so the order of the subtractions cannot change a result.
 #[allow(clippy::too_many_arguments)]
 fn level_sweep<R: Real>(
     lt: &Csr<R>,
@@ -562,6 +562,80 @@ fn level_sweep<R: Real>(
         }
         buckets[lv_i].clear();
         lv_i += 1;
+    }
+}
+
+/// Whether no line of `lt` lists the same destination twice. Lines are built in ascending source order, so equal destinations of a line
+/// are adjacent. Raw MPS columns may repeat a row, in which case the fused `level_sweep` (reversed subtraction order) is not exact.
+fn lt_lines_distinct<R>(lt: &Csr<R>) -> bool {
+    (0..lt.start.len() - 1).all(|v| lt.idx[lt.start[v] as usize..lt.start[v + 1] as usize].windows(2).all(|w| w[0] != w[1]))
+}
+
+/// The two-loop level sweep (scatter forward, then mark and push from the last entry): exact for any `lt`, used when a line repeats a
+/// destination.
+#[cold]
+#[inline(never)]
+#[allow(clippy::too_many_arguments)]
+fn level_sweep_two_loops<R: Real>(
+    lt: &Csr<R>,
+    lev: &[usize],
+    maxlev: usize,
+    lo: usize,
+    x: &mut [R],
+    marks: &mut [u32],
+    stamp: u32,
+    buckets: &mut [Vec<usize>],
+    res: &mut Vec<usize>,
+) {
+    let tol = R::c(TOL);
+    let mut lv_i = lo;
+    while lv_i <= maxlev {
+        let mut k = 0;
+        while k < buckets[lv_i].len() {
+            let i = buckets[lv_i][k];
+            k += 1;
+            let v = x[i];
+            if v.abs() >= tol {
+                res.push(i);
+                let (src, mult) = lt.col(i);
+                for (&j, &lv) in src.iter().zip(mult) {
+                    x[j as usize] -= lv * v;
+                }
+                for &j in src.iter().rev() {
+                    let j = j as usize;
+                    if marks[j] != stamp {
+                        marks[j] = stamp;
+                        buckets[lev[j]].push(j);
+                    }
+                }
+            } else {
+                x[i] = R::ZERO;
+            }
+        }
+        buckets[lv_i].clear();
+        lv_i += 1;
+    }
+}
+
+/// `level_sweep` when `distinct` (see `lt_lines_distinct`), else the two-loop code.
+#[allow(clippy::too_many_arguments)]
+#[inline(always)]
+fn level_sweep_guarded<R: Real>(
+    lt: &Csr<R>,
+    distinct: bool,
+    lev: &[usize],
+    maxlev: usize,
+    lo: usize,
+    x: &mut [R],
+    marks: &mut [u32],
+    stamp: u32,
+    buckets: &mut [Vec<usize>],
+    res: &mut Vec<usize>,
+) {
+    if distinct {
+        level_sweep(lt, lev, maxlev, lo, x, marks, stamp, buckets, res);
+    } else {
+        level_sweep_two_loops(lt, lev, maxlev, lo, x, marks, stamp, buckets, res);
     }
 }
 
@@ -797,6 +871,8 @@ pub struct DualFactor<R: Real = f64> {
     bt_work: Option<Box<BtranWork<R>>>,
     /// Immutable L transpose, in ascending source-column order, shared by all BTRAN calls of this factor.
     lt: Csr<R>,
+    /// No line of `lt` repeats a destination (computed once per factorization); the fused level sweep needs it.
+    lt_distinct: bool,
     /// Immutable forward levels and their maximum for level-bucket L solves (`0x12a990`). Used only
     /// for `m >= 250`, a small level count (`< m/10`) and a short Markowitz L part.
     levels: Option<(Vec<usize>, usize)>,
@@ -1660,6 +1736,7 @@ impl<R: Real> DualFactor<R> {
             at: (0..m).collect(),
             btran_ws: Default::default(),
             etas: Vec::new(),
+            lt_distinct: lt_lines_distinct(&lt),
             lt,
             levels,
             level_cache: LevelCache::default(),
@@ -3821,7 +3898,7 @@ impl<R: Real> DualFactor<R> {
                         ws.buckets[lev[i]].push(i);
                         lo = lo.min(lev[i]);
                     }
-                    level_sweep(lt, lev, maxlev, lo, &mut x, &mut ws.marks, stamp, &mut ws.buckets, &mut res);
+                    level_sweep_guarded(lt, self.lt_distinct, lev, maxlev, lo, &mut x, &mut ws.marks, stamp, &mut ws.buckets, &mut res);
                 } else {
                     let heap = &mut ws.pending;
                     for &i in l {

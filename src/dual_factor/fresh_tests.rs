@@ -382,6 +382,7 @@ impl<R: Real> DualFactor<R> {
             at: (0..m).collect(),
             btran_ws: Default::default(),
             etas: Vec::new(),
+            lt_distinct: lt_lines_distinct(&lt),
             lt,
             levels,
             level_cache: LevelCache::default(),

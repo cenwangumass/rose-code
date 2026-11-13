@@ -27,33 +27,7 @@ fn level_sweep_old(
     buckets: &mut [Vec<usize>],
     res: &mut Vec<usize>,
 ) {
-    let mut lv_i = lo;
-    while lv_i <= maxlev {
-        let mut k = 0;
-        while k < buckets[lv_i].len() {
-            let i = buckets[lv_i][k];
-            k += 1;
-            let v = x[i];
-            if v.abs() >= TOL {
-                res.push(i);
-                let (src, mult) = lt.col(i);
-                for (&j, &lv) in src.iter().zip(mult) {
-                    x[j as usize] -= lv * v;
-                }
-                for &j in src.iter().rev() {
-                    let j = j as usize;
-                    if marks[j] != stamp {
-                        marks[j] = stamp;
-                        buckets[lev[j]].push(j);
-                    }
-                }
-            } else {
-                x[i] = 0.0;
-            }
-        }
-        buckets[lv_i].clear();
-        lv_i += 1;
-    }
+    level_sweep_two_loops(lt, lev, maxlev, lo, x, marks, stamp, buckets, res);
 }
 
 #[test]
@@ -128,4 +102,34 @@ fn level_sweep_matches_two_loops() {
             assert!(run(true) == run(false), "m {m} round {round}");
         }
     }
+}
+
+/// A repeated destination in an `lt` line: the guard must route to the two-loop code (bit for bit), where the fused loop differs.
+#[test]
+fn repeated_destination_uses_two_loops() {
+    // node 2 subtracts a then b into node 0: (2 - a) - b = 1 - 2^-53 but (2 - b) - a = 1 (2 - 2^-53 rounds to 2).
+    let (a, b) = (1.0f64, 2f64.powi(-53));
+    let mut lt = Csr::<f64>::with_capacity(3, 0);
+    lt.push_line(std::iter::empty());
+    lt.push_line(std::iter::empty());
+    lt.push_line([(0usize, a), (0usize, b)].into_iter());
+    assert!(!lt_lines_distinct(&lt));
+    let lev = vec![1usize, 0, 0];
+    let maxlev = 1;
+    let run = |mode: u8| {
+        let mut x = vec![2.0f64, 0.0, 1.0];
+        let mut marks = vec![0u32; 3];
+        let mut buckets: Vec<Vec<usize>> = vec![Vec::new(); 2];
+        let mut res = Vec::new();
+        marks[2] = 1;
+        buckets[0].push(2);
+        match mode {
+            0 => level_sweep_guarded(&lt, lt_lines_distinct(&lt), &lev, maxlev, 0, &mut x, &mut marks, 1, &mut buckets, &mut res),
+            1 => level_sweep_old(&lt, &lev, maxlev, 0, &mut x, &mut marks, 1, &mut buckets, &mut res),
+            _ => level_sweep(&lt, &lev, maxlev, 0, &mut x, &mut marks, 1, &mut buckets, &mut res),
+        }
+        (x.iter().map(|v| v.to_bits()).collect::<Vec<_>>(), marks, res)
+    };
+    assert!(run(0) == run(1));
+    assert!(run(0).0 != run(2).0, "fused loop expected to differ on a repeated destination");
 }
