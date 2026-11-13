@@ -1752,12 +1752,11 @@ struct Dual<'a, R: Real = f64> {
     /// The duals `y = B^-T c_B` of the last recompute.
     last_y: Vec<R>,
     /// Retained scratch of the refactor-time passes (no per-refactor allocation): the weights by variable (all zero between uses), the nonzero rows and values of
-    /// the x_B right-hand side, the double copy of `last_y`, the nonbasic structural values of the last x_B recompute.
+    /// the x_B right-hand side, the double copy of `last_y`.
     scr_wv: Vec<R>,
     scr_rows: Vec<usize>,
     scr_vals: Vec<R>,
     scr_ydbl: Vec<f64>,
-    scr_nbv: Vec<f64>,
     /// Maintained nonbasic values (`nb_value` with `zero_artificial` false, a copy of the bound or 0; 0 for a basic variable) of every variable, the list of the
     /// variables with a nonzero value (`nz`, ascending when `nz_sorted`), and each one's slot in it (`NZ_NONE` when absent). Updated at every status change.
     nbv: Vec<f64>,
@@ -7397,7 +7396,6 @@ fn solve_pass_callback<R: Real>(
         scr_rows: Vec::new(),
         scr_vals: Vec::new(),
         scr_ydbl: Vec::new(),
-        scr_nbv: Vec::new(),
         nbv: Vec::new(),
         nz: Vec::new(),
         nz_pos: Vec::new(),
@@ -8972,7 +8970,6 @@ mod captured_bh305_ratio {
             scr_rows: Vec::new(),
             scr_vals: Vec::new(),
             scr_ydbl: Vec::new(),
-            scr_nbv: Vec::new(),
             nbv: Vec::new(),
             nz: Vec::new(),
             nz_pos: Vec::new(),
@@ -9069,6 +9066,39 @@ mod captured_bh305_ratio {
             case["expected"]["a308"].as_f64().unwrap().to_bits()
         );
         assert!(result.reject.is_none());
+        // Random status sequences through `set_st`/`set_basic`: the maintained nonbasic values and the list of the nonzero ones equal a fresh recomputation
+        // after every step (the sets are compared sorted; `set_st` does not depend on the precision of the type).
+        let mut x = 0x2545_f491_4f6c_dd1du64;
+        let mut next = move || {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            x
+        };
+        s.rebuild_nb();
+        for step in 0..4000 {
+            let j = (next() % (n + m) as u64) as usize;
+            match next() % 6 {
+                0 => s.set_st(j, LB),
+                1 => s.set_st(j, UB),
+                2 => s.set_st(j, FREE),
+                3 => s.set_st(j, FIXED),
+                _ => s.set_basic(j, (next() % m as u64) as i32),
+            }
+            if step % 7 == 0 {
+                s.nz_sort();
+                let (want, want_nz) = s.fresh_nb(false);
+                assert_eq!(s.nz, want_nz);
+                assert!(s.nbv.iter().zip(&want).all(|(a, b)| a.to_bits() == b.to_bits()));
+            } else {
+                let mut got = s.nz.clone();
+                got.sort_unstable();
+                let (want, want_nz) = s.fresh_nb(false);
+                assert_eq!(got, want_nz);
+                assert!(s.nbv.iter().zip(&want).all(|(a, b)| a.to_bits() == b.to_bits()));
+            }
+            assert!(s.nz.iter().enumerate().all(|(k, &jj)| s.nz_pos[jj as usize] as usize == k));
+        }
     }
 }
 
