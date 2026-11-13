@@ -1737,12 +1737,15 @@ impl<R: Real> DualFactor<R> {
             }
         }
         FRESH_SCRATCH.with(|s| s.set(sc));
-        // `at` is the identity of a fresh factor.
-        stream.clear();
-        stream.extend((0..m).map(|c| {
+        // `at` is the identity of a fresh factor. Only the records of the tail slots `i21..m` are ever read, and `update` rewrites a record
+        // before its slot joins the tail (the new column's slot gets its record after `ab.set`), so the others keep whatever they held
+        // (the stream only has to be `m` long; a recycled stream keeps its old records).
+        stream.truncate(m);
+        stream.resize(m, TailRec { col: 0, a_start: 0, a_len: 0, diag: R::ZERO });
+        for c in i21..m {
             let (a_start, a_len) = ab.a_span(c);
-            TailRec { col: c as u32, a_start, a_len, diag: st.diag[c] }
-        }));
+            stream[c] = TailRec { col: c as u32, a_start, a_len, diag: st.diag[c] };
+        }
         let nt = m - i21;
         let nn = nuc.len();
         let h33 = if nt > 0 {
@@ -5207,9 +5210,10 @@ impl<R: Real> DualFactor<R> {
                 }
                 self.at[cur] = occ;
                 self.slot[occ] = cur;
-                for t in hole..=cur {
-                    self.sync_slot(t);
-                }
+                // The records move with their columns: the hole's record (`occ`'s or the stale one of `r`) goes to `cur`.
+                let saved = self.stream[hole];
+                self.stream.copy_within(hole + 1..=cur, hole);
+                self.stream[cur] = saved;
                 break;
             }
             jumps += 2.0 * plen as f64 + 5.0;
@@ -5226,8 +5230,10 @@ impl<R: Real> DualFactor<R> {
             self.at[cur] = occ;
             self.slot[pos] = hole;
             self.slot[occ] = cur;
-            self.sync_slot(hole);
-            self.sync_slot(cur);
+            // Exchange the records too. Slot `cur` now holds the hole's old occupant (`r` on the first jump, a column whose record is
+            // current afterwards), so a stale record of `r` can only land in `r`'s own slot, which the last `sync_slot` of `update`
+            // rewrites after `ab.set(r)`; nothing reads the stream in between.
+            self.stream.swap(hole, cur);
             cur = nxt;
         }
         if jumps > 0.0 {
@@ -5495,7 +5501,8 @@ impl<R: Real> DualFactor<R> {
                     if let Some(p) = pa {
                         // The last entry of A fills the hole, and the demoted column takes the slot A gives up (the front of B).
                         self.ab.demote(k, p);
-                        self.sync_slot(self.slot[k]);
+                        let s = self.slot[k];
+                        self.stream[s].a_len = self.ab.na(k) as u32;
                         if p > 0 {
                             self.upd_work.push((0xf3eac, p as f64, crate::work::CTX));
                         }
@@ -5724,12 +5731,16 @@ impl<R: Real> DualFactor<R> {
                     // `r` moves from B to the end of A (the front slot of B, which A takes), B's front entry filling its hole.
                     if let Some(p) = pos_b {
                         self.ab.b_to_a(k, p);
+                        let s = self.slot[k];
+                        self.stream[s].a_len = self.ab.na(k) as u32;
                     }
                 } else {
                     if let Some(p) = pos_a {
                         // A and B share one array in the reference (A first): A's last entry fills the hole and B's last entry
                         // takes the slot A gives up, which is the front of B.
                         self.ab.drop_a(k, p);
+                        let s = self.slot[k];
+                        self.stream[s].a_len = self.ab.na(k) as u32;
                     }
                     if let Some(p) = pos_b {
                         self.ab.drop_b(k, p);
@@ -5745,8 +5756,8 @@ impl<R: Real> DualFactor<R> {
                         self.mark = self.mark.max(old_ref_slot);
                     }
                 }
-                // `k`'s A header changed (and `k` sits in its final slot: the walk is over).
-                self.sync_slot(self.slot[k]);
+                // Only `a_len` of `k`'s record changed above (`a_start` moves only in `ab.set`, `diag` only at `r`), and `k` sits in its
+                // final slot (the walk is over).
             }
         }
         if !keep {

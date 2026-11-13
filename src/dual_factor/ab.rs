@@ -86,8 +86,11 @@ impl<R: Real> AbLists<R> {
         }
         #[cfg(not(any(test, debug_assertions, feature = "factor-shadow")))]
         {
-            // SAFETY: the span invariant of `a_pair` (the header was read from a span that lies inside both arrays and the
-            // update keeps the stream current), and the caller's: every A entry is below `x.len()`.
+            // SAFETY: (1) the pool arrays only grow between resets (`set` and `append_fresh` extend them, no edit shrinks or moves a span
+            // but `set`), and a stream record is only written from a span that lay inside both arrays when it was valid (`fresh`,
+            // `sync_slot`) or by shrinking or growing `a_len` in step with `na` (`update`), so even a stale header cannot reach outside
+            // the arrays; (2) every A entry is a tail position, below `m`, and the caller asserts `x.len() >= m` once per call, so the
+            // destinations are in range.
             unsafe { scatter_unrolled(self.idx.get_unchecked(lo..hi), self.val.get_unchecked(lo..hi), x, xv) }
         }
     }
