@@ -726,38 +726,54 @@ impl Buckets {
         }
     }
 
+    /// `next`, `prev`, `owner` have the same length `n`; every member `x` passed in is `< n` (asserted in debug builds).
+    #[inline(always)]
+    fn at(v: &[usize], x: usize) -> usize {
+        debug_assert!(x < v.len());
+        // SAFETY: members are column positions / row indices, all below the bucket arrays' length.
+        unsafe { *v.get_unchecked(x) }
+    }
+
+    #[inline(always)]
+    fn set(v: &mut [usize], x: usize, y: usize) {
+        debug_assert!(x < v.len());
+        // SAFETY: as `at`.
+        unsafe { *v.get_unchecked_mut(x) = y }
+    }
+
     fn insert(&mut self, k: usize, x: usize) {
-        debug_assert_eq!(self.owner[x], usize::MAX);
+        debug_assert_eq!(Self::at(&self.owner, x), usize::MAX);
         let h = self.heads[k];
         if h == usize::MAX {
-            self.next[x] = x;
-            self.prev[x] = x;
+            Self::set(&mut self.next, x, x);
+            Self::set(&mut self.prev, x, x);
         } else {
-            let tail = self.prev[h];
-            self.next[tail] = x;
-            self.prev[x] = tail;
-            self.next[x] = h;
-            self.prev[h] = x;
+            let tail = Self::at(&self.prev, h);
+            Self::set(&mut self.next, tail, x);
+            Self::set(&mut self.prev, x, tail);
+            Self::set(&mut self.next, x, h);
+            Self::set(&mut self.prev, h, x);
         }
         self.heads[k] = x;
-        self.owner[x] = k;
+        Self::set(&mut self.owner, x, k);
     }
 
     fn remove(&mut self, k: usize, x: usize) {
-        if self.owner[x] != k {
+        if Self::at(&self.owner, x) != k {
             return;
         }
-        let next = self.next[x];
+        let next = Self::at(&self.next, x);
         if next == x {
             self.heads[k] = usize::MAX;
         } else {
-            self.next[self.prev[x]] = next;
-            self.prev[next] = self.prev[x];
+            let prev = Self::at(&self.prev, x);
+            Self::set(&mut self.next, prev, next);
+            Self::set(&mut self.prev, next, prev);
             if self.heads[k] == x {
                 self.heads[k] = next;
             }
         }
-        self.owner[x] = usize::MAX;
+        Self::set(&mut self.owner, x, usize::MAX);
     }
 
     fn list(&self, k: usize) -> Vec<usize> {
@@ -795,6 +811,22 @@ struct Nucleus<R> {
 }
 
 impl<R: Real> Nucleus<R> {
+    /// Chain links and node ids are produced only by this module (`nodes.len()` at creation), so every id other than `NIL`
+    /// that is read is a valid index; callers never pass `NIL`.
+    #[inline(always)]
+    fn nd(&self, i: usize) -> &Node<R> {
+        debug_assert!(i < self.nodes.len());
+        // SAFETY: see above.
+        unsafe { self.nodes.get_unchecked(i) }
+    }
+
+    #[inline(always)]
+    fn nd_mut(&mut self, i: usize) -> &mut Node<R> {
+        debug_assert!(i < self.nodes.len());
+        // SAFETY: see `nd`.
+        unsafe { self.nodes.get_unchecked_mut(i) }
+    }
+
     fn cins(&mut self, c: usize) {
         let k = self.ccnt[c] as isize - 1;
         if k == 0 {
@@ -833,13 +865,13 @@ impl<R: Real> Nucleus<R> {
     fn clean_col(&mut self, c: usize) {
         let (mut prev, mut i) = (NIL, self.chead[c]);
         while i != NIL {
-            let next = self.nodes[i].cn;
-            if self.nodes[i].alive {
+            let next = self.nd(i).cn;
+            if self.nd(i).alive {
                 prev = i;
             } else if prev == NIL {
                 self.chead[c] = next;
             } else {
-                self.nodes[prev].cn = next;
+                self.nd_mut(prev).cn = next;
             }
             i = next;
         }
@@ -848,13 +880,13 @@ impl<R: Real> Nucleus<R> {
     fn clean_row(&mut self, r: usize) {
         let (mut prev, mut i) = (NIL, self.rhead[r]);
         while i != NIL {
-            let next = self.nodes[i].rn;
-            if self.nodes[i].alive {
+            let next = self.nd(i).rn;
+            if self.nd(i).alive {
                 prev = i;
             } else if prev == NIL {
                 self.rhead[r] = next;
             } else {
-                self.nodes[prev].rn = next;
+                self.nd_mut(prev).rn = next;
             }
             i = next;
         }
@@ -863,16 +895,16 @@ impl<R: Real> Nucleus<R> {
     /// First live entry of column `c`'s chain (`NIL` if none).
     fn first_alive_col(&self, c: usize) -> usize {
         let mut i = self.chead[c];
-        while i != NIL && !self.nodes[i].alive {
-            i = self.nodes[i].cn;
+        while i != NIL && !self.nd(i).alive {
+            i = self.nd(i).cn;
         }
         i
     }
 
     fn first_alive_row(&self, r: usize) -> usize {
         let mut i = self.rhead[r];
-        while i != NIL && !self.nodes[i].alive {
-            i = self.nodes[i].rn;
+        while i != NIL && !self.nd(i).alive {
+            i = self.nd(i).rn;
         }
         i
     }
@@ -1071,7 +1103,7 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, ckeys: &[usize], start: &[usize], en
         let (mut n, mut i) = (0, s.chead[c]);
         while i != NIL {
             n += 1;
-            i = s.nodes[i].cn;
+            i = s.nd(i).cn;
         }
         s.ccnt[c] = n;
     }
@@ -1080,7 +1112,7 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, ckeys: &[usize], start: &[usize], en
         let (mut n, mut i) = (0, s.rhead[r]);
         while i != NIL {
             n += 1;
-            i = s.nodes[i].rn;
+            i = s.nd(i).rn;
         }
         s.rcnt[r] = n;
     }
@@ -1255,7 +1287,7 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, ckeys: &[usize], start: &[usize], en
                 None => break,
             },
         };
-        let (pr, pc, pv) = (s.nodes[best].r, s.nodes[best].c, s.nodes[best].v);
+        let (pr, pc, pv) = (s.nd(best).r, s.nd(best).c, s.nd(best).v);
         if gate_log() {
             eprintln!(
                 "RPIV n={} r={} c={} sing={:?} row={} col={}",
@@ -1277,27 +1309,27 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, ckeys: &[usize], start: &[usize], en
         pcol.clear();
         let mut i = s.chead[pc];
         while i != NIL {
-            s_col += s.rcnt[s.nodes[i].r] - 1;
-            if s.nodes[i].r != pr {
+            s_col += s.rcnt[s.nd(i).r] - 1;
+            if s.nd(i).r != pr {
                 pcol.push(i);
             }
-            i = s.nodes[i].cn;
+            i = s.nd(i).cn;
         }
         prow.clear();
         let mut i = s.rhead[pr];
         while i != NIL {
-            s_row += s.ccnt[s.nodes[i].c] - 1;
-            if s.nodes[i].c != pc {
+            s_row += s.ccnt[s.nd(i).c] - 1;
+            if s.nd(i).c != pc {
                 prow.push(i);
             }
-            i = s.nodes[i].rn;
+            i = s.nd(i).rn;
         }
         s.rdel(pr);
         s.cdel(pc);
         u.clear();
-        u.extend(prow.iter().map(|&i| (s.nodes[i].c, s.nodes[i].v)));
+        u.extend(prow.iter().map(|&i| (s.nd(i).c, s.nd(i).v)));
         l.clear();
-        l.extend(pcol.iter().map(|&i| (s.nodes[i].r, s.nodes[i].v / pv)));
+        l.extend(pcol.iter().map(|&i| (s.nd(i).r, s.nd(i).v / pv)));
         l_idx.extend(l.iter().map(|x| x.0));
         l_val.extend(l.iter().map(|x| x.1));
         l_start.push(l_idx.len());
@@ -1314,30 +1346,30 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, ckeys: &[usize], start: &[usize], en
         let kill_chains = |s: &mut Nucleus<R>| {
             let mut i = s.chead[pc];
             while i != NIL {
-                s.nodes[i].alive = false;
-                i = s.nodes[i].cn;
+                s.nd_mut(i).alive = false;
+                i = s.nd(i).cn;
             }
             let mut i = s.rhead[pr];
             while i != NIL {
-                s.nodes[i].alive = false;
-                i = s.nodes[i].rn;
+                s.nd_mut(i).alive = false;
+                i = s.nd(i).rn;
             }
         };
         if s_col < s_row {
             for &i in &prow {
-                let c = s.nodes[i].c;
+                let c = s.nd(i).c;
                 s.cdel(c);
                 s.ccnt[c] -= 1;
-                s.nodes[i].alive = false;
+                s.nd_mut(i).alive = false;
             }
             for &i in &pcol {
-                let r = s.nodes[i].r;
+                let r = s.nd(i).r;
                 s.rdel(r);
             }
             kill_chains(&mut s);
             for &i in &pcol {
-                let r2 = s.nodes[i].r;
-                s.nodes[i].alive = false;
+                let r2 = s.nd(i).r;
+                s.nd_mut(i).alive = false;
                 s.rcnt[r2] -= 1;
                 let lr = l.iter().find(|x| x.0 == r2).unwrap().1;
                 generation = generation.wrapping_add(1);
@@ -1349,16 +1381,16 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, ckeys: &[usize], start: &[usize], en
                 let mut mid = s.rhead[r2];
                 while mid != NIL {
                     let cur = mid;
-                    mid = s.nodes[cur].rn;
-                    if !s.nodes[cur].alive || s.nodes[cur].c == pc {
+                    mid = s.nd(cur).rn;
+                    if !s.nd(cur).alive || s.nd(cur).c == pc {
                         continue;
                     }
-                    let c = s.nodes[cur].c;
+                    let c = s.nd(cur).c;
                     if let Some(&(_, uc)) = u.iter().find(|x| x.0 == c) {
                         seen[c] = generation;
-                        s.nodes[cur].v -= lr * uc;
-                        if s.nodes[cur].v.abs() < R::c(ABS_TOL) {
-                            s.nodes[cur].alive = false;
+                        s.nd_mut(cur).v -= lr * uc;
+                        if s.nd(cur).v.abs() < R::c(ABS_TOL) {
+                            s.nd_mut(cur).alive = false;
                             s.rcnt[r2] -= 1;
                             s.ccnt[c] -= 1;
                         }
@@ -1380,13 +1412,13 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, ckeys: &[usize], start: &[usize], en
             }
         } else {
             for &i in &pcol {
-                let r = s.nodes[i].r;
+                let r = s.nd(i).r;
                 s.rdel(r);
                 s.rcnt[r] -= 1;
-                s.nodes[i].alive = false;
+                s.nd_mut(i).alive = false;
             }
             for &i in &prow {
-                let c = s.nodes[i].c;
+                let c = s.nd(i).c;
                 s.cdel(c);
             }
             kill_chains(&mut s);
@@ -1400,16 +1432,16 @@ fn nucleus<R: Real>(m: usize, nnz_b: usize, ckeys: &[usize], start: &[usize], en
                 let mut mid = s.chead[c2];
                 while mid != NIL {
                     let cur = mid;
-                    mid = s.nodes[cur].cn;
-                    if !s.nodes[cur].alive || s.nodes[cur].r == pr {
+                    mid = s.nd(cur).cn;
+                    if !s.nd(cur).alive || s.nd(cur).r == pr {
                         continue;
                     }
-                    let r = s.nodes[cur].r;
+                    let r = s.nd(cur).r;
                     if let Some(&(_, lv)) = l.iter().find(|x| x.0 == r) {
                         seen[r] = generation;
-                        s.nodes[cur].v -= lv * uc;
-                        if s.nodes[cur].v.abs() < R::c(ABS_TOL) {
-                            s.nodes[cur].alive = false;
+                        s.nd_mut(cur).v -= lv * uc;
+                        if s.nd(cur).v.abs() < R::c(ABS_TOL) {
+                            s.nd_mut(cur).alive = false;
                             s.rcnt[r] -= 1;
                             s.ccnt[c2] -= 1;
                         }
@@ -1483,19 +1515,19 @@ fn search<R: Real>(s: &mut Nucleus<R>, remaining: usize) -> Option<(usize, f64)>
                     let mut mx = R::ZERO;
                     let mut n = first;
                     while n != NIL {
-                        mx = R::max(mx, s.nodes[n].v.abs());
-                        n = if col { s.nodes[n].cn } else { s.nodes[n].rn };
+                        mx = R::max(mx, s.nd(n).v.abs());
+                        n = if col { s.nd(n).cn } else { s.nd(n).rn };
                     }
                     if mx >= R::c(ABS_TOL) {
                         let mut n = first;
                         while n != NIL {
                             let cost = (((if col {
-                                s.rcnt[s.nodes[n].r]
+                                s.rcnt[s.nd(n).r]
                             } else {
-                                s.ccnt[s.nodes[n].c]
+                                s.ccnt[s.nd(n).c]
                             }) - 1)
                                 * k) as f64;
-                            let a = s.nodes[n].v.abs();
+                            let a = s.nd(n).v.abs();
                             if (cost < bcost && a > R::c(thr) * mx)
                                 || (cost == bcost && a > bratio * mx)
                             {
@@ -1503,7 +1535,7 @@ fn search<R: Real>(s: &mut Nucleus<R>, remaining: usize) -> Option<(usize, f64)>
                                 bratio = a / mx;
                                 best = Some(n);
                             }
-                            n = if col { s.nodes[n].cn } else { s.nodes[n].rn };
+                            n = if col { s.nd(n).cn } else { s.nd(n).rn };
                         }
                         count += 1;
                         if count >= limit {
@@ -1516,15 +1548,15 @@ fn search<R: Real>(s: &mut Nucleus<R>, remaining: usize) -> Option<(usize, f64)>
                             break;
                         }
                     }
-                    x = if col { s.cb.next[x] } else { s.rb.next[x] };
+                    x = if col { Buckets::at(&s.cb.next, x) } else { Buckets::at(&s.rb.next, x) };
                     if x == head {
                         break;
                     }
                 }
                 if let (true, Some(b)) = (done, best) {
                     let li = last;
-                    let owner = if col { s.nodes[b].c } else { s.nodes[b].r };
-                    let next = if col { s.cb.next[li] } else { s.rb.next[li] };
+                    let owner = if col { s.nd(b).c } else { s.nd(b).r };
+                    let next = if col { Buckets::at(&s.cb.next, li) } else { s.rb.next[li] };
                     let nh = if owner == li { li } else { next };
                     if col {
                         s.cb.heads[k] = nh;
