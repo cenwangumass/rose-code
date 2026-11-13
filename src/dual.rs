@@ -1725,14 +1725,57 @@ fn rebuild_rows<R: Real>(
 }
 
 /// The per-row cache of the bounds of the basic variables for the basis `head`.
+/// The pivot column without the pivot entry and its tau values, aligned with it. `tau_out` is the result of the two-vector FTRAN over the positions of
+/// `col_out`, so it holds one entry per entry of `col_out` in the same order (or is empty, in the plain FTRAN of mode 2: every tau value is then `+0.0`).
+/// A dense FTRAN result (count -1) is compacted by an ascending scan that skips the pivot and the entries up to the drop tolerance (`0x12013c`); a sparse
+/// one moves its last entry into the pivot's slot. The tau values undergo the same edit. Equals gathering a dense scatter of `tau_out` along `col`.
+fn hand_off_col_tau<R: Real>(
+    col_out: &[(usize, R)],
+    tau_out: &[(usize, R)],
+    dense: bool,
+    r: usize,
+    col: &mut Vec<(usize, R)>,
+    tau: &mut Vec<R>,
+) {
+    col.clear();
+    tau.clear();
+    if tau_out.is_empty() {
+        if dense {
+            col.extend(col_out.iter().copied().filter(|e| e.0 != r && e.1.abs() > R::c(DROP_TOL)));
+        } else {
+            col.extend_from_slice(col_out);
+            if let Some(k) = col.iter().position(|e| e.0 == r) {
+                col.swap_remove(k);
+            }
+        }
+        tau.resize(col.len(), R::ZERO);
+        return;
+    }
+    debug_assert!(tau_out.len() == col_out.len() && tau_out.iter().zip(col_out).all(|(t, c)| t.0 == c.0));
+    if dense {
+        for (e, t) in col_out.iter().zip(tau_out) {
+            if e.0 != r && e.1.abs() > R::c(DROP_TOL) {
+                col.push(*e);
+                tau.push(t.1);
+            }
+        }
+    } else {
+        col.extend_from_slice(col_out);
+        tau.extend(tau_out.iter().map(|t| t.1));
+        if let Some(k) = col.iter().position(|e| e.0 == r) {
+            col.swap_remove(k);
+            tau.swap_remove(k);
+        }
+    }
+}
+
 fn basic_bounds<R: Real>(p: &Internal, head: &[usize]) -> (Vec<R>, Vec<R>) {
     head.iter().map(|&v| basic_bound_pair::<R>(p.lo[v], p.up[v])).unzip()
 }
 
-/// Retained per-iteration buffers of `Dual::iteration` and `update_primal_and_weights`. `tau` and `rhs` are either empty or of length `m` with every entry
+/// Retained per-iteration buffers of `Dual::iteration` and `update_primal_and_weights`. `rhs` is either empty or of length `m` with every entry
 /// `R::ZERO`; the user clears the entries it set and puts the buffer back (a path that returns early just drops it).
 struct GlueBufs<R: Real> {
-    tau: Vec<R>,
     rhs: Vec<R>,
     changed: Vec<usize>,
     /// Per-iteration lists of `Dual::iteration`, taken (cleared) at the start and put back when the pivot is built; capacities only. `rho_r`/`rho_v`: the
@@ -1757,7 +1800,6 @@ struct GlueBufs<R: Real> {
 impl<R: Real> Default for GlueBufs<R> {
     fn default() -> Self {
         GlueBufs {
-            tau: Vec::new(),
             rhs: Vec::new(),
             changed: Vec::new(),
             rho_r: Vec::new(),
@@ -5410,13 +5452,6 @@ impl<'a, R: Real> Dual<'a, R> {
             self.work
                 .add(0x120114, 4.0 * copied as f64 + vec_work, crate::work::CTX);
         }
-        let mut tau_dense = std::mem::take(&mut self.glue.tau);
-        if tau_dense.len() != m {
-            tau_dense = vec![R::ZERO; m];
-        }
-        for &(i, v) in &tau_out {
-            tau_dense[i] = v;
-        }
         let alpha = col_out.iter().rfind(|e| e.0 == r).map_or(R::ZERO, |e| e.1);
         // Pivot check: the row's value in the true frame against the column's.
         let sq = if self.st[q] == UB { -1.0 } else { 1.0 };
@@ -5430,7 +5465,7 @@ impl<'a, R: Real> Dual<'a, R> {
             || rel > R::c(PAIR_TOL.with(|c| c.get()));
         if let Some(s) = rec.as_mut() {
             s["alpha_col"] = serde_json::json!(alpha.to_f64());
-            s["tau_r"] = serde_json::json!(tau_dense[r].to_f64());
+            s["tau_r"] = serde_json::json!(tau_out.iter().rfind(|e| e.0 == r).map_or(R::ZERO, |e| e.1).to_f64());
             s["w"] = serde_json::json!(w_row.to_f64());
             s["col"] = crate::dump::sparse_r(&col_out);
             s["tau"] = crate::dump::sparse_r(&tau_out);
@@ -5538,21 +5573,9 @@ impl<'a, R: Real> Dual<'a, R> {
         // Column without the pivot entry: the last entry moves into the pivot's slot.
         // A dense FTRAN result (count -1) is compacted by an ascending scan that skips the pivot and the entries up to the drop tolerance (`0x12013c`).
         let mut col: Vec<(usize, R)> = std::mem::take(&mut self.glue.col);
-        col.clear();
-        col.extend_from_slice(&col_out);
-        if self.mirror.last_dense() {
-            col.retain(|e| e.0 != r && e.1.abs() > R::c(DROP_TOL));
-        } else if let Some(k) = col.iter().position(|e| e.0 == r) {
-            col.swap_remove(k);
-        }
         let mut tau: Vec<R> = std::mem::take(&mut self.glue.tau_col);
-        tau.clear();
-        tau.extend(col.iter().map(|e| tau_dense[e.0]));
-        for &(i, _) in &tau_out {
-            tau_dense[i] = R::ZERO;
-        }
+        hand_off_col_tau(&col_out, &tau_out, self.mirror.last_dense(), r, &mut col, &mut tau);
         self.mirror.give_list(tau_out);
-        self.glue.tau = tau_dense;
         // Each accepted pivot and each bound flip advances the shared clock.
         crate::simplex::TOTAL_ITERS.with(|c| c.set(c.get() + 1.0 + flips.len() as f64));
         // Bound flips: x_B and the statuses (`0xcd720`).
@@ -10715,6 +10738,92 @@ mod framework_list_diff {
 
     #[test]
     fn framework_list_matches_old_loop_f80() {
+        run::<crate::f80::F80>();
+    }
+}
+
+#[cfg(test)]
+mod tau_hand_off_diff {
+    use super::*;
+
+    /// The hand-off as it was: `tau_out` scattered into a dense array, gathered along the final `col`, the array cleared.
+    fn old<R: Real>(col_out: &[(usize, R)], tau_out: &[(usize, R)], dense: bool, r: usize, m: usize) -> (Vec<(usize, R)>, Vec<R>, Vec<R>) {
+        let mut tau_dense = vec![R::ZERO; m];
+        for &(i, v) in tau_out {
+            tau_dense[i] = v;
+        }
+        let mut col: Vec<(usize, R)> = col_out.to_vec();
+        if dense {
+            col.retain(|e| e.0 != r && e.1.abs() > R::c(DROP_TOL));
+        } else if let Some(k) = col.iter().position(|e| e.0 == r) {
+            col.swap_remove(k);
+        }
+        let tau: Vec<R> = col.iter().map(|e| tau_dense[e.0]).collect();
+        for &(i, _) in tau_out {
+            tau_dense[i] = R::ZERO;
+        }
+        (col, tau, tau_dense)
+    }
+
+    fn same<R: Real>(a: R, b: R) -> bool {
+        format!("{:?}", a) == format!("{:?}", b) && a.to_f64().to_bits() == b.to_f64().to_bits()
+    }
+
+    fn run<R: Real>() {
+        let mut seed = 0x9e37_79b9_7f4a_7c15u64;
+        let mut next = move || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        let vals = [0.0, -0.0, 1.0, -2.5, 1e-14, -1e-14, 1e-12, 3.0, f64::NAN, 7.25];
+        let (mut sparse_seen, mut dense_seen, mut empty_seen, mut dup_seen) = (0, 0, 0, 0);
+        for _ in 0..20000 {
+            let m = 1 + next() as usize % 12;
+            let r = next() as usize % m;
+            let n = next() as usize % 14;
+            // Rows may repeat; the FTRAN output pass gives equal tau values to repeated needed positions (a function of the position).
+            let col_out: Vec<(usize, R)> = (0..n).map(|_| (next() as usize % m, R::c(vals[next() as usize % vals.len()]))).collect();
+            let per_row: Vec<R> = (0..m).map(|_| R::c(vals[next() as usize % vals.len()])).collect();
+            let empty = next() % 4 == 0;
+            let tau_out: Vec<(usize, R)> = if empty { Vec::new() } else { col_out.iter().map(|e| (e.0, per_row[e.0])).collect() };
+            let dense = next() % 2 == 0;
+            let (oc, ot, od) = old(&col_out, &tau_out, dense, r, m);
+            assert!(od.iter().all(|&v| same(v, R::ZERO)));
+            let (mut nc, mut nt) = (vec![(99, R::ONE)], vec![R::ONE]);
+            hand_off_col_tau(&col_out, &tau_out, dense, r, &mut nc, &mut nt);
+            assert_eq!(oc.len(), nc.len());
+            assert_eq!(ot.len(), nt.len());
+            for (x, y) in oc.iter().zip(&nc) {
+                assert!(x.0 == y.0 && same(x.1, y.1));
+            }
+            for (x, y) in ot.iter().zip(&nt) {
+                assert!(same(*x, *y));
+            }
+            // The dump's `tau_r`: the last tau_out entry of the pivot row, else +0.0.
+            let tr = tau_out.iter().rfind(|e| e.0 == r).map_or(R::ZERO, |e| e.1);
+            let mut dd = vec![R::ZERO; m];
+            for &(i, v) in &tau_out {
+                dd[i] = v;
+            }
+            assert!(same(tr, dd[r]));
+            if dense { dense_seen += 1 } else { sparse_seen += 1 }
+            if empty { empty_seen += 1 }
+            let mut rows: Vec<usize> = col_out.iter().map(|e| e.0).collect();
+            rows.sort();
+            if rows.windows(2).any(|w| w[0] == w[1]) { dup_seen += 1 }
+        }
+        assert!(sparse_seen > 0 && dense_seen > 0 && empty_seen > 0 && dup_seen > 0);
+    }
+
+    #[test]
+    fn tau_hand_off_matches_dense_round_trip_f64() {
+        run::<f64>();
+    }
+
+    #[test]
+    fn tau_hand_off_matches_dense_round_trip_f80() {
         run::<crate::f80::F80>();
     }
 }
