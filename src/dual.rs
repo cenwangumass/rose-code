@@ -1724,7 +1724,6 @@ fn rebuild_rows<R: Real>(
     (rows.len(), n_fresh)
 }
 
-/// The per-row cache of the bounds of the basic variables for the basis `head`.
 /// The pivot column without the pivot entry and its tau values, aligned with it. `tau_out` is the result of the two-vector FTRAN over the positions of
 /// `col_out`, so it holds one entry per entry of `col_out` in the same order (or is empty, in the plain FTRAN of mode 2: every tau value is then `+0.0`).
 /// A dense FTRAN result (count -1) is compacted by an ascending scan that skips the pivot and the entries up to the drop tolerance (`0x12013c`); a sparse
@@ -1751,7 +1750,8 @@ fn hand_off_col_tau<R: Real>(
         tau.resize(col.len(), R::ZERO);
         return;
     }
-    debug_assert!(tau_out.len() == col_out.len() && tau_out.iter().zip(col_out).all(|(t, c)| t.0 == c.0));
+    assert_eq!(tau_out.len(), col_out.len(), "tau not aligned with the pivot column");
+    debug_assert!(tau_out.iter().zip(col_out).all(|(t, c)| t.0 == c.0));
     if dense {
         for (e, t) in col_out.iter().zip(tau_out) {
             if e.0 != r && e.1.abs() > R::c(DROP_TOL) {
@@ -1769,6 +1769,7 @@ fn hand_off_col_tau<R: Real>(
     }
 }
 
+/// The per-row cache of the bounds of the basic variables for the basis `head`.
 fn basic_bounds<R: Real>(p: &Internal, head: &[usize]) -> (Vec<R>, Vec<R>) {
     head.iter().map(|&v| basic_bound_pair::<R>(p.lo[v], p.up[v])).unzip()
 }
