@@ -761,12 +761,23 @@ fn auxiliary_lazy_build_matches_eager_build() {
 /// The row-wise copy of the nonbasic structurals as flat pools: row `i` is `idx/val[start[i]..start[i] + len[i]]` with `cap[i] - len[i]` spare slots.
 /// The per-pivot edits keep the in-row order of a `Vec<(usize, f64)>` (`swap_remove` moves the last entry into the hole; `push` appends): the order of
 /// the scatter is the order of the floating-point sums. A full row moves to the end of the pool; the pool is compacted when most of it is dead.
+const NO_SLOT: u32 = u32::MAX;
+
 struct FlatRows {
     start: Vec<u32>,
     len: Vec<u32>,
     cap: Vec<u32>,
     idx: Vec<u32>,
     val: Vec<f64>,
+    /// The id of each slot's entry in the column store (`cstart[j] + t` for the `t`-th entry of column `j`; `NO_SLOT` when untracked), parallel to `idx`.
+    eid: Vec<u32>,
+    /// Back-pointers: `slot_of[e]` is the position within its row of the slot holding entry `e`, `NO_SLOT` when no slot does. Only the first
+    /// entry of a repeated (row, column) pair of the column store is ever referenced. Empty unless `tracked`.
+    slot_of: Vec<u32>,
+    /// First entry id of each column of the column store (`n + 1` values); empty unless `tracked`.
+    cstart: Vec<u32>,
+    /// `slot_of`/`eid` are valid (`track` found every slot in the column store and no repeated slot); otherwise lookups scan the row.
+    tracked: bool,
     /// Slots of the pool owned by no row (left behind by moved rows).
     dead: usize,
     /// Exclusive bound of every stored index (`n + m`).
@@ -785,6 +796,10 @@ impl FlatRows {
             cap: vec![0; m],
             idx: Vec::new(),
             val: Vec::new(),
+            eid: Vec::new(),
+            slot_of: Vec::new(),
+            cstart: Vec::new(),
+            tracked: false,
             dead: 0,
             nv: n + m,
             n,
@@ -802,6 +817,7 @@ impl FlatRows {
         assert!(total < u32::MAX as usize / 2);
         f.idx.reserve(total);
         f.val.reserve(total);
+        f.eid.reserve(total);
         for (i, r) in rows.iter().enumerate() {
             let cap = r.len() + (r.len() / 2).max(4);
             f.start[i] = f.idx.len() as u32;
@@ -811,9 +827,11 @@ impl FlatRows {
                 assert!(j < n, "slack index {j} in a pivot row (n = {n})");
                 f.idx.push(j as u32);
                 f.val.push(a);
+                f.eid.push(NO_SLOT);
             }
             f.idx.resize(f.idx.len() + cap - r.len(), 0);
             f.val.resize(f.val.len() + cap - r.len(), 0.0);
+            f.eid.resize(f.eid.len() + cap - r.len(), NO_SLOT);
         }
         #[cfg(debug_assertions)]
         {
@@ -839,12 +857,148 @@ impl FlatRows {
         self.row(i).0.iter().position(|&x| x as usize == j)
     }
 
+    /// Attach the back-pointers: every slot `(i, j)` gets the id of the first entry of row `i` in column `j` of the column store `cols`. When a slot has
+    /// no such entry or a (row, column) pair occupies two slots, the rows stay untracked (lookups scan).
+    fn track(&mut self, cols: &[Vec<(usize, f64)>]) {
+        let (m, n) = (self.start.len(), self.n);
+        assert!(cols.len() >= n);
+        let mut cstart = Vec::with_capacity(n + 1);
+        let mut tot = 0usize;
+        for c in &cols[..n] {
+            cstart.push(tot as u32);
+            tot += c.len();
+        }
+        cstart.push(tot as u32);
+        assert!(tot < u32::MAX as usize / 2);
+        // The slots by column (counting sort): `by_col[cnt[j]..cnt[j + 1]]` are the `(row, position)` pairs of column `j`.
+        let mut cnt = vec![0u32; n + 1];
+        for i in 0..m {
+            for &j in self.row(i).0 {
+                cnt[j as usize + 1] += 1;
+            }
+        }
+        for j in 0..n {
+            cnt[j + 1] += cnt[j];
+        }
+        let mut fill = cnt.clone();
+        let mut by_col = vec![(0u32, 0u32); cnt[n] as usize];
+        for i in 0..m {
+            for (k, &j) in self.row(i).0.iter().enumerate() {
+                by_col[fill[j as usize] as usize] = (i as u32, k as u32);
+                fill[j as usize] += 1;
+            }
+        }
+        let mut slot_of = vec![NO_SLOT; tot];
+        let mut first = vec![(u32::MAX, 0u32); m];
+        let mut ok = true;
+        'cols: for j in 0..n {
+            let slots = &by_col[cnt[j] as usize..cnt[j + 1] as usize];
+            if slots.is_empty() {
+                continue;
+            }
+            for (t, &(i, _)) in cols[j].iter().enumerate() {
+                if first[i].0 != j as u32 {
+                    first[i] = (j as u32, t as u32);
+                }
+            }
+            for &(i, k) in slots {
+                if first[i as usize].0 != j as u32 {
+                    ok = false;
+                    break 'cols;
+                }
+                let e = cstart[j] + first[i as usize].1;
+                if slot_of[e as usize] != NO_SLOT {
+                    ok = false;
+                    break 'cols;
+                }
+                slot_of[e as usize] = k;
+                let s = self.start[i as usize] as usize + k as usize;
+                self.eid[s] = e;
+            }
+        }
+        self.tracked = ok;
+        if ok {
+            self.slot_of = slot_of;
+            self.cstart = cstart;
+        } else {
+            self.slot_of = Vec::new();
+            self.cstart = Vec::new();
+            self.eid.iter_mut().for_each(|e| *e = NO_SLOT);
+        }
+        self.check();
+    }
+
+    /// The entry id of the `t`-th entry of column `j` of the column store.
+    #[inline(always)]
+    fn eid_of(&self, j: usize, t: usize) -> u32 {
+        if self.tracked {
+            self.cstart[j] + t as u32
+        } else {
+            NO_SLOT
+        }
+    }
+
+    /// The first position of variable `j` in row `i`, `e` being the id of the first entry of row `i` in column `j`: O(1) through the back-pointer
+    /// (checked against the scan in debug and factor-shadow builds), the scan when untracked.
+    #[inline(always)]
+    fn find(&self, i: usize, j: usize, e: u32) -> Option<usize> {
+        if !self.tracked {
+            return self.position(i, j);
+        }
+        let s = self.slot_of[e as usize];
+        let r = (s != NO_SLOT).then_some(s as usize);
+        #[cfg(any(debug_assertions, feature = "factor-shadow"))]
+        assert_eq!(r, self.position(i, j), "back-pointer of ({i}, {j})");
+        r
+    }
+
+    /// The row-copy edit of a pivot: in a row holding both columns the leaving one takes the entering one's place; elsewhere the entering one is
+    /// deleted (the last entry moves into its slot) and the leaving one is appended.
+    fn pivot_edit(&mut self, cols: &[Vec<(usize, f64)>], q: usize, leave: usize, leave_in: bool) {
+        if q < self.n {
+            for (t, &(i, _)) in cols[q].iter().enumerate() {
+                if let Some(kk) = self.find(i, q, self.eid_of(q, t)) {
+                    if let Some(tl) = leave_in.then(|| cols[leave].iter().position(|e| e.0 == i)).flatten() {
+                        self.set(i, kk, leave, cols[leave][tl].1, self.eid_of(leave, tl));
+                    } else {
+                        self.swap_remove(i, kk);
+                    }
+                }
+            }
+        }
+        if leave_in {
+            for (t, &(i, _)) in cols[leave].iter().enumerate() {
+                if self.find(i, leave, self.eid_of(leave, t)).is_some() {
+                    continue;
+                }
+                // The first entry of the pair carries the id and the value (a repeated pair is entered once).
+                let tf = cols[leave].iter().position(|e| e.0 == i).unwrap();
+                if self.find(i, leave, self.eid_of(leave, tf)).is_none() {
+                    self.push(i, leave, cols[leave][tf].1, self.eid_of(leave, tf));
+                }
+            }
+        }
+    }
+
     /// Replace entry `k` of row `i`.
-    fn set(&mut self, i: usize, k: usize, j: usize, a: f64) {
+    fn set(&mut self, i: usize, k: usize, j: usize, a: f64, e: u32) {
         assert!(k < self.row_len(i) && j < self.n, "slack index {j} in a pivot row (n = {})", self.n);
         let s = self.start[i] as usize + k;
+        if self.tracked && (e == NO_SLOT || self.slot_of[e as usize] != NO_SLOT) {
+            // Variable `j` already holds a slot (a row that was not built from nonbasic columns only): the unique-slot invariant would break, so
+            // the remaining edits find slots by the scan (same answers).
+            self.tracked = false;
+        }
+        if self.tracked {
+            let old = self.eid[s];
+            if old != NO_SLOT {
+                self.slot_of[old as usize] = NO_SLOT;
+            }
+            self.slot_of[e as usize] = k as u32;
+        }
         self.idx[s] = j as u32;
         self.val[s] = a;
+        self.eid[s] = e;
         #[cfg(debug_assertions)]
         {
             self.mirror[i][k] = (j, a);
@@ -857,8 +1011,15 @@ impl FlatRows {
         let l = self.row_len(i);
         assert!(k < l);
         let s = self.start[i] as usize;
+        if self.tracked {
+            self.slot_of[self.eid[s + k] as usize] = NO_SLOT;
+            if k + 1 < l {
+                self.slot_of[self.eid[s + l - 1] as usize] = k as u32;
+            }
+        }
         self.idx[s + k] = self.idx[s + l - 1];
         self.val[s + k] = self.val[s + l - 1];
+        self.eid[s + k] = self.eid[s + l - 1];
         self.len[i] -= 1;
         #[cfg(debug_assertions)]
         {
@@ -868,15 +1029,22 @@ impl FlatRows {
     }
 
     /// Append `(j, a)` to row `i`.
-    fn push(&mut self, i: usize, j: usize, a: f64) {
+    fn push(&mut self, i: usize, j: usize, a: f64, e: u32) {
         assert!(j < self.n, "slack index {j} in a pivot row (n = {})", self.n);
         let l = self.row_len(i);
         if l == self.cap[i] as usize {
             self.grow(i);
         }
         let s = self.start[i] as usize + l;
+        if self.tracked && (e == NO_SLOT || self.slot_of[e as usize] != NO_SLOT) {
+            self.tracked = false;
+        }
+        if self.tracked {
+            self.slot_of[e as usize] = l as u32;
+        }
         self.idx[s] = j as u32;
         self.val[s] = a;
+        self.eid[s] = e;
         self.len[i] += 1;
         #[cfg(debug_assertions)]
         {
@@ -896,8 +1064,10 @@ impl FlatRows {
         assert!(new_s + cap < u32::MAX as usize / 2);
         self.idx.extend_from_within(s..s + l);
         self.val.extend_from_within(s..s + l);
+        self.eid.extend_from_within(s..s + l);
         self.idx.resize(new_s + cap, 0);
         self.val.resize(new_s + cap, 0.0);
+        self.eid.resize(new_s + cap, NO_SLOT);
         self.dead += self.cap[i] as usize;
         self.start[i] = new_s as u32;
         self.cap[i] = cap as u32;
@@ -907,17 +1077,20 @@ impl FlatRows {
     fn compact(&mut self) {
         let m = self.start.len();
         let live: usize = self.cap.iter().map(|&c| c as usize).sum();
-        let (mut idx, mut val) = (Vec::with_capacity(live), Vec::with_capacity(live));
+        let (mut idx, mut val, mut eid) = (Vec::with_capacity(live), Vec::with_capacity(live), Vec::with_capacity(live));
         for i in 0..m {
             let (s, l, c) = (self.start[i] as usize, self.len[i] as usize, self.cap[i] as usize);
             self.start[i] = idx.len() as u32;
             idx.extend_from_slice(&self.idx[s..s + l]);
             val.extend_from_slice(&self.val[s..s + l]);
+            eid.extend_from_slice(&self.eid[s..s + l]);
             idx.resize(idx.len() + c - l, 0);
             val.resize(val.len() + c - l, 0.0);
+            eid.resize(eid.len() + c - l, NO_SLOT);
         }
         self.idx = idx;
         self.val = val;
+        self.eid = eid;
         self.dead = 0;
     }
 
@@ -933,6 +1106,10 @@ impl FlatRows {
                 assert_eq!(ix.len(), r.len(), "flat row {i} length");
                 for (k, &(j, a)) in r.iter().enumerate() {
                     assert!(ix[k] as usize == j && vl[k].to_bits() == a.to_bits(), "flat row {i} entry {k}");
+                    if self.tracked {
+                        let e = self.eid[self.start[i] as usize + k] as usize;
+                        assert!(self.slot_of[e] as usize == k, "flat row {i} back-pointer {k}");
+                    }
                 }
             }
         }
@@ -2732,6 +2909,7 @@ impl<'a, R: Real> Dual<'a, R> {
             }
         }
         self.rrows = FlatRows::from_rows(&rows, self.n);
+        self.rrows.track(&self.p.cols);
         // `rrows` takes the first entry of a repeated (row, column) pair for every copy, `p.rwise` keeps each entry's own
         // value: with a repeated row in any structural column the single-pass d could differ, so keep the full path.
         let mut seen = vec![usize::MAX; self.m];
@@ -5500,29 +5678,7 @@ impl<'a, R: Real> Dual<'a, R> {
         // Row-wise copy: in a row holding both columns the leaving one takes the entering one's place; elsewhere the entering one is deleted (the last
         // entry moves into its slot) and the leaving one is appended.
         let leave_in = leave < n && p.lo[leave] != p.up[leave];
-        if q < n {
-            for &(i, _) in &p.cols[q] {
-                if let Some(kk) = self.rrows.position(i, q) {
-                    if let Some(a) = leave_in
-                        .then(|| p.cols[leave].iter().find(|e| e.0 == i))
-                        .flatten()
-                        .map(|e| e.1)
-                    {
-                        self.rrows.set(i, kk, leave, a);
-                    } else {
-                        self.rrows.swap_remove(i, kk);
-                    }
-                }
-            }
-        }
-        if leave_in {
-            for &(i, _) in &p.cols[leave] {
-                if self.rrows.position(i, leave).is_none() {
-                    let a = p.cols[leave].iter().find(|e| e.0 == i).unwrap().1;
-                    self.rrows.push(i, leave, a);
-                }
-            }
-        }
+        self.rrows.pivot_edit(&p.cols, q, leave, leave_in);
         if self.d[q] <= R::c(dual_tol()) {
             self.stall += 1;
         }
@@ -7539,6 +7695,7 @@ fn solve_pass_callback<R: Real>(
             })
             .collect();
         s.rrows = FlatRows::from_rows(&rows, n);
+        s.rrows.track(&p.cols);
         s.rrows_exact = false;
     }
     if let Some(dy) = &dstart_d {
@@ -9538,7 +9695,7 @@ mod pivot_row_diff {
                             let kk = flat.position(i, j).unwrap();
                             let a = value(&mut r);
                             rrows[i][kk] = (nj, a);
-                            flat.set(i, kk, nj, a);
+                            flat.set(i, kk, nj, a, NO_SLOT);
                         }
                         1 if !rrows[i].is_empty() => {
                             let k = r.below(rrows[i].len());
@@ -9548,7 +9705,7 @@ mod pivot_row_diff {
                         _ => {
                             let a = value(&mut r);
                             rrows[i].push((nj, a));
-                            flat.push(i, nj, a);
+                            flat.push(i, nj, a, NO_SLOT);
                         }
                     }
                 }
@@ -10368,5 +10525,118 @@ mod infeas_tests {
     #[test]
     fn infeas_of_matches_reference_quad() {
         check::<crate::f80::F80>();
+    }
+}
+
+/// Differential test of the back-pointers: the O(1) lookups and the in-place edits of a tracked `FlatRows` give the same rows, in the same order, as
+/// the position scans on a `Vec<Vec>` copy (the original edit), with repeated (row, column) pairs, fixed columns, slack leaving variables and compaction.
+#[cfg(test)]
+mod rrows_backptr_diff {
+    use super::*;
+
+    struct Rng(u64);
+    impl Rng {
+        fn below(&mut self, k: usize) -> usize {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 7;
+            self.0 ^= self.0 << 17;
+            (self.0 >> 11) as usize % k
+        }
+    }
+
+    /// The original edit of `iteration` on a `Vec<Vec>` copy.
+    fn old_edit(rows: &mut [Vec<(usize, f64)>], cols: &[Vec<(usize, f64)>], q: usize, leave: usize, leave_in: bool, n: usize) {
+        if q < n {
+            for &(i, _) in &cols[q] {
+                if let Some(kk) = rows[i].iter().position(|e| e.0 == q) {
+                    if let Some(a) = leave_in.then(|| cols[leave].iter().find(|e| e.0 == i)).flatten().map(|e| e.1) {
+                        rows[i][kk] = (leave, a);
+                    } else {
+                        rows[i].swap_remove(kk);
+                    }
+                }
+            }
+        }
+        if leave_in {
+            for &(i, _) in &cols[leave] {
+                if rows[i].iter().position(|e| e.0 == leave).is_none() {
+                    let a = cols[leave].iter().find(|e| e.0 == i).unwrap().1;
+                    rows[i].push((leave, a));
+                }
+            }
+        }
+    }
+
+    fn same(flat: &FlatRows, rows: &[Vec<(usize, f64)>]) -> bool {
+        rows.iter().enumerate().all(|(i, r)| {
+            let (ix, vl) = flat.row(i);
+            ix.len() == r.len() && r.iter().enumerate().all(|(k, e)| e.0 == ix[k] as usize && e.1.to_bits() == vl[k].to_bits())
+        })
+    }
+
+    #[test]
+    fn backpointers_match_position_scans() {
+        let mut r = Rng(0x2545f4914f6cdd1d);
+        let (mut tracked_cases, mut untracked_cases) = (0, 0);
+        for case in 0..600 {
+            let n = 2 + r.below(30);
+            let m = 1 + r.below(12);
+            let dups = case % 3 == 0;
+            let cols: Vec<Vec<(usize, f64)>> = (0..n)
+                .map(|_| {
+                    let mut c: Vec<(usize, f64)> = Vec::new();
+                    for i in 0..m {
+                        if r.below(3) == 0 {
+                            c.push((i, (r.below(2001) as f64 - 1000.0) / 8.0));
+                            if dups && r.below(6) == 0 {
+                                c.push((i, (r.below(2001) as f64 - 1000.0) / 8.0));
+                            }
+                        }
+                    }
+                    c
+                })
+                .collect();
+            let fixed: Vec<bool> = (0..n).map(|_| r.below(5) == 0).collect();
+            let mut nonbasic: Vec<bool> = (0..n).map(|_| r.below(3) != 0).collect();
+            // `build_rrows`: column by column, every entry takes the value of the first entry of its row.
+            let mut rows: Vec<Vec<(usize, f64)>> = vec![Vec::new(); m];
+            for j in 0..n {
+                if nonbasic[j] && !fixed[j] {
+                    for &(i, _) in &cols[j] {
+                        let a = cols[j].iter().find(|e| e.0 == i).unwrap().1;
+                        rows[i].push((j, a));
+                    }
+                }
+            }
+            let mut flat = FlatRows::from_rows(&rows, n);
+            flat.track(&cols);
+            if flat.tracked {
+                tracked_cases += 1;
+            } else {
+                untracked_cases += 1;
+            }
+            for _ in 0..60 {
+                let nb: Vec<usize> = (0..n).filter(|&j| nonbasic[j]).collect();
+                let bs: Vec<usize> = (0..n).filter(|&j| !nonbasic[j]).collect();
+                if nb.is_empty() {
+                    break;
+                }
+                let q = nb[r.below(nb.len())];
+                let leave = if bs.is_empty() || r.below(4) == 0 { n + r.below(m) } else { bs[r.below(bs.len())] };
+                let leave_in = leave < n && !fixed[leave];
+                nonbasic[q] = false;
+                if leave < n {
+                    nonbasic[leave] = true;
+                }
+                old_edit(&mut rows, &cols, q, leave, leave_in, n);
+                flat.pivot_edit(&cols, q, leave, leave_in);
+                assert!(same(&flat, &rows), "case {case}");
+                if r.below(10) == 0 {
+                    flat.compact();
+                }
+                flat.check();
+            }
+        }
+        assert!(tracked_cases > 100 && untracked_cases > 0, "{tracked_cases} {untracked_cases}");
     }
 }
