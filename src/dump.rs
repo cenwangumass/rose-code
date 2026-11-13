@@ -139,6 +139,16 @@ pub fn sparse_r<R: crate::real::Real>(v: &[(usize, R)]) -> serde_json::Value {
     )
 }
 
+/// `sparse_r` of the parallel lists `rows` and `vals`.
+pub fn sparse_rv<R: crate::real::Real>(rows: &[usize], vals: &[R]) -> serde_json::Value {
+    serde_json::Value::Array(
+        rows.iter()
+            .zip(vals)
+            .map(|(&i, v)| serde_json::json!([i, v.json()]))
+            .collect(),
+    )
+}
+
 /// A sparse vector as `[[index, value], ...]`.
 pub fn sparse(v: &[(usize, f64)]) -> serde_json::Value {
     serde_json::Value::Array(v.iter().map(|&(i, x)| serde_json::json!([i, x])).collect())

@@ -594,3 +594,62 @@ fn dense_l_sweep_skipping_the_gap_matches_the_full_sweep() {
     }
     assert!(gaps > 10 && live > 20, "gaps {gaps} live {live} checks {checks}");
 }
+
+/// `btran_rho` on real factors (sparse and dense routes, with row etas after updates): the kept entries equal `btran`'s filtered by `|v| > tol`
+/// bit for bit, `rho_full` equals `btran`'s list, and the work and route flags agree.
+#[test]
+fn btran_rho_matches_btran_then_filter() {
+    let mut seed = 0x51ab_1e5eed_77u64;
+    let mut next = || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed as usize
+    };
+    let (mut dense_calls, mut dropped_calls) = (0, 0);
+    for m in [17, 65, 321, 1200] {
+        let cols: Vec<_> = (0..m).map(|i| {
+            let mut rows = vec![i];
+            let mut vals = vec![2.0];
+            for _ in 0..(1 + next() % (m / 2).max(6)) {
+                let r = next() % m;
+                if r != i && !rows.contains(&r) {
+                    rows.push(r);
+                    vals.push(if next() % 2 == 0 { 0.125 } else { -0.25 });
+                }
+            }
+            (true, rows, vals)
+        }).collect();
+        let st = crate::lu_order::factor_structure(m, &cols);
+        let mut plain = DualFactor::fresh(m, m, &st, &cols);
+        let mut rho = DualFactor::fresh(m, m, &st, &cols);
+        let (mut rows, mut vals) = (Vec::new(), Vec::new());
+        for pass in 0..60 {
+            let r = next() % m;
+            // 1e-13 is the solver's tolerance; the others make the filter drop entries of an ordinary result.
+            let tol = [1e-13, 0.0, 1e-3, 0.05, 0.5, f64::NAN][pass % 6];
+            let want = plain.btran(&[(r, 1.0)], true, false);
+            rho.btran_rho(r, tol, &mut rows, &mut vals);
+            let kept: Vec<(usize, f64)> = want.iter().copied().filter(|e| e.1.abs() > tol).collect();
+            assert_eq!(bits(rows.iter().copied().zip(vals.iter().copied()).collect()), bits(kept));
+            assert_eq!(bits(rho.rho_full(&rows, &vals)), bits(want.clone()));
+            assert_eq!(plain.work.to_bits(), rho.work.to_bits());
+            assert_eq!(plain.bt_dense, rho.bt_dense);
+            dense_calls += usize::from(plain.bt_dense);
+            dropped_calls += usize::from(want.len() != rows.len());
+            if pass % 5 == 4 {
+                let r = next() % m;
+                let mut crows = cols[r].1.clone();
+                let mut cvals = cols[r].2.clone();
+                cvals[0] += (pass + 1) as f64 * 0.001;
+                crows.push((r + 1) % m);
+                cvals.push(-0.0);
+                assert_eq!(bits(plain.ftran(&crows, &cvals)), bits(rho.ftran(&crows, &cvals)));
+                plain.update(r);
+                rho.update(r);
+            }
+        }
+    }
+    assert!(dense_calls > 0, "dense {dense_calls}");
+    assert!(dropped_calls > 0, "dropped {dropped_calls}");
+}

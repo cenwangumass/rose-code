@@ -72,3 +72,67 @@ fn sparse_output_matches_filter_collect() {
         }
     }
 }
+
+/// `btran_rho`'s compaction against the previous pipeline (`dense_btran_output`/`sparse_btran_output`, then the `|v| > tol` copy), and `rho_full`
+/// against the packers' unfiltered result.
+fn rho_output_matches<R: Real>(key: impl Fn(R) -> u128) {
+    let mut rng = Rng(0x0dd5_eed5_f00d_1234);
+    let tol = R::c(1e-13);
+    // The tolerance edge, signed zeros, NaN (both signs), and a normal range.
+    let edge = [1e-13, -1e-13, 1e-13 * (1.0 + 1e-15), 1e-13 * (1.0 - 1e-15), 5e-14, -5e-14, 0.0, -0.0, f64::NAN, -f64::NAN, 0.5, -3.0];
+    let mut dense_calls = 0;
+    for m in [0usize, 1, 2, 3, 7, 64, 333] {
+        for call in 0..60 {
+            let x: Vec<R> = (0..m)
+                .map(|_| R::c(if rng.below(3) == 0 { edge[rng.below(edge.len())] } else { value(&mut rng) }))
+                .collect();
+            let mut perm: Vec<usize> = (0..m).collect();
+            for k in (1..m).rev() {
+                perm.swap(k, rng.below(k + 1));
+            }
+            let row_of: Vec<usize> = (0..m).map(|_| rng.below(m)).collect();
+            let res: Vec<usize> = (0..if m == 0 { 0 } else { rng.below(2 * m + 1) }).map(|_| rng.below(m)).collect();
+            let dense = call % 2 == 0;
+            let (full, mut ws) = (
+                if dense {
+                    DualFactor::<R>::dense_btran_output(&x, &perm, m, vec![(9, R::ONE); 2])
+                } else {
+                    DualFactor::<R>::sparse_btran_output(&x, &res, &row_of, vec![(9, R::ONE); 2])
+                },
+                BtranWork::<R>::default(),
+            );
+            let want: Vec<(usize, R)> = full.iter().copied().filter(|e| e.1.abs() > tol).collect();
+            let (mut rows, mut vals) = (vec![5usize; 3], vec![R::ONE; 3]);
+            rows.clear();
+            vals.clear();
+            let o = RhoOut { rows: &mut rows, vals: &mut vals, tol };
+            if dense {
+                DualFactor::<R>::rho_output(m, |k| (k, x[perm[k]]), o, &mut ws);
+                dense_calls += 1;
+            } else {
+                DualFactor::<R>::rho_output(res.len(), |k| (row_of[res[k]], x[res[k]]), o, &mut ws);
+            }
+            assert_eq!(rows.len(), vals.len());
+            assert_eq!(rows.len(), want.len(), "m {m} call {call}");
+            for (k, w) in want.iter().enumerate() {
+                assert!(rows[k] == w.0 && key(vals[k]) == key(w.1), "m {m} call {call} entry {k}");
+            }
+            // The unfiltered list rebuilt from the kept entries and the dropped ones.
+            let rebuilt = DualFactor::<R>::merge_dropped(&rows, &vals, &ws.dropped);
+            assert_eq!(rebuilt.len(), full.len(), "m {m} call {call}");
+            for (a, b) in rebuilt.iter().zip(&full) {
+                assert!(a.0 == b.0 && key(a.1) == key(b.1), "m {m} call {call}");
+            }
+        }
+    }
+    assert!(dense_calls > 100);
+}
+
+#[test]
+fn rho_output_matches_packer_and_filter() {
+    rho_output_matches::<f64>(|v| v.to_bits() as u128);
+    rho_output_matches::<crate::f80::F80>(|v| {
+        let (a, b) = v.repr();
+        ((b as u128) << 64) | a as u128
+    });
+}

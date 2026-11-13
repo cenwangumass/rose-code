@@ -1003,7 +1003,8 @@ fn pivot_row_ws<R: Real>(
     cols: &[Vec<(usize, f64)>],
     n: usize,
     m: usize,
-    rho: &[(usize, R)],
+    rho_rows: &[usize],
+    rho_vals: &[R],
     leave: usize,
     above: bool,
 ) -> (Vec<(usize, R)>, usize, usize, usize) {
@@ -1013,6 +1014,7 @@ fn pivot_row_ws<R: Real>(
         ws.all = Vec::with_capacity(n + m);
         ws.slack_coef = (0..m).map(|i| cols[n + i][0].1).collect();
     }
+    assert!(rho_rows.len() == rho_vals.len());
     assert!(rrows.nv == n + m && rrows.start.len() == m && st.len() >= n + m && slack_nb.len() >= m && ws.slack_coef.len() == m);
     // Local owners keep the pointers and lengths in registers across the scatter (stores through `ws` could alias them).
     let mut acc_v = std::mem::take(&mut ws.acc);
@@ -1026,24 +1028,24 @@ fn pivot_row_ws<R: Real>(
     // The size pass also checks every index of `rho` against `m` (the unchecked reads below rely on it) and keeps the row spans for the scatter.
     let mut spans_v = std::mem::take(&mut ws.spans);
     spans_v.clear();
-    spans_v.reserve(rho.len());
+    spans_v.reserve(rho_rows.len());
     assert!(rrows.len.len() == m && rrows.idx.len() == rrows.val.len());
     let mut est = 0usize;
     {
         let spans_p = spans_v.as_mut_ptr();
-        for (k, e) in rho.iter().enumerate() {
+        for (k, &ri) in rho_rows.iter().enumerate() {
             // One check per entry; the reads of `start`/`len` (both of length m) need no more.
-            assert!(e.0 < m, "pivot_row_ws: row index {} out of range (m = {m})", e.0);
-            let (s, l) = (rrows.start[e.0], rrows.len[e.0]);
+            assert!(ri < m, "pivot_row_ws: row index {ri} out of range (m = {m})");
+            let (s, l) = (rrows.start[ri], rrows.len[ri]);
             debug_assert!(s as usize + l as usize <= rrows.idx.len());
             est += l as usize;
             // SAFETY: `k < rho.len()`, the reserved capacity.
             unsafe { spans_p.add(k).write((s, l)) };
         }
         // SAFETY: `rho.len()` spans were written.
-        unsafe { spans_v.set_len(rho.len()) };
+        unsafe { spans_v.set_len(rho_rows.len()) };
     }
-    let sparse = rho.len() == 1 || !((n as f64) < 1.8 * est as f64);
+    let sparse = rho_rows.len() == 1 || !((n as f64) < 1.8 * est as f64);
     all_v.clear();
     all_v.reserve(n + m);
     let all_p = all_v.as_mut_ptr();
@@ -1084,7 +1086,7 @@ fn pivot_row_ws<R: Real>(
     let (idx_p, val_p) = (rrows.idx.as_ptr(), rrows.val.as_ptr());
     macro_rules! scatter {
         ($step:ident) => {
-            for (&(_, rv), &(s, l)) in rho.iter().zip(spans_v.iter()) {
+            for (&rv, &(s, l)) in rho_vals.iter().zip(spans_v.iter()) {
                 // SAFETY: the span is inside the pools (invariant above), so every read below is.
                 let (ix, vl) = unsafe { (idx_p.add(s as usize), val_p.add(s as usize)) };
                 let k = l as usize;
@@ -1126,7 +1128,7 @@ fn pivot_row_ws<R: Real>(
     if sparse {
         scatter!(step);
     } else {
-        assert!(rrows.n == n && rho.len() >= 2);
+        assert!(rrows.n == n && rho_rows.len() >= 2);
         scatter!(step_untracked);
     }
     // SAFETY: `cnt` slots were written, and cnt <= n + m (distinct indices).
@@ -1135,14 +1137,14 @@ fn pivot_row_ws<R: Real>(
     // Entries that cancelled to (nearly) nothing are dropped (the smallest captured entry is 1.04e-13).
     // A single entry in rho takes the scaled-copy path of `0x134d90` (`0x1360ac`), which has no tolerance test for a scale of 1 or more (fx_e2_r25 call 1: entries of 6e-14 stay);
     // below 1 the same tolerance filter as the general path follows (`0x136629`: `|scale| < 1.0`; seed 50165 call 5: rho -5e-5, a product of 1.25e-17 is dropped).
-    let filter = rho.len() != 1 || rho[0].1.abs() < R::ONE;
+    let filter = rho_rows.len() != 1 || rho_vals[0].abs() < R::ONE;
     let sdir = if above { -1.0 } else { 1.0 };
     // `s * sdir` for s = +-1 is exactly +-sdir.
     let (c_pos, c_neg) = (R::c(sdir), R::c(-sdir));
     let tol = R::c(DROP_TOL);
     // Every entry is written through `out_p`: at most one per touched slot plus one per slack entry of `rho`, which is the reserved capacity
     // (the touched slots are `all.len()` on the sparse route and at most `min(n, est)` on the columnwise one).
-    let mut out: Vec<(usize, R)> = Vec::with_capacity(if sparse { all.len() } else { est.min(n) } + rho.len());
+    let mut out: Vec<(usize, R)> = Vec::with_capacity(if sparse { all.len() } else { est.min(n) } + rho_rows.len());
     let out_p = out.as_mut_ptr();
     let mut no = 0usize;
     // The count of distinct touched columns: booked only by the sparse multi-row branch of `row_product_work`, 0 on the columnwise route.
@@ -1243,7 +1245,7 @@ fn pivot_row_ws<R: Real>(
     let mut lp = usize::MAX;
     // SAFETY: every `i` of `rho` is below `m` (size pass), `slack_nb.len() >= m`, `slack_coef.len() == m`, `st.len() >= n + m`;
     // at most `rho.len()` slack entries follow the `all.len()` structurals.
-    for &(i, rv) in rho {
+    for (&i, &rv) in rho_rows.iter().zip(rho_vals) {
         unsafe {
             let is_leave = i == leave_i;
             if *slack_nb.get_unchecked(i) | is_leave {
@@ -1263,7 +1265,7 @@ fn pivot_row_ws<R: Real>(
     assert!(
         {
             let mut seen = std::collections::HashSet::new();
-            rho.iter().all(|e| seen.insert(e.0))
+            rho_rows.iter().all(|&e| seen.insert(e))
         },
         "pivot_row_ws: repeated row index in rho"
     );
@@ -1556,8 +1558,10 @@ struct GlueBufs<R: Real> {
     tau: Vec<R>,
     rhs: Vec<R>,
     changed: Vec<usize>,
-    /// Per-iteration lists of `Dual::iteration`, taken (cleared) at the start and put back when the pivot is built; capacities only.
-    rho: Vec<(usize, R)>,
+    /// Per-iteration lists of `Dual::iteration`, taken (cleared) at the start and put back when the pivot is built; capacities only. `rho_r`/`rho_v`: the
+    /// pivot-row BTRAN result in its final form (rows, values); `rho_rows`/`rho_vals` the second FTRAN vector.
+    rho_r: Vec<usize>,
+    rho_v: Vec<R>,
     rows_q: Vec<usize>,
     vals_q: Vec<R>,
     rho_rows: Vec<usize>,
@@ -1579,7 +1583,8 @@ impl<R: Real> Default for GlueBufs<R> {
             tau: Vec::new(),
             rhs: Vec::new(),
             changed: Vec::new(),
-            rho: Vec::new(),
+            rho_r: Vec::new(),
+            rho_v: Vec::new(),
             rows_q: Vec::new(),
             vals_q: Vec::new(),
             rho_rows: Vec::new(),
@@ -3701,13 +3706,14 @@ impl<'a, R: Real> Dual<'a, R> {
     /// Returns entries `(variable, value)` with structurals first, the structural result count, and the occurrence/distinct-column counts before filtering.
     fn pivot_row(
         &self,
-        rho: &[(usize, R)],
+        rho_rows: &[usize],
+        rho_vals: &[R],
         leave: usize,
         above: bool,
     ) -> (Vec<(usize, R)>, usize, usize, usize) {
         // No reentrancy: the workspace is borrowed only for the duration of this call, which calls nothing else of `self`.
         let mut ws = self.prow_ws.borrow_mut();
-        pivot_row_ws(&mut ws, &self.rrows, &self.slack_nb, &self.st, &self.p.cols, self.n, self.m, rho, leave, above)
+        pivot_row_ws(&mut ws, &self.rrows, &self.slack_nb, &self.st, &self.p.cols, self.n, self.m, rho_rows, rho_vals, leave, above)
     }
 
     /// The second FTRAN vector of the pricing mode 3 (`0xc57d8..0xc58c4`, `0x11faf9..0x11fcd0`): the entries of the pivot row whose variable was basic when the
@@ -3794,11 +3800,11 @@ impl<'a, R: Real> Dual<'a, R> {
     }
 
     /// Work of the row product (`0x134d90`, site `0x135e92`, same estimate as the primal path's `row_product_work`).
-    fn row_product_work(&mut self, rho: &[(usize, R)], nslack: usize, p5: usize, d: usize) {
+    fn row_product_work(&mut self, rho_vals: &[R], nslack: usize, p5: usize, d: usize) {
         let n = self.n;
-        let nr = rho.len() as f64;
-        let est = if rho.len() == 1 {
-            if rho[0].1.abs() < R::ONE {
+        let nr = rho_vals.len() as f64;
+        let est = if rho_vals.len() == 1 {
+            if rho_vals[0].abs() < R::ONE {
                 10.5 + 5.0 * p5 as f64
             } else {
                 10.5 + 4.0 * p5 as f64
@@ -4825,21 +4831,14 @@ impl<'a, R: Real> Dual<'a, R> {
             xbr > R::c(p.up[leave])
         };
         // Pivot-row BTRAN, drop of the small entries.
-        let rho_full = self.mirror.btran(&[(r, R::ONE)], true, false);
-        let drop_tol = R::c(DROP_TOL);
-        let mut rho: Vec<(usize, R)> = std::mem::take(&mut self.glue.rho);
-        rho.clear();
-        rho.reserve(rho_full.len());
-        for &e in &rho_full {
-            if e.1.abs() > drop_tol {
-                rho.push(e);
-            }
-        }
-        self.p60 = rho.len() as f64;
+        let mut rho_r = std::mem::take(&mut self.glue.rho_r);
+        let mut rho_v = std::mem::take(&mut self.glue.rho_v);
+        self.mirror.btran_rho(r, R::c(DROP_TOL), &mut rho_r, &mut rho_v);
+        self.p60 = rho_r.len() as f64;
         self.work
             .add_from(0x13174d, 0xc51dd, self.mirror.work(), crate::work::FAC);
-        let (mut row, esi, occurrences, distinct) = self.pivot_row(&rho, leave, above);
-        self.row_product_work(&rho, row.len() - esi, occurrences, distinct);
+        let (mut row, esi, occurrences, distinct) = self.pivot_row(&rho_r, &rho_v, leave, above);
+        self.row_product_work(&rho_v, row.len() - esi, occurrences, distinct);
         self.p58 += occurrences as f64;
         self.p50d += occurrences as f64;
         let forced_route = forced_mode && self.forced_ratio_chosen(leave, xbr);
@@ -4878,7 +4877,7 @@ impl<'a, R: Real> Dual<'a, R> {
             if let Some(mut sn) = snap {
                 sn["r"] = serde_json::json!(r);
                 sn["var"] = serde_json::json!(leave);
-                sn["rho"] = crate::dump::sparse_r(&rho);
+                sn["rho"] = crate::dump::sparse_rv(&rho_r, &rho_v);
                 sn["row"] = crate::dump::sparse_r(&row);
                 sn["q"] = serde_json::json!(-1);
                 *dump = Some(sn);
@@ -4892,7 +4891,7 @@ impl<'a, R: Real> Dual<'a, R> {
             if let Some(mut sn) = snap {
                 sn["r"] = serde_json::json!(r);
                 sn["var"] = serde_json::json!(leave);
-                sn["rho"] = crate::dump::sparse_r(&rho);
+                sn["rho"] = crate::dump::sparse_rv(&rho_r, &rho_v);
                 sn["row"] = crate::dump::sparse_r(&row);
                 sn["q"] = serde_json::json!(-1);
                 *dump = Some(sn);
@@ -4908,7 +4907,7 @@ impl<'a, R: Real> Dual<'a, R> {
                 if let Some(mut sn) = snap {
                     sn["r"] = serde_json::json!(r);
                     sn["var"] = serde_json::json!(leave);
-                    sn["rho"] = crate::dump::sparse_r(&rho);
+                    sn["rho"] = crate::dump::sparse_rv(&rho_r, &rho_v);
                     sn["row"] = crate::dump::sparse_r(&row);
                     sn["q"] = serde_json::json!(-1);
                     *dump = Some(sn);
@@ -4939,7 +4938,7 @@ impl<'a, R: Real> Dual<'a, R> {
         if let Some(s) = rec.as_mut() {
             s["r"] = serde_json::json!(r);
             s["var"] = serde_json::json!(leave);
-            s["rho"] = crate::dump::sparse_r(&rho);
+            s["rho"] = crate::dump::sparse_rv(&rho_r, &rho_v);
             s["row"] = crate::dump::sparse_r(&row);
         }
         // The row's value of the chosen entering variable is stored (`ctx+0x308`) before the single-candidate check rejects it (fx_midsing_1496 call 5: -4.5e-9).
@@ -5000,7 +4999,8 @@ impl<'a, R: Real> Dual<'a, R> {
             }
             *dump = rec;
             let mut y = vec![0.0; m];
-            for &(i, v) in &rho_full {
+            // The unfiltered BTRAN result (the entries at most DROP_TOL in magnitude included), rebuilt from the retained BTRAN workspace.
+            for (i, v) in self.mirror.rho_full(&rho_r, &rho_v) {
                 let v = v.to_f64();
                 y[i] = if above { -v } else { v };
             }
@@ -5075,24 +5075,17 @@ impl<'a, R: Real> Dual<'a, R> {
         let col_out = self.mirror.ftran(&rows_q, &vals_q);
         // Mode 3: the second vector is not rho but the combination of the columns of the row's entries that were basic when the weights restarted
         // (`0xc57d8`, `0x11f620`), and its squared norm is the weight of the pivot row.
+        let rho_v_len = rho_v.len();
+        let mut rho_moved = false;
         let (rho_rows, rho_vals, w_row, vec_work, dense_route) = if self.pmode >= 2 {
             let rr = std::mem::take(&mut self.glue.rho_rows);
             let rv = std::mem::take(&mut self.glue.rho_vals);
             self.framework_rhs(&row, leave, above, rr, rv)
         } else {
-            let mut rr = std::mem::take(&mut self.glue.rho_rows);
-            let mut rv = std::mem::take(&mut self.glue.rho_vals);
-            rr.clear();
-            rr.extend(rho.iter().map(|e| e.0));
-            rv.clear();
-            rv.extend(rho.iter().map(|e| e.1));
-            (
-                rr,
-                rv,
-                rho_norm_with(&rho, &mut self.glue.sq),
-                rho.len() as f64,
-                false,
-            )
+            // The BTRAN result is the vector itself: its buffers become the FTRAN input and go back to `rho_r`/`rho_v` at the end.
+            let w = rho_norm_vals(&rho_v, &mut self.glue.sq);
+            rho_moved = true;
+            (std::mem::take(&mut rho_r), std::mem::take(&mut rho_v), w, rho_v_len as f64, false)
         };
         let mut needed = std::mem::take(&mut self.glue.needed);
         needed.clear();
@@ -5462,12 +5455,17 @@ impl<'a, R: Real> Dual<'a, R> {
             }
         };
         // The lists of this iteration go back to the glue (capacities only), the pivot reuses its box.
-        self.mirror.give_list(rho_full);
-        self.glue.rho = rho;
         self.glue.rows_q = rows_q;
         self.glue.vals_q = vals_q;
-        self.glue.rho_rows = rho_rows;
-        self.glue.rho_vals = rho_vals;
+        if rho_moved {
+            self.glue.rho_r = rho_rows;
+            self.glue.rho_v = rho_vals;
+        } else {
+            self.glue.rho_r = rho_r;
+            self.glue.rho_v = rho_v;
+            self.glue.rho_rows = rho_rows;
+            self.glue.rho_vals = rho_vals;
+        }
         self.glue.needed = needed;
         let pivot = Pivot { r, leave, q, row, q_pos, leave_pos, flips, col, tau, alpha, w: w_row, t0, above };
         Step::Pivot(match self.glue.pivot.take() {
@@ -6508,6 +6506,16 @@ fn rho_norm_dense_with<R: Real>(rho: &[(usize, R)], m: usize, sq: &mut Vec<R>) -
 }
 
 /// `rho_norm` with the squares built in the caller's buffer.
+fn rho_norm_vals<R: Real>(vals: &[R], sq: &mut Vec<R>) -> R {
+    if R::QUAD {
+        return vals.iter().fold(R::ZERO, |a, &v| R::c((a + v * v).to_f64()));
+    }
+    sq.clear();
+    sq.extend(vals.iter().map(|&v| v * v));
+    sum_squares(sq)
+}
+
+/// `rho_norm_vals` on a list of pairs.
 fn rho_norm_with<R: Real>(rho: &[(usize, R)], sq: &mut Vec<R>) -> R {
     if R::QUAD {
         // The quad kernel (`0x25d3ff..0x25d49a`) squares in extended precision and keeps the running sum in a double: each step is
@@ -9431,7 +9439,7 @@ mod pivot_row_diff {
                 let leave = n + r.below(m);
                 let above = r.below(2) == 0;
                 let want = pivot_row_ref(&rrows, &slack_nb, &st, &cols, n, m, &rho, leave, above);
-                let got = pivot_row_ws(&mut ws, &flat, &slack_nb, &st, &cols, n, m, &rho, leave, above);
+                let got = pivot_row_ws(&mut ws, &flat, &slack_nb, &st, &cols, n, m, &rho.iter().map(|e| e.0).collect::<Vec<_>>(), &rho.iter().map(|e| e.1).collect::<Vec<_>>(), leave, above);
                 assert!(same(&want, &got, n, rho.len()), "case {case} call {call}");
                 // The first-match position of the leaving variable and the duplicate flag.
                 assert_eq!(ws.leave_pos, got.0.iter().position(|e| e.0 == leave), "case {case} call {call}");
@@ -9483,7 +9491,7 @@ mod pivot_row_diff {
                     let leave = if call % 2 == 0 { n + rows[r.below(k)] } else { n + rows[(k + r.below(m - k + 1)).min(m - 1)] };
                     let above = r.below(2) == 0;
                     let want = pivot_row_ref(&rrows, &slack_nb, &st, &cols, n, m, &rho, leave, above);
-                    let got = pivot_row_ws(&mut ws, &flat, &slack_nb, &st, &cols, n, m, &rho, leave, above);
+                    let got = pivot_row_ws(&mut ws, &flat, &slack_nb, &st, &cols, n, m, &rho.iter().map(|e| e.0).collect::<Vec<_>>(), &rho.iter().map(|e| e.1).collect::<Vec<_>>(), leave, above);
                     assert!(same(&want, &got, n, rho.len()), "n {n} case {case} call {call}");
                     assert_eq!(ws.leave_pos, got.0.iter().position(|e| e.0 == leave), "n {n} case {case} call {call}");
                     assert!(!ws.slack_dup);
@@ -9531,7 +9539,7 @@ mod pivot_row_diff {
                 let leave = n + r.below(m);
                 let above = r.below(2) == 0;
                 let want = pivot_row_ref(&rrows, &slack_nb, &st, &cols, n, m, &rho, leave, above);
-                let got = pivot_row_ws(&mut ws, &flat, &slack_nb, &st, &cols, n, m, &rho, leave, above);
+                let got = pivot_row_ws(&mut ws, &flat, &slack_nb, &st, &cols, n, m, &rho.iter().map(|e| e.0).collect::<Vec<_>>(), &rho.iter().map(|e| e.1).collect::<Vec<_>>(), leave, above);
                 assert!(same(&want, &got, n, rho.len()), "cancel case {case} call {call}");
                 if rho.len() == 1 || !((n as f64) < 1.8 * want.2 as f64) {
                     sparse_calls += 1;

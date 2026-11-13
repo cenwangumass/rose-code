@@ -731,6 +731,13 @@ fn level_sweep_guarded<R: Real>(
     }
 }
 
+/// The output buffers of `btran_rho`.
+struct RhoOut<'a, R> {
+    rows: &'a mut Vec<usize>,
+    vals: &'a mut Vec<R>,
+    tol: R,
+}
+
 /// Scratch for independent BTRAN calls. An empty clone avoids copying dead work vectors.
 #[derive(Default)]
 
@@ -747,6 +754,8 @@ struct BtranWork<R> {
     eta_heads: Vec<usize>,
     eta_prev: Vec<usize>,
     pending: BinaryHeap<usize>,
+    /// The nonzero entries the last `btran_rho` dropped, as (number of kept entries before it, row, value), see `rho_full`.
+    dropped: Vec<(usize, usize, R)>,
 }
 
 impl<R: Default> Clone for BtranWork<R> {
@@ -3857,9 +3866,70 @@ impl<R: Real> DualFactor<R> {
     /// test unless the first position's U^T row is empty. `dense_in` passes the input as a dense vector (count `-1`).
     pub fn btran(&mut self, inp: &[(usize, R)], direct: bool, dense_in: bool) -> Vec<(usize, R)> {
         let mut ws = self.bt_work.take().unwrap_or_default();
-        let result = self.btran_with(inp, direct, dense_in, &mut ws);
+        let result = self.btran_with(inp, direct, dense_in, &mut ws, None);
         self.bt_work = Some(ws);
         result
+    }
+
+    /// The pivot-row BTRAN of the unit vector `e_r` (`direct`, sparse input) with the result in its final form: the entries with `|v| > tol` as parallel
+    /// row and value lists, in the order `btran` returns them (the reference's `0xc5253` compaction; zeros and NaN are dropped). The work estimate and every
+    /// other effect are those of `btran`. When the filter dropped a nonzero entry, `rho_full` rebuilds the unfiltered list.
+    pub fn btran_rho(&mut self, r: usize, tol: R, rows: &mut Vec<usize>, vals: &mut Vec<R>) {
+        let mut ws = self.bt_work.take().unwrap_or_default();
+        ws.dropped.clear();
+        rows.clear();
+        vals.clear();
+        let out = RhoOut { rows, vals, tol };
+        let result = self.btran_with(&[(r, R::ONE)], true, false, &mut ws, Some(out));
+        debug_assert!(result.is_empty());
+        self.bt_work = Some(ws);
+    }
+
+    /// The list `btran` would have returned for the last `btran_rho` (every nonzero entry, in order); `rows`/`vals` are that call's result.
+    pub fn rho_full(&mut self, rows: &[usize], vals: &[R]) -> Vec<(usize, R)> {
+        let ws = self.bt_work.as_ref().expect("rho_full without btran_rho");
+        Self::merge_dropped(rows, vals, &ws.dropped)
+    }
+
+    fn merge_dropped(rows: &[usize], vals: &[R], dropped: &[(usize, usize, R)]) -> Vec<(usize, R)> {
+        let mut out = Vec::with_capacity(rows.len() + dropped.len());
+        let mut at = 0;
+        for &(before, row, v) in dropped {
+            out.extend(rows[at..before].iter().copied().zip(vals[at..before].iter().copied()));
+            out.push((row, v));
+            at = before;
+        }
+        out.extend(rows[at..].iter().copied().zip(vals[at..].iter().copied()));
+        out
+    }
+
+    /// The compaction of `btran_rho`: `(row, value)` of the slots `slot(k)` in order, kept when `|v| > tol`; the closure reads `x`, which still holds the values.
+    /// A dropped entry that is not an exact zero (at most the tolerance in magnitude, or NaN) is noted with the number of entries kept before it.
+    #[inline(always)]
+    fn rho_output(n: usize, slot: impl Fn(usize) -> (usize, R), o: RhoOut<R>, ws: &mut BtranWork<R>) {
+        let RhoOut { rows, vals, tol } = o;
+        rows.reserve(n);
+        vals.reserve(n);
+        let (rp, vp) = (rows.as_mut_ptr(), vals.as_mut_ptr());
+        let mut count = 0usize;
+        for k in 0..n {
+            let (row, v) = slot(k);
+            // count <= k < n <= capacity: a rejected entry's slot is overwritten by the next write.
+            unsafe {
+                rp.add(count).write(row);
+                vp.add(count).write(v);
+            }
+            let keep = v.abs() > tol;
+            if !keep & (v != R::ZERO) {
+                ws.dropped.push((count, row, v));
+            }
+            count += usize::from(keep);
+        }
+        // The first `count` slots hold the kept entries; `usize` and `R` are Copy.
+        unsafe {
+            rows.set_len(count);
+            vals.set_len(count);
+        }
     }
 
     fn btran_with(
@@ -3868,6 +3938,7 @@ impl<R: Real> DualFactor<R> {
         direct: bool,
         dense_in: bool,
         ws: &mut BtranWork<R>,
+        rho: Option<RhoOut<R>>,
     ) -> Vec<(usize, R)> {
         let m = self.m;
         let urows = &self.urows;
@@ -4166,7 +4237,20 @@ impl<R: Real> DualFactor<R> {
         if let Some(order) = list {
             ws.input_order = order;
         }
-        let result = if self.bt_dense {
+        let result = if let Some(o) = rho {
+            // The dense result runs over the rows (`perm`), the sparse one over `res` (duplicates included).
+            if self.bt_dense {
+                let perm = &self.perm[..m];
+                // O(1) proof for the unchecked loads: every `perm[r] < perm_bound <= x.len()`.
+                assert!(self.perm_bound <= x.len());
+                let xs = &x[..];
+                // SAFETY: `k < m = perm.len()`, `perm[k] < perm_bound <= x.len()`.
+                Self::rho_output(m, |k| unsafe { (k, *xs.get_unchecked(*perm.get_unchecked(k))) }, o, ws);
+            } else {
+                Self::rho_output(res.len(), |k| (row_of[res[k]], x[res[k]]), o, ws);
+            }
+            Vec::new()
+        } else if self.bt_dense {
             if R::LANES {
                 Self::dense_btran_output(&x, &self.perm[..m], self.perm_bound, self.lists.take())
             } else {

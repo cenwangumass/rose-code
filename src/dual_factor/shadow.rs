@@ -12,6 +12,8 @@ pub struct Shadow<R: Real = f64> {
     new: DualFactor<R>,
     old: RefStruct<R>,
     calls: Cell<usize>,
+    /// The old backend's unfiltered result of the last `btran_rho`.
+    old_full: Vec<(usize, R)>,
 }
 
 // The encoder is supplied explicitly, so generic Real values cannot accidentally
@@ -52,7 +54,7 @@ impl<R: Real> Shadow<R> {
         let cols: crate::lu_order::Cols<'a> = cols.into();
         let new = DualFactor::fresh(m, ncols, st, cols);
         let old = muted(|| RefStruct::fresh(m, ncols, st, cols));
-        let result = Self { new, old, calls: Cell::new(0) };
+        let result = Self { new, old, calls: Cell::new(0), old_full: Vec::new() };
         result.finish("fresh", &(), &(), true);
         result
     }
@@ -89,6 +91,24 @@ impl<R: Real> Shadow<R> {
     forward!(mut ftran_keep(rows: &[usize], vals: &[R], dense: bool) -> Vec<(usize, R)>, |v: &Vec<(usize, R)>| sparse(v));
     forward!(mut btran(inp: &[(usize, R)], direct: bool, dense_in: bool) -> Vec<(usize, R)>,
         |v: &Vec<(usize, R)>| sparse(v));
+    /// See `DualFactor::btran_rho`; the old backend's `btran` result, filtered, must equal it.
+    pub fn btran_rho(&mut self, r: usize, tol: R, rows: &mut Vec<usize>, vals: &mut Vec<R>) {
+        self.new.btran_rho(r, tol, rows, vals);
+        let old = muted(|| self.old.btran(&[(r, R::ONE)], true, false));
+        let kept: Vec<(usize, R)> = old.iter().copied().filter(|e| e.1.abs() > tol).collect();
+        let new: Vec<(usize, R)> = rows.iter().copied().zip(vals.iter().copied()).collect();
+        self.finish("btran", &sparse(&new), &sparse(&kept), false);
+        self.old_full = old;
+    }
+
+    /// See `DualFactor::rho_full`; compared with the old backend's unfiltered list.
+    pub fn rho_full(&mut self, rows: &[usize], vals: &[R]) -> Vec<(usize, R)> {
+        let new = self.new.rho_full(rows, vals);
+        let old = std::mem::take(&mut self.old_full);
+        self.finish("rho_full", &sparse(&new), &sparse(&old), false);
+        new
+    }
+
     forward!(joint_u(out: &[usize]) -> Option<f64>, |v: &Option<f64>| v.map(bits));
     forward!(ftran_dense_work(b: &[R]) -> f64, |v: &f64| bits(*v));
     forward!(discard_work() -> f64, |v: &f64| bits(*v));
@@ -227,7 +247,7 @@ impl<R: Real> Clone for Shadow<R> {
         let new = self.new.clone();
         let old = muted(|| self.old.clone());
         self.finish("clone", &(), &(), true);
-        let result = Self { new, old, calls: Cell::new(self.calls.get()) };
+        let result = Self { new, old, calls: Cell::new(self.calls.get()), old_full: Vec::new() };
         result.finish("clone result", &(), &(), true);
         result
     }
