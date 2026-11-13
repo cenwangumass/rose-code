@@ -2599,6 +2599,8 @@ impl<R: Real> DualFactor<R> {
         let diag = &self.diag[..];
         let ab = &self.ab;
         let tol = R::c(TOL);
+        // The A lists hold tail positions, all below `m`: `scatter_a` indexes `x` unchecked in release builds.
+        assert!(x.len() >= self.m);
         for c in order {
             let xr = x[c];
             let raw = xr.abs() > tol;
@@ -2625,13 +2627,11 @@ impl<R: Real> DualFactor<R> {
                 }
                 continue;
             }
-            let (ai, av) = ab.a_pair(c);
-            t.book::<TD, R>(ai.len(), fin);
+            let na = ab.na(c);
+            t.book::<TD, R>(na, fin);
             #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
-            r.book_ref::<JD, TD, R>(ai.len(), fin, raw, x_col.get(c));
-            for (&j, &v) in ai.iter().zip(av) {
-                x[j as usize] -= v * xc;
-            }
+            r.book_ref::<JD, TD, R>(na, fin, raw, x_col.get(c));
+            ab.scatter_a(c, x, xc);
         }
         t.finish::<JD, TD>();
         #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]

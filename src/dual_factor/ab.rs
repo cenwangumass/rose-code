@@ -71,8 +71,37 @@ impl<R: Real> AbLists<R> {
     #[inline(always)]
     pub fn a_pair(&self, c: usize) -> (&[u32], &[R]) {
         let s = &self.span[c];
-        let r = s.start as usize..(s.start + s.na) as usize;
-        (&self.idx[r.clone()], &self.val[r])
+        let (lo, hi) = (s.start as usize, (s.start + s.na) as usize);
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        {
+            (&self.idx[lo..hi], &self.val[lo..hi])
+        }
+        #[cfg(not(any(test, debug_assertions, feature = "factor-shadow")))]
+        {
+            // Every span lies inside both arrays (`idx.len() == val.len()`, `start + na + nb <= start + cap <= len`): every edit above
+            // writes through checked indices into room it has sized, and the test, debug and shadow builds check it on each read.
+            // SAFETY: that invariant.
+            unsafe { (self.idx.get_unchecked(lo..hi), self.val.get_unchecked(lo..hi)) }
+        }
+    }
+
+    /// `x[j] -= v * xv` over the A list of column `c`, entry by entry in list order (4-way unrolled, same operations and order as the
+    /// plain loop even if an index repeats). Every A entry is a position below `x.len()` (asserted by the caller once per call;
+    /// checked per entry in the test, debug and shadow builds).
+    #[inline(always)]
+    pub fn scatter_a(&self, c: usize, x: &mut [R], xv: R) {
+        let (idx, val) = self.a_pair(c);
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        {
+            for (&j, &v) in idx.iter().zip(val) {
+                x[j as usize] -= v * xv;
+            }
+        }
+        #[cfg(not(any(test, debug_assertions, feature = "factor-shadow")))]
+        {
+            // SAFETY: the caller's invariant: every A entry is below `x.len()`.
+            unsafe { scatter_unrolled(idx, val, x, xv) }
+        }
     }
 
     /// Coefficients of the A list, entry for entry.
@@ -264,5 +293,30 @@ pub(super) fn same_bits<R: Real>(a: R, b: R) -> bool {
     } else {
         let (a, b) = (a.downcast_ref::<crate::f80::F80>().unwrap(), b.downcast_ref::<crate::f80::F80>().unwrap());
         a.repr() == b.repr()
+    }
+}
+
+/// `x[idx[k]] -= val[k] * xv` for `k` in order, 4-way unrolled with the entries in textual order (an index may repeat).
+///
+/// # Safety
+/// Every `idx` entry is below `x.len()`.
+#[inline(always)]
+#[cfg_attr(any(test, debug_assertions, feature = "factor-shadow"), allow(dead_code))]
+pub(super) unsafe fn scatter_unrolled<R: Real>(idx: &[u32], val: &[R], x: &mut [R], xv: R) {
+    let n = idx.len().min(val.len());
+    let mut k = 0;
+    // SAFETY: `k + r < n <= idx.len(), val.len()`; destinations are in range (caller).
+    unsafe {
+        while k + 4 <= n {
+            *x.get_unchecked_mut(*idx.get_unchecked(k) as usize) -= *val.get_unchecked(k) * xv;
+            *x.get_unchecked_mut(*idx.get_unchecked(k + 1) as usize) -= *val.get_unchecked(k + 1) * xv;
+            *x.get_unchecked_mut(*idx.get_unchecked(k + 2) as usize) -= *val.get_unchecked(k + 2) * xv;
+            *x.get_unchecked_mut(*idx.get_unchecked(k + 3) as usize) -= *val.get_unchecked(k + 3) * xv;
+            k += 4;
+        }
+        while k < n {
+            *x.get_unchecked_mut(*idx.get_unchecked(k) as usize) -= *val.get_unchecked(k) * xv;
+            k += 1;
+        }
     }
 }

@@ -255,3 +255,30 @@ fn needed_scatter_over_a_matches_the_filtered_uc_scan() {
     scatter::<f64>();
     scatter::<crate::f80::F80>();
 }
+
+/// The unrolled unchecked scatter against the plain loop, on lists of every length 0..20 with repeated indices (textual order per entry).
+fn unrolled<R: Real>() {
+    let mut next = rng(0x9e3779b97f4a7c15);
+    for len in 0..20 {
+        for _ in 0..200 {
+            let m = 1 + next() % 9;
+            let idx: Vec<u32> = (0..len).map(|_| (next() % m) as u32).collect();
+            let val: Vec<R> = (0..len).map(|_| R::c(coeffs()[next() % 5] + (next() % 3) as f64 * 0.1)).collect();
+            let xv = R::c(coeffs()[2 + next() % 3]);
+            let x0: Vec<R> = (0..m).map(|_| R::c(coeffs()[next() % 5] + (next() % 3) as f64)).collect();
+            let (mut p, mut q) = (x0.clone(), x0);
+            for (&j, &v) in idx.iter().zip(&val) {
+                p[j as usize] -= v * xv;
+            }
+            // SAFETY: every index is below m = q.len().
+            unsafe { super::ab::scatter_unrolled(&idx, &val, &mut q, xv) };
+            assert!(p.iter().zip(&q).all(|(&a, &b)| same_bits(a, b)), "len {len}");
+        }
+    }
+}
+
+#[test]
+fn unrolled_scatter_matches_the_plain_loop() {
+    unrolled::<f64>();
+    unrolled::<crate::f80::F80>();
+}
