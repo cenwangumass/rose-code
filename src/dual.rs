@@ -1068,37 +1068,66 @@ fn pivot_row_ws<R: Real>(
             }
         }};
     }
+    // The same update without the first-touch tracking (the columnwise route finds the touched slots by scanning `acc`).
+    macro_rules! step_untracked {
+        ($rv:expr, $j:expr, $a:expr) => {{
+            let j = $j as usize;
+            debug_assert!(j < n);
+            // SAFETY: j < n (every stored index of `rrows` is, asserted above).
+            unsafe {
+                let p = acc.get_unchecked_mut(j);
+                *p = *p + $rv * R::c($a);
+            }
+        }};
+    }
     // SAFETY (the spans): `start + len <= idx.len() = val.len()` is an invariant of `FlatRows` (`check`).
     let (idx_p, val_p) = (rrows.idx.as_ptr(), rrows.val.as_ptr());
-    for (&(_, rv), &(s, l)) in rho.iter().zip(spans_v.iter()) {
-        // SAFETY: the span is inside the pools (invariant above), so every read below is.
-        let (ix, vl) = unsafe { (idx_p.add(s as usize), val_p.add(s as usize)) };
-        let k = l as usize;
-        let mut t = 0;
-        while t + 4 <= k {
-            // The loads of four entries; the updates follow in order.
-            let (j0, j1, j2, j3) = unsafe { (*ix.add(t), *ix.add(t + 1), *ix.add(t + 2), *ix.add(t + 3)) };
-            let (a0, a1, a2, a3) = unsafe { (*vl.add(t), *vl.add(t + 1), *vl.add(t + 2), *vl.add(t + 3)) };
-            step!(rv, j0, a0);
-            step!(rv, j1, a1);
-            step!(rv, j2, a2);
-            step!(rv, j3, a3);
-            t += 4;
-        }
-        // The last 0-3 entries, in order.
-        let r = k - t;
-        if r >= 1 {
-            let (j0, a0) = unsafe { (*ix.add(t), *vl.add(t)) };
-            step!(rv, j0, a0);
-            if r >= 2 {
-                let (j1, a1) = unsafe { (*ix.add(t + 1), *vl.add(t + 1)) };
-                step!(rv, j1, a1);
-                if r == 3 {
-                    let (j2, a2) = unsafe { (*ix.add(t + 2), *vl.add(t + 2)) };
-                    step!(rv, j2, a2);
+    macro_rules! scatter {
+        ($step:ident) => {
+            for (&(_, rv), &(s, l)) in rho.iter().zip(spans_v.iter()) {
+                // SAFETY: the span is inside the pools (invariant above), so every read below is.
+                let (ix, vl) = unsafe { (idx_p.add(s as usize), val_p.add(s as usize)) };
+                let k = l as usize;
+                let mut t = 0;
+                while t + 4 <= k {
+                    // The loads of four entries; the updates follow in order.
+                    let (j0, j1, j2, j3) = unsafe { (*ix.add(t), *ix.add(t + 1), *ix.add(t + 2), *ix.add(t + 3)) };
+                    let (a0, a1, a2, a3) = unsafe { (*vl.add(t), *vl.add(t + 1), *vl.add(t + 2), *vl.add(t + 3)) };
+                    $step!(rv, j0, a0);
+                    $step!(rv, j1, a1);
+                    $step!(rv, j2, a2);
+                    $step!(rv, j3, a3);
+                    t += 4;
+                }
+                // The last 0-3 entries, in order.
+                let r = k - t;
+                if r >= 1 {
+                    let (j0, a0) = unsafe { (*ix.add(t), *vl.add(t)) };
+                    $step!(rv, j0, a0);
+                    if r >= 2 {
+                        let (j1, a1) = unsafe { (*ix.add(t + 1), *vl.add(t + 1)) };
+                        $step!(rv, j1, a1);
+                        if r == 3 {
+                            let (j2, a2) = unsafe { (*ix.add(t + 2), *vl.add(t + 2)) };
+                            $step!(rv, j2, a2);
+                        }
+                    }
                 }
             }
-        }
+        };
+    }
+    // The columnwise route (`!sparse`) outputs the touched structurals in index order and needs no first-touch list: the scatter is untracked and
+    // the scan below walks `acc[0..n]`. This is exact because (1) `rho.len() >= 2` there, so `filter` holds and an entry is output only when
+    // |v| > DROP_TOL: a slot that cancelled to zero (either sign) or was never touched (+0.0) is not output, and a NaN is not either (`!(NaN > tol)`),
+    // exactly as the touched list would have it; (2) `rrows` stores structural indices only (`FlatRows::push/set/from_rows` assert j < n), so the
+    // scatter writes `acc[0..n]` only and the scan restores all of it; (3) `row_product_work` books `8.5 nr + 2 p5 + 2.5 n` for this route and does
+    // not read the distinct count (the returned `distinct` is 0 there). Every slot is restored to +0.0 (an untouched or cancelled slot is already
+    // +0.0: `+0.0 + x` is never -0.0 in round-to-nearest, so `acc == ZERO` skips exactly the slots that need no reset).
+    if sparse {
+        scatter!(step);
+    } else {
+        assert!(rrows.n == n && rho.len() >= 2);
+        scatter!(step_untracked);
     }
     // SAFETY: `cnt` slots were written, and cnt <= n + m (distinct indices).
     unsafe { all_v.set_len(cnt) };
@@ -1111,14 +1140,17 @@ fn pivot_row_ws<R: Real>(
     // `s * sdir` for s = +-1 is exactly +-sdir.
     let (c_pos, c_neg) = (R::c(sdir), R::c(-sdir));
     let tol = R::c(DROP_TOL);
-    // Every entry is written through `out_p`: at most one per touched slot plus one per slack entry of `rho`, which is the reserved capacity.
-    let mut out: Vec<(usize, R)> = Vec::with_capacity(all.len() + rho.len());
+    // Every entry is written through `out_p`: at most one per touched slot plus one per slack entry of `rho`, which is the reserved capacity
+    // (the touched slots are `all.len()` on the sparse route and at most `min(n, est)` on the columnwise one).
+    let mut out: Vec<(usize, R)> = Vec::with_capacity(if sparse { all.len() } else { est.min(n) } + rho.len());
     let out_p = out.as_mut_ptr();
     let mut no = 0usize;
-    let mut distinct = all.len();
-    // One pass per touched slot: the kept entry is appended and the accumulator is restored to +0.0 (the slack entries below do not read it).
+    // The count of distinct touched columns: booked only by the sparse multi-row branch of `row_product_work`, 0 on the columnwise route.
+    let mut distinct = 0usize;
     // SAFETY: every `j` is below `n + m` (see above), `acc` has `n + m` slots and `st` at least that many (asserted); `no <= all.len()` here.
     if sparse {
+        distinct = all.len();
+        // One pass per touched slot: the kept entry is appended and the accumulator is restored to +0.0 (the slack entries below do not read it).
         for &j in all {
             let j = j as usize;
             unsafe {
@@ -1131,27 +1163,45 @@ fn pivot_row_ws<R: Real>(
             }
         }
     } else {
-        // Ascending index order over the structurals (the touched slots are only structurals, so the scan sees all of them).
-        distinct = 0;
-        for (w, &word) in bits.iter().enumerate().take(n.div_ceil(64)) {
-            let mut word = word;
-            if (w + 1) * 64 > n {
-                word &= (1u64 << (n - w * 64)) - 1;
+        // Ascending index order over the structurals, four slots at a time: a block of slots equal to zero (all +0.0, see above) is skipped.
+        // SAFETY: `acc[0..n]` exists (n <= n + m), `st[j]` for j < n, and `no` counts distinct kept slots below `min(n, est)` (the capacity).
+        let mut j = 0usize;
+        while j + 4 <= n {
+            unsafe {
+                let (v0, v1, v2, v3) = (*acc.get_unchecked(j), *acc.get_unchecked(j + 1), *acc.get_unchecked(j + 2), *acc.get_unchecked(j + 3));
+                if !((v0 == R::ZERO) & (v1 == R::ZERO) & (v2 == R::ZERO) & (v3 == R::ZERO)) {
+                    macro_rules! slot {
+                        ($j:expr, $v:expr) => {{
+                            let (j, v) = ($j, $v);
+                            if v != R::ZERO {
+                                *acc.get_unchecked_mut(j) = R::ZERO;
+                                if v.abs() > tol {
+                                    out_p.add(no).write((j, v * if *st.get_unchecked(j) == UB { c_neg } else { c_pos }));
+                                    no += 1;
+                                }
+                            }
+                        }};
+                    }
+                    slot!(j, v0);
+                    slot!(j + 1, v1);
+                    slot!(j + 2, v2);
+                    slot!(j + 3, v3);
+                }
             }
-            while word != 0 {
-                let j = w * 64 + word.trailing_zeros() as usize;
-                word &= word - 1;
-                distinct += 1;
-                // SAFETY: j < n (masked), each set bit is one entry of `all`, so `no <= all.len()`.
-                unsafe {
-                    let v = *acc.get_unchecked(j);
+            j += 4;
+        }
+        while j < n {
+            unsafe {
+                let v = *acc.get_unchecked(j);
+                if v != R::ZERO {
                     *acc.get_unchecked_mut(j) = R::ZERO;
-                    if !filter || v.abs() > tol {
+                    if v.abs() > tol {
                         out_p.add(no).write((j, v * if *st.get_unchecked(j) == UB { c_neg } else { c_pos }));
                         no += 1;
                     }
                 }
             }
+            j += 1;
         }
     }
     let nst = no;
@@ -1188,7 +1238,9 @@ fn pivot_row_ws<R: Real>(
     );
     // SAFETY: `no` entries were written, no <= capacity.
     unsafe { out.set_len(no) };
-    bits.fill(0);
+    if sparse {
+        bits.fill(0);
+    }
     ws.acc = acc_v;
     ws.bits = bits_v;
     ws.all = all_v;
@@ -9039,10 +9091,17 @@ mod pivot_row_diff {
         }
     }
 
-    fn same<R: Real>(a: &(Vec<(usize, R)>, usize, usize, usize), b: &(Vec<(usize, R)>, usize, usize, usize)) -> bool {
+    /// `distinct` is booked (and compared) only on the sparse route; the columnwise route returns 0 (`row_product_work` does not read it there).
+    fn same<R: Real>(
+        a: &(Vec<(usize, R)>, usize, usize, usize),
+        b: &(Vec<(usize, R)>, usize, usize, usize),
+        n: usize,
+        nrho: usize,
+    ) -> bool {
+        let sparse = nrho == 1 || !((n as f64) < 1.8 * a.2 as f64);
         a.1 == b.1
             && a.2 == b.2
-            && a.3 == b.3
+            && (if sparse { a.3 == b.3 } else { b.3 == 0 })
             && a.0.len() == b.0.len()
             && a.0.iter().zip(&b.0).all(|(x, y)| x.0 == y.0 && format!("{:?}", x.1).as_bytes() == format!("{:?}", y.1).as_bytes()
                 && x.1.to_f64().to_bits() == y.1.to_f64().to_bits())
@@ -9128,7 +9187,7 @@ mod pivot_row_diff {
                 let above = r.below(2) == 0;
                 let want = pivot_row_ref(&rrows, &slack_nb, &st, &cols, n, m, &rho, leave, above);
                 let got = pivot_row_ws(&mut ws, &flat, &slack_nb, &st, &cols, n, m, &rho, leave, above);
-                assert!(same(&want, &got), "case {case} call {call}");
+                assert!(same(&want, &got, n, rho.len()), "case {case} call {call}");
                 // The first-match position of the leaving variable and the duplicate flag.
                 assert_eq!(ws.leave_pos, got.0.iter().position(|e| e.0 == leave), "case {case} call {call}");
                 let dup = (0..got.0.len()).any(|x| got.0[..x].iter().any(|e| e.0 == got.0[x].0));
@@ -9180,13 +9239,75 @@ mod pivot_row_diff {
                     let above = r.below(2) == 0;
                     let want = pivot_row_ref(&rrows, &slack_nb, &st, &cols, n, m, &rho, leave, above);
                     let got = pivot_row_ws(&mut ws, &flat, &slack_nb, &st, &cols, n, m, &rho, leave, above);
-                    assert!(same(&want, &got), "n {n} case {case} call {call}");
+                    assert!(same(&want, &got, n, rho.len()), "n {n} case {case} call {call}");
                     assert_eq!(ws.leave_pos, got.0.iter().position(|e| e.0 == leave), "n {n} case {case} call {call}");
                     assert!(!ws.slack_dup);
                     assert!(ws.acc.iter().all(|x| x.to_f64().to_bits() == 0) && ws.bits.iter().all(|&w| w == 0));
                 }
             }
         }
+    }
+
+    /// The columnwise route with many cancellations: values from a small grid so that sums hit exactly 0.0 (also from -0.0 and -x + x products),
+    /// tiny values around DROP_TOL, and one or two huge ones; columns shared by many rows.
+    fn run_cancel<R: Real>() {
+        let mut r = Rng(0x1234_5678_9abc_def1);
+        let grid = [0.0, -0.0, 1.0, -1.0, 0.5, -0.5, 1e-13, -1e-13, 1.0000000000000002e-13, 9.999999999999e-14, 3e-14, -3e-14, 1e300, -1e300, 1e-300];
+        let mut sparse_calls = 0;
+        let mut col_calls = 0;
+        for case in 0..400 {
+            let n = 1 + r.below(70);
+            let m = 2 + r.below(24);
+            let mut rrows: Vec<Vec<(usize, f64)>> = vec![Vec::new(); m];
+            for row in rrows.iter_mut() {
+                let l = r.below(n.min(12) + 1);
+                let mut cs: Vec<usize> = (0..n).collect();
+                for t in 0..l {
+                    let u = t + r.below(n - t);
+                    cs.swap(t, u);
+                    row.push((cs[t], grid[r.below(grid.len())]));
+                }
+            }
+            let slack_nb: Vec<bool> = (0..m).map(|_| r.below(2) == 0).collect();
+            let st: Vec<i32> = (0..n + m).map(|_| if r.below(2) == 0 { UB } else { LB }).collect();
+            let cols: Vec<Vec<(usize, f64)>> = (0..n + m)
+                .map(|j| if j < n { Vec::new() } else { vec![(j - n, if r.below(2) == 0 { 1.0 } else { -1.0 })] })
+                .collect();
+            let flat = FlatRows::from_rows(&rrows, n);
+            let mut ws = PivotWs::<R>::default();
+            for call in 0..10 {
+                let mut rows: Vec<usize> = (0..m).collect();
+                for t in 0..m {
+                    let u = r.below(m);
+                    rows.swap(t, u);
+                }
+                let k = if call % 5 == 0 { 1 } else { 2 + r.below(m - 1) };
+                let rho: Vec<(usize, R)> = rows[..k].iter().map(|&i| (i, R::c(grid[r.below(grid.len())]))).collect();
+                let leave = n + r.below(m);
+                let above = r.below(2) == 0;
+                let want = pivot_row_ref(&rrows, &slack_nb, &st, &cols, n, m, &rho, leave, above);
+                let got = pivot_row_ws(&mut ws, &flat, &slack_nb, &st, &cols, n, m, &rho, leave, above);
+                assert!(same(&want, &got, n, rho.len()), "cancel case {case} call {call}");
+                if rho.len() == 1 || !((n as f64) < 1.8 * want.2 as f64) {
+                    sparse_calls += 1;
+                } else {
+                    col_calls += 1;
+                }
+                assert_eq!(ws.leave_pos, got.0.iter().position(|e| e.0 == leave), "cancel case {case} call {call}");
+                assert!(ws.acc.iter().all(|x| x.to_f64().to_bits() == 0) && ws.bits.iter().all(|&w| w == 0), "workspace not restored");
+            }
+        }
+        assert!(sparse_calls > 100 && col_calls > 500, "{sparse_calls} sparse, {col_calls} columnwise");
+    }
+
+    #[test]
+    fn matches_reference_cancel_f64() {
+        run_cancel::<f64>();
+    }
+
+    #[test]
+    fn matches_reference_cancel_f80() {
+        run_cancel::<crate::f80::F80>();
     }
 
     #[test]
