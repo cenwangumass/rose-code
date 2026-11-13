@@ -28,6 +28,8 @@ mod adapter;
 #[cfg(test)]
 mod ab_tests;
 #[cfg(test)]
+mod btran_out_tests;
+#[cfg(test)]
 mod btran_tests;
 #[cfg(test)]
 mod handoff_tests;
@@ -719,6 +721,8 @@ pub struct DualFactor<R: Real = f64> {
     /// Every L destination is above its source step (`y > v`), so a dense forward scan sees final values.
     l_forward: bool,
     perm: Vec<usize>,
+    /// `1 + max(perm)`: every entry of `perm` is below it (`perm` is never modified after construction).
+    perm_bound: usize,
     /// Immutable inverse row permutation, initialized at the first BTRAN output.
     row_of: std::cell::OnceCell<Vec<usize>>,
     dens: f64,
@@ -1431,6 +1435,7 @@ impl<R: Real> DualFactor<R> {
         };
         let nnz_l_tot: usize = lpool.len();
         let perm = step;
+        let perm_bound = perm.iter().map(|&p| p + 1).max().unwrap_or(0);
         let znz = (nnz + sa + sb + 2 * m) as f64;
         // Only the tail slots `i21..m` have `kind == -2`, and all of them do.
         debug_assert!((0..m).all(|x| (kind[x] == -2) == (x >= i21)));
@@ -1587,6 +1592,7 @@ impl<R: Real> DualFactor<R> {
             lpool,
             l_forward,
             perm,
+            perm_bound,
             row_of: Default::default(),
             dens: (h33 + h34) * (h33 + h34),
             dense_est: std::cell::Cell::new(0.0),
@@ -1705,13 +1711,16 @@ impl<R: Real> DualFactor<R> {
 
     /// Pack a dense BTRAN result in row order without conditional vector growth.
     #[inline(never)]
-    fn dense_btran_output(x: &[R], perm: &[usize], mut out: Vec<(usize, R)>) -> Vec<(usize, R)> {
+    fn dense_btran_output(x: &[R], perm: &[usize], perm_bound: usize, mut out: Vec<(usize, R)>) -> Vec<(usize, R)> {
         out.clear();
         out.reserve(perm.len());
+        // O(1) proof for the unchecked loads below: every `perm[r] < perm_bound <= x.len()`.
+        assert!(perm_bound <= x.len());
         let dst: *mut (usize, R) = out.as_mut_ptr();
         let mut count = 0;
         for (r, &i) in perm.iter().enumerate() {
-            let v = x[i];
+            // SAFETY: `i < perm_bound <= x.len()`.
+            let v = unsafe { *x.get_unchecked(i) };
             // count <= r < perm.len() <= capacity before this write. Rejected entries
             // occupy the next unused slot until a later accepted value overwrites it.
             unsafe {
@@ -1724,6 +1733,24 @@ impl<R: Real> DualFactor<R> {
         unsafe {
             out.set_len(count);
         }
+        out
+    }
+
+    /// Pack a sparse BTRAN result: the nonzero `x[i]` for `i` in `res` (duplicates included), as `(row_of[i], x[i])` in `res` order.
+    #[inline(never)]
+    fn sparse_btran_output(x: &[R], res: &[usize], row_of: &[usize], mut out: Vec<(usize, R)>) -> Vec<(usize, R)> {
+        out.clear();
+        out.reserve(res.len());
+        let dst: *mut (usize, R) = out.as_mut_ptr();
+        let mut count = 0usize;
+        for &i in res {
+            let v = x[i];
+            // count < res.len() <= capacity: a rejected entry's slot is overwritten by the next write.
+            unsafe { dst.add(count).write((row_of[i], v)) };
+            count += usize::from(v != R::ZERO);
+        }
+        // The first `count` slots hold the accepted entries in `res` order; `R` is Copy.
+        unsafe { out.set_len(count) };
         out
     }
 
@@ -3830,7 +3857,7 @@ impl<R: Real> DualFactor<R> {
         }
         let result = if self.bt_dense {
             if R::LANES {
-                Self::dense_btran_output(&x, &self.perm[..m], self.lists.take())
+                Self::dense_btran_output(&x, &self.perm[..m], self.perm_bound, self.lists.take())
             } else {
                 let mut out = self.lists.take();
                 out.extend((0..m).filter_map(|r| {
@@ -3840,9 +3867,7 @@ impl<R: Real> DualFactor<R> {
                 out
             }
         } else {
-            let mut out = self.lists.take();
-            out.extend(res.iter().copied().filter(|&i| x[i] != R::ZERO).map(|i| (row_of[i], x[i])));
-            out
+            Self::sparse_btran_output(&x, &res, row_of, self.lists.take())
         };
         if self.bt_dense || partial {
             x.fill(R::ZERO);

@@ -372,6 +372,7 @@ impl<R: Real> DualFactor<R> {
             ab: old_ab,
             lpool,
             l_forward,
+            perm_bound: perm.iter().map(|&p| p + 1).max().unwrap_or(0),
             perm,
             row_of: Default::default(),
             dens: (h33 + h34) * (h33 + h34),
