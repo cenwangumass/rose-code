@@ -1454,6 +1454,39 @@ fn infeas_cached<R: Real>(x: R, blo: R, bup: R) -> R {
     }
 }
 
+/// The classification pass of the walk-list rebuild over rows `0..xb.len()`: the infeasible rows (infeasibility above `ptol`) go to `rows` in ascending order with
+/// `key(row, infeasibility)` in `keys`, get flag 0, and every other row gets flag 2. Returns the number of infeasible rows and of those whose flag was not 0 before.
+#[inline(always)]
+fn rebuild_rows<R: Real>(
+    xb: &[R],
+    blo: &[R],
+    bup: &[R],
+    ptol: f64,
+    flags: &mut [u8],
+    rows: &mut Vec<usize>,
+    keys: &mut Vec<f64>,
+    mut key: impl FnMut(usize, R) -> f64,
+) -> (usize, usize) {
+    rows.clear();
+    keys.clear();
+    let m = xb.len();
+    let (blo, bup, flags) = (&blo[..m], &bup[..m], &mut flags[..m]);
+    let mut n_fresh = 0usize;
+    for (r, ((&x, &lo), &up)) in xb.iter().zip(blo).zip(bup).enumerate() {
+        let fr = infeas_cached::<R>(x, lo, up);
+        if fr.to_f64() > ptol {
+            n_fresh += (flags[r] != 0) as usize;
+            rows.push(r);
+            keys.push(key(r, fr));
+        }
+    }
+    flags.fill(2);
+    for &r in rows.iter() {
+        flags[r] = 0;
+    }
+    (rows.len(), n_fresh)
+}
+
 /// The per-row cache of the bounds of the basic variables for the basis `head`.
 fn basic_bounds<R: Real>(p: &Internal, head: &[usize]) -> (Vec<R>, Vec<R>) {
     head.iter().map(|&v| basic_bound_pair::<R>(p.lo[v], p.up[v])).unzip()
@@ -1627,7 +1660,6 @@ struct Dual<'a, R: Real = f64> {
     cursor: usize,
     walk_len: usize,
     /// Scratch of the pricing passes: the infeasibility of every row.
-    infs: Vec<R>,
     /// Slacks the row product offers, by row: those nonbasic at the last factorization and those that have left the basis since. A slack that enters the
     /// basis stays on offer until the next factorization.
     slack_nb: Vec<bool>,
@@ -2183,18 +2215,6 @@ impl<'a, R: Real> Dual<'a, R> {
             let (lo, up) = basic_bound_pair::<R>(self.p.lo[v], self.p.up[v]);
             assert!(self.blo[r] == lo && self.bup[r] == up, "stale bound cache at row {r}");
         }
-    }
-
-    /// The infeasibility of every row (`infeas_real` of rows `0..m`) into the retained scratch `infs`; the caller takes it with `mem::take` and puts it back.
-    fn fill_infeas(&self, out: &mut Vec<R>) {
-        #[cfg(any(debug_assertions, feature = "factor-shadow"))]
-        self.check_bounds();
-        out.clear();
-        let m = self.m;
-        out.reserve(m);
-        // All three slices cut to `m` once: no bounds check inside the loop.
-        let (xb, blo, bup) = (&self.xb[..m], &self.blo[..m], &self.bup[..m]);
-        out.extend(xb.iter().zip(blo).zip(bup).map(|((&x, &lo), &up)| infeas_cached::<R>(x, lo, up)));
     }
 
     // ------------------------------------------------------------------ factorization
@@ -3243,45 +3263,28 @@ impl<'a, R: Real> Dual<'a, R> {
         self.p68[r] = maxsd(self.p68[r], 100.0 + delta);
     }
 
-    /// `0xbdc10`: flags of all rows and the list of the infeasible ones sorted by priority (descending).
-    fn build_walk_list(&mut self) {
-        let mut infs = std::mem::take(&mut self.infs);
-        self.fill_infeas(&mut infs);
-        self.build_walk_list_from(&infs);
-        self.infs = infs;
-    }
-
-    /// `build_walk_list` with the infeasibilities of the rows already in `infs` (nothing they depend on changes inside).
+    /// `0xbdc10`: flags of all rows and the list of the infeasible ones sorted by priority (descending), in one pass over the rows.
     ///
-    /// Returns the number of infeasible rows and the number of those whose flag was not 0 before (the rows that became infeasible outside the list), counted in
-    /// the same pass.
-    fn build_walk_list_from(&mut self, infs: &[R]) -> (usize, usize) {
+    /// Returns the number of infeasible rows and the number of those whose flag was not 0 before (the rows that became infeasible outside the list).
+    fn build_walk_list(&mut self) -> (usize, usize) {
+        #[cfg(any(debug_assertions, feature = "factor-shadow"))]
+        self.check_bounds();
         let ptol = self.ptol();
-        let (mut n_inf, mut n_fresh) = (0usize, 0usize);
-        let infs = &infs[..self.m];
-        assert!(self.flags.len() >= infs.len() && self.w.len() >= infs.len());
+        let m = self.m;
         let mut rows = std::mem::take(&mut self.glue.spare_list);
         let mut keys = std::mem::take(&mut self.glue.keys);
-        rows.clear();
-        keys.clear();
-        for (r, &fr) in infs.iter().enumerate() {
-            if fr.to_f64() > ptol {
-                n_inf += 1;
-                n_fresh += (self.flags[r] != 0) as usize;
-                self.flags[r] = 0;
-                rows.push(r);
-                keys.push((-self.pri(r, fr)).to_f64());
-            } else {
-                self.flags[r] = 2;
-            }
-        }
+        let mut flags = std::mem::take(&mut self.flags);
+        let counts = rebuild_rows::<R>(&self.xb[..m], &self.blo[..m], &self.bup[..m], ptol, &mut flags, &mut rows, &mut keys, |r, fr| {
+            (-self.pri(r, fr)).to_f64()
+        });
+        self.flags = flags;
         ref_sort(&mut keys, &mut rows);
         self.walk_len = rows.len();
         self.glue.spare_list = std::mem::replace(&mut self.list, rows);
         self.glue.keys = keys;
         self.cursor = 0;
         self.pend = self.cap;
-        (n_inf, n_fresh)
+        counts
     }
 
     /// The rebuild of the walk list inside the update (`0xc2291..0xc2900`): the rows that became infeasible outside the list (flag 1), sorted by priority,
@@ -3481,18 +3484,14 @@ impl<'a, R: Real> Dual<'a, R> {
                 // Work of the pricing-side walk rebuild (`0xbdc10`): classify
                 // all rows, retain waiting entries, and merge the newly infeasible rows.
                 let ptol = self.ptol();
-                let mut infs = std::mem::take(&mut self.infs);
-                self.fill_infeas(&mut infs);
                 let old_len = self.walk_len.min(self.list.len());
                 let old = self.list[..old_len]
                     .iter()
-                    .filter(|&&i| self.flags[i] == 0 && infs[i].to_f64() > ptol)
+                    .filter(|&&i| self.flags[i] == 0 && self.infeas(i) > ptol)
                     .count();
                 // The row counts (`infeas`, `fresh`) come from the pass of the build, which reads each flag before it sets it; `old` reads the flags of the old
                 // list, so it is counted before the build.
-                debug_assert_eq!(infs.len(), self.m);
-                let (infeas, fresh) = self.build_walk_list_from(&infs);
-                self.infs = infs;
+                let (infeas, fresh) = self.build_walk_list();
                 let m = self.m as f64;
                 let scan = if self.level == 0 {
                     3.0 * m
@@ -7169,7 +7168,6 @@ fn solve_pass_callback<R: Real>(
         value_mode: false,
         cursor: 0,
         walk_len: 0,
-        infs: Vec::new(),
         slack_nb: vec![false; m],
         prow_ws: Default::default(),
         glue: Default::default(),
@@ -8740,8 +8738,7 @@ mod captured_bh305_ratio {
             value_mode: false,
             cursor: 0,
             walk_len: 0,
-            infs: Vec::new(),
-            slack_nb: vec![false; m],
+                slack_nb: vec![false; m],
             prow_ws: Default::default(),
             glue: Default::default(),
             fw_ws: Default::default(),
@@ -9989,6 +9986,92 @@ mod infeas_tests {
             let c = infeas_cached::<R>(R::c(x), blo, bup);
             assert!(same(c, b), "cached: x {x} lo {lo} up {up}");
         }
+    }
+
+    /// The former two-pass rebuild (`fill_infeas` + `build_walk_list_from`) on slices.
+    fn old_rebuild<R: Real>(
+        xb: &[R],
+        blo: &[R],
+        bup: &[R],
+        ptol: f64,
+        flags: &mut [u8],
+        key: &dyn Fn(usize, R) -> f64,
+    ) -> (Vec<usize>, Vec<f64>, usize, usize) {
+        let infs: Vec<R> = xb.iter().zip(blo).zip(bup).map(|((&x, &l), &u)| infeas_cached::<R>(x, l, u)).collect();
+        let (mut n_inf, mut n_fresh) = (0usize, 0usize);
+        let (mut rows, mut keys) = (Vec::new(), Vec::new());
+        for (r, &fr) in infs.iter().enumerate() {
+            if fr.to_f64() > ptol {
+                n_inf += 1;
+                n_fresh += (flags[r] != 0) as usize;
+                flags[r] = 0;
+                rows.push(r);
+                keys.push(key(r, fr));
+            } else {
+                flags[r] = 2;
+            }
+        }
+        (rows, keys, n_inf, n_fresh)
+    }
+
+    fn rebuild_check<R: Real>() {
+        let vals = [
+            0.0, -0.0, 1.0, -1.0, 1e-9, 0.5, 2.0, 1e30, -1e30, f64::INFINITY, f64::NEG_INFINITY, f64::NAN,
+        ];
+        let mut s = 0x2545f4914f6cdd1du64;
+        let mut next = move || {
+            s ^= s << 13;
+            s ^= s >> 7;
+            s ^= s << 17;
+            s
+        };
+        for round in 0..3000 {
+            let m = match round % 4 {
+                0 => 0,
+                1 => 1 + (next() % 5) as usize,
+                _ => (next() % 300) as usize,
+            };
+            let gen = |next: &mut dyn FnMut() -> u64| -> f64 {
+                let u = next();
+                if u % 3 == 0 {
+                    vals[(u >> 8) as usize % vals.len()]
+                } else {
+                    // few distinct values: ties between keys
+                    ((u >> 16) % 7) as f64 * 0.25 - 0.5
+                }
+            };
+            let all_bad = round % 11 == 0;
+            let xb: Vec<R> = (0..m).map(|_| R::c(gen(&mut next))).collect();
+            let (blo, bup): (Vec<R>, Vec<R>) = (0..m)
+                .map(|_| {
+                    let (l, u) = if all_bad { (1.0, -1.0) } else { (gen(&mut next), gen(&mut next)) };
+                    basic_bound_pair::<R>(l, u)
+                })
+                .unzip();
+            let w: Vec<f64> = (0..m).map(|_| gen(&mut next)).collect();
+            let ptol = [1e-6, 0.0, -1.0, 0.25, 1e-9][round % 5];
+            let flags0: Vec<u8> = (0..m + 3).map(|_| (next() % 6) as u8).collect();
+            let key = |r: usize, fr: R| (-(fr * fr / R::c(w[r]))).to_f64();
+            let (mut fa, mut fb) = (flags0.clone(), flags0.clone());
+            let (rows_a, keys_a, ni_a, nf_a) = old_rebuild::<R>(&xb, &blo, &bup, ptol, &mut fa, &key);
+            let (mut rows_b, mut keys_b) = (vec![9usize; 3], vec![f64::NAN; 2]);
+            let (ni_b, nf_b) = rebuild_rows::<R>(&xb, &blo, &bup, ptol, &mut fb, &mut rows_b, &mut keys_b, key);
+            assert_eq!((ni_a, nf_a), (ni_b, nf_b));
+            assert_eq!(fa, fb);
+            assert_eq!(rows_a, rows_b);
+            assert!(keys_a.iter().zip(&keys_b).all(|(a, b)| a.to_bits() == b.to_bits()));
+            assert_eq!(keys_a.len(), keys_b.len());
+        }
+    }
+
+    #[test]
+    fn walk_rebuild_matches_two_pass_f64() {
+        rebuild_check::<f64>();
+    }
+
+    #[test]
+    fn walk_rebuild_matches_two_pass_quad() {
+        rebuild_check::<crate::f80::F80>();
     }
 
     #[test]
