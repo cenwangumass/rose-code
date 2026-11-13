@@ -4066,33 +4066,72 @@ impl<R: Real> DualFactor<R> {
         out
     }
 
-    /// The compaction of `btran_rho`: `(row, value)` of the slots `slot(k)` in order, kept when `|v| > tol`; the closure reads `x`, which still holds the values.
-    /// A dropped entry that is not an exact zero (at most the tolerance in magnitude, or NaN) is noted with the number of entries kept before it.
+    /// The compaction of `btran_rho` over the dense result: rows `k` in order with value `x[perm[k]]`, kept when `|v| > tol`. Exact zeros (most slots) are skipped
+    /// with one compare; a dropped entry that is not an exact zero (at most the tolerance in magnitude, or NaN) is noted with the number of entries kept before it.
+    /// `perm[k] < x.len()` for every `k < m` is the caller's proof for the unchecked loads.
     #[inline(always)]
-    fn rho_output(n: usize, slot: impl Fn(usize) -> (usize, R), o: RhoOut<R>, ws: &mut BtranWork<R>) {
+    fn rho_output_dense(m: usize, perm: &[usize], x: &[R], o: RhoOut<R>, ws: &mut BtranWork<R>) {
         let RhoOut { rows, vals, tol } = o;
-        rows.reserve(n);
-        vals.reserve(n);
+        rows.reserve(m);
+        vals.reserve(m);
         let (rp, vp) = (rows.as_mut_ptr(), vals.as_mut_ptr());
         let mut count = 0usize;
-        for k in 0..n {
-            let (row, v) = slot(k);
-            // count <= k < n <= capacity: a rejected entry's slot is overwritten by the next write.
-            unsafe {
-                rp.add(count).write(row);
-                vp.add(count).write(v);
+        for k in 0..m {
+            // SAFETY: `k < m <= perm.len()`, `perm[k] < x.len()` (checked by the caller).
+            let v = unsafe { *x.get_unchecked(*perm.get_unchecked(k)) };
+            if v != R::ZERO {
+                if v.abs() > tol {
+                    // SAFETY: count <= k < m <= capacity.
+                    unsafe {
+                        rp.add(count).write(k);
+                        vp.add(count).write(v);
+                    }
+                    count += 1;
+                } else {
+                    Self::note_dropped(count, k, v, ws);
+                }
             }
-            let keep = v.abs() > tol;
-            if !keep & (v != R::ZERO) {
-                ws.dropped.push((count, row, v));
-            }
-            count += usize::from(keep);
         }
         // The first `count` slots hold the kept entries; `usize` and `R` are Copy.
         unsafe {
             rows.set_len(count);
             vals.set_len(count);
         }
+    }
+
+    /// The compaction of `btran_rho` over the sparse result `res` (rows `row_of[i]`, values `x[i]`), same rule as `rho_output_dense`.
+    #[inline(always)]
+    fn rho_output_sparse(res: &[usize], row_of: &[usize], x: &[R], o: RhoOut<R>, ws: &mut BtranWork<R>) {
+        let RhoOut { rows, vals, tol } = o;
+        let n = res.len();
+        rows.reserve(n);
+        vals.reserve(n);
+        let (rp, vp) = (rows.as_mut_ptr(), vals.as_mut_ptr());
+        let mut count = 0usize;
+        for &i in res {
+            let v = x[i];
+            if v.abs() > tol {
+                // SAFETY: count < n <= capacity.
+                unsafe {
+                    rp.add(count).write(row_of[i]);
+                    vp.add(count).write(v);
+                }
+                count += 1;
+            } else if v != R::ZERO {
+                Self::note_dropped(count, row_of[i], v, ws);
+            }
+        }
+        // The first `count` slots hold the kept entries; `usize` and `R` are Copy.
+        unsafe {
+            rows.set_len(count);
+            vals.set_len(count);
+        }
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn note_dropped(count: usize, row: usize, v: R, ws: &mut BtranWork<R>) {
+        ws.dropped.push((count, row, v));
     }
 
     fn btran_with(
@@ -4408,9 +4447,9 @@ impl<R: Real> DualFactor<R> {
                 assert!(self.perm_bound <= x.len());
                 let xs = &x[..];
                 // SAFETY: `k < m = perm.len()`, `perm[k] < perm_bound <= x.len()`.
-                Self::rho_output(m, |k| unsafe { (k, *xs.get_unchecked(*perm.get_unchecked(k))) }, o, ws);
+                Self::rho_output_dense(m, perm, xs, o, ws);
             } else {
-                Self::rho_output(res.len(), |k| (row_of[res[k]], x[res[k]]), o, ws);
+                Self::rho_output_sparse(&res, row_of, &x, o, ws);
             }
             Vec::new()
         } else if self.bt_dense {

@@ -107,10 +107,10 @@ fn rho_output_matches<R: Real>(key: impl Fn(R) -> u128) {
             vals.clear();
             let o = RhoOut { rows: &mut rows, vals: &mut vals, tol };
             if dense {
-                DualFactor::<R>::rho_output(m, |k| (k, x[perm[k]]), o, &mut ws);
+                DualFactor::<R>::rho_output_dense(m, &perm, &x, o, &mut ws);
                 dense_calls += 1;
             } else {
-                DualFactor::<R>::rho_output(res.len(), |k| (row_of[res[k]], x[res[k]]), o, &mut ws);
+                DualFactor::<R>::rho_output_sparse(&res, &row_of, &x, o, &mut ws);
             }
             assert_eq!(rows.len(), vals.len());
             assert_eq!(rows.len(), want.len(), "m {m} call {call}");
