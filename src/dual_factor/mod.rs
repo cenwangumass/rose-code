@@ -17,6 +17,40 @@ use ab::AbLists;
 use pool::{Csr, LPool};
 use urows::URows;
 use std::collections::BinaryHeap;
+
+/// Scatter of one U column `x[j] -= v * xc` over its `(j, v)` entries in textual order, four per iteration (the updates stay
+/// sequential, so the rounding and repeated destinations are those of the plain loop); `$step` runs after each update with `j`.
+/// Caller contract: `x.len() >= m` and every `j < m` (the U columns hold factor positions); checked per entry in test/debug/shadow builds.
+macro_rules! scatter_u_col {
+    ($x:expr, $col:expr, $xc:expr, $n:expr, |$j:ident| $step:block) => {{
+        let (col, xc, n): (&[(usize, R)], R, usize) = ($col, $xc, $n);
+        let mut k = 0usize;
+        macro_rules! one {
+            ($e:expr) => {{
+                let ($j, v) = $e;
+                #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+                assert!($j < n && $j < $x.len(), "U column entry out of range");
+                // SAFETY: `$j < m <= $x.len()` (caller contract, checked above in test/debug/shadow builds).
+                unsafe { *$x.get_unchecked_mut($j) -= v * xc };
+                $step
+            }};
+        }
+        let len = col.len();
+        // SAFETY of the `get_unchecked` below: `k + 3 < len` in the loop and `k + r < len` in the tail.
+        while k + 4 <= len {
+            one!(unsafe { *col.get_unchecked(k) });
+            one!(unsafe { *col.get_unchecked(k + 1) });
+            one!(unsafe { *col.get_unchecked(k + 2) });
+            one!(unsafe { *col.get_unchecked(k + 3) });
+            k += 4;
+        }
+        while k < len {
+            one!(unsafe { *col.get_unchecked(k) });
+            k += 1;
+        }
+    }};
+}
+
 mod ab;
 mod btran_ws;
 mod pool;
@@ -3386,23 +3420,22 @@ impl<R: Real> DualFactor<R> {
                             sb += nb;
                             let col = &uc[c];
                             su += col.len();
-                            for &($j, v) in col {
-                                x[$j] -= v * xc;
-                                $mark
-                            }
+                            scatter_u_col!(x, col, xc, m, |$j| $mark);
                         }
                     }
                 }};
             }
             macro_rules! mark {
                 ($j:ident) => {{
-                    let word = &mut words[$j / 64];
+                    // SAFETY: `$j < m`, so `$j / 64 < m.div_ceil(64) == words.len()` (`FtranTouched::new`).
+                    let word = unsafe { words.get_unchecked_mut($j / 64) };
                     if *word == 0 {
                         occupied.push($j / 64);
                     }
                     *word |= 1u64 << ($j % 64);
                 }};
             }
+            assert!(x.len() >= m && words.len() >= m.div_ceil(64), "ftran_with: vector shorter than the factor");
             col_surv.clear();
             #[cfg(test)]
             SPARSE_ROUTES.with(|r| {
@@ -3605,6 +3638,7 @@ impl<R: Real> DualFactor<R> {
         // quotient, store, count, scatter over the whole U column.
         {
             let (diag, uc) = (&self.diag[..], &self.uc[..]);
+            assert!(x.len() >= m, "ftran_with: vector shorter than the factor");
             col_surv.reserve(m - i21);
             for &c in self.at[i21..m].iter().rev() {
                 let mut xc = x[c];
@@ -3624,9 +3658,7 @@ impl<R: Real> DualFactor<R> {
                 sb += nb;
                 let col = &uc[c];
                 su += col.len();
-                for &(j, v) in col {
-                    x[j] -= v * xc;
-                }
+                scatter_u_col!(x, col, xc, m, |j| {});
             }
         }
         #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]

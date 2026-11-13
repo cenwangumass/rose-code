@@ -128,3 +128,36 @@ fn full_kernels_match_the_frozen_ones_f80() {
         assert!(run::<crate::f80::F80>(&seeds, pool).0 > 100);
     }
 }
+
+/// `scatter_u_col!` against the plain checked loop: same bits in `x` (repeated destinations included) and the same order of `$step` calls.
+fn scatter_u_col_case<R: Real>() {
+    let mut seed = 0x9e37_79b9_7f4a_7c15u64;
+    let mut next = || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed as usize
+    };
+    for m in [1usize, 5, 64, 130] {
+        for len in 0..13 {
+            let col: Vec<(usize, R)> = (0..len).map(|_| (next() % m, R::c(0.1 * (next() % 97) as f64 - 4.7))).collect();
+            let x0: Vec<R> = (0..m).map(|_| R::c(0.37 * (next() % 53) as f64 - 9.1)).collect();
+            let xc = R::c(1.0 / 3.0);
+            let (mut a, mut b) = (x0.clone(), x0.clone());
+            let (mut la, mut lb) = (Vec::new(), Vec::new());
+            for &(j, v) in &col {
+                a[j] -= v * xc;
+                la.push(j);
+            }
+            scatter_u_col!(b, &col, xc, m, |j| { lb.push(j) });
+            assert_eq!(la, lb);
+            assert_eq!(all_bits(&a), all_bits(&b));
+        }
+    }
+}
+
+#[test]
+fn scatter_u_col_matches_the_plain_loop() {
+    scatter_u_col_case::<f64>();
+    scatter_u_col_case::<crate::f80::F80>();
+}
