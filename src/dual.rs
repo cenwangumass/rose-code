@@ -1166,6 +1166,37 @@ fn pivot_row_ws<R: Real>(
         // Ascending index order over the structurals, four slots at a time: a block of slots equal to zero (all +0.0, see above) is skipped.
         // SAFETY: `acc[0..n]` exists (n <= n + m), `st[j]` for j < n, and `no` counts distinct kept slots below `min(n, est)` (the capacity).
         let mut j = 0usize;
+        // Double mode: eight slots at a time are tested as raw words first (an all-zero block has every bit clear; a block holding -0.0 or anything
+        // else takes the per-slot path below, which skips the zeros itself), so the scan of a mostly empty `acc` costs about one instruction per slot.
+        if !R::QUAD {
+            assert!(std::mem::size_of::<R>() == 8 && acc.len() >= n);
+            let w = acc.as_ptr() as *const u64;
+            while j + 8 <= n {
+                // SAFETY: `R` is `f64` (not `QUAD`, size 8), `acc` holds at least `n` slots, and `j + 8 <= n`.
+                let z = unsafe {
+                    w.add(j).read() | w.add(j + 1).read() | w.add(j + 2).read() | w.add(j + 3).read() | w.add(j + 4).read() | w.add(j + 5).read()
+                        | w.add(j + 6).read() | w.add(j + 7).read()
+                };
+                if z == 0 {
+                    j += 8;
+                    continue;
+                }
+                let end = j + 8;
+                while j < end {
+                    unsafe {
+                        let v = *acc.get_unchecked(j);
+                        if v != R::ZERO {
+                            *acc.get_unchecked_mut(j) = R::ZERO;
+                            if v.abs() > tol {
+                                out_p.add(no).write((j, v * if *st.get_unchecked(j) == UB { c_neg } else { c_pos }));
+                                no += 1;
+                            }
+                        }
+                    }
+                    j += 1;
+                }
+            }
+        }
         while j + 4 <= n {
             unsafe {
                 let (v0, v1, v2, v3) = (*acc.get_unchecked(j), *acc.get_unchecked(j + 1), *acc.get_unchecked(j + 2), *acc.get_unchecked(j + 3));
@@ -1209,7 +1240,7 @@ fn pivot_row_ws<R: Real>(
     // The scatter touches structurals only (`FlatRows` stores indices below `n`), and the rows of `rho` are distinct (a BTRAN result has one entry per row),
     // so a slack occurs at most once in the row: `slack_dup` stays false and the leaving variable's position is that of its single entry.
     let leave_i = leave.wrapping_sub(n);
-    let mut leave_pos = None;
+    let mut lp = usize::MAX;
     // SAFETY: every `i` of `rho` is below `m` (size pass), `slack_nb.len() >= m`, `slack_coef.len() == m`, `st.len() >= n + m`;
     // at most `rho.len()` slack entries follow the `all.len()` structurals.
     for &(i, rv) in rho {
@@ -1219,14 +1250,14 @@ fn pivot_row_ws<R: Real>(
                 let j = n + i;
                 let v = rv * R::c(*slack_coef.get_unchecked(i));
                 let s = if *st.get_unchecked(j) == UB { c_neg } else { c_pos };
-                if is_leave && leave_pos.is_none() {
-                    leave_pos = Some(no);
-                }
+                // The rows of `rho` are distinct, so `is_leave` holds at most once: a conditional move, no first-occurrence test.
+                lp = if is_leave { no } else { lp };
                 out_p.add(no).write((j, v * s));
                 no += 1;
             }
         }
     }
+    let leave_pos = if lp == usize::MAX { None } else { Some(lp) };
     // `slack_dup` is never set: BTRAN's result holds each row once. Checked in debug and shadow builds (shadow parity runs it).
     #[cfg(any(debug_assertions, feature = "factor-shadow"))]
     assert!(
