@@ -1330,20 +1330,26 @@ struct Cand<R> {
     bestc: R,
     xm13: R,
     xm9: R,
+    /// Some entry has magnitude exactly `ALPHA_TOL` (`ZERO` loops only): it is still raw in the row and the zeroing pass has to run.
+    edge: bool,
 }
 
 /// The two candidate loops of `ratio_test_with` (entries from `esi` on that sit at a bound, then the earlier ones), filling the retained lists.
+///
+/// With `ZERO` the loops also write `+0.0` over every entry of magnitude below `ALPHA_TOL` (the zeroing of the ratio test, `0xc7741`, `0xc7870`; the entries that
+/// are candidates have `v < -ALPHA_TOL` and are not touched, NaN is not touched); entries of magnitude exactly `ALPHA_TOL` stay raw and set `edge`, so that the
+/// reads of the row before the zeroing pass (`framework_rhs` zeroes below the tolerance only) see what they saw before the fusion.
 ///
 /// # Safety
 /// `st` and `d` must be longer than every index of `row`.
 #[allow(clippy::too_many_arguments)]
 #[inline]
-unsafe fn ratio_candidates<R: Real>(
+unsafe fn ratio_candidates<R: Real, const ZERO: bool>(
     lo: &[f64],
     up: &[f64],
     st: &[i32],
     d: &[R],
-    row: &[(usize, R)],
+    row: &mut [(usize, R)],
     esi: usize,
     delta: R,
     xmm7: R,
@@ -1361,6 +1367,7 @@ unsafe fn ratio_candidates<R: Real>(
     let (mut best, mut best_i, mut bestc) = (R::c(-1e100), -1i64, R::ZERO);
     let (mut xm13, mut xm9) = (R::ZERO, R::ZERO);
     let (neg_tol, tol10) = (R::c(-ALPHA_TOL), R::c(1e-10));
+    let mut edge = false;
     ratio_arr.clear();
     con.clear();
     lst.clear();
@@ -1400,6 +1407,15 @@ unsafe fn ratio_candidates<R: Real>(
                 }
                 track!(i, ratio, xmm12);
             }
+        } else if ZERO {
+            let a = v.abs();
+            if a <= tol10 {
+                if a < tol10 {
+                    row[i].1 = R::ZERO;
+                } else {
+                    edge = true;
+                }
+            }
         }
     }
     for i in 0..esi.min(cnt) {
@@ -1431,9 +1447,18 @@ unsafe fn ratio_candidates<R: Real>(
                 }
             }
             track!(i, ratio, c);
+        } else if ZERO {
+            let a = v.abs();
+            if a <= tol10 {
+                if a < tol10 {
+                    row[i].1 = R::ZERO;
+                } else {
+                    edge = true;
+                }
+            }
         }
     }
-    Cand { bound, best_i, bestc, xm13, xm9 }
+    Cand { bound, best_i, bestc, xm13, xm9, edge }
 }
 
 /// The candidate list of the ratio test (ratios, contributions, row positions) and the kept list; retained across calls, cleared at the start of each.
@@ -1442,11 +1467,13 @@ struct RatioBufs<R> {
     con: Vec<R>,
     lst: Vec<usize>,
     kept: Vec<usize>,
+    /// `Cand::edge` of the last call.
+    edge: bool,
 }
 
 impl<R> Default for RatioBufs<R> {
     fn default() -> Self {
-        RatioBufs { ratio_arr: Vec::new(), con: Vec::new(), lst: Vec::new(), kept: Vec::new() }
+        RatioBufs { ratio_arr: Vec::new(), con: Vec::new(), lst: Vec::new(), kept: Vec::new(), edge: false }
     }
 }
 
@@ -3797,9 +3824,10 @@ impl<'a, R: Real> Dual<'a, R> {
     ///
     /// # Safety
     /// Every index of `row` must be below `n + m` (rows of `pivot_row_ws` are; the candidate loops read `st` and `d` unchecked).
-    unsafe fn ratio_test(&mut self, row: &[(usize, R)], esi: usize, leave: usize, above: bool, xbr: R) -> Ratio {
+    /// With `zero` the candidate loops also zero the entries below `ALPHA_TOL` in magnitude (`self.rbuf.edge` tells that the zeroing is not complete).
+    unsafe fn ratio_test(&mut self, row: &mut [(usize, R)], zero: bool, esi: usize, leave: usize, above: bool, xbr: R) -> Ratio {
         let mut bufs = std::mem::take(&mut self.rbuf);
-        let result = unsafe { self.ratio_test_with(&mut bufs, row, esi, leave, above, xbr) };
+        let result = unsafe { self.ratio_test_with(&mut bufs, row, zero, esi, leave, above, xbr) };
         self.rbuf = bufs;
         result
     }
@@ -3809,7 +3837,8 @@ impl<'a, R: Real> Dual<'a, R> {
     unsafe fn ratio_test_with(
         &mut self,
         bufs: &mut RatioBufs<R>,
-        row: &[(usize, R)],
+        row: &mut [(usize, R)],
+        zero: bool,
         esi: usize,
         leave: usize,
         above: bool,
@@ -3823,13 +3852,19 @@ impl<'a, R: Real> Dual<'a, R> {
         let xmm12 = R::c(-2.0) * xmm10;
         let xmm7 = ptol - xmm10;
         let cnt = row.len();
-        let RatioBufs { ratio_arr, con, lst, kept } = bufs;
+        let RatioBufs { ratio_arr, con, lst, kept, edge } = bufs;
         assert!(self.st.len() >= self.n + self.m && self.d.len() >= self.n + self.m, "st or d shorter than n + m");
         let variant = self.level != 0 && self.iters + self.it_base > self.m;
         // SAFETY: the lengths were checked above (n + m); the row indices are below n + m (the contract of this function).
-        let Cand { bound, best_i, bestc, xm13, xm9 } = unsafe {
-            ratio_candidates(&p.lo, &p.up, &self.st, &self.d, row, esi, delta, xmm7, xmm12, variant, ratio_arr, con, lst)
+        let Cand { bound, best_i, bestc, xm13, xm9, edge: e } = unsafe {
+            if zero {
+                ratio_candidates::<R, true>(&p.lo, &p.up, &self.st, &self.d, row, esi, delta, xmm7, xmm12, variant, ratio_arr, con, lst)
+            } else {
+                ratio_candidates::<R, false>(&p.lo, &p.up, &self.st, &self.d, row, esi, delta, xmm7, xmm12, variant, ratio_arr, con, lst)
+            }
         };
+        *edge = e;
+        let row: &[(usize, R)] = row;
         kept.clear();
         let nn = lst.len();
         self.work.add(0xc7bcd, 3.0 * cnt as f64, crate::work::CTX);
@@ -4803,11 +4838,14 @@ impl<'a, R: Real> Dual<'a, R> {
         self.p60 = rho.len() as f64;
         self.work
             .add_from(0x13174d, 0xc51dd, self.mirror.work(), crate::work::FAC);
-        let (row, esi, occurrences, distinct) = self.pivot_row(&rho, leave, above);
+        let (mut row, esi, occurrences, distinct) = self.pivot_row(&rho, leave, above);
         self.row_product_work(&rho, row.len() - esi, occurrences, distinct);
         self.p58 += occurrences as f64;
         self.p50d += occurrences as f64;
         let forced_route = forced_mode && self.forced_ratio_chosen(leave, xbr);
+        // The zeroing of the small row entries is made by the candidate loops of the ratio test (`zeroed`), unless a dump of the row or the forced route
+        // needs the raw values.
+        let mut zeroed = false;
         let rt = if forced_route {
             match self.forced_ratio(&row, esi, leave) {
                 Some(qe) => Ratio {
@@ -4833,7 +4871,8 @@ impl<'a, R: Real> Dual<'a, R> {
             }
         } else {
             // SAFETY: the row comes from `pivot_row_ws` (indices below n + m).
-            unsafe { self.ratio_test(&row, esi, leave, above, xbr) }
+            zeroed = snap.is_none();
+            unsafe { self.ratio_test(&mut row, zeroed, esi, leave, above, xbr) }
         };
         if std::mem::take(&mut self.fresh_absorb) && !self.no_art_exit {
             if let Some(mut sn) = snap {
@@ -5403,10 +5442,13 @@ impl<'a, R: Real> Dual<'a, R> {
         // The factor's update is made by the post-iteration pass (it refactorizes instead when one is due).
         self.pending_alpha = Some(col_out);
         // The ratio test zeroes row entries of magnitude at most 1e-10 (`0xc7747..0xc7769`, `0xcc606`; bh50022 has an entry exactly -1e-10).
-        let mut row = row;
-        for e in row.iter_mut() {
-            if e.1.abs() <= R::c(ALPHA_TOL) {
-                e.1 = R::ZERO;
+        // The candidate loops have zeroed the entries below the tolerance in magnitude; the entries of exactly the tolerance (`rbuf.edge`) were left raw for
+        // `framework_rhs` and are zeroed here.
+        if !zeroed || self.rbuf.edge {
+            for e in row.iter_mut() {
+                if e.1.abs() <= R::c(ALPHA_TOL) {
+                    e.1 = R::ZERO;
+                }
             }
         }
         // First-match positions of `q` and the leaving variable: the row's entries are unique by variable unless `rho` repeats a slack index.
@@ -8891,8 +8933,10 @@ mod captured_bh305_ratio {
         s.rbuf.kept.extend([1, 2]);
         s.rbuf.con.extend([f64::NAN; 4]);
         s.rbuf.ratio_arr.extend([f64::NAN; 2]);
+        let mut row = row;
         let result = unsafe { s.ratio_test(
-            &row,
+            &mut row,
+            false,
             input["esi"].as_u64().unwrap() as usize,
             leave,
             false,
@@ -9678,7 +9722,7 @@ mod row_loops_diff {
                 track!(i, ratio, c);
             }
         }
-        Cand { bound, best_i, bestc, xm13, xm9 }
+        Cand { bound, best_i, bestc, xm13, xm9, edge: false }
     }
 
     fn same<R: Real>(a: R, b: R) -> bool {
@@ -9721,7 +9765,40 @@ mod row_loops_diff {
             let (mut a, mut b, mut c) = (vec![R::c(f64::NAN); 2], vec![R::ZERO; 3], vec![7usize]);
             let (mut a2, mut b2, mut c2) = (vec![], vec![R::c(5.0)], vec![]);
             let want = ratio_candidates_ref(&lo, &up, &st, &d, &row, esi, delta, xmm7, xmm12, variant, &mut a, &mut b, &mut c);
-            let got = unsafe { ratio_candidates(&lo, &up, &st, &d, &row, esi, delta, xmm7, xmm12, variant, &mut a2, &mut b2, &mut c2) };
+            let mut row2 = row.clone();
+            let got = unsafe { ratio_candidates::<R, false>(&lo, &up, &st, &d, &mut row2, esi, delta, xmm7, xmm12, variant, &mut a2, &mut b2, &mut c2) };
+            assert!(row2.iter().zip(&row).all(|(x, y)| x.0 == y.0 && same(x.1, y.1)), "the plain loops must not write the row");
+            // The fused zeroing: the same lists, and the row after the loops (plus the old pass when an entry sits exactly at the tolerance) is the old pass's.
+            let mut row3 = row.clone();
+            let (mut a3, mut b3, mut c3) = (vec![], vec![], vec![]);
+            let fused = unsafe { ratio_candidates::<R, true>(&lo, &up, &st, &d, &mut row3, esi, delta, xmm7, xmm12, variant, &mut a3, &mut b3, &mut c3) };
+            assert!(same(fused.bound, got.bound) && same(fused.bestc, got.bestc) && same(fused.xm13, got.xm13) && same(fused.xm9, got.xm9));
+            assert_eq!((fused.best_i, &c3), (got.best_i, &c2));
+            assert!(a3.iter().zip(&a2).all(|(x, y)| same(*x, *y)) && b3.iter().zip(&b2).all(|(x, y)| same(*x, *y)));
+            let mut old = row.clone();
+            for e in old.iter_mut() {
+                if e.1.abs() <= R::c(ALPHA_TOL) {
+                    e.1 = R::ZERO;
+                }
+            }
+            let has_edge = row.iter().any(|e| e.1.abs() == R::c(ALPHA_TOL));
+            assert_eq!(fused.edge, has_edge);
+            // Before the old pass the row differs from the raw one only by zeroed entries below the tolerance (the entries read by `framework_rhs`).
+            for (x, y) in row3.iter().zip(&row) {
+                if y.1.abs() < R::c(ALPHA_TOL) {
+                    assert!(same(x.1, R::ZERO) && format!("{:?}", x.1) == format!("{:?}", R::ZERO));
+                } else {
+                    assert!(same(x.1, y.1));
+                }
+            }
+            if fused.edge {
+                for e in row3.iter_mut() {
+                    if e.1.abs() <= R::c(ALPHA_TOL) {
+                        e.1 = R::ZERO;
+                    }
+                }
+            }
+            assert!(row3.iter().zip(&old).all(|(x, y)| x.0 == y.0 && same(x.1, y.1)), "fused zeroing differs from the pass");
             assert!(same(want.bound, got.bound) && same(want.bestc, got.bestc) && same(want.xm13, got.xm13) && same(want.xm9, got.xm9));
             assert_eq!(want.best_i, got.best_i);
             assert_eq!(c, c2);
