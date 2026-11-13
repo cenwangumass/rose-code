@@ -4072,6 +4072,8 @@ impl<R: Real> DualFactor<R> {
     #[inline(always)]
     fn rho_output_dense(m: usize, perm: &[usize], x: &[R], o: RhoOut<R>, ws: &mut BtranWork<R>) {
         let RhoOut { rows, vals, tol } = o;
+        // Exact zeros are skipped before the tolerance test, which equals the old rule only for `tol >= 0`.
+        debug_assert!(tol >= R::ZERO && m <= perm.len());
         rows.reserve(m);
         vals.reserve(m);
         let (rp, vp) = (rows.as_mut_ptr(), vals.as_mut_ptr());
