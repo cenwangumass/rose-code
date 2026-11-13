@@ -369,7 +369,8 @@ pub(super) fn bits_of<R: Real>(a: R) -> Vec<u8> {
     }
 }
 
-/// `x[idx[k]] -= val[k] * xv` for `k` in order, 4-way unrolled with the entries in textual order (an index may repeat).
+/// `x[idx[k]] -= val[k] * xv` for `k` in order, 4-way unrolled with the entries in textual order (an index may repeat). Lists of 1 to 3
+/// entries (the common case) are straight-line code with no loop; each entry is one multiply then one subtract, in list order.
 ///
 /// # Safety
 /// Every `idx` entry is below `x.len()`.
@@ -377,8 +378,33 @@ pub(super) fn bits_of<R: Real>(a: R) -> Vec<u8> {
 #[cfg_attr(any(test, debug_assertions, feature = "factor-shadow"), allow(dead_code))]
 pub(super) unsafe fn scatter_unrolled<R: Real>(idx: &[u32], val: &[R], x: &mut [R], xv: R) {
     let n = idx.len().min(val.len());
+    // SAFETY: `k < n <= idx.len(), val.len()` for every entry touched; destinations are in range (caller).
+    unsafe {
+        if n <= 3 {
+            if n >= 1 {
+                *x.get_unchecked_mut(*idx.get_unchecked(0) as usize) -= *val.get_unchecked(0) * xv;
+                if n >= 2 {
+                    *x.get_unchecked_mut(*idx.get_unchecked(1) as usize) -= *val.get_unchecked(1) * xv;
+                    if n >= 3 {
+                        *x.get_unchecked_mut(*idx.get_unchecked(2) as usize) -= *val.get_unchecked(2) * xv;
+                    }
+                }
+            }
+            return;
+        }
+        scatter_long(idx, val, x, xv, n);
+    }
+}
+
+/// The 4-way unrolled loop and its 0-3 entry remainder, for `n >= 4`.
+///
+/// # Safety
+/// As `scatter_unrolled`, `n <= idx.len(), val.len()`.
+#[inline(never)]
+#[cfg_attr(any(test, debug_assertions, feature = "factor-shadow"), allow(dead_code))]
+unsafe fn scatter_long<R: Real>(idx: &[u32], val: &[R], x: &mut [R], xv: R, n: usize) {
     let mut k = 0;
-    // SAFETY: `k + r < n <= idx.len(), val.len()`; destinations are in range (caller).
+    // SAFETY: `k + r < n`; destinations are in range (caller).
     unsafe {
         while k + 4 <= n {
             *x.get_unchecked_mut(*idx.get_unchecked(k) as usize) -= *val.get_unchecked(k) * xv;
