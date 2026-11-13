@@ -178,6 +178,7 @@ impl<R: Real> DualFactor<R> {
             }
             f.tp_a2 = tp_a2;
             f.tp_only_a = tp_only_a;
+            f.row_out = needed.iter().filter(|&&p| self.kind[p] >= 0).map(|&p| 2 * (self.urows.len(p) + 2)).sum();
         }
         needed
             .iter()

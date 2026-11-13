@@ -131,7 +131,7 @@ impl<R: Real> DualFactor<R> {
             || self.lev_dense_ft
             || (!self.etas.is_empty() && Self::count_dense(count_l, self.dthr, m));
         let u_cnt = if vec_dense { None } else { Some(spike.len()) };
-        let u_est = self.u_work(&inp, &x, !dense, u_cnt, &Surv { list: &col_surv, n: col_surv.len(), sa, sb, su });
+        let u_est = self.u_work(&inp, &x, !dense, u_cnt, &Surv { list: &col_surv, n: col_surv.len(), sa, sb, su }, None);
         #[cfg(test)]
         assert_eq!(u_est.to_bits(), self.u_work_ref(&inp, &x, !dense, u_cnt).to_bits(), "u_work");
         self.work = u_est + e_l;
@@ -261,7 +261,7 @@ impl<R: Real> DualFactor<R> {
             || self.lev_dense_ft
             || (!self.etas.is_empty() && Self::count_dense(count_l, self.dthr, m));
         let u_cnt = if vec_dense { None } else { Some(nz) };
-        let u_est = self.u_work(&inp, &x, false, u_cnt, &Surv { list: &col_surv, n: col_surv.len(), sa, sb, su });
+        let u_est = self.u_work(&inp, &x, false, u_cnt, &Surv { list: &col_surv, n: col_surv.len(), sa, sb, su }, None);
         #[cfg(test)]
         assert_eq!(u_est.to_bits(), self.u_work_ref(&inp, &x, false, u_cnt).to_bits(), "u_work");
         self.work = u_est + e_l;

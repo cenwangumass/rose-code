@@ -66,6 +66,12 @@ pub(crate) mod projection;
 pub mod shadow;
 
 /// The sums `ftran_needed` books while it finishes the tail columns (all integer-valued).
+///
+/// The loop only accumulates `s` and `n`; `finish` derives the booked sums. In the joint dense loops (`JD`) every booked column has a raw
+/// value above the tolerance (the raw test precedes the division) and, as `KT` is false there, a quotient above it, so each booked column
+/// is a survivor with `|fin| > tol`: `abs_a = s` (less the NaN quotients, which pass no tolerance test), `nz = n`, `tp_a2 = sum (2 na + 4) = 2 s + 4 n`. The snapshot entry of the pivot column
+/// at a tail slot is nonzero exactly for the columns of its `col_surv` (the survivors store a nonzero, everything else +0.0), hence
+/// `tp_only_a = s - sum of na over the col_surv columns that are survivors here` (done by the caller, `joint_only_a`).
 #[derive(Default)]
 struct TailCounts {
     /// Survivors (heap-walk booking).
@@ -76,18 +82,53 @@ struct TailCounts {
     tp_a2: usize,
     tp_only_a: usize,
     /// Columns with a nonzero final value (checked against the vector in debug builds).
-    #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
     surv_nz: usize,
+    /// Accumulators of the loop: the `na` sum and the number of the survivors above the tolerance, and the kept tiny quotients (`KT`).
+    s: usize,
+    n: usize,
+    n_tiny: usize,
+    nan_a: usize,
+    /// The previous booking, for the cross-check.
+    #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+    reference: Option<Box<TailCounts>>,
 }
 
 impl TailCounts {
-    /// One finished column with the nonzero final value `fin`, `na` entries in its A list and, for the joint loops, its snapshot entry.
+    /// One finished column with a quotient above the tolerance and `na` entries in its A list.
     #[inline(always)]
-    fn book<const JD: bool, const TD: bool, R: Real>(&mut self, na: usize, fin: R, raw: bool, col: Option<&R>) {
-        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
-        {
-            self.surv_nz += 1;
+    fn book<const TD: bool, R: Real>(&mut self, na: usize, fin: R) {
+        self.s += na;
+        self.n += 1;
+        if TD {
+            // A NaN quotient is above no tolerance (`fin.abs() > tol` is false): the dense booking leaves it out.
+            self.nan_a += if fin != fin { na } else { 0 };
         }
+    }
+
+    /// One kept tiny quotient (`KT`): a survivor of the dense slot loop, never scattered.
+    #[inline(always)]
+    fn book_tiny(&mut self) {
+        self.n_tiny += 1;
+    }
+
+    /// Derives the booked sums from the accumulators.
+    fn finish<const JD: bool, const TD: bool>(&mut self) {
+        self.surv_nz = self.n + self.n_tiny;
+        if TD {
+            self.abs_a = self.s - self.nan_a;
+        } else {
+            self.nz = self.n + self.n_tiny;
+        }
+        if JD {
+            self.tp_a2 = 2 * self.s + 4 * self.n;
+        }
+    }
+
+    /// The previous per-column booking (reference copy for the debug and shadow cross-check).
+    #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+    #[inline(always)]
+    fn book_ref<const JD: bool, const TD: bool, R: Real>(&mut self, na: usize, fin: R, raw: bool, col: Option<&R>) {
+        self.surv_nz += 1;
         if TD {
             if fin.abs() > R::c(TOL) {
                 self.abs_a += na;
@@ -975,6 +1016,15 @@ struct Surv<'a> {
     su: usize,
 }
 
+/// What the real heap loop of `ftran_with_sparse` leaves for `u_work` instead of a replay of the walk: the seed classification of the input
+/// (distinct tail and nucleus positions), the number of pops, and the top slot and heap size at the break to the sweep (if it broke).
+struct Walk {
+    tail_n: usize,
+    nuc_in: usize,
+    pops: usize,
+    brk: Option<(usize, usize)>,
+}
+
 /// The inputs of the joint U stages of the two-vector FTRAN: for the pivot column and for tau, the count of the L-stage list (`None`: dense, count -1)
 /// and the solved values (the tail entries are the values after the tail solve); for the column also the positions of the L-stage list.
 #[derive(Clone)]
@@ -1002,6 +1052,8 @@ struct F2<R> {
     /// the sum of `len(a)` over those whose column value is zero. Only kept when the joint routines run.
     tp_a2: usize,
     tp_only_a: usize,
+    /// `sum 2 (len(p) + 2)` over the nucleus positions `p` of the last `ftran_needed`'s `needed` list (the output stage of the joint routines).
+    row_out: usize,
     /// Retained buffer of the full U solves' output list (empty between calls; only its capacity travels).
     out_scr: Vec<(usize, R)>,
 }
@@ -1023,6 +1075,7 @@ impl<R> Default for F2<R> {
             col_sb: 0,
             tp_a2: 0,
             tp_only_a: 0,
+            row_out: 0,
             out_scr: Vec::new(),
         }
     }
@@ -2382,6 +2435,23 @@ impl<R: Real> DualFactor<R> {
                 (false, false, true, _) => pass!(false, false, true, tail.iter().copied()),
             }
         };
+        let mut counts = counts;
+        if joint_dense {
+            // `tp_only_a`: the survivors here whose snapshot entry is zero, i.e. all but the survivors that are also in the pivot column's
+            // `col_surv` (a nonzero `x_tau` at one of its columns marks a survivor here: a zero or tiny quotient is stored as +0.0).
+            let f2 = self.f2.borrow();
+            let both: usize = f2.col_surv.iter().filter(|&&c| x[c] != R::ZERO).map(|&c| self.ab.na(c)).sum();
+            counts.tp_only_a = counts.s - both;
+        }
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        {
+            let r = counts.reference.as_ref().unwrap();
+            assert_eq!(
+                (counts.nz, counts.abs_a, counts.tp_a2, counts.tp_only_a, counts.surv_nz),
+                (r.nz, r.abs_a, r.tp_a2, r.tp_only_a, r.surv_nz),
+                "ftran_needed: slim tail counts differ from the per-column booking"
+            );
+        }
         // Invariant (P4-2): every nonzero tail slot was reached through the a-lists and processed, so the nonzero tail values left are exactly the
         // survivors counted in the loop.
         #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
@@ -2410,15 +2480,21 @@ impl<R: Real> DualFactor<R> {
             f.tp_a2 = counts.tp_a2;
             f.tp_only_a = counts.tp_only_a;
         }
+        // The output stage of the joint routines books `2 (len + 2)` per nucleus position of `needed` (`joint_u` receives the same list).
+        let mut row_out = 0usize;
         let mut result = self.lists.take();
         result.extend(needed.iter().map(|&p| {
             let v = match self.kind[p] {
                 -2 => x[p],
                 -1 => x[p] / self.diag[p],
-                _ => self.nucleus_dot(p, &x) / self.diag[p],
+                _ => {
+                    row_out += 2 * (self.urows.len(p) + 2);
+                    self.nucleus_dot(p, &x) / self.diag[p]
+                }
             };
             (p, v)
         }));
+        self.f2.borrow_mut().row_out = row_out;
         self.lists.give(spike);
         result
     }
@@ -2447,6 +2523,10 @@ impl<R: Real> DualFactor<R> {
         tau_raw: &mut [bool],
     ) -> TailCounts {
         let mut t = TailCounts::default();
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        let mut r = TailCounts::default();
+        #[cfg(not(any(test, debug_assertions, feature = "factor-shadow")))]
+        let _ = x_col;
         let diag = &self.diag[..];
         let ab = &self.ab;
         let tol = R::c(TOL);
@@ -2470,15 +2550,24 @@ impl<R: Real> DualFactor<R> {
             if tiny {
                 // A kept tiny quotient is a survivor of the dense slot loop (never scattered); a dropped one books nothing.
                 if KT && fin != R::ZERO {
-                    t.book::<JD, TD, R>(ab.na(c), fin, raw, x_col.get(c));
+                    t.book_tiny();
+                    #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+                    r.book_ref::<JD, TD, R>(ab.na(c), fin, raw, x_col.get(c));
                 }
                 continue;
             }
             let (ai, av) = ab.a_pair(c);
-            t.book::<JD, TD, R>(ai.len(), fin, raw, x_col.get(c));
+            t.book::<TD, R>(ai.len(), fin);
+            #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+            r.book_ref::<JD, TD, R>(ai.len(), fin, raw, x_col.get(c));
             for (&j, &v) in ai.iter().zip(av) {
                 x[j as usize] -= v * xc;
             }
+        }
+        t.finish::<JD, TD>();
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        {
+            t.reference = Some(Box::new(r));
         }
         t
     }
@@ -2509,6 +2598,8 @@ impl<R: Real> DualFactor<R> {
         if ok(f.tau_n) {
             return None;
         }
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        assert_eq!(f.row_out as f64, self.row_out_work(out), "joint_u: row_out of another list than ftran_needed's");
         let v = if ok(f.col_n) {
             self.third_work(&f, out)
         } else {
@@ -2526,7 +2617,9 @@ impl<R: Real> DualFactor<R> {
         Some(v)
     }
 
-    /// Work of the output stage of both joint routines: `(row length + 2) 2` for each result position of the nucleus list.
+    /// Work of the output stage of both joint routines: `(row length + 2) 2` for each result position of the nucleus list. Reference copy of
+    /// `F2::row_out` (summed by `ftran_needed`; integers, so the order is free), checked in `joint_u`.
+    #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
     fn row_out_work(&self, out: &[usize]) -> f64 {
         let mut e = 0.0f64;
         for &p in out {
@@ -2593,26 +2686,28 @@ impl<R: Real> DualFactor<R> {
                 x0 += surv_b;
                 x0 += nuc_len as f64 * 2.4;
             } else {
-                let mut seen = vec![false; m];
+                let mut ws = self.btran_ws.work.borrow_mut();
+                let seen = &mut ws.mark;
+                seen.prepare(m);
                 for &p in &nuc_in {
-                    seen[p] = true;
+                    seen.insert(p);
                 }
                 let mut touched = nuc_cnt;
                 x0 += surv_b;
                 for &c in surv {
                     for &j in self.ab.b(c) {
-                        let j = j as usize;
-                        if !seen[j] {
-                            seen[j] = true;
+                        if seen.insert(j as usize) {
                             touched += 1;
                         }
                     }
                 }
+                // A new epoch leaves no live marker behind (the shadow checker requires the markers clean between calls).
+                seen.prepare(m);
                 x0 += 3.0 * touched as f64;
             }
             x1 = 2.0 * out.len() as f64 + x0;
         }
-        x5 + (x1 + self.row_out_work(out))
+        x5 + (x1 + f.row_out as f64)
     }
 
     /// The inline dense routine of `0x125f50` (`0x128742`, both vectors dense), from the same integer sums as `third_work`.
@@ -2637,7 +2732,7 @@ impl<R: Real> DualFactor<R> {
         x1 += last.max(0) as f64;
         x1 *= 5.0;
         x1 += x9;
-        x4 += self.row_out_work(out);
+        x4 += f.row_out as f64;
         x1 += x5;
         x1 += x4;
         x1 += out.len() as f64;
@@ -3069,7 +3164,7 @@ impl<R: Real> DualFactor<R> {
             || self.lev_dense_ft
             || (!self.etas.is_empty() && Self::count_dense(count_l, self.dthr, m));
         let u_cnt = if vec_dense { None } else { Some(spike.len()) };
-        let u_est = self.u_work(&inp, &x, !dense, u_cnt, &Surv { list: &col_surv, n: col_surv.len(), sa, sb, su });
+        let u_est = self.u_work(&inp, &x, !dense, u_cnt, &Surv { list: &col_surv, n: col_surv.len(), sa, sb, su }, None);
         #[cfg(test)]
         assert_eq!(u_est.to_bits(), self.u_work_ref(&inp, &x, !dense, u_cnt).to_bits(), "u_work");
         self.work = u_est + e_l;
@@ -3173,6 +3268,9 @@ impl<R: Real> DualFactor<R> {
         let (mut sa, mut sb, mut su) = (0usize, 0usize, 0usize);
         let sweep_all;
         let nuc_in;
+        let tail_n;
+        // Counters of the heap loop for `u_work`: pops, and the top slot and heap size at the break to the sweep.
+        let (mut pops, mut brk) = (0usize, None);
         {
             let FtranTouched::Sparse { words, occupied } = &mut touched else { unreachable!() };
             let (diag, uc, kind, slot, at, ab) = (&self.diag[..], &self.uc[..], &self.kind[..], &self.slot[..], &self.at[..], &self.ab);
@@ -3197,6 +3295,7 @@ impl<R: Real> DualFactor<R> {
                 }
             }
             nuc_in = nuc_n;
+            tail_n = tri.len();
             let d2 = self.dens;
             sweep_all = (m as f64) <= (n as f64) * d2 || d2 * ((nuc_n + tri.len()) as f64) > (i3 + (m - i21)) as f64;
             // One tail column: the quotient alone is tested (the sparse routine), a zero slot is stored as +0.0; `$mark` records a scatter target.
@@ -3254,6 +3353,7 @@ impl<R: Real> DualFactor<R> {
                 while let Some(&t) = heap.peek() {
                     if heap.len() > 1 && t - i21 < SWEEP_RATIO * heap.len() {
                         top = t + 1;
+                        brk = Some((t, heap.len()));
                         #[cfg(test)]
                         SPARSE_ROUTES.with(|r| {
                             let mut v = r.get();
@@ -3263,6 +3363,7 @@ impl<R: Real> DualFactor<R> {
                         break;
                     }
                     heap.pop();
+                    pops += 1;
                     solve_column!(at[t], |j| {
                         let word = &mut words[j / 64];
                         if *word == 0 {
@@ -3330,7 +3431,8 @@ impl<R: Real> DualFactor<R> {
             "the sparse U route has a sparse result"
         );
         let u_cnt = if vec_dense { None } else { Some(spike.len()) };
-        let u_est = self.u_work(&inp, &x, true, u_cnt, &Surv { list: &col_surv, n: col_surv.len(), sa, sb, su });
+        let walk = Walk { tail_n, nuc_in, pops, brk };
+        let u_est = self.u_work(&inp, &x, true, u_cnt, &Surv { list: &col_surv, n: col_surv.len(), sa, sb, su }, Some(&walk));
         #[cfg(test)]
         assert_eq!(u_est.to_bits(), self.u_work_ref(&inp, &x, true, u_cnt).to_bits(), "u_work");
         self.work = u_est + e_l;
@@ -3498,7 +3600,7 @@ impl<R: Real> DualFactor<R> {
             || self.lev_dense_ft
             || (!self.etas.is_empty() && Self::count_dense(count_l, self.dthr, m));
         let u_cnt = if vec_dense { None } else { Some(nz) };
-        let u_est = self.u_work(&inp, &x, false, u_cnt, &Surv { list: &col_surv, n: col_surv.len(), sa, sb, su });
+        let u_est = self.u_work(&inp, &x, false, u_cnt, &Surv { list: &col_surv, n: col_surv.len(), sa, sb, su }, None);
         #[cfg(test)]
         assert_eq!(u_est.to_bits(), self.u_work_ref(&inp, &x, false, u_cnt).to_bits(), "u_work");
         self.work = u_est + e_l;
@@ -4101,7 +4203,7 @@ impl<R: Real> DualFactor<R> {
                 x[j] -= v * xc;
             }
         }
-        let result = self.u_work(&[], x, false, None, &Surv { list: &[], n: n_surv, sa: 0, sb: 0, su }) + e;
+        let result = self.u_work(&[], x, false, None, &Surv { list: &[], n: n_surv, sa: 0, sb: 0, su }, None) + e;
         #[cfg(test)]
         assert_eq!(result.to_bits(), (self.u_work_ref(&[], x, false, None) + e).to_bits(), "dense u_work");
         x.fill(R::ZERO);
@@ -4111,7 +4213,17 @@ impl<R: Real> DualFactor<R> {
     /// `u_work_ref` from the sums of the U loop: `s` describes the tail columns that kept a nonzero value (count, their `a`, `b` and
     /// `uc` lengths, and for the sparse solve the columns in the solve's descending slot order). Every summed term is an integer, so
     /// the sums equal the reference's scans bit for bit; the heap walk still decides the walk's own terms from the solved values.
-    fn u_work(&self, inp: &[usize], x: &[R], sparse: bool, cnt: Option<usize>, s: &Surv<'_>) -> f64 {
+    fn u_work(&self, inp: &[usize], x: &[R], sparse: bool, cnt: Option<usize>, s: &Surv<'_>, walk: Option<&Walk>) -> f64 {
+        let v = self.u_work_from(inp, x, sparse, cnt, s, walk);
+        // The replay of the walk stays as the cross-check of the counters of the real heap loop.
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        if walk.is_some() {
+            assert_eq!(v.to_bits(), self.u_work_from(inp, x, sparse, cnt, s, None).to_bits(), "u_work: counters of the heap loop differ from the replay");
+        }
+        v
+    }
+
+    fn u_work_from(&self, inp: &[usize], x: &[R], sparse: bool, cnt: Option<usize>, s: &Surv<'_>, walk: Option<&Walk>) -> f64 {
         let m = self.m;
         let i21 = self.i21;
         let i3 = self.nuc.len();
@@ -4130,43 +4242,63 @@ impl<R: Real> DualFactor<R> {
             let e = (m - i21) as f64 * 3.0 + 0.0 + (2 * s.su) as f64;
             return i3 as f64 + i3 as f64 + e;
         }
-        let mut scratch = self.btran_ws.work.borrow_mut();
-        let btran_ws::Work { mark, nm, tail, heap, .. } = &mut *scratch;
-        tail.clear();
-        tail.extend(inp.iter().copied().filter(|&p| self.kind[p] == -2));
-        let nuc_in = inp.iter().filter(|&&p| self.kind[p] >= 0).count();
-        if d2 * ((nuc_in + tail.len()) as f64) > (i3 + (m - i21)) as f64 {
-            let e = (2 * (nuc_in + tail.len())) as f64;
-            let e = (m - i21) as f64 * 3.0 + e + (2 * s.su) as f64;
-            tail.clear();
-            return i3 as f64 + i3 as f64 + e;
-        }
-        let mut e = (tail.len() * 2) as f64;
-        mark.prepare(m);
-        heap.clear();
-        for &p in tail.iter() {
-            mark.insert(p);
-            heap.push(self.slot[p]);
-        }
-        while let Some(&top) = heap.peek() {
-            let size = heap.len();
-            if size > 1 && ((top - i21) as f64) < 6.0 * size as f64 {
-                // Remaining slots are close together: the reference scans the range from the top slot down.
-                e = (top - i21) as f64 * 5.0 + size as f64 + size as f64 + e;
-                break;
-            }
-            heap.pop();
-            let c = self.at[top];
-            if x[c] != R::ZERO {
-                for &j in self.ab.a(c) {
-                    let j = j as usize;
-                    if mark.insert(j) {
-                        heap.push(self.slot[j]);
-                    }
+        let (mut e, nuc_in) = match walk {
+            Some(w) => {
+                // The counters of the real heap loop: `2` per seed, `8` per pop, and `5 (top - i21) + 2 size` at the break to the sweep.
+                if d2 * ((w.nuc_in + w.tail_n) as f64) > (i3 + (m - i21)) as f64 {
+                    let e = (2 * (w.nuc_in + w.tail_n)) as f64;
+                    let e = (m - i21) as f64 * 3.0 + e + (2 * s.su) as f64;
+                    return i3 as f64 + i3 as f64 + e;
                 }
+                let mut e = (2 * w.tail_n + 8 * w.pops) as f64;
+                if let Some((top, size)) = w.brk {
+                    e = (top - i21) as f64 * 5.0 + size as f64 + size as f64 + e;
+                }
+                (e, w.nuc_in)
             }
-            e += 8.0;
-        }
+            None => {
+                let mut scratch = self.btran_ws.work.borrow_mut();
+                let btran_ws::Work { mark, tail, heap, .. } = &mut *scratch;
+                tail.clear();
+                tail.extend(inp.iter().copied().filter(|&p| self.kind[p] == -2));
+                let nuc_in = inp.iter().filter(|&&p| self.kind[p] >= 0).count();
+                if d2 * ((nuc_in + tail.len()) as f64) > (i3 + (m - i21)) as f64 {
+                    let e = (2 * (nuc_in + tail.len())) as f64;
+                    let e = (m - i21) as f64 * 3.0 + e + (2 * s.su) as f64;
+                    tail.clear();
+                    return i3 as f64 + i3 as f64 + e;
+                }
+                let mut e = (tail.len() * 2) as f64;
+                mark.prepare(m);
+                heap.clear();
+                for &p in tail.iter() {
+                    mark.insert(p);
+                    heap.push(self.slot[p]);
+                }
+                while let Some(&top) = heap.peek() {
+                    let size = heap.len();
+                    if size > 1 && ((top - i21) as f64) < 6.0 * size as f64 {
+                        // Remaining slots are close together: the reference scans the range from the top slot down.
+                        e = (top - i21) as f64 * 5.0 + size as f64 + size as f64 + e;
+                        break;
+                    }
+                    heap.pop();
+                    let c = self.at[top];
+                    if x[c] != R::ZERO {
+                        for &j in self.ab.a(c) {
+                            let j = j as usize;
+                            if mark.insert(j) {
+                                heap.push(self.slot[j]);
+                            }
+                        }
+                    }
+                    e += 8.0;
+                }
+                (e, nuc_in)
+            }
+        };
+        let mut scratch = self.btran_ws.work.borrow_mut();
+        let btran_ws::Work { nm, .. } = &mut *scratch;
         let (lb, ld) = (nuc_in + s.sb, nuc_in + s.sa);
         e = ld as f64 * 3.0 + e;
         let result = if lb as f64 * 2.5 <= i3 as f64 {
