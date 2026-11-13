@@ -67,6 +67,31 @@ impl<R: Real> AbLists<R> {
         &self.idx[s.start as usize..(s.start + s.na) as usize]
     }
 
+    /// Start and length of the A list of column `c` (the header a tail stream record carries).
+    #[inline(always)]
+    pub fn a_span(&self, c: usize) -> (u32, u32) {
+        let s = &self.span[c];
+        (s.start, s.na)
+    }
+
+    /// `x[j] -= v * xv` over the A list at `(start, len)` (an `a_span` header), as `scatter_a` does for its column.
+    #[inline(always)]
+    pub fn scatter_span(&self, start: u32, len: u32, x: &mut [R], xv: R) {
+        let (lo, hi) = (start as usize, start as usize + len as usize);
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        {
+            for (&j, &v) in self.idx[lo..hi].iter().zip(&self.val[lo..hi]) {
+                x[j as usize] -= v * xv;
+            }
+        }
+        #[cfg(not(any(test, debug_assertions, feature = "factor-shadow")))]
+        {
+            // SAFETY: the span invariant of `a_pair` (the header was read from a span that lies inside both arrays and the
+            // update keeps the stream current), and the caller's: every A entry is below `x.len()`.
+            unsafe { scatter_unrolled(self.idx.get_unchecked(lo..hi), self.val.get_unchecked(lo..hi), x, xv) }
+        }
+    }
+
     /// The A list and its coefficients, from one lookup of the column's span.
     #[inline(always)]
     pub fn a_pair(&self, c: usize) -> (&[u32], &[R]) {

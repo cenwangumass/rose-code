@@ -68,6 +68,7 @@ fn run<R: Real>(seeds: &[u64], vals_pool: &[f64]) -> usize {
                 assert_eq!(all_bits(&a.f2.get_mut().x_tau), all_bits(&b.f2.get_mut().x_tau), "x_tau");
                 assert_eq!(a.joint_u(&needed).map(f64::to_bits), b.joint_u(&needed).map(f64::to_bits), "joint_u");
                 checks += 1;
+                tail_pair(&a, &mut next);
                 if step % 3 == 2 {
                     let r = next() % m;
                     let mut rows = vec![r];
@@ -90,6 +91,37 @@ fn run<R: Real>(seeds: &[u64], vals_pool: &[f64]) -> usize {
         }
     }
     checks
+}
+
+/// The stream loop against the `at`/`diag`/`ab` loop it replaces (`needed_tail::<true, false, TD>` over the descending tail slots):
+/// the vector bits, the raw flags and every booked count, on vectors with zeros of both signs, tiny and NaN values.
+fn tail_pair<R: Real>(f: &DualFactor<R>, next: &mut impl FnMut() -> usize) {
+    let m = f.m;
+    let pool = [0.0, -0.0, 0.5, -1.5, 1e-15, -1e-14, 3.0, TOL, -TOL, 2e-14, 7.0, f64::NAN];
+    for round in 0..4 {
+        let x0: Vec<R> = (0..m)
+            .map(|_| match next() % (2 + round * 2) {
+                0 | 1 => R::ZERO,
+                _ => R::c(pool[next() % pool.len()]),
+            })
+            .collect();
+        let x_col: Vec<R> = (0..m).map(|_| R::c(pool[next() % 4])).collect();
+        macro_rules! both {
+            ($td:literal) => {{
+                let (mut xa, mut xb) = (x0.clone(), x0.clone());
+                let (mut ra, mut rb) = (vec![false; m], vec![false; m]);
+                let order = f.at[f.i21..m].iter().rev().copied();
+                let a = f.needed_tail::<true, false, $td>(&mut xa, order, &x_col, &mut ra);
+                let b = f.needed_tail_stream::<$td>(&mut xb, &x_col, &mut rb);
+                assert_eq!(all_bits(&xa), all_bits(&xb), "stream tail x");
+                assert_eq!(ra, rb, "stream tail raw flags");
+                let key = |t: &TailCounts| (t.nz, t.abs_a, t.tp_a2, t.tp_only_a, t.surv_nz, t.s, t.n, t.n_tiny, t.nan_a);
+                assert_eq!(key(&a), key(&b), "stream tail counts");
+            }};
+        }
+        both!(false);
+        both!(true);
+    }
 }
 
 const SMOOTH: &[f64] = &[0.5, -0.75, 1.25, -0.0, 1e-15];

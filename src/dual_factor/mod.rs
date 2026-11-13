@@ -952,6 +952,10 @@ pub struct DualFactor<R: Real = f64> {
     mark: usize,
     /// The A and B lists of the tail columns with their coefficients (the bits of the matching `uc` entries).
     ab: AbLists<R>,
+    /// The tail slots in slot order, one record for each slot of `0..m` (`at[s]`, its A header in `ab`, its diagonal); only the records
+    /// of the tail slots `i21..m` are meaningful. Kept equal to a rebuild from `at`, `ab` and `diag` by `update` (`sync_slot`), and read
+    /// by the joint dense tail loop of `ftran_needed` in descending slot order.
+    stream: Vec<TailRec<R>>,
     /// Immutable forward L columns, preserving coefficient and destination order.
     lpool: LPool<R>,
     /// Every L destination is above its source step (`y > v`), so a dense forward scan sees final values.
@@ -1072,6 +1076,15 @@ pub struct DualFactor<R: Real = f64> {
     bt_dense: bool,
     /// The factor object's update limit when the pricing lowered it (`F+0x188`, the dual path); the default is `max(20, m^0.7)`.
     upd_limit: Option<usize>,
+}
+
+/// One slot of the tail stream: the column in the slot, where its A list lives in the `ab` pool, and its diagonal.
+#[derive(Clone, Copy)]
+struct TailRec<R> {
+    col: u32,
+    a_start: u32,
+    a_len: u32,
+    diag: R,
 }
 
 /// Sums over the tail columns that kept a nonzero value in a U solve (see `u_work`).
@@ -1408,6 +1421,7 @@ fn mirror_wanted() -> bool {
 /// (`DualFactor::recycle`): the refactorization then neither frees the old rows nor allocates the new ones.
 struct Recycled<R> {
     ab: AbLists<R>,
+    stream: Vec<TailRec<R>>,
     uc: Vec<Vec<(usize, R)>>,
     urows: URows<R>,
     /// Scratch that carries only capacities: the level workspace (reset), the result lists and the L-stage buffers.
@@ -1429,6 +1443,7 @@ impl<R: Real> Recycled<R> {
         let mut r = kept.map_or_else(
             || Self {
                 ab: AbLists::new(),
+                stream: Vec::new(),
                 uc: Vec::new(),
                 urows: URows::new(),
                 level: None,
@@ -1458,7 +1473,7 @@ impl<R: Real> DualFactor<R> {
     /// Retire the factor: its lists (`ab`, `uc`, `urows`) are kept, allocations included, for the next `fresh` of this
     /// scalar type on this thread (the rest is dropped). Only capacities carry over; `fresh` clears every row.
     pub fn recycle(self) {
-        let Self { ab, uc, urows, level_cache, lists, lscr, bt_work, .. } = self;
+        let Self { ab, stream, uc, urows, level_cache, lists, lscr, bt_work, .. } = self;
         let mut bt_buckets = bt_work.map(|w| w.buckets).unwrap_or_default();
         bt_buckets.iter_mut().for_each(Vec::clear);
         let mut level = level_cache.0.into_inner();
@@ -1466,7 +1481,7 @@ impl<R: Real> DualFactor<R> {
             l.reset();
         }
         let lscr = lscr.into_inner();
-        RECYCLED.with(|r| r.set(Some(Box::new(Recycled { ab, uc, urows, level, lists, lscr, bt_buckets }))));
+        RECYCLED.with(|r| r.set(Some(Box::new(Recycled { ab, stream, uc, urows, level, lists, lscr, bt_buckets }))));
     }
 
     /// Fresh factor from the pivot sequence; `cols[pos]` is the basis column at incoming position `pos` as `(is_slack, rows, values)`.
@@ -1527,7 +1542,7 @@ impl<R: Real> DualFactor<R> {
                 }
             }
         }
-        let Recycled { mut ab, mut uc, mut urows, level, lists, lscr, bt_buckets } = Recycled::<R>::take(m, mirror);
+        let Recycled { mut ab, mut stream, mut uc, mut urows, level, lists, lscr, bt_buckets } = Recycled::<R>::take(m, mirror);
         let (mut sa, mut sb) = (0usize, 0usize);
         let mut xv = vec![R::ZERO; m];
         let mut ents: Vec<(usize, R)> = Vec::new();
@@ -1722,6 +1737,12 @@ impl<R: Real> DualFactor<R> {
             }
         }
         FRESH_SCRATCH.with(|s| s.set(sc));
+        // `at` is the identity of a fresh factor.
+        stream.clear();
+        stream.extend((0..m).map(|c| {
+            let (a_start, a_len) = ab.a_span(c);
+            TailRec { col: c as u32, a_start, a_len, diag: st.diag[c] }
+        }));
         let nt = m - i21;
         let nn = nuc.len();
         let h33 = if nt > 0 {
@@ -1938,6 +1959,7 @@ impl<R: Real> DualFactor<R> {
             i21,
             mark: mark0,
             ab,
+            stream,
             lpool,
             l_forward,
             perm,
@@ -1975,6 +1997,8 @@ impl<R: Real> DualFactor<R> {
         // Every factor any test builds is also compared with the construction it replaced.
         #[cfg(test)]
         fresh_tests::assert_same(&fresh, &Self::fresh_old(m, ncols, st, cols));
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        fresh.check_stream();
         #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
         if fresh.mirror {
             fresh.ab.check(&fresh.uc, &fresh.kind);
@@ -2581,8 +2605,8 @@ impl<R: Real> DualFactor<R> {
                 };
             }
             match (joint_dense, keep_tiny, tdense, dense_order) {
-                (true, _, false, _) => pass!(true, false, false, dense_slots()),
-                (true, _, true, _) => pass!(true, false, true, dense_slots()),
+                (true, _, false, _) => self.needed_tail_stream::<false>(&mut x, x_col, &mut tau_raw),
+                (true, _, true, _) => self.needed_tail_stream::<true>(&mut x, x_col, &mut tau_raw),
                 (false, true, false, true) => pass!(false, true, false, dense_slots()),
                 (false, true, true, true) => pass!(false, true, true, dense_slots()),
                 (false, true, false, false) => pass!(false, true, false, tail.iter().copied()),
@@ -2660,6 +2684,30 @@ impl<R: Real> DualFactor<R> {
         self.lists.give(list);
     }
 
+    /// Rewrites the stream record of slot `s` from `at`, `ab` and `diag`.
+    #[inline(always)]
+    fn sync_slot(&mut self, s: usize) {
+        let c = self.at[s];
+        let (a_start, a_len) = self.ab.a_span(c);
+        self.stream[s] = TailRec { col: c as u32, a_start, a_len, diag: self.diag[c] };
+    }
+
+    /// The stream equals a rebuild from `at`, `ab` and `diag` on every tail slot (and the slot map is the inverse of `at`).
+    #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+    fn check_stream(&self) {
+        assert_eq!(self.stream.len(), self.m, "tail stream length");
+        for s in self.i21..self.m {
+            let c = self.at[s];
+            let (a_start, a_len) = self.ab.a_span(c);
+            let r = &self.stream[s];
+            assert!(
+                r.col as usize == c && r.a_start == a_start && r.a_len == a_len && ab::same_bits(r.diag, self.diag[c]),
+                "tail stream record of slot {s} differs from a rebuild"
+            );
+            assert_eq!(self.slot[c], s, "slot map of tail slot {s}");
+        }
+    }
+
     /// Number of tail slots whose position holds a nonzero value in the dense vector `x` (the tail positions are `at[i21..m]`).
     fn tail_nonzero(&self, x: &[R]) -> usize {
         debug_assert!((self.i21..self.m).all(|s| self.kind[self.at[s]] == -2));
@@ -2721,6 +2769,56 @@ impl<R: Real> DualFactor<R> {
             ab.scatter_a(c, x, xc);
         }
         t.finish::<JD, TD>();
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        {
+            t.reference = Some(Box::new(r));
+        }
+        t
+    }
+
+    /// `needed_tail::<true, false, TD>` over all the tail slots (descending), reading the slot records of `stream` instead of `at`, `diag`
+    /// and the span of `ab`: the same divide, tests, store, scatter (the entries of each A list in list order) and booking for each slot.
+    #[inline(always)]
+    fn needed_tail_stream<const TD: bool>(&self, x: &mut [R], x_col: &[R], tau_raw: &mut [bool]) -> TailCounts {
+        let mut t = TailCounts::default();
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        let mut r = TailCounts::default();
+        #[cfg(not(any(test, debug_assertions, feature = "factor-shadow")))]
+        let _ = x_col;
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        self.check_stream();
+        let ab = &self.ab;
+        let tol = R::c(TOL);
+        // The A lists hold tail positions, all below `m`: `scatter_span` indexes `x` unchecked in release builds.
+        assert!(x.len() >= self.m);
+        for rec in self.stream[self.i21..self.m].iter().rev() {
+            let c = rec.col as usize;
+            let xr = x[c];
+            let raw = xr.abs() > tol;
+            #[cfg(any(test, feature = "factor-shadow"))]
+            {
+                tau_raw[c] = raw;
+            }
+            #[cfg(not(any(test, feature = "factor-shadow")))]
+            let _ = &tau_raw;
+            if !raw {
+                x[c] = R::ZERO;
+                continue;
+            }
+            let xc = xr / rec.diag;
+            let tiny = xc.abs() <= tol;
+            let fin = if tiny { R::ZERO } else { xc };
+            x[c] = fin;
+            if tiny {
+                continue;
+            }
+            let na = rec.a_len as usize;
+            t.book::<TD, R>(na, fin);
+            #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+            r.book_ref::<true, TD, R>(ab.na(c), fin, raw, x_col.get(c));
+            ab.scatter_span(rec.a_start, rec.a_len, x, xc);
+        }
+        t.finish::<true, TD>();
         #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
         {
             t.reference = Some(Box::new(r));
@@ -5109,6 +5207,9 @@ impl<R: Real> DualFactor<R> {
                 }
                 self.at[cur] = occ;
                 self.slot[occ] = cur;
+                for t in hole..=cur {
+                    self.sync_slot(t);
+                }
                 break;
             }
             jumps += 2.0 * plen as f64 + 5.0;
@@ -5125,6 +5226,8 @@ impl<R: Real> DualFactor<R> {
             self.at[cur] = occ;
             self.slot[pos] = hole;
             self.slot[occ] = cur;
+            self.sync_slot(hole);
+            self.sync_slot(cur);
             cur = nxt;
         }
         if jumps > 0.0 {
@@ -5392,6 +5495,7 @@ impl<R: Real> DualFactor<R> {
                     if let Some(p) = pa {
                         // The last entry of A fills the hole, and the demoted column takes the slot A gives up (the front of B).
                         self.ab.demote(k, p);
+                        self.sync_slot(self.slot[k]);
                         if p > 0 {
                             self.upd_work.push((0xf3eac, p as f64, crate::work::CTX));
                         }
@@ -5544,6 +5648,7 @@ impl<R: Real> DualFactor<R> {
             self.at[oldslot] = x;
             self.slot[r] = cs;
             self.at[cs] = r;
+            self.sync_slot(cs);
             if top > cs as i64 {
                 self.walk(r, cs, top as usize, &refcols[..]);
             }
@@ -5557,6 +5662,7 @@ impl<R: Real> DualFactor<R> {
             }
             self.slot[r] = bt;
             self.at[bt] = r;
+            self.sync_slot(bt);
             if !bare {
                 self.i21 = bt;
             }
@@ -5639,6 +5745,8 @@ impl<R: Real> DualFactor<R> {
                         self.mark = self.mark.max(old_ref_slot);
                     }
                 }
+                // `k`'s A header changed (and `k` sits in its final slot: the walk is over).
+                self.sync_slot(self.slot[k]);
             }
         }
         if !keep {
@@ -5745,6 +5853,7 @@ impl<R: Real> DualFactor<R> {
         }
         bv.reverse();
         self.ab.set(r, &av, &bv);
+        self.sync_slot(self.slot[r]);
         // The new column joins the end of each of its rows, with the coefficient bits of its A and B entries.
         for (&y, &v) in self.ab.both(r).iter().zip(self.ab.both_val(r)) {
             self.urows.push(y as usize, r, v);
@@ -5757,6 +5866,8 @@ impl<R: Real> DualFactor<R> {
             self.empty_tail.remove(&r);
         }
         self.spike_used = true;
+        #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
+        self.check_stream();
         #[cfg(any(test, debug_assertions, feature = "factor-shadow"))]
         if self.mirror {
             self.ab.check(&self.uc, &self.kind);

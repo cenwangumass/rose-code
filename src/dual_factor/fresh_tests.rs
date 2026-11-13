@@ -251,6 +251,7 @@ impl<R: Real> DualFactor<R> {
             }
         }
         DualFactor {
+            stream: Vec::new(),
             upd: 0,
             sum_alpha: 0.0,
             before_last: (0, 0.0),
