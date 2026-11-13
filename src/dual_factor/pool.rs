@@ -181,6 +181,16 @@ impl<R: Copy> Csr<R> {
         (&self.idx[s..e], &self.val[s..e])
     }
 
+    /// `col(v)` without the range checks.
+    ///
+    /// # Safety
+    /// `v < lines()` and the pool is well formed: `start` monotone and ending at `idx.len() == val.len()` (see `check_vector`).
+    #[inline(always)]
+    pub(super) unsafe fn col_unchecked(&self, v: usize) -> (&[u32], &[R]) {
+        let (s, e) = (*self.start.get_unchecked(v) as usize, *self.start.get_unchecked(v + 1) as usize);
+        (self.idx.get_unchecked(s..e), self.val.get_unchecked(s..e))
+    }
+
     #[inline(always)]
     pub fn col_len(&self, v: usize) -> usize {
         (self.start[v + 1] - self.start[v]) as usize

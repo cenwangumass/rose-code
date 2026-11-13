@@ -36,6 +36,8 @@ mod btran_tests;
 #[cfg(test)]
 mod handoff_tests;
 #[cfg(test)]
+mod lstage_tests;
+#[cfg(test)]
 mod needed_old;
 #[cfg(test)]
 mod needed_tests;
@@ -439,6 +441,7 @@ impl<R: Real> LevelWorkspace<R> {
         }
     }
 
+    #[inline(never)]
     fn solve(
         &mut self,
         f: &DualFactor<R>,
@@ -461,28 +464,45 @@ impl<R: Real> LevelWorkspace<R> {
             high = high.max(levels[i]);
         }
         let mut at_tolerance = false;
+        // O(1) proof for the unchecked accesses below: `values` and `state` have one slot per row (`prepare`), every queued row is a
+        // checked seed index or an L destination `< idx_bound <= values.len()`, and `levels` has one entry per row.
+        f.lpool.check_vector(self.values.len());
+        assert!(self.state.len() == self.values.len() && levels.len() >= self.values.len());
+        assert!(f.lpool.lines() >= self.values.len());
+        let Self { values, state, touched, buckets, order, .. } = &mut *self;
         while low <= high {
             let mut j = 0;
-            while j < self.buckets[low].len() {
-                let row = self.buckets[low][j];
+            while j < buckets[low].len() {
+                let row = buckets[low][j];
                 j += 1;
-                let x = self.values[row];
+                // SAFETY: queued rows are `< values.len()`.
+                let x = unsafe { *values.get_unchecked(row) };
                 if x.abs() >= R::c(TOL) {
-                    self.order.push(row);
-                    self.state[row] = 2;
+                    order.push(row);
+                    unsafe { *state.get_unchecked_mut(row) = 2 };
                     at_tolerance |= x.abs() == R::c(TOL);
-                    let (dest, mult) = f.lcolumn(row);
+                    // SAFETY: `row < values.len() <= lines()` and the pool is well formed (`check_vector`).
+                    let (dest, mult) = unsafe { f.lpool.col_unchecked(row) };
                     for (&to, &a) in dest.iter().zip(mult) {
                         let to = to as usize;
-                        self.queue(to, levels[to]);
-                        high = high.max(levels[to]);
-                        self.values[to] -= a * x;
+                        // SAFETY: `to < idx_bound <= values.len() == state.len() <= levels.len()`.
+                        unsafe {
+                            let level = *levels.get_unchecked(to);
+                            let st = state.get_unchecked_mut(to);
+                            if *st == 0 {
+                                *st = 1;
+                                touched.push(to);
+                                buckets[level].push(to);
+                            }
+                            high = high.max(level);
+                            *values.get_unchecked_mut(to) -= a * x;
+                        }
                     }
                 } else {
-                    self.values[row] = R::ZERO;
+                    unsafe { *values.get_unchecked_mut(row) = R::ZERO };
                 }
             }
-            self.buckets[low].clear();
+            buckets[low].clear();
             low += 1;
         }
         let count = self.order.len();
@@ -509,10 +529,7 @@ impl<R: Real> LevelWorkspace<R> {
                     self.pending[word] &= self.pending[word] - 1;
                     let e = word * 64 + bit;
                     let eta = &f.etas[e];
-                    self.gather.clear();
-                    self.gather
-                        .extend(eta.ind.iter().map(|&row| self.values[row]));
-                    let v = dot(&self.gather, &eta.val, eta.peel);
+                    let v = dot_gather(&self.values, &eta.ind, &eta.val, eta.peel, &mut self.gather);
                     let row = eta.idx;
                     if v.abs() <= R::c(TOL) {
                         self.values[row] = R::ZERO;
@@ -1210,6 +1227,64 @@ fn dot_diag<R: Real>(x: &[R], c: &[R], peel: usize) -> R {
     if even < n {
         // The odd last term is added after the two accumulators (seed 2147: 5 terms).
         tot += x[even] * c[even];
+    }
+    tot
+}
+
+/// `x[perm[r]] += v` for the entries `(r, v)` in order (a separate function: the loop keeps its pointers in registers).
+#[inline(never)]
+fn scatter_perm<R: Real>(x: &mut [R], perm: &[usize], rows: &[usize], vals: &[R]) {
+    for (&r, &v) in rows.iter().zip(vals) {
+        x[perm[r]] += v;
+    }
+}
+
+/// `scatter_perm` that also appends each target position to `start`.
+#[inline(never)]
+fn scatter_perm_list<R: Real>(x: &mut [R], perm: &[usize], rows: &[usize], vals: &[R], start: &mut Vec<usize>) {
+    for (&r, &v) in rows.iter().zip(vals) {
+        let s = perm[r];
+        x[s] += v;
+        start.push(s);
+    }
+}
+
+/// `buf = [x[j] for j in ind]` (the eta input gather) without the per-element length bookkeeping of `extend`.
+#[inline(always)]
+fn gather_into<R: Real>(x: &[R], ind: &[usize], buf: &mut Vec<R>) {
+    buf.clear();
+    buf.reserve(ind.len());
+    let dst = buf.as_mut_ptr();
+    for (k, &j) in ind.iter().enumerate() {
+        // SAFETY: `k < ind.len() <= capacity`; a panic in `x[j]` leaves the length at 0.
+        unsafe { dst.add(k).write(x[j]) };
+    }
+    // SAFETY: the first `ind.len()` slots are initialized and `R` is Copy.
+    unsafe { buf.set_len(ind.len()) };
+}
+
+/// `dot(&gathered, c, peel)` for `gathered[i] = x[ind[i]]`. Eta inputs of fewer than `peel + 8` terms (the sequential case) are
+/// gathered into `buf` and go through `dot` itself; longer ones are summed in place, in the same lanes and the same order.
+fn dot_gather<R: Real>(x: &[R], ind: &[usize], c: &[R], peel: usize, buf: &mut Vec<R>) -> R {
+    let n = c.len();
+    if !R::LANES || n < peel + 8 || ind.len() < n {
+        gather_into(x, ind, buf);
+        return dot(buf, c, peel);
+    }
+    // O(1) proof for the unchecked loads: `i < n = c.len() <= ind.len()`; the load from `x` stays checked.
+    let t = |i: usize| unsafe { x[*ind.get_unchecked(i)] * *c.get_unchecked(i) };
+    let n8 = n - ((n - peel) & 7);
+    let mut lanes = [R::ZERO; 8];
+    for i in 0..peel {
+        lanes[0] += t(i);
+    }
+    for i in peel..n8 {
+        lanes[(i - peel) & 7] += t(i);
+    }
+    let mut tot = ((lanes[0] + lanes[2]) + (lanes[4] + lanes[6]))
+        + ((lanes[1] + lanes[3]) + (lanes[5] + lanes[7]));
+    for i in n8..n {
+        tot += t(i);
     }
     tot
 }
@@ -2036,12 +2111,10 @@ impl<R: Real> DualFactor<R> {
         } else {
             Vec::with_capacity(rows.len())
         };
-        for (&r, &v) in rows.iter().zip(vals) {
-            let s = self.perm[r];
-            x[s] += v;
-            if !dense_l {
-                start.push(s);
-            }
+        if dense_l {
+            scatter_perm(&mut x, &self.perm, rows, vals);
+        } else {
+            scatter_perm_list(&mut x, &self.perm, rows, vals, &mut start);
         }
         // `count_l` is `None` where no reader can see it: the readers (here and in `ftran_needed` / `ftran_with`) test it only with
         // etas present and after `rows_dense`, `lev_dense_ft` (and, in `ftran_needed`, `force_dense`) have been ruled out.
@@ -2260,9 +2333,7 @@ impl<R: Real> DualFactor<R> {
                 let mut ee = (netas - first) as f64 * 3.0;
                 for eta in &self.etas[first..] {
                     ee = eta.ind.len() as f64 * 2.0 + ee;
-                    eta_x.clear();
-                    eta_x.extend(eta.ind.iter().map(|&j| xe[j]));
-                    let mut sv = dot(&eta_x, &eta.val, eta.peel);
+                    let mut sv = dot_gather(&xe, &eta.ind, &eta.val, eta.peel, &mut eta_x);
                     if sv.abs() <= R::c(TOL) {
                         sv = R::ZERO;
                     } else if !inlist[eta.idx] {
@@ -2275,9 +2346,7 @@ impl<R: Real> DualFactor<R> {
             }
         }
         for eta in &self.etas {
-            eta_x.clear();
-            eta_x.extend(eta.ind.iter().map(|&j| x[j]));
-            let mut s = dot(&eta_x, &eta.val, eta.peel);
+            let mut s = dot_gather(&x, &eta.ind, &eta.val, eta.peel, &mut eta_x);
             if s.abs() <= R::c(TOL) {
                 s = R::ZERO;
             }
