@@ -2,6 +2,47 @@
 
 use crate::model::{LpModel, Sense, INF};
 use std::collections::HashMap;
+use std::hash::{BuildHasherDefault, Hasher};
+
+/// Deterministic multiplicative hasher (FxHash style) for the name maps below. They are only looked up and
+/// inserted into, never iterated, so the hash function cannot reach any output.
+#[derive(Default)]
+struct NameHasher(u64);
+
+const HASH_K: u64 = 0x517c_c1b7_2722_0a95;
+
+impl NameHasher {
+    #[inline]
+    fn add(&mut self, w: u64) {
+        self.0 = (self.0.rotate_left(5) ^ w).wrapping_mul(HASH_K);
+    }
+}
+
+impl Hasher for NameHasher {
+    #[inline]
+    fn write(&mut self, bytes: &[u8]) {
+        let mut chunks = bytes.chunks_exact(8);
+        for c in &mut chunks {
+            self.add(u64::from_le_bytes(c.try_into().unwrap()));
+        }
+        let rest = chunks.remainder();
+        if !rest.is_empty() {
+            let mut buf = [0u8; 8];
+            buf[..rest.len()].copy_from_slice(rest);
+            self.add(u64::from_le_bytes(buf) ^ ((rest.len() as u64) << 56));
+        }
+    }
+    #[inline]
+    fn write_u8(&mut self, b: u8) {
+        self.add(b as u64);
+    }
+    #[inline]
+    fn finish(&self) -> u64 {
+        self.0
+    }
+}
+
+type NameMap<V> = HashMap<String, V, BuildHasherDefault<NameHasher>>;
 
 #[derive(Debug)]
 pub struct MpsError(pub String);
@@ -37,10 +78,10 @@ pub fn parse(text: &str) -> Result<LpModel, MpsError> {
     let mut sense = Sense::Minimize;
     let mut obj_row: Option<String> = None;
     let mut rows: Vec<(String, RowKind)> = Vec::new();
-    let mut row_ix: HashMap<String, usize> = HashMap::new();
-    let mut ignored_rows: HashMap<String, ()> = HashMap::new();
+    let mut row_ix: NameMap<usize> = NameMap::default();
+    let mut ignored_rows: NameMap<()> = NameMap::default();
     let mut col_names: Vec<String> = Vec::new();
-    let mut col_ix: HashMap<String, usize> = HashMap::new();
+    let mut col_ix: NameMap<usize> = NameMap::default();
     let mut cols: Vec<Vec<(usize, f64)>> = Vec::new();
     let mut obj: Vec<f64> = Vec::new();
     let mut rhs: Vec<f64> = Vec::new();
@@ -53,11 +94,14 @@ pub fn parse(text: &str) -> Result<LpModel, MpsError> {
     let mut up: Vec<f64> = Vec::new();
     let mut objsense_next = false;
 
+    // Tokens of the current line; the buffer is reused so a line costs no allocation.
+    let mut toks: Vec<&str> = Vec::new();
     for raw in text.lines() {
         if raw.trim().is_empty() || raw.starts_with('*') {
             continue;
         }
-        let toks: Vec<&str> = raw.split_whitespace().collect();
+        toks.clear();
+        toks.extend(raw.split_whitespace());
         if !raw.starts_with(' ') && !raw.starts_with('\t') {
             section = toks[0].to_ascii_uppercase();
             match section.as_str() {
@@ -126,14 +170,19 @@ pub fn parse(text: &str) -> Result<LpModel, MpsError> {
                     return err(format!("bad COLUMNS line {raw:?}"));
                 }
                 let cname = toks[0];
-                let j = *col_ix.entry(cname.to_string()).or_insert_with(|| {
-                    col_names.push(cname.to_string());
-                    cols.push(Vec::new());
-                    obj.push(0.0);
-                    lo.push(0.0);
-                    up.push(INF);
-                    cols.len() - 1
-                });
+                let j = match col_ix.get(cname) {
+                    Some(&j) => j,
+                    None => {
+                        col_names.push(cname.to_string());
+                        cols.push(Vec::new());
+                        obj.push(0.0);
+                        lo.push(0.0);
+                        up.push(INF);
+                        let j = cols.len() - 1;
+                        col_ix.insert(cname.to_string(), j);
+                        j
+                    }
+                };
                 for pair in toks[1..].chunks(2) {
                     let v = num(pair[1])?;
                     if Some(pair[0]) == obj_row.as_deref() {
@@ -309,5 +358,365 @@ mod tests {
     fn rejects_integer_markers() {
         let text = "NAME T\nROWS\n N obj\nCOLUMNS\n MARKER 'MARKER' 'INTORG'\nENDATA\n";
         assert!(parse(text).is_err());
+    }
+
+    /// The parser as it was before the allocation-free tokenizer and the fast name maps (verbatim).
+    mod old {
+        use super::super::{err, num, RowKind};
+        use crate::model::{LpModel, Sense, INF};
+        use crate::mps::MpsError;
+        use std::collections::HashMap;
+
+    pub fn parse(text: &str) -> Result<LpModel, MpsError> {
+        let mut name = String::new();
+        let mut section = String::new();
+        let mut sense = Sense::Minimize;
+        let mut obj_row: Option<String> = None;
+        let mut rows: Vec<(String, RowKind)> = Vec::new();
+        let mut row_ix: HashMap<String, usize> = HashMap::new();
+        let mut ignored_rows: HashMap<String, ()> = HashMap::new();
+        let mut col_names: Vec<String> = Vec::new();
+        let mut col_ix: HashMap<String, usize> = HashMap::new();
+        let mut cols: Vec<Vec<(usize, f64)>> = Vec::new();
+        let mut obj: Vec<f64> = Vec::new();
+        let mut rhs: Vec<f64> = Vec::new();
+        let mut obj_rhs = 0.0;
+        let mut range: Vec<Option<f64>> = Vec::new();
+        let mut range_order: Vec<usize> = Vec::new();
+        let mut range_entries: Vec<(usize, f64)> = Vec::new();
+        let mut range_dup = false;
+        let mut lo: Vec<f64> = Vec::new();
+        let mut up: Vec<f64> = Vec::new();
+        let mut objsense_next = false;
+
+        for raw in text.lines() {
+            if raw.trim().is_empty() || raw.starts_with('*') {
+                continue;
+            }
+            let toks: Vec<&str> = raw.split_whitespace().collect();
+            if !raw.starts_with(' ') && !raw.starts_with('\t') {
+                section = toks[0].to_ascii_uppercase();
+                match section.as_str() {
+                    "NAME" => name = toks.get(1).map(|s| s.to_string()).unwrap_or_default(),
+                    "OBJSENSE" => {
+                        if let Some(t) = toks.get(1) {
+                            sense = if t.to_ascii_uppercase().starts_with("MAX") {
+                                Sense::Maximize
+                            } else {
+                                Sense::Minimize
+                            };
+                        } else {
+                            objsense_next = true;
+                        }
+                    }
+                    "ROWS" | "COLUMNS" | "RHS" | "RANGES" | "BOUNDS" | "ENDATA" | "OBJSENSE_" => {}
+                    other => return err(format!("unsupported section {other}")),
+                }
+                continue;
+            }
+            match section.as_str() {
+                "OBJSENSE" => {
+                    if objsense_next || !toks.is_empty() {
+                        sense = if toks[0].to_ascii_uppercase().starts_with("MAX") {
+                            Sense::Maximize
+                        } else {
+                            Sense::Minimize
+                        };
+                        objsense_next = false;
+                    }
+                }
+                "ROWS" => {
+                    if toks.len() != 2 {
+                        return err(format!("bad ROWS line {raw:?}"));
+                    }
+                    let (kind, rname) = (toks[0].to_ascii_uppercase(), toks[1].to_string());
+                    match kind.as_str() {
+                        "N" => {
+                            if obj_row.is_none() {
+                                obj_row = Some(rname);
+                            } else {
+                                ignored_rows.insert(rname, ());
+                            }
+                        }
+                        "E" | "L" | "G" => {
+                            row_ix.insert(rname.clone(), rows.len());
+                            rows.push((
+                                rname,
+                                match kind.as_str() {
+                                    "E" => RowKind::E,
+                                    "L" => RowKind::L,
+                                    _ => RowKind::G,
+                                },
+                            ));
+                            rhs.push(0.0);
+                            range.push(None);
+                        }
+                        _ => return err(format!("bad row type {kind}")),
+                    }
+                }
+                "COLUMNS" => {
+                    if toks.iter().any(|t| t.eq_ignore_ascii_case("'MARKER'")) {
+                        return err("integer markers are not supported (continuous LP only)");
+                    }
+                    if toks.len() != 3 && toks.len() != 5 {
+                        return err(format!("bad COLUMNS line {raw:?}"));
+                    }
+                    let cname = toks[0];
+                    let j = *col_ix.entry(cname.to_string()).or_insert_with(|| {
+                        col_names.push(cname.to_string());
+                        cols.push(Vec::new());
+                        obj.push(0.0);
+                        lo.push(0.0);
+                        up.push(INF);
+                        cols.len() - 1
+                    });
+                    for pair in toks[1..].chunks(2) {
+                        let v = num(pair[1])?;
+                        if Some(pair[0]) == obj_row.as_deref() {
+                            obj[j] += v;
+                        } else if let Some(&i) = row_ix.get(pair[0]) {
+                            cols[j].push((i, v));
+                        } else if !ignored_rows.contains_key(pair[0]) {
+                            return err(format!("unknown row {}", pair[0]));
+                        }
+                    }
+                }
+                "RHS" | "RANGES" => {
+                    let body: &[&str] = if toks.len() % 2 == 1 {
+                        &toks[1..]
+                    } else {
+                        &toks[..]
+                    };
+                    for pair in body.chunks(2) {
+                        if pair.len() != 2 {
+                            return err(format!("bad {section} line {raw:?}"));
+                        }
+                        let v = num(pair[1])?;
+                        if Some(pair[0]) == obj_row.as_deref() {
+                            if section == "RHS" {
+                                obj_rhs = v;
+                            }
+                        } else if let Some(&i) = row_ix.get(pair[0]) {
+                            if section == "RHS" {
+                                rhs[i] = v;
+                            } else {
+                                if range[i].is_none() && v != 0.0 {
+                                    range_order.push(i);
+                                }
+                                if range[i].is_some() {
+                                    range_dup = true;
+                                }
+                                range_entries.push((i, v));
+                                range[i] = Some(v);
+                            }
+                        } else if !ignored_rows.contains_key(pair[0]) {
+                            return err(format!("unknown row {}", pair[0]));
+                        }
+                    }
+                }
+                "BOUNDS" => {
+                    let kind = toks[0].to_ascii_uppercase();
+                    let valued = matches!(kind.as_str(), "UP" | "LO" | "FX" | "LI" | "UI" | "SC");
+                    let want = if valued { 3 } else { 2 };
+                    let (cname, val) = if toks.len() == want + 1 {
+                        (toks[2], if valued { Some(num(toks[3])?) } else { None })
+                    } else if toks.len() == want {
+                        (toks[1], if valued { Some(num(toks[2])?) } else { None })
+                    } else {
+                        return err(format!("bad BOUNDS line {raw:?}"));
+                    };
+                    let j = *col_ix
+                        .get(cname)
+                        .ok_or_else(|| MpsError(format!("unknown column {cname}")))?;
+                    match kind.as_str() {
+                        "UP" => {
+                            let v = val.unwrap();
+                            up[j] = v;
+                            if v < 0.0 && lo[j] == 0.0 {
+                                lo[j] = -INF;
+                            }
+                        }
+                        "LO" => lo[j] = val.unwrap(),
+                        "FX" => {
+                            lo[j] = val.unwrap();
+                            up[j] = val.unwrap();
+                        }
+                        "FR" => {
+                            lo[j] = -INF;
+                            up[j] = INF;
+                        }
+                        "MI" => lo[j] = -INF,
+                        "PL" => up[j] = INF,
+                        "BV" => {
+                            return err("binary variables are not supported (continuous LP only)");
+                        }
+                        "LI" | "UI" | "SC" => {
+                            return err(format!(
+                                "bound type {kind} is not supported (continuous LP only)"
+                            ))
+                        }
+                        _ => return err(format!("bad bound type {kind}")),
+                    }
+                }
+                _ => return err(format!("data line outside a section: {raw:?}")),
+            }
+        }
+
+        let m = rows.len();
+        let mut row_lo = vec![-INF; m];
+        let mut row_up = vec![INF; m];
+        let mut row_range = vec![0.0; m];
+        for (i, (_, kind)) in rows.iter().enumerate() {
+            let r = rhs[i];
+            let rg = range[i];
+            row_range[i] = rg.map_or(0.0, f64::abs);
+            match kind {
+                RowKind::E => match rg {
+                    None => (row_lo[i], row_up[i]) = (r, r),
+                    Some(x) if x >= 0.0 => (row_lo[i], row_up[i]) = (r, r + x),
+                    Some(x) => (row_lo[i], row_up[i]) = (r + x, r),
+                },
+                RowKind::L => (row_lo[i], row_up[i]) = (rg.map_or(-INF, |x| r - x.abs()), r),
+                RowKind::G => (row_lo[i], row_up[i]) = (r, rg.map_or(INF, |x| r + x.abs())),
+            }
+        }
+        let mut col_start = vec![0usize];
+        let mut row_idx = Vec::new();
+        let mut val = Vec::new();
+        for c in &cols {
+            let c = c.clone();
+            for (i, v) in c {
+                // The reference's reader drops constraint coefficients below 1e-13 in magnitude (`NumNZs`: 9.99e-14 and 0.0 are dropped, 1e-13 kept).
+                if v.abs() < 1e-13 {
+                    continue;
+                }
+                row_idx.push(i);
+                val.push(v);
+            }
+            col_start.push(row_idx.len());
+        }
+        Ok(LpModel {
+            name,
+            sense,
+            offset: -obj_rhs,
+            obj,
+            col_lo: lo,
+            col_up: up,
+            row_lo,
+            row_up,
+            row_range,
+            row_kind: rows
+                .iter()
+                .map(|r| match r.1 {
+                    RowKind::E => b'E',
+                    RowKind::L => b'L',
+                    RowKind::G => b'G',
+                })
+                .collect(),
+            range_order,
+            range_entries,
+            range_dup,
+            col_start,
+            row_idx,
+            val,
+            col_names,
+            row_names: rows.into_iter().map(|r| r.0).collect(),
+        })
+    }
+
+    }
+
+    fn same(label: &str, text: &str) {
+        let a = old::parse(text);
+        let b = parse(text);
+        match (a, b) {
+            (Ok(a), Ok(b)) => assert_eq!(format!("{a:?}"), format!("{b:?}"), "{label}"),
+            (Err(a), Err(b)) => assert_eq!(a.0, b.0, "{label}"),
+            (a, b) => panic!("{label}: old {:?} vs new {:?}", a.map(|_| ()), b.map(|_| ())),
+        }
+    }
+
+    fn mps_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+        let Ok(rd) = std::fs::read_dir(dir) else { return };
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                mps_files(&p, out);
+            } else if p.extension().is_some_and(|x| x == "mps") {
+                out.push(p);
+            }
+        }
+    }
+
+    #[test]
+    fn matches_old_parser_on_fixtures_and_corpus() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mut files = Vec::new();
+        mps_files(&root.join("tests/fixtures"), &mut files);
+        mps_files(&root.join("../reverse-engineer/corpus"), &mut files);
+        files.sort();
+        assert!(files.len() >= 100);
+        let (mut ok, mut bad) = (0, 0);
+        for f in &files {
+            let Ok(text) = std::fs::read_to_string(f) else { continue };
+            same(&f.display().to_string(), &text);
+            if parse(&text).is_ok() {
+                ok += 1;
+            } else {
+                bad += 1;
+            }
+        }
+        assert!(ok > 50, "{ok} ok, {bad} errors");
+    }
+
+    #[test]
+    fn matches_old_parser_on_edge_and_malformed_inputs() {
+        let head = "NAME T\nROWS\n N obj\n N obj2\n L r1\n G r2\n E r3\n";
+        let cases: Vec<String> = vec![
+            "NAME T\nROWS\n N obj\nCOLUMNS\n MARKER 'MARKER' 'INTORG'\nENDATA\n".into(),
+            "NAME\nROWS\n N obj\nENDATA\n".into(),
+            "NAME  a b c\nOBJSENSE\n    MAX\nROWS\n N obj\nENDATA\n".into(),
+            "OBJSENSE MAXIMIZE\nROWS\n N obj\nENDATA\n".into(),
+            "OBJSENSE\n\nROWS\n N obj\nENDATA\n".into(),
+            "SOS\n".into(),
+            "ROWS\n N obj\n X r1\n".into(),
+            "ROWS\n N obj L r1\n".into(),
+            "ROWS\n N\n".into(),
+            " L r1\n".into(),
+            "*c\n\n   \nROWS\n\tN\tobj\n\tL\tr1\nCOLUMNS\n\tx\tobj\t1\tr1\t2\nRHS\n\trhs\tr1\t1\nENDATA\n".into(),
+            format!("{head}COLUMNS\n x obj 1 r1\n"),
+            format!("{head}COLUMNS\n x obj 1 r1 1 r2\n"),
+            format!("{head}COLUMNS\n x obj 1 r1 1 r2 1 r3 1\n"),
+            format!("{head}COLUMNS\n x zz 1\n"),
+            format!("{head}COLUMNS\n x obj2 1 r1 abc\n"),
+            format!("{head}COLUMNS\n x obj 1D0 r1 2d1\n x r2 1e-14 r3 1e-13\n y obj 2 r1 -0\n x r3 5\n"),
+            format!("{head}COLUMNS\n x r1 1\nRHS\n r1 4 r2 5\n obj -3\n rhs r1\n"),
+            format!("{head}COLUMNS\n x r1 1\nRHS\n rhs r1\n"),
+            format!("{head}COLUMNS\n x r1 1\nRHS\n rhs r1 2 r2\n"),
+            format!("{head}COLUMNS\n x r1 1\nRHS\n rhs zz 2\n"),
+            format!("{head}COLUMNS\n x r1 1\nRHS\n rhs obj2 2 r1 1\n"),
+            format!("{head}COLUMNS\n x r1 1\nRANGES\n rng r1 3 r2 0 r3 -1\n rng r1 2 r3 1 r3 0\n"),
+            format!("{head}COLUMNS\n x r1 1\nRANGES\n r1 3 r2 2\n"),
+            format!("{head}COLUMNS\n x r1 1\nRANGES\n rng r1 x\n"),
+            format!("{head}COLUMNS\n x r1 1\n y r2 1\nBOUNDS\n UP b x 4\n UP b y -3\n LO b y 1\n FX b x 2\n FR b y\n MI b x\n PL b x\n"),
+            format!("{head}COLUMNS\n x r1 1\nBOUNDS\n UP x 4\n LO x 1\n MI x\n FR x\n"),
+            format!("{head}COLUMNS\n x r1 1\nBOUNDS\n UP b z 4\n"),
+            format!("{head}COLUMNS\n x r1 1\nBOUNDS\n UP b x\n"),
+            format!("{head}COLUMNS\n x r1 1\nBOUNDS\n FR b x 1 2\n"),
+            format!("{head}COLUMNS\n x r1 1\nBOUNDS\n BV b x\n"),
+            format!("{head}COLUMNS\n x r1 1\nBOUNDS\n LI b x 1\n"),
+            format!("{head}COLUMNS\n x r1 1\nBOUNDS\n XX b x 1\n"),
+            format!("{head}COLUMNS\n x r1 1\nBOUNDS\n UP b x q\n"),
+            format!("{head}COLUMNS\n x r1 1\nBOUNDS\n  \n"),
+            format!("{head}COLUMNS\n x r1 1\r\nRHS\r\n rhs r1 2\r\nENDATA\r\n"),
+            format!("{head}COLUMNS\n x r1 1\n\u{3000}ENDATA\n"),
+            format!("{head}COLUMNS\n a_long_column_name_over_eight r1 1\n a_long_column_name_over_eighu r1 2\n a_long_column_name_over_eight r2 3\n"),
+            "ROWS\n L r1\n L r1\nCOLUMNS\n x r1 1\n".into(),
+            "NAME T\nENDATA".into(),
+            String::new(),
+        ];
+        for (k, c) in cases.iter().enumerate() {
+            same(&format!("case {k}"), c);
+        }
     }
 }
