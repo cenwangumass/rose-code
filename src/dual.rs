@@ -1288,6 +1288,7 @@ impl<R> Default for RatioBufs<R> {
 }
 
 /// Primal infeasibility of a basic variable with value `x` and bounds `lo`, `up`.
+#[cfg(test)]
 #[inline(always)]
 fn infeas_of<R: Real>(x: R, lo: f64, up: f64) -> R {
     if lo > -BIG && x < R::c(lo) {
@@ -1297,6 +1298,33 @@ fn infeas_of<R: Real>(x: R, lo: f64, up: f64) -> R {
     } else {
         R::ZERO
     }
+}
+
+/// The bounds of a basic variable as the comparisons of `infeas_of` use them: `R::c(lo)`, or `-inf` when `lo <= -BIG` (the test `x < -inf` is never true, as the
+/// skipped branch), and `R::c(up)` or `+inf` likewise.
+#[inline(always)]
+fn basic_bound_pair<R: Real>(lo: f64, up: f64) -> (R, R) {
+    (
+        if lo > -BIG { R::c(lo) } else { R::c(f64::NEG_INFINITY) },
+        if up < BIG { R::c(up) } else { R::c(f64::INFINITY) },
+    )
+}
+
+/// `infeas_of` with the bounds in `basic_bound_pair` form: the same comparisons on the same values.
+#[inline(always)]
+fn infeas_cached<R: Real>(x: R, blo: R, bup: R) -> R {
+    if x < blo {
+        blo - x
+    } else if x > bup {
+        x - bup
+    } else {
+        R::ZERO
+    }
+}
+
+/// The per-row cache of the bounds of the basic variables for the basis `head`.
+fn basic_bounds<R: Real>(p: &Internal, head: &[usize]) -> (Vec<R>, Vec<R>) {
+    head.iter().map(|&v| basic_bound_pair::<R>(p.lo[v], p.up[v])).unzip()
 }
 
 /// Retained per-iteration buffers of `Dual::iteration` and `update_primal_and_weights`. `tau` and `rhs` are either empty or of length `m` with every entry
@@ -1365,6 +1393,9 @@ struct Dual<'a, R: Real = f64> {
     n: usize,
     m: usize,
     head: Vec<usize>,
+    /// Bounds of the basic variable of each row (`basic_bound_pair`), kept current at every change of `head` (`set_head`, `sync_bounds`).
+    blo: Vec<R>,
+    bup: Vec<R>,
     /// Status per variable: the basis position when basic, else `LB`, `UB`, `FREE`, `FIXED`.
     st: Vec<i32>,
     /// Basic values by position.
@@ -1994,18 +2025,44 @@ impl<'a, R: Real> Dual<'a, R> {
 
     #[inline(always)]
     fn infeas_real(&self, r: usize) -> R {
-        infeas_of::<R>(self.xb[r], self.p.lo[self.head[r]], self.p.up[self.head[r]])
+        infeas_cached::<R>(self.xb[r], self.blo[r], self.bup[r])
+    }
+
+    /// `head[r] = j` with the bound cache of the row.
+    #[inline(always)]
+    fn set_head(&mut self, r: usize, j: usize) {
+        self.head[r] = j;
+        let (lo, up) = basic_bound_pair::<R>(self.p.lo[j], self.p.up[j]);
+        self.blo[r] = lo;
+        self.bup[r] = up;
+    }
+
+    /// Rebuild of the bound cache after a wholesale change of `head`.
+    fn sync_bounds(&mut self) {
+        (self.blo, self.bup) = basic_bounds::<R>(self.p, &self.head);
+    }
+
+    /// The cache equals the tables (debug and shadow builds).
+    #[cfg(any(debug_assertions, feature = "factor-shadow"))]
+    fn check_bounds(&self) {
+        assert_eq!(self.blo.len(), self.head.len());
+        assert_eq!(self.bup.len(), self.head.len());
+        for (r, &v) in self.head.iter().enumerate() {
+            let (lo, up) = basic_bound_pair::<R>(self.p.lo[v], self.p.up[v]);
+            assert!(self.blo[r] == lo && self.bup[r] == up, "stale bound cache at row {r}");
+        }
     }
 
     /// The infeasibility of every row (`infeas_real` of rows `0..m`) into the retained scratch `infs`; the caller takes it with `mem::take` and puts it back.
     fn fill_infeas(&self, out: &mut Vec<R>) {
+        #[cfg(any(debug_assertions, feature = "factor-shadow"))]
+        self.check_bounds();
         out.clear();
         let m = self.m;
         out.reserve(m);
-        // `up` cut to the length of `lo`: one bounds check per row (`v < lo.len()`) serves both arrays.
-        let lo = &self.p.lo[..];
-        let up = &self.p.up[..lo.len()];
-        out.extend(self.head[..m].iter().zip(&self.xb[..m]).map(|(&v, &x)| infeas_of::<R>(x, lo[v], up[v])));
+        // All three slices cut to `m` once: no bounds check inside the loop.
+        let (xb, blo, bup) = (&self.xb[..m], &self.blo[..m], &self.bup[..m]);
+        out.extend(xb.iter().zip(blo).zip(bup).map(|((&x, &lo), &up)| infeas_cached::<R>(x, lo, up)));
     }
 
     // ------------------------------------------------------------------ factorization
@@ -2109,7 +2166,7 @@ impl<'a, R: Real> Dual<'a, R> {
             for (pos, r) in gone.zip(free_rows) {
                 let out = self.head[pos];
                 self.st[out] = LB;
-                self.head[pos] = n + r;
+                self.set_head(pos, n + r);
                 last = Some(out);
             }
             if let Some(j) = last {
@@ -2182,6 +2239,7 @@ impl<'a, R: Real> Dual<'a, R> {
         }
         self.scr_wv = wv;
         self.head = order;
+        self.sync_bounds();
         self.reset_pricing(&st, rows.view(), &mi);
         std::mem::replace(&mut self.mirror, mi).recycle();
         self.mirror.set_upd_limit(self.upd_limit);
@@ -2305,7 +2363,7 @@ impl<'a, R: Real> Dual<'a, R> {
             LB
         };
         self.st[j] = r as i32;
-        self.head[r] = j;
+        self.set_head(r, j);
         self.iters += 1;
         crate::simplex::TOTAL_ITERS.with(|c| c.set(c.get() + 1.0));
         if self.mirror.refactor_due() {
@@ -3062,15 +3120,22 @@ impl<'a, R: Real> Dual<'a, R> {
     }
 
     /// `build_walk_list` with the infeasibilities of the rows already in `infs` (nothing they depend on changes inside).
-    fn build_walk_list_from(&mut self, infs: &[R]) {
+    ///
+    /// Returns the number of infeasible rows and the number of those whose flag was not 0 before (the rows that became infeasible outside the list), counted in
+    /// the same pass.
+    fn build_walk_list_from(&mut self, infs: &[R]) -> (usize, usize) {
         let ptol = self.ptol();
+        let (mut n_inf, mut n_fresh) = (0usize, 0usize);
+        let infs = &infs[..self.m];
+        assert!(self.flags.len() >= infs.len() && self.w.len() >= infs.len());
         let mut rows = std::mem::take(&mut self.glue.spare_list);
         let mut keys = std::mem::take(&mut self.glue.keys);
         rows.clear();
         keys.clear();
-        for r in 0..self.m {
-            let fr = infs[r];
+        for (r, &fr) in infs.iter().enumerate() {
             if fr.to_f64() > ptol {
+                n_inf += 1;
+                n_fresh += (self.flags[r] != 0) as usize;
                 self.flags[r] = 0;
                 rows.push(r);
                 keys.push((-self.pri(r, fr)).to_f64());
@@ -3084,6 +3149,7 @@ impl<'a, R: Real> Dual<'a, R> {
         self.glue.keys = keys;
         self.cursor = 0;
         self.pend = self.cap;
+        (n_inf, n_fresh)
     }
 
     /// The rebuild of the walk list inside the update (`0xc2291..0xc2900`): the rows that became infeasible outside the list (flag 1), sorted by priority,
@@ -3285,17 +3351,16 @@ impl<'a, R: Real> Dual<'a, R> {
                 let ptol = self.ptol();
                 let mut infs = std::mem::take(&mut self.infs);
                 self.fill_infeas(&mut infs);
-                let infeas = infs.iter().filter(|f| f.to_f64() > ptol).count();
                 let old_len = self.walk_len.min(self.list.len());
                 let old = self.list[..old_len]
                     .iter()
                     .filter(|&&i| self.flags[i] == 0 && infs[i].to_f64() > ptol)
                     .count();
-                let fresh = self.flags[..self.m]
-                    .iter()
-                    .zip(&infs)
-                    .filter(|&(&fl, f)| fl != 0 && f.to_f64() > ptol)
-                    .count();
+                // The row counts (`infeas`, `fresh`) come from the pass of the build, which reads each flag before it sets it; `old` reads the flags of the old
+                // list, so it is counted before the build.
+                debug_assert_eq!(infs.len(), self.m);
+                let (infeas, fresh) = self.build_walk_list_from(&infs);
+                self.infs = infs;
                 let m = self.m as f64;
                 let scan = if self.level == 0 {
                     3.0 * m
@@ -3309,9 +3374,6 @@ impl<'a, R: Real> Dual<'a, R> {
                 self.work.add(0xbe17e, (2 * fresh) as f64, crate::work::CTX);
                 self.work
                     .add(0xbe34d, (old + fresh) as f64, crate::work::CTX);
-                debug_assert_eq!(infs.len(), self.m);
-                self.build_walk_list_from(&infs);
-                self.infs = infs;
                 if self.walk_len == 0 {
                     return None;
                 }
@@ -5173,7 +5235,7 @@ impl<'a, R: Real> Dual<'a, R> {
             self.slack_nb[leave - self.n] = true;
         }
         self.st[q] = r as i32;
-        self.head[r] = q;
+        self.set_head(r, q);
         // Row-wise copy: in a row holding both columns the leaving one takes the entering one's place; elsewhere the entering one is deleted (the last
         // entry moves into its slot) and the leaving one is appended.
         let leave_in = leave < n && p.lo[leave] != p.up[leave];
@@ -6967,11 +7029,14 @@ fn solve_pass_callback<R: Real>(
         st[j] = pos as i32;
     }
     let cap = ((m as f64).powf(0.7).floor() as i64).max(20);
+    let (blo, bup) = basic_bounds::<R>(&p, &order);
     let mut s: Dual<R> = Dual {
         p: &p,
         n,
         m,
         head: order,
+        blo,
+        bup,
         st,
         xb: vec![R::ZERO; m],
         d: vec![R::ZERO; n + m],
@@ -7589,6 +7654,7 @@ fn solve_pass_callback<R: Real>(
                     wv[v] = s.w[pos];
                 }
                 s.head.sort_unstable();
+                s.sync_bounds();
                 for pos in 0..s.m {
                     let v = s.head[pos];
                     s.st[v] = pos as i32;
@@ -8538,11 +8604,14 @@ mod captured_bh305_ratio {
         let basis_cols: Vec<_> = order.iter().map(|&j| &p.cols[j]).collect();
         let factor = Factor::new(m, &basis_cols).unwrap();
         let cap = 20;
+        let (blo, bup) = basic_bounds::<f64>(&p, &order);
         let mut s: Dual<f64> = Dual {
             p: &p,
             n,
             m,
             head: order,
+            blo,
+            bup,
             st,
             xb: vec![0.0; m],
             d: vec![0.0; n + m],
@@ -9683,6 +9752,9 @@ mod infeas_tests {
             };
             let (a, b) = (infeas_of::<R>(R::c(x), lo, up), old_infeas_real::<R>(R::c(x), lo, up));
             assert!(same(a, b), "x {x} lo {lo} up {up}");
+            let (blo, bup) = basic_bound_pair::<R>(lo, up);
+            let c = infeas_cached::<R>(R::c(x), blo, bup);
+            assert!(same(c, b), "cached: x {x} lo {lo} up {up}");
         }
     }
 
