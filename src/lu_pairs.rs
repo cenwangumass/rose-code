@@ -64,7 +64,7 @@ pub struct NucRows<'a> {
 
 struct Pass<'a, R: Real> {
     m: usize,
-    cols: crate::lu_order::Cols<'a>,
+    cols: crate::lu_order::ColView<'a>,
     /// Active counts (> 0 while active, -1 or 0 once assigned).
     rowc: Vec<i64>,
     colc: &'a mut [i64],
@@ -130,7 +130,8 @@ impl<R: Real> Pass<'_, R> {
     fn register_col(&mut self, c: usize) {
         let mut first = usize::MAX;
         let mut second = usize::MAX;
-        for &r in &self.cols[c].1 {
+        for &r in self.cols.rows(c) {
+            let r = r as usize;
             if self.rowc[r] > 0 {
                 if first != usize::MAX {
                     second = r;
@@ -166,8 +167,8 @@ impl<R: Real> Pass<'_, R> {
         self.rowc[r] = 0;
         self.colc[c] = 0;
         self.push_step(r, c);
-        let col = &self.cols.get(c).1;
-        for &rr in col {
+        for &rr in self.cols.rows(c) {
+            let rr = rr as usize;
             if self.rowc[rr] > 0 {
                 self.rowc[rr] -= 1;
                 if self.rowc[rr] == 1 {
@@ -180,7 +181,7 @@ impl<R: Real> Pass<'_, R> {
     }
 
     fn col_singleton(&mut self, c: usize, csing: &mut Vec<usize>) {
-        let Some(&r) = self.cols[c].1.iter().find(|&&r| self.rowc[r] >= 1) else {
+        let Some(r) = self.cols.rows(c).iter().map(|&r| r as usize).find(|&r| self.rowc[r] >= 1) else {
             return;
         };
         self.colc[c] = 0;
@@ -219,8 +220,8 @@ impl<R: Real> Pass<'_, R> {
         self.colc[c0] = 0;
         self.push_step(prow, c0);
         let mut l1: Vec<usize> = Vec::new();
-        let col0 = self.cols.get(c0);
-        for (&r, &v) in col0.1.iter().zip(&col0.2) {
+        for (&r, &v) in self.cols.rows(c0).iter().zip(self.cols.vals(c0)) {
+            let r = r as usize;
             if self.rowc[r] > 0 {
                 self.temp[r] = ((-R::c(v)) * u12) / p;
                 l1.push(r);
@@ -238,8 +239,8 @@ impl<R: Real> Pass<'_, R> {
         self.temp[orow] = R::ZERO;
         let mut lr: Vec<usize> = Vec::new();
         let mut lv: Vec<R> = Vec::new();
-        let col1 = self.cols.get(c1);
-        for (&r, &v) in col1.1.iter().zip(&col1.2) {
+        for (&r, &v) in self.cols.rows(c1).iter().zip(self.cols.vals(c1)) {
+            let r = r as usize;
             if self.rowc[r] > 0 {
                 let x = (R::c(v) + self.temp[r]) / schur;
                 self.temp[r] = R::ZERO;
@@ -393,7 +394,7 @@ impl<R: Real> Pass<'_, R> {
 #[allow(clippy::too_many_arguments)]
 pub fn run<'a, R: Real>(
     m: usize,
-    cols: crate::lu_order::Cols<'a>,
+    cols: crate::lu_order::ColView<'a>,
     seq: &mut Vec<(usize, usize)>,
     phase: &mut Vec<u8>,
     nuc: NucRows<'a>,

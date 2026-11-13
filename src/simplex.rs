@@ -831,18 +831,21 @@ pub(crate) struct Internal {
     pub(crate) offs: Vec<usize>,
     /// `fcols` split into `(is_slack, rows, values)` per variable, built on the first dual factorization of the solve (the matrix
     /// never changes) so a refactorization does not copy the basis columns.
-    split: std::sync::OnceLock<Vec<crate::lu_order::Col>>,
+    split: std::sync::OnceLock<crate::lu_order::ModelCols>,
 }
 
 impl Internal {
     /// The variables' columns as the LU structure reads them (`(v >= n, rows, values)` in the model's entry order).
-    pub(crate) fn split_cols(&self) -> &[crate::lu_order::Col] {
+    pub(crate) fn split_cols(&self) -> &crate::lu_order::ModelCols {
         self.split.get_or_init(|| {
-            self.fcols
-                .iter()
-                .enumerate()
-                .map(|(v, c)| (v >= self.n, c.iter().map(|&(r, _)| r).collect(), c.iter().map(|&(_, a)| a).collect()))
-                .collect()
+            crate::lu_order::ModelCols::new(
+                self.m,
+                self.fcols
+                    .iter()
+                    .enumerate()
+                    .map(|(v, c)| (v >= self.n, c.iter().map(|&(r, _)| r).collect(), c.iter().map(|&(_, a)| a).collect()))
+                    .collect(),
+            )
         })
     }
 

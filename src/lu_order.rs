@@ -17,6 +17,8 @@ pub type Col = (bool, Vec<usize>, Vec<f64>);
 pub struct Cols<'a> {
     src: &'a [Col],
     order: Option<&'a [usize]>,
+    /// The flat copy of `src` (validated once per solve) when the columns come from a model.
+    model: Option<&'a FlatCols>,
 }
 
 impl<'a> Cols<'a> {
@@ -52,35 +54,35 @@ impl std::ops::Index<usize> for Cols<'_> {
 
 impl<'a> From<&'a [Col]> for Cols<'a> {
     fn from(src: &'a [Col]) -> Self {
-        Cols { src, order: None }
+        Cols { src, order: None, model: None }
     }
 }
 
 impl<'a> From<&'a Vec<Col>> for Cols<'a> {
     fn from(src: &'a Vec<Col>) -> Self {
-        Cols { src, order: None }
+        Cols { src, order: None, model: None }
     }
 }
 
 impl<'a, const N: usize> From<&'a [Col; N]> for Cols<'a> {
     fn from(src: &'a [Col; N]) -> Self {
-        Cols { src, order: None }
+        Cols { src, order: None, model: None }
     }
 }
 
 /// The columns of a basis head out of the per-variable column list `src` (owns only the head).
 pub struct BasisCols<'p> {
-    src: &'p [Col],
+    src: &'p ModelCols,
     order: Vec<usize>,
 }
 
 impl<'p> BasisCols<'p> {
-    pub fn new(src: &'p [Col], head: &[usize]) -> Self {
+    pub fn new(src: &'p ModelCols, head: &[usize]) -> Self {
         BasisCols { src, order: head.to_vec() }
     }
 
     pub fn view(&self) -> Cols<'_> {
-        Cols { src: self.src, order: Some(&self.order) }
+        Cols { src: &self.src.cols, order: Some(&self.order), model: Some(&self.src.flat) }
     }
 }
 
@@ -154,9 +156,122 @@ pub fn factor_structure_r<'a, R: Real>(m: usize, cols: impl Into<Cols<'a>>) -> S
     st
 }
 
+/// Columns as a flat CSC (rows as `u32`, entries in the order of the `Col` lists), every row index checked against `m` when the
+/// view is filled: the passes of the front end read it through a `ColView` without further checks.
+#[derive(Default)]
+pub struct FlatCols {
+    /// Column `v` is `start[v]..start[v + 1]`.
+    start: Vec<usize>,
+    row: Vec<u32>,
+    val: Vec<f64>,
+    slack: Vec<bool>,
+    /// The row count the rows were checked against.
+    m: usize,
+}
+
+impl FlatCols {
+    pub fn len(&self) -> usize {
+        self.slack.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.slack.is_empty()
+    }
+
+    /// Copies the columns (entries in order) and checks every row below `m` and that each column has as many rows as values.
+    fn fill<'c>(&mut self, m: usize, cols: impl Iterator<Item = &'c Col>) {
+        assert!(m <= u32::MAX as usize);
+        self.m = m;
+        self.start.clear();
+        self.start.push(0);
+        self.row.clear();
+        self.val.clear();
+        self.slack.clear();
+        let mut max_row = 0usize;
+        let mut any = false;
+        for (is_slack, idx, val) in cols {
+            assert_eq!(idx.len(), val.len());
+            for &i in idx {
+                max_row = max_row.max(i);
+                self.row.push(i as u32);
+            }
+            any |= !idx.is_empty();
+            self.val.extend_from_slice(val);
+            self.start.push(self.row.len());
+            self.slack.push(*is_slack);
+        }
+        assert!(!any || max_row < m, "basis column row out of range");
+    }
+}
+
+/// The columns of the model (one per variable) with their flat copy, built and validated once per solve.
+pub struct ModelCols {
+    cols: Vec<Col>,
+    flat: FlatCols,
+}
+
+impl ModelCols {
+    pub fn new(m: usize, cols: Vec<Col>) -> Self {
+        let mut flat = FlatCols::default();
+        flat.fill(m, cols.iter());
+        ModelCols { cols, flat }
+    }
+}
+
+/// The basis columns by position, over a validated `FlatCols`: position `pos` is column `order[pos]` of the flat view. Every
+/// `order` entry is checked below the number of columns when the view is made, so the accessors read without checks.
+#[derive(Clone, Copy)]
+pub struct ColView<'a> {
+    flat: &'a FlatCols,
+    order: &'a [usize],
+}
+
+impl<'a> ColView<'a> {
+    fn new(flat: &'a FlatCols, order: &'a [usize]) -> Self {
+        assert!(order.iter().all(|&v| v < flat.len()), "basis head entry out of range");
+        ColView { flat, order }
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.order.len()
+    }
+
+    #[inline]
+    fn range(&self, pos: usize) -> (usize, usize) {
+        let v = self.order[pos];
+        // SAFETY: `v < flat.len()` (checked in `new`) and `start` has `len + 1` entries.
+        unsafe { (*self.flat.start.get_unchecked(v), *self.flat.start.get_unchecked(v + 1)) }
+    }
+
+    /// The rows of the column at position `pos`, all below the `m` of the view.
+    #[inline]
+    pub fn rows(&self, pos: usize) -> &'a [u32] {
+        let (a, b) = self.range(pos);
+        // SAFETY: `start` is non-decreasing and ends at `row.len()` (built by `fill`).
+        unsafe { self.flat.row.get_unchecked(a..b) }
+    }
+
+    /// The values of the column at position `pos`, as many as `rows(pos)`.
+    #[inline]
+    pub fn vals(&self, pos: usize) -> &'a [f64] {
+        let (a, b) = self.range(pos);
+        // SAFETY: as in `rows`; `val` has the length of `row`.
+        unsafe { self.flat.val.get_unchecked(a..b) }
+    }
+
+    #[inline]
+    pub fn is_slack(&self, pos: usize) -> bool {
+        // SAFETY: as in `range`; `slack` has `len` entries.
+        unsafe { *self.flat.slack.get_unchecked(self.order[pos]) }
+    }
+}
+
 /// Buffers of the front end kept across factorizations (one set per thread).
 #[derive(Default)]
 struct Ws {
+    flat: FlatCols,
+    ident: Vec<usize>,
     /// Row counts (a basic slack counts `m + 1`); the pivot walks decrement them.
     rc: Vec<usize>,
     /// The row has a basic slack.
@@ -202,6 +317,8 @@ fn pair_gate_possible(remaining: usize) -> bool {
 fn build<R: Real>(m: usize, cols: Cols<'_>, ws: &mut Ws) -> Structure<R> {
     let n = cols.len();
     let Ws {
+        flat,
+        ident,
         rc,
         slack_row,
         roff,
@@ -226,17 +343,37 @@ fn build<R: Real>(m: usize, cols: Cols<'_>, ws: &mut Ws) -> Structure<R> {
     rc.resize(m, 0);
     slack_row.clear();
     slack_row.resize(m, false);
-    let (mut nnz_b, mut nnz_cols) = (0usize, 0usize);
-    for (is_slack, idx, _) in cols.iter() {
+    // The flat view: the per-solve one of the model (head order), else a copy of `cols` (identity order).
+    let flat: ColView<'_> = match cols.model {
+        Some(model) => {
+            assert_eq!(model.m, m, "basis columns of another row count");
+            ColView::new(model, cols.order.expect("model columns come with a head"))
+        }
+        None => {
+            flat.fill(m, cols.iter());
+            ident.clear();
+            ident.extend(0..n);
+            ColView::new(flat, ident)
+        }
+    };
+    let mut nnz_cols = 0usize;
+    let mut nnz_b = 0usize;
+    for pos in 0..n {
+        let idx = flat.rows(pos);
         nnz_cols += idx.len();
-        if *is_slack {
-            rc[idx[0]] += 1 + m;
-            slack_row[idx[0]] = true;
+        if flat.is_slack(pos) {
+            let i = idx[0] as usize;
+            // SAFETY: every row of the view is below `m`, the length of `rc` and `slack_row`.
+            unsafe {
+                *rc.get_unchecked_mut(i) += 1 + m;
+                *slack_row.get_unchecked_mut(i) = true;
+            }
             nnz_b += 1;
         } else {
             nnz_b += idx.len();
             for &i in idx {
-                rc[i] += 1;
+                // SAFETY: as above.
+                unsafe { *rc.get_unchecked_mut(i as usize) += 1 };
             }
         }
     }
@@ -254,12 +391,16 @@ fn build<R: Real>(m: usize, cols: Cols<'_>, ws: &mut Ws) -> Structure<R> {
     rcol.resize(total, 0);
     fill.clear();
     fill.extend_from_slice(&roff[..m]);
-    for (pos, (is_slack, idx, _)) in cols.iter().enumerate() {
-        if !*is_slack {
-            for &i in idx {
-                if !slack_row[i] {
-                    rcol[fill[i]] = pos;
-                    fill[i] += 1;
+    for pos in 0..n {
+        if !flat.is_slack(pos) {
+            for &i in flat.rows(pos) {
+                let i = i as usize;
+                // SAFETY: rows are below `m`, the length of `slack_row` and `fill`.
+                unsafe {
+                    if !*slack_row.get_unchecked(i) {
+                        rcol[*fill.get_unchecked(i)] = pos;
+                        *fill.get_unchecked_mut(i) += 1;
+                    }
                 }
             }
         }
@@ -301,12 +442,15 @@ fn build<R: Real>(m: usize, cols: Cols<'_>, ws: &mut Ws) -> Structure<R> {
             continue;
         };
         pivot!(i, pos);
-        let (_, idx, val) = cols.get(pos);
-        let pv = R::c(val[idx.iter().position(|&x| x == i).unwrap()]);
+        let (idx, val) = (flat.rows(pos), flat.vals(pos));
+        let pv = R::c(val[idx.iter().position(|&x| x as usize == i).unwrap()]);
         for (&r2, &x) in idx.iter().zip(val) {
-            if !row_done[r2] {
-                rc[r2] -= 1;
-                if rc[r2] == 1 {
+            let r2 = r2 as usize;
+            // SAFETY: rows are below `m`, the length of `row_done` and `rc`.
+            let (done, rcr) = unsafe { (*row_done.get_unchecked(r2), rc.get_unchecked_mut(r2)) };
+            if !done {
+                *rcr -= 1;
+                if *rcr == 1 {
                     stack.push(r2);
                 }
                 l_idx.push(r2);
@@ -325,16 +469,15 @@ fn build<R: Real>(m: usize, cols: Cols<'_>, ws: &mut Ws) -> Structure<R> {
         if col_done[pos] {
             continue;
         }
-        let (is_slack, idx, val) = cols.get(pos);
-        if !*is_slack {
+        if !flat.is_slack(pos) {
             continue;
         }
-        let i = idx[0];
+        let i = flat.rows(pos)[0] as usize;
         if rc[i] == m + 1 {
             rc[i] = 1;
             pivot!(i, pos);
             l_start.push(l_idx.len());
-            diag.push(R::c(val[0]));
+            diag.push(R::c(flat.vals(pos)[0]));
         }
     }
     // Phase 3: one ascending pass.
@@ -343,22 +486,22 @@ fn build<R: Real>(m: usize, cols: Cols<'_>, ws: &mut Ws) -> Structure<R> {
         if col_done[pos] {
             continue;
         }
-        let (is_slack, idx, val) = cols.get(pos);
-        if !*is_slack {
-            if idx.len() == 1 && rc[idx[0]] <= m && !row_done[idx[0]] {
-                let i = idx[0];
+        let idx = flat.rows(pos);
+        if !flat.is_slack(pos) {
+            if idx.len() == 1 && rc[idx[0] as usize] <= m && !row_done[idx[0] as usize] {
+                let i = idx[0] as usize;
                 rc[i] = 1;
                 pivot!(i, pos);
                 l_start.push(l_idx.len());
-                diag.push(R::c(val[0]));
+                diag.push(R::c(flat.vals(pos)[0]));
             }
         } else {
-            let i = idx[0];
+            let i = idx[0] as usize;
             if !row_done[i] {
                 rc[i] = rc[i].wrapping_sub(m);
                 pivot!(i, pos);
                 l_start.push(l_idx.len());
-                diag.push(R::c(val[0]));
+                diag.push(R::c(flat.vals(pos)[0]));
             }
         }
     }
@@ -388,14 +531,18 @@ fn build<R: Real>(m: usize, cols: Cols<'_>, ws: &mut Ws) -> Structure<R> {
             if col_done[pos] {
                 continue;
             }
-            let (_, idx, val) = cols.get(pos);
             let mut c = 0;
-            for (&r, &v) in idx.iter().zip(val) {
-                if !row_done[r] {
-                    c += 1;
-                    nidx[fill[r]] = pos;
-                    nval[fill[r]] = v;
-                    fill[r] += 1;
+            for (&r, &v) in flat.rows(pos).iter().zip(flat.vals(pos)) {
+                let r = r as usize;
+                // SAFETY: rows are below `m`, the length of `row_done` and `fill`.
+                unsafe {
+                    if !*row_done.get_unchecked(r) {
+                        c += 1;
+                        let f = fill.get_unchecked_mut(r);
+                        nidx[*f] = pos;
+                        nval[*f] = v;
+                        *f += 1;
+                    }
                 }
             }
             cnt[pos] = c;
@@ -404,7 +551,8 @@ fn build<R: Real>(m: usize, cols: Cols<'_>, ws: &mut Ws) -> Structure<R> {
     } else {
         for pos in 0..n {
             if !col_done[pos] {
-                cnt[pos] = cols.get(pos).1.iter().filter(|&&r| !row_done[r]).count() as i64;
+                // SAFETY: rows are below `m`, the length of `row_done`.
+                cnt[pos] = flat.rows(pos).iter().filter(|&&r| !unsafe { *row_done.get_unchecked(r as usize) }).count() as i64;
             }
         }
     }
@@ -416,9 +564,9 @@ fn build<R: Real>(m: usize, cols: Cols<'_>, ws: &mut Ws) -> Structure<R> {
         if cnt[pos] <= 0 || col_done[pos] {
             continue;
         }
-        let (_, idx, val) = cols.get(pos);
-        let k = idx.iter().position(|&i| !row_done[i]).unwrap();
-        let i = idx[k];
+        let (idx, val) = (flat.rows(pos), flat.vals(pos));
+        let k = idx.iter().position(|&i| !row_done[i as usize]).unwrap();
+        let i = idx[k] as usize;
         pivot!(i, pos);
         l_start.push(l_idx.len());
         diag.push(R::c(val[k]));
@@ -441,7 +589,7 @@ fn build<R: Real>(m: usize, cols: Cols<'_>, ws: &mut Ws) -> Structure<R> {
         let before = seq.len();
         ov = crate::lu_pairs::run::<R>(
             m,
-            cols,
+            flat,
             &mut seq,
             &mut phase,
             crate::lu_pairs::NucRows { roff: noff, ridx: nidx, rval: nval },
@@ -470,8 +618,8 @@ fn build<R: Real>(m: usize, cols: Cols<'_>, ws: &mut Ws) -> Structure<R> {
             pair_col[c] = k;
         }
         for (k, &(prow, c)) in seq.iter().enumerate().skip(loff) {
-            let (_, idx, val) = cols.get(c);
-            let pv = R::c(val[idx.iter().position(|&i| i == prow).unwrap()]);
+            let (idx, val) = (flat.rows(c), flat.vals(c));
+            let pv = R::c(val[idx.iter().position(|&i| i as usize == prow).unwrap()]);
             // A pair override replaces the column (its multipliers are all that is known: no raw entries).
             if let Some((r, v)) = ov.l.remove(&k) {
                 l_idx.extend_from_slice(&r);
@@ -479,6 +627,7 @@ fn build<R: Real>(m: usize, cols: Cols<'_>, ws: &mut Ws) -> Structure<R> {
                 l_val.extend(v);
             } else {
                 for (&i, &x) in idx.iter().zip(val) {
+                    let i = i as usize;
                     if !row_done[i] || pair_row[i] > k {
                         l_idx.push(i);
                         l_val.push(R::c(x) / pv);
@@ -487,7 +636,7 @@ fn build<R: Real>(m: usize, cols: Cols<'_>, ws: &mut Ws) -> Structure<R> {
                 }
             }
             for &i in idx {
-                if row_done[i] && pair_row[i] < k {
+                if row_done[i as usize] && pair_row[i as usize] < k {
                     u_sing += 1;
                 }
             }
@@ -526,20 +675,20 @@ fn build<R: Real>(m: usize, cols: Cols<'_>, ws: &mut Ws) -> Structure<R> {
         if col_done[pos] {
             continue;
         }
-        let (is_slack, idx, val) = cols.get(pos);
         let mut active = 0usize;
-        for (&i, &v) in idx.iter().zip(val).rev() {
-            if row_done[i] {
+        for (&i, &v) in flat.rows(pos).iter().zip(flat.vals(pos)).rev() {
+            // SAFETY: rows are below `m`, the length of `row_done`.
+            if unsafe { *row_done.get_unchecked(i as usize) } {
                 u_sing += 1;
             } else {
                 active += 1;
                 // The reference's matrix leaves out entries below the absolute tolerance (fx_e2_r25: a scaled entry 2^-44 in a row of the nucleus changed its count).
                 if v.abs() >= ABS_TOL {
-                    ent.push((i, R::c(v)));
+                    ent.push((i as usize, R::c(v)));
                 }
             }
         }
-        nuc_nnz += if *is_slack { 1 } else { active };
+        nuc_nnz += if flat.is_slack(pos) { 1 } else { active };
         nuc_pos.push(pos);
         nuc_start.push(ent.len());
     }
@@ -2431,6 +2580,110 @@ mod flat_structure_tests {
         check::<F80>(F80::repr);
     }
 
+    /// Degenerate bases: repeated rows inside a column, empty columns, equal columns, a slack column on a row that has structurals.
+    fn degenerate_cols(rng: &mut Rng, m: usize) -> Vec<Col> {
+        let mut cols: Vec<Col> = Vec::new();
+        while cols.len() < m {
+            match rng.below(8) {
+                0 => cols.push((false, vec![], vec![])),
+                1 if !cols.is_empty() => {
+                    let c = cols[rng.below(cols.len())].clone();
+                    cols.push(c);
+                }
+                2 => cols.push((true, vec![rng.below(m)], vec![1.0])),
+                _ => {
+                    let k = 1 + rng.below(4);
+                    let rows: Vec<usize> = (0..k).map(|_| rng.below(m)).collect();
+                    let vals = rows.iter().map(|_| (1 + rng.below(5)) as f64 * if rng.below(2) == 0 { 0.5 } else { -1.0 }).collect();
+                    cols.push((false, rows, vals));
+                }
+            }
+        }
+        cols
+    }
+
+    /// The flat view holds the entries of the columns in the same order, and the new front end equals the old one on degenerate and
+    /// singular bases (or both panic).
+    fn degenerate<R: Real>() {
+        let mut rng = Rng(4242);
+        let mut ok = 0;
+        for case in 0..400 {
+            let m = 1 + rng.below(if case % 8 == 0 { 90 } else { 25 });
+            let cols = degenerate_cols(&mut rng, m);
+            let model = ModelCols::new(m, cols.clone());
+            let ident: Vec<usize> = (0..cols.len()).collect();
+            let flat = ColView::new(&model.flat, &ident);
+            assert_eq!(flat.len(), cols.len());
+            for (pos, (sl, idx, val)) in cols.iter().enumerate() {
+                assert_eq!(flat.is_slack(pos), *sl);
+                assert!(flat.rows(pos).iter().map(|&r| r as usize).eq(idx.iter().copied()));
+                assert!(flat.vals(pos).iter().zip(val).all(|(a, b)| a.to_bits() == b.to_bits()) && flat.vals(pos).len() == val.len());
+            }
+            let gate = (0, GATE_ALWAYS);
+            gate_set(gate);
+            set_pool_dims(m, cols.iter().map(|c| c.1.len()).sum());
+            set_factorization_number(1 + case);
+            let new = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| factor_structure_r::<R>(m, &cols)));
+            gate_set(gate);
+            // The same basis through the per-solve view with a head (a permutation of the columns).
+            let mut head: Vec<usize> = (0..cols.len()).collect();
+            for i in (1..head.len()).rev() {
+                head.swap(i, rng.below(i + 1));
+            }
+            let permuted: Vec<Col> = head.iter().map(|&v| cols[v].clone()).collect();
+            let by_head = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                set_factorization_number(1 + case);
+                factor_structure_r::<R>(m, &BasisCols::new(&model, &head))
+            }));
+            gate_set(gate);
+            set_factorization_number(1 + case);
+            let by_copy = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| factor_structure_r::<R>(m, &permuted)));
+            gate_set(gate);
+            match (by_head, by_copy) {
+                (Ok(a), Ok(b)) => super::old::assert_same(&a, &b, Cols::from(&permuted)),
+                (Err(_), Err(_)) => {}
+                (a, b) => panic!("case {case}: head ok {} copy ok {}", a.is_ok(), b.is_ok()),
+            }
+            set_factorization_number(1 + case);
+            set_factorization_number(1 + case);
+            let old = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| super::old::factor_structure_r::<R>(m, Cols::from(&cols))));
+            gate_set(gate);
+            match (new, old) {
+                (Ok(a), Ok(b)) => {
+                    super::old::assert_same(&a, &b, Cols::from(&cols));
+                    ok += 1;
+                }
+                (Err(_), Err(_)) => {}
+                (a, b) => panic!("case {case}: new ok {} old ok {}", a.is_ok(), b.is_ok()),
+            }
+        }
+        assert!(ok > 100, "{ok} non-panicking cases");
+    }
+
+    #[test]
+    fn degenerate_bases_match_old_front_end_f64() {
+        degenerate::<f64>();
+    }
+
+    #[test]
+    fn degenerate_bases_match_old_front_end_f80() {
+        degenerate::<F80>();
+    }
+
+    #[test]
+    #[should_panic(expected = "row out of range")]
+    fn front_end_rejects_row_out_of_range() {
+        let cols: Vec<Col> = vec![(false, vec![0, 3], vec![1.0, 2.0]), (false, vec![1], vec![1.0])];
+        factor_structure(3, &cols);
+    }
+
+    #[test]
+    #[should_panic(expected = "row out of range")]
+    fn front_end_rejects_slack_row_out_of_range() {
+        let cols: Vec<Col> = vec![(true, vec![0, 3], vec![1.0, 2.0]), (false, vec![1], vec![1.0])];
+        factor_structure(3, &cols);
+    }
+
     /// A basis read through a head over per-variable columns is the same as the copied columns.
     #[test]
     fn head_view_matches_copied_columns() {
@@ -2445,7 +2698,8 @@ mod flat_structure_tests {
             }
             head.truncate(m);
             let copied: Vec<Col> = head.iter().map(|&v| all[v].clone()).collect();
-            let basis = BasisCols::new(&all, &head);
+            let model = ModelCols::new(m, all.clone());
+            let basis = BasisCols::new(&model, &head);
             let a = factor_structure(m, &copied);
             let b = factor_structure(m, &basis);
             assert_eq!(a.pivots, b.pivots, "case {case}");
