@@ -66,6 +66,14 @@ AMD EPYC Processor (with IBPB), kernel 7.0.0-38-generic (remote timing machine v
 baseline remains intact. The separately qualified fixed39 PGO/system-TCMalloc configuration below has its own
 ELF and table. Historical EPYC 9V74/TCMalloc tables remain separate configurations.
 
+Optional PGO build (measured 2026-11-13 on `04fbad99`): `perf/build_pgo.py` passes every gate (release tests, full parity normal and
+`factor-shadow` 987/987, corpus diff 0) and is offered as an optional release build, not the default. Against plain release
+(remote `perf stat -r 3`, dual release) it cuts instructions by about 1-3% and cycles on most rows (primal and barrier included), but
+`witness_dual_r2_mode_switch` is 7-33% slower in cycles in every batch with unchanged instructions, also when the training set adds
+capped mode_switch and GREENBEA dual runs. The profile is valid only for the toolchain it was trained with (rustc 1.98.1, LLVM
+22.1.8) and must be retrained, and the gates rerun, after any source or toolchain change. `codegen-units = 1` and fat LTO are not
+usable: both change NaN payloads or signs (release tests `chol` dgemm/trsm and `gathered_dot` fail).
+
 The current fixed 23-row reference comparison (re-run 2026-11-11 on `789467e2`) is complete: Rose is faster on
 **0/23**. Each solver has one warmup and three measured fresh-process runs per
 row, rotating order on the same CPU. Timers are Rose `diagnostics.seconds` and
